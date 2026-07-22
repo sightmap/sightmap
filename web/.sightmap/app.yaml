@@ -1,0 +1,126 @@
+version: 1
+
+memory:
+  - sightmap.org is a single-page landing site for the open-source sightmap spec
+  - Password gate uses 'argus' — stored in PasswordGate component; gates entry to the whole site
+  - All sections live in src/components/ and compose into src/pages/Home.tsx
+
+views:
+  - name: HomePage
+    route: /
+    description: Main landing page for the Sightmap spec
+    source: src/pages/Home.tsx
+    components:
+      - name: Hero
+        selector: '[data-component="Hero"]'
+        source: src/components/Hero.tsx
+        description: Headline, sitemap/.sightmap contrast, CTAs, and a before/after date-picker snapshot diff
+        memory:
+          - Contains the `teaches` accent treatment (bordered underline on the word itself)
+          - The before/after diff lives in a wider 1180px wrap outside the 860px container
+        children:
+          - name: hero-badge
+            selector: ".hero-badge"
+          - name: hero-sub
+            selector: ".hero-sub"
+          - name: hero-teaches
+            selector: ".hero-teaches"
+          - name: hero-ctas
+            selector: ".hero-ctas"
+          - name: hero-robust
+            selector: ".hero-robust"
+          - name: hero-diff
+            selector: ".hero-diff"
+
+      - name: PitchSection
+        selector: '[data-component="PitchSection"]'
+        source: src/components/PitchSection.tsx
+        description: One-paragraph Problem statement + kicker line
+        children:
+          - name: pitch-body
+            selector: ".pitch-body"
+          - name: pitch-kicker
+            selector: ".pitch-kicker"
+
+      - name: SpecSection
+        selector: '[data-component="SpecSection"]'
+        source: src/components/SpecSection.tsx
+        description: The three-concept section — Views, Components, Requests — with YAML + enriched-output pairs
+        memory:
+          - Each subsection uses the `.concept` wrapper with a numbered header (`.concept-num`)
+          - Requests has a green `new` badge; Views and Components do not
+          - Running example across all three subsections is the flight-search app
+        children:
+          - name: concept
+            selector: ".concept"
+          - name: concept-grid
+            selector: ".concept-grid"
+          - name: schema-table
+            selector: ".schema-table"
+          - name: callout
+            selector: ".callout"
+
+      - name: MemorySection
+        selector: '[data-component="MemorySection"]'
+        source: src/components/AgentSection.tsx
+        description: The Memory section — YAML + enriched output pair, three points, macro tease
+        memory:
+          - Filename is `AgentSection.tsx` for historical reasons; the section data-component is `MemorySection`
+          - Closing block `.memory-tease` is reserved for the future Macros announcement
+        children:
+          - name: memory-grid
+            selector: ".memory-grid"
+          - name: memory-points
+            selector: ".memory-points"
+          - name: memory-point
+            selector: ".memory-point"
+          - name: memory-tease
+            selector: ".memory-tease"
+
+      - name: GetStarted
+        selector: '[data-component="GetStarted"]'
+        source: src/components/CTASection.tsx
+        description: Three-step Get Started — Install the CLI + skills, Start a session and iterate, and Let the agent curate
+        memory:
+          - Filename is `CTASection.tsx` for historical reasons; the section data-component is `GetStarted`
+          - Steps live in `.gs-steps`; each row is a `.gs-step` with `.gs-step-num` + `.gs-step-body`
+          - Step 02 carries the `recommended` badge; step 03 carries `browser-use`
+          - Step 02 quotes the two Claude Code slash commands verbatim — `/plugin marketplace add sightmap/plugin` then `/plugin install sightmap@sightmap`
+          - Step 03's .mcp.json snippet wraps @playwright/mcp via the `--` arg pass-through
+        children:
+          - name: gs-steps
+            selector: ".gs-steps"
+          - name: gs-step
+            selector: ".gs-step"
+          - name: gs-ctas
+            selector: ".gs-ctas"
+
+components:
+  - name: Navigation
+    selector: '[data-component="Navigation"]'
+    source: src/components/Navigation.tsx
+    description: Fixed header with logo and nav links to Spec, Memory, Get started, GitHub
+    children:
+      - name: nav-logo
+        selector: ".nav-logo"
+      - name: nav-links
+        selector: ".nav-links"
+      - name: nav-gh
+        selector: ".nav-gh"
+
+  - name: PasswordGate
+    selector: '[data-component="PasswordGate"]'
+    source: src/components/PasswordGate.tsx
+    description: Full-page password gate rendered before the rest of the site
+    memory:
+      - Password is `argus`
+      - Stored in localStorage after successful submit; does not re-prompt on reload
+      - Gates the entire app — nothing else renders until this clears
+
+  - name: Footer
+    selector: '[data-component="Footer"]'
+    source: src/components/Footer.tsx
+    description: Minimal footer with attribution, GitHub, license, and Subtext link
+    children:
+      - name: footer-links
+        selector: ".footer-links"
