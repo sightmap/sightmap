@@ -73,13 +73,6 @@ export default function AgentSection() {
             </div>
           </div>
         </div>
-
-        <div className="memory-tease">
-          <span className="memory-tease-label">Next</span>
-          <span className="memory-tease-body">
-            <strong>Macros</strong> — learned trajectories that replay, and heal when the site changes.
-          </span>
-        </div>
       </div>
     </section>
   )

@@ -95,10 +95,6 @@ export default function CTASection() {
               Read the docs →
             </a>
           </div>
-          <p className="gs-next">
-            <span className="memory-tease-label">Next</span>
-            <span>Macros — learned trajectories that replay, and heal when the site changes.</span>
-          </p>
         </div>
       </div>
     </section>

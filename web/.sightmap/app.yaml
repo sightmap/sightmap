@@ -63,10 +63,9 @@ views:
       - name: MemorySection
         selector: '[data-component="MemorySection"]'
         source: src/components/AgentSection.tsx
-        description: The Memory section — YAML + enriched output pair, three points, macro tease
+        description: The Memory section — YAML + enriched output pair, three points
         memory:
           - Filename is `AgentSection.tsx` for historical reasons; the section data-component is `MemorySection`
-          - Closing block `.memory-tease` is reserved for the future Macros announcement
         children:
           - name: memory-grid
             selector: ".memory-grid"

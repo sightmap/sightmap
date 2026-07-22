@@ -301,6 +301,6 @@ These are explicitly unresolved in v1 and candidates for SEPs:
 - Cross-sightmap (cross-project) component references — within-project is resolved by [SEP-0002](../seps/0002-component-ref.md)
 - Parameterized memory — interpolating runtime values into memory entries
 - Schema for validating the *shape* of `response.fields` against real responses (today `fields` is documentary, not enforced)
-- Macros — learned trajectories that replay and heal when the site changes (teased in the website; not yet in the spec)
+- Macros — learned trajectories that replay and heal when the site changes (not yet in the spec)
 
 See [`../seps/README.md`](../seps/README.md) to propose.
