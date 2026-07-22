@@ -1,0 +1,312 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="color-scheme" content="dark" />
+        <title>Sightmap</title>
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            body {
+                font-family: "Menlo", "Monaco", "Consolas", monospace;
+                font-size: 11px;
+                line-height: 1.4;
+                background: #1e1e1e;
+                color: #d4d4d4;
+                color-scheme: dark;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            /* ── Toolbar ──────────────────────────────────────────────────────── */
+            #toolbar {
+                flex-shrink: 0;
+                padding: 7px 10px 5px;
+                background: #252526;
+                border-bottom: 1px solid #3a3a3a;
+            }
+            #toolbar-row1 {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                margin-bottom: 3px;
+            }
+            #toolbar-title {
+                flex: 1;
+                font-size: 12px;
+                font-weight: 700;
+                color: #9cdcfe;
+                letter-spacing: 0.02em;
+            }
+            .icon-btn {
+                width: 22px;
+                height: 22px;
+                padding: 0;
+                border: 1px solid #444;
+                border-radius: 4px;
+                background: #2d2d2d;
+                color: #888;
+                font-size: 12px;
+                font-family: inherit;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+            }
+            .icon-btn:hover {
+                background: #3a3a3a;
+                color: #d4d4d4;
+            }
+            .icon-btn.active {
+                color: #ffb74d;
+                border-color: #ffb74d;
+            }
+
+            #toolbar-status {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                font-size: 10px;
+                color: #777;
+            }
+            .status-dot {
+                width: 5px;
+                height: 5px;
+                border-radius: 50%;
+                background: #555;
+                flex-shrink: 0;
+            }
+            .status-dot.on {
+                background: #4caf50;
+            }
+
+            /* ── Hover section — IMMOVABLE ────────────────────────────────────── */
+            #hover-section {
+                flex-shrink: 0;
+                height: 130px; /* fixed total — label + scroll combined */
+                display: flex;
+                flex-direction: column;
+                overflow: hidden; /* hard clip — nothing can push past this */
+                background: #252526;
+                border-bottom: 1px solid #3a3a3a;
+            }
+            #hover-label {
+                flex-shrink: 0;
+                padding: 5px 10px 3px;
+                font-size: 9px;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: #555;
+            }
+            #hover-scroll {
+                flex: 1; /* fills exactly the remaining height */
+                overflow-y: auto;
+                overflow-x: hidden;
+                padding: 0 10px 6px;
+            }
+
+            /* ── Events section ───────────────────────────────────────────────── */
+            #events-section {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+                min-height: 0; /* allow flex child to scroll */
+            }
+            #log-header {
+                flex-shrink: 0;
+                padding: 5px 10px;
+                background: #252526;
+                border-bottom: 1px solid #3a3a3a;
+                font-size: 9px;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: #555;
+            }
+            #log {
+                flex: 1;
+                overflow-y: auto;
+                overflow-x: hidden;
+                padding: 6px 8px 12px;
+                min-height: 0;
+            }
+            #log:empty::after {
+                content: "Interact with the page to see events…";
+                display: block;
+                color: #555;
+                font-style: italic;
+                padding: 10px 2px;
+            }
+
+            /* ── Shared: component line ───────────────────────────────────────── */
+            .comp-line {
+                display: block; /* block so overflow+nowrap works */
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                line-height: 1.7;
+            }
+            .comp-line .cbr {
+                color: #555;
+            }
+            .comp-line .cn {
+                color: #9cdcfe;
+                font-weight: 600;
+            }
+            .comp-line .pk {
+                color: #4ec9b0;
+            }
+            .comp-line .pv {
+                color: #ce9178;
+            }
+            .comp-line .harrow {
+                color: #444;
+                padding-right: 1px;
+            }
+
+            .hover-empty {
+                color: #555;
+                font-style: italic;
+                line-height: 1.7;
+            }
+
+            /* ── Event card ───────────────────────────────────────────────────── */
+            .ev {
+                position: relative;
+                margin-bottom: 5px;
+                padding: 6px 26px 7px 8px; /* right pad leaves room for copy btn */
+                background: #252526;
+                border: 1px solid #3a3a3a;
+                border-radius: 5px;
+                overflow: hidden; /* clips comp-lines to card width */
+            }
+            .ev:last-child {
+                margin-bottom: 0;
+            }
+            .ev:hover {
+                border-color: #555;
+            }
+
+            /* Copy — absolutely pinned top-right; invisible until card hover */
+            .ev-copy {
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                width: 18px;
+                height: 18px;
+                padding: 0;
+                border: none;
+                border-radius: 3px;
+                background: transparent;
+                color: #444;
+                font-size: 11px;
+                font-family: inherit;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                opacity: 0;
+                transition:
+                    opacity 0.12s,
+                    color 0.12s;
+            }
+            .ev:hover .ev-copy {
+                opacity: 1;
+            }
+            .ev-copy:hover {
+                color: #9cdcfe;
+                background: #2d2d2d;
+            }
+            .ev-copy.copied {
+                color: #4caf50 !important;
+                opacity: 1 !important;
+            }
+
+            /* Meta row: time · type */
+            .ev-meta {
+                display: flex;
+                align-items: baseline;
+                margin-bottom: 4px;
+                padding-bottom: 4px;
+                border-bottom: 1px solid #333;
+            }
+            .ev-time {
+                font-size: 9px;
+                color: #555;
+                letter-spacing: 0.03em;
+                font-variant-numeric: tabular-nums;
+            }
+            .ev-dot {
+                font-size: 9px;
+                color: #444;
+                padding: 0 4px;
+            }
+            .ev-type {
+                font-size: 10px;
+                font-weight: 700;
+            }
+            .ev-type.click {
+                color: #4fc3f7;
+            }
+            .ev-type.input {
+                color: #81c784;
+            }
+            .ev-type.change {
+                color: #ffb74d;
+            }
+            .ev-type.focus {
+                color: #ce93d8;
+            }
+
+            .comp-orphan {
+                color: #555;
+                font-style: italic;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="toolbar">
+            <div id="toolbar-row1">
+                <span id="toolbar-title">⬡ Sightmap</span>
+
+                <button
+                    class="icon-btn"
+                    id="btn-pause"
+                    title="Pause event capture"
+                >
+                    ⏸
+                </button>
+                <button class="icon-btn" id="btn-clear" title="Clear event log">
+                    ⊘
+                </button>
+            </div>
+            <div id="toolbar-status">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-line">waiting for server…</span>
+            </div>
+        </div>
+
+        <div id="hover-section">
+            <div id="hover-label">Hovering</div>
+            <div id="hover-scroll">
+                <div id="hover-path-tree"></div>
+            </div>
+        </div>
+
+        <div id="events-section">
+            <div id="log-header">Events</div>
+            <div id="log"></div>
+        </div>
+
+        <script src="side-panel.js"></script>
+    </body>
+</html>

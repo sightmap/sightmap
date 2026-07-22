@@ -1,0 +1,39 @@
+{
+  "name": "@sightmap/sightmap",
+  "version": "0.1.0",
+  "description": "sightmap authoring toolkit — live browser capture, annotated component snapshots, and coverage (native binary, no Go toolchain required)",
+  "license": "MIT",
+  "homepage": "https://github.com/sightmap/sightmap#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sightmap/sightmap.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sightmap/sightmap/issues"
+  },
+  "keywords": [
+    "sightmap",
+    "agent",
+    "cdp",
+    "chrome",
+    "cli",
+    "yaml"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "sightmap": "bin/sightmap.js"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

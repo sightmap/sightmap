@@ -1,0 +1,18 @@
+- name: EmailInput
+  selectors:
+    - '[type="email"]'
+- name: ExternalLink
+  selectors:
+    - '[href^="https://"]'
+- name: SearchDiv
+  selectors:
+    - '[aria-label*="Search"]'
+- name: ActiveItem
+  selectors:
+    - '[class~="active"]'
+- name: LangItem
+  selectors:
+    - '[lang|="en"]'
+- name: DisabledInput
+  selectors:
+    - '[disabled]'

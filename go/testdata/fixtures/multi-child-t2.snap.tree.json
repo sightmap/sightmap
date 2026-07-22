@@ -1,0 +1,17 @@
+{
+  "role": "WebArea",
+  "children": [
+    {
+      "role": "complementary",
+      "selector": {
+        "tag": "div",
+        "classes": ["sidebar"]
+      },
+      "children": [
+        {"role": "button", "name": "Create", "isInteractive": true},
+        {"role": "button", "name": "Delete", "isInteractive": true},
+        {"role": "link", "name": "Settings", "isInteractive": true}
+      ]
+    }
+  ]
+}

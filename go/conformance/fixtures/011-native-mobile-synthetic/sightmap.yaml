@@ -1,0 +1,3 @@
+- name: AddToCart
+  selectors:
+    - 'UIButton[label="Add to Cart"]'

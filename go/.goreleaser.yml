@@ -1,0 +1,30 @@
+version: 2
+project_name: sightmap
+builds:
+  - id: sightmap
+    main: ./cmd/sightmap
+    binary: sightmap
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+archives:
+  - id: default
+    formats: [tar.gz]
+    name_template: "sightmap_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [none*]
+checksum:
+  name_template: checksums.txt
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+release:
+  github:
+    owner: sightmap
+    name: sightmap
+  name_template: "v{{ .Version }}"
+  ids: [default]

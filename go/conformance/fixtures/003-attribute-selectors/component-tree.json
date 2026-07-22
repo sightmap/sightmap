@@ -1,0 +1,102 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "selector": {"tag": "div"},
+  "children": [
+    {
+      "id": "inp1",
+      "role": "textbox",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "selector": {"tag": "input", "attrs": {"type": "email"}}
+    },
+    {
+      "id": "inp2",
+      "role": "textbox",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 2,
+      "selector": {"tag": "input", "attrs": {"type": "text"}}
+    },
+    {
+      "id": "a1",
+      "role": "link",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 3,
+      "selector": {"tag": "a", "attrs": {"href": "https://example.com"}}
+    },
+    {
+      "id": "d1",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 4,
+      "selector": {"tag": "div", "attrs": {"aria-label": "Search products"}}
+    },
+    {
+      "id": "s1",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 5,
+      "selector": {"tag": "span", "attrs": {"class": "active btn"}}
+    },
+    {
+      "id": "d2",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 6,
+      "selector": {"tag": "div", "attrs": {"lang": "en-US"}}
+    },
+    {
+      "id": "inp3",
+      "role": "textbox",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 7,
+      "selector": {
+        "tag": "input",
+        "attrs": {"disabled": ""},
+        "attrOps": {"disabled": "[]"}
+      }
+    }
+  ]
+}

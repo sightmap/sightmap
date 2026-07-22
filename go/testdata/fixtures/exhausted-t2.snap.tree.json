@@ -1,0 +1,19 @@
+{
+  "role": "WebArea",
+  "children": [
+    {
+      "role": "main",
+      "selector": {
+        "tag": "main",
+        "classes": ["app-content"]
+      },
+      "children": [
+        {"role": "button", "name": "Action 1", "isInteractive": true},
+        {"role": "button", "name": "Action 2", "isInteractive": true},
+        {"role": "button", "name": "Action 3", "isInteractive": true},
+        {"role": "button", "name": "Action 4", "isInteractive": true},
+        {"role": "button", "name": "Action 5", "isInteractive": true}
+      ]
+    }
+  ]
+}

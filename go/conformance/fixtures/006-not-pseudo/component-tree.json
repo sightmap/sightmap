@@ -1,0 +1,66 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "selector": { "tag": "section" },
+  "children": [
+    {
+      "id": "btn1",
+      "role": "button",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "selector": { "tag": "button", "classes": ["primary"] }
+    },
+    {
+      "id": "btn2",
+      "role": "button",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 2,
+      "selector": { "tag": "button", "classes": ["primary", "disabled"] }
+    },
+    {
+      "id": "d1",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 3,
+      "selector": { "tag": "div" }
+    },
+    {
+      "id": "d2",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": false,
+      "isInteractive": false,
+      "inViewport": false,
+      "isIgnored": false,
+      "nthChild": 4,
+      "selector": {
+        "tag": "div",
+        "attrs": { "hidden": "" },
+        "attrOps": { "hidden": "[]" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Sightmap Overlay",
+  "version": "0.1.17",
+  "description": "Component path overlay and structured event log for sightmap-instrumented pages.",
+
+  "permissions": ["storage", "activeTab", "scripting", "devtools", "sidePanel"],
+
+  "host_permissions": ["http://localhost:*/*"],
+
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src http://localhost:*"
+  },
+
+  "action": {
+    "default_title": "Sightmap — click to open panel"
+  },
+
+  "side_panel": {
+    "default_path": "side-panel.html"
+  },
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "devtools_page": "devtools.html"
+}

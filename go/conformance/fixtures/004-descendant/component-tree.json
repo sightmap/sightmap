@@ -1,0 +1,94 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "selector": {"tag": "div"},
+  "children": [
+    {
+      "id": "nav",
+      "role": "navigation",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "selector": {"tag": "nav", "classes": ["main-nav"]},
+      "children": [
+        {
+          "id": "ul",
+          "role": "list",
+          "name": "",
+          "value": "",
+          "isVisible": true,
+          "isInteractive": false,
+          "inViewport": true,
+          "isIgnored": false,
+          "nthChild": 1,
+          "selector": {"tag": "ul"},
+          "children": [
+            {
+              "id": "li1",
+              "role": "listitem",
+              "name": "",
+              "value": "",
+              "isVisible": true,
+              "isInteractive": false,
+              "inViewport": true,
+              "isIgnored": false,
+              "nthChild": 1,
+              "selector": {"tag": "li"},
+              "children": [
+                {
+                  "id": "a1",
+                  "role": "link",
+                  "name": "",
+                  "value": "",
+                  "isVisible": true,
+                  "isInteractive": true,
+                  "inViewport": true,
+                  "isIgnored": false,
+                  "nthChild": 1,
+                  "selector": {"tag": "a", "classes": ["nav-link"]}
+                }
+              ]
+            },
+            {
+              "id": "li2",
+              "role": "listitem",
+              "name": "",
+              "value": "",
+              "isVisible": true,
+              "isInteractive": false,
+              "inViewport": true,
+              "isIgnored": false,
+              "nthChild": 2,
+              "selector": {"tag": "li"},
+              "children": [
+                {
+                  "id": "a2",
+                  "role": "link",
+                  "name": "",
+                  "value": "",
+                  "isVisible": true,
+                  "isInteractive": true,
+                  "inViewport": true,
+                  "isIgnored": false,
+                  "nthChild": 1,
+                  "selector": {"tag": "a", "classes": ["nav-link"]}
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

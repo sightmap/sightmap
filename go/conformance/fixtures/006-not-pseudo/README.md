@@ -1,0 +1,3 @@
+# 006-not-pseudo
+
+A `section` root containing four children: two buttons (btn1 with class `primary`, btn2 with classes `primary disabled`) and two divs (d1 with no attributes, d2 with the `hidden` attribute). The sightmap uses `button:not(.disabled)` and `div:not([hidden])`. This fixture verifies the `:not()` pseudo-class with both a class argument and an attribute-presence argument. btn1 matches `EnabledButton` because it lacks the `disabled` class; btn2 does not because it has that class. d1 matches `VisibleDiv` because it lacks the `hidden` attribute; d2 does not because it has it. The root `section` is excluded from both selectors by its tag alone.

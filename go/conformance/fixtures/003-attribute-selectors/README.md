@@ -1,0 +1,3 @@
+# 003-attribute-selectors
+
+A flat tree of seven sibling nodes under a `div` root, each exercising a different CSS attribute selector operator. `EmailInput` tests exact equality (`[type="email"]`); `ExternalLink` tests prefix matching (`[href^="https://"]`); `SearchDiv` tests substring matching (`[aria-label*="Search"]`); `ActiveItem` tests whitespace-separated word matching (`[class~="active"]`); `LangItem` tests hyphen-prefixed value matching (`[lang|="en"]`, which matches `en-US`); and `DisabledInput` tests presence-only matching (`[disabled]`). The `input[type="text"]` node (inp2) is present to confirm the exact-equality check does not accidentally match other values.

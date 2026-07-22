@@ -1,0 +1,24 @@
+{
+  "role": "WebArea",
+  "children": [
+    {
+      "role": "region",
+      "selector": {
+        "tag": "div",
+        "classes": ["product-grid"]
+      },
+      "children": [
+        {"role": "link", "name": "Product 1", "isInteractive": true},
+        {"role": "link", "name": "Product 2", "isInteractive": true},
+        {"role": "link", "name": "Product 3", "isInteractive": true},
+        {"role": "link", "name": "Product 4", "isInteractive": true},
+        {"role": "link", "name": "Product 5", "isInteractive": true},
+        {"role": "link", "name": "Product 6", "isInteractive": true},
+        {"role": "link", "name": "Product 7", "isInteractive": true},
+        {"role": "link", "name": "Product 8", "isInteractive": true},
+        {"role": "link", "name": "Product 9", "isInteractive": true},
+        {"role": "link", "name": "Product 10", "isInteractive": true}
+      ]
+    }
+  ]
+}

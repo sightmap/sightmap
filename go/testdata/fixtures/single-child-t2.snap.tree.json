@@ -1,0 +1,12 @@
+{
+  "role": "WebArea",
+  "children": [
+    {
+      "role": "navigation",
+      "name": "Footer",
+      "children": [
+        {"role": "link", "name": "Privacy", "isInteractive": true}
+      ]
+    }
+  ]
+}

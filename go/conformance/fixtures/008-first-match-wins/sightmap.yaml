@@ -1,0 +1,6 @@
+- name: Primary
+  selectors:
+    - "button.primary"
+- name: Submit
+  selectors:
+    - "button.submit"

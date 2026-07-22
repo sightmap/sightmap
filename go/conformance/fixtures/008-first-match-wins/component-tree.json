@@ -1,0 +1,26 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "selector": {"tag": "div"},
+  "children": [
+    {
+      "id": "btn",
+      "role": "button",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "selector": {"tag": "button", "classes": ["primary", "submit"]}
+    }
+  ]
+}

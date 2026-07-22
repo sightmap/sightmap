@@ -1,0 +1,6 @@
+- name: EnabledButton
+  selectors:
+    - "button:not(.disabled)"
+- name: VisibleDiv
+  selectors:
+    - "div:not([hidden])"

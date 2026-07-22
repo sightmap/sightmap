@@ -1,0 +1,38 @@
+{
+  "id": "screen",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "selector": {"tag": "UIView"},
+  "children": [
+    {
+      "id": "btn1",
+      "role": "button",
+      "name": "Add to Cart",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "selector": {"tag": "UIButton", "attrs": {"label": "Add to Cart"}}
+    },
+    {
+      "id": "btn2",
+      "role": "button",
+      "name": "Remove",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 2,
+      "selector": {"tag": "UIButton", "attrs": {"label": "Remove"}}
+    }
+  ]
+}

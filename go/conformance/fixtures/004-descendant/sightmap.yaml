@@ -1,0 +1,3 @@
+- name: NavLink
+  selectors:
+    - "nav.main-nav a.nav-link"

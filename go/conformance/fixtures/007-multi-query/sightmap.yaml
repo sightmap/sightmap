@@ -1,0 +1,6 @@
+- name: NavLink
+  selectors:
+    - "nav a.nav-link"
+- name: SearchInput
+  selectors:
+    - '[type="email"]'

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<!--
+  extension/preview.html
+  Standalone preview for side-panel layout iteration.
+  Open with: python3 -m http.server 8765 (from extension/)
+  Then browse to http://localhost:8765/preview.html
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sightmap Panel Preview</title>
+  <style>
+    /* Simulate Chrome side panel dimensions */
+    body { margin: 0; display: flex; justify-content: center; background: #888; }
+    #panel-frame {
+      width: 360px;
+      height: 700px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+    }
+  </style>
+  <!-- The actual side-panel styles live below this wrapper -->
+  <style id="panel-styles">
+
+    /* ── Reset + tokens ───────────────────────────────────────────────── */
+    #panel-frame *, #panel-frame *::before, #panel-frame *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+    }
+    #panel-frame {
+      font-family: 'Menlo','Monaco','Consolas',monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      color-scheme: dark;
+    }
+
+    /* ── Toolbar ──────────────────────────────────────────────────────── */
+    #toolbar {
+      flex-shrink: 0;
+      padding: 7px 10px 5px;
+      background: #252526;
+      border-bottom: 1px solid #3a3a3a;
+    }
+    #toolbar-row1 {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 3px;
+    }
+    #toolbar-title {
+      flex: 1;
+      font-size: 12px;
+      font-weight: 700;
+      color: #9cdcfe;
+      letter-spacing: 0.02em;
+    }
+    .icon-btn {
+      width: 22px; height: 22px; padding: 0;
+      border: 1px solid #444; border-radius: 4px;
+      background: #2d2d2d; color: #888;
+      font-size: 12px; font-family: inherit; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .icon-btn:hover { background: #3a3a3a; color: #d4d4d4; }
+    .icon-btn.active { color: #ffb74d; border-color: #ffb74d; }
+
+    #toolbar-status {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 10px; color: #777;
+    }
+    .status-dot {
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #555; flex-shrink: 0;
+    }
+    .status-dot.on { background: #4CAF50; }
+
+    /* ── Hover section — IMMOVABLE ────────────────────────────────────── */
+    /*
+     * The ENTIRE section is a fixed height.
+     * #hover-section = label height + scroll height, both fixed.
+     * No child content can push this taller.
+     */
+    #hover-section {
+      flex-shrink: 0;
+      height: 130px;        /* fixed total — adjust this number only */
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;     /* hard clip — nothing escapes */
+      background: #252526;
+      border-bottom: 1px solid #3a3a3a;
+    }
+    #hover-label {
+      flex-shrink: 0;
+      padding: 5px 10px 3px;
+      font-size: 9px; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #555;
+    }
+    #hover-scroll {
+      flex: 1;              /* fills remaining height exactly */
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 0 10px 6px;
+    }
+
+    /* ── Events section ───────────────────────────────────────────────── */
+    #events-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #log-header {
+      flex-shrink: 0;
+      padding: 5px 10px;
+      background: #252526;
+      border-bottom: 1px solid #3a3a3a;
+      font-size: 9px; text-transform: uppercase;
+      letter-spacing: 0.1em; color: #555;
+    }
+    #log {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 6px 8px 12px;
+    }
+    #log:empty::after {
+      content: 'Interact with the page to see events…';
+      display: block; color: #555;
+      font-style: italic; padding: 10px 2px;
+    }
+
+    /* ── Shared: component line ───────────────────────────────────────── */
+    /*
+     * Critical: MUST be display:block with explicit overflow+nowrap.
+     * Any inline children are fine — the block container clips them.
+     */
+    .comp-line {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.7;
+    }
+    .comp-line .cbr  { color: #555; }
+    .comp-line .cn   { color: #9cdcfe; font-weight: 600; }
+    .comp-line .pk   { color: #4ec9b0; }
+    .comp-line .pv   { color: #ce9178; }
+    .comp-line .harrow { color: #444; padding-right: 1px; }
+
+    .hover-empty { color: #555; font-style: italic; line-height: 1.7; }
+
+    /* ── Event card ───────────────────────────────────────────────────── */
+    .ev {
+      position: relative;
+      margin-bottom: 5px;
+      padding: 6px 26px 7px 8px;  /* right padding = space for copy btn */
+      background: #252526;
+      border: 1px solid #3a3a3a;
+      border-radius: 5px;
+      overflow: hidden;            /* ensures comp-lines clip to card width */
+    }
+    .ev:last-child { margin-bottom: 0; }
+    .ev:hover { border-color: #555; }
+
+    /* Meta: time · type  (nothing else — copy is absolute) */
+    .ev-meta {
+      display: flex;
+      align-items: baseline;
+      gap: 0;
+      margin-bottom: 4px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #333;
+    }
+    .ev-time {
+      font-size: 9px; color: #555;
+      letter-spacing: 0.03em;
+      font-variant-numeric: tabular-nums;
+    }
+    .ev-dot { font-size: 9px; color: #444; padding: 0 4px; }
+
+    .ev-type {
+      font-size: 10px; font-weight: 700;
+    }
+    .ev-type.click  { color: #4fc3f7; }
+    .ev-type.input  { color: #81c784; }
+    .ev-type.change { color: #ffb74d; }
+    .ev-type.focus  { color: #ce93d8; }
+
+    /* Copy — absolutely pinned to top-right of card */
+    .ev-copy {
+      position: absolute;
+      top: 4px; right: 4px;
+      width: 18px; height: 18px;
+      padding: 0; border: none; border-radius: 3px;
+      background: transparent; color: #444;
+      font-size: 11px; font-family: inherit; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity 0.12s, color 0.12s;
+    }
+    .ev:hover .ev-copy { opacity: 1; }
+    .ev-copy:hover { color: #9cdcfe; background: #2d2d2d; }
+    .ev-copy.copied { color: #4CAF50 !important; opacity: 1 !important; }
+
+    .ev-body .comp-line { /* no extra style needed — inherits .comp-line */ }
+    .comp-orphan { color: #555; font-style: italic; }
+  </style>
+</head>
+<body>
+<div id="panel-frame">
+
+  <!-- TOOLBAR -->
+  <div id="toolbar">
+    <div id="toolbar-row1">
+      <span id="toolbar-title">⬡ Sightmap</span>
+      <button class="icon-btn" title="Pause">⏸</button>
+      <button class="icon-btn" title="Clear">⊘</button>
+    </div>
+    <div id="toolbar-status">
+      <span class="status-dot on"></span>
+      <span>vividseats.com · 662 components</span>
+    </div>
+  </div>
+
+  <!-- HOVER SECTION (fixed height) -->
+  <div id="hover-section">
+    <div id="hover-label">Hovering</div>
+    <div id="hover-scroll" id="hover-path-tree">
+      <!-- populated by script below -->
+    </div>
+  </div>
+
+  <!-- EVENTS SECTION -->
+  <div id="events-section">
+    <div id="log-header">Events</div>
+    <div id="log">
+      <!-- populated by script below -->
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Shared renderer ─────────────────────────────────────────────────────────
+
+function compLine(match, { arrow = false, depth = 0 } = {}) {
+  const div = document.createElement('div');
+  div.className = 'comp-line';
+  if (depth > 0) div.style.paddingLeft = depth * 10 + 'px';
+
+  if (arrow) {
+    const a = document.createElement('span');
+    a.className = 'harrow'; a.textContent = '▸ '; div.appendChild(a);
+  }
+  const open = document.createElement('span'); open.className = 'cbr'; open.textContent = '['; div.appendChild(open);
+  const name = document.createElement('span'); name.className = 'cn'; name.textContent = match.name; div.appendChild(name);
+
+  for (const [k, v] of Object.entries(match.properties || {})) {
+    div.appendChild(document.createTextNode(' '));
+    const ke = document.createElement('span'); ke.className = 'pk'; ke.textContent = k + '='; div.appendChild(ke);
+    const ve = document.createElement('span'); ve.className = 'pv';
+    const disp = v.length > 40 ? v.slice(0, 37) + '…' : v;
+    ve.textContent = '"' + disp + '"'; ve.title = v; div.appendChild(ve);
+  }
+  const close = document.createElement('span'); close.className = 'cbr'; close.textContent = ']'; div.appendChild(close);
+  return div;
+}
+
+function eventCard(ev) {
+  const card = document.createElement('div');
+  card.className = 'ev';
+
+  // Copy button — absolute
+  const copy = document.createElement('button');
+  copy.className = 'ev-copy'; copy.textContent = '⧉';
+  copy.title = ev.formatted || ev.path.map(m => '['+m.name+']').join(' > ');
+  copy.onclick = e => {
+    e.stopPropagation();
+    copy.textContent = '✓'; copy.classList.add('copied');
+    setTimeout(() => { copy.textContent = '⧉'; copy.classList.remove('copied'); }, 1200);
+  };
+  card.appendChild(copy);
+
+  // Meta row: time · type
+  const meta = document.createElement('div'); meta.className = 'ev-meta';
+  const t = document.createElement('span'); t.className = 'ev-time'; t.textContent = ev.time; meta.appendChild(t);
+  const dot = document.createElement('span'); dot.className = 'ev-dot'; dot.textContent = ' · '; meta.appendChild(dot);
+  const ty = document.createElement('span'); ty.className = 'ev-type ' + ev.type; ty.textContent = ev.type; meta.appendChild(ty);
+  card.appendChild(meta);
+
+  // Body: one comp-line per component
+  const body = document.createElement('div'); body.className = 'ev-body';
+  if (!ev.path || !ev.path.length) {
+    const o = document.createElement('div'); o.className = 'comp-line comp-orphan'; o.textContent = '(orphaned)'; body.appendChild(o);
+  } else {
+    ev.path.forEach(m => body.appendChild(compLine(m)));
+  }
+  card.appendChild(body);
+  return card;
+}
+
+// ── Mock data ───────────────────────────────────────────────────────────────
+
+// Hover path
+const hoverPath = [
+  { name: 'TicketListings', properties: {} },
+  { name: 'TicketListingLink', properties: {
+    price: '$91',
+    label: 'BLUE LOT Row GA | 1–3 tickets Fees Incl.'
+  }}
+];
+
+const scroll = document.getElementById('hover-scroll');
+hoverPath.forEach((m, i) => scroll.appendChild(compLine(m, { arrow: i > 0, depth: i })));
+
+// Events
+const events = [
+  {
+    time: '19:00:08', type: 'click',
+    path: [
+      { name: 'QuantitySelectionModal', properties: {} },
+      { name: 'QuantityButton', properties: { quantity: '2' } }
+    ]
+  },
+  {
+    time: '19:00:03', type: 'click',
+    path: [
+      { name: 'InternationalShowsList', properties: {} },
+      { name: 'ProductionListingRow', properties: { label: 'FriAug 14 7:01pm🔥 64 tickets left' } },
+      { name: 'InternationalShowRow', properties: { date: 'FRI Aug 14 7:01pm' } }
+    ]
+  },
+  {
+    time: '18:59:54', type: 'click',
+    path: [
+      { name: 'PerformerFilterBar', properties: {} },
+      { name: 'PerformerTabBar', properties: {} },
+      { name: 'PerformerTab', properties: { label: 'Parking' } }
+    ]
+  },
+  {
+    time: '18:59:53', type: 'click',
+    path: [
+      { name: 'PerformerFilterBar', properties: {} },
+      { name: 'PerformerTabBar', properties: {} }
+    ]
+  },
+  {
+    time: '18:59:42', type: 'click',
+    path: [
+      { name: 'HomepageContent', properties: {} },
+      { name: 'HeroBanner', properties: {} },
+      { name: 'HeroCTA', properties: { label: 'Get Falcons Tickets' } }
+    ]
+  },
+  {
+    time: '18:59:30', type: 'input',
+    path: [
+      { name: 'SiteHeader', properties: {} },
+      { name: 'SearchBox', properties: {} },
+      { name: 'SearchInput', properties: {} }
+    ]
+  },
+  {
+    time: '18:59:20', type: 'click',
+    path: []  // orphaned
+  }
+];
+
+const log = document.getElementById('log');
+events.forEach(ev => log.appendChild(eventCard(ev)));
+</script>
+</body>
+</html>

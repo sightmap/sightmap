@@ -1,0 +1,54 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "selector": {"tag": "div"},
+  "children": [
+    {
+      "id": "pc1",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "selector": {"tag": "div", "classes": ["product-card"]},
+      "children": [
+        {
+          "id": "pc2",
+          "role": "generic",
+          "name": "",
+          "value": "",
+          "isVisible": true,
+          "isInteractive": false,
+          "inViewport": true,
+          "isIgnored": false,
+          "nthChild": 1,
+          "selector": {"tag": "div"},
+          "children": [
+            {
+              "id": "pc3",
+              "role": "generic",
+              "name": "",
+              "value": "",
+              "isVisible": true,
+              "isInteractive": false,
+              "inViewport": true,
+              "isIgnored": false,
+              "nthChild": 1,
+              "selector": {"tag": "div", "classes": ["product-card", "featured"]}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

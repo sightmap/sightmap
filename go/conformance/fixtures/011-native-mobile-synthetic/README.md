@@ -1,0 +1,3 @@
+# 011-native-mobile-synthetic
+
+A native iOS component tree: a `UIView` root with two `UIButton` children, differentiated by their `label` attribute (`"Add to Cart"` and `"Remove"`). The sightmap targets `UIButton[label="Add to Cart"]`. This fixture verifies that the matcher is selector-scheme-agnostic — it works identically for synthetic mobile type names as for HTML tag names. Tag comparison is case-insensitive (`strings.EqualFold`), so the selector string `UIButton` (lowercased to `uibutton` by the parser) correctly matches the node whose `tag` field is `UIButton`. Only btn1 matches; btn2 has a different label value.
