@@ -1,0 +1,80 @@
+/* Lifted from ~/src/sightmap/spec/src/index.css (the marketing site).
+   Keep in sync if marketing tokens change. */
+:root {
+  /* Surfaces */
+  --sm-bg: #faf8f6;
+  --sm-bg-raised: #ffffff;
+  --sm-bg-subtle: #f0ece8;
+  --sm-bg-code: #1a1a2e;
+
+  /* Borders */
+  --sm-border: #e5e0da;
+  --sm-border-bright: #d4cdc5;
+
+  /* Text */
+  --sm-text: #3d3929;
+  --sm-text-dim: #8a8272;
+  --sm-text-bright: #1a1714;
+
+  /* Accents */
+  --sm-accent: #c9456d;
+  --sm-accent-dim: #c9456d15;
+  --sm-green: #2d8a5e;
+  --sm-green-dim: #2d8a5e14;
+  --sm-yellow: #b8860b;
+  --sm-yellow-dim: #b8860b14;
+  --sm-blue: #6b8aed;
+  --sm-purple: #9b7ae8;
+
+  /* Code-block syntax (vivid against --sm-bg-code) */
+  --sm-code-text: #c9d1d9;
+  --sm-code-key: #7eb6f6;
+  --sm-code-str: #7ee8a8;
+  --sm-code-com: #555e6b;
+  --sm-code-val: #f0c674;
+  --sm-code-type: #c4a1f5;
+  --sm-code-accent: #e87da0;
+  --sm-code-border: #2a2a40;
+  --sm-code-header-bg: rgba(255, 255, 255, 0.04);
+
+  /* Typography */
+  --sm-font-sans: 'DM Sans', system-ui, sans-serif;
+  --sm-font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Dark-mode overrides — flip surfaces and text so any component using
+   --sm-* tokens (e.g. the Hero, the PageTitle styling) gets readable
+   colors against Starlight's dark background. Code-block tokens stay
+   the same since the night-owl theme renders its own dark-on-dark. */
+:root[data-theme='dark'] {
+  /* Surfaces */
+  --sm-bg: #0a0a0c;
+  --sm-bg-raised: #15151a;
+  --sm-bg-subtle: #1a1a20;
+  /* Borders */
+  --sm-border: #2a2a30;
+  --sm-border-bright: #3a3a40;
+  /* Text — invert: dim becomes mid, bright becomes near-white */
+  --sm-text: #c8c8cc;
+  --sm-text-dim: #8a8a90;
+  --sm-text-bright: #f0f0f4;
+  /* Accent — punch up for the darker background */
+  --sm-accent: #ec6b8e;
+  --sm-accent-dim: rgba(236, 107, 142, 0.18);
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('/fonts/dm-sans.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}

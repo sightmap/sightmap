@@ -1,0 +1,54 @@
+---
+title: Sightmap
+description: An open YAML format that teaches AI agents how to see and use a web app — checked into your repo, learned from the running app, not parsed out of source.
+hero:
+  tagline: An open YAML format that teaches AI agents how to see and use your web app. Checked into your repo. Learned from the running app — not parsed out of source.
+  actions:
+    - text: Quickstart
+      link: /start/quickstart/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/sightmap/spec
+      icon: external
+      variant: minimal
+template: splash
+---
+
+import { LinkCard, CardGrid } from '@astrojs/starlight/components';
+import AgentSeesDiff from '../../components/AgentSeesDiff.astro';
+
+<h4 class="sm-diff-heading">What an agent sees: opening a <code>&lt;DepartureDatePicker&gt;</code></h4>
+
+<AgentSeesDiff />
+
+<p class="sm-diff-note">
+  Without a sightmap: no view name, no component identity, no hint the textbox accepts typed dates. The agent's only path forward is brute force. With one: it knows which view it's on, that the picker has a typed-input shortcut, that past dates look interactive but aren't, and that the source file is one click away.
+</p>
+
+<p class="sm-diff-kicker"><strong>One artifact, learned once, shared across every agent.</strong></p>
+
+## Get started
+
+<CardGrid>
+  <LinkCard
+    title="Quickstart"
+    href="/start/quickstart/"
+    description="Five steps from install to a populated .sightmap/ — agent-driven, against the running app. Works for any web app."
+  />
+  <LinkCard
+    title="The Spec"
+    href="/spec/"
+    description="The YAML format — views, components, requests, memory."
+  />
+  <LinkCard
+    title="Authoring tools"
+    href="/authoring/"
+    description="The sightmap CLI and agent skills that drive curation against your running app."
+  />
+  <LinkCard
+    title="Reference"
+    href="/reference/schema/"
+    description="Exhaustive schema, JSON Schema, glossary, versioning, contributing."
+  />
+</CardGrid>

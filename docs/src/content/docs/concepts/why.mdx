@@ -1,0 +1,48 @@
+---
+title: "Why agents need a sightmap"
+description: "Agents guess at app surface; sightmap stops the guessing."
+---
+
+Open any real web app in a coding agent and watch what it gets. The browser exposes an accessibility tree — a flat list of roles, names, and IDs. The agent sees buttons, text fields, `gridcell`s, headings. What it does not see: which screen this is, which component renders which subtree, which keystroke shortcut the engineers wired up last quarter, or which API request fires when the user clicks "Search."
+
+So it guesses. It greps source. It reads filenames and prays the routes line up. And when it's done — even if it succeeds — nothing it learned stays. The next agent on the next task starts over.
+
+A sightmap is the small file that stops this loop. It is a YAML map of the app's views, components, and API requests, checked into the repo, learned from the running app rather than parsed out of source. Every agent that opens the project reads the same map.
+
+## What the agent sees, with vs. without
+
+Take a date picker — a `<DepartureDatePicker>` rendering inside a flight search form. Without a sightmap, the accessibility snapshot looks like this:
+
+```
+uid=1_0   RootWebArea  "Book a flight"
+uid=1_3   textbox      "Departure date"
+uid=1_8   button       "Previous Month"
+uid=1_9   button       "Next Month"
+uid=1_19  gridcell     "Choose Tuesday, July 1st, 2025"
+uid=1_20  gridcell     "Choose Wednesday, July 2nd, 2025"
+          …28 more gridcells…
+```
+
+Thirty-one near-identical `gridcell`s, no view name, no component identity, no hint that the textbox accepts typed dates. The agent's only path forward is brute force: click each cell until the date matches.
+
+With a sightmap, the same snapshot is enriched at the top with a `[Guide]` block and component names:
+
+```
+[View: FlightSearch "/search"]
+[Guide]
+- DepartureDatePicker accepts typed YYYY-MM-DD — skips opening the calendar
+- Past dates render but are aria-disabled
+- Range: 1st click = start, 2nd = end, 3rd resets
+
+uid=1_3   DepartureDatePicker [src: src/components/DatePicker.tsx]
+uid=1_4     date-input
+uid=1_19    day "Choose Tuesday, July 1st, 2025"
+```
+
+Now the agent knows: it's on the `FlightSearch` view, the picker has a typed-input shortcut, past dates look interactive but aren't, and the source file is one click away. The same shape applies to a pricing table where the third column is the "popular" plan, or a multi-step wizard whose `Next` button is enabled by a hidden invariant — anything that source code alone cannot tell the agent.
+
+## Where the wins compound
+
+Every component, view, and request can carry a `memory` list — short notes about quirks, invariants, and shortcuts the source code doesn't record. They show up in the `[Guide]` section the next time the same component is in scope, so an observation made once is available to every agent afterward instead of being rediscovered per task.
+
+The cumulative effect: agents stop relearning the app on every task. The first agent to map a screen leaves a trail; the next agent walks it. The map is checked in, language-agnostic, framework-agnostic, and small enough to read end-to-end. See [The curation workflow](/concepts/workflow/) for how the map gets written, and [Curator vs. consumer](/concepts/curator-vs-consumer/) for who does what.

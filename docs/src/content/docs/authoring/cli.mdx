@@ -1,0 +1,71 @@
+---
+title: "The sightmap CLI"
+description: "The Go sightmap command — live browser capture, annotated snapshots, coverage, and corpus health checks."
+---
+
+`sightmap` is the reference command-line tool (Go). It drives a real Chrome session over the Chrome DevTools Protocol, layers your `.sightmap/` corpus onto the live page, and reports annotated snapshots and coverage. It's what you author against, and what CI runs to keep a corpus healthy.
+
+The same repository is a `go get`-able library — downstream consumers import the component model and matcher directly. See [`go/`](https://github.com/sightmap/sightmap/tree/main/go) for the package map.
+
+## Install
+
+```bash
+# Native binary via npm (no Go toolchain needed):
+npm install -g @sightmap/sightmap
+# One-off:
+npx @sightmap/sightmap snapshot ...
+# From source:
+go install github.com/sightmap/sightmap/go/cmd/sightmap@latest
+```
+
+Install the agent skills into your harness (defaults to `~/.agents/skills`):
+
+```bash
+sightmap skills install
+```
+
+The overlay browser extension is embedded in the binary and auto-extracted on first `browser start` — no flags needed.
+
+## Command surface
+
+Grouped by what you reach for. This is an orientation, not an exhaustive flag reference — that lives in [`go/docs/reference.md`](https://github.com/sightmap/sightmap/blob/main/go/docs/reference.md).
+
+| Group | Commands | What they do |
+|---|---|---|
+| **Session** | `browser start` / `status` / `navigate` / `stop` / `eval` / `screenshot` | Launch and drive a Chrome session; the corpus hot-reloads as you edit YAML. |
+| **Authoring loop** | `iterate <url>`, `snapshot`, `coverage`, `report`, `multi-coverage` | Snap a page, score coverage (T1/T2/T3), and track corpus health across views. |
+| **Selectors** | `sel-probe`, `sel-check` | Verify a candidate selector against the live page before writing YAML. |
+| **Interaction** | `browser click` / `fill` / `hover` / `scroll` / `keypress` / `wait-for` | Act on elements by probe ID or by component query. |
+| **Corpus health** | `validate`, `lint` | Structural YAML correctness (exits non-zero on error) and advisory style checks. |
+
+Most commands accept `--json` for machine-readable output and `--sightmap-dir` to point at a corpus outside the current directory.
+
+## The authoring loop
+
+```bash
+cd my-app                       # a project with a .sightmap/ corpus
+sightmap browser start          # Chrome + corpus server
+sightmap iterate 'http://localhost:3000/products'
+```
+
+`iterate` prints per-view coverage and, for any orphaned (T3) nodes, a suggested selector. Verify it, then add a component to `.sightmap/`:
+
+```bash
+sightmap sel-probe '[data-testid="product-pod"] button[data-testid="atc"]'
+```
+
+Re-run `iterate` until coverage reports `0 orphaned`, then check the whole corpus:
+
+```bash
+sightmap validate      # structural correctness
+sightmap lint          # advisory style checks
+sightmap report        # per-view T1/T2/T3 health table
+```
+
+## Where the detail lives
+
+The full authoring workflow — coverage tiers, the component model, property extraction, cross-page promotion, and the quality checklist — is documented alongside the code and driven by the skills:
+
+- [`sightmap-authoring` skill](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md) — the authoritative authoring playbook.
+- [`sightmap-browser` skill](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-browser/SKILL.md) — driving a live session against a finished corpus.
+- [`go/docs/reference.md`](https://github.com/sightmap/sightmap/blob/main/go/docs/reference.md) — coverage model, component model, the outer loop, full tool reference, lint rules, quality checklist.

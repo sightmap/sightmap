@@ -1,0 +1,51 @@
+---
+title: "Authoring a sightmap"
+description: "How a .sightmap/ corpus gets built and maintained — agent-driven, against the running app, with the sightmap CLI."
+---
+
+A `.sightmap/` directory is a **curated authority**: authored and maintained by coding agents and humans, learned from the running app rather than parsed out of source. Nothing generates it from your code; there is no build step that writes YAML. That keeps the corpus honest about what the app actually does — including the quirks source can't tell you.
+
+## The tool
+
+Authoring runs through the **`sightmap` CLI** (Go), which drives a real Chrome session over the Chrome DevTools Protocol and layers your `.sightmap/` corpus onto the live page. You get:
+
+- **Annotated snapshots** — the page's component tree with every matched node named `[ComponentName prop="val"]` from your corpus.
+- **Coverage** — every interactive node scored T1 (named), T2 (inside a named component), or T3 (orphaned), so you know what's left to name.
+
+Install it and drop the agent skills into your harness:
+
+```bash
+npm install -g @sightmap/sightmap      # or: npx @sightmap/sightmap ...
+# or, from source:
+go install github.com/sightmap/sightmap/go/cmd/sightmap@latest
+
+sightmap skills install                # installs the sightmap-authoring + sightmap-browser skills
+```
+
+See [The sightmap CLI](/authoring/cli/) for the command surface and [Install](/start/install/) for all paths.
+
+## The loop, at a glance
+
+Authoring is an edit-verify loop against a live page:
+
+1. **Start a session** — `sightmap browser start` launches Chrome and a server that hot-reloads the corpus as you edit YAML.
+2. **Iterate a page** — `sightmap iterate <url>` navigates, snaps, and prints coverage. Orphaned (T3) nodes come with a suggested selector.
+3. **Name what's unnamed** — add components to `.sightmap/*.yaml`, verifying selectors with `sightmap sel-probe`.
+4. **Repeat** until coverage shows `0 orphaned`, then `sightmap validate` / `sightmap lint` / `sightmap report`.
+
+## The skills are the authoritative playbook
+
+The detailed loop — coverage tiers, the component model, property extraction, cross-page promotion, the quality checklist — lives in the bundled agent skills, which are the source of truth for *how* to author:
+
+- **[`sightmap-authoring`](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md)** — building and maintaining a corpus.
+- **[`sightmap-browser`](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-browser/SKILL.md)** — driving a live session and acting on a finished corpus.
+
+The full CLI/authoring reference lives with the code in [`go/docs/reference.md`](https://github.com/sightmap/sightmap/blob/main/go/docs/reference.md). These pages stay deliberately high-level and point there rather than duplicating it.
+
+## Maintaining a corpus
+
+`.sightmap/` moves with the app. When routes or components change, re-run the loop on the affected pages — existing `memory`, `properties`, and selector choices are preserved; newly-orphaned nodes surface in coverage. Memory entries are written at use time, based on what an agent observed during QA; where a quirk can be *fixed* in the app instead of memorized, prefer that.
+
+## Hand-authoring
+
+None of this is required. `.sightmap/` is plain YAML validated against a [public JSON Schema](/reference/json-schema/) — hand-editing is always fine. The CLI and skills exist to keep curation cost near zero as the app grows.

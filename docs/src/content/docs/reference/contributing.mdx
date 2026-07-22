@@ -1,0 +1,68 @@
+---
+title: "Contributing"
+description: "How to contribute to Sightmap — DCO sign-off, the PR flow, where to discuss design changes."
+---
+
+Sightmap is open source and welcomes contributions from anyone — not just the Subtext team. This page is the high-level overview. The canonical documents in the [`sightmap/sightmap`](https://github.com/sightmap/sightmap) repo are the source of truth.
+
+## Where to discuss
+
+| Topic | Where |
+|---|---|
+| Question | [GitHub Discussions](https://github.com/sightmap/sightmap/discussions) |
+| Bug report | [GitHub Issues](https://github.com/sightmap/sightmap/issues) — use the **Bug report** template |
+| Small docs/website fix | Open a PR directly |
+| Spec change | A Discussion first, then an SEP under [`seps/`](https://github.com/sightmap/sightmap/tree/main/spec/seps) |
+| Security report | Email **subtext@fullstory.com** — do **not** open a public issue |
+
+## Spec changes go through SEPs
+
+Anything that changes what the spec *means* — adding a top-level key, renaming a field, changing route semantics — goes through a **Sightmap Enhancement Proposal**. SEPs exist because the spec is consumed by multiple SDKs and tools; a drive-by PR can break everyone downstream. See [`seps/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/seps/README.md).
+
+AI-assisted contributions (including SEP drafts) are accepted as long as you've read the output yourself and can defend it under review.
+
+## Pull request expectations
+
+- **One concern per PR.** If you fix two unrelated bugs, that's two PRs.
+- **Describe the *why*.** "What" is visible in the diff.
+- **Update docs in the same PR.** If you change a schema field, update `spec/v1/schema.md`, the JSON Schema, and any affected examples in one go.
+- **Don't reformat unrelated code.** Keep diffs focused.
+- Maintainers aim for first response within 3 business days.
+
+## Developer Certificate of Origin
+
+We do **not** require a CLA. Instead, every commit is gated by a [Developer Certificate of Origin](https://developercertificate.org/) sign-off — the same mechanism the Linux kernel, Kubernetes, and GitLab use.
+
+Sign off every commit with `-s`:
+
+```bash
+git commit -s -m "Your commit message"
+```
+
+That appends a `Signed-off-by: Your Name <your@email>` trailer. The trailer must match `git config user.name` and `git config user.email`. The DCO check on the PR runs against every commit on the branch.
+
+Forgot to sign off? Amend or rebase:
+
+```bash
+git commit --amend --signoff
+# or, for a range of commits already on the branch:
+git rebase --signoff main
+git push --force-with-lease
+```
+
+## Branch and commit conventions
+
+- Branch names: `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, `spec/<topic>`, or `sep/<number>-<slug>` for SEP drafts.
+- Commit messages: short imperative subject, optional body explaining *why*. Conventional Commits welcome but not required.
+- Every commit ends with `Signed-off-by: …`.
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the project's [MIT License](https://github.com/sightmap/sightmap/blob/main/LICENSE).
+
+## Canonical documents
+
+- [`CONTRIBUTING.md`](https://github.com/sightmap/sightmap/blob/main/CONTRIBUTING.md) — full contributor guide
+- [`SECURITY.md`](https://github.com/sightmap/sightmap/blob/main/SECURITY.md) — security policy and reporting
+- [`CODE_OF_CONDUCT.md`](https://github.com/sightmap/.github/blob/main/CODE_OF_CONDUCT.md) — community standards (org-wide)
+- [`GOVERNANCE.md`](https://github.com/sightmap/.github/blob/main/GOVERNANCE.md) — how decisions are made (org-wide)

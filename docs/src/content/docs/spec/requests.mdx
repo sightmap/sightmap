@@ -1,0 +1,89 @@
+---
+title: "Requests"
+description: "Route patterns, Express-style params, first-match-wins matching."
+---
+
+A request is a named API endpoint. Names replace raw URLs in network traces, so an agent inspecting traffic sees `SearchFlights` instead of `POST /api/flights/search`.
+
+```yaml
+- name: SearchFlights
+  route: /api/flights/search
+  method: POST
+  description: Run a flight search and return results
+  source: src/api/flights.ts
+  request:
+    fields:
+      - name: origin
+        type: string
+      - name: destination
+        type: string
+      - name: departureDate
+        type: string
+        description: ISO-8601 date
+  response:
+    fields:
+      - name: results
+        type: array
+  headers: [x-request-id]
+```
+
+`name` and `route` are required. `request` and `response` describe the expected payload shape; both are documentary today and not enforced against real responses. See [Schema reference](/reference/schema/#request) for the full type, including the `Payload` and `Field` sub-types.
+
+## Route patterns
+
+Request routes use the same glob syntax as views — `*` for one segment, `**` for any depth — with one addition: **Express-style `:param` segments are normalized to `*`**. These two are identical:
+
+```yaml
+- route: /api/users/:id/orders    # same as below
+- route: /api/users/*/orders
+```
+
+The named form exists because Express, Next.js API routes, and most JS frameworks already write routes that way; you can paste a route in unchanged. The runtime treats both identically.
+
+## Method filter
+
+`method` is an optional HTTP method filter — `GET`, `POST`, `PUT`, etc. If omitted, the route matches any method. With it set, only matching methods are named.
+
+```yaml
+- name: GetUser
+  route: /api/users/:id
+  method: GET
+
+- name: UpdateUser
+  route: /api/users/:id
+  method: PATCH
+```
+
+Two definitions can share a route as long as they differ on method. Conformance fixture `007-request-method-filter` covers this case.
+
+## First match wins
+
+Definition order is priority order. List more-specific routes before more-general ones.
+
+```yaml
+requests:
+  - name: SearchFlights
+    route: /api/flights/search       # specific
+  - name: FlightById
+    route: /api/flights/:id          # also specific, different shape
+  - name: AnyFlightsCall
+    route: /api/flights/**           # catch-all — listed last
+```
+
+## Scoped vs global
+
+Like components, requests can live at the file root or inside a view.
+
+- **Global** (file root): matched on every view.
+- **View-scoped** (inside a view): matched only when that view is active.
+- Additive: a view sees its own requests plus all globals. See [Views](/spec/views/#scoped-vs-global).
+
+Most apps put requests at the file root — the same `/api/users/:id` is meaningful regardless of which view is showing. Scope to a view when an endpoint is genuinely page-specific.
+
+:::caution
+The order of method filters and route specificity both matter. The runtime walks definitions top-to-bottom and stops at the first match — it does not pick the "best" match.
+:::
+
+## Next
+
+[Memory](/spec/memory/) covers the `memory:` field that any request can carry, surfaced to the agent in the network detail view.

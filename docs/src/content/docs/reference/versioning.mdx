@@ -1,0 +1,64 @@
+---
+title: "Versioning policy"
+description: "The two-axes model — stream version vs project semver."
+---
+
+Two things in the `sightmap/sightmap` repo are versioned independently. Knowing which is which is the whole point of this page.
+
+| | Versioned by | Current | Bumps when |
+|---|---|---|---|
+| **The spec** | A single integer in the YAML `version:` field | `1` | A breaking change to the YAML format |
+| **The project** | [SemVer](https://semver.org/) (GitHub Releases) | `0.1.0` | Anything ships — patch, minor, or major per SemVer |
+
+The spec stream is the contract SDKs implement. The project semver describes how settled that stream currently is and tracks the cadence of repo-level changes (docs, schema clarifications, examples, tooling). The two are decoupled so that the contract SDKs depend on doesn't churn every time the docs site or examples are touched.
+
+We aim to keep the spec stream at `1` for a long time. The project will move through `0.x`, `1.0.0`, and beyond independently.
+
+## TL;DR
+
+- The spec stream version (`version: 1`) bumps **only on breaking changes** to the YAML format.
+- The project semver bumps as `spec/v1/` matures: `0.x` while we tighten in place, `1.0.0` once we commit to compatibility, `2.0.0` only if `spec/v2/` ever ships.
+- We support the previous spec stream for **at least 12 months** after a successor stream is released.
+
+## Pre-1.0 (today)
+
+The project is at `0.1.0`. Per SemVer 0.x semantics:
+
+- The shape of `spec/v1/` may tighten or clarify in place.
+- Such changes are announced in the GitHub Release notes and a Discussion before they land.
+- We won't introduce a `version: 2` until the project hits `1.0.0` and we have a real break to commit to.
+
+When the project reaches `1.0.0`, the rules below become commitments rather than guidance.
+
+## What counts as a breaking change to the spec stream
+
+These require bumping `version: 1` → `version: 2` and creating `spec/v2/`:
+
+- Removing or renaming a field
+- Changing the type of a field (e.g. string → array)
+- Making a previously optional field required
+- Changing route-matching semantics (`*`, `**`, `:param`) in a way that alters existing matches
+- Changing the file-merge rules under `.sightmap/`
+- Any change that could make a previously valid `.sightmap/` directory produce different behavior in a conforming SDK
+
+The bar is high. Breaking changes require an accepted SEP with explicit maintainer consensus and a stated migration path.
+
+## What is **not** a breaking change
+
+These can land within stream `1` and ship as a project minor or patch bump:
+
+- Adding a new optional field at any level
+- Adding a new top-level key (a new peer to `views`, `components`, `requests`)
+- Adding a new match kind that is opt-in via a new field
+- Tightening validation to reject input that was always underspecified — pre-1.0 these land freely; post-1.0 they get a deprecation window
+- Clarifying wording that doesn't change conforming behavior
+
+## Support windows
+
+- **Current spec stream**: fully supported. Bug fixes, clarifications, new examples, new optional fields.
+- **Previous spec stream**: supported for at least 12 months after the successor is released. Security fixes and clarifications only.
+- **Older than that**: best-effort. SDKs may choose to drop support.
+
+## Canonical document
+
+Full process — including how a new spec stream gets cut, the deprecation window, and how SDKs dispatch on `version:` — lives in [`spec/VERSIONING.md`](https://github.com/sightmap/sightmap/blob/main/spec/VERSIONING.md). On any disagreement, the canonical file wins.

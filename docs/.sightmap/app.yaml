@@ -1,0 +1,52 @@
+version: 1
+
+components:
+  - name: SiteTitle
+    selector: '.site-title-link'
+  - name: PageTitle
+    selector: '.docs-page-title'
+  - name: Hero
+    selector: '.docs-hero'
+  - name: Sidebar
+    selector: 'nav[aria-label="Main"]'
+  - name: TableOfContents
+    selector: 'nav[aria-label*="On this page"]'
+  - name: SearchInput
+    selector: '[data-pagefind-ui-input]'
+
+views:
+  - route: /
+    name: Home
+    components:
+      - name: Hero
+        selector: '.docs-hero'
+
+  - route: /start/**
+    name: Start Here
+    memory:
+      - 'Onboarding section. Pages here should be readable in under 5 minutes.'
+
+  - route: /spec/**
+    name: The Spec
+    memory:
+      - 'Stream version 1 reference. Schema canon lives at github.com/sightmap/spec.'
+
+  - route: /authoring/**
+    name: Authoring
+    memory:
+      - 'Per-package documentation for @sightmap/* tooling.'
+
+  - route: /concepts/**
+    name: Concepts
+    memory:
+      - 'Conceptual onramps. No exhaustive reference here.'
+
+  - route: /reference/**
+    name: Reference
+    memory:
+      - 'Exhaustive reference appendix. Canonical schema text lives in sightmap/spec.'
+
+memory:
+  - 'This is the docs site itself, dogfooding Sightmap. Built with Astro Starlight.'
+  - 'Five sidebar groups: Start Here, The Spec, Authoring, Concepts, Reference.'
+  - 'All content is hand-authored MDX under src/content/docs/. No build-time content sync from sightmap/spec.'

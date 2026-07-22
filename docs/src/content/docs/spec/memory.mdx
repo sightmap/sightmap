@@ -1,0 +1,80 @@
+---
+title: "Memory"
+description: "File-level notes, view-scoped notes, and what they mean to consumers."
+---
+
+Memory entries are short freeform notes attached to any definition — file, view, component, or request. They exist so agents can carry forward context that isn't recoverable from the source code: quirks, invariants, workarounds, "you have to click this twice" lore.
+
+```yaml
+memory:
+  - Past dates render but are aria-disabled
+  - Range: 1st click = start, 2nd = end, 3rd resets
+```
+
+Each entry is a single human-readable sentence or short bullet. The format is intentionally unstructured — they are notes for a reader, not data for a parser.
+
+## Where they attach
+
+Memory is a string array on every definition that carries any structure. Where you put it determines when it applies.
+
+```yaml
+version: 1
+
+memory:                                  # file-level — applies to every definition in this file
+  - All routes require an authenticated session
+
+views:
+  - name: FlightSearch
+    route: /search
+    memory:                              # view-level — applies on /search
+      - The search form lives inside a modal on mobile; selectors differ
+    components:
+      - name: DepartureDatePicker
+        selector: '[data-picker="departure"]'
+        memory:                          # component-level — applies when this component is matched
+          - Accepts typed YYYY-MM-DD — skips the calendar
+          - Past dates render but are aria-disabled
+
+requests:
+  - name: SearchFlights
+    route: /api/flights/search
+    memory:                              # request-level — applies in the network-trace detail view
+      - 429s on more than 10 requests/min per user
+```
+
+The activation rules:
+
+- **File-level**: applies whenever any definition from that file is active.
+- **View-level**: applies whenever the current URL matches that view's route.
+- **Component-level**: applies whenever that component is matched on the current view.
+- **Request-level**: applies in the network-trace detail view for that request.
+
+## What consumers do with them
+
+Memory entries are **durable hints**, not configuration. Conforming SDKs SHOULD surface applicable entries in a `[Guide]` section at the top of enriched output, so the next agent reading the page picks up where the last one left off.
+
+The reference consumer is [Subtext](https://subtext.fullstory.com): it injects matching memory entries into snapshot and network-trace output automatically, in front of every named element. Other consumers (your CLAUDE.md instructions, `.cursorrules`, custom tooling) are free to format them however they like — they're plain text.
+
+## What to write
+
+Treat memory as the "inline comment" of the running app — short observations about behavior the source code doesn't make obvious.
+
+Good entries:
+
+- "Past dates render but are aria-disabled"
+- "Throws 429 above 10 requests/min per user"
+- "The third click on the date range resets the selection"
+
+Less useful:
+
+- "This is the search page" (the `name` already says that)
+- "Type a city name and submit" (an agent will figure that out)
+- A novel-length explanation (split into smaller bullets, or move to `description`)
+
+:::tip
+Memory is the field that pays back the most over time. Every quirk you write down is a debug session a future agent — or future you — doesn't have to repeat.
+:::
+
+## Next
+
+[Conformance](/spec/conformance/) describes how SDKs verify they implement the spec correctly, including the rules above.

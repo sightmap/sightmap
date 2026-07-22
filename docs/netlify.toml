@@ -1,0 +1,32 @@
+[build]
+  command = "pnpm build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PNPM_VERSION = "10.32.1"
+
+# Pre-baked vanity-URL redirects (also defined in astro.config.mjs;
+# Netlify-side redirects let URL types resolve before reaching Astro).
+[[redirects]]
+  from = "/quickstart"
+  to = "/start/react-quickstart/"
+  status = 301
+
+[[redirects]]
+  from = "/schema"
+  to = "/reference/schema/"
+  status = 301
+
+[[redirects]]
+  from = "/install"
+  to = "/start/install/"
+  status = 301
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

@@ -1,0 +1,66 @@
+---
+title: "The Spec"
+description: "Sightmap stream version 1 — overview of the YAML format and top-level fields."
+---
+
+A sightmap is a directory of YAML files at the root of a project, under `.sightmap/`. It describes the app's **views**, **components**, and **requests**, with optional **memory** entries that carry notes agents can use at runtime.
+
+These pages are the readable walk-through. The exhaustive field-by-field contract lives in the [Schema reference](/reference/schema/) and is mirrored verbatim from [the canonical schema](https://github.com/sightmap/spec/blob/main/spec/v1/schema.md).
+
+## What's in a sightmap
+
+Four kinds of definitions, all optional:
+
+- **[Views](/spec/views/)** — named screens identified by URL routes.
+- **[Components](/spec/components/)** — named DOM subtrees identified by CSS selectors.
+- **[Requests](/spec/requests/)** — named API endpoints identified by route patterns.
+- **[Memory](/spec/memory/)** — short freeform notes attached to any of the above.
+
+Every `*.yaml` and `*.yml` file under `.sightmap/` is discovered recursively and merged. The directory layout is for authors; it has no semantic meaning.
+
+## Top-level fields
+
+Every file begins with `version: 1`. All other top-level keys are optional.
+
+```yaml
+version: 1
+memory:      # string[] — file-level notes
+views:       # View[]
+components:  # Component[] — global, matched on every view
+requests:    # Request[] — global, matched on every view
+```
+
+`components` and `requests` at the file root are **global** — matched against every view. Nest them inside a view to scope. Scoped definitions are additive with globals. See [Components](/spec/components/) and [Requests](/spec/requests/) for the matching rules.
+
+## Two versioning axes
+
+The spec and the project that publishes it move independently.
+
+- **The spec stream** is the integer in the YAML `version:` field. It is currently `1` and bumps **only on breaking changes** to the format.
+- **The project semver** (in `package.json`) describes how settled stream `1` is. It is currently `0.1.0` — pre-1.0, so we may tighten or clarify the spec in place. After `1.0.0` the rules in [VERSIONING.md](https://github.com/sightmap/spec/blob/main/spec/VERSIONING.md) become commitments.
+
+We aim to keep the spec at stream `1` for a long time. A `version: 2` would mean a new `spec/v2/` directory and a real, accepted breaking change.
+
+## A small example
+
+```yaml
+# .sightmap/home.yaml
+version: 1
+
+views:
+  - name: Home
+    route: /
+    components:
+      - name: SearchBox
+        selector: '[data-component="SearchBox"]'
+```
+
+That is the smallest file that does anything useful. Everything else in this section is layered onto this shape: more views, nested components, glob routes, request definitions, and memory entries.
+
+:::caution
+Quote attribute selectors so YAML parses them as strings: `selector: '[data-component="X"]'`. Unquoted, the brackets break the parser.
+:::
+
+## Next
+
+Start with [Views](/spec/views/) for routes and view-level structure, then [Components](/spec/components/) for selector semantics. The full schema reference, including every field on every type, is in [Schema reference](/reference/schema/).

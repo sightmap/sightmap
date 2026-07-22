@@ -1,0 +1,48 @@
+---
+// Splash-page before/after diff. Mirrors the marketing site's hero-diff
+// (sightmap.org) so the docs landing reads as part of the same product.
+// HTML lives here (not in MDX) so per-token <span class="sm-c-…"> coloring
+// can be authored cleanly without MDX's JSX-in-pre limitations.
+---
+
+<div class="sm-diff-grid">
+  <div class="sm-diff-col">
+    <p class="sm-diff-label">snapshot — without <code>.sightmap/</code></p>
+    <div class="sm-code-block">
+      <pre><code><span class="sm-c-com">uid=1_0</span>  RootWebArea <span class="sm-c-str">"Book a flight"</span>
+<span class="sm-c-com">uid=1_3</span>  textbox <span class="sm-c-str">"Departure date"</span>
+<span class="sm-c-com">uid=1_8</span>  button <span class="sm-c-str">"Previous Month"</span>
+<span class="sm-c-com">uid=1_9</span>  button <span class="sm-c-str">"Next Month"</span>
+<span class="sm-c-com">uid=1_10</span> generic <span class="sm-c-str">"July 2025"</span>
+<span class="sm-c-com">uid=1_19</span> gridcell <span class="sm-c-str">"Choose Tuesday, July 1st, 2025"</span>
+<span class="sm-c-com">uid=1_20</span> gridcell <span class="sm-c-str">"Choose Wednesday, July 2nd, 2025"</span>
+<span class="sm-c-com">uid=1_21</span> gridcell <span class="sm-c-str">"Choose Thursday, July 3rd, 2025"</span>
+         <span class="sm-c-com">…28 more gridcells…</span>
+</code></pre>
+    </div>
+  </div>
+
+  <div class="sm-diff-col">
+    <p class="sm-diff-label">snapshot — with <code>.sightmap/</code></p>
+    <div class="sm-code-block sm-code-block--highlight">
+      <pre><code><span class="sm-c-accent">[View: FlightSearch <span class="sm-c-str">"/search"</span>]</span>
+<span class="sm-c-accent">[Guide]</span>
+<span class="sm-c-val">-</span> DepartureDatePicker accepts typed <span class="sm-c-str">YYYY-MM-DD</span>
+  <span class="sm-c-com">// skips opening the calendar</span>
+<span class="sm-c-val">-</span> Arrow keys navigate the grid; Enter selects; Esc closes
+<span class="sm-c-val">-</span> Past dates render but are <span class="sm-c-str">aria-disabled</span>
+<span class="sm-c-val">-</span> Range: 1st click = start, 2nd = end, 3rd resets
+
+<span class="sm-c-com">uid=1_0</span>  RootWebArea <span class="sm-c-str">"Book a flight"</span>
+<span class="sm-c-com">uid=1_1</span>  <span class="sm-c-key">FlightSearchForm</span> <span class="sm-c-val">visible</span>
+<span class="sm-c-com">uid=1_3</span>    <span class="sm-c-key">DepartureDatePicker</span> <span class="sm-c-com">[src: src/components/DatePicker.tsx]</span> <span class="sm-c-val">visible interactive</span>
+<span class="sm-c-com">uid=1_4</span>      <span class="sm-c-key">date-input</span> <span class="sm-c-val">visible interactive</span>
+<span class="sm-c-com">uid=1_8</span>      <span class="sm-c-key">prev-month</span> <span class="sm-c-val">visible interactive</span>
+<span class="sm-c-com">uid=1_9</span>      <span class="sm-c-key">next-month</span> <span class="sm-c-val">visible interactive</span>
+<span class="sm-c-com">uid=1_10</span>     <span class="sm-c-key">month-label</span> <span class="sm-c-str">"July 2025"</span> <span class="sm-c-val">visible</span>
+<span class="sm-c-com">uid=1_19</span>     <span class="sm-c-key">day</span> <span class="sm-c-str">"Choose Tuesday, July 1st, 2025"</span> <span class="sm-c-val">visible interactive</span>
+         <span class="sm-c-com">…30 more days…</span>
+</code></pre>
+    </div>
+  </div>
+</div>
