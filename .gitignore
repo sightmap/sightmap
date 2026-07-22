@@ -39,3 +39,6 @@ go/npm/vendor/
 # Generated OG images (docs/ prebuild)
 docs/public/og/
 docs/public/og-image.png
+
+# Generated docs pages (synced from canonical spec/ at build; see docs/scripts/sync-spec.mjs)
+docs/src/content/docs/reference/schema.md
