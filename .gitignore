@@ -7,7 +7,7 @@
 .claude/
 
 # Temporary conversion roadmap — local only, removed when the merge is done
-PLAN.md
+/PLAN.md
 
 # Node / JS (docs/, web/)
 node_modules/
@@ -24,9 +24,8 @@ pnpm-debug.log*
 .env.*
 *.local
 
-# Go (go/) — local build output
+# Go (go/) — local build output (binaries only; NOT the go/sightmap package dir)
 /sightmap
-go/sightmap
 go/cmd/sightmap/sightmap
 go/cmd/sightmap/sightmap-go
 
