@@ -1,0 +1,51 @@
+name: Spec proposal (pre-SEP)
+description: Float an idea for a spec change before drafting a formal SEP.
+labels: ["spec", "proposal", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this to float an idea for a change to the Sightmap spec — a new field, a new concept, changed semantics, or a breaking change.
+
+        This is the **pre-SEP** stage. If the idea has legs, a maintainer will ask you (or volunteer themselves) to draft a formal SEP PR against `spec/seps/`. See [`spec/seps/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/seps/README.md) for the process.
+
+        If you already have a concrete design doc ready, you can skip this and open the SEP PR directly.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is the user-facing problem this would solve? Who hits it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed shape
+      description: Rough YAML sketch or prose describing the change.
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways to solve the problem. What did you rule out and why?
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact on existing sightmaps
+      description: Would this break anything currently valid? Would implementations need to change?
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched existing issues, discussions, and SEPs for similar proposals.
+          required: true
+        - label: I read [`spec/seps/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/seps/README.md) and understand this may need to become a full SEP.
+          required: true

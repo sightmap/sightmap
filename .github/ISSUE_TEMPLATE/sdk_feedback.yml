@@ -1,0 +1,54 @@
+name: SDK / integration feedback
+description: Share feedback from building or using a Sightmap SDK or integration.
+labels: ["sdk-feedback", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Are you building or maintaining something that reads, writes, or validates `.sightmap/` files? This is the place to report rough edges, missing spec clarity, or cross-implementation divergence.
+
+        For bugs in the reference CLI/library, use the **Bug report** template instead.
+
+  - type: input
+    id: tool
+    attributes:
+      label: Tool / SDK
+      description: What are you building? Link if public.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of feedback
+      options:
+        - Spec is ambiguous and I had to guess
+        - JSON Schema didn't match what I expected
+        - I disagree with an existing design choice
+        - Missing capability — I need something the spec doesn't currently support
+        - Cross-implementation behavior diverges for the same input
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: Be specific. Include the field or section of the spec, and a minimal example if possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What would help?
+      description: Optional. A suggested fix, wording change, or spec direction.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched existing issues, discussions, and SEPs.
+          required: true

@@ -1,0 +1,74 @@
+name: Bug report
+description: Report a problem with the spec, the JSON Schema, the CLI, or a website.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in as much of the form as you can.
+
+        If your report is about how to **use** sightmaps rather than a defect, please open a [Discussion](https://github.com/sightmap/sightmap/discussions) instead.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Where does this bug live?
+      options:
+        - Spec (wording, ambiguity, contradiction)
+        - JSON Schema (validation is wrong)
+        - CLI / Go library
+        - Docs site (docs.sightmap.org)
+        - Marketing site (sightmap.org)
+        - Example files
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: A clear description of the problem.
+      placeholder: When I do X, Y happens, but I expected Z.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal steps, command, or YAML snippet that demonstrates the issue.
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: false
+
+  - type: input
+    id: spec-version
+    attributes:
+      label: Spec version
+      description: The `version:` field in the sightmap file, if applicable.
+      placeholder: "1"
+
+  - type: input
+    id: tool-version
+    attributes:
+      label: Version / commit / URL
+      description: For CLI bugs, the `sightmap` version. For a website, the URL. For spec/schema bugs, the commit SHA if you know it.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you submit
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: I've read the [Code of Conduct](https://github.com/sightmap/.github/blob/main/CODE_OF_CONDUCT.md).
+          required: true

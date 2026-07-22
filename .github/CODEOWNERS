@@ -1,0 +1,8 @@
+# CODEOWNERS for sightmap/sightmap
+#
+# See https://docs.github.com/en/repositories/managing-your-repositories-settings-and-security/customizing-your-repository/about-code-owners
+#
+# Every path requires review by at least one of these maintainers. Add more
+# specific rules below only when ownership genuinely differs from the default.
+
+* @chiplay @jurassix @joelgwebber

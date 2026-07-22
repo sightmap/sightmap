@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or how-to
+    url: https://github.com/sightmap/sightmap/discussions/categories/q-a
+    about: Questions about using sightmaps go in Discussions, not Issues.
+  - name: Spec idea or RFC
+    url: https://github.com/sightmap/sightmap/discussions/categories/ideas
+    about: Float the idea in Discussions first. If it gains traction, open an SEP PR.
+  - name: Security issue
+    url: https://github.com/sightmap/sightmap/blob/main/SECURITY.md
+    about: Please report security issues privately, not as public issues.
+  - name: Subtext product support
+    url: https://subtext.fullstory.com
+    about: This repo is for the open-source Sightmap project. Subtext product support is separate.

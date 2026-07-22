@@ -1,0 +1,23 @@
+name: Docs request
+description: Request a new doc page, a clarification, or a content improvement.
+labels: ["docs", "triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What's missing or unclear?
+      description: A short description of the gap or confusion.
+    validations:
+      required: true
+
+  - type: input
+    id: page
+    attributes:
+      label: Affected page (URL or path)
+      placeholder: https://docs.sightmap.org/spec/views/
+
+  - type: textarea
+    id: who
+    attributes:
+      label: Who is the reader?
+      description: App author, agent author, tool builder?

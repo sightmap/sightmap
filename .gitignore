@@ -1,0 +1,41 @@
+# OS / editor cruft
+.DS_Store
+
+# Local agent tooling — never committed
+.yaks/
+.agents/
+.claude/
+
+# Temporary conversion roadmap — local only, removed when the merge is done
+PLAN.md
+
+# Node / JS (docs/, web/)
+node_modules/
+dist/
+.astro/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+*.local
+
+# Go (go/) — local build output
+/sightmap
+go/sightmap
+go/cmd/sightmap/sightmap
+go/cmd/sightmap/sightmap-go
+
+# Local Chrome session state (go/ browser)
+.session
+
+# npm wrapper: downloaded binary
+go/npm/vendor/
+
+# Generated OG images (docs/ prebuild)
+docs/public/og/
+docs/public/og-image.png
