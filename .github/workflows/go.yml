@@ -1,0 +1,39 @@
+name: go
+
+on:
+  push:
+    branches: [main]
+    paths: ['go/**', '.github/workflows/go.yml']
+  pull_request:
+    paths: ['go/**', '.github/workflows/go.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: build + test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.2'
+          cache-dependency-path: go/go.sum
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "unformatted files:"; echo "$out"; exit 1; fi
+
+      - run: go build ./...
+
+      - run: go test ./...

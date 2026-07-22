@@ -50,6 +50,14 @@ understand the view structure, components, and any `memory:` entries. When addin
 or changing views/components, update the corresponding sightmap file. Components
 use `data-component="ComponentName"` attributes for runtime matching.
 
+## CI
+
+Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
+`go` (gofmt + build + `go test`), `spec` (schema-validate examples + conformance),
+`docs` (build + lychee link check), `web` (build). A pushed `v*` tag triggers
+`release` — goreleaser (config `go/.goreleaser.yml`) plus the npm publish of
+`@sightmap/sightmap` from `go/npm/`.
+
 ## Conventions
 
 - One concern per PR; keep diffs focused.

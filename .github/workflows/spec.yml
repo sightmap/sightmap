@@ -1,0 +1,39 @@
+name: spec
+
+on:
+  push:
+    branches: [main]
+    paths: ['spec/**', '.github/workflows/spec.yml']
+  pull_request:
+    paths: ['spec/**', '.github/workflows/spec.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spec-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: validate schema + examples + conformance
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: spec
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: spec/package-lock.json
+
+      - run: npm ci
+
+      - name: Validate spec/v1/examples against the schema
+        run: npm run validate:examples
+
+      - name: Validate conformance fixtures against the schema
+        run: npm run validate:conformance

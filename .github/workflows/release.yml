@@ -1,0 +1,63 @@
+name: release
+
+# Push a semver tag (e.g. v0.1.0) to cut a release:
+#   1. goreleaser builds cross-platform binaries (config: go/.goreleaser.yml) and
+#      publishes a GitHub release on sightmap/sightmap.
+#   2. the @sightmap/sightmap npm wrapper (go/npm) is published; its postinstall
+#      downloads the matching binary from that GitHub release.
+#
+# Requires one repo secret: NPM_TOKEN (an npm automation token with publish
+# rights to the @sightmap scope). GITHUB_TOKEN is provided automatically.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.2'
+          cache-dependency-path: go/go.sum
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: release --clean
+          workdir: go
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-npm:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go/npm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Pin the wrapper's version to the pushed tag so install.js downloads the
+      # binary from the release goreleaser just cut (it fetches tag v<version>).
+      - name: Sync wrapper version to tag
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
