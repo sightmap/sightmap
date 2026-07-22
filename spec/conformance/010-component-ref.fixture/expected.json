@@ -1,0 +1,33 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/b/garden" },
+      "expected": {
+        "result": {
+          "view": { "name": "PLP" },
+          "components": [
+            { "name": "NavFooter", "scope": "global" },
+            { "name": "SiteHeader", "scope": "view-scoped", "scopedToView": "PLP" },
+            { "name": "SearchBox", "scope": "view-scoped", "scopedToView": "PLP" },
+            { "name": "ProductGrid", "scope": "view-scoped", "scopedToView": "PLP" }
+          ]
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/" },
+      "expected": {
+        "result": {
+          "view": { "name": "Home" },
+          "components": [
+            { "name": "SiteHeader", "scope": "global" },
+            { "name": "SearchBox", "scope": "global" },
+            { "name": "NavFooter", "scope": "global" }
+          ]
+        }
+      }
+    }
+  ]
+}

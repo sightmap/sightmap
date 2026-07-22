@@ -1,0 +1,6 @@
+version: 1
+views:
+  - name: Login
+    route: /login
+    components:
+      this-is-not-a-list-it-is-a-mapping: oops

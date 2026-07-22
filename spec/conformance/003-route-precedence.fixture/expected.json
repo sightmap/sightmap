@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/users/me" },
+      "expected": { "result": { "view": { "name": "Specific" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/users/42" },
+      "expected": { "result": { "view": { "name": "Generic" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/admin/foo/bar" },
+      "expected": { "result": { "view": { "name": "Tree" } } }
+    }
+  ]
+}

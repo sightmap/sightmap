@@ -1,0 +1,8 @@
+version: 1
+views:
+  - name: Settings
+    route: /settings
+  - name: Dashboard
+    route: /dashboard
+  - name: Login
+    route: /login

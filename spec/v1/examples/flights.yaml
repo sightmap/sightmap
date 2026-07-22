@@ -1,0 +1,92 @@
+# yaml-language-server: $schema=../sightmap.schema.json
+#
+# Running example from the spec documentation: a flight-search app with a
+# view, a component with a child tree, a request, and memory entries.
+version: 1
+
+memory:
+  - Dates throughout the app are ISO-8601 (YYYY-MM-DD)
+  - All currency values are USD minor units (cents)
+
+views:
+  - name: FlightSearch
+    route: /search
+    description: Main search page with date and origin/destination pickers
+    source: src/pages/FlightSearch.tsx
+    dependencies:
+      - src/hooks/useFlightSearch.ts
+      - src/stores/flightFilterStore.ts
+    memory:
+      - The search form lives inside a modal on mobile; selectors differ
+    components:
+      - name: DepartureDatePicker
+        selector: '[data-picker="departure"]'
+        source: src/components/DatePicker.tsx
+        dependencies:
+          - src/components/DatePicker.module.css
+        memory:
+          - Accepts typed YYYY-MM-DD — skips the calendar
+          - Arrow keys navigate; Enter selects; Esc closes
+          - Past dates render but are aria-disabled
+          - Range mode, 1st click = start, 2nd = end, 3rd resets
+        children:
+          - name: date-input
+            selector: input
+          - name: day
+            selector: '[role="gridcell"]'
+
+      - name: OriginAirportPicker
+        selector:
+          - '[data-picker="origin"]'
+          - '#origin-combobox'
+        source: src/components/AirportPicker.tsx
+        children:
+          - name: option
+            selector: '[role="option"]'
+
+    requests:
+      - name: SearchFlights
+        route: /api/flights/search
+        method: POST
+        source: src/api/flights.ts
+        request:
+          fields:
+            - name: origin
+              type: string
+              description: IATA code
+            - name: destination
+              type: string
+              description: IATA code
+            - name: departureDate
+              type: string
+              description: ISO-8601 date
+        response:
+          fields:
+            - name: results
+              type: array
+        headers: [x-request-id]
+        memory:
+          - Rate-limited to 10 requests/min per user; returns 429 beyond that
+
+components:
+  - name: Navigation
+    selector: 'nav[data-component="Navigation"]'
+    source: src/components/Navigation.tsx
+    description: Top navigation, present on every page
+    children:
+      - name: nav-logo
+        selector: .nav-logo
+      - name: nav-signin
+        selector: .nav-signin
+
+requests:
+  - name: GetCurrentUser
+    route: /api/me
+    method: GET
+    description: Returns the current user, or 401 if unauthenticated
+    response:
+      fields:
+        - name: id
+          type: string
+        - name: email
+          type: string

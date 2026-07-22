@@ -1,0 +1,9 @@
+version: 1
+views:
+  - name: Dashboard
+    route: /dashboard
+    components:
+      - name: StockBadge
+        selector: '[data-sightmap="StockBadge"]'
+    memory:
+      - Recently-added widget area in top-right

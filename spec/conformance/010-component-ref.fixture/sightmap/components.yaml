@@ -1,0 +1,9 @@
+version: 1
+components:
+  - name: SiteHeader
+    selector: '#header'
+    children:
+      - name: SearchBox
+        selector: 'form#header-search'
+  - name: NavFooter
+    selector: '#footer'

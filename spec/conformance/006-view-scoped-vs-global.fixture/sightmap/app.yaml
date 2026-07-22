@@ -1,0 +1,12 @@
+version: 1
+components:
+  - name: GlobalNav
+    selector: nav
+views:
+  - name: Home
+    route: /
+    components:
+      - name: HomeHero
+        selector: .hero
+  - name: About
+    route: /about

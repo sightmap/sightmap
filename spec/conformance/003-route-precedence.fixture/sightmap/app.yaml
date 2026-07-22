@@ -1,0 +1,8 @@
+version: 1
+views:
+  - name: Specific
+    route: /users/me
+  - name: Generic
+    route: /users/*
+  - name: Tree
+    route: /admin/**

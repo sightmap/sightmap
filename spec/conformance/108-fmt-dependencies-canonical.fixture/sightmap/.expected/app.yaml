@@ -1,0 +1,9 @@
+version: 1
+views:
+  - name: ListView
+    route: /lists
+    source: src/views/ListView.tsx
+    dependencies:
+      - src/hooks/useChecklist.ts
+      - src/stores/listStore.ts
+      - src/styles/list-card.css

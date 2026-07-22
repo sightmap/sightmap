@@ -1,0 +1,16 @@
+version: 1
+views:
+  - name: ListView
+    route: /lists/:id
+    description: List view with secondary file dependencies
+    source: src/views/ListView.tsx
+    dependencies:
+      - src/hooks/useChecklist.ts
+      - src/stores/listStore.ts
+      - src/styles/list-card.css
+    components:
+      - name: ListCard
+        selector: '[data-component="ListCard"]'
+        source: src/components/ListCard.tsx
+        dependencies:
+          - src/components/ListCard.module.css

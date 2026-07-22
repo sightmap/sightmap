@@ -1,0 +1,9 @@
+version: 1
+components:
+  - name: SiteHeader
+    selector: '#header'
+views:
+  - name: Home
+    route: /
+    components:
+      - $ref: DoesNotExist

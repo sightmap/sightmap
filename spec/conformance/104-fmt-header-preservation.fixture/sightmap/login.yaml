@@ -1,0 +1,6 @@
+# Curated sightmap. See https://sightmap.org for conventions.
+
+version: 1
+views:
+  - name: Login
+    route: /login

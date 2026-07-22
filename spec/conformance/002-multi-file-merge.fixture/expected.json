@@ -1,0 +1,13 @@
+{
+  "cases": [
+    {
+      "command": "lint",
+      "args": {},
+      "expected": {
+        "diagnostics": [
+          { "code": "merge-collision-view" }
+        ]
+      }
+    }
+  ]
+}

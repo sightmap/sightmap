@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=../../sightmap.schema.json
+version: 1
+
+views:
+  - name: Dashboard
+    route: /dashboard
+    source: src/pages/Dashboard.tsx
+    components:
+      - name: DashboardLayout
+        selector: '[data-component="DashboardLayout"]'
+        source: src/pages/Dashboard.tsx
+        children:
+          - name: sidebar
+            selector: '[data-slot="sidebar"]'
+          - name: main
+            selector: '[data-slot="main"]'
+
+      - name: ActivityFeed
+        selector: '[data-component="ActivityFeed"]'
+        source: src/components/ActivityFeed.tsx
+        memory:
+          - Paginated 20 at a time; scroll to bottom to load more
+          - Empty state hides the header entirely

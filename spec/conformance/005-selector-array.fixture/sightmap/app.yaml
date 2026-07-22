@@ -1,0 +1,10 @@
+version: 1
+views:
+  - name: V
+    route: /
+    components:
+      - name: Try
+        selector:
+          - '[data-testid="primary"]'
+          - .legacy-primary
+          - button.primary

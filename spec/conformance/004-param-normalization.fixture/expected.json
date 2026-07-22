@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/api/users/42", "method": "GET" },
+      "expected": { "result": { "requests": [{ "name": "GetUser" }] } }
+    }
+  ]
+}

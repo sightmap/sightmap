@@ -1,0 +1,18 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/api/users/42", "method": "POST" },
+      "expected": {
+        "result": { "requests": [{ "name": "UpdateUser" }] }
+      }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/api/users/42", "method": "GET" },
+      "expected": {
+        "result": { "requests": [{ "name": "GetUser" }] }
+      }
+    }
+  ]
+}

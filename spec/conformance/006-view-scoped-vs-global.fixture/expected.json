@@ -1,0 +1,29 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/" },
+      "expected": {
+        "result": {
+          "view": { "name": "Home" },
+          "components": [
+            { "name": "GlobalNav", "scope": "global" },
+            { "name": "HomeHero", "scope": "view-scoped", "scopedToView": "Home" }
+          ]
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/about" },
+      "expected": {
+        "result": {
+          "view": { "name": "About" },
+          "components": [
+            { "name": "GlobalNav", "scope": "global" }
+          ]
+        }
+      }
+    }
+  ]
+}

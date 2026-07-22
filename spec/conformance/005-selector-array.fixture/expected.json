@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "command": "explain",
+      "args": { "query": "Try" },
+      "expected": {
+        "result": {
+          "hits": [
+            { "type": "component", "entry": { "name": "Try" } }
+          ]
+        }
+      }
+    }
+  ]
+}

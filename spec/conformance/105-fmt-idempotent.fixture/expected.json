@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "command": "fmt",
+      "args": { "check": true },
+      "expected": {
+        "ok": true,
+        "diagnostics": []
+      }
+    },
+    {
+      "command": "fmt",
+      "args": { "write": true },
+      "expected": {
+        "ok": true,
+        "result": {
+          "files": [
+            { "path": "app.yaml", "changed": false }
+          ]
+        }
+      }
+    }
+  ]
+}

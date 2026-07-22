@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/lists/42" },
+      "expected": {
+        "result": {
+          "views": [
+            {
+              "name": "ListView",
+              "dependencies": [
+                "src/hooks/useChecklist.ts",
+                "src/stores/listStore.ts",
+                "src/styles/list-card.css"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

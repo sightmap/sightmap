@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=../../sightmap.schema.json
+version: 1
+
+views:
+  - name: Checkout
+    route: /checkout
+    source: src/pages/Checkout.tsx
+    components:
+      - name: CartSummary
+        selector: '[data-component="CartSummary"]'
+        source: src/components/CartSummary.tsx
+
+      - name: PaymentForm
+        selector: '[data-component="PaymentForm"]'
+        source: src/components/PaymentForm.tsx
+        memory:
+          - Card number field masks all but last 4 on blur
+          - Submit is disabled until all required fields pass validation
+        children:
+          - name: card-number
+            selector: 'input[name="card"]'
+          - name: submit
+            selector: 'button[type="submit"]'
+
+    requests:
+      - name: PlaceOrder
+        route: /api/orders
+        method: POST
+        memory:
+          - Idempotency-Key header is required; duplicates are rejected with 409

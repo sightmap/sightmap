@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sightmap/sightmap/main/spec/v1/sightmap.schema.json",
+  "title": "Sightmap v1",
+  "description": "A sightmap file: one YAML document under .sightmap/ describing views, components, requests, and memory entries. See https://github.com/sightmap/sightmap/blob/main/spec/v1/schema.md for the human-readable reference.",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Must be 1 for files that conform to this version of the spec."
+    },
+    "memory": {
+      "$ref": "#/$defs/memory",
+      "description": "File-level memory entries — surfaced whenever any definition from this file is active."
+    },
+    "views": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/view" }
+    },
+    "components": {
+      "type": "array",
+      "description": "Global components — matched against every view. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",
+      "items": { "$ref": "#/$defs/componentOrRef" }
+    },
+    "requests": {
+      "type": "array",
+      "description": "Global requests — matched against every view.",
+      "items": { "$ref": "#/$defs/request" }
+    }
+  },
+  "$defs": {
+    "memory": {
+      "type": "array",
+      "description": "Freeform notes surfaced to agents at runtime in the [Guide] section.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "selector": {
+      "description": "A CSS selector, or a list of alternative selectors tried in order.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      ]
+    },
+    "view": {
+      "type": "object",
+      "required": ["name", "route"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "route": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Glob pattern matched against the URL pathname. * matches one segment, ** matches any depth."
+        },
+        "description": { "type": "string" },
+        "source": { "type": "string" },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of supplementary files (minimatch globs, '!' negation, project-root-anchored) whose changes should trigger re-curation of this view. See spec/v1/schema.md#dependencies for semantics."
+        },
+        "memory": { "$ref": "#/$defs/memory" },
+        "components": {
+          "type": "array",
+          "description": "View-scoped components. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",
+          "items": { "$ref": "#/$defs/componentOrRef" }
+        },
+        "requests": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/request" }
+        }
+      }
+    },
+    "componentOrRef": {
+      "description": "Either an inline component definition or a reference object {\"$ref\": ComponentName}. See SEP-0002.",
+      "oneOf": [
+        { "$ref": "#/$defs/component" },
+        { "$ref": "#/$defs/componentRef" }
+      ]
+    },
+    "componentRef": {
+      "type": "object",
+      "description": "A reference to a component defined at file root in any sightmap file. Expanded inline before matching. See SEP-0002.",
+      "required": ["$ref"],
+      "additionalProperties": false,
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The name of a component defined at file root in any loaded sightmap file."
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": ["name", "selector"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "selector": { "$ref": "#/$defs/selector" },
+        "source": { "type": "string" },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of supplementary files (minimatch globs, '!' negation, project-root-anchored) whose changes should trigger re-curation of this component. See spec/v1/schema.md#dependencies for semantics."
+        },
+        "description": { "type": "string" },
+        "memory": { "$ref": "#/$defs/memory" },
+        "children": {
+          "type": "array",
+          "description": "Nested components. Selectors are scoped to the parent's matched subtree. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",
+          "items": { "$ref": "#/$defs/componentOrRef" }
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "required": ["name", "route"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "route": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Glob pattern. Express-style :param segments normalize to *."
+        },
+        "method": {
+          "type": "string",
+          "description": "HTTP method filter. Case-insensitive; commonly GET, POST, PUT, PATCH, DELETE."
+        },
+        "description": { "type": "string" },
+        "source": { "type": "string" },
+        "request": { "$ref": "#/$defs/payload" },
+        "response": { "$ref": "#/$defs/payload" },
+        "headers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "memory": { "$ref": "#/$defs/memory" }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

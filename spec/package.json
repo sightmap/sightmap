@@ -1,0 +1,16 @@
+{
+  "name": "sightmap-spec",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "Schema validation for the Sightmap spec — examples and conformance fixtures against spec/v1/sightmap.schema.json.",
+  "scripts": {
+    "validate:examples": "node scripts/validate-sightmap.mjs v1/examples",
+    "validate:conformance": "node scripts/validate-sightmap.mjs conformance"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.0",
+    "js-yaml": "^4.1.0"
+  }
+}

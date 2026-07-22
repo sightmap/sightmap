@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "command": "fmt",
+      "args": { "check": true },
+      "expected": {
+        "ok": false,
+        "diagnostics": [
+          { "code": "fmt.not-canonical", "severity": "warning" }
+        ]
+      }
+    },
+    {
+      "command": "fmt",
+      "args": { "write": true },
+      "expected": {
+        "ok": true,
+        "result": {
+          "files": [
+            { "path": "app.yaml", "matchesExpected": true }
+          ]
+        }
+      }
+    }
+  ]
+}

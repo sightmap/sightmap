@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/sightmap/sightmap/main/spec/v1/config.schema.json",
+  "title": "Sightmap config v1",
+  "description": "A `.sightmap/config.yaml` file. Optional in any project; pins spec version. The file is mostly a marker that the project uses sightmap (analogous to `.prettierrc`'s presence). Most projects can omit it entirely. Future versions may add fields; the schema is additive. See https://github.com/sightmap/sightmap/blob/main/spec/v1/canonical-format.md for the canonical format and authoring-side diagnostic codes.",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "description": "Must be 1 for files that conform to this version of the spec."
+    }
+  },
+  "examples": [
+    { "version": 1 }
+  ]
+}

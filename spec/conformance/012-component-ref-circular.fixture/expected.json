@@ -1,0 +1,14 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": false,
+        "diagnostics": [
+          { "code": "ref-circular", "severity": "error" }
+        ]
+      }
+    }
+  ]
+}

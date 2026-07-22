@@ -1,0 +1,11 @@
+version: 1
+requests:
+  - name: GetUser
+    route: /api/users/*
+    method: GET
+  - name: UpdateUser
+    route: /api/users/*
+    method: POST
+views:
+  - name: X
+    route: /api/users/*

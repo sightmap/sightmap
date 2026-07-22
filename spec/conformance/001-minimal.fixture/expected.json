@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": { "ok": true }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/" },
+      "expected": { "ok": true, "result": { "view": { "name": "Home" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/missing" },
+      "expected": { "ok": true, "result": { "view": null } }
+    }
+  ]
+}

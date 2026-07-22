@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=../../sightmap.schema.json
+#
+# Demonstrates the directory-merge pattern: one file for globals,
+# separate files per view. All files under .sightmap/ are merged.
+version: 1
+
+components:
+  - name: Navigation
+    selector: 'nav[data-component="Navigation"]'
+    source: src/components/Navigation.tsx
+
+  - name: Footer
+    selector: 'footer[data-component="Footer"]'
+    source: src/components/Footer.tsx
+
+requests:
+  - name: GetCurrentUser
+    route: /api/me
+    method: GET

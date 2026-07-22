@@ -1,0 +1,7 @@
+version: 1
+views:
+  - name: Login
+    route: /login
+    components:
+      - name: LoginButton
+        selector: '[data-sightmap="LoginButton"]'

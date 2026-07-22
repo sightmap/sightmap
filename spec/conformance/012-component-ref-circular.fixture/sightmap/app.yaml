@@ -1,0 +1,9 @@
+version: 1
+components:
+  - name: Loop
+    selector: '#loop'
+    children:
+      - $ref: Loop
+views:
+  - name: Home
+    route: /

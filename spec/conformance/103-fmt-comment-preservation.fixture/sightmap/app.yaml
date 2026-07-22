@@ -1,0 +1,11 @@
+version: 1
+views:
+  - name: Dashboard
+    route: /dashboard
+    components:
+      # Top-right widget area; recently redesigned
+      - name: StockBadge
+        selector: '[data-sightmap="StockBadge"]'
+      # Footer area
+      - name: Footer
+        selector: '[data-sightmap="Footer"]'

@@ -1,0 +1,8 @@
+version: 1
+requests:
+  - name: GetUser
+    route: /api/users/:id
+    method: GET
+views:
+  - name: X
+    route: /api/users/*

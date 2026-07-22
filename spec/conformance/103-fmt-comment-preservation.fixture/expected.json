@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {
+      "command": "fmt",
+      "args": { "check": true },
+      "expected": {
+        "ok": true,
+        "diagnostics": []
+      }
+    }
+  ]
+}

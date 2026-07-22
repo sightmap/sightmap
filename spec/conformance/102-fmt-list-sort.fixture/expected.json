@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "command": "fmt",
+      "args": { "write": true },
+      "expected": {
+        "ok": true,
+        "result": {
+          "files": [
+            { "path": "app.yaml", "matchesExpected": true }
+          ]
+        }
+      }
+    }
+  ]
+}

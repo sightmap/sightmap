@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=../sightmap.schema.json
+# The smallest sightmap that does something useful.
+version: 1
+
+views:
+  - name: Home
+    route: /
+    components:
+      - name: SearchBox
+        selector: '[data-component="SearchBox"]'

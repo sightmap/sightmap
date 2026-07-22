@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "command": "fmt",
+      "args": { "write": true },
+      "expected": {
+        "ok": false,
+        "diagnostics": [
+          { "code": "fmt.schema-invalid", "severity": "error" }
+        ],
+        "result": {
+          "files": [
+            { "path": "app.yaml", "changed": false }
+          ]
+        }
+      }
+    }
+  ]
+}

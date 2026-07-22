@@ -1,0 +1,10 @@
+version: 1
+views:
+  - name: PLP
+    route: /b/**
+    components:
+      - $ref: SiteHeader
+      - name: ProductGrid
+        selector: '[data-component="ProductGrid"]'
+  - name: Home
+    route: /
