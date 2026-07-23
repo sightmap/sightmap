@@ -54,7 +54,15 @@ func TestLaunch(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	conn, cleanup, err := Launch(ctx, LaunchOptions{StartURL: "about:blank"})
+	// Force headless with CI-safe flags. The default launch is headed, which
+	// can't start on a display-less CI runner: Chrome exits immediately and
+	// never binds the debug port, surfacing as "connection refused". The extra
+	// flags keep headless Chrome happy in constrained CI sandboxes/containers.
+	conn, cleanup, err := Launch(ctx, LaunchOptions{
+		StartURL:  "about:blank",
+		Headless:  true,
+		ExtraArgs: []string{"--no-sandbox", "--disable-dev-shm-usage"},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
