@@ -13,11 +13,11 @@ both websites.
 |---|---|---|
 | `spec/` | Markdown + JSON Schema | Normative specification, SEP process, conformance fixtures. Source of truth. |
 | `go/` | Go | Reference implementation: `sightmap` CLI + `go get`-able library. npm: `@sightmap/sightmap`. |
-| `docs/` | Astro Starlight | Documentation site (docs.sightmap.org). |
+| `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
 
-Each area is self-contained. `go.mod` lives only under `go/`; each site has its
-own `package.json` and `netlify.toml`.
+Each area is self-contained. `go.mod` lives only under `go/`; `web/` has its own
+`package.json` and `netlify.toml`; `docs/` is configured by `docs.json`.
 
 ## Golden rule: the spec is the source of truth
 
@@ -38,9 +38,16 @@ Never change spec semantics without an SEP (`spec/seps/`).
 - `cmd/sightmap/` is the binary; library packages (`match`, `sel`, `comps`, …) at the module root.
 - Downstream consumers import the library directly, so treat exported names as public API.
 
-### `docs/` and `web/`
-- `pnpm install && pnpm dev` in the respective directory.
-- Both deploy to Netlify from their own subdirectory.
+### `docs/`
+- Mintlify site: `npm i -g mint`, then `mint dev` from `docs/`. See `docs/AGENTS.md`
+  for page conventions.
+- `reference/schema.md` is generated from `spec/v1/schema.md` by
+  `docs/scripts/sync-spec.mjs` and checked in — regenerate, never hand-edit.
+- Deploys via the Mintlify GitHub app on pushes to `main` (no build pipeline here).
+
+### `web/`
+- `pnpm install && pnpm dev` from `web/`.
+- Deploys to Netlify from its subdirectory.
 
 ## Sightmap dogfooding
 
@@ -54,7 +61,8 @@ use `data-component="ComponentName"` attributes for runtime matching.
 
 Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
 `go` (gofmt + build + `go test`), `spec` (schema-validate examples + conformance),
-`docs` (build + lychee link check), `web` (build). A pushed `v*` tag triggers
+`docs` (schema-page sync check + `mint validate` + `mint broken-links`), `web`
+(build). A pushed `v*` tag triggers
 `release` — goreleaser (config `go/.goreleaser.yml`) plus the npm publish of
 `@sightmap/sightmap` from `go/npm/`.
 

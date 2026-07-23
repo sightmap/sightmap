@@ -53,11 +53,11 @@ Before tagging: `cd go && go test ./...` is green, and the wrapper version will 
 
 ## 3. The websites
 
-Both sites auto-deploy from `main` via Netlify, each from its own subdirectory (`docs/` and `web/`) with its own `netlify.toml`. Every merged PR that touches a site is effectively a release.
+Both sites auto-deploy from `main`: `docs/` via the Mintlify GitHub app (custom domain configured in the Mintlify dashboard), `web/` via Netlify from its subdirectory with its own `netlify.toml`. Every merged PR that touches a site is effectively a release.
 
 Checks before merging anything that affects a site:
 
-- [ ] Preview deploy looks right (Netlify posts a preview URL on the PR)
+- [ ] Preview looks right (Netlify posts a preview URL on `web/` PRs; for `docs/`, run `mint dev` locally and CI runs `mint validate` + `mint broken-links`)
 - [ ] `web/` only: no regressions on the password gate until launch (see below)
 - [ ] No dev-only env vars accidentally shipped
 
@@ -73,4 +73,4 @@ Until we flip `web/` public, the password gate stays on. It is not a security bo
 
 ## 4. Breaking glass
 
-If we need to pull a site down: Netlify dashboard → site → Deploys → Publish a previous deploy. If a spec file at the raw GitHub URL is wrong, a fast-follow PR is the right answer — we can't "unpublish" a commit on `main`. To yank a bad CLI release, deprecate the npm version and delete/mark the GitHub Release, then cut a fixed patch.
+If we need to pull a site down: for `web/`, Netlify dashboard → site → Deploys → Publish a previous deploy; for `docs/`, revert the commit on `main` (the Mintlify GitHub app redeploys) or unpublish from the Mintlify dashboard. If a spec file at the raw GitHub URL is wrong, a fast-follow PR is the right answer — we can't "unpublish" a commit on `main`. To yank a bad CLI release, deprecate the npm version and delete/mark the GitHub Release, then cut a fixed patch.
