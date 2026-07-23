@@ -14,7 +14,9 @@ export default function AgentSection() {
               <span className="code-filename">.sightmap/pages/flights.yaml</span>
               <span className="code-lang">yaml</span>
             </div>
-            <pre><code><span className="c-key">components</span>:{'\n'}
+            <pre><code><span className="c-key">version</span>: <span className="c-val">1</span>{'\n'}
+{'\n'}
+<span className="c-key">components</span>:{'\n'}
 {'  '}- <span className="c-key">name</span>: <span className="c-str">DepartureDatePicker</span>{'\n'}
 {'    '}<span className="c-key">selector</span>: <span className="c-str">'[data-picker="departure"]'</span>{'\n'}
 {'    '}<span className="c-key">source</span>: <span className="c-str">src/components/DatePicker.tsx</span>{'\n'}

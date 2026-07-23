@@ -7,8 +7,8 @@ export default function Hero() {
           Open-source spec · v0.1
         </div>
         <h1>
-          Teach agents how to see<br className="hidden md:inline" />{" "}
-          and use your site.
+          A memory system for agents<br className="hidden md:inline" />{" "}
+          that use your web app.
         </h1>
         <p className="hero-sub">
           <code>sitemap.xml</code> tells search engines how to crawl your site.<br />
@@ -23,7 +23,7 @@ export default function Hero() {
           </a>
         </div>
         <p className="hero-robust">
-          A YAML map of your app's views, components, and API routes — checked into your repo, shared across every agent, and learned from the running app, not the source code.
+          A YAML map of your app's views, components, and API routes — checked into your repo, shared across every agent, curated against the running app, and linked back to source files.
         </p>
       </div>
 

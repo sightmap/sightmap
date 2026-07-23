@@ -669,19 +669,6 @@ h2 {
   letter-spacing: 0.02em;
 }
 
-.concept-badge {
-  display: inline-block;
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.2em 0.55em;
-  background: var(--green-dim);
-  color: var(--green);
-  border-radius: 4px;
-  margin-left: 0.25rem;
-}
-
 .concept-closer {
   font-size: 1.5rem !important;
   color: var(--text-bright);
