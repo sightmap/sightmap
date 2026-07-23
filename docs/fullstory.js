@@ -1,10 +1,11 @@
-// FullStory analytics — same org as sightmap.org and the previous docs site.
+// FullStory analytics — staging org, same as sightmap.org.
 // Mintlify includes every root-level .js file globally on all pages.
 
-    window['_fs_host'] = 'fullstory.com'
-    window['_fs_script'] = 'edge.fullstory.com/s/fs.js'
-    window['_fs_org'] = 'o-24BT0G-na1'
+    window['_fs_host'] = 'analytics.staging.fsty.io'
+    window['_fs_script'] = 'analytics.staging.fsty.io/s/fs.js'
+    window['_fs_org'] = 'thefullstory.com'
     window['_fs_namespace'] = 'FS'
+    window['_fs_app_host'] = 'app.staging.fullstory.com'
     !(function (m, n, e, t, l, o, g, y) {
       var s,
         f,
