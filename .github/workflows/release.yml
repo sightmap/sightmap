@@ -1,25 +1,35 @@
 name: release
 
-# Push a semver tag (e.g. v0.1.0) to cut a release:
+# Push a semver tag (e.g. v0.13.0) to cut a release:
 #   1. goreleaser builds cross-platform binaries (config: go/.goreleaser.yml) and
 #      publishes a GitHub release on sightmap/sightmap.
-#   2. the @sightmap/sightmap npm wrapper (go/npm) is published; its postinstall
-#      downloads the matching binary from that GitHub release.
+#   2. the @sightmap/sightmap npm wrapper (go/npm) is published to npm; its
+#      postinstall downloads the matching binary from that GitHub release.
 #
-# Requires one repo secret: NPM_TOKEN (an npm automation token with publish
-# rights to the @sightmap scope). GITHUB_TOKEN is provided automatically.
+# npm auth uses OIDC "trusted publishing" — there is NO NPM_TOKEN secret.
+# One-time setup on npmjs.com: on the @sightmap/sightmap package, add a Trusted
+# Publisher -> GitHub Actions, repository "sightmap/sightmap", workflow
+# "release.yml". The repo must be public (npm rejects provenance from a private
+# source repo with E422). GITHUB_TOKEN is provided automatically.
+#
+# NOTE: npm is already at 0.12.0 from the previous (JS) package. The first new
+# tag MUST be greater than 0.12.0 and must not reuse any previously published
+# version, or `latest` will move backward / the publish will fail.
 
 on:
   push:
     tags:
       - 'v*'
 
+# Least privilege by default; each job widens only what it needs.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub release and upload the binary assets
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,6 +51,9 @@ jobs:
   publish-npm:
     needs: goreleaser
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # mint the OIDC token npm uses for trusted publishing
     defaults:
       run:
         working-directory: go/npm
@@ -49,15 +62,22 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; ensure a new enough CLI
+      # regardless of what the Node image bundles.
+      - name: Update npm
+        run: npm install -g npm@latest
 
       # Pin the wrapper's version to the pushed tag so install.js downloads the
       # binary from the release goreleaser just cut (it fetches tag v<version>).
       - name: Sync wrapper version to tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
 
+      # No NODE_AUTH_TOKEN: npm exchanges the OIDC token via the configured
+      # trusted publisher. Provenance is attached (public repo + id-token).
       - name: Publish to npm
         run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true

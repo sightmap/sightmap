@@ -1,9 +1,9 @@
 {
   "name": "@sightmap/sightmap",
-  "version": "0.1.0",
+  "version": "0.13.0",
   "description": "sightmap authoring toolkit — live browser capture, annotated component snapshots, and coverage (native binary, no Go toolchain required)",
   "license": "MIT",
-  "homepage": "https://github.com/sightmap/sightmap#readme",
+  "homepage": "https://sightmap.org",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sightmap/sightmap.git"
