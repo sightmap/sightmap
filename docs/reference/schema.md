@@ -4,6 +4,10 @@ sidebarTitle: "Schema"
 description: "Exhaustive field-level reference for the Sightmap v1 YAML format, generated from the canonical spec."
 ---
 
+{/* AUTO-GENERATED — DO NOT EDIT BY HAND.
+    Generated from spec/v1/schema.md by docs/scripts/sync-spec.mjs.
+    Regenerate: node docs/scripts/sync-spec.mjs */}
+
 <Note>
 This page is generated from [`spec/v1/schema.md`](https://github.com/sightmap/sightmap/blob/main/spec/v1/schema.md) —
 do not edit it here. The canonical file and
