@@ -12,6 +12,9 @@
 # Node / JS (web/)
 node_modules/
 dist/
+
+# npm release packaging staging (go/npm/scripts/build-npm-packages.mjs)
+/npm-staging/
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*

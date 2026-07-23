@@ -1,20 +1,26 @@
 name: release
 
-# Push a semver tag (e.g. v0.13.0) to cut a release:
-#   1. goreleaser builds cross-platform binaries (config: go/.goreleaser.yml) and
-#      publishes a GitHub release on sightmap/sightmap.
-#   2. the @sightmap/sightmap npm wrapper (go/npm) is published to npm; its
-#      postinstall downloads the matching binary from that GitHub release.
+# Push a semver tag (e.g. v0.13.1) to cut a release:
+#   1. goreleaser builds cross-platform binaries (config: go/.goreleaser.yml),
+#      publishes a GitHub release on sightmap/sightmap, and its archives are
+#      handed to the npm job as a workflow artifact.
+#   2. those archives are repackaged into npm packages and published:
+#        - one @sightmap/sightmap-<os>-<arch> package per platform (the binary,
+#          gated by os/cpu), and
+#        - the @sightmap/sightmap meta package, which lists them as
+#          optionalDependencies so npm installs only the matching one (no
+#          post-install download, no install scripts).
 #
 # npm auth uses OIDC "trusted publishing" — there is NO NPM_TOKEN secret.
-# One-time setup on npmjs.com: on the @sightmap/sightmap package, add a Trusted
-# Publisher -> GitHub Actions, repository "sightmap/sightmap", workflow
-# "release.yml". The repo must be public (npm rejects provenance from a private
+# One-time setup on npmjs.com: register a Trusted Publisher (GitHub Actions,
+# repository "sightmap/sightmap", workflow "release.yml") on EACH published
+# package — the meta package AND all six @sightmap/sightmap-<os>-<arch>
+# packages. The repo must be public (npm rejects provenance from a private
 # source repo with E422). GITHUB_TOKEN is provided automatically.
 #
-# NOTE: npm is already at 0.12.0 from the previous (JS) package. The first new
-# tag MUST be greater than 0.12.0 and must not reuse any previously published
-# version, or `latest` will move backward / the publish will fail.
+# NOTE: npm is already at 0.13.0. The pushed tag MUST be greater than the latest
+# published version and must not reuse any existing version, or `latest` moves
+# backward / the publish fails.
 
 on:
   push:
@@ -48,17 +54,32 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Hand the built archives to the npm job (avoids re-downloading the release
+      # we just cut, and keeps the two jobs' privileges separate).
+      - name: Upload release archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-archives
+          path: |
+            go/dist/*.tar.gz
+            go/dist/*.zip
+          if-no-files-found: error
+          retention-days: 1
+
   publish-npm:
     needs: goreleaser
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # mint the OIDC token npm uses for trusted publishing
-    defaults:
-      run:
-        working-directory: go/npm
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download release archives
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-archives
+          path: dist-archives
 
       - uses: actions/setup-node@v4
         with:
@@ -70,14 +91,23 @@ jobs:
       - name: Update npm
         run: npm install -g npm@latest
 
-      # Pin the wrapper's version to the pushed tag so install.js downloads the
-      # binary from the release goreleaser just cut (it fetches tag v<version>).
-      - name: Sync wrapper version to tag
-        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+      # Build the per-platform packages + version-synced meta from the archives.
+      - name: Assemble npm packages
+        run: node go/npm/scripts/build-npm-packages.mjs --version "${GITHUB_REF_NAME#v}" --dist dist-archives --out npm-staging
 
-      # No NODE_AUTH_TOKEN: npm exchanges the OIDC token via the configured
-      # trusted publisher. Provenance is attached (public repo + id-token).
-      - name: Publish to npm
-        run: npm publish
+      # Publish platform packages first, then the meta (so its optional deps
+      # already exist). No NODE_AUTH_TOKEN: npm exchanges the OIDC token via each
+      # package's configured trusted publisher; provenance is attached.
+      - name: Publish platform packages
+        run: |
+          for dir in npm-staging/@sightmap/*/; do
+            echo "publishing $dir"
+            ( cd "$dir" && npm publish )
+          done
+        env:
+          NPM_CONFIG_PROVENANCE: true
+
+      - name: Publish meta package
+        run: cd npm-staging/meta && npm publish
         env:
           NPM_CONFIG_PROVENANCE: true
