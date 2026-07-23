@@ -7,14 +7,6 @@ sidebarTitle: "Schema"
 description: "Exhaustive field-level reference for the Sightmap v1 YAML format, generated from the canonical spec."
 ---
 
-<Note>
-This page is generated from [`spec/v1/schema.md`](https://github.com/sightmap/sightmap/blob/main/spec/v1/schema.md) —
-do not edit it here. The canonical file and
-[`sightmap.schema.json`](https://github.com/sightmap/sightmap/blob/main/spec/v1/sightmap.schema.json) win on any
-disagreement. Regenerate with `node docs/scripts/sync-spec.mjs`.
-</Note>
-
-
 > **Status**: spec stream `1`, project semver **0.1.0** (pre-1.0). In-place tightening allowed until the project hits 1.0.0. See [the versioning policy](/reference/versioning).
 
 A sightmap is a directory of YAML files at the root of a project, under `.sightmap/`. It describes the app's **views**, **components**, and **requests**, with optional **memory** entries that carry notes agents can use at runtime.
