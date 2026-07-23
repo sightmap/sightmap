@@ -1,0 +1,185 @@
+---
+title: "Authoring a Sightmap: The Edit-Verify Loop with the Sightmap CLI"
+sidebarTitle: "Overview"
+description: "Build and maintain a .sightmap/ corpus against the running app — iterate, probe, name, and validate until every interactive node is attributed."
+---
+
+A `.sightmap/` directory is a **curated authority**: authored and maintained by coding agents and humans, curated against the running app. Nothing generates it from your code; there is no build step that writes YAML. That keeps the corpus honest about what the app actually does — including the quirks source can't tell you.
+
+## The tool
+
+Authoring runs through the **`sightmap` CLI** (Go), which drives a real Chrome session over the Chrome DevTools Protocol and layers your `.sightmap/` corpus onto the live page. You get:
+
+- **Annotated snapshots** — the page's component tree with every matched node named `[ComponentName prop="val"]` from your corpus.
+- **Coverage** — every interactive node scored T1 (directly matched), T2 (unnamed inside a matched ancestor), or T3 (orphaned), so you know what's left to name.
+
+Install it and drop the agent skills into your harness:
+
+```bash
+npm install -g @sightmap/sightmap      # or: npx @sightmap/sightmap ...
+# or, from source:
+go install github.com/sightmap/sightmap/go/cmd/sightmap@latest
+
+sightmap skills install                # installs the sightmap-authoring + sightmap-browser skills
+```
+
+See [the CLI tour](/authoring/cli) for the command surface grouped by job, the [CLI reference](/cli/overview) for every flag, and [Install](/start/install) for all install paths. If you have never run the CLI, the [Quickstart](/start/quickstart) gets you to a first corpus in minutes.
+
+## The loop
+
+Authoring is an edit-verify loop against a live page.
+
+<Steps>
+<Step title="Start a session">
+
+```bash
+cd my-app                   # a project with a .sightmap/ directory
+sightmap browser start      # launches Chrome + the sightmap server
+sightmap browser status     # should show: ● running cdp=7892
+```
+
+`browser start` launches Chrome and a local server that hot-reloads the corpus whenever you edit YAML — no restart between edits. The overlay browser extension is embedded in the binary and extracted automatically on first run. Session commands are documented in [`sightmap browser`](/cli/browser).
+
+</Step>
+<Step title="Iterate a page">
+
+`sightmap iterate` navigates, snaps, and prints coverage in one step:
+
+```bash
+sightmap iterate 'https://example.com/products'
+```
+
+```text
+[View: ProductListPage "https://example.com/products"]
+[Coverage] (visible only)
+87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
+
+Unlabeled clusters:
+  5× button (no text)
+       inside: div[data-testid="product-pod"]
+       → [data-testid="product-pod"] button
+```
+
+Coverage assigns every interactive node a tier:
+
+| Tier | Meaning | Goal |
+|---|---|---|
+| **T1** direct | The node itself matched a component selector | Maximize |
+| **T2** scoped | Unnamed, but inside a matched ancestor | Acceptable when tight |
+| **T3** orphaned | No matched ancestor at any depth | **Must reach 0** |
+
+`iterate` is built for speed: it suppresses the tree output and writes its capture to a temp file, leaving your saved view sets untouched. Reach for `sightmap snapshot` when you want the full annotated tree or a recorded capture — both are covered in [Capture](/cli/capture).
+
+</Step>
+<Step title="Verify the suggested selector">
+
+Every unlabeled cluster ends with a `→` selector hint. Never write YAML from an unverified selector — probe it against the live page first:
+
+```bash
+sightmap sel-probe '[data-testid="product-pod"] button'
+```
+
+`sel-probe` reports the match count, each match's key attributes, and the parent chain, marking the nearest already-known component with a ★. A wrong match count corrupts coverage; the right one becomes your `selector:` value. Selector tooling — including offline checks with `sel-check` — lives in [Selector tools](/cli/selectors); selector strategy in [Selectors & match strategy](/concepts/selectors).
+
+</Step>
+<Step title="Name what's unnamed">
+
+Add the component to the matching view file under `.sightmap/views/` (or to `components.yaml` if it appears app-wide):
+
+```yaml .sightmap/views/products.yaml
+views:
+  - name: ProductListPage
+    route: /products/**
+    url: https://example.com/products
+    components:
+      - name: AddToCartButton
+        selector: '[data-testid="product-pod"] button[data-testid="atc"]'
+        properties:
+          - name: label
+            extract: attr=aria-label
+```
+
+The top-level `url:` matters beyond documentation — it is where `report` and `snapshot --all` learn which page represents this view.
+
+<Warning>
+Property extraction (`properties:`) is a draft spec extension (SEP-0003) implemented by the CLI. It is not part of spec v1 and may change.
+</Warning>
+
+Then check the structure:
+
+```bash
+sightmap validate
+```
+
+The running session hot-reloads your edit immediately. The component shape — children, selectors, naming — is specified in [Components](/spec/components); `validate` and its companions in [Corpus hygiene](/cli/corpus).
+
+</Step>
+<Step title="Repeat until zero orphans">
+
+Re-run `iterate` after every edit. The page is done when the coverage line reads `0 orphaned T3 ✓` — then move on to the T2 triage below.
+
+</Step>
+</Steps>
+
+<Tip>
+Starting on a page with no view file yet? `sightmap suggest --exclude-known` lists stable selector candidates not yet in the corpus, `sightmap discover` classifies the site's URL patterns (mapped / surveyed / unseen), and `sightmap inspect` prints the raw DOM tree when you need an anchor. See [Selector tools](/cli/selectors), [Capture](/cli/capture), and [Corpus checks](/cli/corpus).
+</Tip>
+
+## Triage what's left: T2 quality
+
+Zero T3 is necessary but not sufficient. A **T2-tight** node — the single interactive child of its named ancestor — is fine: events attribute cleanly. **T2-loose** scopes, where several unnamed siblings share one ancestor, are indistinguishable in event logs. They are your remaining authoring queue.
+
+Re-snap with `sightmap snapshot --trace` to include selector hints for every unlabeled interactive cluster, ranked by how many nodes share the scope (`sightmap coverage --trace` prints the same cluster detail offline from saved captures). Classify every multi-child scope — don't just accept it — and record the verdict in the component's or view's `memory:`:
+
+| Category | What it is | Action |
+|---|---|---|
+| **A** — third-party | Injected widgets: analytics, live chat, consent banners | Acceptable — note the vendor in `memory:` |
+| **B** — exhausted | No stable selector exists after real attempts | Acceptable — document what you tried |
+| **C** — untried | Nobody has probed it yet (the default state) | Run `sel-probe` before accepting |
+| **D** — unstable | Selector is inherently fragile: hashed classes, dynamic IDs | Mark `stability: unstable` — a permanent T2 residual by design |
+
+While you are here, finish the quality pass: every T1 link or button should carry at least one property somewhere in its chain, and any component that matches zero nodes deserves investigation before you accept the result. Coverage commands are documented in [Coverage](/cli/coverage).
+
+## Promote shared components
+
+Once several views are mapped, look for components that recur:
+
+```bash
+sightmap multi-coverage
+```
+
+The matrix shows one column per view. Promote a component from its view file to `components.yaml` when it appears in two or more views:
+
+- **3+ views, same selector** — always promote.
+- **2 views, same selector** — usually promote.
+- **2 views, different selectors** — keep it view-scoped.
+
+## Check corpus health and refresh captures
+
+Close a session of authoring with the health pass:
+
+```bash
+sightmap validate            # structural correctness (exit 1 on error)
+sightmap lint --warn-only    # advisory style checks
+sightmap report              # per-view T1/T2/T3 health table + T2 quality
+sightmap snapshot --all      # refresh a capture for every URL declared in views/*.yaml
+```
+
+`report` prints one row per view, scored over the view's whole view set — a view fails when any capture still has orphans, or when it has no captures at all. `snapshot --all` visits every URL your view files declare (the top-level `url:` plus any `snapshots[].url` variants) and appends timestamped captures to each view's set. A novelty gate keeps dynamic pages from accumulating churn: a re-snap is saved only when it adds something structurally new; otherwise the CLI reports it as nothing new and skips the write. View sets, the novelty gate, and pruning are covered in [View sets](/cli/snapshots).
+
+## The skills are the authoritative playbook
+
+The detailed loop — coverage tiers, the component model, property extraction, cross-page promotion, the quality checklist — lives in the bundled agent skills, which are the source of truth for *how* to author:
+
+- [`sightmap-authoring`](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md) — building and maintaining a corpus.
+- [`sightmap-browser`](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-browser/SKILL.md) — driving a live session and acting on a finished corpus; the interaction commands it drives are documented in [Interaction](/cli/interaction).
+
+This page stays deliberately high-level; the [CLI reference](/cli/overview) documents every command and flag.
+
+## Maintaining a corpus
+
+`.sightmap/` moves with the app. When routes or components change, re-run the loop on the affected pages — existing `memory:`, `properties:`, and selector choices are preserved; newly orphaned nodes surface in coverage. Memory entries are written at use time, based on what an agent observed while working the app; where a quirk can be *fixed* in the app instead of memorized, prefer that. The wider process — bootstrap, maintenance triggers, CI — is [the curation workflow](/concepts/workflow).
+
+## Hand-authoring
+
+None of this is required. `.sightmap/` is plain YAML validated against a [public JSON Schema](/reference/json-schema) — hand-editing is always fine, and [the spec](/spec/overview) defines every field. The CLI and skills exist to keep curation cost near zero as the app grows.

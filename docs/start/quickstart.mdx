@@ -1,0 +1,89 @@
+---
+title: "Sightmap Quickstart: Bootstrap a .sightmap/ From Your Running App"
+sidebarTitle: "Quickstart"
+description: "From install to a populated .sightmap/ — agent-driven, against your running app, with the sightmap CLI."
+---
+
+One curation flow: an agent drives your live app with the `sightmap` CLI and writes `.sightmap/` from what it observes. Works for any web app the CLI can reach — local dev, a preview deploy, or a hosted URL. You don't write the YAML by hand.
+
+<Steps>
+  <Step title="Install the CLI and skills">
+    ```bash
+    npm install -g @sightmap/sightmap        # or: npx @sightmap/sightmap ...
+    # or from source:
+    go install github.com/sightmap/sightmap/go/cmd/sightmap@latest
+
+    sightmap skills install                  # sightmap-authoring + sightmap-browser skills
+    ```
+
+    `sightmap skills install` drops the two agent skills into `~/.agents/skills` (override with `--target`). Any skills-aware agent (Claude Code and others) picks them up and follows the authoring playbook.
+  </Step>
+
+  <Step title="Start a browser session">
+    ```bash
+    cd my-app                 # your project (a .sightmap/ will be created here)
+    sightmap browser start    # launches Chrome + a corpus server that hot-reloads YAML
+    sightmap browser status   # ● running
+    ```
+  </Step>
+
+  <Step title="Let an agent bootstrap the corpus">
+    Point your agent at the app and let the `sightmap-authoring` skill drive:
+
+    > Bootstrap a sightmap for this app. Start a browser session, iterate over the main routes, and name the interactive components until coverage is clean.
+
+    Under the hood the agent runs the edit-verify loop:
+
+    ```bash
+    sightmap iterate 'http://localhost:3000/'          # snap + coverage for a route
+    sightmap sel-probe '[data-testid="product-pod"]'   # verify a candidate selector
+    # ...add components to .sightmap/*.yaml, then re-iterate
+    ```
+
+    Each `iterate` prints the matched view, a coverage line, and suggested selectors for the unattributed nodes:
+
+    ```text
+    [View: ProductListPage "http://localhost:3000/products"]
+    [Coverage] (visible only)
+    87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
+
+    Unlabeled clusters:
+      5× button (no text)
+           inside: div[data-testid="product-pod"]
+           → [data-testid="product-pod"] button
+    ```
+
+    `iterate` scores every interactive node **T1** (named), **T2** (inside a named component), or **T3** (orphaned). The agent adds components until a view reports `0 orphaned T3 ✓`.
+  </Step>
+
+  <Step title="Check the corpus">
+    ```bash
+    sightmap validate     # structural correctness (non-zero exit on error)
+    sightmap lint         # advisory quality checks
+    sightmap report       # per-view T1/T2/T3 health table
+    ```
+
+    Result:
+
+    ```text
+    .sightmap/
+      components.yaml      # global components, matched on every view
+      views/
+        home.yaml          # one file per view, with its route and url
+        products.yaml
+        account.yaml
+    ```
+  </Step>
+</Steps>
+
+## Iterate
+
+- **For selector stability**, add `data-component="ComponentName"` to the source where no stable selector exists — it's the most stable selector candidate an agent can key on.
+- **When source changes** — new route, renamed component — re-run `sightmap iterate` on the affected pages. Existing `memory` entries and selector choices are preserved; new orphans surface in coverage.
+
+## Next steps
+
+- [Authoring overview](/authoring/overview) — the model and the loop.
+- [The sightmap CLI](/authoring/cli) — the full command surface.
+- [`sightmap-authoring` skill](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md) — the authoritative authoring playbook.
+- [Schema reference](/reference/schema) — every field in the YAML.

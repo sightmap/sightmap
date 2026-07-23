@@ -1,0 +1,249 @@
+---
+title: "Sightmap CLI: Selector Tools Reference"
+sidebarTitle: "Selectors"
+description: "Complete reference for the sightmap selector tools: suggest, gap, sel-probe, and sel-check — discover selector candidates, find coverage gaps, and verify every selector before it enters your corpus."
+---
+
+Selectors are the load-bearing part of every component definition, and these four commands cover their whole lifecycle. `sightmap suggest` scans the live page for stable selector candidates. `sightmap gap` lists the interactive nodes your corpus does not yet cover, with a suggested selector for each cluster it can anchor. `sightmap sel-probe` validates a candidate selector against the live page. `sightmap sel-check` re-validates a selector offline against a saved snapshot. This page documents every selector tool.
+
+<Note>
+These commands work on one selector at a time. For the selector syntax the matcher accepts, see [Selectors](/concepts/selectors); for capturing the snapshots that `sel-check` reads, see [Capture](/cli/capture); for scoring whole-page coverage, see [Coverage](/cli/coverage).
+</Note>
+
+<Note>
+**Selector subset.** Sightmap selectors support the descendant (space) and direct-child (`>`) combinators only, and exactly four pseudo-classes: `:not()`, `:is()`, `:where()`, and `:has()`. Positional pseudo-classes such as `:nth-child()` are errors at `validate` time.
+</Note>
+
+---
+
+### `sightmap suggest`
+
+Scans the live page — including labeled landmark and widget roles — for elements carrying a stable authoring hook (`data-testid` or `data-component`) and prints one candidate selector per unique hook, with a match count and a text sample. Candidates are sorted by match count, highest first. Reach for it when you start a fresh page and the corpus has nothing to say about it yet.
+
+Pass `--exclude-known` to hide candidates already covered by a corpus selector, and `--group` to group the remaining candidates under their nearest known ancestor component. Grouping matches the page against the newest `.snap.tree.json` in the current directory; point `--snap` at a specific tree file to override the auto-detection.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--exclude-known` | off | Exclude elements already matched by a known sightmap component |
+| `--group` | off | Group candidates by nearest known ancestor component |
+| `--launch` | off | Auto-launch Chrome if unreachable |
+| `--max` | `20` | Max candidates to show |
+| `--min-count` | `1` | Only show candidates matching at least N elements |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
+| `--snap` | auto-detected | Path to a `.snap.tree.json` for grouping (newest in the current directory when omitted) |
+| `--tab` | — | Target tab ID (from `browser start` output) |
+
+```bash
+sightmap suggest --exclude-known
+```
+
+```text
+Candidate selectors (not yet in sightmap):
+
+  [data-testid="product-pod"]      24 elements  (div "Garden Hose 50 ft $29.98 Add to Cart Com…")
+  [data-testid="filter-chip"]      8 elements  (button "In Stock Today")
+  [data-testid="sort-dropdown"]    1 element  (button "Sort by: Best Match")
+  [data-component^="PromoBanner"]  1 element  (div "Spring savings on outdoor power")
+```
+
+With `--group`, candidates that sit inside a matched component are listed under it, so you can see which gaps belong to a component you already own:
+
+```bash
+sightmap suggest --exclude-known --group
+```
+
+```text
+[ProductCard] — 2 uncovered candidates:
+  [data-testid="atc"]          24 elements  (button "Add to Cart")
+  [data-testid="pod-compare"]  24 elements  (checkbox "Compare")
+
+Ungrouped (no known ancestor):
+  [data-testid="feedback-tab"]  1 element  (button "Feedback")
+```
+
+---
+
+### `sightmap gap`
+
+Walks the live page's component tree and reports interactive nodes with no component context. By default it reports orphaned (T3) nodes — interactive nodes with no matched ancestor at any depth — grouped into clusters by role, text, and nearest stable-anchor ancestor. Clusters with a stable-anchor ancestor carry a `→` suggested selector to seed a `sel-probe` verification; clusters without one print no hint.
+
+With `--scope COMPONENT`, the analysis inverts: instead of orphans, it reports the unmatched interactive nodes (T2) inside that component's matched subtree — the right tool when you are tightening a loose scope. Only visible nodes are counted unless you pass `--include-hidden`. The command requires a `.sightmap/` directory.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--include-hidden` | off | Include hidden/off-screen nodes in gap analysis |
+| `--launch` | off | Auto-launch Chrome if unreachable |
+| `--scope` | — | Filter gaps to unmatched nodes within the named component's subtree |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
+| `--tab` | — | Target tab ID (from `browser start` output) |
+| `--url` | — | Navigate to this URL before extracting |
+| `--visible` | `true` | Deprecated: visible-only is now the default |
+
+```bash
+sightmap gap --url 'https://www.example.com/b/garden-hoses'
+```
+
+```text
+Gap analysis — 5 orphaned interactive nodes:
+
+  3× button "Compare"
+       inside: div[data-testid="product-pod"]
+       → [data-testid="product-pod"] button
+
+  1× link "Weekly Ad"
+       inside: header[data-testid="site-header"]
+       → [data-testid="site-header"] a
+
+  1× button "Feedback"
+       inside: (no stable ancestor)
+```
+
+When every visible interactive node is covered, the command prints `✓ no orphaned interactive nodes`. In scoped mode the header becomes `T2 gaps in [ComponentName] — N unmatched interactive elements:` and a clean result prints `✓ No T2 gaps in [ComponentName]`.
+
+<Tip>
+The `→` hint is a starting point, not a verified selector. Always run it through `sel-probe` before writing YAML — a hint that matches more nodes than the cluster it came from will corrupt your coverage numbers.
+</Tip>
+
+---
+
+### `sightmap sel-probe`
+
+Queries the live page with a CSS selector and prints the match count plus per-match detail: element identity, role, text, key attributes, and up to five levels of parent chain. Parents that match a known corpus component are annotated with `★ ComponentName`, and a `nearest component` summary line shows which component the matches sit inside. Run it on every selector before that selector enters YAML.
+
+```bash
+sightmap sel-probe [flags] -- 'css-selector'
+```
+
+The `--` separator before the selector is recommended: selectors can start with `-` and would otherwise be misinterpreted as flags.
+
+With `--all`, the command instead navigates to every view URL declared in `views/*.yaml` — each view's top-level `url:` plus any `snapshots[].url` entries — and prints a per-view match count. That is the cross-page check to run before promoting a component from a view to `components.yaml`. It waits at least 0.5 seconds after each navigation; raise `--wait` for slow pages.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--all` | off | Probe the selector on every view URL declared in `views/*.yaml` |
+| `--full` | off | Show full text (no truncation to 80 characters) |
+| `--launch` | off | Launch a new Chrome instance if `--addr` is unreachable |
+| `--max` | `10` | Max matches to show |
+| `--probe-urls` | `.sightmap/probe-urls.yaml` | Deprecated fallback: path to a legacy `probe-urls.yaml`, read only when no view declares a `url:` |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory for component annotation |
+| `--tab` | — | Target tab ID (from `browser start` output) |
+| `--wait` | `0` | Seconds to wait after navigation with `--all` (minimum 0.5) |
+
+```bash
+sightmap sel-probe -- '[data-testid="product-pod"] button[data-testid="atc"]'
+```
+
+```text
+selector: [data-testid="product-pod"] button[data-testid="atc"]
+matches: 2
+nearest component: ★ ProductCard  (div[data-testid="product-pod"])
+
+[1] button.atc-btn
+    text:  "Add to Cart"
+    attrs: aria-label="Add Garden Hose 50 ft to cart"  data-testid="atc"  type="button"
+    parents:
+      div.pod-footer
+      div.product-pod  ★ ProductCard
+      div.results-grid
+      main#browse-main
+
+[2] button.atc-btn
+    text:  "Add to Cart"
+    attrs: aria-label="Add Sprinkler Head to cart"  data-testid="atc"  type="button"
+    parents:
+      div.pod-footer
+      div.product-pod  ★ ProductCard
+      div.results-grid
+      main#browse-main
+```
+
+The `--all` variant prints one line per view URL:
+
+```bash
+sightmap sel-probe --all -- '[data-testid="product-pod"]'
+```
+
+```text
+home                      sel=[data-testid="product-pod"]  0 matches
+plp                       sel=[data-testid="product-pod"]  24 matches
+plp/filtered              sel=[data-testid="product-pod"]  18 matches
+pdp                       sel=[data-testid="product-pod"]  1 match
+```
+
+<Note>
+`sel-probe` exits 0 even when the selector matches nothing — it is a diagnostic, and `matches: 0` is a valid answer. Use `sel-check` when you need a non-zero exit code for automation. Also note that probing does not preserve focus state: elements that only exist while an input is focused (search autocomplete dropdowns, for example) cannot be probed this way — establish the focus state with `browser eval` instead.
+</Note>
+
+---
+
+### `sightmap sel-check`
+
+Evaluates a CSS selector against a saved `.snap.tree.json` file offline — no browser session needed. Pass either the `.snap` path (the sibling `.snap.tree.json` is derived automatically) or the tree file itself. Matching applies the last simple selector in the chain to every node in the tree, so it answers "does this target element exist in the capture" rather than enforcing the full ancestor chain.
+
+The command exits 1 when the selector matches zero nodes, which makes it a cheap regression guard: pin a known-good selector against a saved snapshot and any refactor that breaks it fails the check.
+
+```bash
+sightmap sel-check 'SELECTOR' FILE.snap
+```
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--include-hidden` | off | Include hidden nodes (all nodes are shown by default) |
+| `--limit` | `20` | Max matches to print (all matches are still counted) |
+
+```bash
+sightmap sel-check --limit 3 'button[data-testid="atc"]' .sightmap/snapshots/plp/20260721T183045Z.snap
+```
+
+```text
+24 matches in .sightmap/snapshots/plp/20260721T183045Z.snap:
+
+  node 214  button  "Add to Cart"
+    data-testid: atc
+
+  node 389  button  "Add to Cart"
+    data-testid: atc
+
+  node 511  button  "Add to Cart"
+    data-testid: atc
+
+  … 21 more (use --limit to show more)
+```
+
+A selector that matches nothing prints the count and fails:
+
+```text
+0 matches in .sightmap/snapshots/pdp/20260722T091210Z.snap
+```
+
+<Tip>
+`sel-check` is deliberately looser than `sel-probe`: offline matching applies only the last simple selector, so it can count nodes that the live query's ancestor constraints would exclude. A disagreement beyond that usually means the snapshot is stale — re-capture the page first.
+</Tip>
+
+## Typical flow
+
+<Steps>
+  <Step title="Find candidates">
+    On a fresh page, run `sightmap suggest --exclude-known` to list stable-hook selectors not yet in the corpus, or `sightmap gap` to see orphaned interactive nodes with `→` selector hints.
+  </Step>
+  <Step title="Verify live">
+    Run `sightmap sel-probe -- 'selector'` and confirm the match count and parent chain are what you expect. Never write YAML from an unverified selector.
+  </Step>
+  <Step title="Write the component and re-check">
+    Add the component to `views/*.yaml` (or `components.yaml`), run `sightmap validate`, then re-run the [authoring loop](/cli/coverage) until the page reports zero orphans.
+  </Step>
+  <Step title="Cross-check before promotion">
+    Before promoting a component to `components.yaml`, run `sightmap sel-probe --all -- 'selector'` across every view URL, and pin the result offline with `sightmap sel-check` against saved snapshots.
+  </Step>
+</Steps>

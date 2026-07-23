@@ -1,0 +1,69 @@
+---
+title: "Install the Sightmap CLI"
+sidebarTitle: "Install"
+description: "Install paths for the sightmap CLI, the agent skills, the Go library, and editor schema validation."
+---
+
+Everything you need is the `sightmap` CLI plus the bundled agent skills.
+
+## The CLI
+
+| Path | Command | When |
+|---|---|---|
+| npm (native binary, no Go toolchain) | `npm install -g @sightmap/sightmap` | Most users. Downloads the prebuilt binary for your platform. |
+| One-off | `npx @sightmap/sightmap <cmd>` | Try it without installing. |
+| From source | `go install github.com/sightmap/sightmap/go/cmd/sightmap@latest` | Go developers, or building from a checkout. |
+
+The npm package downloads the native binary for your platform at install time; set `SIGHTMAP_SKIP_DOWNLOAD=1` to skip the download (useful in CI stages that never run the binary).
+
+Most commands accept `--sightmap-dir <dir>` to point at a corpus outside the current directory. See [The sightmap CLI](/authoring/cli) for the command surface.
+
+## The agent skills
+
+```bash
+sightmap skills install        # installs into ~/.agents/skills (override with --target)
+```
+
+This drops two skills into your agent harness:
+
+- **`sightmap-authoring`** — building and maintaining a corpus.
+- **`sightmap-browser`** — driving a live session and acting on a finished corpus.
+
+## The browser
+
+`sightmap browser start` needs a Chrome it can launch. If you don't have one available, install a managed Chrome for Testing:
+
+```bash
+sightmap browser install       # downloads Chrome for Testing to ~/.sightmap/browsers/
+```
+
+## The Go library
+
+The same module is `go get`-able for tools that consume sightmaps (the component model, selector matching, corpus loading):
+
+```bash
+go get github.com/sightmap/sightmap/go@latest
+```
+
+See the [package map](https://github.com/sightmap/sightmap/tree/main/go) and [Curator vs consumer](/concepts/curator-vs-consumer).
+
+## Editor schema validation
+
+Add this header to your `.sightmap/` YAML files for in-editor validation (yaml-language-server, used by the VS Code / JetBrains / Neovim YAML integrations):
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/sightmap/sightmap/main/spec/v1/sightmap.schema.json
+```
+
+See [JSON Schema](/reference/json-schema) for per-editor setup.
+
+## Requirements
+
+- **CLI (npm):** Node 18+. **From source:** Go 1.25.2+.
+- **Skills:** any skills-aware agent harness.
+- A Chrome the CLI can launch (see [The browser](#the-browser) above).
+
+## Next steps
+
+- [Quickstart](/start/quickstart) — from install to a populated `.sightmap/`.
+- [Authoring overview](/authoring/overview) — the model and the loop.

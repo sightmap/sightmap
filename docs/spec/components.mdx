@@ -1,0 +1,148 @@
+---
+title: "Sightmap Components: Selectors, Children, and References"
+sidebarTitle: "Components"
+description: "Name DOM subtrees with CSS selectors — single strings or ordered alternatives, scoped children, and shared $ref definitions."
+---
+
+A component is a named DOM subtree, identified by one or more CSS selectors. Names replace the generic accessibility role in enriched snapshots, so an agent reading the page sees `DepartureDatePicker` instead of `group`.
+
+```yaml
+- name: DepartureDatePicker
+  selector: '[data-picker="departure"]'
+  source: src/components/DatePicker.tsx
+  children:
+    - name: date-input
+      selector: input
+    - name: day
+      selector: '[role="gridcell"]'
+```
+
+`name` and `selector` are required. See [Schema reference](/reference/schema#component) for the full field list, including `description`, `source`, and `memory`.
+
+## Selectors
+
+`selector` accepts a single CSS selector string or an array of strings:
+
+```yaml
+# Single selector
+- name: SubmitButton
+  selector: 'button[type="submit"]'
+
+# Array — alternatives tried in order, first match wins
+- name: OriginAirportPicker
+  selector:
+    - '[data-picker="origin"]'
+    - '#origin-combobox'
+```
+
+Use the array form when you want a stable name across multiple variants of the UI — a redesigned page, a feature flag, or a third-party widget you don't control. The array isn't an OR over all matches; the runtime takes the first selector that matches anything and stops.
+
+If a selector matches multiple elements, all matches get the name. Selectors are not required to be unique.
+
+## The `data-component` convention
+
+The recommended pattern is to render a `data-component="<Name>"` attribute on the root element of each named component, then select on that attribute:
+
+```tsx
+<nav data-component="Navigation">…</nav>
+```
+
+```yaml
+- name: Navigation
+  selector: 'nav[data-component="Navigation"]'
+```
+
+This decouples the sightmap from class names, CSS modules, and styling refactors. It costs one attribute per named component and is trivial to grep for.
+
+It is a convention, not a requirement. Any CSS selector works.
+
+## Children are scoped
+
+Selectors inside `children` are evaluated **within** their parent's matched subtree, not against the whole document. This is how the spec avoids naming collisions between, say, two card components that each contain a `button.primary`.
+
+```yaml
+- name: SearchCard
+  selector: '[data-component="SearchCard"]'
+  children:
+    - name: submit
+      selector: 'button.primary'   # only inside SearchCard's subtree
+
+- name: BookingCard
+  selector: '[data-component="BookingCard"]'
+  children:
+    - name: submit
+      selector: 'button.primary'   # only inside BookingCard's subtree
+```
+
+## Scoping inside views vs at file level
+
+Components at the file root are **global** — matched on every view. Nested inside a view, they are scoped to that view. Both forms are additive: a view sees its own components plus all globals. See [Views](/spec/views#scoped-vs-global) for the full rule.
+
+<Warning>
+Quote attribute selectors so YAML parses them as strings: `selector: '[data-component="X"]'`. Unquoted, the brackets are read as a YAML flow sequence and the entry fails validation.
+</Warning>
+
+## Referencing shared components
+
+When the same component (a site header, a persistent footer, a chat widget) appears across many views, a `components:` array entry can be a **reference object** instead of a fresh inline definition:
+
+```yaml
+- $ref: SiteHeader
+```
+
+The reference is expanded inline to a deep copy of the named component before matching; if the copied `children:` contain further `$ref` entries, those are expanded too. Names resolve against a registry built from the root-level `components:` of every loaded file — nested children and view-scoped definitions are not addressable. When two files define a registry component with the same name, the first seen wins (sorted by source-file path) and implementations SHOULD emit a `merge-collision-component` warning.
+
+```yaml .sightmap/components.yaml
+version: 1
+
+components:
+  - name: SiteHeader
+    selector: '#site-header'
+    children:
+      - name: SearchBox
+        selector: 'form#header-search'
+```
+
+```yaml .sightmap/views/plp.yaml
+version: 1
+
+views:
+  - name: PLP
+    route: /b/**
+    components:
+      - $ref: SiteHeader     # attests SiteHeader is expected on this view
+      - name: ProductGrid    # view-specific
+        selector: '[data-component="ProductGrid"]'
+```
+
+Two reasons to prefer `$ref` over inline duplication or implicit auto-match:
+
+- **Single source of truth.** Update the header's selector or memory entries in one place; every referencing view picks up the change.
+- **Attestation.** A view's `components:` becomes a compact, machine-readable manifest of what it expects to see. Drift-detection tooling can surface "attested but matched 0 elements" as a signal — distinct from "this name was never mentioned anywhere."
+
+The conformance rules:
+
+- A `$ref` entry MUST contain exactly one key (`$ref`); overrides are not allowed in v1.
+- A `$ref` to a name that isn't in the registry is a `ref-unresolved` error.
+- A self-referential chain (`A` → `B` → `A`) is a `ref-circular` error.
+- When a view-scoped `$ref` and a file-root global share a name, the view-scoped expansion **subsumes** the global for that view — implementations MUST NOT produce two matches.
+
+See the [schema reference](/reference/schema#component-references) for the full statement.
+
+## Dependencies
+
+A component can declare additional files whose changes should prompt re-curation of the entry — typically style modules, hooks the component consumes, or shared utilities that don't warrant their own entry:
+
+```yaml
+- name: DepartureDatePicker
+  selector: '[data-picker="departure"]'
+  source: src/components/DatePicker.tsx
+  dependencies:
+    - src/components/DatePicker.module.css
+```
+
+`dependencies` is purely curation-time metadata — runtime consumers never read source files. Strings are minimatch globs, project-root-anchored, with `!`-prefix negation. See the [schema reference](/reference/schema#dependencies) for what belongs and what does not.
+
+## Next
+
+[Requests](/spec/requests) for API endpoints. [Memory](/spec/memory) for the freeform notes you can attach to any component.

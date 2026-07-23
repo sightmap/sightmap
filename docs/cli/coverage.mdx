@@ -1,0 +1,171 @@
+---
+title: "Sightmap CLI Coverage Commands: coverage, multi-coverage, and report"
+sidebarTitle: "Coverage"
+description: "Score saved captures offline against your corpus: coverage checks T1/T2/T3 tiers over a view's view set, multi-coverage builds the cross-page matrix, and report rolls up per-view health."
+---
+
+The coverage commands answer "is the corpus done?" without touching a browser. They re-match saved captures against the current `.sightmap/` YAML and classify every interactive node into a tier:
+
+| Tier | Meaning | Goal |
+|------|---------|------|
+| **T1** direct | The node itself matched a component selector — you know what it is and which instance | Maximize |
+| **T2** scoped | Inside a matched ancestor but unnamed itself — you know where, not what | Acceptable when tight |
+| **T3** orphaned | No matched ancestor at any depth — unattributable | **Must reach 0** |
+
+A view is a set of timestamped captures, and all three commands score the **union** of that set: real pages render differently load to load, so a component missing from one capture is not a dead selector. All three exit 0 on success and 1 on failure.
+
+<Note>
+These commands read the `.snap.tree.json` files written by `snapshot` — see [Capture commands](/cli/capture) for producing them and [View sets](/cli/snapshots) for how the sets are organized. Coverage only scores nodes; validating the YAML itself is `validate` and `lint` (see [Corpus commands](/cli/corpus)).
+</Note>
+
+---
+
+### `coverage`
+
+Re-runs T1/T2/T3 coverage on saved captures. With no arguments it walks every capture under `.sightmap/snapshots/`; pass one or more `FILE.snap` paths to score just those (each needs its `.snap.tree.json` sibling). Counts visible nodes only by default — running with `--include-hidden` unintentionally inflates T3 with false failures.
+
+`coverage` prints a per-capture tier line (each capture describes one DOM), but judges component **presence across the whole view set**:
+
+- `[Warnings]` — components that matched 0 of N snaps while their leaf selector part does match nodes: the scoped selector is likely broken.
+- `[Absent]` — components that matched 0 of N snaps and whose leaf part matches nothing either: structurally valid selector, element simply not rendered in the captured scenarios.
+- `[Presence]` — components matched in only a subset of the set, with the last-matched capture stamp. These are not failures; they are what a union-scored set is for.
+
+The check fails when a capture cannot be read or when any capture has T3 orphans; the dead-component sections (`[Warnings]`, `[Absent]`) are reported without affecting the exit status. A trailing `[Annotation gaps]` section is purely advisory — it lists non-interactive content nodes whose accessible name carries real information but that have zero component context, and never affects the exit status.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--include-hidden` | `false` | Include hidden/off-screen nodes in coverage stats. |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+| `--trace` | `false` | Print unlabeled cluster details for T3 orphaned nodes. |
+| `--visible` | `true` | Count only visible nodes (use `--include-hidden` to disable). |
+
+```bash
+sightmap coverage
+```
+
+```text
+20260607T193000Z.snap (visible only):
+  87 interactive · 26 direct T1 (30%) · 61 scoped T2 (70%) · 0 orphaned T3 ✓
+20260608T001500Z.snap (visible only):
+  83 interactive · 24 direct T1 (29%) · 59 scoped T2 (71%) · 0 orphaned T3 ✓
+[Warnings]
+  ProductListPage: QuickViewButton — 0 matches (0 of 2 snaps) — selector likely broken (leaf part matches nodes but full scoped selector does not)
+
+[Presence] (matched in a subset of the view's snapshots)
+  ProductListPage: PromoCarousel — matched in 1 of 2 snaps (last 2026-06-08 00:15Z)
+```
+
+With `--trace`, each failing capture also prints its orphan clusters, grouped by role and nearest stable-attribute ancestor with a suggested selector:
+
+```text
+Unlabeled clusters:
+  5× button (no text)
+       inside: div[data-testid="product-pod"]
+       → [data-testid="product-pod"] button
+```
+
+<Tip>
+Do not treat a one-shot `0 matches` on a fresh capture as a dead selector. Re-snap the view a few times — the novelty gate keeps only structurally new captures — and let the union decide. Confirm genuine absence with `sel-probe` against the live page.
+</Tip>
+
+---
+
+### `multi-coverage`
+
+Builds the cross-page coverage matrix: one row per component, one column per **view**. A view's captures fold into a single column whose cell is the maximum matched count across the set — "renders up to K of these" — and `-` marks a component that never matched in any of that view's captures. The column header reads `view·N` when the view carries more than one capture.
+
+Below the matrix, `multi-coverage` lists **global candidates**: components that matched in 2 or more views but are not yet in `components.yaml`. Candidates count views, not capture files, so a single view snapped many times never trips the threshold. The promotion rule of thumb: 3+ views with the same selector, always promote; 2 views with identical selectors, usually promote; 2 views with different selectors, keep view-scoped.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+
+```bash
+sightmap multi-coverage
+```
+
+```text
+Component        home·3  plp·2   pdp
+────────────────────────────────────
+AddToCartButton       -      -     1
+DigitalEndcap         4      -     -
+FacetFilter           -      8     -
+ProductPod           12     36     6
+PromoBanner           2      -     -
+SiteHeader            1      1     1
+SortDropdown          -      1     -
+
+Global candidates (appear in 2+ views, not yet in global components):
+  ProductPod  home(12) plp(36) pdp(6)   → add to components.yaml
+```
+
+Here the max-per-set cell rescues `DigitalEndcap`, a lazy carousel that rendered in only one of `home`'s three captures — it still reads `4`, not dead. `FacetFilter` and `PromoBanner` each appear in a single view, so they are correctly not promotion candidates.
+
+---
+
+### `report`
+
+The corpus health table: one row per view with a URL, aggregated over the view's whole view set. URLs come from each view's top-level `url:` in `views/*.yaml`. Views with no saved captures show `MISSING – run: sightmap snapshot --all`.
+
+How a set of N captures rolls up to one row:
+
+| Column | Aggregation over the view's N captures |
+|--------|----------------------------------------|
+| `Snaps` | Set size N |
+| `T1` / `T2` | Weighted averages: summed tier counts over summed interactive totals |
+| `T3` | **Max** orphan count across the set; `✗` iff greater than 0 |
+| `Largest T2 scope` | Largest single T2 cluster seen anywhere in the set (`⚠` at 15+) |
+
+The max-T3 gate is what keeps `report` and `coverage` in agreement: both fail iff some capture in a set has an orphan, so a clean final load can never mask an earlier capture's gaps. After the table, a **T2 quality** section aggregates the largest T2 clusters across all views — each entry is a component whose subtree contains multiple unnamed interactive children, i.e. the next place to add child components. `report` exits 1 when any view fails the T3 gate or has no captures.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--probe-urls` | — | Deprecated. Legacy `probe-urls.yaml` path, consulted only when no view declares a `url:`. URLs are read from `views/*.yaml`. |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+
+```bash
+sightmap report
+```
+
+```text
+sightmap report · example.com · 2026-07-22
+───────────────────────────────────────────────────────────
+ View  Route  Snaps    T1    T2   T3  Largest T2 scope
+───────────────────────────────────────────────────────────
+ home  /          3   78%   22%    3 ✗  [GlobalNav] (7)
+ plp   /b/**      2   82%   17%    0 ✓  [FacetFilter] (8)
+ pdp   /p/**      1   83%   17%    0 ✓  [GlobalNav] (7)
+───────────────────────────────────────────────────────────
+ 2/3 views ✓  ·  1 ✗  ·  avg T1 80%  ·  avg T2 18%
+
+T2 quality (add child components to improve coverage quality):
+    8  [FacetFilter]  (plp)
+    7  [GlobalNav]  (home, pdp)
+```
+
+<Tip>
+`report` is the natural CI gate: it fails on any orphaned node in any capture and on any view missing captures, and its summary line gives you the trend numbers (average T1/T2) to watch across commits.
+</Tip>
+
+## Typical flow
+
+<Steps>
+  <Step title="Refresh captures">
+    Run `sightmap snapshot --all` against a live session to append a novelty-gated capture for every view URL declared in `views/*.yaml` (see [Capture commands](/cli/capture)).
+  </Step>
+  <Step title="Score the sets">
+    Run `sightmap coverage` (add `--trace` on failures). Fix broken selectors flagged under `[Warnings]`, and author components for any orphan clusters until every capture reads `0 orphaned T3 ✓`.
+  </Step>
+  <Step title="Promote cross-page components">
+    Run `sightmap multi-coverage` and move each global candidate that appears in 2+ views into `components.yaml`.
+  </Step>
+  <Step title="Check corpus health">
+    Run `sightmap report`. You are done when every view shows `✓`, nothing is `MISSING`, and the T2 quality list contains only clusters you have deliberately accepted.
+  </Step>
+</Steps>

@@ -1,0 +1,29 @@
+---
+title: "Sightmap Conformance: The Rules Implementations Must Follow"
+sidebarTitle: "Conformance"
+description: "What it means for an implementation to conform to the spec, and where the executable definition — the conformance fixtures — lives."
+---
+
+An implementation *conforms* when it behaves the way the spec says for every input the spec defines. Because a sightmap is consumed by many tools — coding agents, runtime enrichers, CI checks — that shared contract is what lets a `.sightmap/` directory mean the same thing everywhere.
+
+## The rules
+
+A conforming implementation:
+
+- **MUST** accept any file that validates against [`sightmap.schema.json`](https://github.com/sightmap/sightmap/blob/main/spec/v1/sightmap.schema.json), and reject any that doesn't.
+- **MUST** implement [route matching](/spec/views#most-specific-wins) as specified — most-specific-wins for views, all-matches-apply for requests.
+- **MUST** implement [global vs view-scoped](/spec/views#scoped-vs-global) precedence.
+- **SHOULD** surface applicable [`memory`](/spec/memory) entries when the parent definition is active.
+- **MAY** ignore fields it doesn't use, and **MAY** add non-standard behavior as long as it doesn't change the meaning of conforming inputs.
+
+The full statement is in the [schema reference](/reference/schema#conformance).
+
+## The executable definition
+
+The spec's semantics are executable: each **[conformance fixture](/reference/conformance-fixtures)** pairs a simulated `.sightmap/` directory with an `expected.json` of `{ command, args, expected }` cases that every implementation must pass. On any disagreement, `sightmap.schema.json` and the normative spec text win — a fixture that contradicts them is a bug in the fixture. That still makes a failing fixture the cheapest way to influence the spec: it forces the conversation about whether the spec or the implementation is wrong, before either gets entrenched.
+
+See [Conformance fixtures](/reference/conformance-fixtures) for the catalog, how to run them, and how to contribute one.
+
+## Next
+
+The full field-by-field contract is in the [Schema reference](/reference/schema).

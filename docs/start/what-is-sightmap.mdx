@@ -1,0 +1,21 @@
+---
+title: "What Is Sightmap? The Open Spec That Teaches Agents Your Web App"
+sidebarTitle: "What is Sightmap?"
+description: "A two-paragraph framing of the Sightmap open spec — who reads it, and what one learned artifact gives every agent that follows."
+---
+
+Sightmap is an open specification for a `.sightmap/` directory you check into your repo. The directory holds YAML files that name your app's **views** (URL routes), **components** (CSS selectors), and **requests** (API routes), plus freeform `memory` notes about the quirks, invariants, and shortcuts that source code never records. `sitemap.xml` tells search engines how to crawl your site. `.sightmap/` teaches agents how to use it.
+
+## Who reads it
+
+Any tool that drives or analyzes your running app. Coding agents (Claude Code, Cursor, Codex, Windsurf) read it to understand which file renders which screen before editing. Browser-driving agents read it to act on components by name instead of by guessed selectors. [Subtext](https://subtext.fullstory.com), the runtime product the spec was extracted from, injects sightmap names and memory into live session snapshots and replays. Anything that wants semantic, repo-shared context about a web app can consume it.
+
+## What it gives you
+
+One artifact, learned once, shared across every agent. Components get real names. Memory entries — "Past dates render but are aria-disabled", "POST /api/search debounces 300ms" — appear in a `[Guide]` section at the top of every enriched snapshot, so the next agent picks up where the last one left off. The format is plain YAML validated against a [public JSON Schema](/reference/json-schema); the spec is MIT-licensed; no runtime, no service, no lock-in.
+
+## Where to go next
+
+- [Choose your path](/start/choose) — a one-screen guide for app authors, agent curators, and tool builders.
+- [Quickstart](/start/quickstart) — from install to a populated `.sightmap/`, agent-driven against your running app.
+- [Schema reference](/reference/schema) — every field, every constraint.

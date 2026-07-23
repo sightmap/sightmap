@@ -1,0 +1,81 @@
+---
+title: "Sightmap Conformance Fixtures: The Language-Agnostic Test Suite"
+sidebarTitle: "Conformance Fixtures"
+description: "The fixture catalog, how the assertions run, and how to contribute a new fixture."
+---
+
+The conformance fixtures are language-agnostic test cases. Every Sightmap implementation is expected to pass them, so the same `.sightmap/` directory means the same thing everywhere. They live under [`spec/conformance/`](https://github.com/sightmap/sightmap/tree/main/spec/conformance).
+
+## Layout
+
+Each fixture is a directory named `NNN-{slug}.fixture/` containing:
+
+- `sightmap/` — input YAML files (the simulated `.sightmap/` directory)
+- `expected.json` — a list of `{ command, args, expected }` test cases the runner checks
+
+The runner asserts that every key in `expected` is present in the actual output and matches deeply. Extra keys in the actual output are allowed, so the suite is forward-compatible. For arrays in `expected`, the actual array must be at least as long, and the prefix must match. The exact shape is documented in [`spec/conformance/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/conformance/README.md).
+
+<Note>
+The `command` values in `expected.json` (`match`, `explain`, `fmt`, `validate`, `lint`) are **fixture-harness verbs** — operations a conformance runner implements internally, not `sightmap` CLI commands. The shipping CLI has no `match`, `explain`, or `fmt` command; only `validate` and `lint` overlap in name. The harness that executes these verbs lives with each implementation.
+</Note>
+
+## Runtime-semantics fixtures (`0NN`)
+
+The first series exercises loading, route matching, and diagnostics:
+
+| # | Name | Exercises |
+|---|---|---|
+| 001 | `minimal` | Smallest valid sightmap; basic matching |
+| 002 | `multi-file-merge` | Same view name across two files → `merge-collision-view` warning |
+| 003 | `route-precedence` | Most-specific-wins for views: literal &gt; `:param` &gt; `*` &gt; `**`; declaration order tie-breaks |
+| 004 | `param-normalization` | Express-style `:param` normalizes to `*` |
+| 005 | `selector-array` | `selector` accepts an array; alternates tried in order |
+| 006 | `view-scoped-vs-global` | Global components match everywhere; scoped only on their view |
+| 007 | `request-method-filter` | Request matching filters by HTTP method |
+| 008 | `dependencies-binding` | `dependencies[]` glob binding and diagnostics (SEP-0001) |
+| 010 | `component-ref` | `$ref` expansion, view attestation, global+view dedup (SEP-0002) |
+| 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
+| 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
+
+## Canonical-format fixtures (`1NN`)
+
+The second series verifies the canonical byte-level YAML format defined by [`spec/v1/canonical-format.md`](https://github.com/sightmap/sightmap/blob/main/spec/v1/canonical-format.md) — the normative output format for any tool that writes `.sightmap/*.yaml` files. Each fixture carries expected canonical outputs under `sightmap/.expected/*.yaml`.
+
+| # | Name | Exercises |
+|---|---|---|
+| 100 | `fmt-quoting` | Quoting preference: plain → single-quoted → double-quoted |
+| 101 | `fmt-key-order` | Canonical key order per entry type |
+| 102 | `fmt-list-sort` | Top-level list ordering (views/components by `name`, requests by route+method) |
+| 103 | `fmt-comment-preservation` | Comments survive a structural rewrite |
+| 104 | `fmt-header-preservation` | Leading `#`-comment blocks preserved verbatim |
+| 105 | `fmt-idempotent` | Canonicalizing canonical input is a no-op |
+| 106 | `fmt-invalid-untouched` | Input that fails parse or schema validation is left untouched |
+| 108 | `fmt-dependencies-canonical` | `dependencies` arrays sorted and deduplicated |
+
+<Note>
+These fixtures pin the canonical format itself, not a formatter command — the shipping CLI does not include one. An implementation that writes sightmap YAML proves its output canonical by passing this series.
+</Note>
+
+## Running locally
+
+The fixture *inputs* validate against the JSON Schema with the monorepo's checker:
+
+```bash from a checkout of sightmap/sightmap
+cd spec && npm install && node scripts/validate-sightmap.mjs conformance
+```
+
+The full `{ command, args, expected }` assertions are executed by a conforming implementation's test suite. The reference implementation under [`go/`](https://github.com/sightmap/sightmap/tree/main/go) runs every fixture in CI. A port in another language implements a runner that loads each fixture's `sightmap/` directory, executes the listed `command` with `args`, and asserts the result matches `expected`.
+
+## Contributing a new fixture
+
+<Steps>
+  <Step title="Claim the next number">
+    Create the next-numbered `NNN-{slug}.fixture/` directory under `spec/conformance/` (see [`CONVENTIONS.md`](https://github.com/sightmap/sightmap/blob/main/spec/CONVENTIONS.md)). Open PRs reserve fixture numbers the same way they reserve SEP numbers.
+  </Step>
+  <Step title="Author the fixture">
+    Write `sightmap/*.yaml` and `expected.json`. Keep each fixture focused on one behavior.
+  </Step>
+  <Step title="Verify and open a PR">
+    Confirm the fixture passes against the reference implementation, then open a PR. Sign off your commits with `-s` per the [Contributing guide](/reference/contributing).
+  </Step>
+</Steps>

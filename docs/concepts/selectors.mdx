@@ -1,0 +1,66 @@
+---
+title: "Selectors and Match Strategy in Sightmap"
+sidebarTitle: "Selectors"
+description: "Why sightmaps point at the UI with CSS selectors, how selector arrays survive refactors, and how views and requests resolve their matches."
+---
+
+A sightmap names parts of the UI. To do that, it has to point at them — somehow — in a way that survives across frameworks, refactors, and rendering modes. Sightmap uses CSS selectors. The choice is not arbitrary; the alternatives are worse.
+
+## Why CSS
+
+CSS selectors are the one selection language every web framework and every browser-driving tool already understands. React, Vue, Svelte, Angular, server-rendered HTML, web components — all produce DOM, and DOM is queryable with CSS. Playwright, Puppeteer, every accessibility tree, every devtools console: CSS works.
+
+The alternatives each fail one constraint:
+
+- **Framework-specific component handles** (`<DatePicker>` in React DevTools, Vue component instance IDs) require the curator and the consumer to agree on the framework.
+- **XPath** is universal but verbose and brittle.
+- **Custom DOM mutations** (injecting unique IDs at runtime) change the page the agent is observing — a non-starter for tools like Subtext that enrich live sessions.
+
+CSS selectors are universal, non-mutating, and already in every agent's toolkit. They are also imperfect — which is why the spec adds two things on top.
+
+<Note>
+Sightmap matches a deliberate subset of CSS: tag, id, class, and attribute selectors, the descendant and child (`>`) combinators, and the pseudo-classes `:not()`, `:is()`, `:where()`, and `:has()`. Sibling combinators (`+`, `~`) are not supported. Staying inside the subset keeps a selector portable across every tool that reads the map — verify any selector with `sightmap sel-probe` or `sightmap sel-check` (see [Selector tools](/cli/selectors)).
+</Note>
+
+## Selectors can be arrays
+
+A `selector` field accepts either a single CSS string or an array of strings tried in order. First match wins.
+
+```yaml
+- name: DepartureDatePicker
+  selector:
+    - '[data-component="DepartureDatePicker"]'
+    - '[data-picker="departure"]'
+    - '.flight-search .date-picker'
+```
+
+This is how sightmaps survive refactors. The first selector is the long-term ideal — a `data-component` attribute the team has agreed to maintain. The second is the legacy attribute the picker shipped with. The third is the structural fallback for the day someone removes both. The map keeps working through all three states; the curator drops the stale entries when they're confident nothing relies on them.
+
+For nested components, child selectors are evaluated **within** the parent's matched subtree, not against the document root. Two unrelated card components can both contain a `button.primary` without colliding.
+
+## The `data-component` convention
+
+The recommended marker is a `data-component="ComponentName"` attribute on the root element of each component you want to name. It is:
+
+- **Stable across refactors** — the attribute moves with the component file.
+- **Invisible to users and to most CSS** — no styling implications.
+- **Trivially queryable** — `[data-component="DatePicker"]`.
+- **Consistent with framework norms** — React, Vue, and Svelte all pass `data-*` props through to the DOM.
+
+When an agent authors a corpus, a `data-component` marker is the highest-ranked, most stable selector candidate — so where one exists, it wins over ARIA, semantic tags, or ids. The convention exists so a new project has a default handle to reach for; add a marker in source wherever no stable selector already exists.
+
+<Warning>
+Quote attribute selectors in YAML. `selector: [data-component="X"]` is parsed as a YAML flow sequence and will fail validation. The correct form is `selector: '[data-component="X"]'` — single-quoted so the inner double quotes survive.
+</Warning>
+
+## How matching resolves
+
+The spec has three resolution rules, each tuned to what getting it wrong would cost.
+
+**Selector arrays** within a component use **first-match-wins**. The first pattern that resolves to one or more elements is the winner. This is what makes the legacy-then-fallback pattern in the section above work: list the long-term ideal first, the legacy attribute second, the structural fallback last.
+
+**View routes** (`views[].route`) use **most-specific-match-wins**, with declaration order as a tiebreak. A URL is scored against every matching pattern by summing per-segment weights — literal segments score 3, `:param` scores 2, `*` scores 1, `**` scores 0 — and the highest-scoring pattern wins. For the URL `/users/admin`, the view routed at `/users/admin` (score 6) beats `/users/*` (score 4) regardless of which was declared first.
+
+**Request routes** (`requests[].route`) use **all-matches-apply**. Every request whose route (and optional `method`) matches the observed traffic contributes its payload docs and memory — there is no single winner and no priority order. This is deliberate: a broad entry at `/api/**` documenting a shared rate limit and a specific entry at `/api/flights/search` documenting the payload both apply to the same call, and the agent should see both.
+
+In practice: declaration order rarely matters for views — the matcher picks `/install` over `*` on specificity — though keeping more specific routes near the top is still good hygiene. For requests, write each entry as if it stands alone, and use broad routes like `/api/**` for notes that genuinely apply everywhere. See [Route matching](/reference/schema#route-matching) in the schema reference for the glob syntax and the exact scoring weights.

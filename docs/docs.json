@@ -1,0 +1,178 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Sightmap",
+  "theme": "mint",
+  "colors": {
+    "primary": "#c9456d",
+    "light": "#ec6b8e",
+    "dark": "#a83359"
+  },
+  "logo": {
+    "light": "/images/logo-light.svg",
+    "dark": "/images/logo-dark.svg",
+    "href": "https://sightmap.org"
+  },
+  "favicon": "/favicon.svg",
+  "fonts": {
+    "family": "DM Sans"
+  },
+  "contextual": {
+    "options": ["copy", "view", "chatgpt", "claude", "cursor", "vscode", "mcp"]
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/sightmap/sightmap"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "index",
+              "start/what-is-sightmap",
+              "start/install",
+              "start/quickstart",
+              "start/choose"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/why",
+              "concepts/vs",
+              "concepts/curator-vs-consumer",
+              "concepts/workflow",
+              "concepts/selectors"
+            ]
+          },
+          {
+            "group": "Authoring",
+            "pages": [
+              "authoring/overview",
+              "authoring/cli"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "cli/overview"
+            ]
+          },
+          {
+            "group": "Browser",
+            "pages": [
+              "cli/browser",
+              "cli/interaction"
+            ]
+          },
+          {
+            "group": "Capture and coverage",
+            "pages": [
+              "cli/capture",
+              "cli/coverage",
+              "cli/snapshots"
+            ]
+          },
+          {
+            "group": "Selectors and corpus",
+            "pages": [
+              "cli/selectors",
+              "cli/corpus"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "cli/integrate"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Specification",
+        "groups": [
+          {
+            "group": "The spec",
+            "pages": [
+              "spec/overview",
+              "spec/views",
+              "spec/components",
+              "spec/requests",
+              "spec/memory",
+              "spec/conformance"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/schema",
+              "reference/json-schema",
+              "reference/conformance-fixtures",
+              "reference/versioning",
+              "reference/go-library",
+              "reference/glossary",
+              "reference/contributing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/sightmap/sightmap"
+    },
+    "links": [
+      {
+        "header": "Project",
+        "items": [
+          { "label": "sightmap.org", "href": "https://sightmap.org" },
+          { "label": "GitHub", "href": "https://github.com/sightmap/sightmap" },
+          { "label": "CLI on npm", "href": "https://www.npmjs.com/package/@sightmap/sightmap" }
+        ]
+      },
+      {
+        "header": "Docs",
+        "items": [
+          { "label": "Quickstart", "href": "https://docs.sightmap.org/start/quickstart" },
+          { "label": "CLI reference", "href": "https://docs.sightmap.org/cli" },
+          { "label": "Schema reference", "href": "https://docs.sightmap.org/reference/schema" }
+        ]
+      }
+    ]
+  },
+  "search": {
+    "prompt": "Search the Sightmap docs..."
+  },
+  "seo": {
+    "metatags": {
+      "og:locale": "en_US"
+    },
+    "indexing": "navigable"
+  },
+  "redirects": [
+    { "source": "/quickstart", "destination": "/start/quickstart" },
+    { "source": "/install", "destination": "/start/install" },
+    { "source": "/schema", "destination": "/reference/schema" },
+    { "source": "/start/react-quickstart", "destination": "/start/quickstart" },
+    { "source": "/start/agent-quickstart", "destination": "/start/quickstart" },
+    { "source": "/authoring", "destination": "/authoring/overview" },
+    { "source": "/spec", "destination": "/spec/overview" },
+    { "source": "/cli", "destination": "/cli/overview" }
+  ]
+}
