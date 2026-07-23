@@ -1,0 +1,28 @@
+---
+title: "Curator vs. Consumer: The Two Roles Around a Sightmap"
+sidebarTitle: "Curator vs. Consumer"
+description: "Understand who writes .sightmap/ and who reads it — and why consumers stay small while curation carries the judgment work."
+---
+
+A sightmap has two sides. Someone has to write `.sightmap/`, and something has to read it. The spec is deliberately shaped so these two jobs stay separate, because they are not equally hard.
+
+## Curator: the side with the work
+
+The **curator** writes and maintains `.sightmap/`. They name the views, pick the selectors, decide which components matter, and capture the memory entries that turn the file from a structural skeleton into something an agent can actually use.
+
+In practice, curation is almost never done by hand. The curator is a human working with an agent — and the agent is doing most of the typing. The tooling covers the curation surface:
+
+- **The [`sightmap` CLI](/authoring/cli)** drives a live Chrome session, layers the corpus onto the page, and reports annotated snapshots and coverage. It's what the agent authors against and what CI runs (`validate`, `lint`) to keep a corpus healthy.
+- **The bundled skills** — [`sightmap-authoring`](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md) and [`sightmap-browser`](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-browser/SKILL.md) — are the playbook the agent follows to discover views/components from the running app and act on a finished corpus.
+
+Curation is the hard problem because it is judgment work. *What's the right granularity for a component? Is this quirk worth capturing as memory or is it noise? Should this selector be one string or three? Did refactoring just break a selector silently?* No tool answers those questions for you, but the right tools give an agent enough leverage to draft, validate, and iterate alongside the human.
+
+## Consumer: the side that should stay small
+
+The **consumer** reads `.sightmap/` and uses it. Examples: a coding agent (Claude Code, Cursor, Codex) that loads the file as repo context; an IDE plugin that surfaces components in a sidebar; a runtime like [Subtext](https://subtext.fullstory.com) that injects names, memory, and source paths into live browser snapshots; a CI check that validates the file.
+
+Consumers should be small because the spec does most of the work. Match a URL against `views[].route`. Pull the active components and requests. Try `selector` strings in order until one matches. Surface `memory` in a `[Guide]` block. That's the shape of every consumer. The library does the heavy lifting — the integration is mostly plumbing.
+
+This asymmetry is intentional. Anyone wanting to consume a sightmap should be able to do it in an afternoon with the [Go library](/reference/go-library) (or a re-implementation in their language of choice — see the [conformance fixtures](/reference/conformance-fixtures)). Curation is where the time goes, and where tooling pays for itself.
+
+If you're building something that *reads* `.sightmap/`, start at the [JSON Schema](/reference/json-schema) and the [conformance fixtures](/reference/conformance-fixtures). If you're filling one in, start at [the curation workflow](/concepts/workflow).

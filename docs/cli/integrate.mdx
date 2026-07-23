@@ -1,0 +1,153 @@
+---
+title: "Sightmap CLI: Integration Tools Reference"
+sidebarTitle: "Integrations"
+description: "Complete reference for sightmap serve-sightmap, skills install, and version — serve the compiled corpus over HTTP with hot reload, install the embedded agent skills, and check the binary version."
+---
+
+These commands connect a corpus to the tools around it. `sightmap serve-sightmap` serves the compiled corpus as JSON over HTTP and hot-reloads it as you edit YAML. `sightmap skills install` extracts the two embedded agent skills into your agent harness. `sightmap version` prints the binary version. This page documents every integration command.
+
+<Note>
+`sightmap browser start` already runs the same HTTP server alongside Chrome — you rarely need to start it by hand. Reach for standalone `serve-sightmap` when you want the corpus endpoint without a managed browser session: your own tooling, a dashboard, or a browser started outside sightmap. See [Browser](/cli/browser) for session management.
+</Note>
+
+---
+
+### `sightmap serve-sightmap`
+
+Compiles the `.sightmap/` corpus and serves it over HTTP on port 7891 by default. Two endpoints:
+
+| Endpoint | Returns |
+| --- | --- |
+| `GET /sightmap` | The compiled corpus JSON: `site`, `version`, `views` (name and route), `globals`, and `viewComponents` keyed by route |
+| `GET /sightmap/version` | `{"version":"..."}` — cheap change detection for polling clients |
+
+The `version` value is a unix-milliseconds stamp bumped on every recompile, and responses carry `Access-Control-Allow-Origin: *` so browser clients can fetch cross-origin.
+
+The server watches `.yaml`/`.yml` files under `.sightmap/` and recompiles on change, debounced to 200 ms. The `snapshots/` and `review/` directories are excluded from the watch, so writing captures never bumps the corpus version.
+
+The primary consumer is the overlay browser extension, which fetches the served corpus to annotate the live page in the side panel and DevTools. The extension is embedded in the `sightmap` binary and auto-extracted to `~/.sightmap/extension/` when a browser session starts (and re-extracted whenever the bundled version changes) — there is nothing to install by hand.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--port` | `7891` | HTTP port to listen on |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
+
+```bash
+sightmap serve-sightmap
+```
+
+```text
+[serve-sightmap] listening on http://:7891
+[serve-sightmap] recompiled (v1753208412345)
+```
+
+Fetch the compiled corpus:
+
+```bash
+curl -s localhost:7891/sightmap
+```
+
+```json
+{
+  "site": "example-shop",
+  "version": "1753208412345",
+  "views": [
+    { "name": "plp", "route": "/b/**" },
+    { "name": "pdp", "route": "/p/**" }
+  ],
+  "globals": [
+    {
+      "name": "SiteHeader",
+      "selector": "header[data-testid=\"site-header\"]",
+      "parentChain": [],
+      "properties": []
+    }
+  ],
+  "viewComponents": {
+    "/b/**": [
+      {
+        "name": "ProductPod",
+        "selector": "[data-testid=\"product-pod\"]",
+        "parentChain": [],
+        "properties": [
+          { "name": "label", "extract": "h3" }
+        ]
+      }
+    ],
+    "/p/**": []
+  }
+}
+```
+
+`site` is the basename of the directory the server was started in. Each component carries its `name`, a comma-joined `selector` string, a `parentChain` (always an array, empty for top-level components), and its `properties`.
+
+<Warning>
+The `properties` entries reflect property extraction (`properties:` on components), which the CLI implements as a draft extension — it is not part of spec v1 and may change.
+</Warning>
+
+---
+
+### `sightmap skills install`
+
+Extracts the two agent skills embedded in the binary, each into its own subdirectory of the target directory:
+
+- **`sightmap-authoring`** — the corpus authoring playbook: the edit-verify loop, coverage tiers, selector rules, and quality checks.
+- **`sightmap-browser`** — driving a live browser session against a finished corpus: reading annotated snapshots and interacting by component query.
+
+The default target is `~/.agents/skills/`. Installing removes any previous copy of each skill and re-extracts it, so re-running after a CLI upgrade cleanly picks up the matching skill versions.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--target` | `~/.agents/skills` | Directory to install skills into (each skill becomes a subdirectory) |
+
+```bash
+sightmap skills install
+```
+
+```text
+installed 2 sightmap skill(s) → /Users/you/.agents/skills
+  sightmap-authoring
+  sightmap-browser
+  version: 0.1.0
+```
+
+<Tip>
+The skills ship inside the binary, so they are always in sync with the CLI you have. Re-run `sightmap skills install` after every upgrade.
+</Tip>
+
+---
+
+### `sightmap version`
+
+Prints the version and exits. No flags.
+
+```bash
+sightmap version
+```
+
+```text
+sightmap version 0.1.0
+```
+
+Releases are published on [GitHub Releases](https://github.com/sightmap/sightmap/releases); see [Install](/start/install) for the npm and `go install` paths.
+
+## Typical flow
+
+<Steps>
+  <Step title="Install the skills">
+    Run `sightmap skills install` so your agent harness picks up `sightmap-authoring` and `sightmap-browser` from `~/.agents/skills/`.
+  </Step>
+  <Step title="Serve the corpus">
+    Start a full session with `sightmap browser start` (the server is included), or run `sightmap serve-sightmap` standalone when you only need the HTTP endpoint.
+  </Step>
+  <Step title="Consume the endpoints">
+    Point your tooling at `GET /sightmap` for the compiled corpus and poll `GET /sightmap/version` to detect changes. The overlay extension does exactly this.
+  </Step>
+  <Step title="Edit YAML and let it reload">
+    Save a change under `.sightmap/` — the watcher recompiles 200 ms after the last write, the version bumps, and every polling client refreshes. No restarts.
+  </Step>
+</Steps>

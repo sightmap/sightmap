@@ -6,7 +6,7 @@ This repo contains:
 
 1. A specification (YAML schema, documentation, JSON Schema)
 2. A reference implementation (the Go library and `sightmap` CLI, plus its npm wrapper)
-3. Two static websites (Astro docs site and a React marketing site, deployed to Netlify)
+3. Two websites (a Mintlify docs site and a React marketing site on Netlify)
 
 Things we treat as security issues:
 

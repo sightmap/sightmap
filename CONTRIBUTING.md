@@ -18,7 +18,7 @@ The whole open Sightmap project, in one place:
 
 1. **The spec** — [`spec/`](spec/) contains the canonical specification, JSON Schema, examples, the SEP process, and conformance fixtures. This is the source of truth.
 2. **The reference implementation** — [`go/`](go/) is the Go library and `sightmap` CLI (published to npm as `@sightmap/sightmap`).
-3. **The websites** — [`docs/`](docs/) renders [docs.sightmap.org](https://docs.sightmap.org) (Astro Starlight); [`web/`](web/) renders [sightmap.org](https://sightmap.org) (React + Vite).
+3. **The websites** — [`docs/`](docs/) renders [docs.sightmap.org](https://docs.sightmap.org) (Mintlify); [`web/`](web/) renders [sightmap.org](https://sightmap.org) (React + Vite).
 
 Community SDK ports in other languages may live in separate repositories under the [`sightmap` GitHub organization](https://github.com/sightmap); they implement the spec defined here.
 
@@ -64,7 +64,8 @@ The repo is split by area; set up only what you're touching.
 
 - **Spec** (`spec/`) — schema validation runs on Node. See [`spec/`](spec/) for the validator.
 - **Go** (`go/`) — Go 1.25+. `cd go && go test ./...`.
-- **Docs / web** (`docs/`, `web/`) — Node 20+ and **pnpm**. `cd docs && pnpm install && pnpm dev` (or `cd web`). Please don't commit a `package-lock.json` or `yarn.lock`.
+- **Docs** (`docs/`) — Node 20+ and the Mintlify CLI: `npm i -g mint`, then `cd docs && mint dev`.
+- **Web** (`web/`) — Node 20+ and **pnpm**. `cd web && pnpm install && pnpm dev`. Please don't commit a `package-lock.json` or `yarn.lock`.
 
 CI runs the relevant checks per area on every PR.
 

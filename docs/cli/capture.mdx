@@ -1,0 +1,221 @@
+---
+title: "Sightmap CLI Capture Commands: snapshot, iterate, and inspect"
+sidebarTitle: "Capture"
+description: "Capture annotated component trees from a live Chrome session: snapshot writes novelty-gated captures, iterate runs the edit-verify loop, and inspect shows the raw DOM for selector authoring."
+---
+
+The capture commands read the live page over the Chrome DevTools Protocol, apply your `.sightmap/` corpus, and turn the DOM into something an agent (or you) can reason about. `snapshot` produces the full annotated tree and saves it into the view's view set. `iterate` is the fast edit-verify loop — navigate, snap, and score coverage in one step, without printing the tree. `inspect` drops below the sightmap layer and shows the raw DOM structure when you need to find an anchor for a new selector.
+
+<Note>
+All three commands need a running browser session — start one with `sightmap browser start` (see [Browser session](/cli/browser)). Scoring saved captures offline is covered in [Coverage commands](/cli/coverage), and how captures are organized on disk in [View sets](/cli/snapshots). To verify a candidate selector before writing YAML, use the [selector tools](/cli/selectors).
+</Note>
+
+---
+
+### `snapshot`
+
+Connects to the Chrome session, runs the component-extraction pipeline, applies the corpus, and emits an annotated ARIA tree together with coverage statistics. The output has four sections: a `[View: ...]` header (when the page URL matches a view's `route:`), a `[Guide]` listing each matched component with its match count, the component tree itself, and a `[Coverage]` summary line. Components that matched zero nodes are listed under `[Warnings]`.
+
+Each tree line starts with a numeric probe ID, then the node content:
+
+- **Matched nodes** render as `ID [ComponentName prop="val"]` — the component name replaces the ARIA role, extracted properties are sorted alphabetically, and the accessible name appears last (suppressed when it exactly equals a property value).
+- **Unmatched nodes** render as `ID role "text"` — the ARIA role and accessible name.
+
+The probe ID is a handle for the [interaction commands](/cli/interaction), though component queries are the more robust way to target dynamic pages.
+
+Where the capture goes depends on your flags:
+
+- **View matched, no `--out`** — the capture is appended to the view's set at `.sightmap/snapshots/{view}/{stamp}.snap` with a sibling `.snap.tree.json`, subject to the novelty gate (below). On success the command prints nothing.
+- **Explicit `--out FILE`** — writes exactly there. No set, no gate.
+- **No view, no `--out`** — prints to stdout.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address (host:port). |
+| `--all` | `false` | Capture every view URL declared in `views/*.yaml` (top-level `url:` plus `snapshots[].url`). |
+| `--compact` | `false` | Omit hidden/ignored nodes from output. |
+| `--depth` | `0` | Max tree depth (0 = unlimited). |
+| `--force` | `false` | Write the capture even if it adds no new component or slot vs the view set (skip the novelty gate). |
+| `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
+| `--interactive` | `false` | Show interactive nodes only. |
+| `--json` | — | Write annotated tree JSON to this file (superset of `--tree-out`: includes component name, memory, extracted props). |
+| `--launch` | `false` | Auto-launch Chrome if unreachable. |
+| `--out` | — | Write to file instead of stdout. |
+| `--probe-urls` | `.sightmap/probe-urls.yaml` | Deprecated. Legacy `probe-urls.yaml` path, consulted only when no view declares a `url:`. |
+| `--screenshot` | — | Save a PNG screenshot to this file alongside the tree, from the same page state. |
+| `--selectors` | `false` | Show `tag #id [data-testid]` selector hints (no CSS classes). |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+| `--tab` | — | Target tab ID (from `browser start` output). |
+| `--trace` | `false` | Include selector hints for unlabeled interactive clusters. |
+| `--tree-out` | — | Write raw component tree JSON to this file (enables offline `coverage`/`multi-coverage`). |
+| `--url` | — | Navigate to this URL before snapping. |
+| `--visible` | `true` | Count only visible nodes (use `--include-hidden` to disable). |
+| `--wait` | `0` | Extra seconds to wait after DOM stability is detected (use for unusually slow pages). |
+
+```bash
+sightmap snapshot --url 'https://example.com/products/outdoor'
+```
+
+The capture written to `.sightmap/snapshots/plp/20260722T183502Z.snap`:
+
+```text Capture excerpt
+[View: ProductListPage]
+route: /products/**
+
+[Guide]
+AddToCartButton  12
+ProductPod       12
+FacetFilter       8
+SearchInput       1
+SiteHeader        1
+
+--- component tree ---
+
+1 [SiteHeader]
+  14 [SearchInput value="cordless drill"]
+  22 link "Cart"
+36 main
+  41 [FacetFilter facet="Brand"]
+  52 [ProductPod name="Garden Hose 50ft" price="$24.98"]
+    57 [AddToCartButton label="Add Garden Hose 50ft to cart"]
+  63 [ProductPod name="Sprinkler Head" price="$8.47"]
+    68 [AddToCartButton label="Add Sprinkler Head to cart"]
+
+[Coverage] (visible only)
+87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
+```
+
+**The novelty gate.** When appending to a view's set, `snapshot` keeps the capture only if it adds something structurally new relative to the set — a new component type matched, or a new orphan slot. Pure value churn (different products, prices, copy) never counts, so dynamic pages saturate instead of accumulating near-duplicates. The first capture of a view always writes; `--force` overrides. A skipped capture reports on stderr:
+
+```text
+snapshot: nothing new vs 3 capture(s) in plp — not saved (use --force to keep)
+```
+
+See [View sets](/cli/snapshots) for the full set model and the `snapshot-novelty` primitive.
+
+**`--json` vs `--tree-out`.** These are the only JSON outputs, and both write files. `--tree-out` writes the raw component tree — the input the offline commands (`coverage`, `multi-coverage`, `sel-check`) consume; it is written automatically as the `.snap.tree.json` sibling whenever a capture joins a view's set. `--json` writes an annotated tree — a strict superset of the raw tree that adds the matched component name, `memory:` notes, and extracted property values per node (fields omitted on unmatched nodes). Use `--json` when a downstream tool wants the sightmap layer, `--tree-out` when it wants the bare structure.
+
+**`--all`** navigates to every URL declared in your `views/*.yaml` files — each view's top-level `url:` plus any `snapshots[].url` variants — and appends a novelty-gated capture per target, then prints a summary:
+
+```bash
+sightmap snapshot --all
+```
+
+```text
+snapping home → https://example.com/
+snapping plp → https://example.com/products/outdoor
+snapping pdp → https://example.com/p/garden-hose-50ft
+
+home                  = nothing new vs 3 snap(s) — not saved
+plp                   142 interactive · T1 61% · T2 39% · T3 0 ✓
+pdp                   98 interactive · T1 74% · T2 26% · T3 0 ✓
+```
+
+<Warning>
+Property extraction (the `properties:` field on components, shown as `prop="val"` in the annotated output and included in `--json` files) is a draft spec extension and may change. The v1 schema does not define the field.
+</Warning>
+
+<Tip>
+Defaults for `--wait`, `--trace`, and `--include-hidden` can be set once in `.sightmap/config.yaml` (`snapshot.wait`, `snapshot.trace`, `snapshot.include_hidden`) instead of repeating them per invocation. Async-rendered pages that populate after load usually need `--wait 1` or `--wait 2`.
+</Tip>
+
+---
+
+### `iterate`
+
+The primary authoring loop: navigate, snap, and print coverage in one step. `iterate` suppresses the tree output entirely — you get the `[View: ...]` line, the `[Coverage]` summary, an `Unlabeled clusters` section grouping the orphaned T3 nodes with a suggested selector (the `→` line), and a `T2 scopes` breakdown of components with multiple unnamed interactive children. That makes it the fastest way to run the fix-YAML-and-recheck cycle described in [the authoring workflow](/concepts/workflow).
+
+The full snap is still written — to `/tmp/sightmap-iter-SLUG.snap` (with a `.snap.tree.json` sibling), where `SLUG` is derived from the URL path — never to the site's view sets. Use `snapshot` when you want a permanent capture.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address (host:port). |
+| `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+| `--tab` | — | Target tab ID (from `browser start` output). |
+| `--wait` | `0` | Seconds to wait after navigation. |
+
+```bash
+sightmap iterate 'https://example.com/products/outdoor'
+```
+
+```text
+[View: ProductListPage "https://example.com/products/outdoor"]
+[Coverage] (visible only)
+87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
+
+Unlabeled clusters:
+  5× button (no text)
+       inside: div[data-testid="product-pod"]
+       → [data-testid="product-pod"] button
+
+Snap saved: /tmp/sightmap-iter-products-outdoor.snap
+```
+
+Verify the suggested selector with `sel-probe` before writing YAML, add the component, then run `iterate` again. Repeat until the coverage line reads `0 orphaned T3 ✓`.
+
+---
+
+### `inspect`
+
+Renders the raw DOM component tree — every element with its identifying attributes, without the sightmap filtering that `snapshot` applies. Use it when you need to find an anchor for a new component and `sel-probe` already presupposes a selector.
+
+Each line shows the probe ID, a CSS-selector-style display (`tag#id[attr="value"]`), and the accessible name when present. By default only the key identifying attributes appear: `data-*`, `aria-*`, `role`, `type`, `href`, `name`, `for`, `action`, `src`, and `placeholder`. Hidden nodes are marked `[hidden]`. Nodes already matched by a component in `--sightmap-dir` carry a `★ComponentName` annotation, so you can see at a glance which parts of the DOM your corpus already claims.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address (host:port). |
+| `--classes` | `false` | Show CSS class names in selector display. |
+| `--depth` | `0` | Max tree depth to print (0 = unlimited). |
+| `--interactive` | `false` | Show only interactive nodes and their ancestors. |
+| `--launch` | `false` | Auto-launch Chrome if unreachable. |
+| `--out` | — | Write output to file instead of stdout. |
+| `--selectors` | `false` | Show all attributes, not just key identifying ones. |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir for ★ annotations. |
+| `--url` | — | Navigate to this URL before inspecting. |
+| `--wait` | `0` | Seconds to wait after navigation (minimum 0.5 when `--url` is used). |
+
+```bash
+sightmap inspect --url 'https://example.com/products/outdoor' --interactive
+```
+
+```text
+1 body
+  4 header[data-testid="site-header"] ★SiteHeader
+    9 nav[aria-label="Main navigation"]
+      12 a[href="/deals"] "Deals"
+      15 a[href="/stores"] "Stores"
+    18 form[action="/search"][role="search"]
+      21 input[name="q"][placeholder="Search products"][type="search"]
+  33 main
+    36 div[data-testid="product-pod"] ★ProductPod
+      41 a[href="/p/garden-hose-50ft"] "Garden Hose 50ft"
+      47 button[aria-label="Add Garden Hose 50ft to cart"]
+```
+
+<Tip>
+Prefer anchors in this order: `data-testid` or a stable `#id`, then `data-component` or `aria-label`, then tag plus structural context. Class selectors are volatile — reach for `--classes` only when nothing better exists. See [Selectors](/concepts/selectors) for the full hierarchy.
+</Tip>
+
+## Typical flow
+
+<Steps>
+  <Step title="Start a browser session">
+    Run `sightmap browser start` from the directory containing your `.sightmap/` corpus. Confirm with `sightmap browser status` (see [Browser session](/cli/browser)).
+  </Step>
+  <Step title="Iterate on one page">
+    Run `sightmap iterate 'URL'` and read the coverage line. For each unlabeled cluster, verify the suggested selector with `sel-probe`, add a component to your YAML, and iterate again until `0 orphaned T3 ✓`.
+  </Step>
+  <Step title="Inspect when you need an anchor">
+    When no suggestion fits, run `sightmap inspect --interactive` to see the raw DOM with `★` marks on already-claimed nodes, and pick a stable attribute to build the selector from.
+  </Step>
+  <Step title="Refresh the view sets">
+    Run `sightmap snapshot --all` to append a novelty-gated capture for every view URL in `views/*.yaml`, then score them offline with the [coverage commands](/cli/coverage).
+  </Step>
+</Steps>

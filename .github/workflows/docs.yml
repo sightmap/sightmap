@@ -3,9 +3,9 @@ name: docs
 on:
   push:
     branches: [main]
-    paths: ['docs/**', 'spec/v1/**', '.github/workflows/docs.yml', '.github/lychee.toml']
+    paths: ['docs/**', 'spec/v1/**', '.github/workflows/docs.yml']
   pull_request:
-    paths: ['docs/**', 'spec/v1/**', '.github/workflows/docs.yml', '.github/lychee.toml']
+    paths: ['docs/**', 'spec/v1/**', '.github/workflows/docs.yml']
 
 permissions:
   contents: read
@@ -15,34 +15,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: build + link check
+  check:
+    name: schema sync + validate + link check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: pnpm
-          cache-dependency-path: docs/pnpm-lock.yaml
 
-      # The Schema reference page is generated from spec/v1/schema.md at build
-      # time (docs/scripts/sync-spec.mjs, wired into prebuild).
-      - name: Install
-        working-directory: docs
-        run: pnpm install --frozen-lockfile
+      # reference/schema.md is generated from the canonical spec/v1/schema.md
+      # and checked in (Mintlify has no build step). Fail when it drifts.
+      - name: Schema page in sync
+        run: |
+          node docs/scripts/sync-spec.mjs
+          git diff --exit-code docs/reference/schema.md
 
-      - name: Build
+      - name: Install Mintlify CLI
+        run: npm i -g mint
+
+      - name: Validate
         working-directory: docs
-        run: pnpm build
+        run: mint validate
 
       - name: Link check
-        uses: lycheeverse/lychee-action@v2
-        with:
-          args: --config .github/lychee.toml --base https://docs.sightmap.org --no-progress 'docs/dist/**/*.html'
-          fail: true
+        working-directory: docs
+        run: mint broken-links

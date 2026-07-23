@@ -5,7 +5,7 @@ export default function CTASection() {
         <div className="section-label">Get Started</div>
         <h2>Hand your agent the map.</h2>
         <p className="section-desc">
-          Install the CLI, start a browser session, and let your agent map the running app into <code>.sightmap/</code>. One YAML directory, learned from what the app actually does, shared across every agent. Three steps below.
+          Install the CLI, start a browser session, and let your agent map the running app into <code>.sightmap/</code>. One YAML directory, curated against the running app, shared across every agent. Three steps below.
         </p>
 
         <div className="gs-steps">
@@ -24,7 +24,9 @@ export default function CTASection() {
                 </div>
                 <pre><code><span className="c-com">$</span> npm install -g <span className="c-str">@sightmap/sightmap</span>{'\n'}
 <span className="c-com">$</span> sightmap skills install{'\n'}
-<span className="c-val">✓</span> installed <span className="c-key">sightmap-authoring</span> + <span className="c-key">sightmap-browser</span></code></pre>
+installed 2 sightmap skill(s) → ~/.agents/skills{'\n'}
+{'  '}<span className="c-key">sightmap-authoring</span>{'\n'}
+{'  '}<span className="c-key">sightmap-browser</span></code></pre>
               </div>
               <p className="gs-followup">
                 Prefer source? <code>go install github.com/sightmap/sightmap/go/cmd/sightmap@latest</code>. The same module is <code>go get</code>-able as a library.
@@ -46,10 +48,11 @@ export default function CTASection() {
                   <span className="code-lang">shell</span>
                 </div>
                 <pre><code><span className="c-com">$</span> sightmap browser start{'\n'}
-<span className="c-val">●</span> running{'\n'}
+<span className="c-val">●</span> ready  port=7891  cdp=7892  pid=52441  tab=A1B2C3D4{'\n'}
 <span className="c-com">$</span> sightmap iterate <span className="c-str">'http://localhost:3000/'</span>{'\n'}
-<span className="c-accent">[View: Home]</span>{'\n'}
-87 interactive · 61 named · 21 scoped · <span className="c-val">5 orphaned</span></code></pre>
+<span className="c-accent">[View: Home <span className="c-str">"http://localhost:3000/"</span>]</span>{'\n'}
+<span className="c-accent">[Coverage]</span> (visible only){'\n'}
+87 interactive · 61 direct T1 (70%) · 21 scoped T2 (24%) · <span className="c-val">5 orphaned T3 ✗</span></code></pre>
               </div>
               <p className="gs-followup">
                 Verify a candidate before you write it: <code>sightmap sel-probe '[data-testid="product-pod"]'</code>.
@@ -65,7 +68,7 @@ export default function CTASection() {
                 Let the agent curate <span className="gs-step-badge">agent-driven</span>
               </h3>
               <p className="gs-step-intro">
-                Point your agent at the app. The bundled <code>sightmap-authoring</code> skill walks the routes, names the orphaned components, and writes <code>.sightmap/</code> — you review the diff. The corpus is agent-curated, not generated; nothing writes it from source.
+                Point your agent at the app. The bundled <code>sightmap-authoring</code> skill walks the routes, names the orphaned components, and writes <code>.sightmap/</code> — you review the diff. The corpus is curated, not generated: definitions land only after they're verified against the live app.
               </p>
               <div className="code-block">
                 <div className="code-header">

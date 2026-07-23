@@ -1,15 +1,12 @@
 # Sightmap
 
-**Teach agents how to see and use your web app.**
-
-`sitemap.xml` tells search engines how to crawl your site.
-`.sightmap/` **teaches** agents how to use it.
-
-A `.sightmap/` directory in your repo is a YAML map of your app's **views**,
-**components**, and **API routes** — checked in, shared across every agent, and
-learned from the running app, not the source code. Any definition can carry a
-`memory` list: freeform notes about quirks, invariants, and shortcuts the source
-code doesn't record.
+Sightmap is an open YAML format and CLI that maintain a shared memory of a web
+app for AI agents. A `.sightmap/` directory in your repo names the app's
+**views**, **components**, and **API requests**; any definition can carry a
+`memory` list — freeform notes about quirks, invariants, and shortcuts the
+source code doesn't record. Agents curate the map against the running app with
+the `sightmap` CLI, definitions link back to their source files, and every
+agent that works on the app reads the same map.
 
 → **[sightmap.org](https://sightmap.org)** — overview and landing page
 → **[docs.sightmap.org](https://docs.sightmap.org)** — full documentation
@@ -25,7 +22,7 @@ implementation, and both websites in one place:
 |---|---|
 | [`spec/`](spec/) | The **normative** specification — `spec/v1/` schema + JSON Schema, the SEP process (`spec/seps/`), and language-agnostic conformance fixtures. Source of truth. |
 | [`go/`](go/) | The reference **Go implementation** — the `sightmap` CLI (live browser capture, annotated snapshots, coverage) plus a `go get`-able library for the component model and selector matching. Published to npm as [`@sightmap/sightmap`](https://www.npmjs.com/package/@sightmap/sightmap). |
-| [`docs/`](docs/) | The documentation site at [docs.sightmap.org](https://docs.sightmap.org) (Astro Starlight). |
+| [`docs/`](docs/) | The documentation site at [docs.sightmap.org](https://docs.sightmap.org) (Mintlify). |
 | [`web/`](web/) | The marketing landing page at [sightmap.org](https://sightmap.org) (React + Vite). |
 
 Each area has its own README with build and contribution details.
@@ -49,7 +46,7 @@ views:
           - Accepts typed YYYY-MM-DD — skips the calendar
 ```
 
-Then point your agent at the directory. The [quickstart](https://docs.sightmap.org/start/quickstart/)
+Then point your agent at the directory. The [quickstart](https://docs.sightmap.org/start/quickstart)
 walks the full loop, and the [`sightmap` CLI](go/) drives curation against a live
 browser.
 

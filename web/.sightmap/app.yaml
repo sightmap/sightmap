@@ -48,7 +48,6 @@ views:
         description: The three-concept section — Views, Components, Requests — with YAML + enriched-output pairs
         memory:
           - Each subsection uses the `.concept` wrapper with a numbered header (`.concept-num`)
-          - Requests has a green `new` badge; Views and Components do not
           - Running example across all three subsections is the flight-search app
         children:
           - name: concept
@@ -73,8 +72,6 @@ views:
             selector: ".memory-points"
           - name: memory-point
             selector: ".memory-point"
-          - name: memory-tease
-            selector: ".memory-tease"
 
       - name: GetStarted
         selector: '[data-component="GetStarted"]'
@@ -83,9 +80,8 @@ views:
         memory:
           - Filename is `CTASection.tsx` for historical reasons; the section data-component is `GetStarted`
           - Steps live in `.gs-steps`; each row is a `.gs-step` with `.gs-step-num` + `.gs-step-body`
-          - Step 02 carries the `recommended` badge; step 03 carries `browser-use`
-          - Step 02 quotes the two Claude Code slash commands verbatim — `/plugin marketplace add sightmap/plugin` then `/plugin install sightmap@sightmap`
-          - Step 03's .mcp.json snippet wraps @playwright/mcp via the `--` arg pass-through
+          - Step 03 carries the `agent-driven` badge (`.gs-step-badge`); steps 01 and 02 have none
+          - Step 03's code block is a prompt to the agent, not shell — the bundled `sightmap-authoring` skill does the curation
         children:
           - name: gs-steps
             selector: ".gs-steps"

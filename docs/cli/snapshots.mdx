@@ -1,0 +1,164 @@
+---
+title: "Sightmap View Sets: Capture Layout, the Novelty Gate, and Pruning"
+sidebarTitle: "Snapshots"
+description: "How Sightmap organizes captures on disk — a view is a set of timestamped snapshots scored as a union — plus snapshot-novelty, snapshot-prune, and migrate-snapshots."
+---
+
+Real pages are non-deterministic: lazy carousels, personalization, rotating promos, and interaction-gated sections mean no single page load exercises a view's full component structure. Sightmap therefore treats a **view as a set of captures** — its **view set** — not a single file, and scores the **union** of that set. This page explains the on-disk layout, the novelty gate that keeps sets small, and the three commands that manage them.
+
+<Note>
+Captures are produced by `snapshot` and `iterate` — see [Capture commands](/cli/capture). The commands that read the sets (`coverage`, `multi-coverage`, `report`) are on [Coverage commands](/cli/coverage).
+</Note>
+
+## The capture layout
+
+Each capture lives under its view's directory at `.sightmap/snapshots/{view}/{stamp}.snap`, where `{stamp}` is a filesystem-safe UTC timestamp in `YYYYMMDDTHHMMSSZ` form — so lexical order equals chronological order:
+
+```text .sightmap/snapshots/
+.sightmap/
+└── snapshots/
+    ├── home/
+    │   ├── 20260607T193000Z.snap
+    │   ├── 20260607T193000Z.snap.tree.json
+    │   ├── 20260608T001500Z.snap
+    │   └── 20260608T001500Z.snap.tree.json
+    └── plp/
+        ├── 20260722T141230Z.snap
+        └── 20260722T141230Z.snap.tree.json
+```
+
+Two files per capture:
+
+- **`{stamp}.snap`** — the human-readable annotated tree, exactly what `snapshot` prints.
+- **`{stamp}.snap.tree.json`** — the raw component tree JSON sibling, written automatically alongside every capture. This is what powers the offline commands (`coverage`, `multi-coverage`, `sel-check`, `snapshot-novelty`).
+
+There is no per-view "state" axis and no curated capture names. To cover a drawer open, a tab switched, or a different personalization bucket, just re-snap the view in that configuration — a new timestamped capture joins the set if it earns its place.
+
+## A view is a set
+
+Re-snapping never overwrites: `snapshot` **appends** to the view's set, and every set-aware reader operates over the union:
+
+- `coverage` flags a component dead only when it matches 0 of N snaps across the whole set; components present in some captures appear under `[Presence]` instead.
+- `report` rolls each set up to one row — T1/T2 as weighted averages, T3 as the max across captures.
+- `multi-coverage` folds each set into one matrix column whose cells are per-component maximums.
+
+The consequence: a carousel that renders in one load out of three still counts, and a component's absence from a single reduced load is never mistaken for a broken selector.
+
+## The novelty gate
+
+Left unchecked, append-only sets would grow without bound. The novelty gate keeps a capture only when it is **structurally new** relative to its view's existing set:
+
+- A new **component type** matched — a component that no existing capture in the set matches, or
+- A new **orphan slot** — an uncovered interactive node identified by its role and nearest stable-attribute ancestor, a deliberately instance-free key.
+
+Value churn — different products, prices, or copy filling the same structure — never counts, so dynamic views saturate after a few snaps. The first capture of a view always writes, `--force` bypasses the gate, and an explicit `--out FILE` writes exactly there (no set, no gate).
+
+Novelty is **corpus-relative**: captures are re-matched against the current corpus every time. A capture kept because it had unique orphans stops being novel once you author components covering those orphans — which is exactly what lets `snapshot-prune` clean up after the fact.
+
+---
+
+### `snapshot-novelty`
+
+Asks the gate's question explicitly for a saved capture: does this file add any new component type or orphan slot versus the rest of its view's set? Use it to understand why a capture was kept, or to check a candidate before committing it.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+
+```bash
+sightmap snapshot-novelty .sightmap/snapshots/plp/20260722T141230Z.snap
+```
+
+```text
+plp · candidate 20260722T141230Z.snap vs 3 existing capture(s)
+
+Novel components (matched here, in no existing capture):
+  QuickViewModal
+
+Novel orphan slots (uncovered interactive nodes, new vs the set):
+  2× button @ div[data-testid="quick-view"]
+
+→ NOVEL: adds 1 component, 1 orphan slot — keep.
+```
+
+A redundant capture reports the opposite verdict:
+
+```text
+plp · candidate 20260722T141230Z.snap vs 3 existing capture(s)
+
+nothing new vs 3 capture(s) — redundant.
+```
+
+---
+
+### `snapshot-prune`
+
+The retrospective counterpart to the capture-time gate: re-matches every capture in a view against the **current** corpus and deletes the ones that are subsumed — removing them does not shrink the union, because their component types and orphan slots all survive in some retained capture. Pruning is conservative: it never chases a minimal cover, never drops a view's last capture, and collapses two identical captures to one rather than deleting both. Pass a view name, or `--all` to prune every view with captures.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--all` | `false` | Prune every view with captures. |
+| `--dry-run` | `false` | Report what would be pruned without deleting. |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+
+```bash
+sightmap snapshot-prune --dry-run plp
+```
+
+```text
+plp: 5 capture(s) → keep 3, would prune 2
+  would prune 2026-06-07 19:30Z
+  would prune 2026-06-08 00:15Z
+
+(dry run — nothing deleted; re-run without --dry-run to prune)
+```
+
+Re-run without `--dry-run` to delete the listed captures along with their `.snap.tree.json` siblings.
+
+<Tip>
+Prune after authoring sessions, not before. Because novelty is corpus-relative, a batch of new components is exactly what turns older captures redundant — run `snapshot-prune --dry-run --all` once coverage is green and reclaim the difference.
+</Tip>
+
+---
+
+### `migrate-snapshots`
+
+Moves legacy flat `.snap` files (and their `.snap.tree.json` siblings) from the current directory into the organized per-view structure under `.sightmap/snapshots/`, where the set-aware commands find them. Each file's view is inferred from its basename. Run with `--dry-run` first to see every planned move as an `old → new` line.
+
+Legacy layouts still parse everywhere in the meantime — `coverage`, `report`, and `snapshot --all` read both forms during a transition — so migration is a one-time tidy-up, not a prerequisite.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` | `false` | Show what would be moved without actually moving files. |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+
+```bash
+sightmap migrate-snapshots --dry-run
+```
+
+```text
+migrate-snapshots: dry run complete, 4 files would be moved
+```
+
+## Typical flow
+
+<Steps>
+  <Step title="Build the set">
+    Re-snap each view a few times in different configurations — fresh loads, a drawer open, a tab switched. The novelty gate keeps only captures that add a new component type or orphan slot, so just snap freely.
+  </Step>
+  <Step title="Check a candidate when in doubt">
+    Run `sightmap snapshot-novelty FILE.snap` to see exactly what a capture adds versus the rest of its set — or why it was skipped.
+  </Step>
+  <Step title="Author against the union">
+    Work the [coverage loop](/cli/coverage) until every capture is orphan-free. New components retroactively cover the orphan slots that made older captures novel.
+  </Step>
+  <Step title="Prune the redundant captures">
+    Run `sightmap snapshot-prune --dry-run --all`, review the plan, then prune. The surviving set's union is identical — just smaller.
+  </Step>
+</Steps>

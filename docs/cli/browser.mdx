@@ -1,0 +1,216 @@
+---
+title: "Sightmap Browser Commands: Managing Chrome Sessions"
+sidebarTitle: "Browser Sessions"
+description: "Install Chrome for Testing, start and stop sightmap sessions, navigate, evaluate JavaScript, and reset storage from the command line."
+---
+
+`sightmap browser` manages the Chrome for Testing session that every live command relies on. A session is one Chrome instance per site, recorded in `.sightmap/.session`, exposing its DevTools endpoint on `localhost:7892` (the default `--addr`) and — when started with `browser start` — a sightmap HTTP server on port `7891` that feeds the in-browser overlay extension. This page documents the session lifecycle: `install`, `start`, `launch`, `stop`, `status`, `navigate`, `eval`, and `clear-storage`.
+
+<Note>
+This page covers session management only. For acting on the page — `click`, `fill`, `screenshot`, `bounds`, tab management — see [Page interaction](/cli/interaction). For capturing annotated component trees, see [Capturing pages](/cli/capture). Page-affecting commands also accept `--addr` and `--tab`; see the [shared conventions](/cli/overview).
+</Note>
+
+---
+
+### `browser install`
+
+Downloads the latest stable Chrome for Testing into `~/.sightmap/browsers/` and prints the path to the installed binary. Idempotent: if the current stable version is already installed, it prints the path and exits `0`. Takes no flags.
+
+```bash
+sightmap browser install
+```
+
+```text
+Resolving latest Chrome for Testing (Stable)...
+  version: 151.0.7922.47  platform: mac-arm64
+Downloading https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.47/mac-arm64/chrome-mac-arm64.zip
+    5%  8 / 178 MB     25%  44 / 178 MB     50%  89 / 178 MB     75%  133 / 178 MB    100%  178 / 178 MB
+Extracting...
+Installed: /Users/you/.sightmap/browsers/chrome-151.0.7922.47/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+/Users/you/.sightmap/browsers/chrome-151.0.7922.47/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
+```
+
+The final line is the binary path on stdout, so scripts can capture it; progress goes to stderr.
+
+---
+
+### `browser start`
+
+The everyday session command. `start` launches Chrome, starts the sightmap HTTP server (default port `7891`) that serves your compiled corpus, and loads the overlay extension — which is embedded in the binary and auto-extracted to `~/.sightmap/extension/` on first start, no flag needed. The server hot-reloads the corpus whenever you edit YAML under `.sightmap/`, so the overlay always reflects your latest edits. `start` runs in the foreground until you press Ctrl-C, which stops Chrome and the server together.
+
+Run it from the site directory (the one containing `.sightmap/`), typically in a second terminal or as a background job.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | `7891` | Sightmap HTTP server port (`0` = auto-allocate) |
+| `--extensions` | embedded overlay | Comma-separated extension paths to load instead of the embedded overlay extension |
+| `--url` | none | Navigate here after launch |
+| `--profile` | per-site directory under `~/.sightmap/profiles/` | Chrome user data dir |
+
+```bash
+cd sites/shop.example.com/
+sightmap browser start --url 'https://shop.example.com'
+```
+
+```text
+[serve-sightmap] listening on http://:7891
+● ready  port=7891  cdp=7892  pid=84210  tab=8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D
+  Addr: --addr localhost:7892
+  Tab:  --tab 8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D  (pass this on commands once other agents open tabs here)
+  Press Ctrl-C to stop.
+```
+
+<Note>
+If Chrome is already running for this site, `start` does not launch a second instance — it opens a new tab in the existing session and prints that tab's ID:
+
+```text
+● tab    cdp=7892  tab=F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A
+  Chrome was already running for this site; opened a NEW tab for you.
+  Pass --tab F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A on EVERY command this session — other tabs belong to other agents.
+```
+
+Thread that ID through as `--tab` on every subsequent command so concurrent agents never drive each other's tab.
+</Note>
+
+---
+
+### `browser launch`
+
+A bare Chrome launcher: starts Chrome with its DevTools endpoint only — no sightmap server, and no overlay extension unless you pass `--extensions`. Unlike `start`, `launch` returns immediately and leaves Chrome running detached; it prints the chosen CDP port to stdout so scripts can capture it. Use `launch` when you want a plain CDP session without the overlay, or use the `--launch` flag on analysis commands to do this implicitly.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--headless` | off | Run headless |
+| `--port` | `7892` | CDP port (`0` = pick a free one) |
+| `--profile` | `~/.sightmap/profiles/default` | User data dir |
+| `--extensions` | none | Comma-separated extension directory paths to load |
+| `--url` | none | Navigate here after launch |
+| `--wait` | `0` | Seconds to wait after navigation |
+
+```bash
+sightmap browser launch --headless --url 'https://shop.example.com'
+```
+
+```text
+7892
+Chrome launched on port 7892  (pid 84210)
+Profile: /Users/you/.sightmap/profiles/default
+```
+
+If a session is already running, `launch` refuses with `a session is already running on port 7892` — run `browser stop` first, or `browser status` to inspect it.
+
+---
+
+### `browser stop`
+
+Stops the session's Chrome — terminating the whole process group, falling back to reaping by profile directory — and removes the session file once nothing is left alive. Takes no flags.
+
+```bash
+sightmap browser stop
+```
+
+```text
+stopping Chrome (pgid 84210, port 7892)...
+stopped
+```
+
+With no session running it prints `no active session` and exits `0`.
+
+---
+
+### `browser status`
+
+Reports session health. `status` probes the CDP endpoint rather than trusting the `.session` file, so it detects dead sessions: when Chrome is gone it prints `✗ unreachable`, removes the stale session file, and tells you to run `browser start` again. It also lists every open content tab with a ready-to-paste `--tab` flag. Takes no flags.
+
+```bash
+sightmap browser status
+```
+
+```text
+● running  cdp=7892  pid=84210
+  profile: /Users/you/.sightmap/profiles/shop.example.com
+  tabs (2):
+    --tab 8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D  https://shop.example.com/
+    --tab F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A  https://shop.example.com/cart
+  multiple tabs open — pass --tab <ID> on page commands to avoid crosstalk.
+```
+
+With no session it prints `○ no session`. If a Chrome process for the site's profile is still alive without a session file, it reports `⚠ orphan` and points you at `browser stop` to reap it.
+
+---
+
+### `browser navigate`
+
+Navigates the session to a URL and waits for the page to load. The URL is a **positional** argument. After a server-side redirect, `navigate` prints the final URL so you know where the page actually landed.
+
+```bash
+sightmap browser navigate 'https://shop.example.com/deals'
+```
+
+```text
+navigated to https://shop.example.com/deals
+  (redirected to https://shop.example.com/offers)
+```
+
+<Warning>
+`browser navigate` takes a positional URL — there is no `--url` flag here (that flag belongs to `browser start` and `browser launch`). `sightmap browser navigate --url 'https://...'` passes the literal string `--url` as the URL and fails.
+</Warning>
+
+---
+
+### `browser eval`
+
+Evaluates a JavaScript expression in the page context and prints the result — pretty-printed when it is a JSON object or array. The script is a positional argument.
+
+Only JSON-serializable values come back. A DOM element reference — `document.querySelector(...)` by itself — returns an error; extract the value you need instead (`document.querySelector('h1')?.textContent`).
+
+```bash
+sightmap browser eval '({url: location.href, title: document.title})'
+```
+
+```text
+{
+  "title": "Example Shop — Home",
+  "url": "https://shop.example.com/"
+}
+```
+
+---
+
+### `browser clear-storage`
+
+Wipes session state: clears **all** cookies — including `httpOnly` cookies that page JavaScript cannot touch — and the origin's storage (localStorage, IndexedDB, service workers, caches). It is the programmatic equivalent of Chrome DevTools **Application → Clear storage**, and the reliable way to reset a logged-in session to a clean slate.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--origin` | current page origin | Origin whose storage to clear |
+
+```bash
+sightmap browser clear-storage
+```
+
+```text
+clear-storage: ✓ httpOnly cookies cleared
+clear-storage: ✓ origin storage cleared (https://shop.example.com)
+clear-storage: done — navigate to homepage and wait before accessing protected pages
+```
+
+## Typical flow
+
+<Steps>
+  <Step title="Install the browser once">
+    `sightmap browser install` downloads Chrome for Testing to `~/.sightmap/browsers/`.
+  </Step>
+  <Step title="Start the session">
+    From the site directory, `sightmap browser start` — note the `--addr` and `--tab` values it prints.
+  </Step>
+  <Step title="Check health">
+    `sightmap browser status` confirms `● running` and lists open tabs.
+  </Step>
+  <Step title="Navigate and work">
+    `sightmap browser navigate 'https://...'`, then capture and interact ([Capturing pages](/cli/capture), [Page interaction](/cli/interaction)).
+  </Step>
+  <Step title="Stop when done">
+    Ctrl-C in the `start` terminal, or `sightmap browser stop` from anywhere in the site directory.
+  </Step>
+</Steps>

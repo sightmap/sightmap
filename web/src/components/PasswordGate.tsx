@@ -22,7 +22,7 @@ export default function PasswordGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div style={{
+    <div data-component="PasswordGate" style={{
       display: 'flex',
       minHeight: '100vh',
       alignItems: 'center',

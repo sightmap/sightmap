@@ -1,52 +1,79 @@
 version: 1
 
 components:
-  - name: SiteTitle
-    selector: '.site-title-link'
-  - name: PageTitle
-    selector: '.docs-page-title'
-  - name: Hero
-    selector: '.docs-hero'
+  - name: Navbar
+    selector: '#navbar'
+    description: Fixed header — logo (links to sightmap.org), search, theme toggle, GitHub button
+  - name: SearchEntry
+    selector: ['#search-bar-entry', '#search-bar-entry-mobile']
+    description: Opens the Mintlify search / assistant dialog
   - name: Sidebar
-    selector: 'nav[aria-label="Main"]'
+    selector: '#sidebar'
+    description: Left navigation — tabs (Documentation, CLI reference, Specification) and their groups
+  - name: ContentArea
+    selector: 'main#content-container'
+    description: Rendered MDX page body
   - name: TableOfContents
-    selector: 'nav[aria-label*="On this page"]'
-  - name: SearchInput
-    selector: '[data-pagefind-ui-input]'
+    selector: '#table-of-contents'
+    description: Right-rail on-this-page outline
+  - name: ThemeToggle
+    selector: '#theme-preference-menu-trigger'
+  - name: CopyCodeButton
+    selector: '[data-testid="copy-code-button"]'
+  - name: PageContextMenu
+    selector: '#page-context-menu-button'
+    description: Contextual menu — copy page, view as markdown, open in ChatGPT/Claude/Cursor/VS Code, MCP
+  - name: Pagination
+    selector: '#pagination'
+    description: Previous/next page links at the bottom of each page
+  - name: Footer
+    selector: '#footer'
+  - name: StatusLiveRegion
+    selector: 'div[aria-live="polite"][role="status"]'
+    description: Framework toast/status live region — empty until a notification fires
+  - name: RouteAnnouncer
+    selector: '#__next-route-announcer__'
+    description: Next.js client-navigation announcer for screen readers
 
 views:
   - route: /
     name: Home
-    components:
-      - name: Hero
-        selector: '.docs-hero'
+    description: Landing page — positioning, before/after snapshot CodeGroup, nav cards, how-it-works steps
+    url: http://localhost:3000/
 
   - route: /start/**
     name: Start Here
     memory:
       - 'Onboarding section. Pages here should be readable in under 5 minutes.'
 
-  - route: /spec/**
-    name: The Spec
-    memory:
-      - 'Stream version 1 reference. Schema canon lives at github.com/sightmap/spec.'
-
-  - route: /authoring/**
-    name: Authoring
-    memory:
-      - 'Per-package documentation for @sightmap/* tooling.'
-
   - route: /concepts/**
     name: Concepts
     memory:
       - 'Conceptual onramps. No exhaustive reference here.'
 
+  - route: /authoring/**
+    name: Authoring
+    memory:
+      - 'The curation loop and CLI tour. Flag tables live under /cli/, not here.'
+
+  - route: /cli/**
+    name: CLI Reference
+    memory:
+      - 'One section per command, flags tables generated from the real --help output.'
+      - 'Command surface is canonical from go/cmd/sightmap — never document a flag that is not in the binary.'
+
+  - route: /spec/**
+    name: The Spec
+    memory:
+      - 'Stream version 1 reference. Schema canon lives at spec/v1/ in the sightmap/sightmap monorepo.'
+
   - route: /reference/**
     name: Reference
     memory:
-      - 'Exhaustive reference appendix. Canonical schema text lives in sightmap/spec.'
+      - 'Exhaustive appendix. reference/schema is generated from spec/v1/schema.md by scripts/sync-spec.mjs — edit the spec, then regenerate.'
 
 memory:
-  - 'This is the docs site itself, dogfooding Sightmap. Built with Astro Starlight.'
-  - 'Five sidebar groups: Start Here, The Spec, Authoring, Concepts, Reference.'
-  - 'All content is hand-authored MDX under src/content/docs/. No build-time content sync from sightmap/spec.'
+  - 'This is the docs site itself, dogfooding Sightmap. Built with Mintlify; navigation and theme live in docs.json.'
+  - 'Three sidebar tabs: Documentation (Get started, Concepts, Authoring), CLI reference, Specification (The spec, Reference).'
+  - 'All content is hand-authored MDX at the docs/ root. reference/schema.md is the one generated page.'
+  - 'The Mintlify chrome (navbar, sidebar, TOC, search) is framework-rendered — its selectors are stable ids like #navbar, #sidebar, #table-of-contents.'

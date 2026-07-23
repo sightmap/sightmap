@@ -1,26 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>sightmap — a memory system for agents that use your web app</title>
-  <meta name="description" content="An open YAML format and CLI. A .sightmap/ directory names your app's views, components, and API requests — curated by agents against the running app, shared by every agent.">
-  <meta property="og:title" content="sightmap — a memory system for agents">
-  <meta property="og:description" content="An open YAML format and CLI. A .sightmap/ directory names your app's views, components, and API requests — curated by agents against the running app, shared by every agent.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://sightmap.org">
-  <meta property="og:image" content="https://sightmap.org/og-image.png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="sightmap — a memory system for agents">
-  <meta name="twitter:description" content="An open YAML format and CLI. A .sightmap/ directory names your app's views, components, and API requests — curated by agents against the running app, shared by every agent.">
-  <meta name="twitter:image" content="https://sightmap.org/og-image.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Fullstory -->
-  <script>
+// FullStory analytics — same org as sightmap.org and the previous docs site.
+// Mintlify includes every root-level .js file globally on all pages.
+
     window['_fs_host'] = 'fullstory.com'
     window['_fs_script'] = 'edge.fullstory.com/s/fs.js'
     window['_fs_org'] = 'o-24BT0G-na1'
@@ -172,10 +152,4 @@
           }),
         (g._v = '2.0.0'))
     })(window, document, window._fs_namespace, 'script', window._fs_script)
-  </script>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
-</html>
+  

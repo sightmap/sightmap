@@ -1,0 +1,295 @@
+---
+title: "Sightmap Browser Commands: Interacting with the Live Page"
+sidebarTitle: "Interaction"
+description: "Click, fill, scroll, and screenshot a live page — targeting elements by semantic component identity instead of brittle CSS."
+---
+
+Once a session is running ([Browser sessions](/cli/browser)), these commands act on the live page: `click`, `fill`, `hover`, `keypress`, `scroll`, `drag`, `wait-for`, `dialog`, `screenshot`, `bounds`, and `tabs`. Interaction targets are either a numeric probe ID from [`sightmap snapshot`](/cli/capture) output or a **component query** — a small CSS-shaped language that addresses elements by their sightmap identity.
+
+<Note>
+All commands on this page except the `tabs` subcommands (which resolve the session address themselves) accept `--addr` (default `localhost:7892`) and `--tab`; pass `--tab` whenever two or more content tabs are open, and put flags before positional arguments ([shared conventions](/cli/overview)). Session lifecycle commands live on the [Browser sessions](/cli/browser) page.
+</Note>
+
+## Component queries
+
+Probe IDs are extraction-local: every snapshot reassigns them, so on a page that re-renders, an ID from an earlier snapshot goes stale. A component query avoids that — the command extracts the live tree, applies your corpus, and acts, all in one atomic pass, so nothing can go stale in between. Prefer queries on dynamic pages.
+
+Queries match over **component names and extracted property values**, not the DOM:
+
+| Query | Matches |
+|-------|---------|
+| `SearchInput` | the component named `SearchInput` |
+| `ProductCard[sku=12345]` | a `ProductCard` whose `sku` property equals `12345` |
+| `ProductCard[name^="Weber"]` | property prefix (`^=`) |
+| `ProductCard[name*="grill" i]` | property substring (`*=`); trailing ` i` makes the comparison case-insensitive |
+| `ProductCard[sku=12345][badge=Sale]` | all predicates must hold |
+| `LoginForm UserNameInput` | whitespace is a descendant chain; the **last** component is the target |
+| `FulfillmentTileButton#1` | occurrence index `#N` (0-based) — a weak fallback when nothing else disambiguates |
+
+The only predicate operators are `=` (exact), `^=` (prefix), and `*=` (substring). Quote values that contain spaces. `--sightmap-dir` (default `.sightmap`) selects the corpus that resolves the query.
+
+A query that matches **zero** components is an error. A query that matches **several** is also an error — the CLI lists the candidates with their distinguishing properties so you can add a predicate or an `#N` index:
+
+```text
+sightmap browser: query FulfillmentTileButton is ambiguous: 2 components match. Add a property predicate or an occurrence index (#N):
+  #0  id=112  FulfillmentTileButton label="Pickup"
+  #1  id=118  FulfillmentTileButton label="Delivery"
+```
+
+<Warning>
+Property predicates depend on `properties:` extraction in your corpus, which is a **draft spec extension** — implemented by the Go CLI but not part of sightmap spec v1, and subject to change. Robust targeting and property authoring reinforce each other: a component with no properties can only be addressed by name or `#N` index.
+</Warning>
+
+---
+
+### `browser click`
+
+Clicks an element. The target is a probe ID, a component query, or raw `--x`/`--y` coordinates (a layout-fragile escape hatch). Prints nothing on success.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+| `--x` | `-1` | Absolute x coordinate (skips node lookup) |
+| `--y` | `-1` | Absolute y coordinate (skips node lookup) |
+
+```bash
+sightmap browser click 'ProductCard[name^="Weber"] AddToCartButton'
+```
+
+<Tip>
+Off-screen targets can be missed. Scroll the element into view first with `browser scroll --component-id`, then click.
+</Tip>
+
+---
+
+### `browser fill`
+
+Types a value into an input. Takes two positionals: the target (probe ID or component query) and the value. Prints nothing on success.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--clear` | off | Clear the field via JS before typing (use for React-controlled inputs) |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+
+```bash
+sightmap browser fill --clear SearchInput 'garden hose'
+```
+
+<Tip>
+React-controlled inputs may append instead of replace. Pass `--clear`, or set the value through the native setter with `browser eval`:
+
+```bash
+sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "new value"); el.dispatchEvent(new Event("input", {bubbles: true}))'
+```
+</Tip>
+
+---
+
+### `browser hover`
+
+Moves the pointer over an element — for hover-revealed menus and tooltips. Same targeting as `click`: probe ID, component query, or `--x`/`--y`. Prints nothing on success.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+| `--x` | `-1` | Absolute x coordinate (skips node lookup) |
+| `--y` | `-1` | Absolute y coordinate (skips node lookup) |
+
+```bash
+sightmap browser hover 'AccountMenu'
+```
+
+---
+
+### `browser keypress`
+
+Sends a key event to the currently focused element — click or fill a field first to focus it. The key name is a positional argument: `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, `Space`, and so on. Prints nothing on success.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+
+```bash
+sightmap browser fill SearchInput 'garden hose'
+sightmap browser keypress Enter
+```
+
+---
+
+### `browser scroll`
+
+Scrolls the page by pixel deltas, scrolls a component into view, or both — `--component-id` first brings the target into view, then any deltas apply. Prints nothing on success.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--component-id` | none | Component ID or `'ComponentQuery'` to scroll into view first |
+| `--delta-x` | `0` | Horizontal scroll delta in pixels |
+| `--delta-y` | `0` | Vertical scroll delta in pixels |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+
+```bash
+sightmap browser scroll --delta-y 800
+sightmap browser scroll --component-id 'FooterLinks'
+```
+
+---
+
+### `browser drag`
+
+Drags an element by pixel deltas — for sliders and drag handles. The target is a positional **probe ID** from snapshot output (component queries are not supported here). Prints nothing on success.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--delta-x` | `0` | Horizontal drag delta in pixels |
+| `--delta-y` | `0` | Vertical drag delta in pixels |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+
+```bash
+sightmap browser drag 214 --delta-x 120 --delta-y 0
+```
+
+---
+
+### `browser wait-for`
+
+Blocks until a condition holds — exactly one of `--url`, `--selector`, or `--load`. Prints nothing on success; exits `1` if the timeout elapses first. Use it after a click that triggers navigation or async rendering, before you snapshot or act again.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--load` | off | Wait for the page load event |
+| `--selector` | none | Wait until a DOM element matching this selector appears |
+| `--timeout-ms` | `10000` | Timeout in milliseconds |
+| `--url` | none | Wait until the page URL contains this pattern |
+
+```bash
+sightmap browser click 'CheckoutButton'
+sightmap browser wait-for --url '/checkout' --timeout-ms 15000
+```
+
+---
+
+### `browser dialog`
+
+Resolves a blocking JavaScript dialog (`alert`, `confirm`, `prompt`). The action is a positional argument: `accept` or `dismiss`. Prints nothing on success.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+| `--text` | none | Prompt input text (prompt dialogs only) |
+
+```bash
+sightmap browser dialog accept --text 'Springfield'
+```
+
+---
+
+### `browser screenshot`
+
+Captures the current page as a PNG.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--out` | `screenshot.png` | Output file path |
+| `--stdout` | off | Write image bytes to stdout (for piping) |
+
+```bash
+sightmap browser screenshot --out cart.png
+```
+
+```text
+screenshot saved: cart.png
+```
+
+---
+
+### `browser bounds`
+
+Emits bounding boxes as JSON — as viewport percentages (mapping directly onto a screenshot taken at the same browser state) plus raw pixels. Query by positional component **names** (exact, case-insensitive — this is name lookup, not the component-query DSL), by raw CSS selector, or dump every matched component with `--all`. Offscreen matches are skipped unless you ask for them.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--all` | off | Emit bounds for every matched component (ignores positional queries) |
+| `--include-offscreen` | off | Include components whose bounds fall entirely outside the viewport |
+| `--selector` | none | Query raw DOM elements by CSS selector instead of component name |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component-name queries) |
+| `--substring` | off | Match component names by case-insensitive substring (default: exact, case-insensitive) |
+| `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+
+```bash
+sightmap browser bounds SearchInput
+```
+
+```text
+viewport: 1440x900
+[
+  {
+    "comp": "SearchInput",
+    "label": "Search products",
+    "id": "27",
+    "top": 2.1,
+    "left": 30.6,
+    "width": 38.9,
+    "height": 4.9,
+    "px": {
+      "x": 440,
+      "y": 19,
+      "width": 560,
+      "height": 44
+    },
+    "inViewport": true
+  }
+]
+```
+
+---
+
+### `browser tabs`
+
+Tab management for the session. `browser start` prints your tab's ID; `tabs list` shows every open content tab.
+
+| Subcommand | Description |
+|------------|-------------|
+| `tabs list` | List open tabs (TargetID, URL, Title) |
+| `tabs new [URL]` | Open a new tab; prints its TargetID |
+| `tabs select <target-id>` | Deprecated — pass `--tab <ID>` on individual commands instead |
+| `tabs close <target-id>` | Close a tab |
+| `tabs resize <width> <height>` | Resize the viewport of the current tab |
+
+```bash
+sightmap browser tabs list
+```
+
+```text
+8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D	https://shop.example.com/	Example Shop — Home
+F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A	https://shop.example.com/cart	Your Cart
+```
+
+## Typical flow
+
+<Steps>
+  <Step title="Read the page">
+    `sightmap snapshot` prints the annotated component tree — component names, extracted properties, and probe IDs ([Capturing pages](/cli/capture)).
+  </Step>
+  <Step title="Act by identity">
+    `browser click 'ProductCard[name^="Weber"] AddToCartButton'`, `browser fill --clear SearchInput 'garden hose'` — component queries stay valid across re-renders.
+  </Step>
+  <Step title="Wait for the result">
+    `browser wait-for --url '/cart'` (or `--selector`/`--load`) before the next action.
+  </Step>
+  <Step title="Verify">
+    Re-snapshot to read the new state, or `browser screenshot --out after.png` — pair with `browser bounds` to locate components in the image.
+  </Step>
+</Steps>

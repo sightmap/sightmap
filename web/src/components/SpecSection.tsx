@@ -73,7 +73,7 @@ export default function SpecSection() {
                 <tr>
                   <td>description</td>
                   <td>string</td>
-                  <td>Optional, not uploaded — useful for humans reading the file</td>
+                  <td>Optional, not surfaced at runtime — useful for humans reading the file</td>
                 </tr>
                 <tr>
                   <td>source</td>
@@ -83,7 +83,7 @@ export default function SpecSection() {
                 <tr>
                   <td>dependencies</td>
                   <td>string[]</td>
-                  <td>Optional globs naming secondary files (hooks, stores, styles) whose changes should also trigger re-curation. Reverse lookup walks these too.</td>
+                  <td>Optional globs naming secondary files (hooks, stores, styles) whose changes should also trigger re-curation.</td>
                 </tr>
                 <tr>
                   <td>components</td>
@@ -116,7 +116,9 @@ export default function SpecSection() {
                 <span className="code-filename">.sightmap/pages/flights.yaml</span>
                 <span className="code-lang">yaml</span>
               </div>
-              <pre><code><span className="c-key">components</span>:{'\n'}
+              <pre><code><span className="c-key">version</span>: <span className="c-val">1</span>{'\n'}
+{'\n'}
+<span className="c-key">components</span>:{'\n'}
 {'  '}- <span className="c-key">name</span>: <span className="c-str">DepartureDatePicker</span>{'\n'}
 {'    '}<span className="c-key">selector</span>: <span className="c-str">'[data-picker="departure"]'</span>{'\n'}
 {'    '}<span className="c-key">source</span>: <span className="c-str">src/components/DatePicker.tsx</span>{'\n'}
@@ -155,11 +157,11 @@ export default function SpecSection() {
           </div>
 
           <div className="callout">
-            <strong>Selectors can be a list.</strong> When multiple CSS patterns should match the same component — say, both a class name and an ARIA role — pass a YAML array instead of a string.
+            <strong>Selectors can be a list.</strong> When multiple CSS patterns should match the same component — say, both a class name and an ARIA role — pass a YAML array instead of a string. Alternatives are tried in order; the first selector that matches wins.
           </div>
 
           <div className="callout">
-            <strong>Reference shared components by name.</strong> Inside any <code>components:</code> array, an entry of the form <code>{'{ $ref: SiteHeader }'}</code> inlines a deep copy of a component defined elsewhere. Define a header, footer, or chat widget once, and every view that contains it attests to its presence — drift checks treat <em>attested but missing</em> as a distinct signal.
+            <strong>Reference shared components by name.</strong> Inside any <code>components:</code> array, an entry of the form <code>{'{ $ref: SiteHeader }'}</code> inlines a deep copy of a component defined at the root <code>components:</code> of any file. Define a header, footer, or chat widget once, and every view that contains it attests to its presence — drift checks can treat <em>attested but missing</em> as a distinct signal.
           </div>
 
           <div className="schema-table-wrap">
@@ -186,12 +188,12 @@ export default function SpecSection() {
                 <tr>
                   <td>dependencies</td>
                   <td>string[]</td>
-                  <td>Optional globs naming supplementary files (styles, helpers) that influence this component. Used by reverse-lookup and change-propagation tools; not uploaded.</td>
+                  <td>Optional globs naming supplementary files (styles, helpers) whose changes should trigger re-curation of this component. Curation-time metadata; not surfaced at runtime.</td>
                 </tr>
                 <tr>
                   <td>description</td>
                   <td>string</td>
-                  <td>Optional, not uploaded</td>
+                  <td>Optional, not surfaced at runtime</td>
                 </tr>
                 <tr>
                   <td>memory</td>
@@ -213,7 +215,6 @@ export default function SpecSection() {
           <div className="concept-header">
             <span className="concept-num">03</span>
             <h3>Requests</h3>
-            <span className="concept-badge">new</span>
           </div>
           <p className="concept-intro">
             Requests map API endpoints to semantic names with optional field schemas. The network tab gets the same treatment as the DOM — agents see the names you wrote, not a wall of URLs.
@@ -225,7 +226,9 @@ export default function SpecSection() {
                 <span className="code-filename">.sightmap/requests.yaml</span>
                 <span className="code-lang">yaml</span>
               </div>
-              <pre><code><span className="c-key">requests</span>:{'\n'}
+              <pre><code><span className="c-key">version</span>: <span className="c-val">1</span>{'\n'}
+{'\n'}
+<span className="c-key">requests</span>:{'\n'}
 {'  '}- <span className="c-key">name</span>: <span className="c-str">SearchFlights</span>{'\n'}
 {'    '}<span className="c-key">route</span>: <span className="c-str">/api/flights/search</span>{'\n'}
 {'    '}<span className="c-key">method</span>: <span className="c-val">POST</span>{'\n'}
