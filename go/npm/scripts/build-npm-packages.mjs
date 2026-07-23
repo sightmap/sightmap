@@ -17,6 +17,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -50,10 +51,25 @@ const targets = [
   { key: "win32-x64", os: "win32", cpu: "x64", archive: "sightmap_windows_amd64.zip", bin: "sightmap.exe" },
 ];
 
+// findArchive locates an archive by name under distDir, tolerating whatever
+// nesting the CI artifact download produces (flat, or preserved under go/dist).
+function findArchive(root, name) {
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(p);
+      else if (entry.name === name) return p;
+    }
+  }
+  return null;
+}
+
 function extractBinary(archive, destDir, binName) {
-  const archivePath = join(distDir, archive);
-  if (!existsSync(archivePath)) {
-    throw new Error(`missing archive: ${archivePath}`);
+  const archivePath = findArchive(distDir, archive);
+  if (!archivePath) {
+    throw new Error(`missing archive ${archive} under ${distDir}`);
   }
   mkdirSync(destDir, { recursive: true });
   if (archive.endsWith(".zip")) {
