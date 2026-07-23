@@ -25,12 +25,9 @@
   "bin": {
     "sightmap": "bin/sightmap.js"
   },
-  "scripts": {
-    "postinstall": "node install.js"
-  },
   "files": [
     "bin/",
-    "install.js",
+    "resolve-binary.js",
     "README.md"
   ],
   "publishConfig": {
