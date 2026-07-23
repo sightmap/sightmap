@@ -43,13 +43,6 @@ title: "Sightmap Schema Reference"
 sidebarTitle: "Schema"
 description: "Exhaustive field-level reference for the Sightmap v1 YAML format, generated from the canonical spec."
 ---
-
-<Note>
-This page is generated from [\`spec/v1/schema.md\`](${BLOB}/spec/v1/schema.md) —
-do not edit it here. The canonical file and
-[\`sightmap.schema.json\`](${BLOB}/spec/v1/sightmap.schema.json) win on any
-disagreement. Regenerate with \`node docs/scripts/sync-spec.mjs\`.
-</Note>
 `;
 
 mkdirSync(dirname(out), { recursive: true });
