@@ -1,0 +1,24 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "sightmap-marketplace",
+  "owner": {
+    "name": "Sightmap"
+  },
+  "plugins": [
+    {
+      "name": "sightmap",
+      "source": "./",
+      "version": "0.13.1",
+      "description": "Author and maintain .sightmap/ corpora and drive a live browser via annotated component snapshots",
+      "category": "development",
+      "keywords": [
+        "sightmap",
+        "agent",
+        "browser-automation",
+        "cli",
+        "yaml"
+      ],
+      "homepage": "https://github.com/sightmap/sightmap"
+    }
+  ]
+}

@@ -110,8 +110,13 @@ sightmap report              # per-view T1/T2/T3 health table
 For the full authoring workflow — coverage tiers, the component model, property
 extraction, cross-page promotion, and the quality checklist — see the
 [authoring reference](docs/reference.md). The bundled
-[sightmap-authoring skill](skills/sightmap-authoring/SKILL.md) drives an agent through the
+[sightmap-authoring skill](../skills/sightmap-authoring/SKILL.md) drives an agent through the
 same loop.
+
+> The canonical skills live at the repo root under [`../skills/`](../skills/).
+> The copy under `skills/` here is generated (`go generate ./skills/...`) and
+> embedded into the binary for `sightmap skills install` — edit the canonical
+> copy, not this one.
 
 ---
 
@@ -120,8 +125,8 @@ same loop.
 | Doc | What it covers |
 |-----|----------------|
 | [docs/reference.md](docs/reference.md) | Authoring reference — coverage model, component model, the outer loop, full tool reference, lint rules, quality checklist |
-| [skills/sightmap-authoring/SKILL.md](skills/sightmap-authoring/SKILL.md) | Authoring skill — building/maintaining a corpus (agent workflow) |
-| [skills/sightmap-browser/SKILL.md](skills/sightmap-browser/SKILL.md) | Browser skill — driving a live session and interacting via a corpus |
+| [../skills/sightmap-authoring/SKILL.md](../skills/sightmap-authoring/SKILL.md) | Authoring skill — building/maintaining a corpus (agent workflow) |
+| [../skills/sightmap-browser/SKILL.md](../skills/sightmap-browser/SKILL.md) | Browser skill — driving a live session and interacting via a corpus |
 
 ---
 

@@ -27,7 +27,8 @@
   },
   "files": [
     "bin/",
-    "README.md"
+    "README.md",
+    "skills/"
   ],
   "optionalDependencies": {
     "@sightmap/sightmap-darwin-arm64": "0.13.1",

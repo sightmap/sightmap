@@ -3,9 +3,9 @@ name: go
 on:
   push:
     branches: [main]
-    paths: ['go/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
   pull_request:
-    paths: ['go/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
 
 permissions:
   contents: read
@@ -33,6 +33,20 @@ jobs:
         run: |
           out=$(gofmt -l .)
           if [ -n "$out" ]; then echo "unformatted files:"; echo "$out"; exit 1; fi
+
+      # The embedded skills (go/skills/<name>/) are generated from the canonical
+      # corpora at the repo root (skills/). Regenerate and fail on any drift so
+      # the two never diverge. Edit skills/<name>/, not the go/skills copy.
+      - name: skills embed in sync
+        run: |
+          go generate ./skills/...
+          if [ -n "$(git -C .. status --porcelain -- skills go/skills)" ]; then
+            echo "Embedded skills are out of sync with the canonical skills/ directory."
+            echo "Run 'go generate ./skills/...' from go/ and commit the result."
+            git -C .. status --porcelain -- skills go/skills
+            git -C .. --no-pager diff -- skills go/skills
+            exit 1
+          fi
 
       - run: go build ./...
 
