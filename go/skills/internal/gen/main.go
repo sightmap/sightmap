@@ -48,6 +48,35 @@ func run() error {
 		return fmt.Errorf("read canonical skills %s: %w", srcRoot, err)
 	}
 
+	// Names of the canonical skills. Everything else under pkgDir that looks like
+	// a generated skill copy is an orphan (a skill renamed or dropped upstream)
+	// and must be removed — otherwise a stale copy lingers and CI drift checks
+	// would not catch it.
+	canonical := map[string]bool{}
+	for _, e := range entries {
+		if e.IsDir() {
+			canonical[e.Name()] = true
+		}
+	}
+
+	// pkgKeep are non-skill entries in pkgDir that the generator must never touch.
+	pkgKeep := map[string]bool{"internal": true}
+
+	pkgEntries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		return fmt.Errorf("read package dir %s: %w", pkgDir, err)
+	}
+	for _, e := range pkgEntries {
+		if !e.IsDir() || pkgKeep[e.Name()] || canonical[e.Name()] {
+			continue
+		}
+		orphan := filepath.Join(pkgDir, e.Name())
+		if err := os.RemoveAll(orphan); err != nil {
+			return fmt.Errorf("remove orphaned skill %s: %w", orphan, err)
+		}
+		fmt.Printf("gen-skills: removed orphaned skill copy %s\n", e.Name())
+	}
+
 	var synced []string
 	for _, e := range entries {
 		if !e.IsDir() {
