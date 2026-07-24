@@ -13,6 +13,7 @@ both websites.
 |---|---|---|
 | `spec/` | Markdown + JSON Schema | Normative specification, SEP process, conformance fixtures. Source of truth. |
 | `go/` | Go | Reference implementation: `sightmap` CLI + `go get`-able library. npm: `@sightmap/sightmap`. |
+| `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
 | `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
 
@@ -37,6 +38,24 @@ Never change spec semantics without an SEP (`spec/seps/`).
 - `go test ./...` from `go/`.
 - `cmd/sightmap/` is the binary; library packages (`match`, `sel`, `comps`, …) at the module root.
 - Downstream consumers import the library directly, so treat exported names as public API.
+- `go/skills/<name>/` is a **generated, committed** copy of the canonical `skills/`
+  (see below) — never hand-edit it.
+
+### `skills/` (canonical agent skills)
+- The source of truth for the `sightmap-authoring` and `sightmap-browser` skills.
+  Edit the skill Markdown **here**, at the repo root.
+- `go:embed` can't reach outside the `go/` module or follow symlinks, so a copy
+  is generated into `go/skills/<name>/` and checked in (the same generate-and-commit
+  pattern as the docs schema page). Regenerate with `go generate ./skills/...`
+  from `go/`; CI fails on any drift.
+- Three delivery paths, one source: (1) **plugin** — root manifests
+  (`.claude-plugin/`, `.codex-plugin/`) expose `skills/` so the repo installs like
+  any plugin; (2) **CLI** — `sightmap skills install` extracts the embedded copy;
+  (3) **npm** — the skills ship inside the `@sightmap/sightmap` package (`files`
+  includes `skills/`; `go/npm/scripts/build-npm-packages.mjs` copies them into the
+  meta package) so downstream tools like Subtext vendor them from a pinned version.
+- When adding a new skill, create `skills/<name>/`, add it to the `//go:embed`
+  list in `go/skills/embed.go`, and regenerate.
 
 ### `docs/`
 - Mintlify site: `npm i -g mint`, then `mint dev` from `docs/`. See `docs/AGENTS.md`
@@ -60,7 +79,8 @@ use `data-component="ComponentName"` attributes for runtime matching.
 ## CI
 
 Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
-`go` (gofmt + build + `go test`), `spec` (schema-validate examples + conformance),
+`go` (gofmt + build + `go test` + embedded-skills drift check; also triggered by
+`skills/**`), `spec` (schema-validate examples + conformance),
 `docs` (schema-page sync check + `mint validate` + `mint broken-links`), `web`
 (build). A pushed `v*` tag triggers
 `release` — goreleaser (config `go/.goreleaser.yml`) plus the npm publish of

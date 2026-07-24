@@ -22,6 +22,7 @@ implementation, and both websites in one place:
 |---|---|
 | [`spec/`](spec/) | The **normative** specification — `spec/v1/` schema + JSON Schema, the SEP process (`spec/seps/`), and language-agnostic conformance fixtures. Source of truth. |
 | [`go/`](go/) | The reference **Go implementation** — the `sightmap` CLI (live browser capture, annotated snapshots, coverage) plus a `go get`-able library for the component model and selector matching. Published to npm as [`@sightmap/sightmap`](https://www.npmjs.com/package/@sightmap/sightmap). |
+| [`skills/`](skills/) | The **agent skills** — `sightmap-authoring` and `sightmap-browser`. This is the canonical, standalone skills directory; the CLI embeds a committed copy under `go/skills/` (regenerated via `go generate`). |
 | [`docs/`](docs/) | The documentation site at [docs.sightmap.org](https://docs.sightmap.org) (Mintlify). |
 | [`web/`](web/) | The marketing landing page at [sightmap.org](https://sightmap.org) (React + Vite). |
 
@@ -49,6 +50,24 @@ views:
 Then point your agent at the directory. The [quickstart](https://docs.sightmap.org/start/quickstart)
 walks the full loop, and the [`sightmap` CLI](go/) drives curation against a live
 browser.
+
+## Skills & plugin
+
+The [`skills/`](skills/) directory is a first-class, installable skill set for
+coding agents — `sightmap-authoring` (build and maintain a corpus) and
+`sightmap-browser` (drive a live session). It reaches agents three ways, all
+from the same source:
+
+- **As a plugin** — install this repo like any other (Claude Code:
+  `/plugin marketplace add sightmap/sightmap` then
+  `/plugin install sightmap@sightmap-marketplace`). Useful on its own as a
+  browser-use agent, no other tooling required.
+- **Via the CLI** — `sightmap skills install` extracts the embedded copy into
+  `~/.agents/skills/` (handy when you already have the binary).
+- **Vendored by downstream tools** — they ship in the published
+  [`@sightmap/sightmap`](https://www.npmjs.com/package/@sightmap/sightmap) npm
+  package, so consumers like [Subtext](https://subtext.fullstory.com) pull them
+  from a pinned version.
 
 ## Who reads it
 

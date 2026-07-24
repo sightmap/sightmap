@@ -113,12 +113,15 @@ for (const t of targets) {
   console.log(`staged ${name}@${version}`);
 }
 
-// Stage the meta package: copy launcher + README, pin version and the
-// optionalDependencies to this release.
+// Stage the meta package: copy launcher + README + the canonical skill corpora,
+// pin version and the optionalDependencies to this release. The skills ship in
+// the meta package (see the "skills/" entry in go/npm/package.json's files) so
+// downstream consumers (e.g. Subtext) can vendor them from a pinned version.
 const metaOut = join(outDir, "meta");
 mkdirSync(metaOut, { recursive: true });
 cpSync(join(metaDir, "bin"), join(metaOut, "bin"), { recursive: true });
 cpSync(join(metaDir, "README.md"), join(metaOut, "README.md"));
+cpSync(join(repoRoot, "skills"), join(metaOut, "skills"), { recursive: true });
 
 const meta = { ...commonMeta, version, optionalDependencies };
 delete meta.scripts;
