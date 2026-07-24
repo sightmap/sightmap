@@ -49,13 +49,21 @@ Never change spec semantics without an SEP (`spec/seps/`).
   pattern as the docs schema page). Regenerate with `go generate ./skills/...`
   from `go/`; CI fails on any drift.
 - Three delivery paths, one source: (1) **plugin** — root manifests
-  (`.claude-plugin/`, `.codex-plugin/`) expose `skills/` so the repo installs like
-  any plugin; (2) **CLI** — `sightmap skills install` extracts the embedded copy;
-  (3) **npm** — the skills ship inside the `@sightmap/sightmap` package (`files`
-  includes `skills/`; `go/npm/scripts/build-npm-packages.mjs` copies them into the
-  meta package) so downstream tools like Subtext vendor them from a pinned version.
+  (`.claude-plugin/`, `.codex-plugin/`, `.cursor-plugin/`) expose `skills/` so the
+  repo installs like any plugin; (2) **CLI** — `sightmap skills install` extracts
+  the embedded copy; (3) **npm** — the skills ship inside the `@sightmap/sightmap`
+  package (`files` includes `skills/`; `go/npm/scripts/build-npm-packages.mjs`
+  copies them into the meta package) so downstream tools like Subtext vendor them
+  from a pinned version.
 - When adding a new skill, create `skills/<name>/`, add it to the `//go:embed`
-  list in `go/skills/embed.go`, and regenerate.
+  list in `go/skills/embed.go`, and regenerate. (`go generate` also removes any
+  `go/skills/<name>` copy whose canonical source was renamed or dropped.)
+- The plugin manifests carry their own `version` fields (shown in harness UIs)
+  that the tag-driven release does **not** touch. Keep them in sync from
+  `go/npm/package.json` with `node scripts/sync-plugin-versions.mjs`. Release
+  prep: bump `go/npm/package.json`, run the sync, commit, then tag. (Gemini is
+  intentionally not a target — its extension manifest is MCP-only and has no
+  skills concept.)
 
 ### `docs/`
 - Mintlify site: `npm i -g mint`, then `mint dev` from `docs/`. See `docs/AGENTS.md`

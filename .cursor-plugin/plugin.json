@@ -1,12 +1,10 @@
 {
   "name": "sightmap",
-  "version": "0.14.0",
   "description": "Author and maintain .sightmap/ corpora and drive a live browser via annotated component snapshots",
+  "version": "0.14.0",
   "license": "MIT",
-  "homepage": "https://sightmap.org",
   "author": {
     "name": "Sightmap",
     "url": "https://sightmap.org"
-  },
-  "skills": "./skills/"
+  }
 }
