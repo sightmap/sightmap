@@ -1,22 +1,22 @@
 ---
 title: "Use Sightmap as a Go Library"
 sidebarTitle: "Go Library"
-description: "Import the same corpus loading, selector matching, and CDP client that power the sightmap CLI into your own Go tools."
+description: "Use the CLI's corpus loader, selector matcher, component model, and CDP client in your Go tools."
 ---
 
-The module `github.com/sightmap/sightmap/go` is the reference implementation behind the `sightmap` CLI — and it's importable. Consumers such as snapshot enrichers, analysis scripts, and custom agents use the library directly instead of re-implementing component matching, so semantics can't diverge between tools.
+The module `github.com/sightmap/sightmap/go` contains the packages used by the `sightmap` CLI. Snapshot enrichers, analysis programs, and other Go tools can import the same component model and matcher.
 
 ```bash
 go get github.com/sightmap/sightmap/go
 ```
 
-Requires **Go 1.25.2+**.
+Requires Go 1.25.2 or later.
 
 ## Design goals
 
-- **One canonical component model and rule matcher.** Downstream consumers import this library rather than re-implementing matching.
-- **Tree-level matching, not DOM queries.** Matching operates against a component tree — every node carries a `SelectorPart` — rather than via `document.querySelectorAll`. That enables offline analysis of exported snapshots and native-mobile compatibility via synthetic selectors.
-- **One canonical probe.** The browser-side extractor (`cdp-probe.js`) is embedded once, in the `probe` package; consumers embed it from there so bounds, visibility, and interactivity logic cannot diverge.
+- **Shared component model and matcher.** The `comps` and `match` packages give consumers the same types and matching logic.
+- **Tree-level matching.** Matching operates on a component tree whose nodes carry `SelectorPart` values. This supports offline analysis of saved trees and synthetic selectors for native-mobile nodes.
+- **Embedded browser probe.** The `probe` package exposes the browser-side `probe.js` source as `probe.ProbeJS`, including its bounds, visibility, and interactivity logic.
 
 ## Package map
 
@@ -25,19 +25,19 @@ All import paths are rooted at `github.com/sightmap/sightmap/go/`.
 | Package | Purpose |
 |---|---|
 | `sightmap` | Corpus loading, thread-safe `Session` matching cache, `Validate` and `Lint` |
-| `comps` | Canonical component model types — `ComponentNode`, `SelectorPart`, `Bounds` — and tree operations (`Walk`, `Collect`, `Filter`) |
+| `comps` | Component model types (`ComponentNode`, `SelectorPart`, `Bounds`) and tree operations (`Walk`, `Collect`, `Filter`) |
 | `sel` | CSS selector parsing and single-node matching for the sightmap selector subset |
-| `match` | NFA multi-query matcher — applies every component definition in a single tree traversal |
-| `extract` | Post-probe pipeline: merges accessibility data into probe output and rebuilds the tree; no browser dependency |
+| `match` | NFA multi-query matcher that applies component definitions in one tree traversal |
+| `extract` | Post-probe pipeline that merges accessibility data with probe output and rebuilds the tree; no browser dependency |
 | `browser` | Minimal `Page` interface plus a direct-CDP client for any Chrome debugging port (no chromedp) |
-| `compquery` | The component-query DSL engine — resolves queries like `ProductCard[name^="Weber"]` against extracted trees |
-| `probe` | The embedded canonical `cdp-probe.js` browser-side extractor |
+| `compquery` | Component-query parser and resolver for queries such as `ProductCard[name^="Weber"]` |
+| `probe` | Embedded `probe.js` browser-side extractor, exposed as `probe.ProbeJS` |
 | `render` | Tree rendering for snapshot- and inspect-style output |
-| `conformance` | Shared cross-implementation fixtures verifying identical matching semantics |
+| `conformance` | Fixture documentation and data used by the component-matching conformance tests |
 
 ## Load a corpus and match a tree
 
-The core flow is three calls: `DirLoader` points at a `.sightmap/` directory, `NewSession` wraps it in a compiled-query cache, and `MatchTree` applies the corpus to a component tree for a page URL.
+The core flow uses three API calls. `DirLoader` creates a loader for a `.sightmap/` directory, `NewSession` adds a compiled-query cache, and `MatchTree` applies the corpus to a component tree for a page URL.
 
 ```go main.go
 package main
@@ -82,24 +82,28 @@ func main() {
 }
 ```
 
-`MatchTree` returns `map[*comps.ComponentNode]*match.SightmapMatch` — each match carries the component `Name` and its `Memory` notes. The view is selected from the URL's pathname using the same most-specific-wins route matching the CLI uses; if no view matches, global components still apply.
+`MatchTree` returns `map[*comps.ComponentNode]*match.SightmapMatch`. Each match contains the component `Name` and `Memory` notes. The current library selects the first view in corpus order whose route matches the URL pathname. If no view matches, global components still apply.
+
+<Warning>
+The stream 1 spec requires the most specific matching view, with declaration order used only to break ties. `ViewForURL` currently uses the first match in corpus order. Avoid overlapping routes when calling the library directly until this implementation gap is closed.
+</Warning>
 
 ## Sessions
 
-`sightmap.Session` is safe for concurrent use. It caches compiled match queries per (corpus generation, page URL) pair, so repeated `MatchTree` calls against the same URL are cheap. Useful methods beyond `MatchTree`:
+`sightmap.Session` is safe for concurrent use. It caches compiled match queries by corpus generation and page URL, so repeated `MatchTree` calls reuse the compiled queries.
 
 | Method | Purpose |
 |---|---|
-| `Refresh()` | Reload the corpus and invalidate the cache — call after `.sightmap/` YAML edits |
-| `Components(pageURL)` | The merged component list for a URL, without needing a tree |
-| `ViewForURL(pageURL)` | The matching `View` (name, route, memory, capture URLs), or `nil` if only globals apply |
-| `GlobalComponentNames()` | The set of names declared at global scope |
+| `Refresh() error` | Reload the corpus and invalidate the cache; call after `.sightmap/` YAML edits |
+| `Components(pageURL string) ([]match.SightmapComponent, error)` | Return the merged component list for a URL without matching a tree |
+| `ViewForURL(pageURL string) (*sightmap.View, error)` | Return the first matching view, or `nil` when no view matches |
+| `GlobalComponentNames() (map[string]bool, error)` | Return the names declared at global scope |
 
-Besides `DirLoader`, the package provides `StaticLoader` (wrap an already-built `*Corpus`) and `LoaderFunc` (adapt any `func() (*Corpus, error)`) — handy for tests and for corpora that don't live on disk.
+The package also provides `StaticLoader(c *Corpus) Loader` for an existing corpus. The `LoaderFunc` type, `func() (*Corpus, error)`, implements the `Loader` interface.
 
 ## Validate and lint from Go
 
-The same checks behind `sightmap validate` and `sightmap lint` are plain functions:
+The `Validate` and `Lint` functions run the same checks as `sightmap validate` and `sightmap lint`:
 
 ```go
 corpus, err := sightmap.DirLoader(".sightmap").Load()
@@ -114,20 +118,20 @@ for _, w := range sightmap.Lint(corpus) {
 }
 ```
 
-`LintWithCounts` augments lint with real per-component match counts from a snapshot, which is how `sightmap lint --snapshot` works.
+`LintWithCounts(c *Corpus, counts map[string]int) []LintWarning` adds per-component match counts to lint results. The CLI uses it for `sightmap lint --snapshot` and `sightmap lint --all-snapshots`.
 
 ## Where component trees come from
 
-- **Saved captures** — every capture under `.sightmap/snapshots/{view}/` has a sibling `.snap.tree.json` file holding the raw `ComponentNode` tree; `sightmap snapshot --tree-out FILE` writes one anywhere you like. Unmarshal it straight into `*comps.ComponentNode` as in the example above.
-- **Live pages** — the `browser` package dials a Chrome debugging port (`DialCDP`), and `ExtractComponents` runs the embedded probe against a page to produce the same tree shape.
-- **Your own extraction** — the `extract` package builds a tree from raw probe and accessibility data with no browser dependency, and native consumers can synthesize `SelectorPart` values for non-DOM trees.
+- **Saved captures.** Auto-organized captures under `.sightmap/snapshots/{view}/` include a sibling `.snap.tree.json` file containing the raw `ComponentNode` tree. `sightmap snapshot --tree-out FILE` writes the tree to an explicit path. Unmarshal either form into `*comps.ComponentNode`, as in the example above.
+- **Live pages.** Call `browser.DialCDP` to connect to a Chrome debugging port, then pass a `browser.Page` to `browser.ExtractComponents`.
+- **Custom extraction.** Call `extract.BuildTree` with probe, accessibility, and DOM data. Native consumers can create `SelectorPart` values for non-DOM trees.
 
 <Note>
-The `conformance` package ships tree-plus-corpus fixtures with expected matches. If you build a matching consumer in another language, run them to prove your semantics agree with the reference implementation — see [Conformance fixtures](/reference/conformance-fixtures).
+The `conformance` directory includes component-tree fixtures, flat sightmap definitions, and expected matches. Use them to compare another implementation with the Go matcher. See [Conformance fixtures](/reference/conformance-fixtures).
 </Note>
 
 ## Related
 
-- [CLI overview](/cli/overview) — the command-line surface built on these packages
-- [Curator vs. consumer](/concepts/curator-vs-consumer) — where a library consumer fits in the ecosystem
-- [Schema reference](/reference/schema) — the YAML contract the loader reads
+- [CLI overview](/cli/overview): the commands built on these packages
+- [Curator vs. consumer](/concepts/curator-vs-consumer): where a library consumer fits
+- [Schema reference](/reference/schema): the YAML format

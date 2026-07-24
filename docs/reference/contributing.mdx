@@ -1,10 +1,10 @@
 ---
 title: "Contributing to Sightmap: DCO Sign-Off, SEPs, and the Monorepo"
 sidebarTitle: "Contributing"
-description: "Where to discuss changes, how the DCO sign-off works, and how spec changes flow through the SEP process."
+description: "Choose the right contribution path, follow the SEP process for spec changes, and sign off every commit."
 ---
 
-Sightmap is open source and welcomes contributions from anyone — not just the Subtext team. This page is the high-level overview. The canonical documents in the [`sightmap/sightmap`](https://github.com/sightmap/sightmap) repo are the source of truth.
+Sightmap accepts contributions to the spec, reference implementation, documentation, and website. This page summarizes the process; the files in the [`sightmap/sightmap`](https://github.com/sightmap/sightmap) repository define the policy.
 
 ## The monorepo
 
@@ -12,41 +12,42 @@ Everything lives in one repository:
 
 ```text github.com/sightmap/sightmap
 sightmap/
-├── spec/    the canonical spec — schema.md, sightmap.schema.json, SEPs, conformance fixtures
-├── go/      the reference implementation — the sightmap CLI and Go library
+├── spec/    the canonical spec: schema.md, sightmap.schema.json, SEPs, conformance fixtures
+├── go/      the reference implementation: the sightmap CLI and Go library
 ├── docs/    this documentation site
 └── web/     the sightmap.org marketing site
 ```
 
-On any disagreement between a docs page and `spec/`, the spec wins.
+For the YAML format and its semantics, `spec/v1/` is authoritative.
 
 ## Where to discuss
 
 | Topic | Where |
 |---|---|
 | Question | [GitHub Discussions](https://github.com/sightmap/sightmap/discussions) |
-| Bug report | [GitHub Issues](https://github.com/sightmap/sightmap/issues) — use the **Bug report** template |
+| Bug report | Open the [Bug report form](https://github.com/sightmap/sightmap/issues/new?template=bug_report.yml) |
 | Small docs/website fix | Open a PR directly |
-| Spec change | A Discussion first, then an SEP under [`spec/seps/`](https://github.com/sightmap/sightmap/tree/main/spec/seps) |
-| Security report | Email **subtext@fullstory.com** — do **not** open a public issue |
+| Spec change | Start a [Discussion](https://github.com/sightmap/sightmap/discussions) or [spec proposal issue](https://github.com/sightmap/sightmap/issues/new?template=spec_proposal.yml), then follow the SEP process |
+| Code of Conduct report | Email **subtext@fullstory.com** |
+| Security report | Email **subtext@fullstory.com**; do **not** open a public issue |
 
 ## Spec changes go through SEPs
 
-Anything that changes what the spec *means* — adding a top-level key, renaming a field, changing route semantics — goes through a **Sightmap Enhancement Proposal**. SEPs exist because the spec is consumed by the reference implementation and community ports alike; a drive-by PR can break everyone downstream. See [`spec/seps/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/seps/README.md) for the full process — numbering, lifecycle, and the review window.
+Changes such as adding or renaming a field, changing route or merge semantics, or introducing a top-level concept require a Sightmap Enhancement Proposal. The SEP records the design and gives implementations a shared basis for review. [`spec/seps/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/seps/README.md) defines the scope, numbering, lifecycle, and review windows.
 
 AI-assisted contributions (including SEP drafts) are accepted as long as you've read the output yourself and can defend it under review.
 
 ## Pull request expectations
 
 - **One concern per PR.** If you fix two unrelated bugs, that's two PRs.
-- **Describe the *why*.** "What" is visible in the diff.
-- **Update docs in the same PR.** If you change a schema field, update `spec/v1/schema.md`, the JSON Schema, and any affected examples in one go.
+- **Explain why the change is needed.** The diff already shows what changed.
+- **Update related files in the same PR.** If you change a schema field, update `spec/v1/schema.md`, `spec/v1/sightmap.schema.json`, and any affected examples.
 - **Don't reformat unrelated code.** Keep diffs focused.
-- Maintainers aim for first response within 3 business days.
+- **Expect review.** Maintainers aim to provide a first response within three business days.
 
 ## Developer Certificate of Origin
 
-We do **not** require a CLA. Instead, every commit is gated by a [Developer Certificate of Origin](https://developercertificate.org/) sign-off — the same mechanism the Linux kernel, Kubernetes, and GitLab use.
+Sightmap does not require a CLA. Every commit needs a [Developer Certificate of Origin](https://developercertificate.org/) sign-off confirming that you wrote the contribution or have the right to submit it under the project's license.
 
 Sign off every commit with `-s`:
 
@@ -54,13 +55,17 @@ Sign off every commit with `-s`:
 git commit -s -m "Your commit message"
 ```
 
-That appends a `Signed-off-by: Your Name <your@email>` trailer. The trailer must match `git config user.name` and `git config user.email`. The DCO check on the PR runs against every commit on the branch.
+This appends a `Signed-off-by: Your Name <your@email>` trailer to the commit. The name and email must match `git config user.name` and `git config user.email`. The DCO check examines every commit on the branch.
 
-Forgot to sign off? Amend or rebase:
+To sign off the latest commit, amend it:
 
 ```bash
 git commit --amend --signoff
-# or, for a range of commits already on the branch:
+```
+
+To add the sign-off to a range of commits, rebase against `main`. This rewrites history, so force-push with a lease if the branch is already remote:
+
+```bash
 git rebase --signoff main
 git push --force-with-lease
 ```
@@ -77,7 +82,9 @@ By contributing, you agree that your contributions will be licensed under the pr
 
 ## Canonical documents
 
-- [`CONTRIBUTING.md`](https://github.com/sightmap/sightmap/blob/main/CONTRIBUTING.md) — full contributor guide
-- [`SECURITY.md`](https://github.com/sightmap/sightmap/blob/main/SECURITY.md) — security policy and reporting
-- [`CODE_OF_CONDUCT.md`](https://github.com/sightmap/.github/blob/main/CODE_OF_CONDUCT.md) — community standards (org-wide)
-- [`GOVERNANCE.md`](https://github.com/sightmap/.github/blob/main/GOVERNANCE.md) — how decisions are made (org-wide)
+- [`CONTRIBUTING.md`](https://github.com/sightmap/sightmap/blob/main/CONTRIBUTING.md): contributor guide
+- [`SECURITY.md`](https://github.com/sightmap/sightmap/blob/main/SECURITY.md): security policy and reporting process
+- [`MAINTAINERS.md`](https://github.com/sightmap/sightmap/blob/main/MAINTAINERS.md): current maintainers and contact paths
+- [`CODE_OF_CONDUCT.md`](https://github.com/sightmap/.github/blob/main/CODE_OF_CONDUCT.md): organization-wide community standards
+- [`GOVERNANCE.md`](https://github.com/sightmap/.github/blob/main/GOVERNANCE.md): organization-wide decision process
+- [`spec/seps/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/seps/README.md): SEP process
