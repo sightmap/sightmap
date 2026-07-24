@@ -1,14 +1,14 @@
 ---
-title: "Sightmap: A Memory System for AI Agents That Use Your Web App"
-sidebarTitle: "Home"
-description: "An open YAML format and CLI that maintain a shared memory of your web app — views, components, and API requests, curated by agents against the running app."
+title: "Sightmap: Runtime Context for Agents Using Your Web App"
+sidebarTitle: "Overview"
+description: "An open YAML format and CLI for sharing runtime context about your app with Sightmap-enabled agents."
 ---
 
-Sightmap is an open YAML format and CLI that maintain a shared memory of a web app for AI agents. A `.sightmap/` directory checked into your repo names the app's views, components, and API requests; `memory` notes record the quirks, invariants, and shortcuts source code never states. Agents curate the map against the running app, definitions link back to their source files, and every agent that follows reads the same map.
+Sightmap is an open YAML format and CLI for sharing runtime context about a web app. A `.sightmap/` directory checked into your repo names views, components, and API requests; `memory` notes record runtime quirks, invariants, and shortcuts that source code does not explain. Agents curate the map against the running app. Definitions link back to source files, and Sightmap-enabled tools read the same checked-in context.
 
 ## What an agent sees
 
-The same page, two snapshots — an agent opening a `<DepartureDatePicker>` on a flight-search form:
+The same date picker appears differently in a bare accessibility snapshot and one enriched by Sightmap:
 
 <CodeGroup>
 
@@ -46,24 +46,22 @@ uid=1_19     day "Choose Tuesday, July 1st, 2025" visible interactive
 
 </CodeGroup>
 
-Without a sightmap: no view name, no component identity, no hint the textbox accepts typed dates. The agent's only path forward is brute force. With one: it knows which view it's on, that the picker has a typed-input shortcut, that past dates look interactive but aren't, and that the source file is one click away.
-
-**One artifact, learned once, shared across every agent.**
+A bare accessibility snapshot has no view name, component identity, or indication that the textbox accepts typed dates. With Sightmap, the agent sees the current view, the picker's typed-input shortcut, the disabled state of past dates, and a link to the source file.
 
 ## Get started
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/start/quickstart">
-    Four steps from install to a populated `.sightmap/` — agent-driven, against the running app. Works for any web app.
+    Install the CLI, start a browser session, and build a `.sightmap/` against any running web app.
   </Card>
   <Card title="CLI reference" icon="terminal" href="/cli/overview">
-    The `sightmap` command surface — browser sessions, snapshots, coverage, selectors, and corpus health.
+    `sightmap` commands for browser sessions, snapshots, coverage, selectors, and corpus health.
   </Card>
   <Card title="The spec" icon="file-lines" href="/spec/overview">
-    The YAML format — views, components, requests, memory — with a public JSON Schema and conformance fixtures.
+    The version 1 YAML format for views, components, requests, and memory, with its JSON Schema and conformance fixtures.
   </Card>
   <Card title="Authoring" icon="map" href="/authoring/overview">
-    The curation model and the agent skills that build a corpus from your running app.
+    How agents inspect the running app, verify selectors, and maintain `.sightmap/`.
   </Card>
 </CardGroup>
 
@@ -71,19 +69,19 @@ Without a sightmap: no view name, no component identity, no hint the textbox acc
 
 <Steps>
   <Step title="Install the CLI and skills">
-    `npm install -g @sightmap/sightmap` gives you the `sightmap` binary; `sightmap skills install` adds the `sightmap-authoring` and `sightmap-browser` skills to your agent harness.
+    Install the `sightmap` binary with `npm install -g @sightmap/sightmap`, then run `sightmap skills install` to add the bundled authoring and browser skills to your agent harness.
   </Step>
   <Step title="Start a browser session">
-    `sightmap browser start` launches Chrome plus a local server that hot-reloads the corpus whenever YAML changes.
+    `sightmap browser start` launches Chrome and a local corpus server that reloads the YAML when it changes.
   </Step>
   <Step title="Let an agent iterate">
-    The agent runs `sightmap iterate <url>` per route: snap the page, see which interactive nodes are still unattributed, add components, re-snap — until every view reports zero orphaned nodes.
+    Run `sightmap iterate <url>` for each route. The command snapshots the page and identifies unattributed interactive nodes. The agent names those components and runs it again until the view reports zero orphaned nodes.
   </Step>
   <Step title="Check it in">
-    `sightmap validate`, `lint`, and `report` keep the corpus honest. Commit `.sightmap/`, and every agent that touches the app — coding agents, browser agents, runtime tools — reads the same map.
+    Run `sightmap validate`, `sightmap lint`, and `sightmap report`, then commit `.sightmap/`. Sightmap-enabled agents and tools can now read the same checked-in context.
   </Step>
 </Steps>
 
 <Note>
-Sightmap is an open, MIT-licensed specification with a single shipped implementation: the `sightmap` CLI and Go library. The spec, CLI, conformance fixtures, and these docs all live in one repo at [github.com/sightmap/sightmap](https://github.com/sightmap/sightmap).
+Sightmap is an MIT-licensed specification with one reference implementation: the `sightmap` CLI and Go library. The spec, implementation, conformance fixtures, and these docs live in one repo at [github.com/sightmap/sightmap](https://github.com/sightmap/sightmap).
 </Note>

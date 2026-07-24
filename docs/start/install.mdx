@@ -1,45 +1,45 @@
 ---
 title: "Install the Sightmap CLI"
 sidebarTitle: "Install"
-description: "Install paths for the sightmap CLI, the agent skills, the Go library, and editor schema validation."
+description: "Install the Sightmap CLI and agent skills, or add the Go library and schema validation to your project."
 ---
 
-Everything you need is the `sightmap` CLI plus the bundled agent skills.
+Most users should install the `sightmap` CLI from npm, then add the bundled agent skills.
 
 ## The CLI
 
 | Path | Command | When |
 |---|---|---|
-| npm (native binary, no Go toolchain) | `npm install -g @sightmap/sightmap` | Most users. Downloads the prebuilt binary for your platform. |
+| npm (native binary, no Go toolchain) | `npm install -g @sightmap/sightmap` | Recommended. Installs the prebuilt binary for your platform. |
 | One-off | `npx @sightmap/sightmap <cmd>` | Try it without installing. |
-| From source | `go install github.com/sightmap/sightmap/go/cmd/sightmap@latest` | Go developers, or building from a checkout. |
+| From source | `go install github.com/sightmap/sightmap/go/cmd/sightmap@latest` | Build the CLI with Go. |
 
-The npm package downloads the native binary for your platform at install time; set `SIGHTMAP_SKIP_DOWNLOAD=1` to skip the download (useful in CI stages that never run the binary).
+The npm package installs the native binary for your platform and does not require a Go toolchain.
 
-Most commands accept `--sightmap-dir <dir>` to point at a corpus outside the current directory. See [The sightmap CLI](/authoring/cli) for the command surface.
+Most commands accept `--sightmap-dir <dir>` to point at a corpus outside the current directory. See the [CLI reference](/cli/overview) for the full command surface.
 
 ## The agent skills
 
 ```bash
-sightmap skills install        # installs into ~/.agents/skills (override with --target)
+sightmap skills install
 ```
 
-This drops two skills into your agent harness:
+This installs two skills in `~/.agents/skills`. Pass `--target <dir>` to use another directory.
 
-- **`sightmap-authoring`** — building and maintaining a corpus.
-- **`sightmap-browser`** — driving a live session and acting on a finished corpus.
+- **`sightmap-authoring`** builds and maintains a corpus.
+- **`sightmap-browser`** drives a live session using a finished corpus.
 
 ## The browser
 
 `sightmap browser start` needs a Chrome it can launch. If you don't have one available, install a managed Chrome for Testing:
 
 ```bash
-sightmap browser install       # downloads Chrome for Testing to ~/.sightmap/browsers/
+sightmap browser install
 ```
 
 ## The Go library
 
-The same module is `go get`-able for tools that consume sightmaps (the component model, selector matching, corpus loading):
+Tools that consume sightmaps can import the Go module for corpus loading, selector matching, and the component model:
 
 ```bash
 go get github.com/sightmap/sightmap/go@latest
@@ -49,21 +49,22 @@ See the [package map](https://github.com/sightmap/sightmap/tree/main/go) and [Cu
 
 ## Editor schema validation
 
-Add this header to your `.sightmap/` YAML files for in-editor validation (yaml-language-server, used by the VS Code / JetBrains / Neovim YAML integrations):
+Add this schema directive to your `.sightmap/` YAML files for in-editor validation:
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/sightmap/sightmap/main/spec/v1/sightmap.schema.json
 ```
 
-See [JSON Schema](/reference/json-schema) for per-editor setup.
+See [JSON Schema](/reference/json-schema) for editor-specific setup.
 
 ## Requirements
 
-- **CLI (npm):** Node 18+. **From source:** Go 1.25.2+.
-- **Skills:** any skills-aware agent harness.
+- **CLI from npm:** Node 18+.
+- **CLI from source:** Go 1.25.2+.
+- **Skills:** A skills-aware agent harness.
 - A Chrome the CLI can launch (see [The browser](#the-browser) above).
 
 ## Next steps
 
-- [Quickstart](/start/quickstart) — from install to a populated `.sightmap/`.
-- [Authoring overview](/authoring/overview) — the model and the loop.
+- [Quickstart](/start/quickstart) to build a `.sightmap/` against a running app.
+- [Authoring overview](/authoring/overview) to understand the curation model and workflow.

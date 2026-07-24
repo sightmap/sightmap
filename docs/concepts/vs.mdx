@@ -1,33 +1,33 @@
 ---
-title: "Sightmap vs. README, sitemap.xml, OpenAPI, and Agent Rule Files"
-sidebarTitle: "vs. Other Formats"
-description: "See how a sightmap complements the files your project already has — and fills the gap between the URL, the DOM, the API, and the institutional knowledge."
+title: "Sightmap vs. README Files, sitemap.xml, OpenAPI, and Agent Instructions"
+sidebarTitle: "Compare Formats"
+description: "Compare the runtime context in .sightmap/ with project docs, crawl maps, API contracts, and agent instructions."
 ---
 
-Sightmap is not the first file a project drops in to teach an agent how its app works. Most projects already have several — a `README.md`, maybe a `CLAUDE.md` or `AGENTS.md`, a `sitemap.xml`, an `openapi.yaml`. None of them solve the same problem, and Sightmap is not trying to replace them. It fills the gap they leave: a structured, agent-readable map of the **running UI surface**.
+Most web apps already have a `README.md`, agent instructions such as `AGENTS.md`, a `sitemap.xml`, or an OpenAPI document. Each describes a different part of the system. Sightmap adds structured context for the running app: the active view, named components, API requests, source paths, and runtime notes.
 
-## What each tool actually captures
+## What each format records
 
-| Tool | What it captures | Audience |
+| Format | What it records | Used by |
 |---|---|---|
-| `README.md` / flat docs | Free-form prose: setup, architecture, conventions | Humans onboarding |
-| `sitemap.xml` | URLs and crawl hints | Search engine crawlers |
-| OpenAPI / Swagger | API endpoints, payloads, response shapes | API clients (human and machine) |
-| `CLAUDE.md` / `AGENTS.md` / `.cursorrules` | Free-form instructions to one agent | A coding agent |
-| `.sightmap/` | Views, components, requests, and memory of the running app | Any agent reading the live UI |
+| `README.md` and project docs | Setup, architecture, concepts, and contributor guidance | Humans and coding agents |
+| `sitemap.xml` | Public URLs and crawl metadata | Search engine crawlers |
+| OpenAPI | API operations, parameters, schemas, and authentication | API clients and tooling |
+| `AGENTS.md`, `CLAUDE.md`, and agent rules | Repository conventions, commands, and coding instructions | Coding agents |
+| `.sightmap/` | Runtime views, DOM-backed components, API requests, source links, and memory | Sightmap-enabled agents and tools |
 
-## Where each one wins
+## Use each format for its job
 
-**Flat docs (README, CONTRIBUTING).** Best for narrative — why the project exists, how to contribute, what the architecture looks like at a glance. Useless when an agent has the app open in a browser and needs to know which DOM subtree is the date picker.
+**Project docs** explain why the project exists, how to run it, and how the code is organized. They can describe UI behavior, but an agent still has to connect that prose to the current URL and DOM.
 
-**`sitemap.xml`.** A solved problem for crawlers. It lists URLs and last-modified dates. It says nothing about what's on a page, what components render it, or which API requests it fires. Agents are not crawlers.
+**`sitemap.xml`** helps crawlers discover pages. It does not describe the components on those pages or connect them to source files and API requests.
 
-**OpenAPI / Swagger.** Excellent for the API layer in isolation. It does not connect a request to the view that triggers it, the component that renders the result, or the quirk that the endpoint 429s above 10 rps. Sightmap's `requests:` block points at the API; OpenAPI tells you the shape; both can coexist.
+**OpenAPI** defines an API contract. A sightmap can name requests and scope them to a view, but it does not replace the full endpoint and schema detail in an OpenAPI document.
 
-**`CLAUDE.md`, `AGENTS.md`, Cursor rules.** Instruction text for one specific agent. They tell the agent how to behave — "always run the tests before committing" — but they do not give it a map. They are also single-vendor: rules written for Claude Code don't help Cursor, and vice versa. A sightmap is read by all of them.
+**Agent instructions** tell coding agents how to work in the repository: which commands to run, which conventions to follow, and where to look for source. They can tell an agent to consult `.sightmap/`, but they do not define a structured model of the running UI.
 
 ## Where Sightmap fits
 
-Sightmap sits between the API contract and the agent's runtime view of the page. It names the screens (`views`), names the parts on each screen (`components`), names the endpoints behind them (`requests`), and attaches `memory` notes that survive across sessions. It is checked into the repo like a README, validated like OpenAPI, and read by every agent like a `CLAUDE.md` rule — but unlike any of them, it describes the live UI with structured selectors an agent can act on.
+Sightmap connects repository context to the page an agent is currently using. A Sightmap-enabled client matches the URL to a `view`, applies component names to matching DOM nodes, identifies relevant `requests`, and surfaces applicable `memory`.
 
-If the project already has all four of the files above, Sightmap is the missing fifth: the one that links the URL to the DOM to the API to the institutional knowledge. See [Why agents need a sightmap](/concepts/why) for the underlying motivation, or jump to the [Schema reference](/reference/schema) for the exact shape.
+Use it alongside project docs, agent instructions, `sitemap.xml`, and OpenAPI when an agent needs semantic context from the running app. Read [What is Sightmap?](/start/what-is-sightmap) for an overview or go to the [Schema reference](/reference/schema) for the exact format.

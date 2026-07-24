@@ -125,7 +125,7 @@ Defaults for `--wait`, `--trace`, and `--include-hidden` can be set once in `.si
 
 ### `iterate`
 
-The primary authoring loop: navigate, snap, and print coverage in one step. `iterate` suppresses the tree output entirely — you get the `[View: ...]` line, the `[Coverage]` summary, an `Unlabeled clusters` section grouping the orphaned T3 nodes with a suggested selector (the `→` line), and a `T2 scopes` breakdown of components with multiple unnamed interactive children. That makes it the fastest way to run the fix-YAML-and-recheck cycle described in [the authoring workflow](/concepts/workflow).
+The primary authoring loop: navigate, snap, and print coverage in one step. `iterate` suppresses the tree output entirely — you get the `[View: ...]` line, the `[Coverage]` summary, an `Unlabeled clusters` section grouping the orphaned T3 nodes with a suggested selector (the `→` line), and a `T2 scopes` breakdown of components with multiple unnamed interactive children. That makes it the fastest way to run the fix-YAML-and-recheck cycle described in [the authoring workflow](/authoring/overview).
 
 The full snap is still written — to `/tmp/sightmap-iter-SLUG.snap` (with a `.snap.tree.json` sibling), where `SLUG` is derived from the URL path — never to the site's view sets. Use `snapshot` when you want a permanent capture.
 
