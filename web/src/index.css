@@ -1182,6 +1182,8 @@ footer {
 .footer-links {
   display: flex;
   gap: 1.25rem;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .footer-links a {
