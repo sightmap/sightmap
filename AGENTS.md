@@ -59,11 +59,11 @@ Never change spec semantics without an SEP (`spec/seps/`).
   list in `go/skills/embed.go`, and regenerate. (`go generate` also removes any
   `go/skills/<name>` copy whose canonical source was renamed or dropped.)
 - The plugin manifests carry their own `version` fields (shown in harness UIs)
-  that the tag-driven release does **not** touch. Keep them in sync from
-  `go/npm/package.json` with `node scripts/sync-manifest-versions.mjs`. Release
-  prep: bump `go/npm/package.json`, run the sync, commit, then tag. (Gemini is
-  intentionally not a target — its extension manifest is MCP-only and has no
-  skills concept.)
+  that the tag-driven release does **not** touch. `scripts/sync-manifest-versions.mjs`
+  writes `go/npm/package.json`'s version into all of them; it runs automatically
+  as part of the changesets `version-packages` step (see [Releasing](#releasing)),
+  so you normally never hand-edit them. (Gemini is intentionally not a target —
+  its extension manifest is MCP-only and has no skills concept.)
 
 ### `docs/`
 - Mintlify site: `npm i -g mint`, then `mint dev` from `docs/`. See `docs/AGENTS.md`
@@ -90,9 +90,31 @@ Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
 `go` (gofmt + build + `go test` + embedded-skills drift check; also triggered by
 `skills/**`), `spec` (schema-validate examples + conformance),
 `docs` (schema-page sync check + `mint validate` + `mint broken-links`), `web`
-(build). A pushed `v*` tag triggers
-`release` — goreleaser (config `go/.goreleaser.yml`) plus the npm publish of
-`@sightmap/sightmap` from `go/npm/`.
+(build). On push to `main`, `changesets` opens/updates the "Version Packages" PR
+when changesets are pending. A pushed `v*` tag triggers `release` — goreleaser
+(config `go/.goreleaser.yml`) plus the npm publish of `@sightmap/sightmap` from
+`go/npm/`.
+
+## Releasing
+
+Versioning is driven by [changesets](https://github.com/changesets/changesets),
+scoped to the `@sightmap/sightmap` package (the `go/npm` workspace). The flow:
+
+1. **Per change:** if a PR affects the published package, add a changeset
+   (`npm run changeset`) and commit the resulting `.changeset/*.md`. Infra/docs
+   changes that don't affect the package can skip it.
+2. **Per release (automatic):** when changesets land on `main`, the `changesets`
+   workflow opens a "Version Packages" PR that bumps `go/npm/package.json`, writes
+   `go/npm/CHANGELOG.md`, runs `scripts/sync-manifest-versions.mjs`, and deletes
+   the consumed changesets.
+3. **Per release (manual):** merge that PR, then push the tag it implies —
+   `git tag v<version> && git push origin v<version>` — which triggers `release`
+   (goreleaser + npm publish). The tag is pushed by a human on purpose: a tag
+   pushed by a workflow (`GITHUB_TOKEN`) would not trigger `release`.
+
+So the only hand steps are: write a changeset in your PR, merge the Version
+Packages PR, and push the tag. Everything else (version math, changelog, manifest
+sync, build, publish) is automatic.
 
 ## Conventions
 
