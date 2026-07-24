@@ -4,24 +4,24 @@ sidebarTitle: "Conformance Fixtures"
 description: "The fixture catalog, how the assertions run, and how to contribute a new fixture."
 ---
 
-The conformance fixtures are language-agnostic test cases. Every Sightmap implementation is expected to pass them, so the same `.sightmap/` directory means the same thing everywhere. They live under [`spec/conformance/`](https://github.com/sightmap/sightmap/tree/main/spec/conformance).
+The conformance fixtures define language-independent test cases for Sightmap implementations. Each implementation is expected to pass them. The fixtures live under [`spec/conformance/`](https://github.com/sightmap/sightmap/tree/main/spec/conformance).
 
 ## Layout
 
-Each fixture is a directory named `NNN-{slug}.fixture/` containing:
+Each fixture is a directory named `NNN-{slug}.fixture/` with:
 
-- `sightmap/` — input YAML files (the simulated `.sightmap/` directory)
-- `expected.json` — a list of `{ command, args, expected }` test cases the runner checks
+- `sightmap/`: input YAML files that simulate a `.sightmap/` directory
+- `expected.json`: an object whose `cases` array contains `{ command, args, expected }` entries
 
-The runner asserts that every key in `expected` is present in the actual output and matches deeply. Extra keys in the actual output are allowed, so the suite is forward-compatible. For arrays in `expected`, the actual array must be at least as long, and the prefix must match. The exact shape is documented in [`spec/conformance/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/conformance/README.md).
+The runner checks that each key in `expected` exists in the actual output and matches deeply. The actual output may contain additional keys. For an array in `expected`, the actual array must be at least as long and have the same prefix. [`spec/conformance/README.md`](https://github.com/sightmap/sightmap/blob/main/spec/conformance/README.md) defines the case shape.
 
 <Note>
-The `command` values in `expected.json` (`match`, `explain`, `fmt`, `validate`, `lint`) are **fixture-harness verbs** — operations a conformance runner implements internally, not `sightmap` CLI commands. The shipping CLI has no `match`, `explain`, or `fmt` command; only `validate` and `lint` overlap in name. The harness that executes these verbs lives with each implementation.
+The `command` values in `expected.json` (`match`, `explain`, `fmt`, `validate`, `lint`) are fixture-runner operations, not `sightmap` CLI commands. The CLI has no `match`, `explain`, or `fmt` command; only `validate` and `lint` share names with CLI commands. Each implementation supplies its own runner.
 </Note>
 
 ## Runtime-semantics fixtures (`0NN`)
 
-The first series exercises loading, route matching, and diagnostics:
+The `0NN` series covers loading, route matching, and diagnostics:
 
 | # | Name | Exercises |
 |---|---|---|
@@ -29,7 +29,7 @@ The first series exercises loading, route matching, and diagnostics:
 | 002 | `multi-file-merge` | Same view name across two files → `merge-collision-view` warning |
 | 003 | `route-precedence` | Most-specific-wins for views: literal &gt; `:param` &gt; `*` &gt; `**`; declaration order tie-breaks |
 | 004 | `param-normalization` | Express-style `:param` normalizes to `*` |
-| 005 | `selector-array` | `selector` accepts an array; alternates tried in order |
+| 005 | `selector-array` | `selector` accepts an array |
 | 006 | `view-scoped-vs-global` | Global components match everywhere; scoped only on their view |
 | 007 | `request-method-filter` | Request matching filters by HTTP method |
 | 008 | `dependencies-binding` | `dependencies[]` glob binding and diagnostics (SEP-0001) |
@@ -39,43 +39,45 @@ The first series exercises loading, route matching, and diagnostics:
 
 ## Canonical-format fixtures (`1NN`)
 
-The second series verifies the canonical byte-level YAML format defined by [`spec/v1/canonical-format.md`](https://github.com/sightmap/sightmap/blob/main/spec/v1/canonical-format.md) — the normative output format for any tool that writes `.sightmap/*.yaml` files. Each fixture carries expected canonical outputs under `sightmap/.expected/*.yaml`.
+The `1NN` series covers the byte-level YAML format defined by [`spec/v1/canonical-format.md`](https://github.com/sightmap/sightmap/blob/main/spec/v1/canonical-format.md). Tools that write `.sightmap/*.yaml` must produce this format. Fixtures that test rewritten output store the expected YAML under `sightmap/.expected/`.
 
 | # | Name | Exercises |
 |---|---|---|
 | 100 | `fmt-quoting` | Quoting preference: plain → single-quoted → double-quoted |
 | 101 | `fmt-key-order` | Canonical key order per entry type |
-| 102 | `fmt-list-sort` | Top-level list ordering (views/components by `name`, requests by route+method) |
-| 103 | `fmt-comment-preservation` | Comments survive a structural rewrite |
+| 102 | `fmt-list-sort` | Top-level views sorted by `name` |
+| 103 | `fmt-comment-preservation` | Canonical input with component comments passes `fmt --check` |
 | 104 | `fmt-header-preservation` | Leading `#`-comment blocks preserved verbatim |
 | 105 | `fmt-idempotent` | Canonicalizing canonical input is a no-op |
-| 106 | `fmt-invalid-untouched` | Input that fails parse or schema validation is left untouched |
+| 106 | `fmt-invalid-untouched` | Schema-invalid input is rejected without changes |
 | 108 | `fmt-dependencies-canonical` | `dependencies` arrays sorted and deduplicated |
 
 <Note>
-These fixtures pin the canonical format itself, not a formatter command — the shipping CLI does not include one. An implementation that writes sightmap YAML proves its output canonical by passing this series.
+These fixtures define canonical output; the CLI does not include a formatter command. An implementation that writes Sightmap YAML can check its output against this series.
 </Note>
 
 ## Running locally
 
-The fixture *inputs* validate against the JSON Schema with the monorepo's checker:
+The monorepo checker validates fixture inputs expected to be valid and canonical outputs. It skips inputs that the fixture marks with a `fmt.schema-invalid` or `fmt.parse-error` diagnostic.
 
 ```bash from a checkout of sightmap/sightmap
-cd spec && npm install && node scripts/validate-sightmap.mjs conformance
+cd spec
+npm ci
+node scripts/validate-sightmap.mjs conformance
 ```
 
-The full `{ command, args, expected }` assertions are executed by a conforming implementation's test suite. The reference implementation under [`go/`](https://github.com/sightmap/sightmap/tree/main/go) runs every fixture in CI. A port in another language implements a runner that loads each fixture's `sightmap/` directory, executes the listed `command` with `args`, and asserts the result matches `expected`.
+The checker above validates YAML; it does not execute the `{ command, args, expected }` cases. Each implementation needs a fixture runner that loads the `sightmap/` directory, executes each `command` with its `args`, and checks the result against `expected`.
 
 ## Contributing a new fixture
 
 <Steps>
   <Step title="Claim the next number">
-    Create the next-numbered `NNN-{slug}.fixture/` directory under `spec/conformance/` (see [`CONVENTIONS.md`](https://github.com/sightmap/sightmap/blob/main/spec/CONVENTIONS.md)). Open PRs reserve fixture numbers the same way they reserve SEP numbers.
+    Create the next-numbered `NNN-{slug}.fixture/` directory under `spec/conformance/` (see [`CONVENTIONS.md`](https://github.com/sightmap/sightmap/blob/main/spec/CONVENTIONS.md)). Check open SEP and fixture PRs first because they reserve associated fixture numbers.
   </Step>
   <Step title="Author the fixture">
     Write `sightmap/*.yaml` and `expected.json`. Keep each fixture focused on one behavior.
   </Step>
   <Step title="Verify and open a PR">
-    Confirm the fixture passes against the reference implementation, then open a PR. Sign off your commits with `-s` per the [Contributing guide](/reference/contributing).
+    Run the schema checker and the fixture runner for the implementation you are changing, then open a PR. Sign off your commits with `-s` per the [Contributing guide](/reference/contributing).
   </Step>
 </Steps>

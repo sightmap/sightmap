@@ -1,12 +1,12 @@
 ---
 title: "Sightmap JSON Schema: Editor Validation and CI Setup"
 sidebarTitle: "JSON Schema"
-description: "Wire sightmap.schema.json into your editor and CI for validation, autocomplete, and hover docs on every .sightmap/ file."
+description: "Configure editor feedback and CI validation for .sightmap/ files with the Sightmap v1 JSON Schema."
 ---
 
-The Sightmap v1 JSON Schema is the machine-readable contract for `.sightmap/*.yaml` files. [JSON Schema](https://json-schema.org/) is a standard for describing the shape of structured data; despite the name it validates YAML just as well as JSON, since YAML is a superset of JSON's data model. This page covers that machine-readable file — editor and CI setup. For the human-readable field-by-field walk-through, see the [Schema reference](/reference/schema).
+The Sightmap v1 JSON Schema defines the structure of `.sightmap/*.yaml` files. A validator checks the parsed YAML value against the schema. This page covers editor and CI setup; the [Schema reference](/reference/schema) documents each field.
 
-The schema is published in the monorepo and addressable by a stable `$id` URL.
+The schema lives in the monorepo and has a stable `$id` URL.
 
 | | |
 |---|---|
@@ -17,7 +17,7 @@ The schema is published in the monorepo and addressable by a stable `$id` URL.
 
 ## yaml-language-server directive
 
-Paste this comment as the first line of any `.sightmap/*.yaml` file to opt into editor validation, autocomplete, and hover docs:
+Add this comment as the first line of a `.sightmap/*.yaml` file to enable schema-based validation, completion, and hover documentation in compatible editors:
 
 ```yaml first line of a .sightmap/ file
 # yaml-language-server: $schema=https://raw.githubusercontent.com/sightmap/sightmap/main/spec/v1/sightmap.schema.json
@@ -27,7 +27,7 @@ views:
     route: /
 ```
 
-The directive is recognized by the [Red Hat YAML language server](https://github.com/redhat-developer/yaml-language-server), which most editor integrations use under the hood.
+The [Red Hat YAML language server](https://github.com/redhat-developer/yaml-language-server) recognizes this directive.
 
 ## VS Code
 
@@ -53,23 +53,21 @@ The directive is recognized by the [Red Hat YAML language server](https://github
 
 ## JetBrains (IntelliJ, WebStorm, PyCharm)
 
-JetBrains IDEs ship with a JSON Schema mappings UI:
+JetBrains IDEs provide a JSON Schema mappings UI:
 
 1. **Settings → Languages & Frameworks → Schemas and DTDs → JSON Schema Mappings**
-2. Add a mapping with the `$id` URL above as the schema URL and `.sightmap/*.yaml` as the file pattern.
-
-The inline `# yaml-language-server: $schema=…` directive is also honored.
+2. Add a mapping with the `$id` URL above as the schema URL. Map it to the `.sightmap/` directory or to patterns covering both `.yaml` and `.yml` files.
 
 ## Neovim
 
-Most LSP setups for Neovim wrap the same Red Hat language server. Configure `yamlls` with the schema mapping, or rely on the inline directive.
+If your Neovim setup uses `yamlls`, configure the schema mapping or add the inline directive.
 
 ## Pinning and vendoring
 
-The `$id` URL above tracks `main`, so it always reflects the latest published schema. For reproducible builds, pin instead:
+The `$id` URL above tracks `main`, so its contents can change. For reproducible validation, use one of these options:
 
-- **Pin to a commit**: replace `main` in the raw URL with a commit SHA or tag, so your validation doesn't shift when the schema is clarified.
-- **Vendor the file**: copy `spec/v1/sightmap.schema.json` into your project and point your validator at the local copy. Update it deliberately, alongside a CLI upgrade.
+- **Pin to a commit or tag**: replace `main` in the raw URL with a commit SHA or tag.
+- **Vendor the file**: copy `spec/v1/sightmap.schema.json` into your project and point the validator at the local copy. Update the copy with the tools that consume it.
 
 <Note>
 The schema sets `additionalProperties: false` at every level, so a document that uses a field added in a newer schema revision fails validation against an older pinned copy. See the [versioning policy](/reference/versioning) for how schema evolution is coordinated.
@@ -77,14 +75,16 @@ The schema sets `additionalProperties: false` at every level, so a document that
 
 ## CI validation
 
-Validate `.sightmap/*.yaml` against the schema with any JSON-Schema 2020-12 validator pointed at the `$id` above. The monorepo ships a small [ajv](https://ajv.js.org/)-based checker used to validate the spec's own examples and conformance fixtures:
+To validate YAML in CI, parse each file and pass the resulting value to a JSON Schema 2020-12 validator loaded with the Sightmap schema. The monorepo includes an [ajv](https://ajv.js.org/)-based checker that performs both steps. It validates examples and conformance inputs expected to be valid, and skips fixture inputs marked as intentionally invalid.
 
 ```bash from a checkout of sightmap/sightmap
-cd spec && npm install && node scripts/validate-sightmap.mjs <dir>
+cd spec
+npm ci
+node scripts/validate-sightmap.mjs ../my-app/.sightmap
 ```
 
-Point it at any directory of `.sightmap/` YAML.
+The script accepts one or more files or directories and exits non-zero on an unexpected parse or validation error.
 
 <Tip>
-For day-to-day corpus checks you don't need a schema validator at all — `sightmap validate` performs the structural check locally, and `sightmap lint` adds style checks on top. See the [corpus commands](/cli/corpus).
+For corpus checks during authoring, `sightmap validate` checks the structure locally and `sightmap lint` adds style checks. See the [corpus commands](/cli/corpus).
 </Tip>
