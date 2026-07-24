@@ -1,36 +1,36 @@
 ---
-title: "Sightmap CLI Coverage Commands: coverage, multi-coverage, and report"
+title: "Sightmap CLI Coverage Commands: Coverage, Multi-Coverage, and Report"
 sidebarTitle: "Coverage"
-description: "Score saved captures offline against your corpus: coverage checks T1/T2/T3 tiers over a view's view set, multi-coverage builds the cross-page matrix, and report rolls up per-view health."
+description: "Score saved captures, compare component matches across views, and report coverage for the corpus."
 ---
 
-The coverage commands answer "is the corpus done?" without touching a browser. They re-match saved captures against the current `.sightmap/` YAML and classify every interactive node into a tier:
+The coverage commands re-match saved captures against the current `.sightmap/` YAML without opening a browser. They classify each interactive node into a tier:
 
 | Tier | Meaning | Goal |
 |------|---------|------|
-| **T1** direct | The node itself matched a component selector — you know what it is and which instance | Maximize |
-| **T2** scoped | Inside a matched ancestor but unnamed itself — you know where, not what | Acceptable when tight |
-| **T3** orphaned | No matched ancestor at any depth — unattributable | **Must reach 0** |
+| **T1** direct | The node matched a component selector | Maximize |
+| **T2** scoped | The node is unnamed but has a matched ancestor | Accept when the scope is unambiguous |
+| **T3** orphaned | The node has no matched ancestor | Reach 0 |
 
-A view is a set of timestamped captures, and all three commands score the **union** of that set: real pages render differently load to load, so a component missing from one capture is not a dead selector. All three exit 0 on success and 1 on failure.
+A view can have several timestamped captures. `coverage` reports tiers per capture and evaluates component presence across the set. `multi-coverage` takes the highest match count per component in each view. `report` aggregates each view into one row.
 
 <Note>
-These commands read the `.snap.tree.json` files written by `snapshot` — see [Capture commands](/cli/capture) for producing them and [View sets](/cli/snapshots) for how the sets are organized. Coverage only scores nodes; validating the YAML itself is `validate` and `lint` (see [Corpus commands](/cli/corpus)).
+These commands read the `.snap.tree.json` files written by `snapshot`. See [Capture commands](/cli/capture) for creating them and [View sets](/cli/snapshots) for their layout. Use `validate` and `lint` to check the YAML itself; see [Corpus commands](/cli/corpus).
 </Note>
 
 ---
 
 ### `coverage`
 
-Re-runs T1/T2/T3 coverage on saved captures. With no arguments it walks every capture under `.sightmap/snapshots/`; pass one or more `FILE.snap` paths to score just those (each needs its `.snap.tree.json` sibling). Counts visible nodes only by default — running with `--include-hidden` unintentionally inflates T3 with false failures.
+Re-runs T1/T2/T3 coverage on saved captures. With no arguments, it reads captures under `.sightmap/snapshots/` and legacy `.snap` files in the current directory. Pass one or more `FILE.snap` paths to score only those files; each needs a `.snap.tree.json` sibling. Coverage counts visible nodes by default. Use `--include-hidden` when hidden and off-screen nodes belong in the analysis.
 
-`coverage` prints a per-capture tier line (each capture describes one DOM), but judges component **presence across the whole view set**:
+`coverage` prints tiers for each capture and evaluates component presence across the view set:
 
-- `[Warnings]` — components that matched 0 of N snaps while their leaf selector part does match nodes: the scoped selector is likely broken.
-- `[Absent]` — components that matched 0 of N snaps and whose leaf part matches nothing either: structurally valid selector, element simply not rendered in the captured scenarios.
-- `[Presence]` — components matched in only a subset of the set, with the last-matched capture stamp. These are not failures; they are what a union-scored set is for.
+- `[Warnings]` lists components that matched none of the captures even though their leaf selector matched nodes. The full scoped selector is likely wrong.
+- `[Absent]` lists components whose full selector and leaf selector matched nothing in the set.
+- `[Presence]` lists components that matched only some captures and shows the most recent matching capture.
 
-The check fails when a capture cannot be read or when any capture has T3 orphans; the dead-component sections (`[Warnings]`, `[Absent]`) are reported without affecting the exit status. A trailing `[Annotation gaps]` section is purely advisory — it lists non-interactive content nodes whose accessible name carries real information but that have zero component context, and never affects the exit status.
+The command exits with an error when it cannot read a capture or any capture has T3 orphans. `[Warnings]`, `[Absent]`, `[Presence]`, and `[Annotation gaps]` do not affect the exit status. `[Annotation gaps]` lists non-interactive content nodes with no component context when their accessible names contain a letter and are at least 12 characters long.
 
 **Flags:**
 
@@ -67,16 +67,16 @@ Unlabeled clusters:
 ```
 
 <Tip>
-Do not treat a one-shot `0 matches` on a fresh capture as a dead selector. Re-snap the view a few times — the novelty gate keeps only structurally new captures — and let the union decide. Confirm genuine absence with `sel-probe` against the live page.
+A component can be absent from one capture and present in another. Capture the relevant page states before treating `0 matches` as a dead selector, then check the live page with `sel-probe`.
 </Tip>
 
 ---
 
 ### `multi-coverage`
 
-Builds the cross-page coverage matrix: one row per component, one column per **view**. A view's captures fold into a single column whose cell is the maximum matched count across the set — "renders up to K of these" — and `-` marks a component that never matched in any of that view's captures. The column header reads `view·N` when the view carries more than one capture.
+Builds a cross-page matrix with one row per component and one column per view. Each cell is the highest match count for that component across the view's captures. `-` means the component never matched in that view. The column header reads `view·N` when the view has more than one capture.
 
-Below the matrix, `multi-coverage` lists **global candidates**: components that matched in 2 or more views but are not yet in `components.yaml`. Candidates count views, not capture files, so a single view snapped many times never trips the threshold. The promotion rule of thumb: 3+ views with the same selector, always promote; 2 views with identical selectors, usually promote; 2 views with different selectors, keep view-scoped.
+Below the matrix, `multi-coverage` lists components that matched in at least two views but are not global components. It counts views rather than capture files.
 
 **Flags:**
 
@@ -103,13 +103,13 @@ Global candidates (appear in 2+ views, not yet in global components):
   ProductPod  home(12) plp(36) pdp(6)   → add to components.yaml
 ```
 
-Here the max-per-set cell rescues `DigitalEndcap`, a lazy carousel that rendered in only one of `home`'s three captures — it still reads `4`, not dead. `FacetFilter` and `PromoBanner` each appear in a single view, so they are correctly not promotion candidates.
+`DigitalEndcap` matched four nodes in at least one `home` capture, so its cell reads `4`. `FacetFilter` and `PromoBanner` each appear in one view and are not listed as global candidates.
 
 ---
 
 ### `report`
 
-The corpus health table: one row per view with a URL, aggregated over the view's whole view set. URLs come from each view's top-level `url:` in `views/*.yaml`. Views with no saved captures show `MISSING – run: sightmap snapshot --all`.
+Prints one row for each view with a top-level `url`. Each row aggregates the view set. A view with no saved captures shows `MISSING – run: sightmap snapshot --all`.
 
 How a set of N captures rolls up to one row:
 
@@ -120,7 +120,7 @@ How a set of N captures rolls up to one row:
 | `T3` | **Max** orphan count across the set; `✗` iff greater than 0 |
 | `Largest T2 scope` | Largest single T2 cluster seen anywhere in the set (`⚠` at 15+) |
 
-The max-T3 gate is what keeps `report` and `coverage` in agreement: both fail iff some capture in a set has an orphan, so a clean final load can never mask an earlier capture's gaps. After the table, a **T2 quality** section aggregates the largest T2 clusters across all views — each entry is a component whose subtree contains multiple unnamed interactive children, i.e. the next place to add child components. `report` exits 1 when any view fails the T3 gate or has no captures.
+`report` fails if any capture has a T3 orphan or any view is missing captures. The maximum T3 count prevents a clean capture from hiding orphans in another capture. The **T2 quality** section lists up to 15 components whose subtrees contain at least three unnamed interactive children.
 
 **Flags:**
 
@@ -150,7 +150,7 @@ T2 quality (add child components to improve coverage quality):
 ```
 
 <Tip>
-`report` is the natural CI gate: it fails on any orphaned node in any capture and on any view missing captures, and its summary line gives you the trend numbers (average T1/T2) to watch across commits.
+Run `report` in CI to fail on orphaned nodes or missing captures. Its summary includes average T1 and T2 percentages across the corpus.
 </Tip>
 
 ## Typical flow
@@ -163,9 +163,9 @@ T2 quality (add child components to improve coverage quality):
     Run `sightmap coverage` (add `--trace` on failures). Fix broken selectors flagged under `[Warnings]`, and author components for any orphan clusters until every capture reads `0 orphaned T3 ✓`.
   </Step>
   <Step title="Promote cross-page components">
-    Run `sightmap multi-coverage` and move each global candidate that appears in 2+ views into `components.yaml`.
+    Run `sightmap multi-coverage` and review the global candidates. Move a component into the root `components:` collection only when it should match every view.
   </Step>
   <Step title="Check corpus health">
-    Run `sightmap report`. You are done when every view shows `✓`, nothing is `MISSING`, and the T2 quality list contains only clusters you have deliberately accepted.
+    Run `sightmap report`. Check that every view shows `✓`, no view is `MISSING`, and each remaining T2 cluster is intentional.
   </Step>
 </Steps>
