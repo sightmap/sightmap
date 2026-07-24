@@ -74,10 +74,40 @@ CI runs the relevant checks per area on every PR.
 - **One concern per PR.** If you fix two unrelated bugs, that's two PRs. Small PRs get reviewed fast.
 - **Describe the *why*.** The PR template asks for it. "What" is visible in the diff.
 - **Update docs in the same PR.** If you change a schema field, update `spec/v1/schema.md`, the JSON Schema, and any affected examples together.
+- **Add a changeset** if your PR affects the published `@sightmap/sightmap` package (`go/`). Run `npm run changeset`, pick the bump, and commit the `.changeset/*.md` file. Infra/docs-only changes can skip it. See [Releasing](#releasing).
 - **Don't reformat unrelated code.** Keep diffs focused.
 - **Expect review.** Maintainers aim for first response within 3 business days. See [`maintainers/reviewing-prs.md`](maintainers/reviewing-prs.md) for the review bar.
 
 We do **not** require a CLA. Instead, contributions are gated by a lightweight Developer Certificate of Origin sign-off (see below).
+
+## Releasing
+
+The `@sightmap/sightmap` npm package is versioned with
+[changesets](https://github.com/changesets/changesets). You don't hand-edit
+versions, `CHANGELOG.md`, or the plugin manifest versions — the tooling does it.
+
+1. **In your PR**, if the change is user-facing for the package, add a changeset:
+
+   ```sh
+   npm run changeset
+   ```
+
+   Pick `patch` / `minor` / `major`, write a short summary, and commit the
+   generated `.changeset/*.md`.
+
+2. **On merge to `main`**, the `changesets` workflow opens a "Version Packages"
+   PR that bumps `go/npm/package.json`, writes `go/npm/CHANGELOG.md`, and syncs
+   the plugin manifest versions.
+
+3. **A maintainer** merges that PR, then cuts the release by pushing the tag:
+
+   ```sh
+   git tag v<version> && git push origin v<version>
+   ```
+
+   which triggers goreleaser + the npm publish. (The tag push is manual by
+   design — a workflow-pushed tag wouldn't trigger the release.) More detail in
+   [`.changeset/README.md`](.changeset/README.md).
 
 ## Developer Certificate of Origin
 
