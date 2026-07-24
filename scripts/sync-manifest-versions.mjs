@@ -1,18 +1,25 @@
 #!/usr/bin/env node
-// Sync the plugin manifest versions to the sightmap package version.
+// Sync the per-harness manifest versions to the sightmap package version.
 //
-// The release is tag-driven (goreleaser + the npm publish take the version from
-// the pushed git tag), but the root plugin manifests carry their own `version`
-// fields that the harness UIs display. Those are not touched by the release
-// flow, so they drift. This script writes a single source-of-truth version into
-// every manifest.
+// The root plugin manifests (.claude-plugin/, .codex-plugin/, .cursor-plugin/)
+// and the marketplace listing carry their own `version` fields that the
+// harnesses' UIs display. This script writes a single source-of-truth version
+// into every manifest.
 //
-// Source of truth: go/npm/package.json's `version` (override with --version).
+// This is the sightmap counterpart to subtext's scripts/sync-manifest-versions.mjs
+// and behaves identically. It differs only where the two repos legitimately
+// differ:
+//   - Version source: subtext reads the root package.json (bumped by changesets);
+//     sightmap's release is tag-driven, so the source of truth is
+//     go/npm/package.json's `version` (override with --version, e.g. from a tag).
+//   - Manifest set: sightmap ships no Gemini extension (its manifest is MCP-only
+//     and has no skills concept), so gemini-extension.json is not in the list.
+//
 // Release prep: bump go/npm/package.json, run this, commit, then tag.
 //
 // Pure Node.js (no deps). Idempotent.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,11 +30,12 @@ function arg(name) {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : undefined;
 }
 
-const metaPkg = JSON.parse(readFileSync(join(REPO_ROOT, 'go', 'npm', 'package.json'), 'utf8'));
-const version = (arg('version') ?? metaPkg.version).replace(/^v/, '');
+const { version: pkgVersion } = JSON.parse(
+  readFileSync(join(REPO_ROOT, 'go', 'npm', 'package.json'), 'utf8'),
+);
+const version = (arg('version') ?? pkgVersion).replace(/^v/, '');
 
-// Manifests whose top-level `version` field mirrors the package version.
-const TOP_LEVEL_MANIFESTS = [
+const PER_HARNESS_MANIFESTS = [
   '.claude-plugin/plugin.json',
   '.codex-plugin/plugin.json',
   '.cursor-plugin/plugin.json',
@@ -35,7 +43,7 @@ const TOP_LEVEL_MANIFESTS = [
 
 let touched = 0;
 
-for (const rel of TOP_LEVEL_MANIFESTS) {
+for (const rel of PER_HARNESS_MANIFESTS) {
   const path = join(REPO_ROOT, rel);
   if (!existsSync(path)) continue;
   const json = JSON.parse(readFileSync(path, 'utf8'));
@@ -59,5 +67,5 @@ if (existsSync(marketplacePath)) {
 }
 
 if (touched === 0) {
-  console.log(`sync: all plugin manifests already at ${version}`);
+  console.log(`sync: all manifests already at ${version}`);
 }

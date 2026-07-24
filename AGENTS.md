@@ -60,7 +60,7 @@ Never change spec semantics without an SEP (`spec/seps/`).
   `go/skills/<name>` copy whose canonical source was renamed or dropped.)
 - The plugin manifests carry their own `version` fields (shown in harness UIs)
   that the tag-driven release does **not** touch. Keep them in sync from
-  `go/npm/package.json` with `node scripts/sync-plugin-versions.mjs`. Release
+  `go/npm/package.json` with `node scripts/sync-manifest-versions.mjs`. Release
   prep: bump `go/npm/package.json`, run the sync, commit, then tag. (Gemini is
   intentionally not a target — its extension manifest is MCP-only and has no
   skills concept.)
