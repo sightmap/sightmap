@@ -5,7 +5,7 @@ export default function AgentSection() {
         <div className="section-label">Memory</div>
         <h2>What agents learn, checked in.</h2>
         <p className="section-desc">
-          Sightmap starts as vocabulary — names for views, components, and API routes. It becomes <strong>memory</strong> when agents attach notes to them: the quirks, invariants, and shortcuts that never show up in source code. Those notes appear in a <code>[Guide]</code> section at the top of every snapshot, so the next agent picks up where the last one left off.
+          Sightmap names views, components, and API routes. Agents add <strong>memory</strong> notes for quirks, invariants, and shortcuts that source code does not explain. Sightmap-enabled tooling puts those notes in a <code>[Guide]</code> at the top of each snapshot. The next agent starts with the context the last one recorded.
         </p>
 
         <div className="memory-grid">
@@ -56,22 +56,22 @@ export default function AgentSection() {
           <div className="memory-point">
             <div className="memory-point-num">01</div>
             <div>
-              <strong>Written once, read by every agent.</strong>{" "}
-              One memory entry helps Claude Code, Cursor, Codex, and whoever comes next — all from the same YAML.
+              <strong>One entry, shared across agents.</strong>{" "}
+              Claude Code, Cursor, Codex, and other agents using Sightmap-enabled tooling read the same YAML entry.
             </div>
           </div>
           <div className="memory-point">
             <div className="memory-point-num">02</div>
             <div>
-              <strong>Accumulates.</strong>{" "}
-              Each agent's run is a chance to record something the next one shouldn't have to rediscover. Sightmap is the place those learnings land.
+              <strong>Grows with each run.</strong>{" "}
+              Each run can add notes for the next agent. App-specific knowledge stays in the repo after the session ends.
             </div>
           </div>
           <div className="memory-point">
             <div className="memory-point-num">03</div>
             <div>
               <strong>Reviewed like code.</strong>{" "}
-              Memory entries are lines in a YAML file. They show up in diffs, land in PRs, and can be challenged, edited, or rolled back like anything else in your repo.
+              Memory entries are ordinary YAML. Review them in diffs and PRs, edit them when behavior changes, or roll them back when they are wrong.
             </div>
           </div>
         </div>
