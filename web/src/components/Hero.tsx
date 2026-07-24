@@ -4,15 +4,15 @@ export default function Hero() {
       <div className="container">
         <div className="hero-badge">
           <span className="dot"></span>
-          Open-source spec · v0.1
+          Open-source spec · v1
         </div>
         <h1>
-          A memory system for agents<br className="hidden md:inline" />{" "}
-          that use your web app.
+          Runtime context for agents<br className="hidden md:inline" />{" "}
+          using your web app.
         </h1>
         <p className="hero-sub">
           <code>sitemap.xml</code> tells search engines how to crawl your site.<br />
-          <code>.sightmap/</code> <span className="hero-teaches">teaches</span> agents how to use it.
+          <code>.sightmap/</code> <span className="hero-teaches">teaches</span> coding agents how your app works.
         </p>
         <div className="hero-ctas">
           <a href="https://github.com/sightmap/sightmap" target="_blank" rel="noreferrer" className="btn-primary">
@@ -23,15 +23,15 @@ export default function Hero() {
           </a>
         </div>
         <p className="hero-robust">
-          A YAML map of your app's views, components, and API routes — checked into your repo, shared across every agent, curated against the running app, and linked back to source files.
+          A sightmap is YAML checked into your repo. It maps views, components, and API routes to source files, so every agent gets the same context. Agents check it against the running app to keep it current.
         </p>
       </div>
 
       <div className="hero-diff-wrap">
         <div className="hero-diff-caption">
-          What a coding agent sees when it opens a date picker —
+          The same date picker, as seen by a coding agent
           <br className="hidden md:inline" />{" "}
-          before and after a sightmap.
+          with and without a sightmap.
         </div>
         <div className="hero-diff">
           <div className="code-block">

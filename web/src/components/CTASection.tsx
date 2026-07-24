@@ -5,7 +5,7 @@ export default function CTASection() {
         <div className="section-label">Get Started</div>
         <h2>Hand your agent the map.</h2>
         <p className="section-desc">
-          Install the CLI, start a browser session, and let your agent map the running app into <code>.sightmap/</code>. One YAML directory, curated against the running app, shared across every agent. Three steps below.
+          Install the CLI, start a browser session, and have your agent map the running app into <code>.sightmap/</code>. Review and commit the YAML so every agent using Sightmap-enabled tooling starts with the same app context.
         </p>
 
         <div className="gs-steps">
@@ -15,7 +15,7 @@ export default function CTASection() {
             <div className="gs-step-body">
               <h3>Install the CLI and skills</h3>
               <p className="gs-step-intro">
-                The <code>sightmap</code> CLI ships as a prebuilt native binary via npm — no Go toolchain required — or build it from source with <code>go install</code>. <code>skills install</code> drops the agent playbooks into your harness. There is no framework adapter and no build step; <code>.sightmap/</code> is plain YAML.
+                The <code>sightmap</code> CLI ships through npm as a prebuilt native binary, so you do not need Go. <code>sightmap skills install</code> adds the agent playbooks to your harness. <code>.sightmap/</code> is plain YAML, with no framework adapter or build step.
               </p>
               <div className="code-block">
                 <div className="code-header">
@@ -29,7 +29,7 @@ installed 2 sightmap skill(s) → ~/.agents/skills{'\n'}
 {'  '}<span className="c-key">sightmap-browser</span></code></pre>
               </div>
               <p className="gs-followup">
-                Prefer source? <code>go install github.com/sightmap/sightmap/go/cmd/sightmap@latest</code>. The same module is <code>go get</code>-able as a library.
+                To build from source, run <code>go install github.com/sightmap/sightmap/go/cmd/sightmap@latest</code>. You can also import the module as a library with <code>go get</code>.
               </p>
             </div>
           </div>
@@ -40,7 +40,7 @@ installed 2 sightmap skill(s) → ~/.agents/skills{'\n'}
             <div className="gs-step-body">
               <h3>Start a session and iterate</h3>
               <p className="gs-step-intro">
-                <code>browser start</code> launches Chrome and a corpus server that hot-reloads your YAML. <code>iterate</code> snaps a page and scores coverage — every interactive node is named (<strong>T1</strong>), inside a named component (<strong>T2</strong>), or orphaned (<strong>T3</strong>). You drive toward zero orphans.
+                <code>browser start</code> launches Chrome and a corpus server that reloads YAML changes. <code>iterate</code> snapshots a page and scores each interactive node: named (<strong>T1</strong>), inside a named component (<strong>T2</strong>), or orphaned (<strong>T3</strong>). Repeat until there are no orphans.
               </p>
               <div className="code-block">
                 <div className="code-header">
@@ -55,7 +55,7 @@ installed 2 sightmap skill(s) → ~/.agents/skills{'\n'}
 87 interactive · 61 direct T1 (70%) · 21 scoped T2 (24%) · <span className="c-val">5 orphaned T3 ✗</span></code></pre>
               </div>
               <p className="gs-followup">
-                Verify a candidate before you write it: <code>sightmap sel-probe '[data-testid="product-pod"]'</code>.
+                Run <code>sightmap sel-probe '[data-testid="product-pod"]'</code> to verify a selector before adding it.
               </p>
             </div>
           </div>
@@ -68,7 +68,7 @@ installed 2 sightmap skill(s) → ~/.agents/skills{'\n'}
                 Let the agent curate <span className="gs-step-badge">agent-driven</span>
               </h3>
               <p className="gs-step-intro">
-                Point your agent at the app. The bundled <code>sightmap-authoring</code> skill walks the routes, names the orphaned components, and writes <code>.sightmap/</code> — you review the diff. The corpus is curated, not generated: definitions land only after they're verified against the live app.
+                Point your agent at the app. The bundled <code>sightmap-authoring</code> skill walks routes, names orphaned components, and writes <code>.sightmap/</code>. Review the diff before committing it. The skill checks each definition against the running app before adding it.
               </p>
               <div className="code-block">
                 <div className="code-header">
@@ -80,7 +80,7 @@ installed 2 sightmap skill(s) → ~/.agents/skills{'\n'}
 <span className="c-com">&gt;</span> components until coverage is clean.</code></pre>
               </div>
               <p className="gs-followup">
-                Keep it honest in CI with <code>sightmap validate</code> and <code>sightmap lint</code>. Reconcile as the app changes by re-running <code>iterate</code> on the affected pages.
+                Run <code>sightmap validate</code> and <code>sightmap lint</code> in CI. When the app changes, rerun <code>iterate</code> on the affected pages.
               </p>
             </div>
           </div>

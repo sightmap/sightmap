@@ -5,7 +5,7 @@ export default function SpecSection() {
         <div className="section-label">The Spec</div>
         <h2>Views, components, requests.</h2>
         <p className="section-desc">
-          A sightmap has three kinds of definitions. <strong>Views</strong> name the screens your app renders. <strong>Components</strong> name the parts of each screen. <strong>Requests</strong> name the API routes behind them. Define them in YAML under <code>.sightmap/</code> and agents pick them up automatically.
+          <strong>Views</strong> name your app's screens and routes. <strong>Components</strong> name the parts of each screen. <strong>Requests</strong> name the API routes your app calls. Define all three in YAML under <code>.sightmap/</code>. Sightmap-enabled tooling adds them to the agent's accessibility snapshot automatically.
         </p>
 
         {/* -------------------- VIEWS -------------------- */}
@@ -15,7 +15,7 @@ export default function SpecSection() {
             <h3>Views</h3>
           </div>
           <p className="concept-intro">
-            A view is a screen or route. When an agent lands on a matching URL, its snapshot gets a header — <em>"you are here"</em>.
+            A view names a screen or route. When the current URL matches, the agent sees the view name and route at the top of its snapshot.
           </p>
 
           <div className="concept-grid">
@@ -107,7 +107,7 @@ export default function SpecSection() {
             <h3>Components</h3>
           </div>
           <p className="concept-intro">
-            A component maps a CSS selector to a semantic name. Agents see your names — <code>DepartureDatePicker</code>, not <code>div.react-datepicker__day</code> — in every snapshot. The <code>memory</code> field is where the running app's quirks get written down.
+            A component gives a CSS selector a semantic name. Agents see <code>DepartureDatePicker</code> instead of <code>div.react-datepicker__day</code> in every snapshot. Record runtime quirks in the <code>memory</code> field.
           </p>
 
           <div className="concept-grid">
@@ -157,11 +157,11 @@ export default function SpecSection() {
           </div>
 
           <div className="callout">
-            <strong>Selectors can be a list.</strong> When multiple CSS patterns should match the same component — say, both a class name and an ARIA role — pass a YAML array instead of a string. Alternatives are tried in order; the first selector that matches wins.
+            <strong>Selectors can be a list.</strong> Pass a YAML array when more than one CSS selector can identify a component, such as a class name or an ARIA role. Sightmap tries them in order; the first match wins.
           </div>
 
           <div className="callout">
-            <strong>Reference shared components by name.</strong> Inside any <code>components:</code> array, an entry of the form <code>{'{ $ref: SiteHeader }'}</code> inlines a deep copy of a component defined at the root <code>components:</code> of any file. Define a header, footer, or chat widget once, and every view that contains it attests to its presence — drift checks can treat <em>attested but missing</em> as a distinct signal.
+            <strong>Reference shared components by name.</strong> Inside a <code>components:</code> array, <code>{'{ $ref: SiteHeader }'}</code> inserts a deep copy of a root-level component from any sightmap file. Define a header, footer, or chat widget once, then reference it from every view where it should appear. If the component is absent at runtime, drift checks can report it as <em>attested but missing</em>.
           </div>
 
           <div className="schema-table-wrap">
@@ -217,7 +217,7 @@ export default function SpecSection() {
             <h3>Requests</h3>
           </div>
           <p className="concept-intro">
-            Requests map API endpoints to semantic names with optional field schemas. The network tab gets the same treatment as the DOM — agents see the names you wrote, not a wall of URLs.
+            Requests give API endpoints semantic names and optional request and response schemas. Sightmap-enabled clients show the name, source file, description, and expected fields alongside each matching request.
           </p>
 
           <div className="concept-grid">
@@ -332,7 +332,7 @@ Expected response fields:{'\n'}
             <h3 className="concept-closer">Organize however.</h3>
           </div>
           <p className="concept-intro">
-            All <code>*.yaml</code> and <code>*.yml</code> files under <code>.sightmap/</code> are discovered recursively and merged. Structure the directory however makes sense — one file per feature, one per view, or one big file.
+            Sightmap recursively loads and merges every <code>*.yaml</code> and <code>*.yml</code> file under <code>.sightmap/</code>. Split definitions by feature or view, or keep everything in one file.
           </p>
 
           <div className="code-block">
