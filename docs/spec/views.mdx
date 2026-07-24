@@ -1,10 +1,10 @@
 ---
 title: "Sightmap Views: Routes, Specificity, and Scoping"
 sidebarTitle: "Views"
-description: "Name screens by URL route with glob patterns — the most specific route wins, so you never hand-order your views."
+description: "Define named screens with URL route patterns and deterministic specificity rules."
 ---
 
-A view is a named screen in the app, identified by a URL route. Views are where components and requests get scoped, and where most authoring happens.
+A view is a named screen in the app, identified by a URL route. Components and requests nested under a view apply only when that view is active.
 
 ```yaml
 version: 1
@@ -23,7 +23,7 @@ views:
         method: POST
 ```
 
-`name` and `route` are required. `description` and `source` are documentary — they aren't surfaced at runtime but pay for themselves in PR review and future maintenance. See [Schema reference](/reference/schema#view) for every field.
+`name` and `route` are required. `description` records the view's purpose, and `source` links it to a source file. See [Schema reference](/reference/schema#view) for every field.
 
 ## Route matching
 
@@ -38,7 +38,7 @@ For requests, Express-style `:param` segments are normalized to `*`, so `/api/us
 
 ## Most specific wins
 
-When more than one view's route matches the URL, the **most specific** route wins — not the first one listed. Definition order does **not** set priority; it only breaks ties between routes of equal specificity. You don't have to hand-order routes specific-before-general.
+When more than one view route matches a URL, the route with the highest specificity score wins. Declaration order breaks ties between routes with equal scores.
 
 Specificity is the sum of per-segment scores:
 
@@ -54,15 +54,15 @@ The root route `/` scores `1` — more specific than any wildcard-only pattern. 
 ```yaml
 views:
   - name: UserProfile
-    route: /users/*             # score 3+1 = 4 — listed first, still loses
-  - name: UserSettings
-    route: /users/me/settings   # score 3+3+3 = 9 — wins for its path
+    route: /users/*        # score 3+1 = 4
+  - name: UserAdmin
+    route: /users/admin    # score 3+3 = 6
 ```
 
-`/users/me/settings` resolves to `UserSettings` (score 9) **regardless of declaration order** — flipping these two lines changes nothing. `/users/*` (score 4) still wins for paths like `/users/42`.
+`/users/admin` matches both routes and resolves to `UserAdmin`. `/users/42` matches only `UserProfile`.
 
 <Note>
-This rule is for views only. Requests use the opposite model — **every** matching request applies, with no single winner. See [Requests](/spec/requests#all-matches-apply).
+This specificity rule applies only to views. Every matching request applies. See [Requests](/spec/requests#all-matches-apply).
 </Note>
 
 ## Scoped vs global
@@ -71,7 +71,7 @@ Components and requests can live at the file root or nested inside a view.
 
 - **Global** (file root): matched against every view.
 - **View-scoped** (inside a view): matched only when that view is active.
-- They are **additive**. A view defines its own components on top of any globals; both apply.
+- **Additive**: a view receives its scoped definitions and all globals. A view-scoped `$ref` subsumes a global component with the same name for that view.
 
 ```yaml
 components:
@@ -87,12 +87,12 @@ views:
 ```
 
 <Warning>
-View names should be unique across the sightmap. Two files defining a view with the same `name` is implementation-defined behavior; conforming implementations SHOULD warn (the conformance suite asserts this — see fixture `002-multi-file-merge`).
+View names should be unique across the sightmap. Runtime behavior is implementation-defined when two files define the same view name. Conforming implementations SHOULD emit a warning.
 </Warning>
 
 ## Dependencies
 
-`source` names the view's primary file. A view often touches more code than that — a feature-specific hook, a store, a CSS module. Listing those in `dependencies` lets reverse-lookup tooling tie file edits back to the view without forcing every supplementary file into its own entry:
+`source` names the view's primary file. List supplementary files, such as feature-specific hooks, stores, and CSS modules, under `dependencies`. Reverse-lookup tools can then associate changes to those files with the view:
 
 ```yaml
 views:
@@ -104,7 +104,7 @@ views:
       - src/stores/flightFilterStore.ts
 ```
 
-`dependencies` is purely curation-time — strings are minimatch globs, project-root-anchored, with `!`-prefix negation. The runtime never reads source files. See the [schema reference](/reference/schema#dependencies) for the full rules (what belongs, what doesn't, normative diagnostics).
+`dependencies` is curation-time metadata. Each string is a project-root-anchored minimatch glob; prefix it with `!` to negate it. Runtime consumers MUST NOT add page-load cost based on this field. See the [schema reference](/reference/schema#dependencies) for usage rules and diagnostics.
 
 ## Next
 

@@ -1,10 +1,10 @@
 ---
 title: "Sightmap Requests: Routes, Methods, and Payload Shapes"
 sidebarTitle: "Requests"
-description: "Name API endpoints with glob routes and optional method filters — every matching request applies, so order never matters."
+description: "Name API endpoints with glob routes, optional method filters, and documentary payload fields."
 ---
 
-A request is a named API endpoint. Names replace raw URLs in network traces, so an agent inspecting traffic sees `SearchFlights` instead of `POST /api/flights/search`.
+A request assigns a semantic name to an API endpoint. Consumers can show `SearchFlights` alongside `POST /api/flights/search` in enriched network output.
 
 ```yaml
 - name: SearchFlights
@@ -33,18 +33,18 @@ A request is a named API endpoint. Names replace raw URLs in network traces, so 
 
 ## Route patterns
 
-Request routes use the same glob syntax as views — `*` for one segment, `**` for any depth — with one addition: **Express-style `:param` segments are normalized to `*`**. These two are identical:
+Request routes use the same glob syntax as views: `*` matches one segment, and `**` matches any depth. Express-style `:param` segments are normalized to `*`, so these routes are equivalent:
 
 ```yaml
 - route: /api/users/:id/orders    # same as below
 - route: /api/users/*/orders
 ```
 
-The named form exists because Express, Next.js API routes, and most JS frameworks already write routes that way; you can paste a route in unchanged. The runtime treats both identically.
+Use `:param` when the application already expresses the route that way. Consumers treat both forms identically.
 
 ## Method filter
 
-`method` is an optional HTTP method filter — `GET`, `POST`, `PUT`, etc. — matched case-insensitively. If omitted, the route matches any method. With it set, only matching methods are named.
+`method` is an optional, case-insensitive HTTP method filter such as `GET`, `POST`, or `PUT`. If omitted, the definition matches any method.
 
 ```yaml
 - name: GetUser
@@ -56,11 +56,11 @@ The named form exists because Express, Next.js API routes, and most JS framework
   method: PATCH
 ```
 
-Two definitions can share a route as long as they differ on method. Conformance fixture `007-request-method-filter` covers this case.
+Definitions may share a route. Conformance fixture `007-request-method-filter` verifies that the optional method filters choose the matching definitions.
 
 ## All matches apply
 
-Requests are matched independently. **Every** request whose `route` matches the URL — and whose optional `method` matches the request method — applies. There is no "winning" request; all matches contribute to the enriched output.
+Requests are matched independently. Every definition whose `route` matches the URL and whose optional `method` matches the request method applies.
 
 ```yaml
 requests:
@@ -70,19 +70,19 @@ requests:
     route: /api/flights/**        # catch-all
 ```
 
-A `POST /api/flights/search` matches **both** `SearchFlights` and `AnyFlightsCall`, and both names apply. Declaration order changes nothing, and there is no need to list specific routes before general ones.
+A `POST /api/flights/search` matches both `SearchFlights` and `AnyFlightsCall`. Declaration order does not affect request matching.
 
 <Note>
-This is the opposite of view matching, where exactly one view wins by specificity. See [Views](/spec/views#most-specific-wins) for that rule.
+View matching uses a different rule: exactly one view wins by specificity. See [Views](/spec/views#most-specific-wins).
 </Note>
 
 ## Payloads are documentary
 
-`request` and `response` describe the expected payload shape. Both are `Payload` objects — `{ fields: [...] }` — where each field has a `name` (required), a free-text `type` label (`string`, `number`, `boolean`, `array`, `object`, or anything else), and an optional `description`.
+`request` and `response` describe the expected payload shape. Both are `Payload` objects with an optional `fields` array. Each field requires a `name` and may include a free-text `type` and `description`. The `type` value is not restricted to a predefined set.
 
-The listed fields are not exhaustive and are not enforced: extra fields in real-world traffic are never rejected. They document what an agent should expect to see, nothing more.
+The listed fields are documentary, not exhaustive. They do not validate live request or response payloads.
 
-`headers` lists notable header names to highlight in the network detail view:
+`headers` lists header names that a consumer may highlight in network details. This example documents the response from a current-user endpoint:
 
 ```yaml
 - name: GetCurrentUser
@@ -99,13 +99,13 @@ The listed fields are not exhaustive and are not enforced: extra fields in real-
 
 ## Scoped vs global
 
-Like components, requests can live at the file root or inside a view.
+Requests can be declared at the file root or inside a view.
 
-- **Global** (file root): matched on every view.
-- **View-scoped** (inside a view): matched only when that view is active.
-- Additive: a view sees its own requests plus all globals. See [Views](/spec/views#scoped-vs-global).
+- **Global** requests at the file root are matched on every view.
+- **View-scoped** requests are matched only when that view is active.
+- The two scopes are additive: an active view receives its requests and all global requests. See [Views](/spec/views#scoped-vs-global).
 
-Most apps put requests at the file root — the same `/api/users/:id` is meaningful regardless of which view is showing. Scope to a view when an endpoint is genuinely page-specific.
+Declare a request at the file root when it applies regardless of the active view. Put it inside a view when it applies only to that view.
 
 ## Next
 

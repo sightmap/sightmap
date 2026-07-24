@@ -1,7 +1,7 @@
 ---
 title: "Sightmap Components: Selectors, Children, and References"
 sidebarTitle: "Components"
-description: "Name DOM subtrees with CSS selectors — single strings or ordered alternatives, scoped children, and shared $ref definitions."
+description: "Define named DOM subtrees with CSS selectors, scoped children, and shared $ref definitions."
 ---
 
 A component is a named DOM subtree, identified by one or more CSS selectors. Names replace the generic accessibility role in enriched snapshots, so an agent reading the page sees `DepartureDatePicker` instead of `group`.
@@ -35,7 +35,7 @@ A component is a named DOM subtree, identified by one or more CSS selectors. Nam
     - '#origin-combobox'
 ```
 
-Use the array form when you want a stable name across multiple variants of the UI — a redesigned page, a feature flag, or a third-party widget you don't control. The array isn't an OR over all matches; the runtime takes the first selector that matches anything and stops.
+Use the array form to keep one name across UI variants, such as a redesigned page, a feature flag, or a third-party widget. Sightmap tries each selector in order and uses the first one that matches one or more elements.
 
 If a selector matches multiple elements, all matches get the name. Selectors are not required to be unique.
 
@@ -52,13 +52,13 @@ The recommended pattern is to render a `data-component="<Name>"` attribute on th
   selector: 'nav[data-component="Navigation"]'
 ```
 
-This decouples the sightmap from class names, CSS modules, and styling refactors. It costs one attribute per named component and is trivial to grep for.
+This keeps the sightmap independent of class names, CSS modules, and styling changes. It adds one searchable attribute to each named component.
 
-It is a convention, not a requirement. Any CSS selector works.
+The spec accepts any CSS selector; `data-component` is the recommended convention.
 
 ## Children are scoped
 
-Selectors inside `children` are evaluated **within** their parent's matched subtree, not against the whole document. This is how the spec avoids naming collisions between, say, two card components that each contain a `button.primary`.
+Selectors inside `children` are evaluated within their parent's matched subtree instead of against the whole document. Two card components can therefore each contain a child selected by `button.primary` without colliding.
 
 ```yaml
 - name: SearchCard
@@ -76,7 +76,7 @@ Selectors inside `children` are evaluated **within** their parent's matched subt
 
 ## Scoping inside views vs at file level
 
-Components at the file root are **global** — matched on every view. Nested inside a view, they are scoped to that view. Both forms are additive: a view sees its own components plus all globals. See [Views](/spec/views#scoped-vs-global) for the full rule.
+Components at the file root are global and match on every view. Components nested inside a view apply only to that view. Both forms are additive, except that a view-scoped `$ref` subsumes a global component with the same name. See [Views](/spec/views#scoped-vs-global) for the full rule.
 
 <Warning>
 Quote attribute selectors so YAML parses them as strings: `selector: '[data-component="X"]'`. Unquoted, the brackets are read as a YAML flow sequence and the entry fails validation.
@@ -84,13 +84,13 @@ Quote attribute selectors so YAML parses them as strings: `selector: '[data-comp
 
 ## Referencing shared components
 
-When the same component (a site header, a persistent footer, a chat widget) appears across many views, a `components:` array entry can be a **reference object** instead of a fresh inline definition:
+When a component such as a site header, persistent footer, or chat widget appears across views, a `components:` array can contain a reference object instead of another inline definition:
 
 ```yaml
 - $ref: SiteHeader
 ```
 
-The reference is expanded inline to a deep copy of the named component before matching; if the copied `children:` contain further `$ref` entries, those are expanded too. Names resolve against a registry built from the root-level `components:` of every loaded file — nested children and view-scoped definitions are not addressable. When two files define a registry component with the same name, the first seen wins (sorted by source-file path) and implementations SHOULD emit a `merge-collision-component` warning.
+Before matching, the reference expands inline to a deep copy of the named component. Any `$ref` entries in its `children:` expand recursively. Names resolve against a registry built from the root-level `components:` arrays of all loaded files; nested children and view-scoped definitions are not addressable. For duplicate registry names, the first definition in source-file path order wins. Implementations SHOULD emit a `merge-collision-component` warning.
 
 ```yaml .sightmap/components.yaml
 version: 1
@@ -115,10 +115,10 @@ views:
         selector: '[data-component="ProductGrid"]'
 ```
 
-Two reasons to prefer `$ref` over inline duplication or implicit auto-match:
+Use `$ref` for reuse and attestation:
 
-- **Single source of truth.** Update the header's selector or memory entries in one place; every referencing view picks up the change.
-- **Attestation.** A view's `components:` becomes a compact, machine-readable manifest of what it expects to see. Drift-detection tooling can surface "attested but matched 0 elements" as a signal — distinct from "this name was never mentioned anywhere."
+- **Reuse.** Update the header's selector or memory entries in one definition; every referencing view receives the change.
+- **Attestation.** A view's `components:` lists what it expects to contain. Drift-detection tools can report an attested component that matches zero elements separately from a component the view never referenced.
 
 The conformance rules:
 
@@ -131,7 +131,7 @@ See the [schema reference](/reference/schema#component-references) for the full 
 
 ## Dependencies
 
-A component can declare additional files whose changes should prompt re-curation of the entry — typically style modules, hooks the component consumes, or shared utilities that don't warrant their own entry:
+A component can list supplementary files whose changes should prompt re-curation, such as style modules, hooks, or shared utilities:
 
 ```yaml
 - name: DepartureDatePicker
@@ -141,7 +141,7 @@ A component can declare additional files whose changes should prompt re-curation
     - src/components/DatePicker.module.css
 ```
 
-`dependencies` is purely curation-time metadata — runtime consumers never read source files. Strings are minimatch globs, project-root-anchored, with `!`-prefix negation. See the [schema reference](/reference/schema#dependencies) for what belongs and what does not.
+`dependencies` is curation-time metadata. Each string is a project-root-anchored minimatch glob; prefix it with `!` to negate it. Runtime consumers MUST NOT add page-load cost based on this field. See the [schema reference](/reference/schema#dependencies) for usage rules.
 
 ## Next
 

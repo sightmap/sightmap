@@ -1,22 +1,28 @@
 ---
 title: "Sightmap CLI Reference: Conventions, Shared Flags, and Exit Codes"
 sidebarTitle: "Overview"
-description: "Learn the conventions every sightmap command shares — flag placement, session flags, visibility defaults, and exit codes — then jump to the right command group."
+description: "Learn the flag placement, session flags, visibility defaults, and exit codes shared by Sightmap CLI commands."
 ---
 
-The `sightmap` binary is a single authoring toolkit: it drives a Chrome for Testing session over the Chrome DevTools Protocol, layers your `.sightmap/` corpus onto the live page, and gives you commands for capturing annotated snapshots, measuring coverage, validating selectors, and interacting with the page. This page covers the conventions shared across the whole surface; the pages linked below document each command group in full.
+The `sightmap` CLI drives Chrome for Testing over the Chrome DevTools Protocol (CDP). Its commands apply `.sightmap/` to the live page, capture annotated snapshots, measure coverage, validate selectors, and interact with page elements. This page covers conventions shared across command groups.
 
 <Note>
-Not installed yet? See [Install the Sightmap CLI](/start/install). The short version: `npm install -g @sightmap/sightmap` or `go install github.com/sightmap/sightmap/go/cmd/sightmap@latest`.
+See [Install the Sightmap CLI](/start/install) for all install options. To install directly, run `npm install -g @sightmap/sightmap` or `go install github.com/sightmap/sightmap/go/cmd/sightmap@latest`.
 </Note>
 
 ## Global conventions
 
-**Put flags before positional arguments.** The CLI uses Go-style flag parsing, which stops at the first positional argument. Some interaction commands tolerate interspersed flags, but `sightmap snapshot --url URL` always works and `sightmap snapshot URL --url` never does — make flags-first a habit. Single-dash (`-url`) and double-dash (`--url`) spellings are equivalent.
+**Put flags before positional arguments.** Most commands use Go-style flag parsing, which stops at the first positional argument. Interaction commands accept flags in either position, but putting them first works consistently:
+
+```bash
+sightmap browser fill --clear SearchInput 'garden hose'
+```
+
+Commands backed by Go flag sets accept single-dash (`-url`) and double-dash (`--url`) spellings. `browser navigate` and `browser eval` parse `--addr` and `--tab` directly, so use the double-dash form shown in this reference.
 
 **Run commands from the site directory.** Most commands read the corpus from `--sightmap-dir`, which defaults to `.sightmap` in the current directory.
 
-A handful of flags recur across the surface:
+Several flags appear in multiple command groups:
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -26,20 +32,20 @@ A handful of flags recur across the surface:
 | `--launch` | off | Auto-launch Chrome when `--addr` is unreachable (live analysis commands: `snapshot`, `inspect`, `suggest`, `gap`, `discover`, `sel-probe`) |
 | `--include-hidden` | off | Count hidden and off-screen nodes too |
 
-**One session per site, addressed by port and tab.** `sightmap browser start` launches Chrome with its DevTools endpoint on `localhost:7892` and the sightmap HTTP server on port `7891`. Every live command dials `--addr` to reach that session. When more than one content tab is open — the concurrent multi-agent case — page-affecting commands refuse to guess and require `--tab` with the tab ID that `browser start` printed. See [Browser sessions](/cli/browser).
+**Address sessions by port and tab.** `sightmap browser start` launches Chrome with its DevTools endpoint on `localhost:7892` and the Sightmap HTTP server on port `7891`. Live commands use `--addr` to reach the session. When more than one content tab is open, page commands require `--tab` with the tab ID printed by `browser start`. See [Browser sessions](/cli/browser).
 
-**Visible-only counting is the default.** Coverage and analysis commands count visible interactive nodes only. Pass `--include-hidden` to widen the count to hidden and off-screen nodes — deliberately, since doing it unintentionally inflates orphan counts with false failures.
+**Visible-only counting is the default.** Coverage and analysis commands count visible interactive nodes only. Pass `--include-hidden` to include hidden and off-screen nodes. These nodes can increase the orphan count, so enable the flag only when you intend to audit them.
 
 ## Exit codes
 
-Every command exits `0` on success and `1` on any failure — there is no richer exit-code taxonomy. Errors print to stderr as `sightmap <command>: <message>`.
+Commands exit `0` on success and `1` when command execution returns an error. Errors print to stderr as `sightmap <command>: <message>`.
 
 What counts as failure for the check-style commands:
 
 | Command | Exits `1` when |
 |---------|----------------|
 | `validate` | the corpus has structural errors |
-| `lint` | any warning exists (pass `--warn-only` to always exit `0`) |
+| `lint` | any warning exists (`--warn-only` prevents warnings from causing exit `1`) |
 | `coverage` | any capture has orphaned (T3) nodes, or a snap file cannot be loaded (dead components print warnings but do not fail) |
 | `report` | any view has issues (orphans or missing snapshots) |
 | `sel-check` | the selector matches zero nodes |
@@ -51,31 +57,31 @@ What counts as failure for the check-style commands:
     Install Chrome for Testing, start and stop sessions, navigate, evaluate JavaScript, and reset storage.
   </Card>
   <Card title="Page interaction" icon="bolt" href="/cli/interaction">
-    Click, fill, scroll, and screenshot the live page — targeting elements by component identity.
+    Click, fill, scroll, and screenshot the live page by component identity.
   </Card>
   <Card title="Capturing pages" icon="map" href="/cli/capture">
-    `snapshot`, `inspect`, and `iterate` — annotated component trees and the edit-verify loop.
+    Use `snapshot`, `inspect`, and `iterate` to inspect component trees.
   </Card>
   <Card title="Coverage" icon="chart-line" href="/cli/coverage">
-    `coverage`, `multi-coverage`, and `report` — the T1/T2/T3 done-signal for a corpus.
+    Use `coverage`, `multi-coverage`, and `report` to measure T1, T2, and T3 coverage.
   </Card>
   <Card title="View sets" icon="layer-group" href="/cli/snapshots">
-    `snapshot-novelty`, `snapshot-prune`, and `migrate-snapshots` — maintain each view's set of captures.
+    Use `snapshot-novelty`, `snapshot-prune`, and `migrate-snapshots` to maintain each view's captures.
   </Card>
   <Card title="Selector tools" icon="magnifying-glass" href="/cli/selectors">
-    `sel-probe`, `sel-check`, `suggest`, and `gap` — verify selectors live and offline.
+    Verify selectors with `sel-probe`, `sel-check`, `suggest`, and `gap`.
   </Card>
   <Card title="Corpus checks" icon="file-lines" href="/cli/corpus">
-    `validate`, `lint`, `search`, and `discover` — structural and style checks over your YAML, plus URL pattern discovery.
+    Check YAML structure and style, search the corpus, and discover URL patterns.
   </Card>
   <Card title="Integration" icon="network-wired" href="/cli/integrate">
-    `serve-sightmap` and `skills install` — the overlay server and the embedded agent skills.
+    Run the overlay server and install the bundled agent skills.
   </Card>
 </CardGroup>
 
 ---
 
-`sightmap version` prints the build version and exits — see [Integrations](/cli/integrate).
+`sightmap version` prints the build version and exits. See [Integration](/cli/integrate).
 
 ## Typical flow
 
@@ -84,12 +90,12 @@ What counts as failure for the check-style commands:
     Install the CLI ([Install](/start/install)), then `sightmap browser install` to download Chrome for Testing.
   </Step>
   <Step title="Start a session">
-    From the site directory, run `sightmap browser start` — Chrome plus the sightmap server, with the overlay extension loaded ([Browser sessions](/cli/browser)).
+    From the site directory, run `sightmap browser start`. It launches Chrome, the Sightmap server, and the overlay extension ([Browser sessions](/cli/browser)).
   </Step>
   <Step title="Iterate on pages">
     Capture annotated snapshots and close coverage gaps with `iterate`, `snapshot`, and the selector tools ([Capturing pages](/cli/capture), [Coverage](/cli/coverage)).
   </Step>
   <Step title="Check corpus health">
-    Finish with `validate`, `lint --warn-only`, and `report` ([Corpus checks](/cli/corpus), [Coverage](/cli/coverage)).
+    Run `validate`, `lint`, and `report` ([Corpus checks](/cli/corpus), [Coverage](/cli/coverage)).
   </Step>
 </Steps>

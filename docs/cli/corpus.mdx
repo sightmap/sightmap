@@ -1,10 +1,10 @@
 ---
 title: "Sightmap CLI: Corpus Health Tools Reference"
 sidebarTitle: "Corpus"
-description: "Complete reference for the sightmap corpus tools: validate, lint, search, and discover — structural checks, style rules, offline YAML search, and URL pattern discovery."
+description: "Use validate, lint, search, and discover to check corpus structure, review selector quality, find definitions, and classify linked routes."
 ---
 
-These four commands keep the `.sightmap/` corpus itself healthy. `sightmap validate` is the structural gate: it checks the YAML against the spec and exits non-zero on any error. `sightmap lint` runs advisory style checks that catch selectors likely to rot. `sightmap search` is an offline regex search across the corpus with hierarchy breadcrumbs. `sightmap discover` classifies the URL space of the live page against your views. This page documents every corpus tool.
+`sightmap validate` checks whether the corpus loads and follows the CLI's structural rules. `sightmap lint` reports selector and naming problems. `sightmap search` searches component definitions offline. `sightmap discover` classifies same-host links from the current page against the corpus.
 
 <Note>
 `validate`, `lint`, and `search` are fully offline — no browser needed. `discover` reads links from a live page, so it needs a running session (see [Browser](/cli/browser)). For scoring how well the corpus covers a page, see [Coverage](/cli/coverage); for the normative YAML format, see [the spec](/spec/overview).
@@ -14,9 +14,9 @@ These four commands keep the `.sightmap/` corpus itself healthy. `sightmap valid
 
 ### `sightmap validate`
 
-Structural check of the corpus against the spec: the YAML parses, every component has a name and at least one selector, every selector parses in the supported subset, view routes are present, `stability:` and `access:` values are legal, and no scope declares the same name-plus-selector pair twice. Exits 1 on any error. Run it after every YAML edit and in CI.
+Loads the YAML and checks the resulting corpus. It verifies component selectors, view routes, `stability:` and `access:` values, and duplicate name-plus-selector pairs within a scope. It exits 1 on any load or validation error. Run it after YAML edits and in CI.
 
-Unsupported selector syntax is caught here too — a positional pseudo-class like `:nth-child()` is a validate-time parse error that points you at the four supported pseudo-classes (`:not()`, `:is()`, `:where()`, `:has()`).
+The command also rejects selector syntax outside Sightmap's supported subset. For example, `:nth-child()` produces a parse error; the supported pseudo-classes are `:not()`, `:is()`, `:where()`, and `:has()`.
 
 **Flags:**
 
@@ -35,8 +35,8 @@ sightmap validate
 On a broken corpus, each problem prints as one `error:` line and the command exits 1:
 
 ```text
-error: FacetFilter: component has no selectors
 error: ProductPod: duplicate component name and selector
+error: BrowsePage: view has empty route
 sightmap validate: 2 validation error(s)
 ```
 
@@ -44,21 +44,21 @@ sightmap validate: 2 validation error(s)
 
 ### `sightmap lint`
 
-Style and quality checks — static, no browser, advisory. Where `validate` answers "is this corpus well-formed", `lint` answers "will this corpus age well". The five main rules:
+Runs static style and maintainability checks without a browser. The five main rules are:
 
-| Rule | What it flags | What suppresses it |
+| Rule | What it flags | Response |
 | --- | --- | --- |
-| `child-repeats-parent` | A child selector that restates its parent's selector. The loader prepends the parent selector before matching, so the doubled path (`.dashboard .dashboard .card`) matches nothing | Drop the parent prefix — child selectors are scoped to the parent's subtree automatically |
+| `child-repeats-parent` | A child selector that repeats an ancestor class, producing a doubled path such as `.dashboard .dashboard .card` | Drop the parent prefix; child selectors are scoped under the parent automatically |
 | `broad-tag-selector` | A bare HTML tag (`header`, `a`, `button`) at global scope | Scope it under a parent as a child component, or add an anchor such as `data-testid` or `aria-label` |
-| `deep-nesting` | Selectors with four or more descendant levels — fragile and over-specified | Break the chain into a parent component plus a simple child selector |
+| `deep-nesting` | Selectors with four or more parts | Break the chain into a parent component and a simpler child selector |
 | `id-hash-selector` | `#id` selectors that look auto-generated (long digit runs, hash-like fragments) | Use `data-testid` or a semantic attribute; keep a stable framework hook (like `#__next`) with a `memory:` note explaining it |
-| `multi-instance-no-property` | A broad selector with no uniqueness anchor and no `properties:` — every instance annotates identically, so instances are indistinguishable in event logs | A singleton-style name (containing `Header`, `Footer`, `Nav`, `Sidebar`, `Main`, `Site`, `Page`, `Layout`, `Modal`, or `Dialog`), a parent chain (child components are exempt), at least one property, or `stability: unstable` |
+| `multi-instance-no-property` | A broad selector with no uniqueness anchor and no `properties:` | Add a property, narrow the selector, make it a child component, or mark it `stability: unstable`; singleton-style names are exempt |
 
-Three smaller checks run alongside them: `name-case` flags component names that do not start with an uppercase letter, `comma-in-selector` flags a top-level comma in a selector (split it into separate selectors instead), and every `validate` error is re-emitted as a warning under the `validation` rule, so `lint` alone also surfaces structural breakage.
+Three other checks run with them. `name-case` flags component names that do not start with an uppercase letter. `comma-in-selector` flags a top-level comma and expects separate selector entries instead. The `validation` rule re-emits each `validate` error as a warning.
 
-By default `lint` exits 1 when any warning exists. Pass `--warn-only` to always exit 0 — the recommended mode in the authoring loop, where warnings are advice rather than a gate.
+By default, `lint` exits 1 when it finds a warning. Pass `--warn-only` to print warnings and exit 0.
 
-Snapshot data sharpens the noisiest rule: `--snapshot FILE` (or `--all-snapshots` to walk `.sightmap/snapshots/**/*.snap.tree.json`) counts how many nodes each component's selector actually matches in the captures. A count of exactly 1 suppresses `multi-instance-no-property` as a false positive; a count of 0 appends `(0 matches in snapshot — selector may be broken)`; a higher count appends `(matched N times in snapshot)`.
+Snapshot data refines `multi-instance-no-property`. `--snapshot FILE` counts selector matches in one capture; `--all-snapshots` reads `.sightmap/snapshots/**/*.snap.tree.json`. A count of 1 suppresses the warning. A count of 0 adds `(0 matches in snapshot — selector may be broken)`, while a higher count adds `(matched N times in snapshot)`.
 
 **Flags:**
 
@@ -86,9 +86,13 @@ Property extraction (`properties:` on components) is implemented by the CLI as a
 
 ### `sightmap search`
 
-Offline regex search across every `.yaml`/`.yml` file under `.sightmap/`. Matches print with a hierarchy breadcrumb — file, view (with its route), parent components, then the matching component — so you can see where a definition lives without opening files. `PATTERN` is a Go regular expression and matching is case-insensitive unless you pass `--case`.
+Searches component definitions and `$ref` entries in `.yaml` and `.yml` files under `.sightmap/`. Each match includes a breadcrumb with the file, view and route when applicable, parent components, and matching component. `PATTERN` is a Go regular expression. Matching is case-insensitive unless you pass `--case`.
 
-Restrict the search with `--field`: `name`, `selector`, `description`, `memory`, or `all` (the default). `--field selector` is the fastest way to hunt duplicate selectors across views; `--field memory` finds triage notes and past decisions.
+Restrict the search with `--field`: `name`, `selector`, `description`, `memory`, or `all` (the default). These fields apply to component definitions; the command does not search view or request fields.
+
+<Warning>
+`search` currently reads scalar `selector:` values. If a file contains a selector array, it prints a parse warning and skips that file.
+</Warning>
 
 **Flags:**
 
@@ -119,13 +123,13 @@ When nothing matches, the command prints `no matches for PATTERN` to stderr and 
 
 ### `sightmap discover`
 
-URL pattern discovery from the live session. The command extracts every same-host link from the current page, normalizes dynamic path segments — numeric IDs, UUIDs, digit-bearing slugs — to `*`, and classifies each resulting pattern against the corpus:
+Reads unique same-host paths linked from the current page, replaces dynamic path segments with `*`, and classifies each resulting pattern against the corpus. Dynamic segments include numeric IDs, UUIDs, and digit-bearing slugs of at least eight characters.
 
-- `?` **unseen** — no view route matches. Sorted by link count, so the highest-traffic gaps come first.
-- `✓` **mapped** — the pattern matches a view's `route:`.
-- `○` **surveyed** — the pattern matches an entry in `.sightmap/survey.yaml`: pages you visited and deliberately chose not to map. Hidden unless you pass `--all`.
+- `?` **unseen**: no view route matches. Sorted by the number of distinct paths that normalize to the pattern.
+- `✓` **mapped**: the pattern matches a view's `route:`.
+- `○` **surveyed**: the pattern matches an entry in `.sightmap/survey.yaml`. Hidden unless you pass `--all`.
 
-Run it at the start of a new site to understand the URL space before authoring, and periodically afterward to catch sections the corpus has never seen.
+Run it on pages that link to major sections of the app, then add views for relevant unseen patterns or record surveyed patterns in `.sightmap/survey.yaml`.
 
 **Flags:**
 
@@ -152,22 +156,22 @@ sightmap discover --all
 ```
 
 <Tip>
-Every `?` line is a decision to make: map it (add a view), or survey it (add the pattern to `survey.yaml` with a reason). A corpus where `discover` prints no `?` lines has consciously triaged its whole URL space.
+Each `?` line is unmatched among the links on the current page. Add a view or add the pattern and a reason to `survey.yaml`.
 </Tip>
 
 ## Typical flow
 
 <Steps>
   <Step title="Validate after every edit">
-    Run `sightmap validate` whenever you touch corpus YAML. It is fast, offline, and exits 1 on structural errors — wire it into CI as a hard gate.
+    Run `sightmap validate` after changing corpus YAML. It works offline and exits 1 on load or validation errors, so it can run as a required CI check.
   </Step>
   <Step title="Lint for style">
     Run `sightmap lint --warn-only` and read the warnings as a review checklist. Add `--all-snapshots` once you have captures, so match counts separate real problems from false positives.
   </Step>
   <Step title="Search before you add">
-    Before naming a new component, run `sightmap search` for the name and `--field selector` for the selector — reuse or promote an existing definition instead of duplicating it.
+    Before naming a component, search for its proposed name and selector. Reuse or promote an existing definition when it already represents the same UI.
   </Step>
   <Step title="Discover the uncovered URL space">
-    From a live session, run `sightmap discover` and triage each `?` pattern into a new view or a `survey.yaml` entry until none remain.
+    From a live session, run `sightmap discover` on pages that link to the app's main sections. Classify each relevant `?` pattern as a view or a `survey.yaml` entry.
   </Step>
 </Steps>

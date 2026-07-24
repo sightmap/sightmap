@@ -1,74 +1,70 @@
 ---
 title: "Sightmap Glossary: Views, Components, Coverage Tiers, and More"
 sidebarTitle: "Glossary"
-description: "Definitions for view, component, request, memory, selector, curator, consumer, coverage tiers, novelty gate, component query, and stream version."
+description: "Look up the terms used throughout the Sightmap specification, CLI, and documentation."
 ---
 
-Definitions used throughout the Sightmap docs and spec. Alphabetical.
+Terms used throughout the Sightmap docs and spec, listed alphabetically.
 
 ### Audit
 
-A maintainer or contributor task that compares the live `.sightmap/` directory against the actual codebase to catch drift — stale routes, missing components, dead memory entries. Audits are typically run before a release or after a large refactor.
+A review of `.sightmap/` against the running app and source code to find stale routes, missing components, invalid selectors, and outdated memory.
 
 ### Bootstrap
 
-The first generation of a `.sightmap/` directory for a project — produced by an agent driving the running app with the [`sightmap` CLI](/authoring/cli) and proposing an initial set of views and components from what it observes. The author then curates the output. See [the curation workflow](/concepts/workflow).
+The initial creation of a project's `.sightmap/` directory. An agent or human uses the [`sightmap` CLI](/cli/overview) against the running app, proposes views and components, and verifies the resulting YAML. See [the authoring workflow](/authoring/overview).
 
 ### Capture
 
-One timestamped snapshot of a view, stored at `.sightmap/snapshots/{view}/{stamp}.snap` with a sibling `.snap.tree.json` file holding the raw component tree. A view's captures together form its **view set**. See [Snapshots](/cli/snapshots).
+One snapshot of a view. New captures added to a view set are stored at `.sightmap/snapshots/{view}/{stamp}.snap`, with the raw component tree in a sibling `.snap.tree.json` file. See [Snapshots](/cli/snapshots).
 
 ### Component
 
-A named DOM subtree, identified by one or more CSS selectors. The unit of UI naming Sightmap surfaces to agents. Defined under `components:` either at the file root (global) or inside a view (scoped). See [Components](/spec/components).
+A named DOM subtree identified by one or more CSS selectors. Components can be global at the file root or scoped inside a view. See [Components](/spec/components).
 
 ### Component query
 
-A small query language for targeting components by name and extracted property values — for example `ProductCard[name^="Weber"]` or `Ancestor Descendant`. Accepted by `sightmap browser click`, `fill`, `hover`, and `scroll` in place of a component ID from `sightmap snapshot` output; the query resolves against a fresh extraction in one atomic pass, so it survives re-renders that invalidate previously captured component IDs. See [Interaction](/cli/interaction).
+A query language for targeting components by name, descendant relationships, and extracted property values, such as `ProductCard[name^="Weber"]` or `Ancestor Descendant`. `sightmap browser click`, `fill`, `hover`, and `scroll` accept a query instead of a probe ID. The CLI extracts and matches the live tree immediately before the action, which reduces reliance on stale IDs. Resolution and the action are separate operations, so a later re-render can still invalidate the target. See [Interaction](/cli/interaction).
 
 ### Conformance
 
-The contract a Sightmap implementation honors. Conforming implementations are validated against the language-agnostic [conformance fixtures](/reference/conformance-fixtures) and the requirements in the [schema reference](/reference/schema#conformance).
+The requirements a Sightmap implementation must follow. The JSON Schema and normative spec text define the contract; the language-agnostic [conformance fixtures](/reference/conformance-fixtures) test defined behavior. See [Conformance](/spec/conformance).
 
 ### Consumer
 
-A program that reads a sightmap at runtime — typically an agent, a snapshot enricher, or a network-trace tool. Consumers honor the spec; they do not produce sightmap files. Contrast with **Curator**. See [Curator vs. consumer](/concepts/curator-vs-consumer).
+A tool acting in the reader role: it loads a sightmap and applies it to the running app without deciding what the corpus should contain. The same tool can also support the **Curator** role. See [Curator vs. consumer](/concepts/curator-vs-consumer).
 
 ### Corpus
 
-The merged contents of a project's `.sightmap/` directory — every discovered YAML file combined into one set of views, components, and requests — as loaded by the CLI and the [Go library](/reference/go-library). `validate`, `lint`, `search`, and the coverage commands operate on the corpus as a whole, not on individual files. See **`.sightmap/` (the directory)** below.
+The views, components, requests, and memory produced by loading and merging a project's sightmap files. `validate`, `lint`, and `search` load the directory as a corpus. Coverage commands re-match saved captures against that corpus. See [the Go library](/reference/go-library).
 
 ### Coverage tiers
 
-The three-tier score the CLI assigns every interactive node in a capture. **T1 direct** — the node itself is matched by a component selector; maximize this. **T2 scoped** — the node sits inside a matched ancestor but is unnamed itself; acceptable when the scope is tight. **T3 orphaned** — no matched ancestor at any depth; must reach 0. See [Coverage](/cli/coverage).
+The classification the CLI assigns to each analyzed interactive node. **T1 direct** means the node matched a component selector. **T2 scoped** means the node is unnamed but has a matched ancestor. **T3 orphaned** means the node has no matched ancestor. Coverage counts visible nodes by default. See [Coverage](/cli/coverage).
 
 ### Curator
 
-A human (or human-supervised agent) who authors and maintains the `.sightmap/` directory. Curators choose which UI surfaces are worth naming, write memory entries, and keep the corpus in sync as the app evolves. Contrast with **Consumer**.
-
-### Glossary (this page)
-
-Where these terms are defined. If a term is missing, open a [Discussion](https://github.com/sightmap/sightmap/discussions).
+A human, an agent, or both working together to author and maintain `.sightmap/`. Curators choose names and selectors, write memory, and update the corpus as the app changes. Contrast with **Consumer**.
 
 ### MCP
 
-[Model Context Protocol](https://modelcontextprotocol.io/) — the protocol some agent hosts use to expose tools to agents. Sightmap itself is transport-agnostic: the `.sightmap/` corpus is plain files, and any tool (MCP-based or not) can read it.
+[Model Context Protocol](https://modelcontextprotocol.io/), a protocol for exposing tools and context to agents. Sightmap does not require MCP; consumers can load its YAML files through any transport.
 
 ### Memory
 
-Short freeform notes attached to a file, view, component, or request. Memory carries context that isn't recoverable from the source code: quirks, invariants, "you have to click this twice" lore. See [Memory](/spec/memory).
+Short freeform notes attached at the file root or to a view, component, or request. Memory records runtime context that source code may not state, such as quirks, invariants, and workarounds. See [Memory](/spec/memory).
 
 ### Novelty gate
 
-The rule that decides whether a re-snap of a view is kept: a capture is saved only if it adds something structurally new relative to the view set — a new component type matched, or a new uncovered interactive slot. Pure value churn (different products, prices, copy) never counts, so dynamic views saturate instead of accumulating near-duplicate captures. `sightmap snapshot --force` overrides the gate. See [Snapshots](/cli/snapshots).
+The rule applied when `snapshot` appends to a view set. The first capture is kept; later captures are kept only when they add a matched component type or uncovered interactive slot. Changes to values such as products, prices, or copy do not count. `sightmap snapshot --force` bypasses the gate. See [Snapshots](/cli/snapshots).
 
 ### Project semver
 
-The [SemVer](https://semver.org/) version of the `sightmap/sightmap` repo (currently `0.1.0`), published on GitHub Releases. Tracks docs, schema clarifications, examples, and tooling cadence. Independent of the spec stream version. See [Versioning policy](/reference/versioning).
+The [SemVer](https://semver.org/) version assigned to the spec project, currently `0.1.0` in the canonical versioning policy. It is independent of both the spec stream in a sightmap file and the shipped CLI version. The current CLI/npm release is `0.13.1`; `sightmap version` prints the installed CLI version. See [Versioning policy](/reference/versioning).
 
 ### Request
 
-A named API endpoint described in the sightmap. Carries the route glob, HTTP method, payload shape, and optional memory. Defined under `requests:`. See [Requests](/spec/requests).
+A named API endpoint with a route glob and optional method filter, payload fields, headers, source path, description, and memory. Defined under `requests:`. See [Requests](/spec/requests).
 
 ### Selector
 
@@ -76,20 +72,20 @@ A CSS selector (or array of alternatives) that locates a component's root elemen
 
 ### Sightmap (the file)
 
-A single YAML document under `.sightmap/` that conforms to the v1 schema. "A sightmap" can also refer to the whole `.sightmap/` directory, depending on context.
+A corpus YAML document under `.sightmap/` that conforms to the stream 1 schema. Depending on context, "a sightmap" can also mean the full directory.
 
 ### `.sightmap/` (the directory)
 
-The conventional location for a project's sightmap files. Lives at the repo root. All `*.yaml` and `*.yml` files inside (recursively) are discovered and merged into the **corpus**; the `snapshots/` and `review/` subdirectories are skipped during corpus loading.
+The `.sightmap/` directory at the project root. Sightmap discovers and merges corpus `*.yaml` and `*.yml` files recursively. The Go loader skips the `snapshots/` and `review/` subdirectories because they hold non-corpus artifacts.
 
 ### Stream version
 
-The integer in a sightmap file's `version:` field — currently `1`. Identifies which spec stream the file conforms to. Bumps only on a breaking change to the YAML format. Independent of the project semver. See [Versioning policy](/reference/versioning).
+The integer in a sightmap file's `version` field, currently `1`. It selects the spec stream used to interpret the file and changes only for a breaking change to the YAML format. It is independent of project SemVer. See [Versioning policy](/reference/versioning).
 
 ### View
 
-A named screen in the app, identified by a URL route glob. The unit of routing Sightmap matches against the current page. Defined under `views:`. See [Views](/spec/views).
+A named screen identified by a URL route glob. Sightmap matches the current URL to one active view. See [Views](/spec/views).
 
 ### View set
 
-All captures for a single view. Coverage is scored over the **union** of the set, because real pages are non-deterministic — lazy carousels, personalization, and rotating promos mean a single capture can miss whole sections. See [Snapshots](/cli/snapshots).
+All saved captures for one view. `coverage` reports T1/T2/T3 for each capture and evaluates component presence across the set. `report` aggregates the set into one row, while `multi-coverage` uses the highest component count found in the set. See [Snapshots](/cli/snapshots).

@@ -41,26 +41,20 @@
               "index",
               "start/what-is-sightmap",
               "start/install",
-              "start/quickstart",
-              "start/choose"
+              "start/quickstart"
             ]
           },
           {
             "group": "Concepts",
             "pages": [
-              "concepts/why",
               "concepts/vs",
               "concepts/curator-vs-consumer",
-              "concepts/workflow",
               "concepts/selectors"
             ]
           },
           {
             "group": "Authoring",
-            "pages": [
-              "authoring/overview",
-              "authoring/cli"
-            ]
+            "pages": ["authoring/overview"]
           }
         ]
       },
@@ -166,6 +160,10 @@
     "indexing": "navigable"
   },
   "redirects": [
+    { "source": "/start/choose", "destination": "/" },
+    { "source": "/concepts/why", "destination": "/start/what-is-sightmap" },
+    { "source": "/concepts/workflow", "destination": "/authoring/overview" },
+    { "source": "/authoring/cli", "destination": "/cli/overview" },
     { "source": "/quickstart", "destination": "/start/quickstart" },
     { "source": "/install", "destination": "/start/install" },
     { "source": "/schema", "destination": "/reference/schema" },

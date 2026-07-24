@@ -1,21 +1,21 @@
 ---
 title: "Sightmap Versioning Policy: Spec Stream vs Project SemVer"
 sidebarTitle: "Versioning"
-description: "How the integer spec stream and the project's SemVer releases evolve independently, and what counts as a breaking change."
+description: "Distinguish the integer spec stream from project SemVer and determine which changes require a new stream."
 ---
 
-Two things in the `sightmap/sightmap` monorepo are versioned independently. Knowing which is which is the whole point of this page.
+Sightmap versions the spec stream and the project independently.
 
 | | Versioned by | Current | Bumps when |
 |---|---|---|---|
 | **The spec** | A single integer in the YAML `version:` field | `1` | A breaking change to the YAML format |
-| **The project** | [SemVer](https://semver.org/) (GitHub Releases) | `0.1.0` | Anything ships — patch, minor, or major per SemVer |
+| **The project** | [SemVer](https://semver.org/) (GitHub Releases) | `0.1.0` | A project release; patch, minor, or major follows SemVer |
 
-The spec stream is the contract implementations honor. The project semver describes how settled that stream currently is and tracks the cadence of repo-level changes (docs, schema clarifications, examples, tooling). The two are decoupled so that the contract tools depend on doesn't churn every time the docs site or examples are touched.
+The spec stream identifies the contract an implementation supports. Project SemVer covers repository releases, including documentation, schema clarifications, examples, and tooling. A project release does not require a new spec stream.
 
-We aim to keep the spec stream at `1` for a long time. The project will move through `0.x`, `1.0.0`, and beyond independently.
+The project can move through `0.x`, `1.0.0`, and later releases while the spec remains at stream `1`.
 
-## TL;DR
+## Version summary
 
 - The spec stream version (`version: 1`) bumps **only on breaking changes** to the YAML format.
 - The project semver bumps as `spec/v1/` matures: `0.x` while we tighten in place, `1.0.0` once we commit to compatibility, `2.0.0` only if `spec/v2/` ever ships.
@@ -42,9 +42,9 @@ These require bumping `version: 1` → `version: 2` and creating `spec/v2/`:
 - Changing the file-merge rules under `.sightmap/`
 - Any change that could make a previously valid `.sightmap/` directory produce different behavior in a conforming implementation
 
-The bar is high. Breaking changes require an accepted SEP with explicit maintainer consensus and a stated migration path.
+Every breaking change requires an accepted SEP, explicit maintainer consensus, and a migration path.
 
-## What is **not** a breaking change
+## Changes that do not bump the spec stream
 
 These can land within stream `1` and ship as a project minor or patch bump:
 
@@ -54,19 +54,19 @@ These can land within stream `1` and ship as a project minor or patch bump:
 - Tightening validation to reject input that was always underspecified — pre-1.0 these land freely; post-1.0 they get a deprecation window
 - Clarifying wording that doesn't change conforming behavior
 
-## The additive-field paradox
+## Additive fields and older implementations
 
-The JSON Schema sets `additionalProperties: false` at **every** level. That's a deliberate, load-bearing policy — conforming implementations MUST reject unknown fields rather than silently ignore, default, or migrate them. It has a consequence that surprises people:
+The JSON Schema sets `additionalProperties: false` at every level. Conforming implementations MUST reject unknown fields instead of ignoring, defaulting, or migrating them.
 
 <Warning>
 A document that uses a newly added *optional* field is schema-invalid under **older** implementations, even though adding the field is "not a breaking change" and `version:` stays `1`.
 </Warning>
 
-The stream version tells you which contract a file targets, not which schema revision. So every schema evolution — additive or reductive — requires coordinated releases:
+The stream version identifies the contract a file targets, not its schema revision. Additive and reductive schema changes therefore require coordinated releases:
 
 - Tooling releases that understand the new field ship *before* sightmaps in the wild start using it.
 - Adopters who pin a vendored schema copy or an older CLI should upgrade before authoring the new field.
-- CI that validates against a pinned schema (see [JSON Schema](/reference/json-schema)) fails loudly instead of letting the field pass through unvalidated — that's the point.
+- CI that validates against a pinned schema (see [JSON Schema](/reference/json-schema)) rejects an unknown field.
 
 ## Support windows
 
@@ -76,4 +76,4 @@ The stream version tells you which contract a file targets, not which schema rev
 
 ## Canonical document
 
-Full process — including how a new spec stream gets cut, the deprecation window, and how implementations dispatch on `version:` — lives in [`spec/VERSIONING.md`](https://github.com/sightmap/sightmap/blob/main/spec/VERSIONING.md). On any disagreement, the canonical file wins.
+[`spec/VERSIONING.md`](https://github.com/sightmap/sightmap/blob/main/spec/VERSIONING.md) defines how to create a spec stream, apply the deprecation window, and dispatch on `version:`. On any disagreement, that file wins.

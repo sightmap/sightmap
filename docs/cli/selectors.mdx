@@ -1,10 +1,10 @@
 ---
 title: "Sightmap CLI: Selector Tools Reference"
 sidebarTitle: "Selectors"
-description: "Complete reference for the sightmap selector tools: suggest, gap, sel-probe, and sel-check — discover selector candidates, find coverage gaps, and verify every selector before it enters your corpus."
+description: "Use suggest, gap, sel-probe, and sel-check to find selector candidates, locate coverage gaps, and verify selectors."
 ---
 
-Selectors are the load-bearing part of every component definition, and these four commands cover their whole lifecycle. `sightmap suggest` scans the live page for stable selector candidates. `sightmap gap` lists the interactive nodes your corpus does not yet cover, with a suggested selector for each cluster it can anchor. `sightmap sel-probe` validates a candidate selector against the live page. `sightmap sel-check` re-validates a selector offline against a saved snapshot. This page documents every selector tool.
+Every component definition needs a selector. `sightmap suggest` finds stable hooks on the live page. `sightmap gap` lists interactive nodes that the corpus does not cover and suggests selectors when it can. `sightmap sel-probe` checks a selector against the live page, while `sightmap sel-check` checks one against a saved snapshot.
 
 <Note>
 These commands work on one selector at a time. For the selector syntax the matcher accepts, see [Selectors](/concepts/selectors); for capturing the snapshots that `sel-check` reads, see [Capture](/cli/capture); for scoring whole-page coverage, see [Coverage](/cli/coverage).
@@ -18,16 +18,16 @@ These commands work on one selector at a time. For the selector syntax the match
 
 ### `sightmap suggest`
 
-Scans the live page — including labeled landmark and widget roles — for elements carrying a stable authoring hook (`data-testid` or `data-component`) and prints one candidate selector per unique hook, with a match count and a text sample. Candidates are sorted by match count, highest first. Reach for it when you start a fresh page and the corpus has nothing to say about it yet.
+Scans the live page for elements with a `data-testid` or `data-component` attribute. It prints one selector per unique attribute value, along with a match count and text sample, sorted by match count from highest to lowest.
 
-Pass `--exclude-known` to hide candidates already covered by a corpus selector, and `--group` to group the remaining candidates under their nearest known ancestor component. Grouping matches the page against the newest `.snap.tree.json` in the current directory; point `--snap` at a specific tree file to override the auto-detection.
+Pass `--exclude-known` to hide candidates already covered by a global component selector. Pass `--group` to organize the remaining candidates by their nearest known ancestor component. Grouping uses the newest `.snap.tree.json` in the current directory when available, or matches the live tree if no snapshot is found. Use `--snap` to select a specific tree file.
 
 **Flags:**
 
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--addr` | `localhost:7892` | CDP address (host:port) |
-| `--exclude-known` | off | Exclude elements already matched by a known sightmap component |
+| `--exclude-known` | off | Exclude elements already matched by a global component |
 | `--group` | off | Group candidates by nearest known ancestor component |
 | `--launch` | off | Auto-launch Chrome if unreachable |
 | `--max` | `20` | Max candidates to show |
@@ -68,9 +68,9 @@ Ungrouped (no known ancestor):
 
 ### `sightmap gap`
 
-Walks the live page's component tree and reports interactive nodes with no component context. By default it reports orphaned (T3) nodes — interactive nodes with no matched ancestor at any depth — grouped into clusters by role, text, and nearest stable-anchor ancestor. Clusters with a stable-anchor ancestor carry a `→` suggested selector to seed a `sel-probe` verification; clusters without one print no hint.
+Walks the live page's component tree and reports interactive nodes with no component context. By default, it reports orphaned (T3) nodes with no matched ancestor at any depth. It groups them by role, text, and nearest stable-anchor ancestor. A cluster with a stable-anchor ancestor includes a `→` selector suggestion.
 
-With `--scope COMPONENT`, the analysis inverts: instead of orphans, it reports the unmatched interactive nodes (T2) inside that component's matched subtree — the right tool when you are tightening a loose scope. Only visible nodes are counted unless you pass `--include-hidden`. The command requires a `.sightmap/` directory.
+With `--scope COMPONENT`, the command reports unmatched interactive nodes (T2) inside that component's matched subtree. Only visible nodes are counted unless you pass `--include-hidden`. The command requires a `.sightmap/` directory.
 
 **Flags:**
 
@@ -107,14 +107,14 @@ Gap analysis — 5 orphaned interactive nodes:
 When every visible interactive node is covered, the command prints `✓ no orphaned interactive nodes`. In scoped mode the header becomes `T2 gaps in [ComponentName] — N unmatched interactive elements:` and a clean result prints `✓ No T2 gaps in [ComponentName]`.
 
 <Tip>
-The `→` hint is a starting point, not a verified selector. Always run it through `sel-probe` before writing YAML — a hint that matches more nodes than the cluster it came from will corrupt your coverage numbers.
+The `→` hint is unverified. Run it through `sel-probe` before writing YAML because a broad match can inflate coverage.
 </Tip>
 
 ---
 
 ### `sightmap sel-probe`
 
-Queries the live page with a CSS selector and prints the match count plus per-match detail: element identity, role, text, key attributes, and up to five levels of parent chain. Parents that match a known corpus component are annotated with `★ ComponentName`, and a `nearest component` summary line shows which component the matches sit inside. Run it on every selector before that selector enters YAML.
+Queries the live page with a CSS selector and prints details for up to `--max` matches: element identity, role, text, key attributes, and five levels of parent context. Parents that match a global component are annotated with `★ ComponentName`. A `nearest component` line summarizes the global component ancestors of the returned matches.
 
 ```bash
 sightmap sel-probe [flags] -- 'css-selector'
@@ -122,19 +122,19 @@ sightmap sel-probe [flags] -- 'css-selector'
 
 The `--` separator before the selector is recommended: selectors can start with `-` and would otherwise be misinterpreted as flags.
 
-With `--all`, the command instead navigates to every view URL declared in `views/*.yaml` — each view's top-level `url:` plus any `snapshots[].url` entries — and prints a per-view match count. That is the cross-page check to run before promoting a component from a view to `components.yaml`. It waits at least 0.5 seconds after each navigation; raise `--wait` for slow pages.
+With `--all`, the command navigates to the corpus's snapshot targets. A view with no `snapshots:` entries contributes its top-level `url:`. Otherwise, each `snapshots[].url` contributes a target and falls back to the top-level `url:` when omitted. The command prints a match count for each target. Use this check before promoting a view component to the global `components:` collection. It waits at least 0.5 seconds after each navigation; increase `--wait` for pages that need more time.
 
 **Flags:**
 
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--addr` | `localhost:7892` | CDP address (host:port) |
-| `--all` | off | Probe the selector on every view URL declared in `views/*.yaml` |
+| `--all` | off | Probe the selector on every snapshot target declared by the corpus |
 | `--full` | off | Show full text (no truncation to 80 characters) |
-| `--launch` | off | Launch a new Chrome instance if `--addr` is unreachable |
-| `--max` | `10` | Max matches to show |
+| `--launch` | off | Launch Chrome if `--addr` is unreachable; not used with `--all` |
+| `--max` | `10` | Max matches to query and show |
 | `--probe-urls` | `.sightmap/probe-urls.yaml` | Deprecated fallback: path to a legacy `probe-urls.yaml`, read only when no view declares a `url:` |
-| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory for component annotation |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory for global component annotation |
 | `--tab` | — | Target tab ID (from `browser start` output) |
 | `--wait` | `0` | Seconds to wait after navigation with `--all` (minimum 0.5) |
 
@@ -169,7 +169,7 @@ nearest component: ★ ProductCard  (div[data-testid="product-pod"])
 The `--all` variant prints one line per view URL:
 
 ```bash
-sightmap sel-probe --all -- '[data-testid="product-pod"]'
+sightmap sel-probe --all --max 50 -- '[data-testid="product-pod"]'
 ```
 
 ```text
@@ -180,16 +180,16 @@ pdp                       sel=[data-testid="product-pod"]  1 match
 ```
 
 <Note>
-`sel-probe` exits 0 even when the selector matches nothing — it is a diagnostic, and `matches: 0` is a valid answer. Use `sel-check` when you need a non-zero exit code for automation. Also note that probing does not preserve focus state: elements that only exist while an input is focused (search autocomplete dropdowns, for example) cannot be probed this way — establish the focus state with `browser eval` instead.
+`sel-probe` exits 0 when the selector matches nothing because `matches: 0` is a valid diagnostic result. Use `sel-check` when automation needs a non-zero exit code for zero matches. Match counts are capped by `--max`, including with `--all`; raise the limit when you need the full count. `sel-probe` also does not create transient UI state. Open a menu or focus an input with a browser interaction before probing elements that only exist in that state.
 </Note>
 
 ---
 
 ### `sightmap sel-check`
 
-Evaluates a CSS selector against a saved `.snap.tree.json` file offline — no browser session needed. Pass either the `.snap` path (the sibling `.snap.tree.json` is derived automatically) or the tree file itself. Matching applies the last simple selector in the chain to every node in the tree, so it answers "does this target element exist in the capture" rather than enforcing the full ancestor chain.
+Evaluates a CSS selector against a saved `.snap.tree.json` file without a browser session. Pass either the `.snap` path, which resolves to the sibling `.snap.tree.json`, or the tree file itself. Matching applies the last simple selector in the chain to every node in the tree. It checks whether the target element exists without enforcing the ancestor chain.
 
-The command exits 1 when the selector matches zero nodes, which makes it a cheap regression guard: pin a known-good selector against a saved snapshot and any refactor that breaks it fails the check.
+The command exits 1 when the selector matches zero nodes. You can use that exit code to check a known selector against a saved snapshot in automation.
 
 ```bash
 sightmap sel-check 'SELECTOR' FILE.snap
@@ -199,7 +199,7 @@ sightmap sel-check 'SELECTOR' FILE.snap
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--include-hidden` | off | Include hidden nodes (all nodes are shown by default) |
+| `--include-hidden` | off | Accepted for parity with other commands; has no effect because all saved nodes are checked |
 | `--limit` | `20` | Max matches to print (all matches are still counted) |
 
 ```bash
@@ -228,7 +228,7 @@ A selector that matches nothing prints the count and fails:
 ```
 
 <Tip>
-`sel-check` is deliberately looser than `sel-probe`: offline matching applies only the last simple selector, so it can count nodes that the live query's ancestor constraints would exclude. A disagreement beyond that usually means the snapshot is stale — re-capture the page first.
+`sel-check` is looser than `sel-probe`: offline matching applies only the last simple selector, so it can count nodes that the live query's ancestor constraints would exclude. If the results otherwise differ, recapture the page before investigating further.
 </Tip>
 
 ## Typical flow
@@ -238,12 +238,12 @@ A selector that matches nothing prints the count and fails:
     On a fresh page, run `sightmap suggest --exclude-known` to list stable-hook selectors not yet in the corpus, or `sightmap gap` to see orphaned interactive nodes with `→` selector hints.
   </Step>
   <Step title="Verify live">
-    Run `sightmap sel-probe -- 'selector'` and confirm the match count and parent chain are what you expect. Never write YAML from an unverified selector.
+    Run `sightmap sel-probe -- 'selector'` and confirm the match count and parent chain before writing the selector to YAML.
   </Step>
   <Step title="Write the component and re-check">
     Add the component to `views/*.yaml` (or `components.yaml`), run `sightmap validate`, then re-run the [authoring loop](/cli/coverage) until the page reports zero orphans.
   </Step>
   <Step title="Cross-check before promotion">
-    Before promoting a component to `components.yaml`, run `sightmap sel-probe --all -- 'selector'` across every view URL, and pin the result offline with `sightmap sel-check` against saved snapshots.
+    Before promoting a component to the global `components:` collection, run `sightmap sel-probe --all -- 'selector'` across the declared view URLs. Use `sightmap sel-check` to check the selector against saved snapshots.
   </Step>
 </Steps>

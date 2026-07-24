@@ -1,10 +1,10 @@
 ---
 title: "Sightmap Memory: Durable Notes Agents Read at Runtime"
 sidebarTitle: "Memory"
-description: "Attach short freeform notes to files, views, components, and requests so every quirk you learn once is surfaced to the next agent."
+description: "Attach runtime notes to files, views, components, and requests."
 ---
 
-Memory entries are short freeform notes attached to any definition — file, view, component, or request. They exist so agents can carry forward context that isn't recoverable from the source code: quirks, invariants, workarounds, "you have to click this twice" lore.
+Memory entries are short freeform notes attached at the file root or to a view, component, or request. They record runtime context that source code may not state, such as quirks, invariants, and workarounds.
 
 ```yaml
 memory:
@@ -12,11 +12,11 @@ memory:
   - Range mode, 1st click = start, 2nd = end, 3rd resets
 ```
 
-Each entry is a single human-readable sentence or short bullet. The format is intentionally unstructured — they are notes for a reader, not data for a parser.
+Each entry is a non-empty string, usually a sentence or short bullet. Consumers treat the content as text rather than structured data.
 
 ## Where they attach
 
-Memory is a string array on every definition that carries any structure. Where you put it determines when it applies.
+`memory` is a string array. Its location determines when the entries apply.
 
 ```yaml .sightmap/flights.yaml
 version: 1
@@ -52,17 +52,17 @@ The activation rules:
 
 ## What consumers do with them
 
-Memory entries are **durable hints**, not configuration. Conforming implementations SHOULD surface applicable entries in a `[Guide]` section at the top of enriched output, so the next agent reading the page picks up where the last one left off.
+Memory entries are runtime guidance, not configuration. Conforming implementations SHOULD include applicable entries in a `[Guide]` section at the top of enriched output.
 
-The reference implementation is the `sightmap` CLI: `sightmap snapshot` prints view-level memory in its snapshot header and includes component memory in its annotated JSON output (`--json`). Runtime consumers like session-replay enrichers (for example [Subtext](https://subtext.fullstory.com)) inject matching entries into snapshot and network-trace output the same way. Any other consumer — your agent instructions, custom tooling — is free to format them however it likes; they're plain text.
+The `sightmap` CLI prints view-level memory in the snapshot header and includes component memory in annotated JSON written with `--json`.
 
 <Note>
-Memory is the runtime-surfaced field. `description` is the opposite: it exists for PR review and future maintenance, and is **never** surfaced at runtime. Put "what an agent needs while driving the page" in `memory` and "what a reviewer needs while reading the YAML" in `description`.
+`memory` contains guidance for consumers at runtime. `description` supports review and maintenance and is not surfaced at runtime. Put page-driving context in `memory` and YAML-maintenance context in `description`.
 </Note>
 
 ## What to write
 
-Treat memory as the "inline comment" of the running app — short observations about behavior the source code doesn't make obvious.
+Use memory for short observations about runtime behavior that the source code does not make obvious.
 
 Good entries:
 
@@ -70,14 +70,14 @@ Good entries:
 - "Rate-limited to 10 requests/min per user; returns 429 beyond that"
 - "The third click on the date range resets the selection"
 
-Less useful:
+Avoid entries that:
 
-- "This is the search page" (the `name` already says that)
-- "Type a city name and submit" (an agent will figure that out)
-- A novel-length explanation (split into smaller bullets, or move to `description`)
+- Repeat the definition's `name`, such as "This is the search page"
+- Restate behavior already exposed by the controls, such as "Type a city name and submit"
+- Contain a long explanation that belongs in smaller entries or in `description`
 
 <Tip>
-Memory is the field that pays back the most over time. Every quirk you write down is a debug session a future agent — or future you — doesn't have to repeat.
+Update or delete a memory entry when the behavior it describes changes.
 </Tip>
 
 ## Next

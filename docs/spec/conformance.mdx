@@ -1,26 +1,33 @@
 ---
 title: "Sightmap Conformance: The Rules Implementations Must Follow"
 sidebarTitle: "Conformance"
-description: "What it means for an implementation to conform to the spec, and where the executable definition — the conformance fixtures — lives."
+description: "Understand the requirements and fixtures used to test a Sightmap implementation."
 ---
 
-An implementation *conforms* when it behaves the way the spec says for every input the spec defines. Because a sightmap is consumed by many tools — coding agents, runtime enrichers, CI checks — that shared contract is what lets a `.sightmap/` directory mean the same thing everywhere.
+An implementation conforms when it handles every defined input according to the spec.
 
 ## The rules
 
 A conforming implementation:
 
 - **MUST** accept any file that validates against [`sightmap.schema.json`](https://github.com/sightmap/sightmap/blob/main/spec/v1/sightmap.schema.json), and reject any that doesn't.
-- **MUST** implement [route matching](/spec/views#most-specific-wins) as specified — most-specific-wins for views, all-matches-apply for requests.
+- **MUST** implement [route matching](/spec/views#most-specific-wins) as specified: most-specific-wins for views and all-matches-apply for requests.
 - **MUST** implement [global vs view-scoped](/spec/views#scoped-vs-global) precedence.
 - **SHOULD** surface applicable [`memory`](/spec/memory) entries when the parent definition is active.
-- **MAY** ignore fields it doesn't use, and **MAY** add non-standard behavior as long as it doesn't change the meaning of conforming inputs.
+- **MAY** ignore fields it doesn't use.
+- **MAY** add non-standard behavior as long as it doesn't change the meaning of conforming inputs.
 
 The full statement is in the [schema reference](/reference/schema#conformance).
 
+Individual sections add requirements for specific features, including [component references](/spec/components#component-references) and [dependencies](/reference/schema#dependencies).
+
+Any tool that writes `.sightmap/*.yaml` files MUST produce the [canonical YAML format](https://github.com/sightmap/sightmap/blob/main/spec/v1/canonical-format.md). The `1NN` conformance fixtures test that output byte for byte.
+
 ## The executable definition
 
-The spec's semantics are executable: each **[conformance fixture](/reference/conformance-fixtures)** pairs a simulated `.sightmap/` directory with an `expected.json` of `{ command, args, expected }` cases that every implementation must pass. On any disagreement, `sightmap.schema.json` and the normative spec text win — a fixture that contradicts them is a bug in the fixture. That still makes a failing fixture the cheapest way to influence the spec: it forces the conversation about whether the spec or the implementation is wrong, before either gets entrenched.
+Each [conformance fixture](/reference/conformance-fixtures) contains a simulated `.sightmap/` directory and an `expected.json` file. The file has a `cases` array of `{ command, args, expected }` assertions for implementation test runners. Implementations are expected to pass the shared fixtures.
+
+If a fixture disagrees with `sightmap.schema.json` or the normative spec text, the schema and spec text win. The fixture must be corrected.
 
 See [Conformance fixtures](/reference/conformance-fixtures) for the catalog, how to run them, and how to contribute one.
 

@@ -1,46 +1,43 @@
 ---
-title: "Sightmap Quickstart: Bootstrap a .sightmap/ From Your Running App"
+title: "Sightmap Quickstart: Build a .sightmap/ From a Running App"
 sidebarTitle: "Quickstart"
-description: "From install to a populated .sightmap/ — agent-driven, against your running app, with the sightmap CLI."
+description: "Install the CLI, start a browser session, and build a checked-in .sightmap/ against your running app."
 ---
 
-One curation flow: an agent drives your live app with the `sightmap` CLI and writes `.sightmap/` from what it observes. Works for any web app the CLI can reach — local dev, a preview deploy, or a hosted URL. You don't write the YAML by hand.
+Use the `sightmap-authoring` skill to inspect a running app and write a `.sightmap/` directory in your repo. The CLI can reach a local dev server, preview deployment, or hosted URL. The agent writes the YAML; you review the diff before committing it.
 
 <Steps>
   <Step title="Install the CLI and skills">
     ```bash
-    npm install -g @sightmap/sightmap        # or: npx @sightmap/sightmap ...
-    # or from source:
-    go install github.com/sightmap/sightmap/go/cmd/sightmap@latest
-
-    sightmap skills install                  # sightmap-authoring + sightmap-browser skills
+    npm install -g @sightmap/sightmap
+    sightmap skills install
     ```
 
-    `sightmap skills install` drops the two agent skills into `~/.agents/skills` (override with `--target`). Any skills-aware agent (Claude Code and others) picks them up and follows the authoring playbook.
+    `sightmap skills install` writes `sightmap-authoring` and `sightmap-browser` to `~/.agents/skills`. Pass `--target <dir>` to use another directory. See [Install](/start/install) for the `npx`, Go, and browser-install options.
   </Step>
 
   <Step title="Start a browser session">
     ```bash
-    cd my-app                 # your project (a .sightmap/ will be created here)
-    sightmap browser start    # launches Chrome + a corpus server that hot-reloads YAML
-    sightmap browser status   # ● running
+    cd my-app
+    sightmap browser start --url 'http://localhost:3000/'
     ```
+
+    Run this from your project root. `browser start` launches Chrome and the local corpus server in the foreground. Leave it running, then use another terminal for the remaining commands.
   </Step>
 
-  <Step title="Let an agent bootstrap the corpus">
-    Point your agent at the app and let the `sightmap-authoring` skill drive:
+  <Step title="Have an agent build the corpus">
+    Give your agent this prompt:
 
-    > Bootstrap a sightmap for this app. Start a browser session, iterate over the main routes, and name the interactive components until coverage is clean.
+    > Build a sightmap for this app. Inspect the main routes with `sightmap iterate`, verify each selector with `sightmap sel-probe`, and name components until every view has zero orphaned T3 nodes. Let me review the YAML before committing it.
 
-    Under the hood the agent runs the edit-verify loop:
+    The agent repeats this edit-and-verify loop:
 
     ```bash
-    sightmap iterate 'http://localhost:3000/'          # snap + coverage for a route
-    sightmap sel-probe '[data-testid="product-pod"]'   # verify a candidate selector
-    # ...add components to .sightmap/*.yaml, then re-iterate
+    sightmap iterate 'http://localhost:3000/'
+    sightmap sel-probe -- '[data-testid="product-pod"]'
     ```
 
-    Each `iterate` prints the matched view, a coverage line, and suggested selectors for the unattributed nodes:
+    `iterate` snapshots the page, reports coverage, and suggests selectors for unattributed nodes. The agent probes a selector, updates `.sightmap/`, and runs `iterate` again.
 
     ```text
     [View: ProductListPage "http://localhost:3000/products"]
@@ -53,17 +50,16 @@ One curation flow: an agent drives your live app with the `sightmap` CLI and wri
            → [data-testid="product-pod"] button
     ```
 
-    `iterate` scores every interactive node **T1** (named), **T2** (inside a named component), or **T3** (orphaned). The agent adds components until a view reports `0 orphaned T3 ✓`.
+    `T1` nodes have their own component name. `T2` nodes sit inside a named component. `T3` nodes have no named ancestor. Keep iterating until each view reports `0 orphaned T3 ✓`.
   </Step>
 
-  <Step title="Check the corpus">
+  <Step title="Validate and review">
     ```bash
-    sightmap validate     # structural correctness (non-zero exit on error)
-    sightmap lint         # advisory quality checks
-    sightmap report       # per-view T1/T2/T3 health table
+    sightmap validate
+    sightmap lint
     ```
 
-    Result:
+    `validate` checks the YAML structure and exits nonzero on errors. `lint` reports advisory quality issues. Review the new or changed YAML before committing it:
 
     ```text
     .sightmap/
@@ -76,14 +72,15 @@ One curation flow: an agent drives your live app with the `sightmap` CLI and wri
   </Step>
 </Steps>
 
-## Iterate
+## Keep the corpus current
 
-- **For selector stability**, add `data-component="ComponentName"` to the source where no stable selector exists — it's the most stable selector candidate an agent can key on.
-- **When source changes** — new route, renamed component — re-run `sightmap iterate` on the affected pages. Existing `memory` entries and selector choices are preserved; new orphans surface in coverage.
+If the app has no stable selector for a component, add `data-component="ComponentName"` to the source. This gives Sightmap an explicit runtime hook.
+
+When a route or component changes, rerun `sightmap iterate` on the affected pages. Existing selectors and `memory` entries remain in the corpus, while coverage exposes new orphaned nodes.
 
 ## Next steps
 
-- [Authoring overview](/authoring/overview) — the model and the loop.
-- [The sightmap CLI](/authoring/cli) — the full command surface.
-- [`sightmap-authoring` skill](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md) — the authoritative authoring playbook.
-- [Schema reference](/reference/schema) — every field in the YAML.
+- [Authoring overview](/authoring/overview) for the curation model and workflow.
+- [CLI reference](/cli/overview) for every command and flag.
+- [`sightmap-authoring` skill](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md) for the full agent playbook.
+- [Schema reference](/reference/schema) for every version 1 field and constraint.
