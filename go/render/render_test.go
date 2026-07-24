@@ -535,7 +535,7 @@ func TestFormat_Indent(t *testing.T) {
 	}
 }
 
-// --- go-0042: redundant accessible-name suppression ---
+// --- redundant accessible-name suppression ---
 
 func TestFilter_SoleChildNameSuppressesParentName(t *testing.T) {
 	// link "Foo" → [heading "Foo"] should produce link with no name;
@@ -581,7 +581,7 @@ func TestFilter_MultipleChildren_ParentNameKept(t *testing.T) {
 	}
 }
 
-// --- New tests for go-0044 (bracket format) and go-0045 (ID prefix) ---
+// --- New tests for the bracket format and ID prefix ---
 
 func TestFormat_Bracket_NoPropsNoName(t *testing.T) {
 	// Matched structural node with no text and no props → bare [CompName]

@@ -54,7 +54,7 @@ func DialCDP(ctx context.Context, addr string) (*CDPConn, error) {
 
 	// Prefer a real content page over internal surfaces (extension side panel,
 	// DevTools), which CDP also reports as type=="page" — picking one of those by
-	// default is the silent wrong-tab footgun (go-tabg). Fall back to any page
+	// default is the silent wrong-tab footgun. Fall back to any page
 	// target only if no content tab exists.
 	var wsURL, fallbackWS string
 	for _, t := range targets {

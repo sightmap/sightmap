@@ -1,5 +1,5 @@
 // snapshot-novelty — does a candidate capture add anything NEW relative to the
-// existing union of its view's set? (go-snap.3)
+// existing union of its view's set?
 //
 // "New" is purely STRUCTURAL and corpus-relative: a new component TYPE matched,
 // or a new uncovered-interactive SLOT (orphanSlotKey) — never instance/value
@@ -9,7 +9,7 @@
 // and it has unique orphans) stops being novel once components are authored to
 // cover those orphans — which is what makes after-the-fact dedup/merge possible.
 //
-// This is the primitive; capture-time gating (go-snap.7) and the subsumption
+// This is the primitive; capture-time gating and the subsumption
 // prune/merge pass build on it.
 package main
 
@@ -122,7 +122,7 @@ func loadViewSlots(sightmapDir, viewBasename string, sess *sightmap.Session, exc
 }
 
 // noveltyGate decides whether a freshly extracted capture should be written to
-// its view's set (go-snap.7). The first capture of a view always writes; force
+// its view's set. The first capture of a view always writes; force
 // bypasses the gate. Returns the novelty result and the write decision.
 func noveltyGate(sightmapDir, viewBasename string, cand captureSlots, force bool) (noveltyResult, bool) {
 	sess := sightmap.NewSession(sightmap.DirLoader(sightmapDir))

@@ -11,8 +11,8 @@ import (
 
 // runMultiCoverage shows a cross-page component coverage matrix and surfaces
 // global promotion candidates. Each matrix column is a VIEW, not a single capture
-// file: a view is a SET of timestamped captures (go-snap.6/.10), and each cell is
-// the MAX matched count across that view's set (go-snap.8). Grouping by view keeps
+// file: a view is a SET of timestamped captures, and each cell is
+// the MAX matched count across that view's set. Grouping by view keeps
 // the matrix one-column-per-page even when a view carries many captures, and makes
 // "global candidate" mean "appears on 2+ pages" rather than "appears in 2+ files".
 func runMultiCoverage(args []string) error {
@@ -81,7 +81,7 @@ func runMultiCoverage(args []string) error {
 }
 
 // viewColumn is one matrix column in multi-coverage: a view and the per-component
-// MAX matched count across that view's capture set (go-snap.8). Snaps is the set
+// MAX matched count across that view's capture set. Snaps is the set
 // size, surfaced in the column header (e.g. "home·3") so the reader can tell a
 // stable single-capture view from a unioned multi-capture one.
 type viewColumn struct {
@@ -186,7 +186,7 @@ type globalCandidate struct {
 
 // globalCandidatesAcrossViews returns components that match (count > 0) in 2 or
 // more VIEWS and aren't already global. Counting views (not capture files) is the
-// go-snap.8 fix: a single view snapped many times no longer trips the threshold.
+// A single view snapped many times no longer trips the threshold.
 // Result is sorted by name; each candidate's hits follow column order.
 func globalCandidatesAcrossViews(cols []viewColumn, globalNames map[string]bool) []globalCandidate {
 	nameSet := map[string]bool{}

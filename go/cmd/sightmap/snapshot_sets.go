@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Multi-snapshot view layout (go-snap.1 / go-snap.10)
+// Multi-snapshot view layout
 // ---------------------------------------------------
 // A VIEW is a SET of timestamped captures, not a single file:
 //
@@ -17,9 +17,9 @@ import (
 // where <stamp> is a filesystem-safe UTC timestamp (snapStampLayout). Real pages
 // are non-deterministic (lazy carousels, personalization, rotating promos), so no
 // single capture exercises a view's full component structure. Tooling operates
-// over the UNION of the view's set (go-snap.2+). go-snap.10 removed the named
+// over the UNION of the view's set. We removed the named
 // per-view "state" segment: re-snapping just appends a capture and the novelty
-// gate (go-snap.7) drops redundant ones, so curated state names aren't needed.
+// gate drops redundant ones, so curated state names aren't needed.
 
 // snapStampLayout formats capture timestamps as filesystem-safe UTC basic
 // ISO-8601, e.g. 20260607T193000Z. Lexical order == chronological order.
@@ -29,7 +29,7 @@ const snapStampLayout = "20060102T150405Z"
 func snapshotStamp(t time.Time) string { return t.UTC().Format(snapStampLayout) }
 
 // viewSnapshotPath returns the path of one timestamped capture in a view's set:
-// snapshots/<view>/<stamp>.snap (go-snap.10).
+// snapshots/<view>/<stamp>.snap.
 func viewSnapshotPath(sightmapDir, viewName string, t time.Time) string {
 	return filepath.Join(sightmapDir, "snapshots", viewName, snapshotStamp(t)+".snap")
 }
@@ -59,7 +59,7 @@ func formatStampDisplay(stamp string) string {
 // — the greatest stamp under snapshots/<view>/ — falling back to the legacy flat
 // <view>.snap. ok=false when no capture exists. Used by readers that need ONE
 // representative file for a view (report, pick-time hints); union-aware readers
-// walk the whole set instead (go-snap.2).
+// walk the whole set instead.
 func latestViewSnapshot(sightmapDir, viewBasename string) (string, bool) {
 	dir := filepath.Join(sightmapDir, "snapshots", viewBasename)
 	if entries, err := os.ReadDir(dir); err == nil {
@@ -88,7 +88,7 @@ func latestViewSnapshot(sightmapDir, viewBasename string) (string, bool) {
 // stamp — the whole set under snapshots/<viewBasename>/ — falling back to the
 // legacy flat <viewBasename>.snap when no set dir exists. Empty when the view has
 // no capture. This is the set-aware analogue of latestViewSnapshot, used by readers
-// that aggregate over a view's union (report, go-snap.8).
+// that aggregate over a view's union (report).
 func viewSnapshotSet(sightmapDir, viewBasename string) []snapEntry {
 	dir := filepath.Join(sightmapDir, "snapshots", viewBasename)
 	var entries []snapEntry
@@ -136,7 +136,7 @@ type captureMatchCounts struct {
 }
 
 // componentPresence summarizes how often a view component matched across the
-// UNION of a view's snapshot set (go-snap.2). A component is "alive" if
+// UNION of a view's snapshot set. A component is "alive" if
 // MatchedIn > 0 and "dead" only when MatchedIn == 0 across the whole set, so a
 // component absent from a single reduced load is no longer flagged.
 // LeafMatchAny is set (only meaningful when MatchedIn==0) when at least one
@@ -199,7 +199,7 @@ func unionPresence(components []string, caps []captureMatchCounts) []componentPr
 }
 
 // captureSlots is the corpus-relative structural fingerprint of one capture used
-// by snapshot novelty (go-snap.3): the component TYPES it matched and the
+// by snapshot novelty: the component TYPES it matched and the
 // uncovered-interactive SLOTS it left orphaned. Both are computed by re-matching
 // the capture against the CURRENT corpus, so a capture's novelty is re-evaluated
 // as the corpus matures (which is what lets redundant captures be pruned later).
@@ -253,7 +253,7 @@ func computeNovelty(cand captureSlots, others []captureSlots) noveltyResult {
 }
 
 // planPrune returns the indices (into caps) of captures that are SUBSUMED and can
-// be dropped without shrinking the view's union (go-snap.9). A capture is
+// be dropped without shrinking the view's union. A capture is
 // subsumed when it adds no new component type or orphan slot vs the OTHERS — i.e.
 // computeNovelty(c, others) is not novel. Pruning is iterative and conservative:
 // each pass drops the first subsumed capture (scanning in the given order, so

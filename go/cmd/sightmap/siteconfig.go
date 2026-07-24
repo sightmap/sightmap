@@ -15,7 +15,6 @@ type SiteConfig struct {
 	Name     string `yaml:"name"` // short site name; used for Chrome profile directory
 	Snapshot struct {
 		Wait          float64 `yaml:"wait"`           // default for --wait
-		Visible       bool    `yaml:"visible"`        // DEPRECATED: visible is now the default; use include_hidden: true to opt out
 		IncludeHidden bool    `yaml:"include_hidden"` // if true, include hidden nodes (overrides the visible-by-default behaviour)
 		Trace         bool    `yaml:"trace"`          // default for --trace
 	} `yaml:"snapshot"`
@@ -31,7 +30,7 @@ type SiteConfig struct {
 // It returns a zero-value SiteConfig if the file is absent or cannot be parsed,
 // logging a warning to stderr only on a parse error (missing file is silent).
 // VisibleOnly returns true when the site config says to filter to visible nodes only
-// (the default since go-i8c3, overridden by include_hidden: true).
+// (the default, overridden by include_hidden: true).
 func (c SiteConfig) VisibleOnly() bool {
 	return !c.Snapshot.IncludeHidden
 }
@@ -46,9 +45,6 @@ func loadSiteConfig(sightmapDir string) SiteConfig {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "siteconfig: warning: %s: %v\n", path, err)
 		return SiteConfig{}
-	}
-	if cfg.Snapshot.Visible {
-		fmt.Fprintf(os.Stderr, "siteconfig: %s: 'snapshot.visible: true' is now the default; remove this line (use 'snapshot.include_hidden: true' to include hidden nodes)\n", path)
 	}
 	return cfg
 }

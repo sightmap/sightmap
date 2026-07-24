@@ -97,8 +97,7 @@ func runSelProbe(args []string) error {
 	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ directory for component annotation")
 	maxN := fs.Int("max", 10, "Max matches to show")
 	full := fs.Bool("full", false, "Show full text (no truncation to 80 chars)")
-	allFlag := fs.Bool("all", false, "Check selector against all probe URLs from probe-urls.yaml")
-	probeURLsFlag := fs.String("probe-urls", "", "Path to probe-urls.yaml (default: .sightmap/probe-urls.yaml)")
+	allFlag := fs.Bool("all", false, "Check selector against every view URL in views/*.yaml")
 	waitFlag := fs.Float64("wait", 0, "Seconds to wait after navigation when using --all (minimum 0.5)")
 
 	fs.Usage = func() {
@@ -114,7 +113,7 @@ func runSelProbe(args []string) error {
 	}
 
 	if *allFlag {
-		return runSelProbeAll(fs.Args(), *sightmapDir, *probeURLsFlag, *addr, *tabFlag, *maxN, *full, *waitFlag)
+		return runSelProbeAll(fs.Args(), *sightmapDir, *addr, *tabFlag, *maxN, *full, *waitFlag)
 	}
 
 	remaining := fs.Args()
@@ -229,7 +228,7 @@ func selProbeConnect(ctx context.Context, addr string, launch bool, tabID string
 
 	// No --tab: auto-select the single content tab, but refuse to guess when
 	// several are open (concurrent agents) so we never probe the wrong tab or the
-	// extension side panel (go-tabg).
+	// extension side panel.
 	if tabs, listErr := browser.ListTabs(ctx, addr); listErr == nil {
 		if len(tabs) == 1 {
 			if conn, err := browser.ConnectTab(ctx, addr, tabs[0].TargetID); err == nil {
@@ -428,13 +427,13 @@ func elementDesc(tag, id string, classes []string) string {
 
 // runSelProbeAll navigates to each probe URL and reports how many DOM elements
 // match the given selector on each page.
-func runSelProbeAll(args []string, sightmapDir, probeURLsPath, addr, tabID string, max int, full bool, wait float64) error {
+func runSelProbeAll(args []string, sightmapDir, addr, tabID string, max int, full bool, wait float64) error {
 	if len(args) == 0 {
 		return fmt.Errorf("usage: sel-probe --all [flags] 'selector'")
 	}
 	selector := args[0]
 
-	targets, err := corpusProbeTargets(sightmapDir, probeURLsPath)
+	targets, err := corpusProbeTargets(sightmapDir)
 	if err != nil {
 		return err
 	}

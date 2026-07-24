@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// TestCDPVersionAlive guards the go-pcol / go-stck fix: cdpVersionAlive must
+// TestCDPVersionAlive guards the fix: cdpVersionAlive must
 // only report alive for a genuine Chrome DevTools endpoint (HTTP 200 +
 // webSocketDebuggerUrl), NOT for the sightmap HTTP server that can occupy the
 // same port and answers /json/version with a 404.
@@ -33,7 +33,7 @@ func TestCDPVersionAlive(t *testing.T) {
 	})
 
 	t.Run("sightmap server 404 (port collision)", func(t *testing.T) {
-		// Mimics the Go HTTP server that won the CDP port in go-pcol: it answers
+		// Mimics the Go HTTP server that won the CDP port: it answers
 		// but with a 404 page-not-found, never the DevTools JSON.
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)

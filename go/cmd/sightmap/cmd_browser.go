@@ -99,7 +99,6 @@ Session utilities:
 Tabs:
   tabs list
   tabs new [URL]
-  tabs select <target-id>
   tabs close  <target-id>
   tabs resize <width> <height>
 
@@ -280,7 +279,7 @@ func freePort() (int, error) {
 // listening at addr (host:port). It is deliberately stricter than a bare
 // TCP/HTTP probe: the sightmap HTTP server can occupy the same port and answer
 // /json/version with a 404, which an err==nil check mistakes for a live browser
-// (go-pcol). A real DevTools endpoint returns HTTP 200 with a JSON body that
+// . A real DevTools endpoint returns HTTP 200 with a JSON body that
 // carries a browser-level webSocketDebuggerUrl (and a "Browser" string), so we
 // require those before declaring CDP alive.
 func cdpVersionAlive(ctx context.Context, addr string) bool {
@@ -354,7 +353,7 @@ func portOrProfileAlive(port int, profile string) bool {
 // just the leader — macOS can relaunch the recorded PID), fall back to reaping by
 // the profile --user-data-dir (covers a missing session file and PID reuse), and
 // only remove the session file once the port AND profile are actually dead (so we
-// never leave an invisible orphan). (go-reap)
+// never leave an invisible orphan).
 func runStop(_ []string) error {
 	info, infoErr := browser.ReadSessionInfo()
 	hasSession := infoErr == nil && (info.Port > 0 || info.PID > 0 || info.Pgid > 0)
@@ -424,7 +423,7 @@ func runStatus(args []string) error {
 	info, err := browser.ReadSessionInfo()
 	if err != nil {
 		// No session file — but an orphan Chrome for this profile may still be alive
-		// (e.g. a prior stop dropped the file without reaping the process). (go-reap)
+		// (e.g. a prior stop dropped the file without reaping the process).
 		if profile := defaultProfileDir(); profileProcessAlive(profile) {
 			fmt.Printf("⚠ orphan  Chrome is running for this profile but there is no session file\n"+
 				"  profile: %s\n  run 'browser stop' to reap it.\n", profile)
@@ -436,7 +435,7 @@ func runStatus(args []string) error {
 
 	if !isPortAlive(info.Port) {
 		// The recorded port is not answering as a Chrome DevTools endpoint. This
-		// covers both a fully-dead session and the go-pcol case where the sightmap
+		// covers both a fully-dead session and the case where the sightmap
 		// HTTP server occupied the CDP port (so /json/version 404s). Either way the
 		// session is unusable — clear it and tell the user how to recover.
 		fmt.Printf("✗ unreachable  cdp=%d pid=%d  (CDP not responding; removing stale session file)\n",
@@ -458,7 +457,7 @@ func runStatus(args []string) error {
 
 	// Enumerate CONTENT tabs (the extension side panel is excluded) so an agent
 	// can see exactly which tab IDs to pass via --tab. Page-affecting commands
-	// require --tab whenever more than one is open (go-tabg).
+	// require --tab whenever more than one is open.
 	tabs, listErr := browser.ListTabs(context.Background(), addr)
 	if listErr != nil || len(tabs) == 0 {
 		fmt.Println("  tabs: (none)")
@@ -536,7 +535,7 @@ func runNavigate(args []string) error {
 		return err
 	}
 	// Print the FINAL url after any server-side redirects, not the one we asked
-	// for (go-3404) — e.g. HD silently redirects some category URLs to a different
+	// for — e.g. HD silently redirects some category URLs to a different
 	// category, and a caller needs to know where it actually landed.
 	finalURL, urlErr := browser.GetURL(context.Background(), conn)
 	if urlErr == nil && finalURL != "" && finalURL != url {

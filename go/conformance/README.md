@@ -26,7 +26,7 @@ Each fixture lives in its own directory under `fixtures/`:
 
 `sightmap.yaml` uses the flat (non-hierarchical) form — each component has a
 `name` and a `selectors` list. No `children`, no `$ref`. The full hierarchical
-format is tested by go-0011 (sightmap/ package); these fixtures test the NFA
+format is tested by the sightmap/ package; these fixtures test the NFA
 matching layer only.
 
 `expected-matches.json` maps component name to a sorted list of node IDs.

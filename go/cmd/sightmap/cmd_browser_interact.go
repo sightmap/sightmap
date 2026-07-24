@@ -24,7 +24,7 @@ import (
 // carrying the element's current bounds. It deliberately does NOT re-extract the
 // component tree: a fresh extraction re-probes the page and reassigns every
 // data-sightmap-id, which would invalidate the id the caller just minted and is the
-// root cause of the snapshot->click race (go-a1fe). Resolving through the
+// root cause of the snapshot->click race. Resolving through the
 // already-present attribute keeps the id stable across re-renders that don't
 // remount the target.
 func resolveNode(ctx context.Context, conn *browser.CDPConn, id string) (*comps.ComponentNode, error) {
@@ -35,7 +35,7 @@ func resolveNode(ctx context.Context, conn *browser.CDPConn, id string) (*comps.
 // tabID it connects to that tab. Without one it auto-selects the single open
 // CONTENT tab, but errors (listing the tabs) when there are zero or several — so
 // concurrent agents can never silently drive each other's tab, and a command
-// never lands on the extension side panel (go-tabg, follow-on to go-37b5).
+// never lands on the extension side panel.
 func dialAddrTab(addr, tabID string) (*browser.CDPConn, error) {
 	ctx := context.Background()
 	if tabID != "" {
@@ -91,8 +91,7 @@ func dialAddr(addr string) (*browser.CDPConn, error) {
 
 // parseFlagsInterspersed parses fs allowing flags to appear AFTER positional
 // arguments. Go's stdlib flag stops at the first positional, which silently
-// drops flags like `click 'ComponentQuery' --tab X` (go-d3f1 / the go-4c24
-// gotcha) — a multi-agent footgun where --tab is ignored. We reorder flags
+// drops flags like `click 'ComponentQuery' --tab X` — a multi-agent footgun where --tab is ignored. We reorder flags
 // ahead of positionals (consulting fs to know which flags take a value), then
 // delegate to fs.Parse.
 func parseFlagsInterspersed(fs *flag.FlagSet, args []string) error {
@@ -548,8 +547,6 @@ func runTabs(args []string) error {
 		return runTabsList(args[1:])
 	case "new":
 		return runTabsNew(args[1:])
-	case "select":
-		return runTabsSelect(args[1:])
 	case "close":
 		return runTabsClose(args[1:])
 	case "resize":
@@ -567,7 +564,6 @@ func tabsUsage() {
 Subcommands:
   list                     list open tabs (TargetID  URL  Title)
   new [URL]                open a new tab; prints its TargetID
-  select <target-id>       set the active tab for subsequent commands
   close  <target-id>       close a tab
   resize <width> <height>  resize the viewport of the current tab
 
@@ -613,11 +609,6 @@ func runTabsNew(args []string) error {
 	}
 	conn.Close()
 	fmt.Println(targetID)
-	return nil
-}
-
-func runTabsSelect(args []string) error {
-	fmt.Fprintln(os.Stderr, "warning: 'browser tabs select' is deprecated — use --tab TAB_ID on individual commands instead")
 	return nil
 }
 

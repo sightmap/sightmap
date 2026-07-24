@@ -11,8 +11,8 @@ type ProbeResult struct {
 }
 
 // ProbeComponent is the JSON output of probe.js for one element.
-// The Selector field is a CSS selector string (pre-go-0006 form).
-// After go-0006, probe.js will output a structured object; for now, parse
+// The Selector field is a CSS selector string.
+// probe.js will output a structured object; for now, parse
 // the string using sel.ParseSightmapSelector.
 type ProbeComponent struct {
 	Id            string            `json:"id"`

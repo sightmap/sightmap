@@ -55,8 +55,7 @@ func runSnapshot(args []string) error {
 	treeOutFlag := fs.String("tree-out", "", "Write raw ComponentNode tree JSON to this file (enables offline coverage/multi-coverage)")
 	jsonOutFlag := fs.String("json", "", "Write annotated tree JSON to this file (superset of --tree-out: includes component name, memory, extracted props)")
 	screenshotFlag := fs.String("screenshot", "", "Save a PNG screenshot to this file alongside the tree")
-	allFlag := fs.Bool("all", false, "Snap all probe URLs from probe-urls.yaml")
-	probeURLsFlag := fs.String("probe-urls", "", "Path to probe-urls.yaml (default: .sightmap/probe-urls.yaml)")
+	allFlag := fs.Bool("all", false, "Snap every view URL declared in views/*.yaml")
 	forceFlag := fs.Bool("force", false, "Write the capture even if it adds no new component/slot vs the view set (skip the novelty gate)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	if err := fs.Parse(args); err != nil {
@@ -70,9 +69,6 @@ func runSnapshot(args []string) error {
 		cfg := loadSiteConfig(*sightmapDirFlag)
 		if !explicit["wait"] && cfg.Snapshot.Wait > 0 {
 			*waitFlag = cfg.Snapshot.Wait
-		}
-		if !explicit["visible"] && cfg.Snapshot.Visible {
-			*visibleFlag = true // legacy no-op (default is already true)
 		}
 		if !explicit["include-hidden"] && cfg.Snapshot.IncludeHidden {
 			*includeHiddenFlag = true
@@ -88,7 +84,7 @@ func runSnapshot(args []string) error {
 	}
 
 	if *allFlag {
-		return runSnapshotAll(args, *sightmapDirFlag, *probeURLsFlag, *addrFlag, *tabFlag, *waitFlag,
+		return runSnapshotAll(args, *sightmapDirFlag, *addrFlag, *tabFlag, *waitFlag,
 			*interactiveFlag, *depthFlag, visible, *selectorsFlag, *jsonOutFlag, *forceFlag)
 	}
 
@@ -221,11 +217,11 @@ func runSnapshot(args []string) error {
 	}
 
 	// If --out is not specified but we have a view, append a timestamped capture to
-	// the view's set: snapshots/<view>/<stamp>.snap (go-snap.6/.10). An explicit
+	// the view's set: snapshots/<view>/<stamp>.snap. An explicit
 	// --out still writes exactly there.
 	if *outFlag == "" && view != nil {
 		viewBasename := view.SnapBasename()
-		// Novelty gate (go-snap.7): skip writing a capture that adds no new component
+		// Novelty gate: skip writing a capture that adds no new component
 		// type or orphan slot vs the existing set. First capture always writes; --force
 		// bypasses. Only applies to the auto-organized set-append path, never --out.
 		if snapshotMatches != nil {
@@ -280,11 +276,11 @@ func runSnapshot(args []string) error {
 	return nil
 }
 
-// runSnapshotAll navigates to each URL in probe-urls.yaml and writes a snap +
-// tree JSON file per view, then prints a summary table.
+// runSnapshotAll navigates to each view URL and writes a snap + tree JSON file
+// per view, then prints a summary table.
 func runSnapshotAll(
 	_ []string,
-	sightmapDir, probeURLsPath, addr, tabID string,
+	sightmapDir, addr, tabID string,
 	wait float64,
 	interactive bool,
 	depth int,
@@ -293,7 +289,7 @@ func runSnapshotAll(
 	jsonOut string,
 	force bool,
 ) error {
-	targets, err := corpusProbeTargets(sightmapDir, probeURLsPath)
+	targets, err := corpusProbeTargets(sightmapDir)
 	if err != nil {
 		return err
 	}
@@ -362,7 +358,7 @@ func runSnapshotAll(
 			globalNames:    globalNames,
 		}
 
-		// Novelty gate (go-snap.7): don't append a redundant capture to the view set.
+		// Novelty gate: don't append a redundant capture to the view set.
 		if !force {
 			parentMap := buildParentMap(root)
 			_, _, _, _, t3nodes, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
@@ -373,7 +369,7 @@ func runSnapshotAll(
 			}
 		}
 
-		// Append a timestamped capture to the view set (go-snap.6/.10).
+		// Append a timestamped capture to the view set.
 		snapPath := viewSnapshotPath(sightmapDir, v.ViewDir, time.Now())
 		treeJSONPath := snapshotTreePath(snapPath)
 
@@ -1031,7 +1027,7 @@ func dataAttrSel(node *comps.ComponentNode) string {
 }
 
 // orphanSlotKey is the cross-snapshot STRUCTURAL identity of an uncovered
-// interactive node, used by snapshot novelty (go-snap.3) to decide whether a
+// interactive node, used by snapshot novelty to decide whether a
 // capture introduces a new "slot". It is the node's role plus the selector of
 // its nearest data-attr ancestor — deliberately WITHOUT the node's instance text,
 // so different instances of the same widget (e.g. each product link in a

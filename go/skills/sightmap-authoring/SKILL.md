@@ -100,7 +100,7 @@ The Go tree matcher stores classes in `SelectorPart.Classes`, NOT in
 - ✓ `.QSIFeedBackLink` — class selector, works
 - ✗ `[class*="QSIFeedBackLink"]` — attribute selector on `class`, always matches 0
 
-Use `.classname` syntax for class-based selectors. `lint` (go-0048) will warn
+Use `.classname` syntax for class-based selectors. `lint` will warn
 about `[class*=...]` patterns once implemented.
 
 **Pseudo-classes: `:not()`, `:is()`, `:where()`, `:has()` are supported**
@@ -167,13 +167,13 @@ sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object
 Only JSON-serializable values are returned. `document.querySelector(...)` returns an error reference. Instead, extract the data you need: `document.querySelector("sel")?.textContent` or `document.querySelector("sel")?.getAttribute("data-x")`.
 
 **Stale session files.**
-`browser status` now probes the CDP endpoint (not just the `.session` file): it reports `✗ unreachable` and removes the stale session file when Chrome is gone or its DevTools never bound (go-stck), so trust its verdict. If a command still fails with a CDP error, run `browser start` again.
+`browser status` now probes the CDP endpoint (not just the `.session` file): it reports `✗ unreachable` and removes the stale session file when Chrome is gone or its DevTools never bound, so trust its verdict. If a command still fails with a CDP error, run `browser start` again.
 
 **Always pass `--tab` when several tabs are open.**
-Page commands (`eval`/`snapshot`/`click`/`navigate`/`sel-probe`/…) auto-pick the lone *content* tab, but ERROR (listing tabs) when zero or several are open — so concurrent agents never silently drive the wrong tab or the extension side panel (go-tabg). `browser start` prints your tab ID; thread it as `--tab <ID>` (flags work before or after positionals now). `browser status` lists every content tab's ID + URL.
+Page commands (`eval`/`snapshot`/`click`/`navigate`/`sel-probe`/…) auto-pick the lone *content* tab, but ERROR (listing tabs) when zero or several are open — so concurrent agents never silently drive the wrong tab or the extension side panel. `browser start` prints your tab ID; thread it as `--tab <ID>` (flags work before or after positionals now). `browser status` lists every content tab's ID + URL.
 
 **`browser navigate` prints the final URL.**
-After a server-side redirect, `navigate` now prints `(redirected to FINAL)` so you know where you actually landed (go-3404).
+After a server-side redirect, `navigate` now prints `(redirected to FINAL)` so you know where you actually landed.
 
 ---
 
@@ -296,7 +296,7 @@ The overlay extension is embedded in the binary and auto-extracted to
 
 If the site has a `package.json` with `g:*` scripts, those are convenience wrappers around the same commands and work equally well.
 
-To connect to an existing Chrome session (go-0053 pending):
+To connect to an existing Chrome session:
 ```bash
 sightmap browser register --addr localhost:PORT
 ```
@@ -388,7 +388,7 @@ For every T2 cluster, categorise — don't just accept it:
 Scan YAML for children in different parents with identical selectors. Consolidate
 or promote to global.
 
-**5. Zero-match component check** *(manual until go-0047 lands)*
+**5. Zero-match component check** *(manual)*
 Cross-check the Guide against the view's component list. Any component defined
 in the YAML but absent from the Guide is either on the wrong page, broken
 selector, or genuinely absent. Investigate before accepting.
@@ -444,22 +444,22 @@ that render content after `loadEventFired`. Homedepot's `snapshot` includes
 
 **Class-attribute selectors** (`[class*="..."]`): don't work — use `.classname`.
 
-**Page non-determinism — a view needs MULTIPLE snapshots** (`go-snap`). Real
+**Page non-determinism — a view needs MULTIPLE snapshots**. Real
 pages render differently load-to-load (lazy carousels, personalization, ad-driven
 modules, rotating promos). A single capture can omit whole sections, making
 correct components report `0 matches`. Don't treat a one-shot `0-match` as a dead
 selector — re-snap, and confirm absence with `sel-probe`. A view is a *set* of
 timestamped captures (`snapshots/<view>/<stamp>.snap`, `<stamp>` = UTC
-`YYYYMMDDTHHMMSSZ`; go-snap.10 removed the old per-view `<state>` segment).
+`YYYYMMDDTHHMMSSZ`).
 
-`coverage` is **union-aware** (`go-snap.2`): it groups captures by view and flags
+`coverage` is **union-aware**: it groups captures by view and flags
 a component dead only when it matches 0 across the *whole* set
 (`[Warnings] … 0 of N snaps`). Components present in only some captures are no
 longer flagged — they appear under `[Presence]` with a `matched in K of N snaps
 (last <stamp>)` recency line. T1/T2/T3 stats stay per-capture (they describe one
 DOM).
 
-Writing **defaults to the per-view set form** (`go-snap.6/.10`): `snapshot` (and
+Writing **defaults to the per-view set form**: `snapshot` (and
 the overlay's Snap-view button) *append* a timestamped capture to
 `snapshots/<view>/<stamp>.snap` rather than overwriting. There is **no per-view
 “state” axis** — just re-snap the view in whatever configurations you want
@@ -467,12 +467,12 @@ the overlay's Snap-view button) *append* a timestamped capture to
 writes exactly there.
 
 A re-snap that adds **no new component type or orphan slot** vs the view set is
-skipped by the **novelty gate** (`go-snap.7`) — `snapshot` prints "nothing new …
+skipped by the **novelty gate** — `snapshot` prints "nothing new …
 not saved" and the overlay's Snap-view button shows "= nothing new (not saved)".
 The first capture of a view always writes; `--force` (CLI) overrides. So just
 re-snap a dynamic view a few times — only loads that render something
 structurally new are kept; pure value churn (different products/prices) is
-ignored. `coverage` unions the whole view set (`go-snap.2`).
+ignored. `coverage` unions the whole view set.
 
 **`coverage` / `multi-coverage`** require `.snap.tree.json` companion files.
 These are written automatically when `--tree-out` is passed to `snapshot`.

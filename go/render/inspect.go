@@ -108,7 +108,7 @@ func (n *InspectNode) formatInspectNode(w io.Writer, indent string, depth int, o
 	var line strings.Builder
 	line.WriteString(indent)
 
-	// ID prefix (always, when non-empty — go-0045 convention)
+	// ID prefix (always, when non-empty)
 	if n.Id != "" {
 		line.WriteString(n.Id)
 		line.WriteString(" ")

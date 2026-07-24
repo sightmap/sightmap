@@ -122,7 +122,7 @@ func findExtensionSWWS(ctx context.Context, addr string) (string, error) {
 // chrome.runtime.reload(), forcing Chrome to re-register the worker from the
 // freshly extracted on-disk files. This defeats Chrome's habit of restoring a
 // cached/stale service worker after an extension version bump, even across a
-// full restart (go-erld). The reload tears the worker down, so a missing
+// full restart. The reload tears the worker down, so a missing
 // response is expected and not an error.
 func ReloadExtension(ctx context.Context, addr string) error {
 	swWSURL, err := findExtensionSWWS(ctx, addr)

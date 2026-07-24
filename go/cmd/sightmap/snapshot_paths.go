@@ -18,7 +18,7 @@ func snapshotTreePath(snapPath string) string {
 }
 
 // parseSnapshotPath extracts the view name and capture stamp from a snapshot path
-// (or its .snap.tree.json sibling). Since go-snap.10 dropped the named-state
+// (or its .snap.tree.json sibling). Since we dropped the named-state
 // segment, a capture lives at snapshots/<view>/<stamp>.snap: the view is the first
 // segment under snapshots/ and the stamp is the last. Legacy forms still parse —
 // a flat <view>.snap, and the old single-file / <view>/<state>/<stamp> layouts —

@@ -93,7 +93,7 @@ func runBrowserStart(args []string) error {
 	// Exclude the server port: if the server's default was busy it may have slid
 	// onto the CDP default, and FindFreePort doesn't hold the port it returns, so
 	// an unguarded CDP allocation would pick the same number and Chrome's DevTools
-	// would fail to bind (go-pcol).
+	// would fail to bind.
 	resolvedCDPPort, err := browser.FindFreePortExcluding(*cdpPortFlag, resolvedServerPort)
 	if err != nil {
 		return fmt.Errorf("start: cdp port: %w", err)
@@ -233,7 +233,7 @@ func runBrowserStart(args []string) error {
 		}
 		// If we just (re)installed a newer extension, force the service worker to
 		// re-register from the new on-disk files — Chrome otherwise restores a stale
-		// cached worker even across a full restart (go-erld). Done before any
+		// cached worker even across a full restart. Done before any
 		// navigation so the content script binds to the fresh worker.
 		if extReinstalled {
 			if rErr := browser.ReloadExtension(ctx, cdpAddr); rErr != nil {
@@ -247,7 +247,7 @@ func runBrowserStart(args []string) error {
 			initialTabID = tabs[0].TargetID
 		}
 		if *urlFlag != "" {
-			// Retry navigation (same go-0029 fix as browser launch).
+			// Retry navigation (same fix as browser launch).
 			var navErr error
 			for attempt := range 3 {
 				if attempt > 0 {
