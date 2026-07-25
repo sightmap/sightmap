@@ -24,7 +24,6 @@ import (
 // flags alongside it.
 type liveFlags struct {
 	addr        *string
-	launch      *bool
 	url         *string
 	wait        *float64
 	tab         *string
@@ -38,7 +37,6 @@ type liveFlags struct {
 func addLiveFlags(fs *flag.FlagSet, cmd string) *liveFlags {
 	return &liveFlags{
 		addr:        fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)"),
-		launch:      fs.Bool("launch", false, "Auto-launch Chrome if unreachable"),
 		url:         fs.String("url", "", "Navigate to this URL before acting"),
 		wait:        fs.Float64("wait", 0, "Extra seconds to wait after DOM stability is detected (default 0; raise for unusually slow pages)"),
 		tab:         fs.String("tab", "", "Target tab ID (from 'browser start' output)"),
@@ -47,15 +45,15 @@ func addLiveFlags(fs *flag.FlagSet, cmd string) *liveFlags {
 	}
 }
 
-// connect attaches to the session (launching Chrome first when --launch is set
-// and nothing is reachable). The returned cleanup must be deferred by the
-// caller.
+// connect attaches to the running browser session's tab. The returned cleanup
+// must be deferred by the caller. There is no auto-launch: start a session with
+// 'sightmap browser start' first (Connect's error says so).
 func (lf *liveFlags) connect(ctx context.Context) (*browser.CDPConn, func(), error) {
-	conn, cleanup, err := browser.ConnectOrLaunch(ctx, *lf.addr, *lf.tab, *lf.launch)
+	conn, err := browser.Connect(*lf.addr, *lf.tab)
 	if err != nil {
 		return nil, nil, err
 	}
-	return conn, cleanup, nil
+	return conn, func() { conn.Close() }, nil
 }
 
 // navOpts tunes how navigate waits for the page to settle.

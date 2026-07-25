@@ -3,12 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"syscall"
 	"time"
@@ -27,8 +24,6 @@ func runBrowser(args []string) error {
 		return runBrowserInstall(args[1:])
 	case "start":
 		return runBrowserStart(args[1:])
-	case "launch":
-		return runLaunch(args[1:])
 	case "stop":
 		return runStop(args[1:])
 	case "status":
@@ -76,7 +71,6 @@ Setup:
 
 Session:
   start [--port N] [--extensions PATH] [--url URL] [--profile DIR]  launch Chrome + sightmap server
-  launch [--headless] [--port N] [--profile DIR] [--extensions PATH[,PATH]] [--url URL] [--wait N]
   stop
   status
   navigate <url>
@@ -106,156 +100,6 @@ Tabs:
 `)
 }
 
-// ── launch ────────────────────────────────────────────────────────────────────
-
-func runLaunch(args []string) error {
-	fs := flag.NewFlagSet("launch", flag.ContinueOnError)
-	headless := fs.Bool("headless", false, "Run headless")
-	port := fs.Int("port", browser.DefaultCDPPort, "CDP port (0 = pick a free one)")
-	profile := fs.String("profile", "", "User data dir (default: ~/.sightmap/profiles/default)")
-	url := fs.String("url", "", "Navigate here after launch")
-	extensions := fs.String("extensions", "", "Comma-separated extension directory paths to load (--load-extension)")
-	wait := fs.Float64("wait", 0, "Seconds to wait after navigation")
-	if err := fs.Parse(args); err != nil {
-		return err
-	}
-
-	// Check for a live existing session.
-	if info, err := browser.ReadSessionInfo(); err == nil && info.Port > 0 {
-		if isPortAlive(info.Port) {
-			return fmt.Errorf("a session is already running on port %d\n"+
-				"Run 'browser stop' first, or 'browser status' to inspect it.", info.Port)
-		}
-		// Stale session file — clean it up silently.
-		os.Remove(sessionFilePath())
-	}
-
-	chromePath, err := browser.FindChrome()
-	if err != nil {
-		return err
-	}
-
-	resolvedPort := *port
-	if resolvedPort == 0 {
-		p, err := freePort()
-		if err != nil {
-			return fmt.Errorf("find free port: %w", err)
-		}
-		resolvedPort = p
-	}
-
-	resolvedProfile := *profile
-	if resolvedProfile == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("home dir: %w", err)
-		}
-		resolvedProfile = filepath.Join(home, ".sightmap", "profiles", "default")
-	}
-	if err := os.MkdirAll(resolvedProfile, 0o700); err != nil {
-		return fmt.Errorf("create profile dir: %w", err)
-	}
-
-	chromeArgs := []string{
-		fmt.Sprintf("--remote-debugging-port=%d", resolvedPort),
-		fmt.Sprintf("--user-data-dir=%s", resolvedProfile),
-		"--no-first-run",
-		"--no-default-browser-check",
-		"--disable-blink-features=AutomationControlled", // always for authoring
-	}
-	if *headless {
-		chromeArgs = append(chromeArgs, "--headless=new")
-	}
-	if *extensions != "" {
-		absExt, absErr := filepath.Abs(*extensions)
-		if absErr != nil {
-			absExt = *extensions
-		}
-		chromeArgs = append(chromeArgs,
-			"--load-extension="+absExt,
-			"--disable-extensions-except="+absExt,
-		)
-	}
-	if fs.NArg() > 0 {
-		chromeArgs = append(chromeArgs, fs.Args()...)
-	}
-
-	// Use plain exec.Command — NOT exec.CommandContext — so Chrome keeps
-	// running after this process exits.
-	cmd := exec.Command(chromePath, chromeArgs...)
-
-	// Detach: new process group so Chrome isn't killed by terminal signals
-	// sent to our process.
-	setSysProcAttr(cmd)
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("start chrome: %w", err)
-	}
-
-	addr := fmt.Sprintf("127.0.0.1:%d", resolvedPort)
-	if err := pollCDPReady(addr); err != nil {
-		// Chrome may have exited or reused an existing process. If the port
-		// is responding anyway (macOS process reuse), treat as success.
-		if !isPortAlive(resolvedPort) {
-			cmd.Process.Kill()
-			cmd.Wait()
-			return fmt.Errorf("chrome did not become ready: %w", err)
-		}
-	}
-
-	// Record the PID — may be 0 if the process already exited due to macOS
-	// reusing an existing Chrome instance.
-	pid := 0
-	if proc := cmd.Process; proc != nil {
-		pid = proc.Pid
-	}
-
-	if err := browser.WriteSessionInfo(browser.SessionInfo{
-		Port:    resolvedPort,
-		PID:     pid,
-		Profile: resolvedProfile,
-	}); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not write session file: %v\n", err)
-	}
-
-	ctx := context.Background()
-
-	if *url != "" {
-		// Retry DialCDP + NavigateAndWait up to 3 times with 300ms gaps.
-		// On macOS, Chrome may reuse an existing process: the port responds to
-		// /json/version immediately but the initial tab isn't registered in
-		// /json/list for ~200ms, causing DialCDP to get a malformed response.
-		var navErr error
-		for attempt := range 3 {
-			if attempt > 0 {
-				time.Sleep(300 * time.Millisecond)
-			}
-			conn, dialErr := browser.DialCDP(ctx, addr)
-			if dialErr != nil {
-				navErr = dialErr
-				continue
-			}
-			navErr = browser.NavigateAndWait(ctx, conn, *url)
-			conn.Close()
-			if navErr == nil {
-				break
-			}
-		}
-		if navErr != nil {
-			fmt.Fprintf(os.Stderr, "warning: could not navigate to %s: %v\n", *url, navErr)
-		}
-		if *wait > 0 {
-			time.Sleep(time.Duration(*wait * float64(time.Second)))
-		}
-	}
-
-	// Print port to stdout (scripts can capture it).
-	fmt.Println(resolvedPort)
-	fmt.Fprintf(os.Stderr, "Chrome launched on port %d  (pid %d)\n", resolvedPort, pid)
-	fmt.Fprintf(os.Stderr, "Profile: %s\n", resolvedProfile)
-	return nil
-}
-
 // sessionFilePath delegates to the browser package's internal logic by
 // re-reading what WriteSessionInfo would write. We use a local copy of the
 // path-finding logic here for the stale-file cleanup case.
@@ -264,16 +108,6 @@ func sessionFilePath() string {
 		return filepath.Join(".sightmap", ".session")
 	}
 	return filepath.Join(os.TempDir(), "sightmap-session")
-}
-
-func freePort() (int, error) {
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-	port := ln.Addr().(*net.TCPAddr).Port
-	ln.Close()
-	return port, nil
 }
 
 // cdpVersionAlive reports whether a genuine Chrome DevTools endpoint is
@@ -512,8 +346,8 @@ func dial(addr string) (*browser.CDPConn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect to Chrome at %s\n"+
 			"Start a session first:\n"+
-			"  browser launch\n"+
-			"  browser launch --url https://...\n", addr)
+			"  sightmap browser start\n"+
+			"  sightmap browser start --url https://...\n", addr)
 	}
 	return conn, nil
 }
