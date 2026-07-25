@@ -14,6 +14,7 @@ import (
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/observe"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // snapshot is a PURE OBSERVE command: it connects, navigates, extracts, matches
@@ -42,7 +43,7 @@ func runSnapshot(args []string) error {
 	{
 		explicit := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
-		cfg := loadSiteConfig(*lf.sightmapDir)
+		cfg := sightmap.LoadConfig(*lf.sightmapDir)
 		if !explicit["wait"] && cfg.Snapshot.Wait > 0 {
 			*lf.wait = cfg.Snapshot.Wait
 		}

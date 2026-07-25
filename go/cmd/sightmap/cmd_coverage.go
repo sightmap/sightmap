@@ -32,7 +32,7 @@ func runCoverage(args []string) error {
 	{
 		explicit := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
-		cfg := loadSiteConfig(*sightmapDirFlag)
+		cfg := sightmap.LoadConfig(*sightmapDirFlag)
 		if !explicit["include-hidden"] && cfg.Snapshot.IncludeHidden {
 			*includeHiddenFlag = true
 		}

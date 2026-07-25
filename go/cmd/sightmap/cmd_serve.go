@@ -62,7 +62,7 @@ func normaliseComponent(c match.SightmapComponent) compiledComponent {
 }
 
 func compileCorpus(sightmapDir, siteName string) (compiledSightmapJSON, error) {
-	corp, err := sightmap.DirLoader(sightmapDir).Load()
+	corp, err := sightmap.Load(sightmapDir)
 	if err != nil {
 		return compiledSightmapJSON{}, err
 	}
