@@ -73,7 +73,7 @@ func FindFreePort(start int) (int, error) {
 // the same value will return the SAME port. Passing the already-resolved port(s)
 // as exclusions guarantees the allocations are mutually distinct — e.g. when the
 // sightmap server's default port is busy it slides onto the CDP default, and
-// without this the CDP allocation would collide with it (go-pcol).
+// without this the CDP allocation would collide with it.
 func FindFreePortExcluding(start int, exclude ...int) (int, error) {
 	excluded := make(map[int]bool, len(exclude))
 	for _, p := range exclude {

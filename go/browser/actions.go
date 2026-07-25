@@ -368,7 +368,7 @@ func selectorString(s *comps.SelectorPart) string {
 // does not reassign data-sightmap-id attributes — the id minted by an earlier
 // snapshot/bounds call stays valid as long as the element has not been
 // remounted. This is what keeps the classic snapshot -> click <id> loop stable
-// across re-renders (go-a1fe): no extraction-local id is recomputed between the
+// across re-renders: no extraction-local id is recomputed between the
 // call that minted the id and the action that consumes it.
 //
 // Returns an error when no element carries the id (the node was removed or the

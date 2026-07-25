@@ -1,7 +1,7 @@
 // report reads each view's snapshot SET, loads the saved captures, and prints a
 // per-view coverage health table plus T2 quality analysis. A view is a set of
-// timestamped captures (go-snap.6/.10), so report aggregates over the whole set
-// (go-snap.8): T1/T2 percentages are summed across the set and recomputed, and the
+// timestamped captures, so report aggregates over the whole set
+// : T1/T2 percentages are summed across the set and recomputed, and the
 // T3 orphan gate is the MAX across captures — which makes report's ✓/✗ agree with
 // `coverage`'s union verdict (both fail iff some capture has an orphan).
 package main
@@ -26,7 +26,7 @@ type captureCoverage struct {
 }
 
 // viewCoverageAgg is report's per-view rollup over a view's capture set
-// (go-snap.8). T1/T2 are summed node counts (rendered as % over sumTotal), T3 is
+// . T1/T2 are summed node counts (rendered as % over sumTotal), T3 is
 // the MAX single-capture orphan count (the ✓/✗ gate), and snaps is the set size.
 type viewCoverageAgg struct {
 	snaps                  int
@@ -71,7 +71,6 @@ type t2clusterHit struct {
 func runReport(args []string) error {
 	fs := flag.NewFlagSet("report", flag.ContinueOnError)
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
-	probeURLsFlag := fs.String("probe-urls", "", "(DEPRECATED) Path to probe-urls.yaml; URLs are now read from views/*.yaml")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -93,23 +92,12 @@ func runReport(args []string) error {
 		}
 	}
 
-	// Fall back to legacy probe-urls.yaml if no views have URLs
-	if len(views) == 0 && *probeURLsFlag != "" {
-		fmt.Fprintln(os.Stderr, "report: warning: using deprecated --probe-urls flag")
-		legacyProbes, lerr := loadProbeURLs(*probeURLsFlag)
-		if lerr == nil {
-			for _, p := range legacyProbes {
-				views = append(views, sightmap.View{Name: p.Name, URL: p.URL})
-			}
-		}
-	}
-
 	if len(views) == 0 {
 		return fmt.Errorf("no views with URLs found\n" +
-			"Add url: field to your views/*.yaml files or run migrate-probe-urls")
+			"Add a url: field to your views/*.yaml files")
 	}
 
-	// visibleOnly: visible-by-default since go-i8c3; overridden by include_hidden: true in config.
+	// visibleOnly: visible-by-default; overridden by include_hidden: true in config.
 	visibleOnly := cfg.VisibleOnly()
 
 	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
@@ -127,7 +115,7 @@ func runReport(args []string) error {
 
 	for _, v := range views {
 		// Resolve the whole capture set for the view and aggregate over it
-		// (go-snap.8); previously report used only the latest capture.
+		//; previously report used only the latest capture.
 		set := viewSnapshotSet(*sightmapDirFlag, v.SnapBasename())
 		if len(set) == 0 {
 			results = append(results, viewResult{name: v.Name, url: v.URL, missing: true})
@@ -276,7 +264,7 @@ func runReport(args []string) error {
 
 	// ── T2 quality analysis ───────────────────────────────────────────────────
 	// Aggregate T2 clusters across ALL captures of all views, keyed by component
-	// name (go-snap.8: was latest-capture-only, now the whole set).
+	// name (was latest-capture-only, now the whole set).
 	printT2Quality(t2hits, t2WarnThreshold)
 
 	if fail > 0 || missing > 0 {

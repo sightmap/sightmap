@@ -362,7 +362,7 @@ func TestClick_NoBounds(t *testing.T) {
 
 // TestResolveBySightmapID verifies that resolution anchors to the persisted
 // data-sightmap-id attribute (not a re-extraction) and returns the element's
-// current bounds. This is the core of the go-a1fe race fix: the id minted by a
+// current bounds. This is the core of the race fix: the id minted by a
 // prior snapshot must resolve without re-probing the page.
 func TestResolveBySightmapID(t *testing.T) {
 	var mu sync.Mutex

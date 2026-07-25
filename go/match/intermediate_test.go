@@ -1,7 +1,7 @@
 package match_test
 
 // Regression tests for child-component annotation through intermediate structural
-// and ignored AX nodes (go-0030/go-0031).
+// and ignored AX nodes.
 
 import (
 	"testing"
@@ -59,7 +59,7 @@ func buildBreadcrumbTree() *comps.ComponentNode {
 }
 
 // TestChildAnnotation_ThroughStructuralIntermediate is the core regression test
-// for go-0030: BreadcrumbLink must be annotated even though list/listitem
+// BreadcrumbLink must be annotated even though list/listitem
 // structural nodes sit between the Breadcrumb container and the link.
 func TestChildAnnotation_ThroughStructuralIntermediate(t *testing.T) {
 	root := buildBreadcrumbTree()

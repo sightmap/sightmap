@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// TestFindFreePortExcluding_SkipsExcluded guards against the go-pcol port
+// TestFindFreePortExcluding_SkipsExcluded guards against the port
 // collision: two allocations that start from overlapping ranges must not return
 // the same port. FindFreePort only probes (open+close) without holding the port,
 // so without an exclusion the server and CDP allocations could collide.

@@ -97,7 +97,7 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 	var line strings.Builder
 	line.WriteString(indent)
 
-	// Component ID prefix — always shown when non-empty (go-0045).
+	// Component ID prefix — always shown when non-empty.
 	if c.Id != "" {
 		line.WriteString(c.Id)
 		line.WriteString(" ")
@@ -108,10 +108,10 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 		line.WriteString("[")
 		line.WriteString(c.Role) // already set to match name by convert()
 
-		// Merged props: sightmap-extracted + AX value fallback (go-0044 Change 4).
+		// Merged props: sightmap-extracted + AX value fallback.
 		props := mergedProps(c, opts)
 
-		// Props sorted alphabetically, before text (go-0044 Change 3).
+		// Props sorted alphabetically, before text.
 		for _, k := range sortedKeys(props) {
 			fmt.Fprintf(&line, " %s=%q", k, truncate(props[k], 60))
 		}
@@ -151,7 +151,7 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 	childIndent := indent + "  "
 	for _, ch := range c.Children {
 		// Rule B: suppress StaticText children whose text exactly equals
-		// any prop value of the matched parent (go-0044 Change 3).
+		// any prop value of the matched parent.
 		if ch.Role == "StaticText" && parentProps != nil && anyPropEquals(ch.Name, parentProps) {
 			continue
 		}
@@ -335,7 +335,7 @@ func markInteractive(c *Comp, set map[*Comp]bool) bool {
 // mergedProps builds the combined property map for a matched Comp node.
 // Sightmap-extracted properties (opts.PropValues[c.Id]) take precedence.
 // If no "value" key is present and the AX Comp.Value is non-empty, it is
-// added as "value" (reserved-but-overridable built-in, go-0044 Change 4).
+// added as "value" (reserved-but-overridable built-in).
 // Returns nil when there are no props and no AX value.
 func mergedProps(c *Comp, opts FormatOpts) map[string]string {
 	smap := opts.PropValues[c.Id]

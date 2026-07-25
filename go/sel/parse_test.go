@@ -310,7 +310,7 @@ func TestParse_HexEscapeInSelector(t *testing.T) {
 }
 
 func TestParse_HexEscapeNoRegression(t *testing.T) {
-	// \: simple escape (go-0032 regression check) still works alongside hex escapes.
+	// \: simple escape (regression check) still works alongside hex escapes.
 	ps := parseOK(t, `a.hover\:text-blue`)
 	if ps.Parts[0].Tag != "a" {
 		t.Errorf("tag: got %q, want \"a\"", ps.Parts[0].Tag)

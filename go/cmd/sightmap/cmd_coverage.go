@@ -62,7 +62,7 @@ func runCoverage(args []string) error {
 
 	// Group captures into their per-VIEW sets so dead-component detection runs over
 	// the UNION of the view's snapshots, not a single (possibly reduced) load
-	// (go-snap.2/.10). T1/T2/T3 stats stay per-capture — they describe each DOM — but
+	//. T1/T2/T3 stats stay per-capture — they describe each DOM — but
 	// the [Warnings] / [Presence] sections are computed across the set.
 	sets := groupSnapshotsByView(snapFiles)
 	views := make([]string, 0, len(sets))
@@ -100,7 +100,7 @@ func runCoverage(args []string) error {
 			}
 		}
 
-		// Annotation-completeness advisory (go-snap.5): named content nodes with no
+		// Annotation-completeness advisory: named content nodes with no
 		// component context, deduped across the view's union. Pure nudge — never
 		// touches `failures`. Fall back to the directory view name when no capture
 		// carried a [View:] header.
@@ -123,7 +123,7 @@ func runCoverage(args []string) error {
 // using the snap's own route header (parseSnapRoute), and returns the parsed tree,
 // the match map, and that route. ok is false (with a stderr note) when the capture
 // can't be loaded, parsed, or matched. Shared by coverage/report/multi-coverage so
-// every reader matches a capture the same route-aware way (go-snap.8) instead of
+// every reader matches a capture the same route-aware way instead of
 // each re-implementing the load/parse/match boilerplate.
 func matchCapture(snapPath string, sess *sightmap.Session) (root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.SightmapMatch, route string, ok bool) {
 	treeFile := snapPath + ".tree.json"
@@ -152,7 +152,7 @@ func matchCapture(snapPath string, sess *sightmap.Session) (root *comps.Componen
 // It returns that capture's per-component matched-node counts, a leaf-only
 // match map for dead components (used to distinguish broken selectors from
 // genuinely-absent components), the view name from the snap header, the T3
-// count, the annotation-completeness gaps found in the capture (go-snap.5),
+// count, the annotation-completeness gaps found in the capture,
 // and ok=false if the capture could not be loaded/parsed/matched.
 func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corpus, visible, trace bool) (counts map[string]int, leafCounts map[string]int, viewName string, t3 int, gaps []contentGap, ok bool) {
 	root, matches, route, ok := matchCapture(snapPath, sess)
@@ -201,7 +201,7 @@ func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corp
 		fmt.Println()
 	}
 
-	// Annotation-completeness gaps for this capture (go-snap.5): named content
+	// Annotation-completeness gaps for this capture: named content
 	// nodes with no component context, surfaced in the union advisory section.
 	gaps = annotationGaps(root, matches, parentMap, visible)
 

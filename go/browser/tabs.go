@@ -22,7 +22,7 @@ type TabInfo struct {
 // an agent would drive, as opposed to an internal surface like the extension
 // side panel or DevTools. Those internal targets are reported by CDP with
 // type=="page" too, so filtering on type alone is not enough — selecting one by
-// default is the silent wrong-tab footgun (go-tabg).
+// default is the silent wrong-tab footgun.
 func IsContentTabURL(url string) bool {
 	switch {
 	case strings.HasPrefix(url, "chrome-extension://"),

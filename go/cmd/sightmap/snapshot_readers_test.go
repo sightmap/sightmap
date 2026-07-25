@@ -9,7 +9,7 @@ import (
 
 // The numbers here mirror the worked example in docs/reference.md (the report /
 // multi-coverage sections) so the tests double as a worked example of the
-// go-snap.8 set aggregation.
+// set aggregation.
 
 // home A/B/C from the doc: load A is full (3 orphans), B/C are reduced (0).
 func TestAggregateViewCoverage(t *testing.T) {

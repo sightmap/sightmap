@@ -23,7 +23,7 @@ type ParsedSelector struct {
 // ParseSightmapSelector parses a sightmap CSS selector string into a
 // ParsedSelector. Supports the sightmap subset: tag, #id, .class,
 // [attr], [attr=val], [attr^=val], [attr$=val], [attr*=val], [attr~=val],
-// [attr|=val], :not(), :is(), :where(), :has(), and descendant ( ) /
+// [attr|=val], :not(), :is(), :where(), :has(), and descendant /
 // direct-child (>) combinators. Sibling combinators (+, ~) are not supported,
 // including inside :has().
 func ParseSightmapSelector(s string) (ParsedSelector, error) {

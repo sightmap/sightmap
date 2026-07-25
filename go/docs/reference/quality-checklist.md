@@ -26,7 +26,7 @@ grep '\[ProductCard\]' product-list.snap     # bare annotation = no properties r
 grep '\[ProductCard label=' product-list.snap # annotated instance = good
 ```
 
-## 3. Multi-instance differentiation *(auto via lint go-d4e6)*
+## 3. Multi-instance differentiation *(auto via lint)*
 
 No component with N > 1 instances on any page has zero properties. The `multi-instance-no-property` lint rule will flag these automatically once implemented; until then, scan the snap manually for repeated bare component names.
 

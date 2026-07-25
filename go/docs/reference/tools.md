@@ -56,7 +56,7 @@ sightmap browser eval 'document.title'
 
 **Use when:** Debugging page state or querying the DOM directly.
 
-**Note:** If you need to probe elements that require focus state (e.g., search autocomplete dropdowns), this is currently the only workaround. Once go-7014 (persistent focus state in sel-probe) ships, this workaround won't be necessary.
+**Note:** If you need to probe elements that require focus state (e.g., search autocomplete dropdowns), this is currently the only workaround. Once persistent focus state in sel-probe ships, this workaround won't be necessary.
 
 ---
 
@@ -101,9 +101,9 @@ extracted properties**, not raw DOM:
   their distinguishing properties (add a predicate, or `#N`).
 - `--sightmap-dir` selects the corpus used to resolve the query.
 - **Flag ordering:** put flags *before* the query — `click --tab T 'Query'`. A
-  positional placed before the flags is silently ignored (go-d3f1).
+  positional placed before the flags is silently ignored.
 - The final act is still a coordinate dispatch, so an off-screen target can be
-  missed; scroll it into view first if needed (go-e7c5). Raw `--x N --y N`
+  missed; scroll it into view first if needed. Raw `--x N --y N`
   remains as a layout-fragile escape hatch.
 
 ---
@@ -143,7 +143,7 @@ sightmap iterate --trace 'https://example.com/products'   # verbose T2 breakdown
 
 **Config:** `snapshot.wait`, `snapshot.trace`, `snapshot.include_hidden` in `.sightmap/config.yaml`.
 
-**Snapshot organization:** A **view** is a **set** of timestamped captures stored at `.sightmap/snapshots/{view}/{stamp}.snap` (`{stamp}` = UTC `YYYYMMDDTHHMMSSZ`; go-snap.6/.10). There is no per-view "state" axis — just re-snap the view in whatever configurations you want (different loads, a drawer open, a tab switched); the **novelty gate** keeps only captures that add a new component type or orphan slot and the **union** is what coverage scores (go-snap.2/.7). Capture each view a few times to cover lazy / rotating / interaction-gated sections. `--all` reads representative URLs from `views/*.yaml` (see *View URLs* below) and dogpiles every target into its view's set. An explicit `--out FILE` writes exactly there (no set, no gate). A re-snap that adds nothing new is skipped; `--force`, or the first capture of a view, always writes.
+**Snapshot organization:** A **view** is a **set** of timestamped captures stored at `.sightmap/snapshots/{view}/{stamp}.snap` (`{stamp}` = UTC `YYYYMMDDTHHMMSSZ`). There is no per-view "state" axis — just re-snap the view in whatever configurations you want (different loads, a drawer open, a tab switched); the **novelty gate** keeps only captures that add a new component type or orphan slot and the **union** is what coverage scores. Capture each view a few times to cover lazy / rotating / interaction-gated sections. `--all` reads representative URLs from `views/*.yaml` (see *View URLs* below) and dogpiles every target into its view's set. An explicit `--out FILE` writes exactly there (no set, no gate). A re-snap that adds nothing new is skipped; `--force`, or the first capture of a view, always writes.
 
 **View URLs (canonical):** `snapshot --all`, `sel-probe --all`, and `report` source their URLs from `views/*.yaml`, not from a separate file. Each view declares a top-level `url:` (its primary page) and may list `snapshots:` entries, each with an optional `url:` to capture a variant (e.g. a category-landing page vs. a leaf PLP). A view with no `snapshots:` yields a single `base` snapshot from its `url:`.
 
@@ -155,8 +155,6 @@ snapshots:
   - notes: Department landing page — no product grid.
     url: https://example.com/c/department      # → also snapshots/plp/{stamp}.snap
 ```
-
-> `probe-urls.yaml` is **deprecated**. The `--all` commands fall back to it (with a warning) only when no view declares a `url:`; migrate those URLs into `views/*.yaml`.
 
 ```bash
 # Appends a timestamped capture to .sightmap/snapshots/{view}/ if view is detected
@@ -171,7 +169,7 @@ sightmap snapshot --all
 
 **Common mistake:** Snapping before async content renders (React Suspense, lazy routes). Use `--wait 2` or set `wait: 2` in `.sightmap/config.yaml`.
 
-**Migration:** Legacy flat `*.snap` files and any older `snapshots/{view}/{name}.snap` / `snapshots/{view}/{state}/{stamp}.snap` captures still load — the parser collapses them to `(view, last-segment)` and groups by view. To tidy the on-disk layout, move each capture to `snapshots/{view}/{stamp}.snap` (no automated migration command; go-snap.10 removed named states).
+**Migration:** Legacy flat `*.snap` files and any older `snapshots/{view}/{name}.snap` / `snapshots/{view}/{state}/{stamp}.snap` captures still load — the parser collapses them to `(view, last-segment)` and groups by view. To tidy the on-disk layout, move each capture to `snapshots/{view}/{stamp}.snap` (no automated migration command).
 
 ---
 
@@ -186,7 +184,7 @@ sightmap coverage home.snap product-list.snap checkout.snap
 
 Automatically loads the corresponding `.snap.tree.json` for each `.snap` argument.
 
-**Union-aware over a view's set (go-snap.2).** `coverage` groups captures by view and reports per-DOM T1/T2/T3 for each capture, but judges component **presence** across the whole set: a `[Warnings]` line fires only when a component matched `0 of N snaps` (union-dead), while components present in just *some* captures appear under `[Presence]` as `matched in K of N snaps`. So a carousel that drops out of a single reduced load is **not** flagged dead.
+**Union-aware over a view's set.** `coverage` groups captures by view and reports per-DOM T1/T2/T3 for each capture, but judges component **presence** across the whole set: a `[Warnings]` line fires only when a component matched `0 of N snaps` (union-dead), while components present in just *some* captures appear under `[Presence]` as `matched in K of N snaps`. So a carousel that drops out of a single reduced load is **not** flagged dead.
 
 ```
 [Warnings]
@@ -198,7 +196,7 @@ Automatically loads the corresponding `.snap.tree.json` for each `.snap` argumen
 
 `coverage`, `report`, and `multi-coverage` are the three set-aware readers — same “operate over the union of the view's set” rule, specialized per job: `coverage` → per-component dead/partial; `report` → aggregate health row; `multi-coverage` → cross-page presence matrix. `report`'s `✗` is wired to match `coverage`'s union fail.
 
-**Annotation gaps (advisory, go-snap.5).** Because T1/T2/T3 only score *interactive* nodes, a non-interactive content node whose accessible name carries real information (e.g. a banner `image "UP TO $800 OFF…"`) is structurally invisible to coverage. `coverage` prints an extra advisory section listing such nodes — a non-trivial accessible name, not matched by a component, and with no matched ancestor (zero component context):
+**Annotation gaps (advisory).** Because T1/T2/T3 only score *interactive* nodes, a non-interactive content node whose accessible name carries real information (e.g. a banner `image "UP TO $800 OFF…"`) is structurally invisible to coverage. `coverage` prints an extra advisory section listing such nodes — a non-trivial accessible name, not matched by a component, and with no matched ancestor (zero component context):
 
 ```
 [Annotation gaps] (named content with no component context)
@@ -213,7 +211,7 @@ It's a precision-biased nudge, **not** a gate (never changes the exit status): a
 
 ## `sightmap report`
 
-**Solves:** "Are we done?" — per-view coverage health table aggregated over each view's whole capture **set** (go-snap.8). Shows T2 quality analysis across views.
+**Solves:** "Are we done?" — per-view coverage health table aggregated over each view's whole capture **set**. Shows T2 quality analysis across views.
 
 ```
 sightmap report
@@ -238,34 +236,11 @@ sightmap report · homedepot.com · 2026-06-08
 | `T3` | **max** orphan count across the set; `✗` iff `> 0` |
 | `Largest T2 scope` | max single T2 cluster seen across the set |
 
-The **max-T3 gate is what makes `report` agree with `coverage`**: both fail iff *some* capture in the set has an orphan. (Before go-snap.8 `report` showed only the latest capture, so a reduced final load could read `0 ✓` while `coverage` failed the set.) Worked example: `home` above has captures with T3 = 3, 0, 0 → row shows `3 ✗`; T1 = `(410+270+250)/(535+340+320)` = 78%.
+The **max-T3 gate is what makes `report` agree with `coverage`**: both fail iff *some* capture in the set has an orphan. (Previously `report` showed only the latest capture, so a reduced final load could read `0 ✓` while `coverage` failed the set.) Worked example: `home` above has captures with T3 = 3, 0, 0 → row shows `3 ✗`; T1 = `(410+270+250)/(535+340+320)` = 78%.
 
 The `⚠` flag on T2 scopes indicates multi-child scopes that warrant investigation.
 
-**Requires:** saved `.snap.tree.json` files (run `snapshot --all` first). URLs come from each view's `url:` / `snapshots[].url` in `views/*.yaml` (see *View URLs* under `snapshot`). A deprecated `--probe-urls FILE` flag remains as a fallback.
-
----
-
-## `sightmap migrate-snapshots`
-
-**Solves:** Moving legacy flat `.snap` files from the site root into the organized `.sightmap/snapshots/{view}/base.snap` structure.
-
-```bash
-# Dry run (show what would be moved)
-sightmap migrate-snapshots --dry-run
-
-# Execute migration
-sightmap migrate-snapshots
-```
-
-**Behavior:**
-- Finds all `*.snap` and `*.snap.tree.json` files in the current directory
-- Uses `probe-urls.yaml` to map file basenames to view names
-- Moves files to `.sightmap/snapshots/{view}/base.snap`
-- Preserves both `.snap` and `.snap.tree.json` files atomically
-- Falls back to using the file basename as the view name if `probe-urls.yaml` is not found
-
-**When to use:** One-time migration when upgrading to the organized snapshot structure. All tools (`coverage`, `report`, `snapshot --all`) support both legacy and new paths during the transition.
+**Requires:** saved `.snap.tree.json` files (run `snapshot --all` first). URLs come from each view's `url:` / `snapshots[].url` in `views/*.yaml` (see *View URLs* under `snapshot`).
 
 ---
 
@@ -289,7 +264,7 @@ Output includes selector hints to seed `sel-probe` investigation.
 
 **Visible-only is the default.** Use `--include-hidden` only when you specifically need to audit hidden-but-interactive nodes.
 
-**Planned (go-c3d5):** `gap --scope COMPONENT_NAME` — show T2 nodes within a specific component's subtree.
+**Planned:** `gap --scope COMPONENT_NAME` — show T2 nodes within a specific component's subtree.
 
 ---
 
@@ -318,9 +293,9 @@ matches: 4
 | `--all` | Run against every view URL in `views/*.yaml` (`url:` + `snapshots[].url`) |
 | `--tab ID` | Target a specific tab (required when several content tabs are open) |
 
-**Gotcha:** `sel-probe` currently loses browser focus state (go-7014). Elements visible only while an input is focused (e.g. search autocomplete suggestions) cannot be probed this way. Workaround: use `browser eval 'document.querySelectorAll(...).length'` with the focus state already established.
+**Gotcha:** `sel-probe` currently loses browser focus state. Elements visible only while an input is focused (e.g. search autocomplete suggestions) cannot be probed this way. Workaround: use `browser eval 'document.querySelectorAll(...).length'` with the focus state already established.
 
-**Planned (go-f510):** `--scope ANCESTOR_SELECTOR` — verify child selector matches only within a specific ancestor.
+**Planned:** `--scope ANCESTOR_SELECTOR` — verify child selector matches only within a specific ancestor.
 
 ---
 
@@ -332,7 +307,7 @@ matches: 4
 sightmap multi-coverage
 ```
 
-One column **per view** (go-snap.8), not per capture file. A view's many captures are folded into a single column whose cell is the **max** matched count across the set (union-honest “renders *up to* K of these”; `-` = matched in no capture). The header reads `view·N` when the view carries N>1 captures.
+One column **per view**, not per capture file. A view's many captures are folded into a single column whose cell is the **max** matched count across the set (union-honest “renders *up to* K of these”; `-` = matched in no capture). The header reads `view·N` when the view carries N>1 captures.
 
 ```
 Component         home·3   plp·2   pdp
@@ -349,7 +324,7 @@ Global candidates (appear in 2+ views, not yet in global components):
   ProductPod    home(12) plp(36) pdp(6)   → add to components.yaml
 ```
 
-**Candidates count views, not files.** A component is a promotion candidate when it appears in 2+ *views* and isn't already global. (Before go-snap.8 the rule was “2+ files,” so a single multi-capture view falsely flagged its own view-local components — e.g. `FacetFilter`/`PromoBanner` above, each in just one view, are correctly *not* candidates.)
+**Candidates count views, not files.** A component is a promotion candidate when it appears in 2+ *views* and isn't already global. (Previously the rule was “2+ files,” so a single multi-capture view falsely flagged its own view-local components — e.g. `FacetFilter`/`PromoBanner` above, each in just one view, are correctly *not* candidates.)
 
 **Requires:** `.snap.tree.json` files for each page, written by `snapshot --tree-out`. Run `snapshot --all` first if stale.
 

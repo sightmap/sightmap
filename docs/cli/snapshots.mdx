@@ -123,34 +123,6 @@ Re-run without `--dry-run` to delete the listed captures along with their `.snap
 Run `snapshot-prune --dry-run --all` after adding component definitions. Review the proposed removals before running it again without `--dry-run`.
 </Tip>
 
----
-
-### `migrate-snapshots`
-
-Moves legacy flat `.snap` files and their `.snap.tree.json` siblings from the current directory to `.sightmap/snapshots/{view}/base.snap`. The command derives the view directory from the filename. Run with `--dry-run` first to print each planned move as an `old → new` line.
-
-Coverage and view-set commands continue to read legacy flat captures during migration.
-
-**Flags:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--dry-run` | `false` | Show what would be moved without actually moving files. |
-| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
-
-```bash
-sightmap migrate-snapshots --dry-run
-```
-
-```text
-home.snap → .sightmap/snapshots/home/base.snap
-home.snap.tree.json → .sightmap/snapshots/home/base.snap.tree.json
-plp.snap → .sightmap/snapshots/plp/base.snap
-plp.snap.tree.json → .sightmap/snapshots/plp/base.snap.tree.json
-
-migrate-snapshots: dry run complete, 2 files would be moved
-```
-
 ## Typical flow
 
 <Steps>

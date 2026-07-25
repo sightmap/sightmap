@@ -1,5 +1,5 @@
 // snapshot-prune — drop captures that no longer add anything to their view's set
-// (go-snap.9), the retrospective counterpart to the capture-time novelty gate.
+// , the retrospective counterpart to the capture-time novelty gate.
 //
 // Because novelty is corpus-relative and re-computed against the CURRENT corpus,
 // a capture kept while the corpus was incomplete (it had unique orphans) becomes
@@ -55,7 +55,7 @@ func runSnapshotPrune(args []string) error {
 }
 
 // pruneView re-matches a view's captures against the current corpus and removes
-// the subsumed ones (go-snap.9). Returns how many were pruned (or would be, under
+// the subsumed ones. Returns how many were pruned (or would be, under
 // --dry-run).
 func pruneView(view string, entries []snapEntry, sess *sightmap.Session, dryRun bool) int {
 	paths := make([]string, 0, len(entries))

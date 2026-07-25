@@ -11,7 +11,7 @@ import (
 	"github.com/sightmap/sightmap/go/match"
 )
 
-// Annotation-completeness detector (go-snap.5)
+// Annotation-completeness detector
 // --------------------------------------------
 // T1/T2/T3 coverage only scores INTERACTIVE nodes, so a NON-interactive content
 // node whose accessible name carries real information — e.g. a banner `image
@@ -55,7 +55,7 @@ type contentGap struct {
 // treating as real content: after trimming it must be at least minContentNameLen
 // runes AND contain a letter. The length floor drops short labels; the letter
 // requirement drops pure-symbol / pure-number strings. Both bias toward banner
-// titles and promo copy and away from icons (go-snap.5).
+// titles and promo copy and away from icons.
 func isContentName(s string) bool {
 	s = strings.TrimSpace(s)
 	if utf8.RuneCountInString(s) < minContentNameLen {
@@ -111,7 +111,7 @@ func annotationGaps(
 }
 
 // contentGapPresence is a distinct annotation gap aggregated across a view's
-// capture set (go-snap.2/.5). Rotating content means the same gap may appear in
+// capture set. Rotating content means the same gap may appear in
 // many captures, so gaps are deduped by gapKey and reported once with the count
 // of captures they appeared in (mirroring the [Presence] "K of N snaps" style).
 type contentGapPresence struct {

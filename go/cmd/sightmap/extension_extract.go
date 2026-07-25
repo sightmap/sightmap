@@ -11,7 +11,7 @@ import (
 // ensureExtension extracts the embedded Chrome extension to
 // ~/.sightmap/extension/ if it is missing or out of date.
 // It returns the path to the extracted directory and whether it (re)installed a
-// new version (so the caller can force a service-worker reload — go-erld).
+// new version (so the caller can force a service-worker reload).
 func ensureExtension() (string, bool, error) {
 	// 1. Read embedded manifest to get the bundled version.
 	embeddedData, err := extensionFS.ReadFile("extension/manifest.json")

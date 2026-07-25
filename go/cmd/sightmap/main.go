@@ -64,19 +64,8 @@ func main() {
 		err = runIterate(args)
 	case "report":
 		err = runReport(args)
-
-	case "migrate-snapshots", "migrate_snapshots":
-		err = runMigrateSnapshots(args)
-	case "migrate-probe-urls", "migrate_probe_urls", "migrate-probes":
-		err = runMigrateProbeURLs(args)
-	case "migrate-visible-config", "migrate_visible_config":
-		err = runMigrateVisibleConfig(args)
 	case "sel-check", "sel_check":
 		err = runSelCheck(args)
-
-	// Hidden aliases kept for backwards compatibility.
-	case "dump":
-		err = runSnapshot(args)
 	case "skills":
 		err = runSkills(args)
 	case "version", "--version", "-v":
@@ -103,11 +92,10 @@ Commands:
   browser stop / status / navigate / eval             session management
   browser click / fill / hover / keypress / scroll     interact with page elements
   browser drag / wait-for / dialog                     more interactions
-  browser tabs list/new/select/close/resize            tab management
+  browser tabs list/new/close/resize                   tab management
 
-  report        [--sightmap-dir DIR] [--probe-urls FILE]          per-view coverage health table + T2 quality
+  report        [--sightmap-dir DIR]                              per-view coverage health table + T2 quality
   iterate URL  [--sightmap-dir DIR]  navigate+snap+coverage in one step (no tree output)
-  migrate-snapshots [--sightmap-dir DIR] [--dry-run]              move legacy .snap files to organized structure
   snapshot       [--url URL] [--out FILE] [--all] [--sightmap-dir DIR]  annotated component tree
   inspect        [--url URL] [--out FILE] [--sightmap-dir DIR]  raw DOM tree for selector authoring
   coverage       [--sightmap-dir DIR] [FILE.snap ...]            offline T1/T2/T3 check

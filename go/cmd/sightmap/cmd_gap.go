@@ -19,7 +19,6 @@ func runGap(args []string) error {
 	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	urlFlag := fs.String("url", "", "Navigate to this URL before extracting")
-	_ = fs.Bool("visible", true, "(deprecated: visible is now the default)")
 	includeHiddenFlag := fs.Bool("include-hidden", false, "Include hidden/off-screen nodes in gap analysis")
 	scopeFlag := fs.String("scope", "", "Filter gaps to components within named component's subtree")
 	if err := fs.Parse(args); err != nil {
