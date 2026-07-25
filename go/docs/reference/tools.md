@@ -108,44 +108,56 @@ extracted properties**, not raw DOM:
 
 ---
 
-## `sightmap iterate URL`
-
-**Solves:** The primary edit-verify loop — navigate + snap + coverage + T2/T3 trace in one command.
-
-```bash
-sightmap iterate 'https://example.com/products'
-sightmap iterate --trace 'https://example.com/products'   # verbose T2 breakdown
-```
-
-**Notes:**
-- Snap is saved to `/tmp/sightmap-iter-SLUG.snap`, not the site directory. Run `snapshot` when you need a permanent file.
-- `snapshot.wait` from config is applied automatically.
-- Suppresses the full tree output; shows coverage stats only. Faster than `snapshot` for the edit loop.
-
----
-
 ## `sightmap snapshot`
 
-**Solves:** Full annotated ARIA tree with coverage stats, saved to a named file.
+**Solves:** Observe a live page — the full annotated ARIA tree with coverage stats, printed to stdout (or `--out FILE`). Pure read: `snapshot` never writes into the corpus and never novelty-gates.
 
 **Key flags:**
 
 | Flag | Purpose |
 |------|---------|
 | `--url URL` | Navigate before snapping |
-| `--out FILE` | Output file (default: appends a timestamped capture `.sightmap/snapshots/{view}/{stamp}.snap` if view is detected, else stdout) |
-| `--force` | Write the capture even if it adds no new component/slot vs the view set (skip the novelty gate) |
-| `--tree-out FILE` | Write raw tree JSON for offline coverage/multi-coverage (auto-generates alongside snapshot if omitted) |
-| `--all` | Snap every representative URL declared in `views/*.yaml` (`url:` + `snapshots[].url`) |
+| `--coverage` | Print `[View]` + `[Coverage]` + cluster traces only, suppressing the tree (the fast edit-loop view) |
+| `--out FILE` | Write the annotated output to FILE instead of stdout (plain file write — no view set, no gate) |
+| `--tree-out FILE` | Write raw tree JSON for offline coverage/multi-coverage |
 | `--trace` | Include T3 cluster detail and T2 scope breakdown |
 | `--include-hidden` | Include hidden/off-screen nodes in coverage stats (default: visible only) |
 | `--wait N` | Seconds to wait after navigation (for async rendering) |
 
 **Config:** `snapshot.wait`, `snapshot.trace`, `snapshot.include_hidden` in `.sightmap/config.yaml`.
 
-**Snapshot organization:** A **view** is a **set** of timestamped captures stored at `.sightmap/snapshots/{view}/{stamp}.snap` (`{stamp}` = UTC `YYYYMMDDTHHMMSSZ`). There is no per-view "state" axis — just re-snap the view in whatever configurations you want (different loads, a drawer open, a tab switched); the **novelty gate** keeps only captures that add a new component type or orphan slot and the **union** is what coverage scores. Capture each view a few times to cover lazy / rotating / interaction-gated sections. `--all` reads representative URLs from `views/*.yaml` (see *View URLs* below) and dogpiles every target into its view's set. An explicit `--out FILE` writes exactly there (no set, no gate). A re-snap that adds nothing new is skipped; `--force`, or the first capture of a view, always writes.
+`--coverage` is the primary edit-verify loop: navigate + coverage + T2/T3 trace in one command, tree suppressed. Edit `.sightmap/*.yaml`, re-run, repeat until T3 = 0.
 
-**View URLs (canonical):** `snapshot --all`, `sel-probe --all`, and `report` source their URLs from `views/*.yaml`, not from a separate file. Each view declares a top-level `url:` (its primary page) and may list `snapshots:` entries, each with an optional `url:` to capture a variant (e.g. a category-landing page vs. a leaf PLP). A view with no `snapshots:` yields a single `base` snapshot from its `url:`.
+```bash
+sightmap snapshot --coverage --url 'https://example.com/products'   # edit loop
+sightmap snapshot --url 'https://example.com/products'              # full annotated tree
+sightmap snapshot --url 'https://example.com/products' --out page.snap --tree-out page.snap.tree.json
+```
+
+**Common mistake:** Snapping before async content renders (React Suspense, lazy routes). Use `--wait 2` or set `wait: 2` in `.sightmap/config.yaml`.
+
+---
+
+## `sightmap capture`
+
+**Solves:** Persist a capture into the matched view's set. `capture` extracts the tree exactly as `snapshot` does, then appends it to `.sightmap/snapshots/{view}/{stamp}.snap` (+ a `.snap.tree.json` sibling), subject to the novelty gate. Requires a matching view — an unmapped page is an error (use `snapshot` to observe one).
+
+**Key flags:**
+
+| Flag | Purpose |
+|------|---------|
+| `--url URL` | Navigate before capturing |
+| `--all` | Capture every representative URL declared in `views/*.yaml` (`url:` + `snapshots[].url`) |
+| `--force` | Write the capture even if it adds no new component/slot vs the view set (skip the novelty gate) |
+| `--json` | Also write an annotated JSON sibling next to each capture |
+| `--include-hidden` | Include hidden/off-screen nodes in analysis |
+| `--wait N` | Seconds to wait after navigation (for async rendering) |
+
+**Config:** `snapshot.wait`, `snapshot.trace`, `snapshot.include_hidden` in `.sightmap/config.yaml`.
+
+**Snapshot organization:** A **view** is a **set** of timestamped captures stored at `.sightmap/snapshots/{view}/{stamp}.snap` (`{stamp}` = UTC `YYYYMMDDTHHMMSSZ`). There is no per-view "state" axis — just re-`capture` the view in whatever configurations you want (different loads, a drawer open, a tab switched); the **novelty gate** keeps only captures that add a new component type or orphan slot and the **union** is what coverage scores. Capture each view a few times to cover lazy / rotating / interaction-gated sections. `--all` reads representative URLs from `views/*.yaml` (see *View URLs* below) and dogpiles every target into its view's set. A capture that adds nothing new is skipped; `--force`, or the first capture of a view, always writes.
+
+**View URLs (canonical):** `capture --all`, `sel-probe --all`, and `report` source their URLs from `views/*.yaml`, not from a separate file. Each view declares a top-level `url:` (its primary page) and may list `snapshots:` entries, each with an optional `url:` to capture a variant (e.g. a category-landing page vs. a leaf PLP). A view with no `snapshots:` yields a single `base` snapshot from its `url:`.
 
 ```yaml
 # views/plp.yaml
@@ -157,19 +169,12 @@ snapshots:
 ```
 
 ```bash
-# Appends a timestamped capture to .sightmap/snapshots/{view}/ if view is detected
-sightmap snapshot --url 'https://example.com/'
+# Append a novelty-gated capture to .sightmap/snapshots/{view}/
+sightmap capture --url 'https://example.com/'
 
-# Explicit path (bypasses auto-organization — writes exactly here, no set, no gate)
-sightmap snapshot --url 'https://example.com/' --out custom.snap
-
-# Refresh every view URL declared in views/*.yaml (auto-organized, novelty-gated)
-sightmap snapshot --all
+# Refresh every view URL declared in views/*.yaml
+sightmap capture --all
 ```
-
-**Common mistake:** Snapping before async content renders (React Suspense, lazy routes). Use `--wait 2` or set `wait: 2` in `.sightmap/config.yaml`.
-
-**Migration:** Legacy flat `*.snap` files and any older `snapshots/{view}/{name}.snap` / `snapshots/{view}/{state}/{stamp}.snap` captures still load — the parser collapses them to `(view, last-segment)` and groups by view. To tidy the on-disk layout, move each capture to `snapshots/{view}/{stamp}.snap` (no automated migration command).
 
 ---
 
@@ -240,7 +245,7 @@ The **max-T3 gate is what makes `report` agree with `coverage`**: both fail iff 
 
 The `⚠` flag on T2 scopes indicates multi-child scopes that warrant investigation.
 
-**Requires:** saved `.snap.tree.json` files (run `snapshot --all` first). URLs come from each view's `url:` / `snapshots[].url` in `views/*.yaml` (see *View URLs* under `snapshot`).
+**Requires:** saved `.snap.tree.json` files (run `capture --all` first). URLs come from each view's `url:` / `snapshots[].url` in `views/*.yaml` (see *View URLs* under `snapshot`).
 
 ---
 
@@ -326,7 +331,7 @@ Global candidates (appear in 2+ views, not yet in global components):
 
 **Candidates count views, not files.** A component is a promotion candidate when it appears in 2+ *views* and isn't already global. (Previously the rule was “2+ files,” so a single multi-capture view falsely flagged its own view-local components — e.g. `FacetFilter`/`PromoBanner` above, each in just one view, are correctly *not* candidates.)
 
-**Requires:** `.snap.tree.json` files for each page, written by `snapshot --tree-out`. Run `snapshot --all` first if stale.
+**Requires:** `.snap.tree.json` files for each page, written by `capture` (or `snapshot --tree-out`). Run `capture --all` first if stale.
 
 **When to use:** After completing per-page iteration, before declaring the corpus done.
 

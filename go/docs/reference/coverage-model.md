@@ -55,7 +55,7 @@ No semantic context. The click is unattributable.
 
 **T2-loose (investigate):** N > 1 interactive children share the same T1 ancestor — they are indistinguishable in event attribution. A broad container needs child components.
 
-The `--trace` flag on `snapshot`, `coverage`, and `iterate` surfaces T2 scopes ranked by child count. Single-child T2 scopes are acceptable; multi-child T2 scopes are the authoring queue.
+The `--trace` flag on `snapshot` and `coverage` surfaces T2 scopes ranked by child count. Single-child T2 scopes are acceptable; multi-child T2 scopes are the authoring queue.
 
 ## T2 triage categories
 

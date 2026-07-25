@@ -30,6 +30,7 @@ type printOpts struct {
 	compact        bool // kept for compat; now a no-op (render is always compact)
 	maxDepth       int
 	trace          bool
+	coverageOnly   bool // suppress the tree + guide; print View/Coverage/traces only
 	visibleOnly    bool
 	propValues     map[string]map[string]string // nodeID → {propName → value}; nil in offline mode
 	selectors      bool                         // show tag #id [data-testid] selector hints
@@ -37,26 +38,29 @@ type printOpts struct {
 	globalNames    map[string]bool              // corpus-level global component names; used by page-check
 }
 
+// snapshot is a PURE OBSERVE command: it connects, navigates, extracts, matches
+// the corpus, and renders the annotated tree + [Coverage] to stdout (or --out
+// FILE). It never writes into the corpus's capture set and never novelty-gates —
+// persisting a capture is the separate `capture` command's job.
 func runSnapshot(args []string) error {
 	fs := flag.NewFlagSet("snapshot", flag.ContinueOnError)
 	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
 	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
 	urlFlag := fs.String("url", "", "Navigate to this URL before snapping")
 	waitFlag := fs.Float64("wait", 0, "Extra seconds to wait after DOM stability is detected (default 0; use for unusually slow pages)")
-	outFlag := fs.String("out", "", "Write to file instead of stdout")
+	outFlag := fs.String("out", "", "Write the annotated output to this file instead of stdout")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	interactiveFlag := fs.Bool("interactive", false, "Show interactive nodes only")
 	depthFlag := fs.Int("depth", 0, "Max tree depth (0 = unlimited)")
 	compactFlag := fs.Bool("compact", false, "Omit hidden/ignored nodes from output")
 	traceFlag := fs.Bool("trace", false, "Include selector hints for unlabeled interactive clusters")
+	coverageOnlyFlag := fs.Bool("coverage", false, "Print [View] + [Coverage] + cluster traces only, suppressing the component tree")
 	visibleFlag := fs.Bool("visible", true, "Count only visible nodes (default: true; use --include-hidden to disable)")
 	includeHiddenFlag := fs.Bool("include-hidden", false, "Include hidden/off-screen nodes in analysis")
 	selectorsFlag := fs.Bool("selectors", false, "Show tag #id [data-testid] selector hints (no CSS classes)")
 	treeOutFlag := fs.String("tree-out", "", "Write raw ComponentNode tree JSON to this file (enables offline coverage/multi-coverage)")
 	jsonOutFlag := fs.String("json", "", "Write annotated tree JSON to this file (superset of --tree-out: includes component name, memory, extracted props)")
 	screenshotFlag := fs.String("screenshot", "", "Save a PNG screenshot to this file alongside the tree")
-	allFlag := fs.Bool("all", false, "Snap every view URL declared in views/*.yaml")
-	forceFlag := fs.Bool("force", false, "Write the capture even if it adds no new component/slot vs the view set (skip the novelty gate)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -81,11 +85,6 @@ func runSnapshot(args []string) error {
 	visible := *visibleFlag
 	if *includeHiddenFlag {
 		visible = false
-	}
-
-	if *allFlag {
-		return runSnapshotAll(args, *sightmapDirFlag, *addrFlag, *tabFlag, *waitFlag,
-			*interactiveFlag, *depthFlag, visible, *selectorsFlag, *jsonOutFlag, *forceFlag)
 	}
 
 	ctx := context.Background()
@@ -185,6 +184,7 @@ func runSnapshot(args []string) error {
 		compact:        *compactFlag,
 		maxDepth:       *depthFlag,
 		trace:          *traceFlag,
+		coverageOnly:   *coverageOnlyFlag,
 		visibleOnly:    visible,
 		propValues:     propValues,
 		selectors:      *selectorsFlag,
@@ -216,33 +216,10 @@ func runSnapshot(args []string) error {
 		}
 	}
 
-	// If --out is not specified but we have a view, append a timestamped capture to
-	// the view's set: snapshots/<view>/<stamp>.snap. An explicit
-	// --out still writes exactly there.
-	if *outFlag == "" && view != nil {
-		viewBasename := view.SnapBasename()
-		// Novelty gate: skip writing a capture that adds no new component
-		// type or orphan slot vs the existing set. First capture always writes; --force
-		// bypasses. Only applies to the auto-organized set-append path, never --out.
-		if snapshotMatches != nil {
-			parentMap := buildParentMap(root)
-			_, _, _, _, t3nodes, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
-			cand := slotsFromMatch(snapshotMatches, t3nodes, parentMap)
-			if res, write := noveltyGate(*sightmapDirFlag, viewBasename, cand, *forceFlag); !write {
-				fmt.Fprintf(os.Stderr, "snapshot: nothing new vs %d capture(s) in %s — not saved (use --force to keep)\n",
-					res.ComparedTo, viewBasename)
-				return nil
-			}
-		}
-		*outFlag = viewSnapshotPath(*sightmapDirFlag, viewBasename, time.Now())
-		if *treeOutFlag == "" {
-			*treeOutFlag = snapshotTreePath(*outFlag)
-		}
-	}
-
 	// ── Write output ───────────────────────────────────────────────────────
+	// snapshot only ever writes the rendered output to stdout or an explicit
+	// --out FILE. It never appends to the corpus capture set (that is `capture`).
 	if *outFlag != "" {
-		// Create parent directory if needed
 		if dir := filepath.Dir(*outFlag); dir != "." {
 			if mkdirErr := os.MkdirAll(dir, 0o755); mkdirErr != nil {
 				return fmt.Errorf("create output directory: %v", mkdirErr)
@@ -263,164 +240,8 @@ func runSnapshot(args []string) error {
 			os.Remove(tmpPath)
 			return fmt.Errorf("rename output file: %v", rerr)
 		}
-
-		// Write tree JSON alongside if not explicitly specified
-		if *treeOutFlag != "" {
-			if err := writeTreeJSON(root, *treeOutFlag); err != nil {
-				fmt.Fprintf(os.Stderr, "snapshot: tree-out: %v\n", err)
-			}
-		}
 	} else {
 		writeOutput(os.Stdout, root, view, snapshotMatches, opts)
-	}
-	return nil
-}
-
-// runSnapshotAll navigates to each view URL and writes a snap + tree JSON file
-// per view, then prints a summary table.
-func runSnapshotAll(
-	_ []string,
-	sightmapDir, addr, tabID string,
-	wait float64,
-	interactive bool,
-	depth int,
-	visible bool,
-	selectors bool,
-	jsonOut string,
-	force bool,
-) error {
-	targets, err := corpusProbeTargets(sightmapDir)
-	if err != nil {
-		return err
-	}
-	if len(targets) == 0 {
-		return fmt.Errorf("no view URLs to snapshot — add url: (and optional snapshots[].url) to views/*.yaml")
-	}
-
-	ctx := context.Background()
-	conn, err := dialAddrTab(addr, tabID)
-	if err != nil {
-		return fmt.Errorf("snapshot --all: %w", err)
-	}
-	defer conn.Close()
-
-	type result struct {
-		name              string
-		t1, t2, t3, total int
-		err               error
-		skipped           bool // novelty gate: nothing new, not written
-		skippedVs         int  // captures compared against when skipped
-	}
-	var results []result
-
-	for _, v := range targets {
-		label := v.ViewName
-		if v.SnapName != "base" {
-			label = v.ViewName + "/" + v.SnapName
-		}
-		fmt.Fprintf(os.Stderr, "snapping %s → %s\n", label, v.URL)
-
-		if err := browser.NavigateAndWaitIdle(ctx, conn, v.URL, 8*time.Second); err != nil {
-			results = append(results, result{name: label, err: err})
-			continue
-		}
-		if wait > 0 {
-			time.Sleep(time.Duration(wait * float64(time.Second)))
-		}
-
-		pageURL, _ := browser.GetURL(ctx, conn)
-		page, err := conn.DefaultPage()
-		if err != nil {
-			results = append(results, result{name: label, err: err})
-			continue
-		}
-		root, err := browser.ExtractComponents(ctx, page)
-		if err != nil {
-			results = append(results, result{name: label, err: err})
-			continue
-		}
-
-		sess := sightmap.NewSession(sightmap.DirLoader(sightmapDir))
-		snapshotMatches, _ := sess.MatchTree(root, pageURL)
-		view, _ := sess.ViewForURL(pageURL)
-		var viewComponents []match.SightmapComponent
-		if components, cErr := sess.Components(pageURL); cErr == nil {
-			viewComponents = components
-		}
-		globalNames, _ := sess.GlobalComponentNames()
-
-		opts := printOpts{
-			interactive:    interactive,
-			maxDepth:       depth,
-			visibleOnly:    visible,
-			selectors:      selectors,
-			viewComponents: viewComponents,
-			globalNames:    globalNames,
-		}
-
-		// Novelty gate: don't append a redundant capture to the view set.
-		if !force {
-			parentMap := buildParentMap(root)
-			_, _, _, _, t3nodes, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
-			cand := slotsFromMatch(snapshotMatches, t3nodes, parentMap)
-			if res, write := noveltyGate(sightmapDir, v.ViewDir, cand, false); !write {
-				results = append(results, result{name: label, skipped: true, skippedVs: res.ComparedTo})
-				continue
-			}
-		}
-
-		// Append a timestamped capture to the view set.
-		snapPath := viewSnapshotPath(sightmapDir, v.ViewDir, time.Now())
-		treeJSONPath := snapshotTreePath(snapPath)
-
-		// Create snapshots directory if needed
-		snapDir := filepath.Dir(snapPath)
-		if mkdirErr := os.MkdirAll(snapDir, 0o755); mkdirErr != nil {
-			results = append(results, result{name: label, err: mkdirErr})
-			continue
-		}
-
-		tmpPath := snapPath + ".tmp"
-		f, ferr := os.Create(tmpPath)
-		if ferr != nil {
-			results = append(results, result{name: label, err: ferr})
-			continue
-		}
-		writeOutput(f, root, view, snapshotMatches, opts)
-		f.Close()
-		os.Rename(tmpPath, snapPath)
-
-		writeTreeJSON(root, treeJSONPath)
-		if jsonOut != "" {
-			jsonPath := strings.TrimSuffix(snapPath, ".snap") + ".snap.annotated.json"
-			writeAnnotatedJSON(root, jsonPath, view, snapshotMatches, nil) // no propValues in --all mode
-		}
-
-		parentMap := buildParentMap(root)
-		t1, t2, t3, total, _, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
-		results = append(results, result{name: label, t1: t1, t2: t2, t3: t3, total: total})
-	}
-
-	fmt.Fprintln(os.Stderr)
-	for _, r := range results {
-		if r.err != nil {
-			fmt.Fprintf(os.Stderr, "%-20s  ERROR: %v\n", r.name, r.err)
-			continue
-		}
-		if r.skipped {
-			fmt.Fprintf(os.Stderr, "%-20s  = nothing new vs %d snap(s) — not saved\n", r.name, r.skippedVs)
-			continue
-		}
-		check := "✓"
-		if r.t3 > 0 {
-			check = "✗"
-		}
-		fmt.Fprintf(os.Stderr, "%-20s  %d interactive · T1 %d%% · T2 %d%% · T3 %d %s\n",
-			r.name, r.total,
-			coveragePct(r.t1, r.total),
-			coveragePct(r.t2, r.total),
-			r.t3, check,
-		)
 	}
 	return nil
 }
@@ -455,22 +276,26 @@ func writeOutput(
 	}
 
 	// ── [Guide] ───────────────────────────────────────────────────────────────
-	if len(matches) > 0 {
+	// Skipped in coverage-only mode, which is meant to be a terse feedback view.
+	if !opts.coverageOnly && len(matches) > 0 {
 		writeGuide(w, matches)
 		fmt.Fprintln(w)
 	}
 
 	// ── component tree ────────────────────────────────────────────────────────
-	fmt.Fprintf(w, "--- component tree ---\n\n")
-	if root != nil {
-		comp := render.Filter(root, matches)
-		if comp != nil {
-			comp.Format(w, "", render.FormatOpts{
-				Selectors:   opts.selectors,
-				MaxDepth:    opts.maxDepth,
-				Interactive: opts.interactive,
-				PropValues:  opts.propValues,
-			})
+	// Coverage-only mode suppresses the (potentially huge) tree entirely.
+	if !opts.coverageOnly {
+		fmt.Fprintf(w, "--- component tree ---\n\n")
+		if root != nil {
+			comp := render.Filter(root, matches)
+			if comp != nil {
+				comp.Format(w, "", render.FormatOpts{
+					Selectors:   opts.selectors,
+					MaxDepth:    opts.maxDepth,
+					Interactive: opts.interactive,
+					PropValues:  opts.propValues,
+				})
+			}
 		}
 	}
 
@@ -486,7 +311,9 @@ func writeOutput(
 		writeCoverage(w, t1, t2, t3, total, opts.visibleOnly)
 
 		// ── Unlabeled clusters (--trace) ─────────────────────────────────────
-		if opts.trace {
+		// Coverage-only mode always shows the cluster traces — they are the point
+		// of the terse view (which orphans/ambiguous clusters still need work).
+		if opts.trace || opts.coverageOnly {
 			if len(t3nodes) > 0 {
 				fmt.Fprintln(w)
 				writeTrace(w, t3nodes, parentMap)

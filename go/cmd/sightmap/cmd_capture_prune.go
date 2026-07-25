@@ -1,5 +1,5 @@
-// snapshot-prune — drop captures that no longer add anything to their view's set
-// , the retrospective counterpart to the capture-time novelty gate.
+// capture-prune — drop captures that no longer add anything to their view's set,
+// the retrospective counterpart to the capture-time novelty gate.
 //
 // Because novelty is corpus-relative and re-computed against the CURRENT corpus,
 // a capture kept while the corpus was incomplete (it had unique orphans) becomes
@@ -18,8 +18,8 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-func runSnapshotPrune(args []string) error {
-	fs := flag.NewFlagSet("snapshot-prune", flag.ContinueOnError)
+func runCapturePrune(args []string) error {
+	fs := flag.NewFlagSet("capture-prune", flag.ContinueOnError)
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	dryRunFlag := fs.Bool("dry-run", false, "Report what would be pruned without deleting")
 	allFlag := fs.Bool("all", false, "Prune every view with captures")
@@ -28,7 +28,7 @@ func runSnapshotPrune(args []string) error {
 	}
 	rest := fs.Args()
 	if (*allFlag) == (len(rest) == 1) {
-		return fmt.Errorf("usage: sightmap snapshot-prune [--dry-run] (<view> | --all)")
+		return fmt.Errorf("usage: sightmap capture-prune [--dry-run] (<view> | --all)")
 	}
 
 	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))

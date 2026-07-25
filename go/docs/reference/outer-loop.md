@@ -7,10 +7,10 @@ See also: [Tool reference](tools.md) · [Quality checklist](quality-checklist.md
 
 ```
 browser start
-    └─ iterate URL              ← primary loop: navigate + snap + coverage
+    └─ snapshot --coverage URL  ← primary loop: navigate + coverage
            ├─ fix YAML
            ├─ validate
-           └─ iterate again
+           └─ snapshot --coverage again
                  └─ T3 = 0 ✓
                        └─ quality self-review
                              ├─ T2 triage (--trace)
@@ -18,7 +18,7 @@ browser start
                              └─ zero-match investigation
                                    └─ multi-coverage     ← cross-page promotion
                                          └─ report       ← corpus health
-                                               └─ snapshot --all
+                                               └─ capture --all
 ```
 
 ## Phase 0 — Session startup
@@ -33,16 +33,18 @@ The sightmap HTTP server starts automatically on port 7891 and hot-reloads on YA
 
 ## Phase 1 — Per-page iteration
 
-`iterate` is the primary edit-verify loop. It navigates, snaps, and prints coverage + T2/T3 trace in one step.
+`snapshot --coverage` is the primary edit-verify loop. It navigates, snaps, and prints coverage + T2/T3 trace in one step, suppressing the full tree.
 
 ```bash
-sightmap iterate 'https://example.com/products'
+sightmap snapshot --coverage --url 'https://example.com/products'
 ```
 
 Example output:
 
 ```
-[View: ProductListPage "https://example.com/products"]
+[View: ProductListPage]
+route: /products/**
+
 [Coverage] (visible only)
 87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
 
@@ -57,7 +59,7 @@ Largest T2 scopes:
     3× [SiteHeader]
 ```
 
-Edit `.sightmap/*.yaml`, then run `iterate` again. Repeat until T3 = 0.
+Edit `.sightmap/*.yaml`, then run `snapshot --coverage` again. Repeat until T3 = 0.
 
 When the output shows `T3 ✗`, the `Unlabeled clusters` section shows selector hints. Use `sel-probe` to validate a candidate before writing YAML.
 
@@ -69,7 +71,7 @@ sightmap sel-probe '[data-testid="product-pod"] button'
 
 1. Re-run with `--trace` to see T2 scope detail:
    ```bash
-   sightmap iterate --trace 'https://example.com/products'
+   sightmap snapshot --coverage --trace --url 'https://example.com/products'
    ```
 2. For each T2 scope with > 1 child: run `sel-probe` on candidate selectors. If nothing stable exists, classify and document (A/B/C/D) in `memory:`.
 3. Check every T1 interactive leaf has at least one property **in its ancestry chain** (either on the leaf itself or on a parent component).
@@ -96,5 +98,5 @@ sightmap validate            # structural correctness; exits non-zero on error
 sightmap lint --warn-only    # style checks; exits 0, advisory only
 
 sightmap report              # per-view T1/T2/T3 table + T2 quality analysis
-sightmap snapshot --all      # refresh a snap for every view URL in views/*.yaml (requires browser)
+sightmap capture --all       # refresh a capture for every view URL in views/*.yaml (requires browser)
 ```

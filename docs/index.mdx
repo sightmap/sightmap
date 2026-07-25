@@ -75,7 +75,7 @@ A bare accessibility snapshot has no view name, component identity, or indicatio
     `sightmap browser start` launches Chrome and a local corpus server that reloads the YAML when it changes.
   </Step>
   <Step title="Let an agent iterate">
-    Run `sightmap iterate <url>` for each route. The command snapshots the page and identifies unattributed interactive nodes. The agent names those components and runs it again until the view reports zero orphaned nodes.
+    Run `sightmap snapshot --coverage --url <url>` for each route. The command reads the page and identifies unattributed interactive nodes. The agent names those components and runs it again until the view reports zero orphaned nodes.
   </Step>
   <Step title="Check it in">
     Run `sightmap validate`, `sightmap lint`, and `sightmap report`, then commit `.sightmap/`. Sightmap-enabled agents and tools can now read the same checked-in context.

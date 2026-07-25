@@ -29,7 +29,7 @@ Several flags appear in multiple command groups:
 | `--sightmap-dir` | `.sightmap` | Path to the corpus directory |
 | `--addr` | `localhost:7892` | CDP address of the Chrome session (printed by `browser start`) |
 | `--tab` | the lone content tab | Target tab ID; required whenever two or more content tabs are open |
-| `--launch` | off | Auto-launch Chrome when `--addr` is unreachable (live analysis commands: `snapshot`, `inspect`, `suggest`, `gap`, `discover`, `sel-probe`) |
+| `--launch` | off | Auto-launch Chrome when `--addr` is unreachable (live analysis commands: `snapshot`, `capture`, `inspect`, `suggest`, `gap`, `discover`, `sel-probe`) |
 | `--include-hidden` | off | Count hidden and off-screen nodes too |
 
 **Address sessions by port and tab.** `sightmap browser start` launches Chrome with its DevTools endpoint on `localhost:7892` and the Sightmap HTTP server on port `7891`. Live commands use `--addr` to reach the session. When more than one content tab is open, page commands require `--tab` with the tab ID printed by `browser start`. See [Browser sessions](/cli/browser).
@@ -59,14 +59,14 @@ What counts as failure for the check-style commands:
   <Card title="Page interaction" icon="bolt" href="/cli/interaction">
     Click, fill, scroll, and screenshot the live page by component identity.
   </Card>
-  <Card title="Capturing pages" icon="map" href="/cli/capture">
-    Use `snapshot`, `inspect`, and `iterate` to inspect component trees.
+  <Card title="Snapshot & capture" icon="map" href="/cli/capture">
+    Use `snapshot` to observe component trees, `capture` to persist them, and `inspect` for the raw DOM.
   </Card>
   <Card title="Coverage" icon="chart-line" href="/cli/coverage">
     Use `coverage`, `multi-coverage`, and `report` to measure T1, T2, and T3 coverage.
   </Card>
   <Card title="View sets" icon="layer-group" href="/cli/snapshots">
-    Use `snapshot-novelty` and `snapshot-prune` to maintain each view's captures.
+    Use `capture-novelty` and `capture-prune` to maintain each view's captures.
   </Card>
   <Card title="Selector tools" icon="magnifying-glass" href="/cli/selectors">
     Verify selectors with `sel-probe`, `sel-check`, `suggest`, and `gap`.
@@ -93,7 +93,7 @@ What counts as failure for the check-style commands:
     From the site directory, run `sightmap browser start`. It launches Chrome, the Sightmap server, and the overlay extension ([Browser sessions](/cli/browser)).
   </Step>
   <Step title="Iterate on pages">
-    Capture annotated snapshots and close coverage gaps with `iterate`, `snapshot`, and the selector tools ([Capturing pages](/cli/capture), [Coverage](/cli/coverage)).
+    Observe annotated snapshots and close coverage gaps with `snapshot --coverage`, then persist captures with `capture` and the selector tools ([Snapshot & capture](/cli/capture), [Coverage](/cli/coverage)).
   </Step>
   <Step title="Check corpus health">
     Run `validate`, `lint`, and `report` ([Corpus checks](/cli/corpus), [Coverage](/cli/coverage)).
