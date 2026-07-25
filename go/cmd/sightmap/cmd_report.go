@@ -78,11 +78,10 @@ func runReport(args []string) error {
 		return err
 	}
 
-	cfg := loadSiteConfig(*sightmapDirFlag)
+	cfg := sightmap.LoadConfig(*sightmapDirFlag)
 
 	// Load corpus to get views with URLs
-	loader := sightmap.DirLoader(*sightmapDirFlag)
-	corpus, err := loader.Load()
+	corpus, err := sightmap.Load(*sightmapDirFlag)
 	if err != nil {
 		return fmt.Errorf("load corpus: %v", err)
 	}

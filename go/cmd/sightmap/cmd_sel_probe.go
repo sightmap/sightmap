@@ -385,12 +385,13 @@ func runSelProbeAll(args []string, sightmapDir, addr, tabID string, max int, ful
 	}
 	selector := args[0]
 
-	targets, err := corpusProbeTargets(sightmapDir)
+	corpus, err := sightmap.Load(sightmapDir)
+	if err != nil {
+		return fmt.Errorf("sel-probe --all: load corpus: %w", err)
+	}
+	targets, err := corpus.ProbeTargets()
 	if err != nil {
 		return err
-	}
-	if len(targets) == 0 {
-		return fmt.Errorf("no view URLs to probe — add url: (and optional snapshots[].url) to views/*.yaml")
 	}
 
 	ctx := context.Background()

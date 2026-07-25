@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func runBrowser(args []string) error {
@@ -331,7 +332,7 @@ func pollCDPReady(addr string) error {
 // mirroring browser start. Lets stop/status reap a profile's Chrome even when the
 // session file is gone.
 func defaultProfileDir() string {
-	cfg := loadSiteConfig(".sightmap")
+	cfg := sightmap.LoadConfig(".sightmap")
 	name := cfg.Name
 	if name == "" {
 		name = filepath.Base(cwd())

@@ -44,7 +44,7 @@ func runCapture(args []string) error {
 	{
 		explicit := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
-		cfg := loadSiteConfig(*lf.sightmapDir)
+		cfg := sightmap.LoadConfig(*lf.sightmapDir)
 		if !explicit["wait"] && cfg.Snapshot.Wait > 0 {
 			*lf.wait = cfg.Snapshot.Wait
 		}
@@ -129,12 +129,13 @@ func runCaptureAll(
 	jsonOut bool,
 	force bool,
 ) error {
-	targets, err := corpusProbeTargets(sightmapDir)
+	corpus, err := sightmap.Load(sightmapDir)
+	if err != nil {
+		return fmt.Errorf("capture --all: load corpus: %v", err)
+	}
+	targets, err := corpus.ProbeTargets()
 	if err != nil {
 		return err
-	}
-	if len(targets) == 0 {
-		return fmt.Errorf("no view URLs to capture — add url: (and optional snapshots[].url) to views/*.yaml")
 	}
 
 	ctx := context.Background()
@@ -143,11 +144,6 @@ func runCaptureAll(
 		return fmt.Errorf("capture --all: %w", err)
 	}
 	defer conn.Close()
-
-	corpus, err := sightmap.Load(sightmapDir)
-	if err != nil {
-		return fmt.Errorf("capture --all: load corpus: %v", err)
-	}
 
 	type result struct {
 		name              string

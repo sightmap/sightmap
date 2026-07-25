@@ -23,8 +23,7 @@ func runLint(args []string) error {
 		return err
 	}
 
-	loader := sightmap.DirLoader(*sightmapDir)
-	corpus, err := loader.Load()
+	corpus, err := sightmap.Load(*sightmapDir)
 	if err != nil {
 		return fmt.Errorf("load corpus: %w", err)
 	}

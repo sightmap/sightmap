@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func runBrowserStart(args []string) error {
@@ -33,7 +34,7 @@ func runBrowserStart(args []string) error {
 	}
 
 	// Apply .sightmap/config.yaml defaults for flags not explicitly set.
-	cfg := loadSiteConfig(*sightmapDir)
+	cfg := sightmap.LoadConfig(*sightmapDir)
 	{
 		explicit := map[string]bool{}
 		fset.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
