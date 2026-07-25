@@ -45,16 +45,19 @@ func runCaptureNovelty(args []string) error {
 		return fmt.Errorf("capture-novelty: not a capture path: %s", rest[0])
 	}
 
-	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
+	corpus, err := sightmap.Load(*sightmapDirFlag)
+	if err != nil {
+		return fmt.Errorf("capture-novelty: load corpus: %v", err)
+	}
 
-	candSlots, ok := extractCaptureSlots(candidate, sess)
+	candSlots, ok := extractCaptureSlots(candidate, corpus)
 	if !ok {
 		return fmt.Errorf("capture-novelty: cannot read candidate tree (%s.tree.json)", candidate)
 	}
 
 	// The rest of the candidate's view set, re-matched against the current corpus
 	// (the candidate itself excluded).
-	others := loadViewSlots(*sightmapDirFlag, view, sess, candidate)
+	others := loadViewSlots(*sightmapDirFlag, view, corpus, candidate)
 
 	res := computeNovelty(candSlots, others)
 	printNovelty(view, filepath.Base(candidate), res)
@@ -85,7 +88,7 @@ func slotsFromMatch(
 // extractCaptureSlots re-matches a saved capture against the current corpus and
 // returns its component-type / orphan-slot fingerprint. Visible nodes only,
 // matching the coverage default.
-func extractCaptureSlots(snapPath string, sess *sightmap.Session) (captureSlots, bool) {
+func extractCaptureSlots(snapPath string, corpus *sightmap.Corpus) (captureSlots, bool) {
 	data, err := os.ReadFile(snapPath + ".tree.json")
 	if err != nil {
 		return captureSlots{}, false
@@ -94,17 +97,14 @@ func extractCaptureSlots(snapPath string, sess *sightmap.Session) (captureSlots,
 	if json.Unmarshal(data, &root) != nil {
 		return captureSlots{}, false
 	}
-	matches, err := sess.MatchTree(&root, parseSnapRoute(snapPath))
-	if err != nil {
-		return captureSlots{}, false
-	}
+	matches := corpus.MatchTree(&root, parseSnapRoute(snapPath))
 	cov := coverage.Score(&root, matches, coverage.Options{VisibleOnly: true})
 	return slotsFromMatch(matches, cov.Orphans, cov.ParentMap), true
 }
 
 // loadViewSlots re-matches every capture currently in the view's set against the
 // current corpus, optionally excluding one path.
-func loadViewSlots(sightmapDir, viewBasename string, sess *sightmap.Session, excludePath string) []captureSlots {
+func loadViewSlots(sightmapDir, viewBasename string, corpus *sightmap.Corpus, excludePath string) []captureSlots {
 	all, _ := findSnapshots(sightmapDir, nil)
 	entries := groupSnapshotsByView(all)[viewBasename]
 	excl := filepath.ToSlash(excludePath)
@@ -113,7 +113,7 @@ func loadViewSlots(sightmapDir, viewBasename string, sess *sightmap.Session, exc
 		if excl != "" && filepath.ToSlash(e.Path) == excl {
 			continue
 		}
-		if cs, ok := extractCaptureSlots(e.Path, sess); ok {
+		if cs, ok := extractCaptureSlots(e.Path, corpus); ok {
 			cs.Stamp = e.Stamp
 			out = append(out, cs)
 		}
@@ -124,9 +124,8 @@ func loadViewSlots(sightmapDir, viewBasename string, sess *sightmap.Session, exc
 // noveltyGate decides whether a freshly extracted capture should be written to
 // its view's set. The first capture of a view always writes; force
 // bypasses the gate. Returns the novelty result and the write decision.
-func noveltyGate(sightmapDir, viewBasename string, cand captureSlots, force bool) (noveltyResult, bool) {
-	sess := sightmap.NewSession(sightmap.DirLoader(sightmapDir))
-	others := loadViewSlots(sightmapDir, viewBasename, sess, "")
+func noveltyGate(corpus *sightmap.Corpus, sightmapDir, viewBasename string, cand captureSlots, force bool) (noveltyResult, bool) {
+	others := loadViewSlots(sightmapDir, viewBasename, corpus, "")
 	res := computeNovelty(cand, others)
 	return res, force || len(others) == 0 || res.IsNovel()
 }

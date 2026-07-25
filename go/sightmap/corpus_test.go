@@ -402,11 +402,7 @@ func TestMatchTreeEndToEnd(t *testing.T) {
 		},
 	}
 
-	sess := sightmap.NewSession(sightmap.StaticLoader(corpus))
-	matches, err := sess.MatchTree(root, "https://example.com/search")
-	if err != nil {
-		t.Fatalf("MatchTree: %v", err)
-	}
+	matches := corpus.MatchTree(root, "https://example.com/search")
 
 	// formNode → SearchForm
 	m := mustMatch(t, matches, formNode, "formNode")
@@ -438,54 +434,6 @@ func TestMatchTreeEndToEnd(t *testing.T) {
 	}
 }
 
-// ---- 7. Refresh invalidates cache -------------------------------------------
-
-func TestRefresh(t *testing.T) {
-	corpus1 := &sightmap.Corpus{
-		GlobalComponents: []match.SightmapComponent{
-			{Name: "V1Comp", Selectors: []string{"#v1"}},
-		},
-	}
-	corpus2 := &sightmap.Corpus{
-		GlobalComponents: []match.SightmapComponent{
-			{Name: "V2Comp", Selectors: []string{"#v2"}},
-		},
-	}
-
-	ml := &mutLoader{corpus: corpus1}
-	sess := sightmap.NewSession(ml)
-
-	// Before refresh: lazily loads corpus1.
-	result1, err := sess.Components("https://example.com/page")
-	if err != nil {
-		t.Fatalf("Components before refresh: %v", err)
-	}
-	if !hasComp(result1, "V1Comp") {
-		t.Errorf("before refresh: want V1Comp in %v", compNames(result1))
-	}
-	if hasComp(result1, "V2Comp") {
-		t.Error("before refresh: V2Comp should not be present")
-	}
-
-	// Swap the backing corpus and refresh.
-	ml.setCorpus(corpus2)
-	if err := sess.Refresh(); err != nil {
-		t.Fatalf("Refresh: %v", err)
-	}
-
-	// After refresh: corpus2 is used, cache is invalidated.
-	result2, err := sess.Components("https://example.com/page")
-	if err != nil {
-		t.Fatalf("Components after refresh: %v", err)
-	}
-	if hasComp(result2, "V1Comp") {
-		t.Error("after refresh: V1Comp should be gone")
-	}
-	if !hasComp(result2, "V2Comp") {
-		t.Errorf("after refresh: want V2Comp in %v", compNames(result2))
-	}
-}
-
 // ---- 8. Concurrent safety (run with -race) ----------------------------------
 
 func TestConcurrentSafety(t *testing.T) {
@@ -504,8 +452,6 @@ func TestConcurrentSafety(t *testing.T) {
 		},
 	}
 
-	sess := sightmap.NewSession(sightmap.StaticLoader(corpus))
-
 	const goroutines = 30
 	var wg sync.WaitGroup
 	wg.Add(goroutines)
@@ -516,11 +462,7 @@ func TestConcurrentSafety(t *testing.T) {
 			defer wg.Done()
 			// Use a few distinct URLs to exercise the multi-key cache path.
 			url := fmt.Sprintf("https://example.com/page/%d", i%5)
-			matches, err := sess.MatchTree(root, url)
-			if err != nil {
-				errs[i] = err
-				return
-			}
+			matches := corpus.MatchTree(root, url)
 			if _, ok := matches[buttonNode]; !ok {
 				errs[i] = fmt.Errorf("goroutine %d: button not matched", i)
 			}
@@ -535,72 +477,7 @@ func TestConcurrentSafety(t *testing.T) {
 	}
 }
 
-// Concurrent Refresh + MatchTree must not race.
-func TestConcurrentRefresh(t *testing.T) {
-	corpus1 := &sightmap.Corpus{
-		GlobalComponents: []match.SightmapComponent{
-			{Name: "Button", Selectors: []string{"button"}},
-		},
-	}
-	corpus2 := &sightmap.Corpus{
-		GlobalComponents: []match.SightmapComponent{
-			{Name: "Button", Selectors: []string{"button"}},
-		},
-	}
-
-	buttonNode := &comps.ComponentNode{
-		Id:       "btn",
-		Selector: &comps.SelectorPart{Tag: "button"},
-	}
-	root := &comps.ComponentNode{
-		Id:       "root",
-		Children: []*comps.ComponentNode{buttonNode},
-	}
-
-	ml := &mutLoader{corpus: corpus1}
-	sess := sightmap.NewSession(ml)
-
-	var wg sync.WaitGroup
-	const goroutines = 20
-
-	// Half goroutines call MatchTree, other half call Refresh.
-	wg.Add(goroutines)
-	for i := range goroutines {
-		if i%2 == 0 {
-			go func() {
-				defer wg.Done()
-				_, _ = sess.MatchTree(root, "https://example.com/")
-			}()
-		} else {
-			go func() {
-				defer wg.Done()
-				ml.setCorpus(corpus2)
-				_ = sess.Refresh()
-			}()
-		}
-	}
-	wg.Wait()
-}
-
 // ---- test helpers -----------------------------------------------------------
-
-// mutLoader is a thread-safe Loader whose backing corpus can be swapped.
-type mutLoader struct {
-	mu     sync.Mutex
-	corpus *sightmap.Corpus
-}
-
-func (m *mutLoader) Load() (*sightmap.Corpus, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.corpus, nil
-}
-
-func (m *mutLoader) setCorpus(c *sightmap.Corpus) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.corpus = c
-}
 
 func writeFile(t *testing.T, path, content string) {
 	t.Helper()

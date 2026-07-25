@@ -101,8 +101,6 @@ func runReport(args []string) error {
 	// visibleOnly: visible-by-default; overridden by include_hidden: true in config.
 	visibleOnly := cfg.VisibleOnly()
 
-	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
-
 	type viewResult struct {
 		name    string
 		url     string
@@ -126,7 +124,7 @@ func runReport(args []string) error {
 		var caps []captureCoverage
 		route := ""
 		for _, e := range set {
-			root, matches, capRoute, ok := matchCapture(e.Path, sess)
+			root, matches, capRoute, ok := matchCapture(e.Path, corpus)
 			if !ok {
 				continue
 			}

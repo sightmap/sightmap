@@ -4,11 +4,15 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/sightmap/sightmap/go/match"
 )
 
-// Corpus is the parsed, $ref-expanded, hierarchy-flattened sightmap data.
+// Corpus is the parsed, $ref-expanded, hierarchy-flattened sightmap data, plus a
+// lazily-populated cache of compiled match queries. It is the single operational
+// handle callers hold: load one with Load (or a Loader), then MatchTree a live
+// component tree against it. Safe for concurrent use.
 type Corpus struct {
 	// GlobalComponents is the flat list of globally-defined components
 	// (from components.yaml), with children already flattened.
@@ -17,6 +21,10 @@ type Corpus struct {
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
 	Views []View
+
+	// mu guards the lazily-built compiled-query cache.
+	mu    sync.Mutex
+	cache map[string]*queryCacheEntry
 }
 
 // Access describes the reachability of a view for the reference capture account.

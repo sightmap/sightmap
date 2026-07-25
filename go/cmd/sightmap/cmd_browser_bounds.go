@@ -74,7 +74,7 @@ func runBounds(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -163,11 +163,11 @@ func boundsByComponent(
 		return nil, fmt.Errorf("bounds: get URL: %w", err)
 	}
 
-	sess := sightmap.NewSession(sightmap.DirLoader(sightmapDir))
-	matches, err := sess.MatchTree(root, pageURL)
+	corpus, err := sightmap.Load(sightmapDir)
 	if err != nil {
-		return nil, fmt.Errorf("bounds: sightmap match: %w", err)
+		return nil, fmt.Errorf("bounds: load corpus: %w", err)
 	}
+	matches := corpus.MatchTree(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("bounds: no sightmap components matched the current page (%s)", pageURL)
 	}

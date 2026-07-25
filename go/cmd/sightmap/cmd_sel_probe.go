@@ -235,7 +235,7 @@ func selProbeConnect(ctx context.Context, addr string, launch bool, tabID string
 				return conn, nil, nil
 			}
 		} else if len(tabs) > 1 {
-			return nil, nil, fmt.Errorf("sel-probe: %w", ambiguousTabError(tabs))
+			return nil, nil, fmt.Errorf("sel-probe: %w", browser.AmbiguousTabError(tabs))
 		}
 	}
 
@@ -300,11 +300,11 @@ func loadCompAnnotations(dir string) []compAnnotation {
 		return nil
 	}
 
-	sess := sightmap.NewSession(sightmap.DirLoader(dir))
-	components, err := sess.Components("")
+	corpus, err := sightmap.Load(dir)
 	if err != nil {
 		return nil
 	}
+	components := corpus.Components("")
 
 	annotations := make([]compAnnotation, 0, len(components))
 	for _, comp := range components {
@@ -442,7 +442,7 @@ func runSelProbeAll(args []string, sightmapDir, addr, tabID string, max int, ful
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(addr, tabID)
+	conn, err := browser.Connect(addr, tabID)
 	if err != nil {
 		return fmt.Errorf("sel-probe --all: %w", err)
 	}
