@@ -67,6 +67,10 @@ func main() {
 		err = runReport(args)
 	case "sel-check", "sel_check":
 		err = runSelCheck(args)
+	case "console":
+		err = runConsole(args)
+	case "network":
+		err = runNetwork(args)
 	case "skills":
 		err = runSkills(args)
 	case "version", "--version", "-v":
@@ -112,6 +116,11 @@ Commands:
   search   [--field FIELD] PATTERN                           offline YAML content search
   discover [--all]                                           URL pattern discovery
   serve-sightmap [--port N] [--sightmap-dir DIR]             sightmap HTTP server for overlay extension
+
+  console  list [--level L] [--tab T] [--limit N]            captured console messages (needs a running session)
+  console  get INDEX                                         one console message by index
+  network  list [--type T] [--url SUBSTR] [--tab T] [--limit N]  captured network requests
+  network  get INDEX [--response-file F] [--request-file F]  one request + body by index
 
   skills install [--target DIR]                             install sightmap authoring skill to ~/.agents/skills/
   version                                                    print version and exit
