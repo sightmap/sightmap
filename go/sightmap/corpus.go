@@ -130,7 +130,7 @@ func (c *Corpus) ViewForURL(pageURL string) *View {
 		path = "/"
 	}
 	for i := range c.Views {
-		if matchRoute(c.Views[i].Route, path) {
+		if MatchRoute(c.Views[i].Route, path) {
 			v := c.Views[i] // copy so caller doesn't share Corpus internals
 			return &v
 		}
@@ -138,10 +138,10 @@ func (c *Corpus) ViewForURL(pageURL string) *View {
 	return nil
 }
 
-// matchRoute reports whether the glob-style route pattern matches path.
+// MatchRoute reports whether the glob-style route pattern matches path.
 // ** matches any sequence of characters including slashes (one or more).
 // *  matches a single path segment (no slashes).
-func matchRoute(pattern, path string) bool {
+func MatchRoute(pattern, path string) bool {
 	re := regexp.MustCompile(routeToRegex(pattern))
 	return re.MatchString(path)
 }
