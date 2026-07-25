@@ -7,24 +7,18 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
-	"time"
+	"io"
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/render"
-	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func runInspect(args []string) error {
 	fs := flag.NewFlagSet("inspect", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
-	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
-	urlFlag := fs.String("url", "", "Navigate to this URL before inspecting")
-	waitFlag := fs.Float64("wait", 0, "Seconds to wait after navigation (minimum 0.5 when --url is used)")
+	lf := addLiveFlags(fs, "inspect")
 	outFlag := fs.String("out", "", "Write output to file instead of stdout")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir for ★ annotations")
 	classesFlag := fs.Bool("classes", false, "Show CSS class names in selector display")
 	selectorsFlag := fs.Bool("selectors", false, "Show all attributes, not just key identifying ones")
 	depthFlag := fs.Int("depth", 0, "Max tree depth to print (0 = unlimited)")
@@ -35,50 +29,19 @@ func runInspect(args []string) error {
 
 	ctx := context.Background()
 
-	// ── Connect to Chrome ────────────────────────────────────────────────────
-	cleanup := func() {}
-	defer func() { cleanup() }()
+	conn, cleanup, err := lf.connect(ctx)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 
-	conn, dialErr := browser.DialCDP(ctx, *addrFlag)
-	if dialErr != nil {
-		if !*launchFlag {
-			return fmt.Errorf(
-				"inspect: cannot connect to Chrome at %s\n"+
-					"Start a session first:\n"+
-					"  inspect --launch --url https://...    (auto-launch Chrome)\n"+
-					"  /path/to/chrome --remote-debugging-port=7892 --user-data-dir=/tmp/cdp",
-				*addrFlag,
-			)
-		}
-		var launchCleanup func()
-		var launchErr error
-		conn, launchCleanup, launchErr = browser.Launch(ctx, browser.LaunchOptions{})
-		if launchErr != nil {
-			return fmt.Errorf("cannot launch Chrome: %v", launchErr)
-		}
-		if launchCleanup != nil {
-			cleanup = launchCleanup
-		}
-	} else {
-		cleanup = func() { conn.Close() }
+	// A minimum 0.5s settle applies when --url is used, so freshly-navigated
+	// content is present before extraction.
+	if err := lf.navigate(ctx, conn, navOpts{minWait: 0.5}); err != nil {
+		return err
 	}
 
-	// ── Navigate ─────────────────────────────────────────────────────────────
-	if *urlFlag != "" {
-		if err := browser.NavigateAndWait(ctx, conn, *urlFlag); err != nil {
-			return fmt.Errorf("navigate: %v", err)
-		}
-		// Minimum 0.5s wait when --url is used; --wait overrides upward only.
-		wait := *waitFlag
-		if wait < 0.5 {
-			wait = 0.5
-		}
-		time.Sleep(time.Duration(wait * float64(time.Second)))
-	} else if *waitFlag > 0 {
-		time.Sleep(time.Duration(*waitFlag * float64(time.Second)))
-	}
-
-	// ── Extract ───────────────────────────────────────────────────────────────
+	// ── Extract ──────────────────────────────────────────────────────────
 	pageURL, err := browser.GetURL(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("get URL: %v", err)
@@ -93,12 +56,10 @@ func runInspect(args []string) error {
 		return fmt.Errorf("extract components: %v", err)
 	}
 
-	// ── Load sightmap (optional, silent on error) ─────────────────────────────
+	// ── Load sightmap (optional, silent on error) ────────────────────────
 	var inspectMatches map[*comps.ComponentNode]*match.SightmapMatch
-	if _, statErr := os.Stat(*sightmapDirFlag); statErr == nil {
-		if corpus, cErr := sightmap.Load(*sightmapDirFlag); cErr == nil {
-			inspectMatches = corpus.MatchTree(root, pageURL)
-		}
+	if corpus, _ := lf.loadCorpus(); corpus != nil {
+		inspectMatches = corpus.MatchTree(root, pageURL)
 	}
 
 	// ── Render ────────────────────────────────────────────────────────────────
@@ -110,24 +71,9 @@ func runInspect(args []string) error {
 		Interactive: *interactiveFlag,
 	}
 
-	// ── Write output ─────────────────────────────────────────────────────────
-	if *outFlag != "" {
-		tmpPath := *outFlag + ".tmp"
-		f, ferr := os.Create(tmpPath)
-		if ferr != nil {
-			return fmt.Errorf("create output file: %v", ferr)
-		}
-		render.FormatInspect(f, inRoot, opts)
-		if cerr := f.Close(); cerr != nil {
-			os.Remove(tmpPath)
-			return fmt.Errorf("close output file: %v", cerr)
-		}
-		if rerr := os.Rename(tmpPath, *outFlag); rerr != nil {
-			os.Remove(tmpPath)
-			return fmt.Errorf("rename output file: %v", rerr)
-		}
-	} else {
-		render.FormatInspect(os.Stdout, inRoot, opts)
-	}
-	return nil
+	// ── Write output ──────────────────────────────────────────────────────
+	return writeOut(*outFlag, func(w io.Writer) error {
+		render.FormatInspect(w, inRoot, opts)
+		return nil
+	})
 }

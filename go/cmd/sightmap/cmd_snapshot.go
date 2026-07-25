@@ -8,14 +8,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
-	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/observe"
-	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // snapshot is a PURE OBSERVE command: it connects, navigates, extracts, matches
@@ -24,12 +22,8 @@ import (
 // persisting a capture is the separate `capture` command's job.
 func runSnapshot(args []string) error {
 	fs := flag.NewFlagSet("snapshot", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
-	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
-	urlFlag := fs.String("url", "", "Navigate to this URL before snapping")
-	waitFlag := fs.Float64("wait", 0, "Extra seconds to wait after DOM stability is detected (default 0; use for unusually slow pages)")
+	lf := addLiveFlags(fs, "snapshot")
 	outFlag := fs.String("out", "", "Write the annotated output to this file instead of stdout")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	interactiveFlag := fs.Bool("interactive", false, "Show interactive nodes only")
 	depthFlag := fs.Int("depth", 0, "Max tree depth (0 = unlimited)")
 	traceFlag := fs.Bool("trace", false, "Include selector hints for unlabeled interactive clusters")
@@ -40,7 +34,6 @@ func runSnapshot(args []string) error {
 	treeOutFlag := fs.String("tree-out", "", "Write raw ComponentNode tree JSON to this file (enables offline coverage/multi-coverage)")
 	jsonOutFlag := fs.String("json", "", "Write annotated tree JSON to this file (superset of --tree-out: includes component name, memory, extracted props)")
 	screenshotFlag := fs.String("screenshot", "", "Save a PNG screenshot to this file alongside the tree")
-	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -49,9 +42,9 @@ func runSnapshot(args []string) error {
 	{
 		explicit := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
-		cfg := loadSiteConfig(*sightmapDirFlag)
+		cfg := loadSiteConfig(*lf.sightmapDir)
 		if !explicit["wait"] && cfg.Snapshot.Wait > 0 {
-			*waitFlag = cfg.Snapshot.Wait
+			*lf.wait = cfg.Snapshot.Wait
 		}
 		if !explicit["include-hidden"] && cfg.Snapshot.IncludeHidden {
 			*includeHiddenFlag = true
@@ -68,55 +61,20 @@ func runSnapshot(args []string) error {
 
 	ctx := context.Background()
 
-	// ── Connect to Chrome ────────────────────────────────────────────────────
-	cleanup := func() {}
-	defer func() { cleanup() }()
-
-	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
-	if dialErr != nil {
-		if !*launchFlag {
-			return fmt.Errorf(
-				"snapshot: cannot connect to Chrome at %s\n"+
-					"Start a session first:\n"+
-					"  snapshot --launch --url https://...    (auto-launch Chrome)\n"+
-					"  /path/to/chrome --remote-debugging-port=7892 --user-data-dir=/tmp/cdp",
-				*addrFlag,
-			)
-		}
-		var launchCleanup func()
-		var launchErr error
-		conn, launchCleanup, launchErr = browser.Launch(ctx, browser.LaunchOptions{})
-		if launchErr != nil {
-			return fmt.Errorf("cannot launch Chrome: %v", launchErr)
-		}
-		if launchCleanup != nil {
-			cleanup = launchCleanup
-		}
-	} else {
-		cleanup = func() { conn.Close() }
+	conn, cleanup, err := lf.connect(ctx)
+	if err != nil {
+		return err
 	}
+	defer cleanup()
 
-	// ── Navigate ─────────────────────────────────────────────────────────────
-	if *urlFlag != "" {
-		// NavigateAndWaitIdle waits for loadEventFired then networkIdle — the
-		// correct signal for React/SPA pages where the a11y tree is populated
-		// only after async data fetches complete.
-		if err := browser.NavigateAndWaitIdle(ctx, conn, *urlFlag, 8*time.Second); err != nil {
-			return fmt.Errorf("navigate: %v", err)
-		}
-	}
-	if *waitFlag > 0 {
-		time.Sleep(time.Duration(*waitFlag * float64(time.Second)))
+	if err := lf.navigate(ctx, conn, navOpts{idle: true}); err != nil {
+		return err
 	}
 
 	// ── Observe (extract + match + coverage + properties) ──────────────────────
-	var corpus *sightmap.Corpus
-	if _, statErr := os.Stat(*sightmapDirFlag); statErr == nil {
-		if c, cErr := sightmap.Load(*sightmapDirFlag); cErr != nil {
-			fmt.Fprintf(os.Stderr, "snapshot: load corpus: %v\n", cErr)
-		} else {
-			corpus = c
-		}
+	corpus, cErr := lf.loadCorpus()
+	if cErr != nil {
+		fmt.Fprintf(os.Stderr, "snapshot: load corpus: %v\n", cErr)
 	}
 	res, err := observe.Page(ctx, conn, corpus, observe.Options{VisibleOnly: visible, ExtractProps: true})
 	if err != nil {
@@ -158,30 +116,10 @@ func runSnapshot(args []string) error {
 	// ── Write output ───────────────────────────────────────────────────────────
 	// snapshot only ever writes the rendered output to stdout or an explicit
 	// --out FILE. It never appends to the corpus capture set (that is `capture`).
-	if *outFlag != "" {
-		if dir := filepath.Dir(*outFlag); dir != "." {
-			if mkdirErr := os.MkdirAll(dir, 0o755); mkdirErr != nil {
-				return fmt.Errorf("create output directory: %v", mkdirErr)
-			}
-		}
-		tmpPath := *outFlag + ".tmp"
-		f, ferr := os.Create(tmpPath)
-		if ferr != nil {
-			return fmt.Errorf("create output file: %v", ferr)
-		}
-		observe.Format(f, res, fmtOpts)
-		if cerr := f.Close(); cerr != nil {
-			os.Remove(tmpPath)
-			return fmt.Errorf("close output file: %v", cerr)
-		}
-		if rerr := os.Rename(tmpPath, *outFlag); rerr != nil {
-			os.Remove(tmpPath)
-			return fmt.Errorf("rename output file: %v", rerr)
-		}
-	} else {
-		observe.Format(os.Stdout, res, fmtOpts)
-	}
-	return nil
+	return writeOut(*outFlag, func(w io.Writer) error {
+		observe.Format(w, res, fmtOpts)
+		return nil
+	})
 }
 
 // ── Output sections ───────────────────────────────────────────────────────────

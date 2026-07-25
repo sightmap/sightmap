@@ -4,22 +4,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"sort"
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
-	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func runGap(args []string) error {
 	fs := flag.NewFlagSet("gap", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
-	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
-	urlFlag := fs.String("url", "", "Navigate to this URL before extracting")
+	lf := addLiveFlags(fs, "gap")
 	includeHiddenFlag := fs.Bool("include-hidden", false, "Include hidden/off-screen nodes in gap analysis")
 	scopeFlag := fs.String("scope", "", "Filter gaps to components within named component's subtree")
 	if err := fs.Parse(args); err != nil {
@@ -28,36 +22,17 @@ func runGap(args []string) error {
 
 	ctx := context.Background()
 
-	// ── Connect to Chrome ────────────────────────────────────────────────────
-	cleanup := func() {}
-	defer func() { cleanup() }()
+	conn, cleanup, err := lf.connect(ctx)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 
-	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
-	if dialErr != nil {
-		if !*launchFlag {
-			return dialErr
-		}
-		var launchCleanup func()
-		var launchErr error
-		conn, launchCleanup, launchErr = browser.Launch(ctx, browser.LaunchOptions{})
-		if launchErr != nil {
-			return fmt.Errorf("gap: cannot launch Chrome: %v", launchErr)
-		}
-		if launchCleanup != nil {
-			cleanup = launchCleanup
-		}
-	} else {
-		cleanup = func() { conn.Close() }
+	if err := lf.navigate(ctx, conn, navOpts{}); err != nil {
+		return err
 	}
 
-	// ── Optionally navigate ──────────────────────────────────────────────────
-	if *urlFlag != "" {
-		if err := browser.NavigateAndWait(ctx, conn, *urlFlag); err != nil {
-			return fmt.Errorf("gap: navigate: %v", err)
-		}
-	}
-
-	// ── Extract component tree ───────────────────────────────────────────────
+	// ── Extract component tree ────────────────────────────────────────
 	pageURL, err := browser.GetURL(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("gap: get URL: %v", err)
@@ -73,14 +48,10 @@ func runGap(args []string) error {
 		return fmt.Errorf("gap: extract components: %v", err)
 	}
 
-	// ── Require .sightmap dir ────────────────────────────────────────────────
-	if _, statErr := os.Stat(*sightmapDirFlag); statErr != nil {
-		return fmt.Errorf("gap: sightmap dir %q not found — run 'sightmap validate' to check setup", *sightmapDirFlag)
-	}
-
-	corpus, loadErr := sightmap.Load(*sightmapDirFlag)
+	// ── Require .sightmap dir ────────────────────────────────────────
+	corpus, loadErr := lf.requireCorpus()
 	if loadErr != nil {
-		return fmt.Errorf("gap: load corpus: %v", loadErr)
+		return loadErr
 	}
 	matches := corpus.MatchTree(root, pageURL)
 
