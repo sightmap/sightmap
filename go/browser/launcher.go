@@ -298,9 +298,15 @@ func sessionFilePath() string {
 }
 
 // pollCDPReady polls http://ADDR/json/version every 100 ms until Chrome
-// responds or the deadline (10 s) / ctx is exceeded.
+// responds or the context deadline (10 s when the ctx has none) is exceeded.
 func pollCDPReady(ctx context.Context, addr string) error {
-	deadline := time.Now().Add(10 * time.Second)
+	// Honor the caller's deadline so a caller that budgets more startup time (a
+	// cold, loaded CI runner can need well over 10s to bind the debug port) gets
+	// it. Fall back to 10s only when the context is deadline-less.
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(10 * time.Second)
+	}
 	for {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -314,7 +320,7 @@ func pollCDPReady(ctx context.Context, addr string) error {
 			return nil
 		}
 		if time.Now().After(deadline) {
-			return fmt.Errorf("chrome did not become ready within 10s at %s: %w", addr, err)
+			return fmt.Errorf("chrome did not become ready at %s: %w", addr, err)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
