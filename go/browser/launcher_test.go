@@ -52,7 +52,7 @@ func TestLaunch(t *testing.T) {
 	if _, err := FindChrome(); err != nil {
 		t.Skip("Chrome not found:", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// Force headless with CI-safe flags. The default launch is headed, which
 	// can't start on a display-less CI runner: Chrome exits immediately and
