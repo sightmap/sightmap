@@ -19,10 +19,7 @@ import (
 
 func runSuggest(args []string) error {
 	fs := flag.NewFlagSet("suggest", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
-	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
+	lf := addLiveFlags(fs, "suggest")
 	maxFlag := fs.Int("max", 20, "Max candidates to show")
 	excludeKnownFlag := fs.Bool("exclude-known", false, "Exclude elements already matched by a known sightmap component")
 	minCountFlag := fs.Int("min-count", 1, "Only show candidates matching >= N elements")
@@ -34,45 +31,26 @@ func runSuggest(args []string) error {
 
 	ctx := context.Background()
 
-	// ── Connect to Chrome ────────────────────────────────────────────────────
-	cleanup := func() {}
-	defer func() { cleanup() }()
-
-	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
-	if dialErr != nil {
-		if !*launchFlag {
-			return dialErr
-		}
-		var launchCleanup func()
-		var launchErr error
-		conn, launchCleanup, launchErr = browser.Launch(ctx, browser.LaunchOptions{})
-		if launchErr != nil {
-			return fmt.Errorf("suggest: cannot launch Chrome: %v", launchErr)
-		}
-		if launchCleanup != nil {
-			cleanup = launchCleanup
-		}
-	} else {
-		cleanup = func() { conn.Close() }
+	conn, cleanup, err := lf.connect(ctx)
+	if err != nil {
+		return err
 	}
+	defer cleanup()
 
-	// ── Scan the live DOM for selector candidates ────────────────────────────
+	// ── Scan the live DOM for selector candidates ───────────────────────
 	candidates, err := authoring.ScanCandidates(ctx, conn, *maxFlag)
 	if err != nil {
 		return fmt.Errorf("suggest: %v", err)
 	}
 
-	// ── Optionally filter out known sightmap components ──────────────────────
+	// ── Optionally filter out known sightmap components ────────────────────
 	var knownSelectors []string
 	if *excludeKnownFlag {
-		if _, statErr := os.Stat(*sightmapDirFlag); statErr == nil {
-			if corpus, loadErr := sightmap.Load(*sightmapDirFlag); loadErr == nil {
-				for _, c := range corpus.Components("") {
-					knownSelectors = append(knownSelectors, c.Selectors...)
-				}
+		if corpus, _ := lf.loadCorpus(); corpus != nil {
+			for _, c := range corpus.Components("") {
+				knownSelectors = append(knownSelectors, c.Selectors...)
 			}
 		}
-		// If dir doesn't exist, skip silently.
 	}
 
 	// ── Apply filters ────────────────────────────────────────────────────────
@@ -105,7 +83,7 @@ func runSuggest(args []string) error {
 	// ── Grouped output ───────────────────────────────────────────────────────
 	if *groupFlag {
 		// Build the sightmapId → matchName map.
-		sightmapMatchMap, mapErr := buildSightmapMatchMapForSuggest(ctx, conn, *snapFlag, *sightmapDirFlag)
+		sightmapMatchMap, mapErr := buildSightmapMatchMapForSuggest(ctx, conn, *snapFlag, *lf.sightmapDir)
 		if mapErr != nil {
 			return fmt.Errorf("suggest: --group: %v", mapErr)
 		}

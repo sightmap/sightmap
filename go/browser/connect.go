@@ -7,6 +7,32 @@ import (
 	"strings"
 )
 
+// ConnectOrLaunch attaches to a running Chrome session, or launches a fresh
+// headed one when launch is true and no session is reachable. It returns the
+// connection and a cleanup func the caller must defer: Close for an attached
+// session, or full process teardown for a launched one. When launch is false and
+// nothing is reachable, the connect error is returned unwrapped so callers can
+// present their own guidance. This is the single connection primitive every
+// page-affecting command (and external callers that own the browser lifecycle)
+// should build on.
+func ConnectOrLaunch(ctx context.Context, addr, tabID string, launch bool) (*CDPConn, func(), error) {
+	conn, err := Connect(addr, tabID)
+	if err == nil {
+		return conn, func() { conn.Close() }, nil
+	}
+	if !launch {
+		return nil, nil, err
+	}
+	lconn, cleanup, lerr := Launch(ctx, LaunchOptions{})
+	if lerr != nil {
+		return nil, nil, fmt.Errorf("cannot launch Chrome: %w", lerr)
+	}
+	if cleanup == nil {
+		cleanup = func() {}
+	}
+	return lconn, cleanup, nil
+}
+
 // Connect attaches to a running Chrome session for a page-affecting command.
 // With an explicit tabID it connects to that tab. Without one it auto-selects
 // the single open CONTENT tab, but errors (listing the tabs) when there are zero

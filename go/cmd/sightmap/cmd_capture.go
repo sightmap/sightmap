@@ -15,8 +15,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -29,18 +29,13 @@ import (
 
 func runCapture(args []string) error {
 	fs := flag.NewFlagSet("capture", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
-	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
-	urlFlag := fs.String("url", "", "Navigate to this URL before capturing")
-	waitFlag := fs.Float64("wait", 0, "Extra seconds to wait after DOM stability is detected (default 0; use for unusually slow pages)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
+	lf := addLiveFlags(fs, "capture")
 	allFlag := fs.Bool("all", false, "Capture every view URL declared in views/*.yaml")
 	forceFlag := fs.Bool("force", false, "Write the capture even if it adds no new component/slot vs the view set (skip the novelty gate)")
 	traceFlag := fs.Bool("trace", false, "Include selector hints for unlabeled interactive clusters in the saved capture")
 	selectorsFlag := fs.Bool("selectors", false, "Show tag #id [data-testid] selector hints in the saved capture")
 	includeHiddenFlag := fs.Bool("include-hidden", false, "Include hidden/off-screen nodes in analysis")
 	jsonOutFlag := fs.Bool("json", false, "Also write an annotated JSON sibling next to each capture")
-	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -49,9 +44,9 @@ func runCapture(args []string) error {
 	{
 		explicit := map[string]bool{}
 		fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
-		cfg := loadSiteConfig(*sightmapDirFlag)
+		cfg := loadSiteConfig(*lf.sightmapDir)
 		if !explicit["wait"] && cfg.Snapshot.Wait > 0 {
-			*waitFlag = cfg.Snapshot.Wait
+			*lf.wait = cfg.Snapshot.Wait
 		}
 		if !explicit["include-hidden"] && cfg.Snapshot.IncludeHidden {
 			*includeHiddenFlag = true
@@ -64,57 +59,26 @@ func runCapture(args []string) error {
 	visible := !*includeHiddenFlag
 
 	if *allFlag {
-		return runCaptureAll(*sightmapDirFlag, *addrFlag, *tabFlag, *waitFlag,
+		return runCaptureAll(*lf.sightmapDir, *lf.addr, *lf.tab, *lf.wait,
 			visible, *selectorsFlag, *jsonOutFlag, *forceFlag)
 	}
 
 	ctx := context.Background()
 
-	// ── Connect to Chrome ────────────────────────────────────────────────────
-	cleanup := func() {}
-	defer func() { cleanup() }()
+	conn, cleanup, err := lf.connect(ctx)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 
-	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
-	if dialErr != nil {
-		if !*launchFlag {
-			return fmt.Errorf(
-				"capture: cannot connect to Chrome at %s\n"+
-					"Start a session first:\n"+
-					"  capture --launch --url https://...    (auto-launch Chrome)\n"+
-					"  /path/to/chrome --remote-debugging-port=7892 --user-data-dir=/tmp/cdp",
-				*addrFlag,
-			)
-		}
-		var launchCleanup func()
-		var launchErr error
-		conn, launchCleanup, launchErr = browser.Launch(ctx, browser.LaunchOptions{})
-		if launchErr != nil {
-			return fmt.Errorf("cannot launch Chrome: %v", launchErr)
-		}
-		if launchCleanup != nil {
-			cleanup = launchCleanup
-		}
-	} else {
-		cleanup = func() { conn.Close() }
+	if err := lf.navigate(ctx, conn, navOpts{idle: true}); err != nil {
+		return err
 	}
 
-	// ── Navigate ─────────────────────────────────────────────────────────────
-	if *urlFlag != "" {
-		if err := browser.NavigateAndWaitIdle(ctx, conn, *urlFlag, 8*time.Second); err != nil {
-			return fmt.Errorf("navigate: %v", err)
-		}
-	}
-	if *waitFlag > 0 {
-		time.Sleep(time.Duration(*waitFlag * float64(time.Second)))
-	}
-
-	// ── Observe (require a matching view) ─────────────────────────────────────
-	if _, statErr := os.Stat(*sightmapDirFlag); statErr != nil {
-		return fmt.Errorf("capture: no %s directory — capture appends to a corpus view set", *sightmapDirFlag)
-	}
-	corpus, cErr := sightmap.Load(*sightmapDirFlag)
+	// ── Observe (require a matching view) ───────────────────────────────
+	corpus, cErr := lf.requireCorpus()
 	if cErr != nil {
-		return fmt.Errorf("capture: load corpus: %v", cErr)
+		return cErr
 	}
 	res, err := observe.Page(ctx, conn, corpus, observe.Options{VisibleOnly: visible})
 	if err != nil {
@@ -131,7 +95,7 @@ func runCapture(args []string) error {
 	cov := res.Coverage
 	if !*forceFlag {
 		cand := viewset.SlotsFromMatch(res.Matches, cov.Orphans, cov.ParentMap)
-		if gres, write := viewset.Gate(corpus, *sightmapDirFlag, viewBasename, cand, false); !write {
+		if gres, write := viewset.Gate(corpus, *lf.sightmapDir, viewBasename, cand, false); !write {
 			fmt.Fprintf(os.Stderr, "capture: nothing new vs %d capture(s) in %s — not saved (use --force to keep)\n",
 				gres.ComparedTo, viewBasename)
 			return nil
@@ -139,7 +103,7 @@ func runCapture(args []string) error {
 	}
 
 	// ── Write the capture into the view's set ─────────────────────────────────
-	snapPath := viewset.CapturePath(*sightmapDirFlag, viewBasename, time.Now())
+	snapPath := viewset.CapturePath(*lf.sightmapDir, viewBasename, time.Now())
 	if err := writeCapture(snapPath, res, fmtOpts); err != nil {
 		return err
 	}
@@ -267,27 +231,12 @@ func runCaptureAll(
 // sibling, creating parent directories as needed. This is the persistence
 // primitive shared by the single-view and --all capture paths.
 func writeCapture(snapPath string, res *observe.Result, opts observe.FormatOpts) error {
-	if dir := filepath.Dir(snapPath); dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("create capture directory: %v", err)
-		}
+	if err := writeOut(snapPath, func(w io.Writer) error {
+		observe.Format(w, res, opts)
+		return nil
+	}); err != nil {
+		return err
 	}
-
-	tmpPath := snapPath + ".tmp"
-	f, ferr := os.Create(tmpPath)
-	if ferr != nil {
-		return fmt.Errorf("create capture file: %v", ferr)
-	}
-	observe.Format(f, res, opts)
-	if cerr := f.Close(); cerr != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("close capture file: %v", cerr)
-	}
-	if rerr := os.Rename(tmpPath, snapPath); rerr != nil {
-		os.Remove(tmpPath)
-		return fmt.Errorf("rename capture file: %v", rerr)
-	}
-
 	if err := writeTreeJSON(res.Root, viewset.TreePath(snapPath)); err != nil {
 		fmt.Fprintf(os.Stderr, "capture: tree-out: %v\n", err)
 	}

@@ -128,14 +128,11 @@ func runSelProbe(args []string) error {
 	ctx := context.Background()
 
 	// Step 1: connect to Chrome.
-	conn, cleanup, err := selProbeConnect(ctx, *addr, *doLaunch, *tabFlag)
+	conn, cleanup, err := browser.ConnectOrLaunch(ctx, *addr, *tabFlag, *doLaunch)
 	if err != nil {
 		return err
 	}
-	if cleanup != nil {
-		defer cleanup()
-	}
-	defer conn.Close()
+	defer cleanup()
 
 	// Step 2: run the query script.
 	results, err := queryElements(ctx, conn, selector, *maxN, *full)
@@ -210,51 +207,6 @@ func runSelProbe(args []string) error {
 		}
 	}
 	return nil
-}
-
-// selProbeConnect dials CDP at addr. If tabID is non-empty, connects directly to
-// that tab. Otherwise, if dial fails and launch is true, starts a new Chrome
-// instance. Returns a cleanup func (non-nil only when Chrome was launched) that
-// should be deferred by the caller.
-func selProbeConnect(ctx context.Context, addr string, launch bool, tabID string) (*browser.CDPConn, func(), error) {
-	if tabID != "" {
-		conn, err := browser.ConnectTab(ctx, addr, tabID)
-		if err != nil {
-			return nil, nil, fmt.Errorf("sel-probe: cannot connect to tab %s at %s\n"+
-				"Run 'sightmap browser tabs list' to see open tabs.", tabID, addr)
-		}
-		return conn, nil, nil
-	}
-
-	// No --tab: auto-select the single content tab, but refuse to guess when
-	// several are open (concurrent agents) so we never probe the wrong tab or the
-	// extension side panel.
-	if tabs, listErr := browser.ListTabs(ctx, addr); listErr == nil {
-		if len(tabs) == 1 {
-			if conn, err := browser.ConnectTab(ctx, addr, tabs[0].TargetID); err == nil {
-				return conn, nil, nil
-			}
-		} else if len(tabs) > 1 {
-			return nil, nil, fmt.Errorf("sel-probe: %w", browser.AmbiguousTabError(tabs))
-		}
-	}
-
-	if !launch {
-		return nil, nil, fmt.Errorf(
-			"sel-probe: cannot connect to Chrome at %s\n"+
-				"Start a session first:\n"+
-				"  sel-probe --launch 'your-selector'    (auto-launch Chrome)\n"+
-				"  sightmap browser launch               (start persistent session)\n"+
-				"  /path/to/chrome --remote-debugging-port=7892 --user-data-dir=/tmp/cdp",
-			addr,
-		)
-	}
-
-	conn, cleanup, launchErr := browser.Launch(ctx, browser.LaunchOptions{})
-	if launchErr != nil {
-		return nil, nil, fmt.Errorf("sel-probe: launch Chrome: %w", launchErr)
-	}
-	return conn, cleanup, nil
 }
 
 // queryElements runs the inline JS and returns the parsed element list.

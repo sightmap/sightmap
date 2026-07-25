@@ -11,7 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/sightmap/sightmap/go/authoring"
-	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -23,10 +22,7 @@ type surveyPattern struct {
 
 func runDiscover(args []string) error {
 	fs := flag.NewFlagSet("discover", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
-	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	launchFlag := fs.Bool("launch", false, "Auto-launch Chrome if unreachable")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
+	lf := addLiveFlags(fs, "discover")
 	allFlag := fs.Bool("all", false, "Include surveyed (○) patterns in output")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -34,29 +30,13 @@ func runDiscover(args []string) error {
 
 	ctx := context.Background()
 
-	// ── Connect to Chrome ────────────────────────────────────────────────────
-	cleanup := func() {}
-	defer func() { cleanup() }()
-
-	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
-	if dialErr != nil {
-		if !*launchFlag {
-			return dialErr
-		}
-		var launchCleanup func()
-		var launchErr error
-		conn, launchCleanup, launchErr = browser.Launch(ctx, browser.LaunchOptions{})
-		if launchErr != nil {
-			return fmt.Errorf("discover: cannot launch Chrome: %v", launchErr)
-		}
-		if launchCleanup != nil {
-			cleanup = launchCleanup
-		}
-	} else {
-		cleanup = func() { conn.Close() }
+	conn, cleanup, err := lf.connect(ctx)
+	if err != nil {
+		return err
 	}
+	defer cleanup()
 
-	// ── Extract internal links from the current page ─────────────────────────
+	// ── Extract internal links from the current page ───────────────────────
 	pathnames, err := authoring.ScanLinks(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("discover: %v", err)
@@ -69,19 +49,15 @@ func runDiscover(args []string) error {
 	}
 
 	// ── Load corpus (optional — absent dir = treat all patterns as unseen) ────
-	var corpus *sightmap.Corpus
-	if _, statErr := os.Stat(*sightmapDirFlag); statErr == nil {
-		loader := sightmap.DirLoader(*sightmapDirFlag)
-		corpus, err = loader.Load()
-		if err != nil {
-			return fmt.Errorf("discover: load corpus: %v", err)
-		}
+	corpus, err := lf.loadCorpus()
+	if err != nil {
+		return fmt.Errorf("discover: load corpus: %v", err)
 	}
 
-	// ── Load survey.yaml (optional) ───────────────────────────────────────────
+	// ── Load survey.yaml (optional) ──────────────────────────────────
 	// surveyPatterns holds ordered (pattern, reason) pairs for glob matching.
 	var surveyPatterns []surveyPattern
-	surveyPath := filepath.Join(*sightmapDirFlag, "survey.yaml")
+	surveyPath := filepath.Join(*lf.sightmapDir, "survey.yaml")
 	if data, readErr := os.ReadFile(surveyPath); readErr == nil {
 		var surveyFile struct {
 			Surveyed []struct {
