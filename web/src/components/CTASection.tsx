@@ -28,9 +28,6 @@ installed 2 sightmap skill(s) → ~/.agents/skills{'\n'}
 {'  '}<span className="c-key">sightmap-authoring</span>{'\n'}
 {'  '}<span className="c-key">sightmap-browser</span></code></pre>
               </div>
-              <p className="gs-followup">
-                To build from source, run <code>go install github.com/sightmap/sightmap/go/cmd/sightmap@latest</code>. You can also import the module as a library with <code>go get</code>.
-              </p>
             </div>
           </div>
 
