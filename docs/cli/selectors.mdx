@@ -29,7 +29,6 @@ Pass `--exclude-known` to hide candidates already covered by a global component 
 | `--addr` | `localhost:7892` | CDP address (host:port) |
 | `--exclude-known` | off | Exclude elements already matched by a global component |
 | `--group` | off | Group candidates by nearest known ancestor component |
-| `--launch` | off | Auto-launch Chrome if unreachable |
 | `--max` | `20` | Max candidates to show |
 | `--min-count` | `1` | Only show candidates matching at least N elements |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
@@ -78,7 +77,6 @@ With `--scope COMPONENT`, the command reports unmatched interactive nodes (T2) i
 | --- | --- | --- |
 | `--addr` | `localhost:7892` | CDP address (host:port) |
 | `--include-hidden` | off | Include hidden/off-screen nodes in gap analysis |
-| `--launch` | off | Auto-launch Chrome if unreachable |
 | `--scope` | — | Filter gaps to unmatched nodes within the named component's subtree |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
 | `--tab` | — | Target tab ID (from `browser start` output) |
@@ -131,7 +129,6 @@ With `--all`, the command navigates to the corpus's snapshot targets. A view wit
 | `--addr` | `localhost:7892` | CDP address (host:port) |
 | `--all` | off | Probe the selector on every snapshot target declared by the corpus |
 | `--full` | off | Show full text (no truncation to 80 characters) |
-| `--launch` | off | Launch Chrome if `--addr` is unreachable; not used with `--all` |
 | `--max` | `10` | Max matches to query and show |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory for global component annotation |
 | `--tab` | — | Target tab ID (from `browser start` output) |

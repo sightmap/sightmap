@@ -38,6 +38,8 @@ The final line is the binary path on stdout, so scripts can capture it; progress
 
 `start` launches Chrome, starts the Sightmap HTTP server, and loads the overlay extension. The extension is embedded in the binary and extracted to `~/.sightmap/extension/` when needed. The server recompiles the corpus after YAML changes under `.sightmap/`. `start` runs in the foreground until you press Ctrl-C, which stops Chrome and the server.
 
+The `start` daemon owns the session: it is the only way to launch Chrome for sightmap, and every live command attaches to it. It also runs the console/network **collector** that buffers browser activity for the [`console` and `network`](/cli/devtools) commands, so those need a running `start` session.
+
 Run it from the site directory (the one containing `.sightmap/`), typically in a second terminal or as a background job.
 
 | Flag | Default | Description |
@@ -75,33 +77,6 @@ If Chrome is already running for this site, `start` opens a new tab in the exist
 
 Pass that ID as `--tab` on every subsequent page command.
 </Note>
-
----
-
-### `browser launch`
-
-`launch` starts Chrome with its DevTools endpoint, without the Sightmap server. It loads an extension only when you pass `--extensions`. Unlike `start`, it returns immediately and leaves Chrome running. The command prints the CDP port to stdout so scripts can capture it.
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--headless` | off | Run headless |
-| `--port` | `7892` | CDP port (`0` = pick a free one) |
-| `--profile` | `~/.sightmap/profiles/default` | User data dir |
-| `--extensions` | none | Comma-separated extension directory paths to load |
-| `--url` | none | Navigate here after launch |
-| `--wait` | `0` | Seconds to wait after navigation |
-
-```bash
-sightmap browser launch --headless --url 'https://shop.example.com'
-```
-
-```text
-7892
-Chrome launched on port 7892  (pid 84210)
-Profile: /Users/you/.sightmap/profiles/default
-```
-
-If a session is already running, `launch` returns `a session is already running on port 7892`. Run `browser stop` first, or use `browser status` to inspect it.
 
 ---
 
@@ -166,7 +141,7 @@ navigated to https://shop.example.com/deals
 ```
 
 <Warning>
-`browser navigate` takes a positional URL. It has no `--url` flag; that flag belongs to `browser start` and `browser launch`. `sightmap browser navigate --url 'https://...'` treats `--url` as the URL and fails.
+`browser navigate` takes a positional URL. It has no `--url` flag; that flag belongs to `browser start`. `sightmap browser navigate --url 'https://...'` treats `--url` as the URL and fails.
 </Warning>
 
 ---

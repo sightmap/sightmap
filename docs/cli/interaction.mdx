@@ -198,7 +198,7 @@ sightmap browser dialog accept --text 'Springfield'
 
 ### `browser screenshot`
 
-Captures the current viewport as a PNG. If the PNG attempt times out, the command retries as JPEG unless you pass `--no-retry`.
+Captures the current viewport as a PNG. If the PNG attempt times out, the command retries as JPEG unless you pass `--no-retry`. Pass `--component` or `--selector` to clip the capture to a single element's bounding box instead of the whole viewport.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -206,6 +206,9 @@ Captures the current viewport as a PNG. If the PNG attempt times out, the comman
 | `--tab` | the lone content tab | Target tab ID |
 | `--out` | `screenshot.png` | Output file path |
 | `--stdout` | off | Write image bytes to stdout (for piping) |
+| `--component` | none | Clip to the bounding box of this Sightmap component (by name) |
+| `--selector` | none | Clip to the bounding box of elements matching this CSS selector |
+| `--expand-pct` | `0` | Grow the clip outward on all sides by this percent of its size (only with `--component`/`--selector`) |
 | `--timeout-ms` | `15000` | Timeout in milliseconds for each attempt |
 | `--jpeg` | off | Capture JPEG without attempting PNG |
 | `--quality` | `80` | JPEG quality from 0 to 100; ignored for PNG |
@@ -218,6 +221,14 @@ sightmap browser screenshot --out cart.png
 ```text
 screenshot saved: cart.png
 ```
+
+Clip to one component, with a little surrounding context:
+
+```bash
+sightmap browser screenshot --component CartSummary --expand-pct 10 --out cart-summary.png
+```
+
+The clip resolves to the union of the component's in-viewport matches (the same boxes `browser bounds` reports); an off-screen target errors with `no in-viewport match to clip to`.
 
 ---
 

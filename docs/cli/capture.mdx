@@ -30,13 +30,11 @@ The probe ID is a handle for the [interaction commands](/cli/interaction). Compo
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | `localhost:7892` | CDP address (host:port). |
-| `--compact` | `false` | Compatibility flag; snapshot output is always compact. |
 | `--coverage` | `false` | Print `[View]` + `[Coverage]` + cluster traces only, suppressing the component tree. |
 | `--depth` | `0` | Max tree depth (0 = unlimited). |
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
 | `--interactive` | `false` | Show interactive nodes only. |
 | `--json` | — | Write annotated tree JSON to this file. It adds component names, memory, and extracted properties to the raw tree. |
-| `--launch` | `false` | Auto-launch Chrome if unreachable. |
 | `--out` | — | Write the annotated output to this file instead of stdout. No view set, no novelty gate. |
 | `--screenshot` | — | Save a PNG screenshot to this file alongside the tree, from the same page state. |
 | `--selectors` | `false` | Show `tag #id [data-testid]` selector hints (no CSS classes). |
@@ -127,7 +125,6 @@ A view is a *set* of captures, not a single file — real pages are non-determin
 | `--force` | `false` | Write the capture even if it adds no new component or slot vs the view set (skip the novelty gate). |
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
 | `--json` | `false` | Also write an annotated JSON sibling next to each capture. |
-| `--launch` | `false` | Auto-launch Chrome if unreachable. |
 | `--selectors` | `false` | Show `tag #id [data-testid]` selector hints in the saved capture. |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
 | `--tab` | — | Target tab ID (from `browser start` output). |
@@ -184,7 +181,6 @@ Each line shows the probe ID, a CSS-selector-style display (`tag#id[attr="value"
 | `--classes` | `false` | Show CSS class names in selector display. |
 | `--depth` | `0` | Max tree depth to print (0 = unlimited). |
 | `--interactive` | `false` | Show only interactive nodes and their ancestors. |
-| `--launch` | `false` | Auto-launch Chrome if unreachable. |
 | `--out` | — | Write output to file instead of stdout. |
 | `--selectors` | `false` | Show all attributes, not just key identifying ones. |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir for ★ annotations. |

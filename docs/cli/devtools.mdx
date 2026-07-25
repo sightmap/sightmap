@@ -1,0 +1,117 @@
+---
+title: "Sightmap Devtools Commands: Console and Network"
+sidebarTitle: "Devtools"
+description: "Read captured browser console messages and network requests from a running Sightmap session."
+---
+
+`sightmap console` and `sightmap network` read the browser activity captured during a session. The [`browser start`](/cli/browser) daemon runs a **collector**: a session-lifetime CDP client that attaches to every tab and buffers console messages and network requests into bounded ring buffers (the most recent ~1000 of each). These commands query that buffer over the daemon's HTTP server.
+
+<Note>
+Devtools commands require a running `browser start` session — the collector lives in that daemon. With no session they print `no running session — start one with 'sightmap browser start'`. Entries captured before the session started are not available.
+</Note>
+
+Buffers are invisible until they overflow: a long burst of activity (or a client that stays away for a while) drops the oldest entries, which `list` reports as `(N earlier entries dropped — buffer overflowed)`.
+
+---
+
+### `console list`
+
+Lists captured console messages, oldest to newest. Uncaught exceptions are folded in as level `exception`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--level` | all | Filter by level: `log`, `debug`, `info`, `warn`, `error`, `exception` |
+| `--tab` | all tabs | Filter by tab ID |
+| `--limit` | all | Show only the most recent N messages |
+
+```bash
+sightmap console list --level error --limit 20
+```
+
+```text
+[42] error     Uncaught TypeError: cart.total is not a function
+[57] exception TypeError: undefined is not iterable
+```
+
+Each line is `[index] level text`. When entries span multiple tabs, the tab ID is shown too. The `index` is stable — pass it to `console get`.
+
+---
+
+### `console get`
+
+Prints one console message by index.
+
+```bash
+sightmap console get 42
+```
+
+```text
+[42] error  (tab 8A3F0C7D)
+Uncaught TypeError: cart.total is not a function
+```
+
+---
+
+### `network list`
+
+Lists captured network requests, oldest to newest.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--type` | all | Filter by resource type (`Document`, `XHR`, `Fetch`, `Stylesheet`, `Image`, `Script`, `Font`, …) |
+| `--url` | all | Filter by URL substring (case-insensitive) |
+| `--tab` | all tabs | Filter by tab ID |
+| `--limit` | all | Show only the most recent N requests |
+
+```bash
+sightmap network list --type XHR --url /api/cart
+```
+
+```text
+[128] POST https://shop.example.com/api/cart → 500 Server Error (XHR)
+[131] GET https://shop.example.com/api/cart → 200 OK (XHR)
+```
+
+Each line is `[index] method url → status (resourceType)`. Requests with no response yet show `pending`.
+
+---
+
+### `network get`
+
+Prints one request's metadata by index, then its response body. Bodies are fetched on demand from the collector connection that observed the request.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--response-file` | none | Write the full response body to this file instead of previewing it |
+| `--request-file` | none | Write the request body (POST data) to this file |
+
+```bash
+sightmap network get 128 --response-file /tmp/cart-error.json
+```
+
+```text
+Method: POST
+URL: https://shop.example.com/api/cart
+Resource Type: XHR
+Status: 500 Server Error
+Tab: 8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D
+response body saved: /tmp/cart-error.json (842 bytes)
+```
+
+Without `--response-file`, `network get` previews the first few KB of the response body inline.
+
+---
+
+## Typical flow
+
+<Steps>
+  <Step title="Start a session">
+    `sightmap browser start` — the collector begins capturing as soon as Chrome is ready.
+  </Step>
+  <Step title="Reproduce the issue">
+    Drive the page with [interaction commands](/cli/interaction) or in the browser window.
+  </Step>
+  <Step title="Read the evidence">
+    `sightmap console list --level error` and `sightmap network list --type XHR` surface what failed; `network get INDEX` pulls the response body.
+  </Step>
+</Steps>

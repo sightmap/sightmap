@@ -18,6 +18,10 @@ The initial creation of a project's `.sightmap/` directory. An agent or human us
 
 One snapshot of a view. New captures added to a view set are stored at `.sightmap/snapshots/{view}/{stamp}.snap`, with the raw component tree in a sibling `.snap.tree.json` file. See [Snapshots](/cli/snapshots).
 
+### Collector
+
+The session-lifetime CDP client the [`browser start`](/cli/browser) daemon runs to buffer console messages and network requests from every tab. The [`console` and `network`](/cli/devtools) commands read its bounded ring buffers.
+
 ### Component
 
 A named DOM subtree identified by one or more CSS selectors. Components can be global at the file root or scoped inside a view. See [Components](/spec/components).
@@ -70,6 +74,10 @@ A named API endpoint with a route glob and optional method filter, payload field
 
 A CSS selector (or array of alternatives) that locates a component's root element. Child selectors are scoped to the matched parent's subtree. See [Selectors](/concepts/selectors).
 
+### Session
+
+The running Chrome instance owned by a `browser start` daemon, recorded in `.sightmap/.session`. It is the only way to launch Chrome for Sightmap; every live command attaches to it. A session may hold several **tabs**. See [Browser sessions](/cli/browser).
+
 ### Sightmap (the file)
 
 A corpus YAML document under `.sightmap/` that conforms to the stream 1 schema. Depending on context, "a sightmap" can also mean the full directory.
@@ -82,9 +90,13 @@ The `.sightmap/` directory at the project root. Sightmap discovers and merges co
 
 The integer in a sightmap file's `version` field, currently `1`. It selects the spec stream used to interpret the file and changes only for a breaking change to the YAML format. It is independent of project SemVer. See [Versioning policy](/reference/versioning).
 
+### Tab
+
+A live browser page in a **session**, identified by the `--tab` ID printed by `browser start`. Distinct from a sightmap **view**: a tab is a running page; a view is a route-scoped definition in the corpus. When two or more tabs are open, page commands require `--tab` to avoid cross-agent crosstalk.
+
 ### View
 
-A named screen identified by a URL route glob. Sightmap matches the current URL to one active view. See [Views](/spec/views).
+A named screen identified by a URL route glob. Sightmap matches the current URL to one active view. A view is a corpus definition, not a live browser **tab**. See [Views](/spec/views).
 
 ### View set
 
