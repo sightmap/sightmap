@@ -2,17 +2,15 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/sightmap/sightmap/go/authoring"
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -59,36 +57,15 @@ func runDiscover(args []string) error {
 	}
 
 	// ── Extract internal links from the current page ─────────────────────────
-	const linkScript = `(function() {
-  const host = location.host;
-  const seen = new Set();
-  const links = [];
-  for (const a of document.querySelectorAll('a[href]')) {
-    try {
-      const u = new URL(a.href);
-      if (u.host === host && !seen.has(u.pathname)) {
-        seen.add(u.pathname);
-        links.push(u.pathname);
-      }
-    } catch(e) {}
-  }
-  return links;
-})()`
-
-	raw, err := browser.EvalJSON(ctx, conn, linkScript)
+	pathnames, err := authoring.ScanLinks(ctx, conn)
 	if err != nil {
-		return fmt.Errorf("discover: eval links: %v", err)
-	}
-
-	var pathnames []string
-	if err := json.Unmarshal(raw, &pathnames); err != nil {
-		return fmt.Errorf("discover: parse links: %v", err)
+		return fmt.Errorf("discover: %v", err)
 	}
 
 	// ── Normalise paths → patterns; count how many raw paths map to each ──────
 	patternCounts := make(map[string]int)
 	for _, p := range pathnames {
-		patternCounts[normalisePath(p)]++
+		patternCounts[authoring.NormalizePath(p)]++
 	}
 
 	// ── Load corpus (optional — absent dir = treat all patterns as unseen) ────
@@ -213,74 +190,13 @@ func runDiscover(args []string) error {
 	return nil
 }
 
-// normalisePath replaces dynamic path segments with "*".
-// A segment is dynamic if it is all digits, a UUID, or a slug-like token
-// (8+ lowercase alphanumeric/dash chars) that contains at least one digit.
-func normalisePath(path string) string {
-	segments := strings.Split(strings.Trim(path, "/"), "/")
-	for i, seg := range segments {
-		if isDynamicSegment(seg) {
-			segments[i] = "*"
-		}
-	}
-	return "/" + strings.Join(segments, "/")
-}
-
-var (
-	reAllDigits = regexp.MustCompile(`^\d+$`)
-	reSlugDyn   = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{7,}$`) // 8+ chars
-	reUUID      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
-	reHasDigit  = regexp.MustCompile(`\d`)
-)
-
-func isDynamicSegment(seg string) bool {
-	if seg == "" {
-		return false
-	}
-	lower := strings.ToLower(seg)
-	return reAllDigits.MatchString(seg) ||
-		reUUID.MatchString(lower) ||
-		(reSlugDyn.MatchString(lower) && reHasDigit.MatchString(lower))
-}
-
 // matchSurvey returns the first survey pattern that glob-matches discoveredPattern,
 // using the same ** / * semantics as sightmap view route matching.
 func matchSurvey(patterns []surveyPattern, discoveredPattern string) (surveyPattern, bool) {
 	for _, sp := range patterns {
-		re := routePatternToRegex(sp.pattern)
-		if compiled, err := regexp.Compile(re); err == nil {
-			if compiled.MatchString(discoveredPattern) {
-				return sp, true
-			}
+		if sightmap.MatchRoute(sp.pattern, discoveredPattern) {
+			return sp, true
 		}
 	}
 	return surveyPattern{}, false
-}
-
-// routePatternToRegex converts a route glob (with ** and *) to an anchored regexp.
-// Mirrors sightmap/corpus.go:routeToRegex but defined locally to avoid importing internals.
-func routePatternToRegex(pattern string) string {
-	var sb strings.Builder
-	sb.WriteByte('^')
-	for i := 0; i < len(pattern); {
-		if pattern[i] == '*' {
-			if i+1 < len(pattern) && pattern[i+1] == '*' {
-				sb.WriteString("(.+)")
-				i += 2
-				continue
-			}
-			sb.WriteString("([^/]+)")
-			i++
-			continue
-		}
-		c := pattern[i]
-		switch c {
-		case '.', '+', '?', '(', ')', '[', ']', '{', '}', '\\', '|', '^', '$':
-			sb.WriteByte('\\')
-		}
-		sb.WriteByte(c)
-		i++
-	}
-	sb.WriteByte('$')
-	return sb.String()
 }

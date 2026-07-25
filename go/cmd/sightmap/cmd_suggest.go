@@ -11,20 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sightmap/sightmap/go/authoring"
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
-
-// suggestCandidate holds one DOM selector candidate from the JS probe.
-type suggestCandidate struct {
-	Sel        string `json:"sel"`
-	Count      int    `json:"count"`
-	Role       string `json:"role"`
-	Tag        string `json:"tag"`
-	Sample     string `json:"sample"`
-	AncestorId string `json:"ancestorId"`
-}
 
 func runSuggest(args []string) error {
 	fs := flag.NewFlagSet("suggest", flag.ContinueOnError)
@@ -65,61 +56,10 @@ func runSuggest(args []string) error {
 		cleanup = func() { conn.Close() }
 	}
 
-	// ── Build and run the JS probe ───────────────────────────────────────────
-	script := fmt.Sprintf(`(function(max) {
-  const results = {};
-  const selectors = [
-    '[data-testid]',
-    '[data-component]',
-    '[aria-label][role]',
-    '[role="navigation"]',
-    '[role="search"]',
-    '[role="banner"]',
-    '[role="main"]',
-    '[role="complementary"]',
-    '[role="contentinfo"]',
-    '[role="dialog"]',
-    '[role="alertdialog"]',
-    '[role="tablist"]',
-    '[role="tab"]',
-    '[role="tabpanel"]',
-  ];
-  for (const sel of selectors) {
-    const els = document.querySelectorAll(sel);
-    for (const el of els) {
-      let candidate = '';
-      const dt = el.getAttribute('data-testid');
-      const dc = el.getAttribute('data-component');
-      const role = el.getAttribute('role') || el.tagName.toLowerCase();
-      const tag = el.tagName.toLowerCase();
-      const text = el.textContent.trim().replace(/\s+/g, ' ').slice(0, 60);
-      if (dt) {
-        candidate = '[data-testid="' + dt + '"]';
-      } else if (dc) {
-        const base = dc.replace(/:v\d+\.\d+\.\d+.*$/, '');
-        candidate = '[data-component^="' + base + '"]';
-      } else {
-        continue;
-      }
-      if (!results[candidate]) {
-        const ancestorEl = el.closest('[data-sightmap-id]');
-        const ancestorId = ancestorEl ? ancestorEl.getAttribute('data-sightmap-id') : '';
-        results[candidate] = {sel: candidate, count: 0, role: role, tag: tag, sample: text, ancestorId: ancestorId};
-      }
-      results[candidate].count++;
-    }
-  }
-  return Object.values(results).sort((a,b) => b.count - a.count).slice(0, max);
-})(%d)`, *maxFlag)
-
-	raw, err := browser.EvalJSON(ctx, conn, script)
+	// ── Scan the live DOM for selector candidates ────────────────────────────
+	candidates, err := authoring.ScanCandidates(ctx, conn, *maxFlag)
 	if err != nil {
-		return fmt.Errorf("suggest: eval: %v", err)
-	}
-
-	var candidates []suggestCandidate
-	if err := json.Unmarshal(raw, &candidates); err != nil {
-		return fmt.Errorf("suggest: parse result: %v", err)
+		return fmt.Errorf("suggest: %v", err)
 	}
 
 	// ── Optionally filter out known sightmap components ──────────────────────
@@ -136,7 +76,7 @@ func runSuggest(args []string) error {
 	}
 
 	// ── Apply filters ────────────────────────────────────────────────────────
-	var filtered []suggestCandidate
+	var filtered []authoring.Candidate
 	for _, c := range candidates {
 		if c.Count < *minCountFlag {
 			continue
@@ -171,7 +111,7 @@ func runSuggest(args []string) error {
 		}
 
 		// Group candidates by match name.
-		groups := make(map[string][]suggestCandidate)
+		groups := make(map[string][]authoring.Candidate)
 		for _, c := range filtered {
 			matchName := sightmapMatchMap[c.AncestorId]
 			groups[matchName] = append(groups[matchName], c)
@@ -187,7 +127,7 @@ func runSuggest(args []string) error {
 		// Build sorted list of named groups (exclude ungrouped for now).
 		type namedGroup struct {
 			name  string
-			cands []suggestCandidate
+			cands []authoring.Candidate
 		}
 		var sortedGroups []namedGroup
 		for name, cands := range groups {
@@ -256,7 +196,7 @@ func runSuggest(args []string) error {
 
 // printSuggestCandidates prints a formatted list of candidates, aligned by
 // selector width. Used by the grouped output path.
-func printSuggestCandidates(cands []suggestCandidate) {
+func printSuggestCandidates(cands []authoring.Candidate) {
 	maxSelLen := 0
 	for _, c := range cands {
 		if len(c.Sel) > maxSelLen {
