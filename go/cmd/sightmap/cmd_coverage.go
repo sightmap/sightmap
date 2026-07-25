@@ -15,6 +15,7 @@ import (
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
+	"github.com/sightmap/sightmap/go/viewset"
 )
 
 // runCoverage re-runs T1/T2/T3 coverage on saved snap .tree.json files.
@@ -47,7 +48,7 @@ func runCoverage(args []string) error {
 	}
 
 	var err error
-	snapFiles, err := findSnapshots(*sightmapDirFlag, fs.Args())
+	snapFiles, err := viewset.Find(*sightmapDirFlag, fs.Args())
 	if err != nil {
 		return err
 	}
@@ -61,7 +62,7 @@ func runCoverage(args []string) error {
 	// the UNION of the view's snapshots, not a single (possibly reduced) load
 	//. T1/T2/T3 stats stay per-capture — they describe each DOM — but
 	// the [Warnings] / [Presence] sections are computed across the set.
-	sets := groupSnapshotsByView(snapFiles)
+	sets := viewset.GroupByView(snapFiles)
 	views := make([]string, 0, len(sets))
 	for v := range sets {
 		views = append(views, v)
@@ -71,7 +72,7 @@ func runCoverage(args []string) error {
 	failures := 0
 	for _, v := range views {
 		entries := sets[v]
-		var caps []captureMatchCounts
+		var caps []viewset.MatchCounts
 		var capGaps [][]coverage.ContentGap
 		headerView := ""
 		for _, e := range entries {
@@ -86,14 +87,14 @@ func runCoverage(args []string) error {
 			if vName != "" && headerView == "" {
 				headerView = vName
 			}
-			caps = append(caps, captureMatchCounts{Stamp: e.Stamp, Counts: counts, LeafCounts: leafCounts})
+			caps = append(caps, viewset.MatchCounts{Stamp: e.Stamp, Counts: counts, LeafCounts: leafCounts})
 			capGaps = append(capGaps, gaps)
 		}
 
 		if headerView != "" && corpus != nil && len(caps) > 0 {
 			inv := viewComponentNames(corpus, headerView)
 			if len(inv) > 0 {
-				emitUnionWarnings(headerView, unionPresence(inv, caps))
+				emitUnionWarnings(headerView, viewset.UnionPresence(inv, caps))
 			}
 		}
 
@@ -117,7 +118,7 @@ func runCoverage(args []string) error {
 }
 
 // matchCapture loads a saved capture's .tree.json, matches it against the corpus
-// using the snap's own route header (parseSnapRoute), and returns the parsed tree,
+// using the snap's own route header (viewset.RouteOf), and returns the parsed tree,
 // the match map, and that route. ok is false (with a stderr note) when the capture
 // can't be loaded, parsed, or matched. Shared by coverage/report/multi-coverage so
 // every reader matches a capture the same route-aware way instead of
@@ -135,7 +136,7 @@ func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.Compone
 		fmt.Fprintf(os.Stderr, "%s: parse tree JSON: %v\n", filepath.Base(snapPath), err)
 		return nil, nil, "", false
 	}
-	route = parseSnapRoute(snapPath)
+	route = viewset.RouteOf(snapPath)
 	matches = corpus.MatchTree(root, route)
 	return root, matches, route, true
 }
@@ -234,7 +235,7 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 		checkRootComponents(os.Stdout, view.Components, globalNames, counts, view.Name)
 	}
 
-	return counts, leafCounts, parseViewName(snapPath), t3, gaps, true
+	return counts, leafCounts, viewset.ViewNameOf(snapPath), t3, gaps, true
 }
 
 // checkRootComponents writes a [Snapshot check] warning to w when every
@@ -320,12 +321,12 @@ func viewComponentNames(corpus *sightmap.Corpus, viewName string) []string {
 // is broken (misconfigured ancestor scoping). When even the leaf matches nothing,
 // the component is genuinely absent from this scenario \u2014 typically expected for
 // step-gated UI (e.g. credit card fields on a delivery-step snapshot).
-func emitUnionWarnings(viewName string, pres []componentPresence) {
+func emitUnionWarnings(viewName string, pres []viewset.ComponentPresence) {
 	n := 0
 	if len(pres) > 0 {
 		n = pres[0].Captures
 	}
-	var broken, absent, partial []componentPresence
+	var broken, absent, partial []viewset.ComponentPresence
 	for _, p := range pres {
 		switch {
 		case p.MatchedIn == 0 && p.LeafMatchAny:
@@ -364,7 +365,7 @@ func emitUnionWarnings(viewName string, pres []componentPresence) {
 	if n > 1 && len(partial) > 0 {
 		fmt.Println("[Presence] (matched in a subset of the view's snapshots)")
 		for _, p := range partial {
-			if rec := formatStampDisplay(p.LastMatchedStamp); rec != "" {
+			if rec := viewset.FormatStamp(p.LastMatchedStamp); rec != "" {
 				fmt.Printf("  %s: %s \u2014 matched in %d of %d snaps (last %s)\n", viewName, p.Name, p.MatchedIn, n, rec)
 			} else {
 				fmt.Printf("  %s: %s \u2014 matched in %d of %d snaps\n", viewName, p.Name, p.MatchedIn, n)
@@ -372,36 +373,4 @@ func emitUnionWarnings(viewName string, pres []componentPresence) {
 		}
 		fmt.Println()
 	}
-}
-
-// parseViewName reads the first 10 lines of snapFile and extracts the view name
-// from a "[View: NAME]" header line, returning "" if not found.
-func parseViewName(snapFile string) string {
-	data, err := os.ReadFile(snapFile)
-	if err != nil {
-		return ""
-	}
-	for _, line := range strings.SplitN(string(data), "\n", 10) {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "[View: ") && strings.HasSuffix(line, "]") {
-			return strings.TrimSuffix(strings.TrimPrefix(line, "[View: "), "]")
-		}
-	}
-	return ""
-}
-
-// parseSnapRoute reads the "route: /path" line from a snap file header.
-// Returns "" if not found.
-func parseSnapRoute(snapFile string) string {
-	data, err := os.ReadFile(snapFile)
-	if err != nil {
-		return ""
-	}
-	for _, line := range strings.SplitN(string(data), "\n", 10) {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "route: ") {
-			return strings.TrimPrefix(line, "route: ")
-		}
-	}
-	return ""
 }

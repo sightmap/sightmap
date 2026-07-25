@@ -1,4 +1,4 @@
-package main
+package viewset
 
 import (
 	"fmt"
@@ -7,10 +7,10 @@ import (
 	"strings"
 )
 
-// findSnapshots returns a list of snapshot files to process.
+// Find returns a list of snapshot files to process.
 // If args are provided, use those paths.
 // Otherwise, search for snapshots in both legacy (*.snap) and new (.sightmap/snapshots/**/*.snap) locations.
-func findSnapshots(sightmapDir string, args []string) ([]string, error) {
+func Find(sightmapDir string, args []string) ([]string, error) {
 	if len(args) > 0 {
 		return args, nil
 	}

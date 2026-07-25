@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/sightmap/sightmap/go/sightmap"
+	"github.com/sightmap/sightmap/go/viewset"
 )
 
 // runMultiCoverage shows a cross-page component coverage matrix and surfaces
@@ -22,7 +23,7 @@ func runMultiCoverage(args []string) error {
 		return err
 	}
 
-	snapFiles, err := findSnapshots(*sightmapDirFlag, fs.Args())
+	snapFiles, err := viewset.Find(*sightmapDirFlag, fs.Args())
 	if err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func runMultiCoverage(args []string) error {
 
 	// Group captures into per-view sets, then fold each view's captures into one
 	// column whose cell value is the per-component MAX across the set.
-	sets := groupSnapshotsByView(snapFiles)
+	sets := viewset.GroupByView(snapFiles)
 	viewNames := make([]string, 0, len(sets))
 	for v := range sets {
 		viewNames = append(viewNames, v)

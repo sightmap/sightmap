@@ -1,50 +1,8 @@
-package main
+package viewset
 
 import (
 	"testing"
 )
-
-func TestSnapshotPath(t *testing.T) {
-	tests := []struct {
-		name         string
-		sightmapDir  string
-		viewName     string
-		snapshotName string
-		want         string
-	}{
-		{
-			name:         "base snapshot",
-			sightmapDir:  ".sightmap",
-			viewName:     "app-home",
-			snapshotName: "base",
-			want:         ".sightmap/snapshots/app-home/base.snap",
-		},
-		{
-			name:         "named snapshot",
-			sightmapDir:  ".sightmap",
-			viewName:     "product-list",
-			snapshotName: "with-filters-open",
-			want:         ".sightmap/snapshots/product-list/with-filters-open.snap",
-		},
-		{
-			name:         "custom sightmap dir",
-			sightmapDir:  "custom/.sightmap",
-			viewName:     "checkout",
-			snapshotName: "base",
-			want:         "custom/.sightmap/snapshots/checkout/base.snap",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := snapshotPath(tt.sightmapDir, tt.viewName, tt.snapshotName)
-			if got != tt.want {
-				t.Errorf("snapshotPath(%q, %q, %q) = %q, want %q",
-					tt.sightmapDir, tt.viewName, tt.snapshotName, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestSnapshotTreePath(t *testing.T) {
 	tests := []struct {
@@ -66,9 +24,9 @@ func TestSnapshotTreePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := snapshotTreePath(tt.snapPath)
+			got := TreePath(tt.snapPath)
 			if got != tt.want {
-				t.Errorf("snapshotTreePath(%q) = %q, want %q", tt.snapPath, got, tt.want)
+				t.Errorf("TreePath(%q) = %q, want %q", tt.snapPath, got, tt.want)
 			}
 		})
 	}
@@ -128,9 +86,9 @@ func TestParseSnapshotPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotView, gotStamp, gotOk := parseSnapshotPath(tt.path)
+			gotView, gotStamp, gotOk := ParsePath(tt.path)
 			if gotView != tt.wantView || gotStamp != tt.wantStamp || gotOk != tt.wantOk {
-				t.Errorf("parseSnapshotPath(%q) = (%q, %q, %v), want (%q, %q, %v)",
+				t.Errorf("ParsePath(%q) = (%q, %q, %v), want (%q, %q, %v)",
 					tt.path, gotView, gotStamp, gotOk, tt.wantView, tt.wantStamp, tt.wantOk)
 			}
 		})

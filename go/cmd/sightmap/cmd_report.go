@@ -16,6 +16,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/sightmap"
+	"github.com/sightmap/sightmap/go/viewset"
 )
 
 // captureCoverage is one capture's per-DOM coverage tiers plus its largest T2
@@ -115,7 +116,7 @@ func runReport(args []string) error {
 	for _, v := range views {
 		// Resolve the whole capture set for the view and aggregate over it
 		//; previously report used only the latest capture.
-		set := viewSnapshotSet(*sightmapDirFlag, v.SnapBasename())
+		set := viewset.Set(*sightmapDirFlag, v.SnapBasename())
 		if len(set) == 0 {
 			results = append(results, viewResult{name: v.Name, url: v.URL, missing: true})
 			continue
