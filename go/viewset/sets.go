@@ -1,4 +1,4 @@
-package main
+package viewset
 
 import (
 	"os"
@@ -14,99 +14,70 @@ import (
 //
 //	snapshots/<view>/<stamp>.snap        (+ .snap.tree.json)
 //
-// where <stamp> is a filesystem-safe UTC timestamp (snapStampLayout). Real pages
+// where <stamp> is a filesystem-safe UTC timestamp (StampLayout). Real pages
 // are non-deterministic (lazy carousels, personalization, rotating promos), so no
 // single capture exercises a view's full component structure. Tooling operates
 // over the UNION of the view's set. We removed the named
 // per-view "state" segment: re-snapping just appends a capture and the novelty
 // gate drops redundant ones, so curated state names aren't needed.
 
-// snapStampLayout formats capture timestamps as filesystem-safe UTC basic
+// StampLayout formats capture timestamps as filesystem-safe UTC basic
 // ISO-8601, e.g. 20260607T193000Z. Lexical order == chronological order.
-const snapStampLayout = "20060102T150405Z"
+const StampLayout = "20060102T150405Z"
 
-// snapshotStamp renders t as a capture-set timestamp segment.
-func snapshotStamp(t time.Time) string { return t.UTC().Format(snapStampLayout) }
+// Stamp renders t as a capture-set timestamp segment.
+func Stamp(t time.Time) string { return t.UTC().Format(StampLayout) }
 
-// viewSnapshotPath returns the path of one timestamped capture in a view's set:
+// CapturePath returns the path of one timestamped capture in a view's set:
 // snapshots/<view>/<stamp>.snap.
-func viewSnapshotPath(sightmapDir, viewName string, t time.Time) string {
-	return filepath.Join(sightmapDir, "snapshots", viewName, snapshotStamp(t)+".snap")
+func CapturePath(sightmapDir, viewName string, t time.Time) string {
+	return filepath.Join(sightmapDir, "snapshots", viewName, Stamp(t)+".snap")
 }
 
-// snapEntry is one capture within a view's set. Stamp is "" for an untimestamped
+// Entry is one capture within a view's set. Stamp is "" for an untimestamped
 // legacy capture (e.g. the flat <view>.snap form).
-type snapEntry struct {
+type Entry struct {
 	Path  string
 	Stamp string
 }
 
-// formatStampDisplay renders a capture stamp (snapStampLayout) for human output,
+// FormatStamp renders a capture stamp (StampLayout) for human output,
 // e.g. "2026-06-07 19:30Z". Returns "" for an empty (untimestamped) stamp and
 // the raw value if it does not parse.
-func formatStampDisplay(stamp string) string {
+func FormatStamp(stamp string) string {
 	if stamp == "" {
 		return ""
 	}
-	t, err := time.Parse(snapStampLayout, stamp)
+	t, err := time.Parse(StampLayout, stamp)
 	if err != nil {
 		return stamp
 	}
 	return t.UTC().Format("2006-01-02 15:04Z")
 }
 
-// latestViewSnapshot returns the path of the most recent .snap capture for a view
-// — the greatest stamp under snapshots/<view>/ — falling back to the legacy flat
-// <view>.snap. ok=false when no capture exists. Used by readers that need ONE
-// representative file for a view (report, pick-time hints); union-aware readers
-// walk the whole set instead.
-func latestViewSnapshot(sightmapDir, viewBasename string) (string, bool) {
-	dir := filepath.Join(sightmapDir, "snapshots", viewBasename)
-	if entries, err := os.ReadDir(dir); err == nil {
-		newest := ""
-		for _, e := range entries {
-			// ".snap.tree.json" ends in ".json", so this keeps only the .snap files;
-			// directories (any stale state subdirs) are skipped.
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".snap") {
-				continue
-			}
-			if e.Name() > newest { // lexical == chronological for snapStampLayout
-				newest = e.Name()
-			}
-		}
-		if newest != "" {
-			return filepath.Join(dir, newest), true
-		}
-	}
-	if flat := viewBasename + ".snap"; fileExists(flat) {
-		return flat, true
-	}
-	return "", false
-}
-
-// viewSnapshotSet returns every .snap capture for a view, ordered oldest→newest by
+// Set returns every .snap capture for a view, ordered oldest→newest by
 // stamp — the whole set under snapshots/<viewBasename>/ — falling back to the
 // legacy flat <viewBasename>.snap when no set dir exists. Empty when the view has
 // no capture. This is the set-aware analogue of latestViewSnapshot, used by readers
 // that aggregate over a view's union (report).
-func viewSnapshotSet(sightmapDir, viewBasename string) []snapEntry {
+func Set(sightmapDir, viewBasename string) []Entry {
 	dir := filepath.Join(sightmapDir, "snapshots", viewBasename)
-	var entries []snapEntry
+	var entries []Entry
 	if des, err := os.ReadDir(dir); err == nil {
 		for _, e := range des {
 			if e.IsDir() || !strings.HasSuffix(e.Name(), ".snap") {
 				continue
 			}
-			_, stamp, ok := parseSnapshotPath("snapshots/" + viewBasename + "/" + e.Name())
+			_, stamp, ok := ParsePath("snapshots/" + viewBasename + "/" + e.Name())
 			if !ok {
 				continue
 			}
-			entries = append(entries, snapEntry{Path: filepath.Join(dir, e.Name()), Stamp: stamp})
+			entries = append(entries, Entry{Path: filepath.Join(dir, e.Name()), Stamp: stamp})
 		}
 	}
 	if len(entries) == 0 {
 		if flat := viewBasename + ".snap"; fileExists(flat) {
-			entries = append(entries, snapEntry{Path: flat, Stamp: ""})
+			entries = append(entries, Entry{Path: flat, Stamp: ""})
 		}
 		return entries
 	}
@@ -124,25 +95,25 @@ func fileExists(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-// captureMatchCounts is one capture's per-component matched-node counts plus its
+// MatchCounts is one capture's per-component matched-node counts plus its
 // stamp within a view's set. Counts is keyed by component name.
 // LeafCounts holds leaf-part-only match counts for components that got 0 full
 // matches in this capture — used to distinguish broken selectors (leaf matches but
 // full scoped selector doesn't) from genuinely-absent components.
-type captureMatchCounts struct {
+type MatchCounts struct {
 	Stamp      string
 	Counts     map[string]int
 	LeafCounts map[string]int // nil when no dead-component probe was performed
 }
 
-// componentPresence summarizes how often a view component matched across the
+// ComponentPresence summarizes how often a view component matched across the
 // UNION of a view's snapshot set. A component is "alive" if
 // MatchedIn > 0 and "dead" only when MatchedIn == 0 across the whole set, so a
 // component absent from a single reduced load is no longer flagged.
 // LeafMatchAny is set (only meaningful when MatchedIn==0) when at least one
 // capture had nodes matching the component's leaf selector part — indicating a
 // broken scoped selector rather than a legitimately-absent component.
-type componentPresence struct {
+type ComponentPresence struct {
 	Name             string // component name
 	MatchedIn        int    // captures in which it matched >=1 node
 	Captures         int    // size of the set (N)
@@ -151,21 +122,21 @@ type componentPresence struct {
 	LeafMatchAny     bool   // any capture had leaf-part matches (only set when MatchedIn==0)
 }
 
-// unionPresence aggregates per-capture match counts across a state's set into
+// UnionPresence aggregates per-capture match counts across a state's set into
 // per-component presence. components is the view's declared component inventory;
 // every listed component appears in the result (MatchedIn == 0 when union-dead)
 // so callers can report dead components, while counts for names outside the
 // inventory (e.g. globals) are ignored. Result is sorted by component name.
 // Stamps are compared lexically, which equals chronological order for
-// snapStampLayout.
-func unionPresence(components []string, caps []captureMatchCounts) []componentPresence {
+// StampLayout.
+func UnionPresence(components []string, caps []MatchCounts) []ComponentPresence {
 	ordered := make([]string, 0, len(components))
-	byName := make(map[string]*componentPresence, len(components))
+	byName := make(map[string]*ComponentPresence, len(components))
 	for _, name := range components {
 		if name == "" || byName[name] != nil {
 			continue
 		}
-		p := &componentPresence{Name: name, Captures: len(caps)}
+		p := &ComponentPresence{Name: name, Captures: len(caps)}
 		byName[name] = p
 		ordered = append(ordered, name)
 	}
@@ -191,42 +162,42 @@ func unionPresence(components []string, caps []captureMatchCounts) []componentPr
 		}
 	}
 	sort.Strings(ordered)
-	out := make([]componentPresence, 0, len(ordered))
+	out := make([]ComponentPresence, 0, len(ordered))
 	for _, name := range ordered {
 		out = append(out, *byName[name])
 	}
 	return out
 }
 
-// captureSlots is the corpus-relative structural fingerprint of one capture used
+// Slots is the corpus-relative structural fingerprint of one capture used
 // by snapshot novelty: the component TYPES it matched and the
 // uncovered-interactive SLOTS it left orphaned. Both are computed by re-matching
 // the capture against the CURRENT corpus, so a capture's novelty is re-evaluated
 // as the corpus matures (which is what lets redundant captures be pruned later).
-type captureSlots struct {
+type Slots struct {
 	Stamp   string
 	Matched map[string]bool // component names matched (>=1 node)
 	Orphans map[string]int  // orphan slot key (orphanSlotKey) -> count
 }
 
-// noveltyResult is what a candidate capture adds vs the UNION of the existing set
+// Novelty is what a candidate capture adds vs the UNION of the existing set
 // (the other captures of its (view, state)). A capture is worth keeping iff it is
 // novel — i.e. it expands the union with a new component type or a new orphan slot.
-type noveltyResult struct {
+type Novelty struct {
 	ComparedTo      int            // number of existing captures unioned against
 	NovelComponents []string       // component types matched here, in no existing capture (sorted)
 	NovelOrphans    map[string]int // orphan slot key -> count in candidate, new vs the union
 }
 
 // IsNovel reports whether the candidate expands the union at all.
-func (r noveltyResult) IsNovel() bool {
+func (r Novelty) IsNovel() bool {
 	return len(r.NovelComponents) > 0 || len(r.NovelOrphans) > 0
 }
 
-// computeNovelty diffs a candidate capture's slots against the union of the other
+// ComputeNovelty diffs a candidate capture's slots against the union of the other
 // captures in its set. Additive-only: it reports what the candidate ADDS, never
 // what it lacks (lost-component detection is a separate, deferred problem).
-func computeNovelty(cand captureSlots, others []captureSlots) noveltyResult {
+func ComputeNovelty(cand Slots, others []Slots) Novelty {
 	unionMatched := map[string]bool{}
 	unionOrphan := map[string]bool{}
 	for _, o := range others {
@@ -237,7 +208,7 @@ func computeNovelty(cand captureSlots, others []captureSlots) noveltyResult {
 			unionOrphan[k] = true
 		}
 	}
-	res := noveltyResult{ComparedTo: len(others), NovelOrphans: map[string]int{}}
+	res := Novelty{ComparedTo: len(others), NovelOrphans: map[string]int{}}
 	for c := range cand.Matched {
 		if !unionMatched[c] {
 			res.NovelComponents = append(res.NovelComponents, c)
@@ -252,15 +223,15 @@ func computeNovelty(cand captureSlots, others []captureSlots) noveltyResult {
 	return res
 }
 
-// planPrune returns the indices (into caps) of captures that are SUBSUMED and can
+// PlanPrune returns the indices (into caps) of captures that are SUBSUMED and can
 // be dropped without shrinking the view's union. A capture is
 // subsumed when it adds no new component type or orphan slot vs the OTHERS — i.e.
-// computeNovelty(c, others) is not novel. Pruning is iterative and conservative:
+// ComputeNovelty(c, others) is not novel. Pruning is iterative and conservative:
 // each pass drops the first subsumed capture (scanning in the given order, so
 // pass oldest-first to retire stale duplicates), then recomputes, so two
 // identical captures collapse to one rather than both vanishing. The surviving
 // set's union equals the original's.
-func planPrune(caps []captureSlots) []int {
+func PlanPrune(caps []Slots) []int {
 	alive := make([]int, len(caps))
 	for i := range alive {
 		alive[i] = i
@@ -272,13 +243,13 @@ func planPrune(caps []captureSlots) []int {
 			if len(alive) <= 1 {
 				break // never prune the last capture
 			}
-			others := make([]captureSlots, 0, len(alive)-1)
+			others := make([]Slots, 0, len(alive)-1)
 			for p2, idx2 := range alive {
 				if p2 != pos {
 					others = append(others, caps[idx2])
 				}
 			}
-			if !computeNovelty(caps[alive[pos]], others).IsNovel() {
+			if !ComputeNovelty(caps[alive[pos]], others).IsNovel() {
 				victim = pos
 				break
 			}
@@ -292,16 +263,16 @@ func planPrune(caps []captureSlots) []int {
 	return pruned
 }
 
-// groupSnapshotsByView groups snapshot file paths into per-view sets, each ordered
+// GroupByView groups snapshot file paths into per-view sets, each ordered
 // oldest→newest by capture stamp (untimestamped legacy captures, stamp "", sort
 // first). Non-snapshot paths are skipped. Accepts either .snap or .snap.tree.json
 // paths; the .snap path is canonical, so a .snap and its .tree.json sibling
 // collapse to one entry.
-func groupSnapshotsByView(files []string) map[string][]snapEntry {
-	sets := make(map[string][]snapEntry)
+func GroupByView(files []string) map[string][]Entry {
+	sets := make(map[string][]Entry)
 	seen := make(map[string]bool)
 	for _, f := range files {
-		view, stamp, ok := parseSnapshotPath(f)
+		view, stamp, ok := ParsePath(f)
 		if !ok {
 			continue
 		}
@@ -311,7 +282,7 @@ func groupSnapshotsByView(files []string) map[string][]snapEntry {
 			continue
 		}
 		seen[snapPath] = true
-		sets[view] = append(sets[view], snapEntry{Path: snapPath, Stamp: stamp})
+		sets[view] = append(sets[view], Entry{Path: snapPath, Stamp: stamp})
 	}
 	for view, entries := range sets {
 		sort.Slice(entries, func(i, j int) bool {

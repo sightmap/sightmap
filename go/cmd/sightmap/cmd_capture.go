@@ -25,6 +25,7 @@ import (
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
+	"github.com/sightmap/sightmap/go/viewset"
 )
 
 func runCapture(args []string) error {
@@ -151,8 +152,8 @@ func runCapture(args []string) error {
 	viewBasename := view.SnapBasename()
 	cov := coverage.Score(root, snapshotMatches, coverage.Options{VisibleOnly: visible})
 	if !*forceFlag {
-		cand := slotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
-		if res, write := noveltyGate(corpus, *sightmapDirFlag, viewBasename, cand, false); !write {
+		cand := viewset.SlotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
+		if res, write := viewset.Gate(corpus, *sightmapDirFlag, viewBasename, cand, false); !write {
 			fmt.Fprintf(os.Stderr, "capture: nothing new vs %d capture(s) in %s — not saved (use --force to keep)\n",
 				res.ComparedTo, viewBasename)
 			return nil
@@ -160,7 +161,7 @@ func runCapture(args []string) error {
 	}
 
 	// ── Write the capture into the view's set ─────────────────────────────────
-	snapPath := viewSnapshotPath(*sightmapDirFlag, viewBasename, time.Now())
+	snapPath := viewset.CapturePath(*sightmapDirFlag, viewBasename, time.Now())
 	if err := writeCapture(snapPath, root, view, snapshotMatches, opts); err != nil {
 		return err
 	}
@@ -258,14 +259,14 @@ func runCaptureAll(
 
 		// Novelty gate: don't append a redundant capture to the view set.
 		if !force {
-			cand := slotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
-			if res, write := noveltyGate(corpus, sightmapDir, v.ViewDir, cand, false); !write {
+			cand := viewset.SlotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
+			if res, write := viewset.Gate(corpus, sightmapDir, v.ViewDir, cand, false); !write {
 				results = append(results, result{name: label, skipped: true, skippedVs: res.ComparedTo})
 				continue
 			}
 		}
 
-		snapPath := viewSnapshotPath(sightmapDir, v.ViewDir, time.Now())
+		snapPath := viewset.CapturePath(sightmapDir, v.ViewDir, time.Now())
 		if err := writeCapture(snapPath, root, view, snapshotMatches, opts); err != nil {
 			results = append(results, result{name: label, err: err})
 			continue
@@ -333,7 +334,7 @@ func writeCapture(
 		return fmt.Errorf("rename capture file: %v", rerr)
 	}
 
-	if err := writeTreeJSON(root, snapshotTreePath(snapPath)); err != nil {
+	if err := writeTreeJSON(root, viewset.TreePath(snapPath)); err != nil {
 		fmt.Fprintf(os.Stderr, "capture: tree-out: %v\n", err)
 	}
 	return nil

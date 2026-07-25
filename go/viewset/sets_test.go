@@ -1,8 +1,6 @@
-package main
+package viewset
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -11,12 +9,12 @@ func TestSnapshotStamp(t *testing.T) {
 	// A fixed instant in a non-UTC zone must render as UTC basic ISO-8601.
 	loc := time.FixedZone("UTC-5", -5*3600)
 	at := time.Date(2026, 6, 7, 14, 30, 0, 0, loc) // 19:30:00 UTC
-	if got, want := snapshotStamp(at), "20260607T193000Z"; got != want {
-		t.Fatalf("snapshotStamp = %q, want %q", got, want)
+	if got, want := Stamp(at), "20260607T193000Z"; got != want {
+		t.Fatalf("Stamp = %q, want %q", got, want)
 	}
 	// Lexical order must equal chronological order.
-	earlier := snapshotStamp(time.Date(2026, 6, 7, 9, 0, 0, 0, time.UTC))
-	later := snapshotStamp(time.Date(2026, 6, 7, 19, 30, 0, 0, time.UTC))
+	earlier := Stamp(time.Date(2026, 6, 7, 9, 0, 0, 0, time.UTC))
+	later := Stamp(time.Date(2026, 6, 7, 19, 30, 0, 0, time.UTC))
 	if !(earlier < later) {
 		t.Fatalf("stamp lexical order broken: %q !< %q", earlier, later)
 	}
@@ -24,10 +22,10 @@ func TestSnapshotStamp(t *testing.T) {
 
 func TestViewSnapshotPath(t *testing.T) {
 	at := time.Date(2026, 6, 7, 19, 30, 0, 0, time.UTC)
-	got := viewSnapshotPath(".sightmap", "home", at)
+	got := CapturePath(".sightmap", "home", at)
 	want := ".sightmap/snapshots/home/20260607T193000Z.snap"
 	if got != want {
-		t.Fatalf("viewSnapshotPath = %q, want %q", got, want)
+		t.Fatalf("CapturePath = %q, want %q", got, want)
 	}
 }
 
@@ -44,7 +42,7 @@ func TestGroupSnapshotsByView(t *testing.T) {
 		// Noise that must be skipped.
 		"notes.txt",
 	}
-	sets := groupSnapshotsByView(files)
+	sets := GroupByView(files)
 
 	home := sets["home"]
 	if len(home) != 3 {
@@ -69,16 +67,16 @@ func TestUnionPresence(t *testing.T) {
 	// A 2-capture set where each load omits a different section (the HD-home
 	// non-determinism case): Endcap renders only in the older snap, Recs only in
 	// the newer one, Header in both, and Footer in neither.
-	caps := []captureMatchCounts{
+	caps := []MatchCounts{
 		{Stamp: "20260607T090000Z", Counts: map[string]int{"Header": 1, "Endcap": 4, "GlobalNav": 7}},
 		{Stamp: "20260607T193000Z", Counts: map[string]int{"Header": 1, "Recs": 6}},
 	}
 	inventory := []string{"Header", "Endcap", "Recs", "Footer"}
 
-	pres := unionPresence(inventory, caps)
+	pres := UnionPresence(inventory, caps)
 
 	// Sorted by name: Endcap, Footer, Header, Recs.
-	by := map[string]componentPresence{}
+	by := map[string]ComponentPresence{}
 	for _, p := range pres {
 		by[p.Name] = p
 	}
@@ -110,11 +108,11 @@ func TestUnionPresence(t *testing.T) {
 func TestUnionPresenceSingleUntimestamped(t *testing.T) {
 	// A single legacy (untimestamped) capture behaves like the old per-snap check:
 	// present components are alive (no recency stamp), absent ones are dead.
-	caps := []captureMatchCounts{
+	caps := []MatchCounts{
 		{Stamp: "", Counts: map[string]int{"Header": 2}},
 	}
-	pres := unionPresence([]string{"Header", "Footer"}, caps)
-	by := map[string]componentPresence{}
+	pres := UnionPresence([]string{"Header", "Footer"}, caps)
+	by := map[string]ComponentPresence{}
 	for _, p := range pres {
 		by[p.Name] = p
 	}
@@ -126,38 +124,8 @@ func TestUnionPresenceSingleUntimestamped(t *testing.T) {
 	}
 }
 
-func TestLatestViewSnapshot(t *testing.T) {
-	dir := t.TempDir()
-	write := func(rel string) string {
-		p := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		return p
-	}
-
-	// Newest stamp under the view dir wins; the .tree.json sibling is ignored.
-	write("snapshots/home/20260607T090000Z.snap")
-	write("snapshots/home/20260607T090000Z.snap.tree.json")
-	newest := write("snapshots/home/20260607T193000Z.snap")
-	write("snapshots/home/20260607T193000Z.snap.tree.json")
-
-	got, ok := latestViewSnapshot(dir, "home")
-	if !ok || got != newest {
-		t.Errorf("view set: got (%q, %v), want (%q, true)", got, ok, newest)
-	}
-
-	// Missing view.
-	if got, ok := latestViewSnapshot(dir, "search"); ok {
-		t.Errorf("missing: got (%q, %v), want ok=false", got, ok)
-	}
-}
-
 func TestComputeNovelty(t *testing.T) {
-	slots := func(matched []string, orphans map[string]int) captureSlots {
+	slots := func(matched []string, orphans map[string]int) Slots {
 		m := map[string]bool{}
 		for _, c := range matched {
 			m[c] = true
@@ -165,7 +133,7 @@ func TestComputeNovelty(t *testing.T) {
 		if orphans == nil {
 			orphans = map[string]int{}
 		}
-		return captureSlots{Matched: m, Orphans: orphans}
+		return Slots{Matched: m, Orphans: orphans}
 	}
 
 	// Candidate uniquely renders DigitalEndcap (a new component type) and has a
@@ -174,12 +142,12 @@ func TestComputeNovelty(t *testing.T) {
 		[]string{"Header", "DigitalEndcap", "ProductPod"},
 		map[string]int{`button @ div[data-testid="endcap"]`: 3, `link @ (no stable ancestor)`: 1},
 	)
-	others := []captureSlots{
+	others := []Slots{
 		slots([]string{"Header", "ProductPod"}, map[string]int{`link @ (no stable ancestor)`: 1}),
 		slots([]string{"Header"}, nil),
 	}
 
-	res := computeNovelty(cand, others)
+	res := ComputeNovelty(cand, others)
 	if !res.IsNovel() {
 		t.Fatalf("expected novel, got %+v", res)
 	}
@@ -198,37 +166,37 @@ func TestComputeNovelty(t *testing.T) {
 
 	// A redundant re-capture (subset of the union) is not novel.
 	dup := slots([]string{"Header", "ProductPod"}, map[string]int{`link @ (no stable ancestor)`: 5})
-	if r := computeNovelty(dup, others); r.IsNovel() {
+	if r := ComputeNovelty(dup, others); r.IsNovel() {
 		t.Errorf("redundant capture flagged novel: %+v", r)
 	}
 
 	// First capture (no others): everything is novel vs the empty union, and
 	// ComparedTo==0 lets the caller treat it as the keep-by-default first capture.
-	if r := computeNovelty(cand, nil); r.ComparedTo != 0 || len(r.NovelComponents) != 3 || len(r.NovelOrphans) != 2 {
+	if r := ComputeNovelty(cand, nil); r.ComparedTo != 0 || len(r.NovelComponents) != 3 || len(r.NovelOrphans) != 2 {
 		t.Errorf("first capture: got %+v, want ComparedTo=0 with all slots novel", r)
 	}
 }
 
 func TestPlanPrune(t *testing.T) {
-	slots := func(matched ...string) captureSlots {
+	slots := func(matched ...string) Slots {
 		m := map[string]bool{}
 		for _, c := range matched {
 			m[c] = true
 		}
-		return captureSlots{Matched: m, Orphans: map[string]int{}}
+		return Slots{Matched: m, Orphans: map[string]int{}}
 	}
 
 	// [0] reduced (subset of [1]), [1] full, [2] duplicate of [1].
 	// Expect: [0] subsumed by [1]; one of the [1]/[2] duplicates dropped; the
 	// union (Header, Hero, Endcap) preserved by the survivor.
-	caps := []captureSlots{
+	caps := []Slots{
 		slots("Header", "Hero"),
 		slots("Header", "Hero", "Endcap"),
 		slots("Header", "Hero", "Endcap"),
 	}
-	prune := planPrune(caps)
+	prune := PlanPrune(caps)
 	if len(prune) != 2 {
-		t.Fatalf("planPrune dropped %d, want 2 (reduced + one duplicate): %v", len(prune), prune)
+		t.Fatalf("PlanPrune dropped %d, want 2 (reduced + one duplicate): %v", len(prune), prune)
 	}
 	// The survivor must still cover the full union.
 	kept := map[int]bool{0: true, 1: true, 2: true}
@@ -245,25 +213,25 @@ func TestPlanPrune(t *testing.T) {
 	}
 
 	// Two captures each contributing a unique component — nothing prunable.
-	distinct := []captureSlots{slots("A", "B"), slots("A", "C")}
-	if p := planPrune(distinct); len(p) != 0 {
-		t.Errorf("planPrune pruned %v from a non-redundant set, want none", p)
+	distinct := []Slots{slots("A", "B"), slots("A", "C")}
+	if p := PlanPrune(distinct); len(p) != 0 {
+		t.Errorf("PlanPrune pruned %v from a non-redundant set, want none", p)
 	}
 
 	// A single capture is never pruned.
-	if p := planPrune([]captureSlots{slots("A")}); len(p) != 0 {
-		t.Errorf("planPrune dropped the sole capture: %v", p)
+	if p := PlanPrune([]Slots{slots("A")}); len(p) != 0 {
+		t.Errorf("PlanPrune dropped the sole capture: %v", p)
 	}
 }
 
 func TestFormatStampDisplay(t *testing.T) {
-	if got := formatStampDisplay(""); got != "" {
+	if got := FormatStamp(""); got != "" {
 		t.Errorf("empty stamp = %q, want \"\"", got)
 	}
-	if got, want := formatStampDisplay("20260607T193000Z"), "2026-06-07 19:30Z"; got != want {
-		t.Errorf("formatStampDisplay = %q, want %q", got, want)
+	if got, want := FormatStamp("20260607T193000Z"), "2026-06-07 19:30Z"; got != want {
+		t.Errorf("FormatStamp = %q, want %q", got, want)
 	}
-	if got, want := formatStampDisplay("not-a-stamp"), "not-a-stamp"; got != want {
+	if got, want := FormatStamp("not-a-stamp"), "not-a-stamp"; got != want {
 		t.Errorf("unparseable stamp = %q, want passthrough %q", got, want)
 	}
 }

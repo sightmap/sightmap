@@ -14,18 +14,14 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/coverage"
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
+	"github.com/sightmap/sightmap/go/viewset"
 )
 
 func runCaptureNovelty(args []string) error {
@@ -40,7 +36,7 @@ func runCaptureNovelty(args []string) error {
 	}
 
 	candidate := strings.TrimSuffix(rest[0], ".tree.json")
-	view, _, ok := parseSnapshotPath(candidate)
+	view, _, ok := viewset.ParsePath(candidate)
 	if !ok {
 		return fmt.Errorf("capture-novelty: not a capture path: %s", rest[0])
 	}
@@ -50,87 +46,21 @@ func runCaptureNovelty(args []string) error {
 		return fmt.Errorf("capture-novelty: load corpus: %v", err)
 	}
 
-	candSlots, ok := extractCaptureSlots(candidate, corpus)
+	candSlots, ok := viewset.SlotsForCapture(candidate, corpus)
 	if !ok {
 		return fmt.Errorf("capture-novelty: cannot read candidate tree (%s.tree.json)", candidate)
 	}
 
 	// The rest of the candidate's view set, re-matched against the current corpus
 	// (the candidate itself excluded).
-	others := loadViewSlots(*sightmapDirFlag, view, corpus, candidate)
+	others := viewset.ViewSlots(*sightmapDirFlag, view, corpus, candidate)
 
-	res := computeNovelty(candSlots, others)
+	res := viewset.ComputeNovelty(candSlots, others)
 	printNovelty(view, filepath.Base(candidate), res)
 	return nil
 }
 
-// slotsFromMatch builds a capture's structural fingerprint from an already-matched
-// tree: the component TYPES matched plus the orphan SLOTS left uncovered. Shared
-// by the offline path (extractCaptureSlots) and the live capture path (capture)
-// so both gate on the same notion of "new".
-func slotsFromMatch(
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
-	t3nodes []*comps.ComponentNode,
-	parentMap map[*comps.ComponentNode]*comps.ComponentNode,
-) captureSlots {
-	cs := captureSlots{Matched: map[string]bool{}, Orphans: map[string]int{}}
-	for _, m := range matches {
-		if m != nil && m.Name != "" {
-			cs.Matched[m.Name] = true
-		}
-	}
-	for _, n := range t3nodes {
-		cs.Orphans[coverage.OrphanSlotKey(n, parentMap)]++
-	}
-	return cs
-}
-
-// extractCaptureSlots re-matches a saved capture against the current corpus and
-// returns its component-type / orphan-slot fingerprint. Visible nodes only,
-// matching the coverage default.
-func extractCaptureSlots(snapPath string, corpus *sightmap.Corpus) (captureSlots, bool) {
-	data, err := os.ReadFile(snapPath + ".tree.json")
-	if err != nil {
-		return captureSlots{}, false
-	}
-	var root comps.ComponentNode
-	if json.Unmarshal(data, &root) != nil {
-		return captureSlots{}, false
-	}
-	matches := corpus.MatchTree(&root, parseSnapRoute(snapPath))
-	cov := coverage.Score(&root, matches, coverage.Options{VisibleOnly: true})
-	return slotsFromMatch(matches, cov.Orphans, cov.ParentMap), true
-}
-
-// loadViewSlots re-matches every capture currently in the view's set against the
-// current corpus, optionally excluding one path.
-func loadViewSlots(sightmapDir, viewBasename string, corpus *sightmap.Corpus, excludePath string) []captureSlots {
-	all, _ := findSnapshots(sightmapDir, nil)
-	entries := groupSnapshotsByView(all)[viewBasename]
-	excl := filepath.ToSlash(excludePath)
-	var out []captureSlots
-	for _, e := range entries {
-		if excl != "" && filepath.ToSlash(e.Path) == excl {
-			continue
-		}
-		if cs, ok := extractCaptureSlots(e.Path, corpus); ok {
-			cs.Stamp = e.Stamp
-			out = append(out, cs)
-		}
-	}
-	return out
-}
-
-// noveltyGate decides whether a freshly extracted capture should be written to
-// its view's set. The first capture of a view always writes; force
-// bypasses the gate. Returns the novelty result and the write decision.
-func noveltyGate(corpus *sightmap.Corpus, sightmapDir, viewBasename string, cand captureSlots, force bool) (noveltyResult, bool) {
-	others := loadViewSlots(sightmapDir, viewBasename, corpus, "")
-	res := computeNovelty(cand, others)
-	return res, force || len(others) == 0 || res.IsNovel()
-}
-
-func printNovelty(view, candName string, res noveltyResult) {
+func printNovelty(view, candName string, res viewset.Novelty) {
 	fmt.Printf("%s · candidate %s vs %d existing capture(s)\n\n",
 		view, candName, res.ComparedTo)
 

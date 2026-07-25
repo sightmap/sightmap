@@ -16,6 +16,7 @@ import (
 	"os"
 
 	"github.com/sightmap/sightmap/go/sightmap"
+	"github.com/sightmap/sightmap/go/viewset"
 )
 
 func runCapturePrune(args []string) error {
@@ -35,8 +36,8 @@ func runCapturePrune(args []string) error {
 	if err != nil {
 		return fmt.Errorf("capture-prune: load corpus: %v", err)
 	}
-	all, _ := findSnapshots(*sightmapDirFlag, nil)
-	sets := groupSnapshotsByView(all)
+	all, _ := viewset.Find(*sightmapDirFlag, nil)
+	sets := viewset.GroupByView(all)
 
 	var views []string
 	if *allFlag {
@@ -60,11 +61,11 @@ func runCapturePrune(args []string) error {
 // pruneView re-matches a view's captures against the current corpus and removes
 // the subsumed ones. Returns how many were pruned (or would be, under
 // --dry-run).
-func pruneView(view string, entries []snapEntry, corpus *sightmap.Corpus, dryRun bool) int {
+func pruneView(view string, entries []viewset.Entry, corpus *sightmap.Corpus, dryRun bool) int {
 	paths := make([]string, 0, len(entries))
-	caps := make([]captureSlots, 0, len(entries))
+	caps := make([]viewset.Slots, 0, len(entries))
 	for _, e := range entries {
-		cs, ok := extractCaptureSlots(e.Path, corpus)
+		cs, ok := viewset.SlotsForCapture(e.Path, corpus)
 		if !ok {
 			continue
 		}
@@ -76,7 +77,7 @@ func pruneView(view string, entries []snapEntry, corpus *sightmap.Corpus, dryRun
 		return 0
 	}
 
-	prune := planPrune(caps)
+	prune := viewset.PlanPrune(caps)
 	if len(prune) == 0 {
 		fmt.Printf("%s: %d capture(s), nothing redundant \u2014 kept all\n", view, len(caps))
 		return 0
@@ -88,7 +89,7 @@ func pruneView(view string, entries []snapEntry, corpus *sightmap.Corpus, dryRun
 	}
 	fmt.Printf("%s: %d capture(s) \u2192 keep %d, %s %d\n", view, len(caps), len(caps)-len(prune), verb, len(prune))
 	for _, idx := range prune {
-		stamp := formatStampDisplay(caps[idx].Stamp)
+		stamp := viewset.FormatStamp(caps[idx].Stamp)
 		if stamp == "" {
 			stamp = "(untimestamped)"
 		}
@@ -97,7 +98,7 @@ func pruneView(view string, entries []snapEntry, corpus *sightmap.Corpus, dryRun
 			if err := os.Remove(paths[idx]); err != nil && !os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
 			}
-			tree := snapshotTreePath(paths[idx])
+			tree := viewset.TreePath(paths[idx])
 			if err := os.Remove(tree); err != nil && !os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
 			}

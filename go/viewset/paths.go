@@ -1,23 +1,22 @@
-package main
+// Package viewset manages a view's on-disk capture set: the snapshots/<view>/
+// <stamp>.snap layout, capture discovery and grouping, the corpus-relative
+// novelty gate and prune planner, and per-view presence aggregation. A view is a
+// SET of timestamped captures (real pages are non-deterministic), and tooling
+// operates over the union of that set.
+package viewset
 
 import (
 	"path/filepath"
 	"strings"
 )
 
-// snapshotPath returns the full path for a snapshot file in the new organized structure.
-// Example: snapshotPath(".sightmap", "app-home", "base") → ".sightmap/snapshots/app-home/base.snap"
-func snapshotPath(sightmapDir, viewName, snapshotName string) string {
-	return filepath.Join(sightmapDir, "snapshots", viewName, snapshotName+".snap")
-}
-
-// snapshotTreePath returns the tree JSON path for a given snapshot path.
+// TreePath returns the tree JSON path for a given snapshot path.
 // Example: ".sightmap/snapshots/app-home/base.snap" → ".sightmap/snapshots/app-home/base.snap.tree.json"
-func snapshotTreePath(snapPath string) string {
+func TreePath(snapPath string) string {
 	return snapPath + ".tree.json"
 }
 
-// parseSnapshotPath extracts the view name and capture stamp from a snapshot path
+// ParsePath extracts the view name and capture stamp from a snapshot path
 // (or its .snap.tree.json sibling). Since we dropped the named-state
 // segment, a capture lives at snapshots/<view>/<stamp>.snap: the view is the first
 // segment under snapshots/ and the stamp is the last. Legacy forms still parse —
@@ -27,7 +26,7 @@ func snapshotTreePath(snapPath string) string {
 //	snapshots/app-home/20260607T193000Z.snap → ("app-home", "20260607T193000Z", true)
 //	snapshots/app-home/base.snap              → ("app-home", "base", true)
 //	app-home.snap (flat)                      → ("app-home", "", true)
-func parseSnapshotPath(path string) (view, stamp string, ok bool) {
+func ParsePath(path string) (view, stamp string, ok bool) {
 	p := filepath.ToSlash(path)
 	p = strings.TrimSuffix(p, ".tree.json")
 	if !strings.HasSuffix(p, ".snap") {
