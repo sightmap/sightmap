@@ -91,7 +91,7 @@ Interaction (IDs from sightmap snapshot output):
   drag        COMPONENT-ID --delta-x N --delta-y N
   wait-for    --url PATTERN | --selector SEL | --load  [--timeout-ms N]
   dialog      accept|dismiss [--text INPUT]
-  screenshot  [--out FILE] [--stdout]
+  screenshot  [--out FILE] [--stdout] [--component NAME | --selector SEL] [--expand-pct N]
   bounds      QUERY... | --selector SEL | --all   viewport-% bounding boxes (JSON)
 
 Session utilities:

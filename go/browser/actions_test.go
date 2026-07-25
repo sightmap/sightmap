@@ -778,6 +778,61 @@ func TestScreenshotWithOptions_OptimizeForSpeed(t *testing.T) {
 	}
 }
 
+func TestScreenshotWithOptions_Clip(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("fake"))
+
+	var mu sync.Mutex
+	var capturedParams json.RawMessage
+
+	conn := newFakeCDP(t, func(method string, params json.RawMessage) json.RawMessage {
+		if method == "Page.captureScreenshot" {
+			mu.Lock()
+			capturedParams = params
+			mu.Unlock()
+			return json.RawMessage(`{"data":"` + encoded + `"}`)
+		}
+		return json.RawMessage(`{}`)
+	})
+
+	_, err := ScreenshotWithOptions(context.Background(), conn, ScreenshotOptions{
+		Clip: &ScreenshotClip{X: 10, Y: 20, Width: 100, Height: 50},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mu.Lock()
+	p := capturedParams
+	mu.Unlock()
+
+	var fields struct {
+		CaptureBeyondViewport bool `json:"captureBeyondViewport"`
+		Clip                  *struct {
+			X      float64 `json:"x"`
+			Y      float64 `json:"y"`
+			Width  float64 `json:"width"`
+			Height float64 `json:"height"`
+			Scale  float64 `json:"scale"`
+		} `json:"clip"`
+	}
+	if err := json.Unmarshal(p, &fields); err != nil {
+		t.Fatalf("unmarshal captureScreenshot params: %v", err)
+	}
+	if fields.Clip == nil {
+		t.Fatal("captureScreenshot: expected a clip in params")
+	}
+	// Scroll offset is 0 in the fake harness, so the box passes through unchanged.
+	if fields.Clip.X != 10 || fields.Clip.Y != 20 || fields.Clip.Width != 100 || fields.Clip.Height != 50 {
+		t.Errorf("clip box = %+v, want {10 20 100 50}", *fields.Clip)
+	}
+	if fields.Clip.Scale != 1 {
+		t.Errorf("clip scale = %v, want 1", fields.Clip.Scale)
+	}
+	if !fields.CaptureBeyondViewport {
+		t.Error("captureScreenshot: expected captureBeyondViewport:true when clipping")
+	}
+}
+
 func TestScreenshotWithOptions_PauseAnimations(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte("fake"))
 

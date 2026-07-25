@@ -288,6 +288,71 @@ func boundsBySelector(
 	return results, nil
 }
 
+// resolveScreenshotClip resolves --component or --selector to a single clip box:
+// the union of the in-viewport bounding boxes of the matches, grown outward on
+// all sides by expandPct percent of its own size. Returns an error when nothing
+// in-viewport matches. The box is viewport-relative px, matching
+// browser.ScreenshotClip's coordinate space.
+func resolveScreenshotClip(
+	ctx context.Context,
+	conn *browser.CDPConn,
+	sightmapDir, component, selector string,
+	expandPct float64,
+) (*browser.ScreenshotClip, error) {
+	vw, vh, err := viewportSize(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+	var results []boundsResult
+	if selector != "" {
+		results, err = boundsBySelector(ctx, conn, selector, vw, vh)
+	} else {
+		results, err = boundsByComponent(ctx, conn, sightmapDir, []string{component}, false, false, vw, vh)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Union the in-viewport match boxes.
+	var x0, y0, x1, y1 float64
+	have := false
+	for _, r := range results {
+		if !r.InViewport {
+			continue
+		}
+		rx0, ry0 := float64(r.Px.X), float64(r.Px.Y)
+		rx1, ry1 := rx0+float64(r.Px.Width), ry0+float64(r.Px.Height)
+		if !have {
+			x0, y0, x1, y1 = rx0, ry0, rx1, ry1
+			have = true
+			continue
+		}
+		x0, y0 = math.Min(x0, rx0), math.Min(y0, ry0)
+		x1, y1 = math.Max(x1, rx1), math.Max(y1, ry1)
+	}
+	if !have {
+		target := component
+		if selector != "" {
+			target = selector
+		}
+		return nil, fmt.Errorf("screenshot: no in-viewport match to clip to for %q", target)
+	}
+
+	// Grow outward on all sides by expandPct% of the box size.
+	if expandPct > 0 {
+		w, h := x1-x0, y1-y0
+		dx, dy := w*expandPct/100, h*expandPct/100
+		x0, y0, x1, y1 = x0-dx, y0-dy, x1+dx, y1+dy
+	}
+	if x0 < 0 {
+		x0 = 0
+	}
+	if y0 < 0 {
+		y0 = 0
+	}
+	return &browser.ScreenshotClip{X: x0, Y: y0, Width: x1 - x0, Height: y1 - y0}, nil
+}
+
 // makeBoundsResult converts viewport-relative px bounds into viewport-% and
 // determines whether the box intersects the viewport at all.
 func makeBoundsResult(comp, label, id string, b *comps.Bounds, vw, vh int) boundsResult {
