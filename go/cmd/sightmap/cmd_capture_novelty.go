@@ -1,4 +1,4 @@
-// snapshot-novelty — does a candidate capture add anything NEW relative to the
+// capture-novelty — does a candidate capture add anything NEW relative to the
 // existing union of its view's set?
 //
 // "New" is purely STRUCTURAL and corpus-relative: a new component TYPE matched,
@@ -27,28 +27,28 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-func runSnapshotNovelty(args []string) error {
-	fs := flag.NewFlagSet("snapshot-novelty", flag.ContinueOnError)
+func runCaptureNovelty(args []string) error {
+	fs := flag.NewFlagSet("capture-novelty", flag.ContinueOnError)
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	rest := fs.Args()
 	if len(rest) != 1 {
-		return fmt.Errorf("usage: sightmap snapshot-novelty [--sightmap-dir DIR] <candidate.snap>")
+		return fmt.Errorf("usage: sightmap capture-novelty [--sightmap-dir DIR] <candidate.snap>")
 	}
 
 	candidate := strings.TrimSuffix(rest[0], ".tree.json")
 	view, _, ok := parseSnapshotPath(candidate)
 	if !ok {
-		return fmt.Errorf("snapshot-novelty: not a snapshot path: %s", rest[0])
+		return fmt.Errorf("capture-novelty: not a capture path: %s", rest[0])
 	}
 
 	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
 
 	candSlots, ok := extractCaptureSlots(candidate, sess)
 	if !ok {
-		return fmt.Errorf("snapshot-novelty: cannot read candidate tree (%s.tree.json)", candidate)
+		return fmt.Errorf("capture-novelty: cannot read candidate tree (%s.tree.json)", candidate)
 	}
 
 	// The rest of the candidate's view set, re-matched against the current corpus
@@ -62,8 +62,8 @@ func runSnapshotNovelty(args []string) error {
 
 // slotsFromMatch builds a capture's structural fingerprint from an already-matched
 // tree: the component TYPES matched plus the orphan SLOTS left uncovered. Shared
-// by the offline path (extractCaptureSlots) and the live capture path
-// (snapshot / captureSnapshot) so both gate on the same notion of "new".
+// by the offline path (extractCaptureSlots) and the live capture path (capture)
+// so both gate on the same notion of "new".
 func slotsFromMatch(
 	matches map[*comps.ComponentNode]*match.SightmapMatch,
 	t3nodes []*comps.ComponentNode,

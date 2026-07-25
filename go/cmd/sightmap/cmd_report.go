@@ -209,7 +209,7 @@ func runReport(args []string) error {
 			missing++
 			fmt.Printf(" %-*s  %-*s  %s\n",
 				nameW, name, routeW, route,
-				"MISSING – run: sightmap snapshot --all")
+				"MISSING – run: sightmap capture --all")
 			continue
 		}
 

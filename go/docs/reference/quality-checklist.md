@@ -12,7 +12,7 @@ Run after reaching T3 = 0. Items marked *(auto)* are surfaced by tooling; *(manu
 Every T2 scope with > 1 interactive child is classified A/B/C/D and documented in `memory:`. Single-child T2 scopes are acceptable without notes.
 
 ```bash
-sightmap iterate --trace 'https://example.com/products'
+sightmap snapshot --coverage --trace --url 'https://example.com/products'
 # or
 sightmap coverage --trace product-list.snap
 ```

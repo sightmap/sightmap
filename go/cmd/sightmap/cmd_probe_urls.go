@@ -16,7 +16,7 @@ type probeTarget struct {
 	URL      string // page to navigate to
 }
 
-// corpusProbeTargets builds the list of pages to navigate for `snapshot --all`
+// corpusProbeTargets builds the list of pages to navigate for `capture --all`
 // and `sel-probe --all` from the corpus: one target per view snapshots[] entry
 // (using the snapshot's url:, or the view's url: as fallback), or a single
 // "base" target from the view url: when a view lists no snapshots.

@@ -109,7 +109,7 @@ Global candidates (appear in 2+ views, not yet in global components):
 
 ### `report`
 
-Prints one row for each view with a top-level `url`. Each row aggregates the view set. A view with no saved captures shows `MISSING – run: sightmap snapshot --all`.
+Prints one row for each view with a top-level `url`. Each row aggregates the view set. A view with no saved captures shows `MISSING – run: sightmap capture --all`.
 
 How a set of N captures rolls up to one row:
 
@@ -156,7 +156,7 @@ Run `report` in CI to fail on orphaned nodes or missing captures. Its summary in
 
 <Steps>
   <Step title="Refresh captures">
-    Run `sightmap snapshot --all` against a live session to append a novelty-gated capture for every view URL declared in `views/*.yaml` (see [Capture commands](/cli/capture)).
+    Run `sightmap capture --all` against a live session to append a novelty-gated capture for every view URL declared in `views/*.yaml` (see [Capture commands](/cli/capture)).
   </Step>
   <Step title="Score the sets">
     Run `sightmap coverage` (add `--trace` on failures). Fix broken selectors flagged under `[Warnings]`, and author components for any orphan clusters until every capture reads `0 orphaned T3 ✓`.

@@ -28,16 +28,16 @@ Use the `sightmap-authoring` skill to inspect a running app and write a `.sightm
   <Step title="Have an agent build the corpus">
     Give your agent this prompt:
 
-    > Build a sightmap for this app. Inspect the main routes with `sightmap iterate`, verify each selector with `sightmap sel-probe`, and name components until every view has zero orphaned T3 nodes. Let me review the YAML before committing it.
+    > Build a sightmap for this app. Inspect the main routes with `sightmap snapshot --coverage`, verify each selector with `sightmap sel-probe`, and name components until every view has zero orphaned T3 nodes. Let me review the YAML before committing it.
 
     The agent repeats this edit-and-verify loop:
 
     ```bash
-    sightmap iterate 'http://localhost:3000/'
+    sightmap snapshot --coverage --url 'http://localhost:3000/'
     sightmap sel-probe -- '[data-testid="product-pod"]'
     ```
 
-    `iterate` snapshots the page, reports coverage, and suggests selectors for unattributed nodes. The agent probes a selector, updates `.sightmap/`, and runs `iterate` again.
+    `snapshot --coverage` reads the page, reports coverage, and suggests selectors for unattributed nodes. The agent probes a selector, updates `.sightmap/`, and runs it again.
 
     ```text
     [View: ProductListPage "http://localhost:3000/products"]
@@ -76,7 +76,7 @@ Use the `sightmap-authoring` skill to inspect a running app and write a `.sightm
 
 If the app has no stable selector for a component, add `data-component="ComponentName"` to the source. This gives Sightmap an explicit runtime hook.
 
-When a route or component changes, rerun `sightmap iterate` on the affected pages. Existing selectors and `memory` entries remain in the corpus, while coverage exposes new orphaned nodes.
+When a route or component changes, rerun `sightmap snapshot --coverage` on the affected pages. Existing selectors and `memory` entries remain in the corpus, while coverage exposes new orphaned nodes.
 
 ## Next steps
 

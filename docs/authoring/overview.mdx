@@ -33,14 +33,16 @@ sightmap browser start --url 'https://example.com/products'
 </Step>
 <Step title="Iterate a page">
 
-Run `iterate` with the page URL:
+Run `snapshot --coverage` with the page URL:
 
 ```bash
-sightmap iterate 'https://example.com/products'
+sightmap snapshot --coverage --url 'https://example.com/products'
 ```
 
 ```text
-[View: ProductListPage "https://example.com/products"]
+[View: ProductListPage]
+route: /products/**
+
 [Coverage] (visible only)
 87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
 
@@ -58,7 +60,7 @@ Coverage assigns every interactive node a tier:
 | **T2** scoped | Unnamed, but inside a matched ancestor | Acceptable when tight |
 | **T3** orphaned | No matched ancestor at any depth | **Must reach 0** |
 
-`iterate` prints coverage and groups T3 nodes by a suggested selector. It writes a temporary capture without changing your saved view sets. Use `sightmap snapshot` when you need the full annotated tree or a saved capture.
+`snapshot --coverage` prints coverage and groups T3 nodes by a suggested selector, suppressing the full tree. Drop the `--coverage` flag for the full annotated tree, or use `sightmap capture` to save the page into its view set.
 
 </Step>
 <Step title="Verify the suggested selector">
@@ -105,7 +107,7 @@ See [Components](/spec/components) for the complete component format.
 </Step>
 <Step title="Repeat">
 
-Re-run `iterate` and work through the remaining T3 clusters. A route reaches the baseline when coverage reports `0 orphaned T3 ✓`. Then review its T2 scopes.
+Re-run `snapshot --coverage` and work through the remaining T3 clusters. A route reaches the baseline when coverage reports `0 orphaned T3 ✓`. Then review its T2 scopes.
 
 </Step>
 </Steps>
@@ -147,10 +149,10 @@ sightmap lint
 
 Keep the corpus current as the app changes:
 
-- Re-iterate affected pages. Coverage exposes new orphaned nodes while existing selectors and `memory` remain in the corpus.
+- Re-run `snapshot --coverage` on affected pages. Coverage exposes new orphaned nodes while existing selectors and `memory` remain in the corpus.
 - Remove stale selectors and `memory`. If you can fix a documented quirk in the app, fix it and delete the note.
 - Run `sightmap validate` and `sightmap lint` in CI.
-- If you maintain saved view sets, refresh them with `sightmap snapshot --all`, then run `sightmap report`.
+- If you maintain saved view sets, refresh them with `sightmap capture --all`, then run `sightmap report`.
 
 See [View sets](/cli/snapshots) for representative URLs, capture storage, and pruning.
 

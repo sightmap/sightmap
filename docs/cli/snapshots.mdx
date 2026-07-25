@@ -1,18 +1,18 @@
 ---
 title: "Sightmap View Sets: Capture Layout, the Novelty Gate, and Pruning"
-sidebarTitle: "Snapshots"
+sidebarTitle: "View sets"
 description: "Understand how Sightmap stores, compares, and prunes captures for each view."
 ---
 
-A page can render different components across loads because of lazy content, personalization, rotating promotions, or user interaction. Sightmap stores multiple captures as a view set. This page covers the on-disk layout, the novelty gate, and the commands that compare, prune, and migrate captures.
+A page can render different components across loads because of lazy content, personalization, rotating promotions, or user interaction. Sightmap stores multiple captures as a view set. This page covers the on-disk layout, the novelty gate, and the commands that compare and prune captures.
 
 <Note>
-`snapshot` and `iterate` create captures; see [Capture commands](/cli/capture). `coverage`, `multi-coverage`, and `report` read saved view sets; see [Coverage commands](/cli/coverage).
+`capture` creates captures; see [Snapshot & capture](/cli/capture). `coverage`, `multi-coverage`, and `report` read saved view sets; see [Coverage commands](/cli/coverage).
 </Note>
 
 ## The capture layout
 
-New view-set captures live at `.sightmap/snapshots/{view}/{stamp}.snap`. `{stamp}` is a UTC timestamp in `YYYYMMDDTHHMMSSZ` form, so lexical and chronological order match:
+View-set captures live at `.sightmap/snapshots/{view}/{stamp}.snap`. `{stamp}` is a UTC timestamp in `YYYYMMDDTHHMMSSZ` form, so lexical and chronological order match:
 
 ```text .sightmap/snapshots/
 .sightmap/
@@ -30,13 +30,13 @@ New view-set captures live at `.sightmap/snapshots/{view}/{stamp}.snap`. `{stamp
 Two files per capture:
 
 - **`{stamp}.snap`** contains the human-readable annotated tree.
-- **`{stamp}.snap.tree.json`** contains the raw component tree used by `coverage`, `multi-coverage`, `sel-check`, and `snapshot-novelty`.
+- **`{stamp}.snap.tree.json`** contains the raw component tree used by `coverage`, `multi-coverage`, `sel-check`, and `capture-novelty`.
 
-Captures do not have curated state names. To cover an open drawer, a selected tab, or another page state, capture the view in that state. The novelty gate adds it to the set only if it contributes new structure.
+Captures do not have curated state names. To cover an open drawer, a selected tab, or another page state, `capture` the view in that state. The novelty gate adds it to the set only if it contributes new structure.
 
 ## A view is a set
 
-`snapshot` appends to the view's set instead of overwriting an existing capture. Each reader handles the set differently:
+`capture` appends to the view's set instead of overwriting an existing capture. Each reader handles the set differently:
 
 - `coverage` reports tiers for each capture and flags a component dead only when it matches none of the captures.
 - `report` rolls each set up to one row, with T1/T2 as weighted averages and T3 as the maximum across captures.
@@ -51,13 +51,13 @@ The novelty gate keeps a capture only when it adds structure to the view's exist
 - A component type that no existing capture matches.
 - An orphan slot that no existing capture contains. A slot is identified by the node's role and nearest `data-testid` or `data-component` ancestor.
 
-Changes to products, prices, or copy within the same structure do not count. The first capture always writes, `--force` bypasses the gate, and `--out FILE` writes outside the set without applying the gate.
+Changes to products, prices, or copy within the same structure do not count. The first capture of a view always writes, and `capture --force` bypasses the gate. (To write a rendered tree to an arbitrary file outside any view set, use `snapshot --out FILE` — that path never touches the set or the gate.)
 
 Novelty depends on the current corpus. The command re-matches saved captures whenever it compares them. A capture kept for unique orphans can become redundant after new component definitions cover those nodes.
 
 ---
 
-### `snapshot-novelty`
+### `capture-novelty`
 
 Reports whether a saved capture adds a component type or orphan slot that does not appear elsewhere in its view's set.
 
@@ -68,7 +68,7 @@ Reports whether a saved capture adds a component type or orphan slot that does n
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
 
 ```bash
-sightmap snapshot-novelty .sightmap/snapshots/plp/20260722T141230Z.snap
+sightmap capture-novelty .sightmap/snapshots/plp/20260722T141230Z.snap
 ```
 
 ```text
@@ -93,7 +93,7 @@ nothing new vs 3 capture(s) — redundant.
 
 ---
 
-### `snapshot-prune`
+### `capture-prune`
 
 Re-matches every capture in a view against the current corpus and removes captures whose component types and orphan slots all appear in the remaining set. Pruning runs iteratively, never removes the last capture, and reduces identical captures to one. Pass a view name, or use `--all` for every view with captures.
 
@@ -106,7 +106,7 @@ Re-matches every capture in a view against the current corpus and removes captur
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
 
 ```bash
-sightmap snapshot-prune --dry-run plp
+sightmap capture-prune --dry-run plp
 ```
 
 ```text
@@ -120,22 +120,22 @@ plp: 5 capture(s) → keep 3, would prune 2
 Re-run without `--dry-run` to delete the listed captures along with their `.snap.tree.json` siblings.
 
 <Tip>
-Run `snapshot-prune --dry-run --all` after adding component definitions. Review the proposed removals before running it again without `--dry-run`.
+Run `capture-prune --dry-run --all` after adding component definitions. Review the proposed removals before running it again without `--dry-run`.
 </Tip>
 
 ## Typical flow
 
 <Steps>
   <Step title="Build the set">
-    Capture each relevant page state, such as a fresh load, an open drawer, or a selected tab. The novelty gate keeps captures that add a component type or orphan slot.
+    `capture` each relevant page state, such as a fresh load, an open drawer, or a selected tab. The novelty gate keeps captures that add a component type or orphan slot.
   </Step>
   <Step title="Check a candidate when in doubt">
-    Run `sightmap snapshot-novelty FILE.snap` to see what a capture adds relative to the rest of its set.
+    Run `sightmap capture-novelty FILE.snap` to see what a capture adds relative to the rest of its set.
   </Step>
   <Step title="Author against the union">
     Follow the [coverage loop](/cli/coverage) until every capture has zero T3 orphans. New component definitions may make older captures redundant.
   </Step>
   <Step title="Prune the redundant captures">
-    Run `sightmap snapshot-prune --dry-run --all`, review the plan, then run it again without `--dry-run`. The remaining captures preserve the same component types and orphan slots.
+    Run `sightmap capture-prune --dry-run --all`, review the plan, then run it again without `--dry-run`. The remaining captures preserve the same component types and orphan slots.
   </Step>
 </Steps>

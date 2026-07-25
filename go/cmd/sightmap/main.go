@@ -3,7 +3,8 @@
 // Usage:
 //
 //	sightmap browser <subcommand>   manage the Chrome session
-//	sightmap snapshot [flags]       extract and annotate the component tree
+//	sightmap snapshot [flags]       observe: annotated component tree + coverage
+//	sightmap capture [flags]        persist a capture into the matched view's set
 //	sightmap sel-probe [flags] SEL  validate a CSS selector against the live page
 //	sightmap validate [flags]       check sightmap YAML for structural errors
 //	sightmap lint [flags]           check sightmap YAML for style issues
@@ -36,6 +37,8 @@ func main() {
 		err = runInspect(args)
 	case "snapshot":
 		err = runSnapshot(args)
+	case "capture":
+		err = runCapture(args)
 	case "sel-probe", "sel_probe":
 		err = runSelProbe(args)
 	case "validate":
@@ -50,18 +53,16 @@ func main() {
 		err = runCoverage(args)
 	case "multi-coverage", "multi_coverage":
 		err = runMultiCoverage(args)
-	case "snapshot-novelty", "snapshot_novelty":
-		err = runSnapshotNovelty(args)
-	case "snapshot-prune", "snapshot_prune":
-		err = runSnapshotPrune(args)
+	case "capture-novelty", "capture_novelty":
+		err = runCaptureNovelty(args)
+	case "capture-prune", "capture_prune":
+		err = runCapturePrune(args)
 	case "search":
 		err = runSearch(args)
 	case "discover":
 		err = runDiscover(args)
 	case "serve-sightmap", "serve_sightmap":
 		err = runServeSightmap(args)
-	case "iterate":
-		err = runIterate(args)
 	case "report":
 		err = runReport(args)
 	case "sel-check", "sel_check":
@@ -95,13 +96,13 @@ Commands:
   browser tabs list/new/close/resize                   tab management
 
   report        [--sightmap-dir DIR]                              per-view coverage health table + T2 quality
-  iterate URL  [--sightmap-dir DIR]  navigate+snap+coverage in one step (no tree output)
-  snapshot       [--url URL] [--out FILE] [--all] [--sightmap-dir DIR]  annotated component tree
+  snapshot       [--url URL] [--coverage] [--out FILE] [--sightmap-dir DIR]  observe: annotated component tree + coverage
+  capture        [--url URL] [--all] [--force] [--sightmap-dir DIR]  persist a capture into the matched view's set
   inspect        [--url URL] [--out FILE] [--sightmap-dir DIR]  raw DOM tree for selector authoring
   coverage       [--sightmap-dir DIR] [FILE.snap ...]            offline T1/T2/T3 check
   multi-coverage [--sightmap-dir DIR] [FILE.snap ...]            cross-page coverage matrix
-  snapshot-novelty [--sightmap-dir DIR] FILE.snap               does a capture add new components/slots vs its view set?
-  snapshot-prune [--dry-run] (<view> | --all)                   drop captures subsumed by the rest of their view set
+  capture-novelty [--sightmap-dir DIR] FILE.snap               does a capture add new components/slots vs its view set?
+  capture-prune [--dry-run] (<view> | --all)                   drop captures subsumed by the rest of their view set
   suggest        [--sightmap-dir DIR] [--max N] [--exclude-known]  DOM selector candidates
   gap            [--sightmap-dir DIR] [--url URL]                   orphaned interactive nodes
   sel-probe [flags] 'selector'  [--all]                         selector validator (live)

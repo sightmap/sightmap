@@ -50,13 +50,14 @@ Use `npm` in instructions — it's the universal baseline. `pnpm`/`yarn` work to
 
 | Command | What it does |
 |---------|-------------|
-| `sightmap snapshot --url URL --out FILE.snap --tree-out FILE.snap.tree.json` | Navigate + snap + inline selector hints. Primary tool for every iteration. |
+| `sightmap snapshot --coverage --url URL` | Observe: navigate + coverage + cluster hints, no tree. **Primary edit-loop tool.** |
+| `sightmap snapshot --url URL` | Observe: full annotated tree + coverage to stdout (add `--out FILE` / `--tree-out FILE` to save). |
+| `sightmap capture --url URL` | Persist a novelty-gated capture into the matched view's set. |
 | `sightmap sel-probe 'selector'` | Verify a selector: match count + parent chain. Run before writing any YAML. |
 | `sightmap validate` | Spec-validate `.sightmap/` YAML. No prepare step needed. |
 | `sightmap lint --warn-only` | Style checks (`--warn-only`; exits 0 always). |
 | `sightmap coverage --trace FILE.snap` | Offline T1/T2/T3 re-check on saved snap (requires `.snap.tree.json` companion). |
 | `sightmap multi-coverage` | Cross-page coverage matrix; surfaces global candidates. |
-| `sightmap iterate URL` | Navigate + snap + coverage + clusters in one step (no tree output). Best for the edit loop. |
 
 ### Discovery
 
@@ -127,11 +128,13 @@ Always `sel-probe`/`sel-check` first — `:has()` now agrees across the live and
 offline matchers.
 
 **ALWAYS navigate before snapping.**
-`snapshot` uses the current browser URL to match views. Use `--url` flag or
-navigate first:
+`snapshot`/`capture` use the current browser URL to match views. Use the `--url`
+flag or navigate first:
 ```bash
-sightmap iterate 'https://www.example.com/page'
-# or for a saved snap file:
+sightmap snapshot --coverage --url 'https://www.example.com/page'
+# persist a capture into the view's set:
+sightmap capture --url 'https://www.example.com/page'
+# or write a one-off snap file (no view set):
 sightmap snapshot --url 'https://www.example.com/page' --out page.snap --tree-out page.snap.tree.json
 ```
 
@@ -321,7 +324,7 @@ Create `.sightmap/views/PAGE.yaml` with `route: "/pattern/**"`. Run
 ### Step 1b — Snap and read coverage
 
 ```bash
-sightmap snapshot --url URL --out PAGE.snap --tree-out PAGE.snap.tree.json
+sightmap snapshot --coverage --url URL
 ```
 
 The `[Coverage] (visible only)` line:
@@ -459,23 +462,24 @@ longer flagged — they appear under `[Presence]` with a `matched in K of N snap
 (last <stamp>)` recency line. T1/T2/T3 stats stay per-capture (they describe one
 DOM).
 
-Writing **defaults to the per-view set form**: `snapshot` (and
-the overlay's Snap-view button) *append* a timestamped capture to
+Observing vs. persisting are **separate commands**. `snapshot` only ever renders
+to stdout (or `--out FILE`) — it never touches the corpus and never gates.
+`capture` (and the overlay's Snap-view button) *append* a timestamped capture to
 `snapshots/<view>/<stamp>.snap` rather than overwriting. There is **no per-view
-“state” axis** — just re-snap the view in whatever configurations you want
-(different loads, a drawer open, a tab switched); an explicit `--out FILE` still
-writes exactly there.
+“state” axis** — just re-`capture` the view in whatever configurations you want
+(different loads, a drawer open, a tab switched).
 
-A re-snap that adds **no new component type or orphan slot** vs the view set is
-skipped by the **novelty gate** — `snapshot` prints "nothing new …
-not saved" and the overlay's Snap-view button shows "= nothing new (not saved)".
-The first capture of a view always writes; `--force` (CLI) overrides. So just
-re-snap a dynamic view a few times — only loads that render something
-structurally new are kept; pure value churn (different products/prices) is
-ignored. `coverage` unions the whole view set.
+A capture that adds **no new component type or orphan slot** vs the view set is
+skipped by the **novelty gate** — `capture` prints "nothing new … not saved" and
+the overlay's Snap-view button shows "= nothing new (not saved)". The first
+capture of a view always writes; `capture --force` overrides. So just re-`capture`
+a dynamic view a few times — only loads that render something structurally new
+are kept; pure value churn (different products/prices) is ignored. `coverage`
+unions the whole view set.
 
 **`coverage` / `multi-coverage`** require `.snap.tree.json` companion files.
-These are written automatically when `--tree-out` is passed to `snapshot`.
+`capture` writes them automatically; `snapshot` writes one when `--tree-out` is
+passed.
 
 **Text duplication artifact**: components whose accessible name is `"X X"` (image
 alt + heading both say "X") will show the duplication even when `category="X"` is

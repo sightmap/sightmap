@@ -43,9 +43,9 @@ invocation). Use `npm` in instructions — the published package is identical un
 
 ## Reading the page: annotated snapshots
 
-`sightmap snapshot --url URL` (or `sightmap iterate URL`) prints the page's
-component tree with your corpus layered on. Each line starts with a numeric
-component ID, then the node content:
+`sightmap snapshot --url URL` prints the page's component tree with your corpus
+layered on (add `--coverage` for a terse coverage-only view that suppresses the
+tree). Each line starts with a numeric component ID, then the node content:
 
 ```
 42 [SiteHeader]
