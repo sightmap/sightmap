@@ -1,4 +1,4 @@
-package main
+package coverage
 
 import (
 	"testing"
@@ -33,14 +33,14 @@ func gapsFixture() (root, banner, image *comps.ComponentNode, parentMap map[*com
 		IsVisible: true,
 		Children:  []*comps.ComponentNode{banner},
 	}
-	return root, banner, image, buildParentMap(root)
+	return root, banner, image, BuildParentMap(root)
 }
 
 func TestAnnotationGaps_FlaggedWhenNoContext(t *testing.T) {
 	root, _, image, pm := gapsFixture()
 	matches := map[*comps.ComponentNode]*match.SightmapMatch{} // nothing matched
 
-	gaps := annotationGaps(root, matches, pm, true)
+	gaps := Gaps(root, matches, pm, true)
 	if len(gaps) != 1 {
 		t.Fatalf("want 1 gap, got %d: %+v", len(gaps), gaps)
 	}
@@ -62,7 +62,7 @@ func TestAnnotationGaps_NotFlaggedWhenDirectlyMatched(t *testing.T) {
 	matches := map[*comps.ComponentNode]*match.SightmapMatch{
 		image: {Name: "BannerImage"},
 	}
-	if gaps := annotationGaps(root, matches, pm, true); len(gaps) != 0 {
+	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps once node is matched, got %d: %+v", len(gaps), gaps)
 	}
 }
@@ -73,7 +73,7 @@ func TestAnnotationGaps_NotFlaggedWhenAncestorMatched(t *testing.T) {
 	matches := map[*comps.ComponentNode]*match.SightmapMatch{
 		banner: {Name: "HeroBanner"},
 	}
-	if gaps := annotationGaps(root, matches, pm, true); len(gaps) != 0 {
+	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps when an ancestor is matched, got %d: %+v", len(gaps), gaps)
 	}
 }
@@ -88,9 +88,9 @@ func TestAnnotationGaps_ShortAndEmptyNamesIgnored(t *testing.T) {
 		IsVisible: true,
 		Children:  []*comps.ComponentNode{short, empty, symbols},
 	}
-	pm := buildParentMap(root)
+	pm := BuildParentMap(root)
 	matches := map[*comps.ComponentNode]*match.SightmapMatch{}
-	if gaps := annotationGaps(root, matches, pm, true); len(gaps) != 0 {
+	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps for short/empty/symbol names, got %d: %+v", len(gaps), gaps)
 	}
 }
@@ -110,9 +110,9 @@ func TestAnnotationGaps_InteractiveSkipped(t *testing.T) {
 		IsVisible: true,
 		Children:  []*comps.ComponentNode{link},
 	}
-	pm := buildParentMap(root)
+	pm := BuildParentMap(root)
 	matches := map[*comps.ComponentNode]*match.SightmapMatch{}
-	if gaps := annotationGaps(root, matches, pm, true); len(gaps) != 0 {
+	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps for interactive node, got %d: %+v", len(gaps), gaps)
 	}
 }
@@ -130,13 +130,13 @@ func TestAnnotationGaps_VisibleOnly(t *testing.T) {
 		IsVisible: true,
 		Children:  []*comps.ComponentNode{hidden},
 	}
-	pm := buildParentMap(root)
+	pm := BuildParentMap(root)
 	matches := map[*comps.ComponentNode]*match.SightmapMatch{}
 
-	if gaps := annotationGaps(root, matches, pm, true); len(gaps) != 0 {
+	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("visibleOnly: want 0 gaps for hidden node, got %d", len(gaps))
 	}
-	if gaps := annotationGaps(root, matches, pm, false); len(gaps) != 1 {
+	if gaps := Gaps(root, matches, pm, false); len(gaps) != 1 {
 		t.Fatalf("include-hidden: want 1 gap for hidden node, got %d", len(gaps))
 	}
 }
@@ -165,14 +165,14 @@ func TestIsContentName(t *testing.T) {
 }
 
 func TestUnionContentGaps_DedupAcrossCaptures(t *testing.T) {
-	g := contentGap{Role: "image", Name: "UP TO $800 OFF appliances", Selector: `div[data-testid="hero"]`}
+	g := ContentGap{Role: "image", Name: "UP TO $800 OFF appliances", Selector: `div[data-testid="hero"]`}
 	// Same gap flagged in two captures, plus an unrelated gap in one.
-	other := contentGap{Role: "heading", Name: "Featured savings of the week", Selector: ""}
-	capGaps := [][]contentGap{
+	other := ContentGap{Role: "heading", Name: "Featured savings of the week", Selector: ""}
+	capGaps := [][]ContentGap{
 		{g},
 		{g, other},
 	}
-	pres := unionContentGaps(capGaps)
+	pres := UnionContentGaps(capGaps)
 	if len(pres) != 2 {
 		t.Fatalf("want 2 distinct gaps, got %d: %+v", len(pres), pres)
 	}
@@ -190,8 +190,8 @@ func TestUnionContentGaps_DedupAcrossCaptures(t *testing.T) {
 
 func TestUnionContentGaps_DoubleCountWithinCaptureCollapses(t *testing.T) {
 	// The same gap appearing twice in ONE capture counts once for that capture.
-	g := contentGap{Role: "image", Name: "UP TO $800 OFF appliances", Selector: ""}
-	pres := unionContentGaps([][]contentGap{{g, g}})
+	g := ContentGap{Role: "image", Name: "UP TO $800 OFF appliances", Selector: ""}
+	pres := UnionContentGaps([][]ContentGap{{g, g}})
 	if len(pres) != 1 {
 		t.Fatalf("want 1 gap, got %d", len(pres))
 	}

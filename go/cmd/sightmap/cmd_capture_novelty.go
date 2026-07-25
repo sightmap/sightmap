@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -76,7 +77,7 @@ func slotsFromMatch(
 		}
 	}
 	for _, n := range t3nodes {
-		cs.Orphans[orphanSlotKey(n, parentMap)]++
+		cs.Orphans[coverage.OrphanSlotKey(n, parentMap)]++
 	}
 	return cs
 }
@@ -97,9 +98,8 @@ func extractCaptureSlots(snapPath string, sess *sightmap.Session) (captureSlots,
 	if err != nil {
 		return captureSlots{}, false
 	}
-	parentMap := buildParentMap(&root)
-	_, _, _, _, t3nodes, _, _ := computeCoverage(&root, matches, parentMap, true)
-	return slotsFromMatch(matches, t3nodes, parentMap), true
+	cov := coverage.Score(&root, matches, coverage.Options{VisibleOnly: true})
+	return slotsFromMatch(matches, cov.Orphans, cov.ParentMap), true
 }
 
 // loadViewSlots re-matches every capture currently in the view's set against the

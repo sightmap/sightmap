@@ -22,6 +22,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -151,10 +152,9 @@ func runCapture(args []string) error {
 
 	// ── Novelty gate ──────────────────────────────────────────────────────────
 	viewBasename := view.SnapBasename()
-	parentMap := buildParentMap(root)
+	cov := coverage.Score(root, snapshotMatches, coverage.Options{VisibleOnly: visible})
 	if !*forceFlag {
-		_, _, _, _, t3nodes, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
-		cand := slotsFromMatch(snapshotMatches, t3nodes, parentMap)
+		cand := slotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
 		if res, write := noveltyGate(*sightmapDirFlag, viewBasename, cand, false); !write {
 			fmt.Fprintf(os.Stderr, "capture: nothing new vs %d capture(s) in %s — not saved (use --force to keep)\n",
 				res.ComparedTo, viewBasename)
@@ -174,9 +174,8 @@ func runCapture(args []string) error {
 		}
 	}
 
-	t1, t2, t3, total, _, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
 	fmt.Fprintf(os.Stderr, "capture saved: %s\n  %d interactive · T1 %d%% · T2 %d%% · T3 %d\n",
-		snapPath, total, coveragePct(t1, total), coveragePct(t2, total), t3)
+		snapPath, cov.Total, coverage.Pct(cov.T1, cov.Total), coverage.Pct(cov.T2, cov.Total), cov.T3)
 	return nil
 }
 
@@ -257,12 +256,11 @@ func runCaptureAll(
 			globalNames:    globalNames,
 		}
 
-		parentMap := buildParentMap(root)
+		cov := coverage.Score(root, snapshotMatches, coverage.Options{VisibleOnly: visible})
 
 		// Novelty gate: don't append a redundant capture to the view set.
 		if !force {
-			_, _, _, _, t3nodes, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
-			cand := slotsFromMatch(snapshotMatches, t3nodes, parentMap)
+			cand := slotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
 			if res, write := noveltyGate(sightmapDir, v.ViewDir, cand, false); !write {
 				results = append(results, result{name: label, skipped: true, skippedVs: res.ComparedTo})
 				continue
@@ -279,8 +277,7 @@ func runCaptureAll(
 			writeAnnotatedJSON(root, jsonPath, view, snapshotMatches, nil) // no propValues in --all mode
 		}
 
-		t1, t2, t3, total, _, _, _ := computeCoverage(root, snapshotMatches, parentMap, visible)
-		results = append(results, result{name: label, t1: t1, t2: t2, t3: t3, total: total})
+		results = append(results, result{name: label, t1: cov.T1, t2: cov.T2, t3: cov.T3, total: cov.Total})
 	}
 
 	fmt.Fprintln(os.Stderr)
@@ -299,8 +296,8 @@ func runCaptureAll(
 		}
 		fmt.Fprintf(os.Stderr, "%-20s  %d interactive · T1 %d%% · T2 %d%% · T3 %d %s\n",
 			r.name, r.total,
-			coveragePct(r.t1, r.total),
-			coveragePct(r.t2, r.total),
+			coverage.Pct(r.t1, r.total),
+			coverage.Pct(r.t2, r.total),
 			r.t3, check,
 		)
 	}
