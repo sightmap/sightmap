@@ -248,7 +248,8 @@ func runBrowserStart(args []string) error {
 			initialTabID = tabs[0].TargetID
 		}
 		if *urlFlag != "" {
-			// Retry navigation (same fix as browser launch).
+			// Retry navigation (Chrome may reuse an existing process and lag on
+			// registering the initial tab).
 			var navErr error
 			for attempt := range 3 {
 				if attempt > 0 {

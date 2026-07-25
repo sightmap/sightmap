@@ -89,7 +89,7 @@ func usage() {
 	fmt.Fprint(os.Stderr, `sightmap — sightmap authoring toolkit
 
 Commands:
-  browser launch [--headless] [--port N] [--url URL]  start Chrome session
+  browser start [--headless] [--port N] [--url URL]   start Chrome session + sightmap server
   browser stop / status / navigate / eval             session management
   browser click / fill / hover / keypress / scroll     interact with page elements
   browser drag / wait-for / dialog                     more interactions

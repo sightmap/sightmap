@@ -1,10 +1,8 @@
 package browser
 
 import (
-	"context"
 	"net"
 	"testing"
-	"time"
 )
 
 // TestFindFreePortExcluding_SkipsExcluded guards against the port
@@ -45,33 +43,5 @@ func TestFindFreePortExcluding_SkipsExcluded(t *testing.T) {
 	}
 	if cdpPort == busy {
 		t.Fatalf("FindFreePortExcluding returned the busy port %d", busy)
-	}
-}
-
-func TestLaunch(t *testing.T) {
-	if _, err := FindChrome(); err != nil {
-		t.Skip("Chrome not found:", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	// Force headless with CI-safe flags. The default launch is headed, which
-	// can't start on a display-less CI runner: Chrome exits immediately and
-	// never binds the debug port, surfacing as "connection refused". The extra
-	// flags keep headless Chrome happy in constrained CI sandboxes/containers.
-	conn, cleanup, err := Launch(ctx, LaunchOptions{
-		StartURL:  "about:blank",
-		Headless:  true,
-		ExtraArgs: []string{"--no-sandbox", "--disable-dev-shm-usage"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer cleanup()
-	url, err := GetURL(ctx, conn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if url != "about:blank" {
-		t.Errorf("got URL %q, want about:blank", url)
 	}
 }

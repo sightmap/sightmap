@@ -1,18 +1,15 @@
 package browser
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // DefaultCDPPort is the Chrome remote-debugging (CDP) port sightmap starts
@@ -106,111 +103,6 @@ func WriteSessionInfo(info SessionInfo) error {
 	return os.WriteFile(sessionFilePath(), data, 0o600)
 }
 
-// LaunchOptions controls how a Chrome subprocess is started.
-type LaunchOptions struct {
-	Headless       bool     // false by default — headed is bot-friendlier
-	Port           int      // 0 = pick a free port automatically
-	UserDataDir    string   // "" = create a temp dir (removed on cleanup)
-	StartURL       string   // navigate here after launch; "" = about:blank
-	HideAutomation bool     // add --disable-blink-features=AutomationControlled
-	ExtraArgs      []string // passed verbatim to Chrome
-}
-
-// Launch starts a Chrome subprocess and returns a connected CDPConn.
-// cleanup kills the process and removes any auto-created UserDataDir.
-func Launch(ctx context.Context, opts LaunchOptions) (*CDPConn, func(), error) {
-	binary, err := FindChrome()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	port := opts.Port
-	if port == 0 {
-		ln, listenErr := net.Listen("tcp", "127.0.0.1:0")
-		if listenErr != nil {
-			return nil, nil, fmt.Errorf("launch: find free port: %w", listenErr)
-		}
-		port = ln.Addr().(*net.TCPAddr).Port
-		ln.Close()
-	}
-
-	userDataDir := opts.UserDataDir
-	var tmpDir string
-	if userDataDir == "" {
-		d, mkErr := os.MkdirTemp("", "sightmap-chrome-*")
-		if mkErr != nil {
-			return nil, nil, fmt.Errorf("launch: create user data dir: %w", mkErr)
-		}
-		tmpDir = d
-		userDataDir = tmpDir
-	}
-
-	args := []string{
-		fmt.Sprintf("--remote-debugging-port=%d", port),
-		fmt.Sprintf("--user-data-dir=%s", userDataDir),
-		"--no-first-run",
-		"--no-default-browser-check",
-	}
-	if opts.HideAutomation {
-		args = append(args, "--disable-blink-features=AutomationControlled")
-	}
-	if opts.Headless {
-		args = append(args, "--headless=new")
-	}
-	if opts.StartURL != "" {
-		args = append(args, opts.StartURL)
-	}
-	args = append(args, opts.ExtraArgs...)
-
-	cmd := exec.CommandContext(ctx, binary, args...)
-	if startErr := cmd.Start(); startErr != nil {
-		if tmpDir != "" {
-			os.RemoveAll(tmpDir)
-		}
-		return nil, nil, fmt.Errorf("launch: start chrome: %w", startErr)
-	}
-
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
-	if pollErr := pollCDPReady(ctx, addr); pollErr != nil {
-		cmd.Process.Kill()
-		cmd.Wait()
-		if tmpDir != "" {
-			os.RemoveAll(tmpDir)
-		}
-		return nil, nil, fmt.Errorf("launch: %w", pollErr)
-	}
-
-	// Write session file so CLI tools can find the running instance.
-	pid := 0
-	if cmd.Process != nil {
-		pid = cmd.Process.Pid
-	}
-	_ = WriteSessionInfo(SessionInfo{
-		Port:    port,
-		PID:     pid,
-		Profile: userDataDir,
-	})
-
-	cleanup := func() {
-		if cmd.Process != nil {
-			cmd.Process.Kill()
-		}
-		cmd.Wait()
-		if tmpDir != "" {
-			os.RemoveAll(tmpDir)
-		}
-		os.Remove(sessionFilePath())
-	}
-
-	conn, dialErr := DialCDP(ctx, addr)
-	if dialErr != nil {
-		cleanup()
-		return nil, nil, fmt.Errorf("launch: dial cdp: %w", dialErr)
-	}
-
-	return conn, cleanup, nil
-}
-
 // FindChrome returns the path to the Chrome binary on the current platform,
 // or an error if none is found.
 func FindChrome() (string, error) {
@@ -295,33 +187,4 @@ func sessionFilePath() string {
 		return filepath.Join(".sightmap", ".session")
 	}
 	return filepath.Join(os.TempDir(), "sightmap-session")
-}
-
-// pollCDPReady polls http://ADDR/json/version every 100 ms until Chrome
-// responds or the context deadline (10 s when the ctx has none) is exceeded.
-func pollCDPReady(ctx context.Context, addr string) error {
-	// Honor the caller's deadline so a caller that budgets more startup time (a
-	// cold, loaded CI runner can need well over 10s to bind the debug port) gets
-	// it. Fall back to 10s only when the context is deadline-less.
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(10 * time.Second)
-	}
-	for {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-		req, _ := http.NewRequestWithContext(reqCtx, "GET", "http://"+addr+"/json/version", nil)
-		resp, err := http.DefaultClient.Do(req)
-		cancel()
-		if err == nil {
-			resp.Body.Close()
-			return nil
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("chrome did not become ready at %s: %w", addr, err)
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
 }
