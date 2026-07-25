@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/sightmap/sightmap/go/coverage"
 )
@@ -29,4 +31,18 @@ func emitContentGaps(viewName string, pres []coverage.ContentGapPresence) {
 		}
 	}
 	fmt.Println()
+}
+
+// displayName truncates s to 60 Unicode code points and wraps it in double
+// quotes. Only backslash and double-quote are escaped; all other Unicode is
+// preserved as-is so the output stays human-readable.
+func displayName(s string) string {
+	const maxRunes = 60
+	if utf8.RuneCountInString(s) > maxRunes {
+		runes := []rune(s)
+		s = string(runes[:maxRunes]) + "…"
+	}
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	return `"` + s + `"`
 }

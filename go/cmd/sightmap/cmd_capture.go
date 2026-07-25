@@ -21,9 +21,8 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
-	"github.com/sightmap/sightmap/go/match"
+	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sightmap"
 	"github.com/sightmap/sightmap/go/viewset"
 )
@@ -109,21 +108,7 @@ func runCapture(args []string) error {
 		time.Sleep(time.Duration(*waitFlag * float64(time.Second)))
 	}
 
-	// ── Extract ───────────────────────────────────────────────────────────────
-	pageURL, err := browser.GetURL(ctx, conn)
-	if err != nil {
-		return fmt.Errorf("get URL: %v", err)
-	}
-	page, err := conn.DefaultPage()
-	if err != nil {
-		return fmt.Errorf("default page: %v", err)
-	}
-	root, err := browser.ExtractComponents(ctx, page)
-	if err != nil {
-		return fmt.Errorf("extract components: %v", err)
-	}
-
-	// ── Load sightmap and require a matching view ─────────────────────────────
+	// ── Observe (require a matching view) ─────────────────────────────────────
 	if _, statErr := os.Stat(*sightmapDirFlag); statErr != nil {
 		return fmt.Errorf("capture: no %s directory — capture appends to a corpus view set", *sightmapDirFlag)
 	}
@@ -131,43 +116,36 @@ func runCapture(args []string) error {
 	if cErr != nil {
 		return fmt.Errorf("capture: load corpus: %v", cErr)
 	}
-	snapshotMatches := corpus.MatchTree(root, pageURL)
-	view := corpus.ViewForURL(pageURL)
-	if view == nil {
+	res, err := observe.Page(ctx, conn, corpus, observe.Options{VisibleOnly: visible})
+	if err != nil {
+		return fmt.Errorf("capture: observe: %v", err)
+	}
+	if res.View == nil {
 		return fmt.Errorf("capture: no view matches %q — capture appends to a view's set; "+
-			"use `snapshot` to observe an unmapped page, or add a view with a matching route", pageURL)
+			"use `snapshot` to observe an unmapped page, or add a view with a matching route", res.URL)
 	}
-	viewComponents := corpus.Components(pageURL)
-	globalNames := corpus.GlobalComponentNames()
-
-	opts := printOpts{
-		trace:          *traceFlag,
-		visibleOnly:    visible,
-		selectors:      *selectorsFlag,
-		viewComponents: viewComponents,
-		globalNames:    globalNames,
-	}
+	fmtOpts := observe.FormatOpts{Trace: *traceFlag, Selectors: *selectorsFlag}
 
 	// ── Novelty gate ──────────────────────────────────────────────────────────
-	viewBasename := view.SnapBasename()
-	cov := coverage.Score(root, snapshotMatches, coverage.Options{VisibleOnly: visible})
+	viewBasename := res.View.SnapBasename()
+	cov := res.Coverage
 	if !*forceFlag {
-		cand := viewset.SlotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
-		if res, write := viewset.Gate(corpus, *sightmapDirFlag, viewBasename, cand, false); !write {
+		cand := viewset.SlotsFromMatch(res.Matches, cov.Orphans, cov.ParentMap)
+		if gres, write := viewset.Gate(corpus, *sightmapDirFlag, viewBasename, cand, false); !write {
 			fmt.Fprintf(os.Stderr, "capture: nothing new vs %d capture(s) in %s — not saved (use --force to keep)\n",
-				res.ComparedTo, viewBasename)
+				gres.ComparedTo, viewBasename)
 			return nil
 		}
 	}
 
 	// ── Write the capture into the view's set ─────────────────────────────────
 	snapPath := viewset.CapturePath(*sightmapDirFlag, viewBasename, time.Now())
-	if err := writeCapture(snapPath, root, view, snapshotMatches, opts); err != nil {
+	if err := writeCapture(snapPath, res, fmtOpts); err != nil {
 		return err
 	}
 	if *jsonOutFlag {
 		jsonPath := strings.TrimSuffix(snapPath, ".snap") + ".snap.annotated.json"
-		if err := writeAnnotatedJSON(root, jsonPath, view, snapshotMatches, nil); err != nil {
+		if err := writeAnnotatedJSON(res.Root, jsonPath, res.View, res.Matches, res.Props); err != nil {
 			fmt.Fprintf(os.Stderr, "capture: json: %v\n", err)
 		}
 	}
@@ -231,49 +209,31 @@ func runCaptureAll(
 			time.Sleep(time.Duration(wait * float64(time.Second)))
 		}
 
-		pageURL, _ := browser.GetURL(ctx, conn)
-		page, err := conn.DefaultPage()
+		res, err := observe.Page(ctx, conn, corpus, observe.Options{VisibleOnly: visible})
 		if err != nil {
 			results = append(results, result{name: label, err: err})
 			continue
 		}
-		root, err := browser.ExtractComponents(ctx, page)
-		if err != nil {
-			results = append(results, result{name: label, err: err})
-			continue
-		}
-
-		snapshotMatches := corpus.MatchTree(root, pageURL)
-		view := corpus.ViewForURL(pageURL)
-		viewComponents := corpus.Components(pageURL)
-		globalNames := corpus.GlobalComponentNames()
-
-		opts := printOpts{
-			visibleOnly:    visible,
-			selectors:      selectors,
-			viewComponents: viewComponents,
-			globalNames:    globalNames,
-		}
-
-		cov := coverage.Score(root, snapshotMatches, coverage.Options{VisibleOnly: visible})
+		fmtOpts := observe.FormatOpts{Selectors: selectors}
+		cov := res.Coverage
 
 		// Novelty gate: don't append a redundant capture to the view set.
 		if !force {
-			cand := viewset.SlotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
-			if res, write := viewset.Gate(corpus, sightmapDir, v.ViewDir, cand, false); !write {
-				results = append(results, result{name: label, skipped: true, skippedVs: res.ComparedTo})
+			cand := viewset.SlotsFromMatch(res.Matches, cov.Orphans, cov.ParentMap)
+			if gres, write := viewset.Gate(corpus, sightmapDir, v.ViewDir, cand, false); !write {
+				results = append(results, result{name: label, skipped: true, skippedVs: gres.ComparedTo})
 				continue
 			}
 		}
 
 		snapPath := viewset.CapturePath(sightmapDir, v.ViewDir, time.Now())
-		if err := writeCapture(snapPath, root, view, snapshotMatches, opts); err != nil {
+		if err := writeCapture(snapPath, res, fmtOpts); err != nil {
 			results = append(results, result{name: label, err: err})
 			continue
 		}
 		if jsonOut {
 			jsonPath := strings.TrimSuffix(snapPath, ".snap") + ".snap.annotated.json"
-			writeAnnotatedJSON(root, jsonPath, view, snapshotMatches, nil) // no propValues in --all mode
+			writeAnnotatedJSON(res.Root, jsonPath, res.View, res.Matches, nil) // no propValues in --all mode
 		}
 
 		results = append(results, result{name: label, t1: cov.T1, t2: cov.T2, t3: cov.T3, total: cov.Total})
@@ -306,13 +266,7 @@ func runCaptureAll(
 // writeCapture renders a capture to snapPath (atomically) plus its .tree.json
 // sibling, creating parent directories as needed. This is the persistence
 // primitive shared by the single-view and --all capture paths.
-func writeCapture(
-	snapPath string,
-	root *comps.ComponentNode,
-	view *sightmap.View,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
-	opts printOpts,
-) error {
+func writeCapture(snapPath string, res *observe.Result, opts observe.FormatOpts) error {
 	if dir := filepath.Dir(snapPath); dir != "." {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("create capture directory: %v", err)
@@ -324,7 +278,7 @@ func writeCapture(
 	if ferr != nil {
 		return fmt.Errorf("create capture file: %v", ferr)
 	}
-	writeOutput(f, root, view, matches, opts)
+	observe.Format(f, res, opts)
 	if cerr := f.Close(); cerr != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("close capture file: %v", cerr)
@@ -334,7 +288,7 @@ func writeCapture(
 		return fmt.Errorf("rename capture file: %v", rerr)
 	}
 
-	if err := writeTreeJSON(root, viewset.TreePath(snapPath)); err != nil {
+	if err := writeTreeJSON(res.Root, viewset.TreePath(snapPath)); err != nil {
 		fmt.Fprintf(os.Stderr, "capture: tree-out: %v\n", err)
 	}
 	return nil

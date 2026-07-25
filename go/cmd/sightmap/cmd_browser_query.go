@@ -11,6 +11,7 @@ import (
 	"github.com/sightmap/sightmap/go/compquery"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
+	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -91,7 +92,7 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	for _, c := range components {
 		compByName[c.Name] = c
 	}
-	props := extractProperties(ctx, conn, relevant, compByName)
+	props := observe.ExtractProperties(ctx, conn, relevant, compByName)
 
 	return compquery.Resolve(root, matches, props, q)
 }

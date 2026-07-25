@@ -1,4 +1,4 @@
-package main
+package observe
 
 import (
 	"bytes"
@@ -39,7 +39,7 @@ func TestWriteT2Trace_Basic(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	writeT2Trace(&buf, t2clusters, t2children, matches, view)
+	WriteT2Trace(&buf, t2clusters, t2children, matches, view)
 
 	output := buf.String()
 	if output == "" {
@@ -86,7 +86,7 @@ func TestWriteT2Trace_SingleChildSuppressed(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	writeT2Trace(&buf, t2clusters, t2children, matches, view)
+	WriteT2Trace(&buf, t2clusters, t2children, matches, view)
 
 	output := buf.String()
 	// Single-child T2 should be suppressed (minT2Count = 2)
@@ -126,7 +126,7 @@ func TestWriteT2Trace_MemoryNoteSuppressed(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	writeT2Trace(&buf, t2clusters, t2children, matches, view)
+	WriteT2Trace(&buf, t2clusters, t2children, matches, view)
 
 	output := buf.String()
 
@@ -177,7 +177,7 @@ func TestWriteT2Trace_Truncation(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	writeT2Trace(&buf, t2clusters, t2children, matches, view)
+	WriteT2Trace(&buf, t2clusters, t2children, matches, view)
 
 	output := buf.String()
 

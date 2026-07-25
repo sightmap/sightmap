@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/coverage"
+	"github.com/sightmap/sightmap/go/render"
 	"github.com/sightmap/sightmap/go/sightmap"
 	"github.com/sightmap/sightmap/go/viewset"
 )
@@ -343,7 +344,7 @@ func routeDisplay(route, url string) string {
 // truncate shortens s to at most n runes, appending "…" if truncated.
 // (Uses truncateStr from cmd_snapshot.go for consistency.)
 func truncate(s string, n int) string {
-	return truncateStr(s, n)
+	return render.TruncateRunes(s, n)
 }
 
 // lastPathComponent returns the last path segment of s.

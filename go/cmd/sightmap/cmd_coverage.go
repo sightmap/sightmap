@@ -4,15 +4,14 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
+	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
 	"github.com/sightmap/sightmap/go/viewset"
@@ -189,11 +188,11 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 	if trace {
 		if len(t3nodes) > 0 {
 			fmt.Fprintln(os.Stdout)
-			writeTrace(os.Stdout, t3nodes, parentMap)
+			observe.WriteTrace(os.Stdout, t3nodes, parentMap)
 		}
 		if len(t2clusters) > 0 {
 			fmt.Fprintln(os.Stdout)
-			writeT2Trace(os.Stdout, t2clusters, t2children, matches, view)
+			observe.WriteT2Trace(os.Stdout, t2clusters, t2children, matches, view)
 		}
 		fmt.Println()
 	}
@@ -232,44 +231,10 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 		for _, gc := range corpus.GlobalComponents {
 			globalNames[gc.Name] = true
 		}
-		checkRootComponents(os.Stdout, view.Components, globalNames, counts, view.Name)
+		observe.CheckRootComponents(os.Stdout, view.Components, globalNames, counts, view.Name)
 	}
 
 	return counts, leafCounts, viewset.ViewNameOf(snapPath), t3, gaps, true
-}
-
-// checkRootComponents writes a [Snapshot check] warning to w when every
-// view-specific top-level component (empty ParentChain, not in globalNames)
-// matched 0 nodes. This is a strong signal that the snapshot captured the
-// wrong page — e.g. a direct URL load silently fell back to a different
-// route (the topwork wizard returning the Dashboard). globalNames excludes
-// shared components (Header, TopworkApp, etc.) that match any page and would
-// suppress the warning spuriously. Pass nil to skip the exclusion.
-func checkRootComponents(w io.Writer, viewComponents []match.SightmapComponent, globalNames map[string]bool, counts map[string]int, viewName string) {
-	var topNames []string
-	for _, comp := range viewComponents {
-		if comp.Name == "" || len(comp.Selectors) == 0 || len(comp.ParentChain) > 0 {
-			continue
-		}
-		if globalNames[comp.Name] {
-			continue // skip globals — they match on any page
-		}
-		topNames = append(topNames, comp.Name)
-	}
-	if len(topNames) == 0 {
-		return // no view-specific top-level components to check
-	}
-	for _, name := range topNames {
-		if counts[name] > 0 {
-			return // at least one view-specific root matched — page is plausibly correct
-		}
-	}
-	label := ""
-	if viewName != "" {
-		label = viewName + ": "
-	}
-	fmt.Fprintf(w, "\n[Snapshot check] %sview root components all unmatched — wrong page captured? (expected: %s)\n\n",
-		label, strings.Join(topNames, ", "))
 }
 
 // countLeafMatches returns the number of tree nodes that satisfy the leaf
