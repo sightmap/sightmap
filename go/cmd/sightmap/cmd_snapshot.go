@@ -9,7 +9,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/render"
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -256,12 +256,6 @@ func writeOutput(
 	matches map[*comps.ComponentNode]*match.SightmapMatch,
 	opts printOpts,
 ) {
-	// Pre-compute tree structures once so we can share them across sections.
-	var parentMap map[*comps.ComponentNode]*comps.ComponentNode
-	if root != nil {
-		parentMap = buildParentMap(root)
-	}
-
 	// ── [View: ...] ──────────────────────────────────────────────────────────
 	if view != nil {
 		fmt.Fprintf(w, "[View: %s]\n", view.Name)
@@ -307,20 +301,20 @@ func writeOutput(
 	// ── [Coverage] ────────────────────────────────────────────────────────────
 	if matches != nil {
 		fmt.Fprintln(w)
-		t1, t2, t3, total, t3nodes, t2clusters, t2children := computeCoverage(root, matches, parentMap, opts.visibleOnly)
-		writeCoverage(w, t1, t2, t3, total, opts.visibleOnly)
+		cov := coverage.Score(root, matches, coverage.Options{VisibleOnly: opts.visibleOnly})
+		writeCoverage(w, cov)
 
 		// ── Unlabeled clusters (--trace) ─────────────────────────────────────
 		// Coverage-only mode always shows the cluster traces — they are the point
 		// of the terse view (which orphans/ambiguous clusters still need work).
 		if opts.trace || opts.coverageOnly {
-			if len(t3nodes) > 0 {
+			if len(cov.Orphans) > 0 {
 				fmt.Fprintln(w)
-				writeTrace(w, t3nodes, parentMap)
+				writeTrace(w, cov.Orphans, cov.ParentMap)
 			}
-			if len(t2clusters) > 0 {
+			if len(cov.Scopes) > 0 {
 				fmt.Fprintln(w)
-				writeT2Trace(w, t2clusters, t2children, matches, view)
+				writeT2Trace(w, cov.Scopes, cov.ScopeChildren, matches, view)
 			}
 		}
 	}
@@ -425,24 +419,18 @@ func writeZeroMatchWarnings(
 }
 
 // writeCoverage prints the [Coverage] section.
-func writeCoverage(w io.Writer, t1, t2, t3, total int, visibleOnly bool) {
-	pct := func(n, d int) int {
-		if d == 0 {
-			return 0
-		}
-		return int(math.Round(float64(n) / float64(d) * 100))
-	}
+func writeCoverage(w io.Writer, cov coverage.Result) {
 	check := "✗"
-	if t3 == 0 {
+	if cov.T3 == 0 {
 		check = "✓"
 	}
-	if visibleOnly {
+	if cov.VisibleOnly {
 		fmt.Fprintf(w, "[Coverage] (visible only)\n")
 	} else {
 		fmt.Fprintf(w, "[Coverage]\n")
 	}
 	fmt.Fprintf(w, "%d interactive · %d direct T1 (%d%%) · %d scoped T2 (%d%%) · %d orphaned T3 %s\n",
-		total, t1, pct(t1, total), t2, pct(t2, total), t3, check)
+		cov.Total, cov.T1, coverage.Pct(cov.T1, cov.Total), cov.T2, coverage.Pct(cov.T2, cov.Total), cov.T3, check)
 }
 
 // writeTrace prints the "Unlabeled clusters" section for T3 (orphaned) nodes.
@@ -467,10 +455,10 @@ func writeTrace(
 	clusters := make(map[clusterKey]*cluster)
 
 	for _, n := range t3nodes {
-		anc := nearestDataAttrAncestor(n, parentMap)
+		anc := coverage.NearestDataAttrAncestor(n, parentMap)
 		inside := ""
 		if anc != nil {
-			inside = dataAttrSel(anc)
+			inside = coverage.DataAttrSelector(anc)
 		}
 
 		nameStr := n.Name
@@ -515,7 +503,7 @@ func writeTrace(
 		fmt.Fprintf(w, "  %d\u00d7 %s %s\n", c.count, key.role, nameDisp)
 		if key.inside != "" {
 			fmt.Fprintf(w, "       inside: %s\n", key.inside)
-			if hint := arrowHint(c.rep, parentMap); hint != "" {
+			if hint := coverage.ArrowHint(c.rep, parentMap); hint != "" {
 				fmt.Fprintf(w, "       \u2192 %s\n", hint)
 			}
 		}
@@ -737,179 +725,6 @@ func extractProperties(
 	return propValues
 }
 
-// ── Tree pre-passes ───────────────────────────────────────────────────────────
-
-// buildParentMap returns a map from each non-root node to its parent.
-func buildParentMap(root *comps.ComponentNode) map[*comps.ComponentNode]*comps.ComponentNode {
-	pm := make(map[*comps.ComponentNode]*comps.ComponentNode)
-	if root == nil {
-		return pm
-	}
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
-		for _, child := range n.Children {
-			pm[child] = n
-		}
-		return true
-	})
-	return pm
-}
-
-// ── Coverage computation ──────────────────────────────────────────────────────
-
-// computeCoverage classifies every interactive node into T1/T2/T3.
-//
-//   - T1 (direct): the node itself has a sightmap match.
-//   - T2 (scoped): an ancestor has a sightmap match.
-//   - T3 (orphan): no sightmap context at any depth.
-func computeCoverage(
-	root *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
-	parentMap map[*comps.ComponentNode]*comps.ComponentNode,
-	visibleOnly bool,
-) (t1, t2, t3, total int, t3nodes []*comps.ComponentNode, t2clusters map[*comps.ComponentNode]int, t2children map[*comps.ComponentNode][]*comps.ComponentNode) {
-	t2clusters = make(map[*comps.ComponentNode]int)
-	t2children = make(map[*comps.ComponentNode][]*comps.ComponentNode)
-	if root == nil {
-		return
-	}
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
-		if !n.IsInteractive {
-			return true
-		}
-		if visibleOnly && (!n.IsVisible || n.IsIgnored) {
-			return true // skip hidden/ignored interactive nodes
-		}
-		total++
-		if matches[n] != nil {
-			t1++
-		} else if anc := nearestMatchedAncestor(n, parentMap, matches); anc != nil {
-			t2++
-			t2clusters[anc]++
-			t2children[anc] = append(t2children[anc], n)
-		} else {
-			t3++
-			t3nodes = append(t3nodes, n)
-		}
-		return true
-	})
-	return
-}
-
-// nearestMatchedAncestor returns the nearest ancestor of node that has a
-// sightmap match, or nil if none exists.
-func nearestMatchedAncestor(
-	node *comps.ComponentNode,
-	parentMap map[*comps.ComponentNode]*comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
-) *comps.ComponentNode {
-	curr := parentMap[node]
-	for curr != nil {
-		if matches[curr] != nil {
-			return curr
-		}
-		curr = parentMap[curr]
-	}
-	return nil
-}
-
-// ── Trace helpers ─────────────────────────────────────────────────────────────
-
-// nearestDataAttrAncestor walks up parentMap to find the nearest ancestor
-// whose selector carries a data-testid or data-component attribute.
-func nearestDataAttrAncestor(
-	node *comps.ComponentNode,
-	parentMap map[*comps.ComponentNode]*comps.ComponentNode,
-) *comps.ComponentNode {
-	curr := parentMap[node]
-	for curr != nil {
-		if curr.Selector != nil {
-			a := curr.Selector.Attrs
-			if a["data-testid"] != "" || a["data-component"] != "" {
-				return curr
-			}
-		}
-		curr = parentMap[curr]
-	}
-	return nil
-}
-
-// dataAttrSel formats an ancestor node for the "inside:" display line.
-// Prefers data-testid, then data-component, then falls back to basic tag#id.cls.
-func dataAttrSel(node *comps.ComponentNode) string {
-	if node.Selector == nil {
-		return node.Role
-	}
-	tag := node.Selector.Tag
-	if tag == "" {
-		tag = node.Role
-	}
-	a := node.Selector.Attrs
-	if dt := a["data-testid"]; dt != "" {
-		return fmt.Sprintf(`%s[data-testid="%s"]`, tag, dt)
-	}
-	if dc := a["data-component"]; dc != "" {
-		return fmt.Sprintf(`%s[data-component^="%s"]`, tag, dc)
-	}
-	return selectorStr(node.Selector)
-}
-
-// orphanSlotKey is the cross-snapshot STRUCTURAL identity of an uncovered
-// interactive node, used by snapshot novelty to decide whether a
-// capture introduces a new "slot". It is the node's role plus the selector of
-// its nearest data-attr ancestor — deliberately WITHOUT the node's instance text,
-// so different instances of the same widget (e.g. each product link in a
-// carousel) collapse to one slot and don't read as endless novelty.
-//
-// It shares the same anchor primitives (nearestDataAttrAncestor / dataAttrSel) as
-// the coverage "Unlabeled clusters" trace and `gap`, so changing the anchoring
-// heuristic (the role+attr scheme) only needs to touch those helpers.
-func orphanSlotKey(
-	node *comps.ComponentNode,
-	parentMap map[*comps.ComponentNode]*comps.ComponentNode,
-) string {
-	role := node.Role
-	if role == "" {
-		role = "?"
-	}
-	inside := "(no stable ancestor)"
-	if anc := nearestDataAttrAncestor(node, parentMap); anc != nil {
-		inside = dataAttrSel(anc)
-	}
-	return role + " @ " + inside
-}
-
-// arrowHint builds the "→ selector" suggestion line for a T3 node.
-// It uses the nearest data-attr ancestor as the scope and appends the
-// T3 node's own tag as the final selector part.
-func arrowHint(
-	node *comps.ComponentNode,
-	parentMap map[*comps.ComponentNode]*comps.ComponentNode,
-) string {
-	nodeTag := ""
-	if node.Selector != nil {
-		nodeTag = node.Selector.Tag
-	}
-	if nodeTag == "" {
-		nodeTag = node.Role
-		if nodeTag == "" {
-			nodeTag = "?"
-		}
-	}
-
-	anc := nearestDataAttrAncestor(node, parentMap)
-	if anc == nil || anc.Selector == nil {
-		return ""
-	}
-	a := anc.Selector.Attrs
-	if dt := a["data-testid"]; dt != "" {
-		return fmt.Sprintf(`[data-testid="%s"] %s`, dt, nodeTag)
-	}
-	if dc := a["data-component"]; dc != "" {
-		return fmt.Sprintf(`[data-component^="%s"] %s`, dc, nodeTag)
-	}
-	return selectorStr(anc.Selector) + " " + nodeTag
-}
-
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
 // displayName truncates s to 60 Unicode code points and wraps it in double
@@ -924,26 +739,6 @@ func displayName(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `"`, `\"`)
 	return `"` + s + `"`
-}
-
-// selectorStr formats a SelectorPart as tag[#id][.cls1.cls2].
-// Attributes (data-testid etc.) are not included in the tree display;
-// they appear only in the trace section.
-func selectorStr(s *comps.SelectorPart) string {
-	if s == nil {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString(s.Tag)
-	if s.Id != "" {
-		b.WriteByte('#')
-		b.WriteString(s.Id)
-	}
-	for _, c := range s.Classes {
-		b.WriteByte('.')
-		b.WriteString(c)
-	}
-	return b.String()
 }
 
 // truncateStr truncates s to at most maxRunes Unicode code points,

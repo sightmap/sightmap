@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -36,8 +37,8 @@ type viewCoverageAgg struct {
 	worstT2Count           int
 }
 
-func (a viewCoverageAgg) t1pct() int { return coveragePct(a.sumT1, a.sumTotal) }
-func (a viewCoverageAgg) t2pct() int { return coveragePct(a.sumT2, a.sumTotal) }
+func (a viewCoverageAgg) t1pct() int { return coverage.Pct(a.sumT1, a.sumTotal) }
+func (a viewCoverageAgg) t2pct() int { return coverage.Pct(a.sumT2, a.sumTotal) }
 
 // aggregateViewCoverage folds a view's per-capture coverage into the report
 // rollup: sum T1/T2/total, take the max T3 (so the gate trips iff ANY capture had
@@ -132,8 +133,8 @@ func runReport(args []string) error {
 			if route == "" {
 				route = capRoute
 			}
-			parentMap := buildParentMap(root)
-			t1, t2, t3, total, _, t2c, _ := computeCoverage(root, matches, parentMap, visibleOnly)
+			cov := coverage.Score(root, matches, coverage.Options{VisibleOnly: visibleOnly})
+			t1, t2, t3, total, t2c := cov.T1, cov.T2, cov.T3, cov.Total, cov.Scopes
 
 			cc := captureCoverage{t1: t1, t2: t2, t3: t3, total: total}
 			for node, count := range t2c {
@@ -256,8 +257,8 @@ func runReport(args []string) error {
 	}
 	if sumTotal > 0 {
 		statusLine += fmt.Sprintf("  ·  avg T1 %d%%  ·  avg T2 %d%%",
-			coveragePct(sumT1, sumTotal),
-			coveragePct(sumT2, sumTotal),
+			coverage.Pct(sumT1, sumTotal),
+			coverage.Pct(sumT2, sumTotal),
 		)
 	}
 	fmt.Printf(" %s\n", statusLine)

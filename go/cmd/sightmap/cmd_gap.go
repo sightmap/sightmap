@@ -9,6 +9,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -84,7 +85,7 @@ func runGap(args []string) error {
 	}
 
 	// ── Build parent map ─────────────────────────────────────────────────────
-	parentMap := buildParentMap(root)
+	parentMap := coverage.BuildParentMap(root)
 
 	// ── Handle --scope flag ──────────────────────────────────────────────────
 	var scopeNode *comps.ComponentNode
@@ -209,13 +210,13 @@ func runGap(args []string) error {
 	clusters := make(map[groupKey]*t3Group)
 
 	for _, n := range gapNodes {
-		anc := nearestDataAttrAncestor(n, parentMap)
+		anc := coverage.NearestDataAttrAncestor(n, parentMap)
 		inside := "(no stable ancestor)"
 		if scopeNode != nil {
 			// In scoped mode, use the scope component as the inside context
 			inside = fmt.Sprintf("[%s]", *scopeFlag)
 		} else if anc != nil {
-			inside = dataAttrSel(anc)
+			inside = coverage.DataAttrSelector(anc)
 		}
 
 		nameStr := n.Name
@@ -280,7 +281,7 @@ func runGap(args []string) error {
 		fmt.Printf("       inside: %s\n", g.ancestorDesc)
 
 		// Build arrow hint from the representative node.
-		if hint := arrowHint(rep, parentMap); hint != "" {
+		if hint := coverage.ArrowHint(rep, parentMap); hint != "" {
 			fmt.Printf("       \u2192 %s\n", hint)
 		}
 		fmt.Println()

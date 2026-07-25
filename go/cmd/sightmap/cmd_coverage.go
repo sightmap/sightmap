@@ -5,13 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -75,7 +75,7 @@ func runCoverage(args []string) error {
 	for _, v := range views {
 		entries := sets[v]
 		var caps []captureMatchCounts
-		var capGaps [][]contentGap
+		var capGaps [][]coverage.ContentGap
 		headerView := ""
 		for _, e := range entries {
 			counts, leafCounts, vName, t3, gaps, ok := coverCapture(e.Path, sess, corpus, visible, *traceFlag)
@@ -109,7 +109,7 @@ func runCoverage(args []string) error {
 			if label == "" {
 				label = v
 			}
-			emitContentGaps(label, unionContentGaps(capGaps))
+			emitContentGaps(label, coverage.UnionContentGaps(capGaps))
 		}
 	}
 
@@ -154,7 +154,7 @@ func matchCapture(snapPath string, sess *sightmap.Session) (root *comps.Componen
 // genuinely-absent components), the view name from the snap header, the T3
 // count, the annotation-completeness gaps found in the capture,
 // and ok=false if the capture could not be loaded/parsed/matched.
-func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corpus, visible, trace bool) (counts map[string]int, leafCounts map[string]int, viewName string, t3 int, gaps []contentGap, ok bool) {
+func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corpus, visible, trace bool) (counts map[string]int, leafCounts map[string]int, viewName string, t3 int, gaps []coverage.ContentGap, ok bool) {
 	root, matches, route, ok := matchCapture(snapPath, sess)
 	if !ok {
 		return nil, nil, "", 0, nil, false
@@ -171,8 +171,11 @@ func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corp
 		}
 	}
 
-	parentMap := buildParentMap(root)
-	t1, t2, t3, total, t3nodes, t2clusters, t2children := computeCoverage(root, matches, parentMap, visible)
+	cov := coverage.Score(root, matches, coverage.Options{VisibleOnly: visible})
+	t1, t2, total := cov.T1, cov.T2, cov.Total
+	t3nodes, t2clusters, t2children := cov.Orphans, cov.Scopes, cov.ScopeChildren
+	parentMap := cov.ParentMap
+	t3 = cov.T3
 	check := "✓"
 	if t3 > 0 {
 		check = "✗"
@@ -185,8 +188,8 @@ func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corp
 	fmt.Printf("%s%s:\n  %d interactive · %d direct T1 (%d%%) · %d scoped T2 (%d%%) · %d orphaned T3 %s\n",
 		filepath.Base(snapPath), suffix,
 		total,
-		t1, coveragePct(t1, total),
-		t2, coveragePct(t2, total),
+		t1, coverage.Pct(t1, total),
+		t2, coverage.Pct(t2, total),
 		t3, check,
 	)
 	if trace {
@@ -203,7 +206,7 @@ func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corp
 
 	// Annotation-completeness gaps for this capture: named content
 	// nodes with no component context, surfaced in the union advisory section.
-	gaps = annotationGaps(root, matches, parentMap, visible)
+	gaps = coverage.Gaps(root, matches, parentMap, visible)
 
 	counts = make(map[string]int)
 	for _, m := range matches {
@@ -376,14 +379,6 @@ func emitUnionWarnings(viewName string, pres []componentPresence) {
 		}
 		fmt.Println()
 	}
-}
-
-// coveragePct returns the percentage of a out of b, rounded to the nearest integer.
-func coveragePct(a, b int) int {
-	if b == 0 {
-		return 0
-	}
-	return int(math.Round(float64(a) * 100 / float64(b)))
 }
 
 // parseViewName reads the first 10 lines of snapFile and extracts the view name
