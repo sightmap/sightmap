@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -143,6 +144,11 @@ func runBrowserStart(args []string) error {
 		json.NewEncoder(w).Encode(c)
 	})
 
+	// Devtools query surface. The collector is created after Chrome is ready
+	// (below); the handlers return 503 until then.
+	var collectorPtr atomic.Pointer[browser.Collector]
+	registerDevtoolsHandlers(mux, &collectorPtr)
+
 	srvAddr := fmt.Sprintf(":%d", resolvedServerPort)
 	srv := &http.Server{Addr: srvAddr, Handler: mux}
 	srvReady := make(chan error, 1)
@@ -211,6 +217,13 @@ func runBrowserStart(args []string) error {
 		cmd.Process.Kill()
 		return fmt.Errorf("start: chrome did not become ready: %w", pollErr)
 	}
+
+	// Start the console/network collector against the now-ready session and
+	// publish it to the devtools handlers registered above.
+	collector := browser.NewCollector(cdpAddr)
+	collector.Start()
+	collectorPtr.Store(collector)
+	defer collector.Stop()
 
 	// Write session file.
 	pid := 0
