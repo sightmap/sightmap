@@ -96,9 +96,8 @@ func runInspect(args []string) error {
 	// ── Load sightmap (optional, silent on error) ─────────────────────────────
 	var inspectMatches map[*comps.ComponentNode]*match.SightmapMatch
 	if _, statErr := os.Stat(*sightmapDirFlag); statErr == nil {
-		sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
-		if m, mErr := sess.MatchTree(root, pageURL); mErr == nil {
-			inspectMatches = m
+		if corpus, cErr := sightmap.Load(*sightmapDirFlag); cErr == nil {
+			inspectMatches = corpus.MatchTree(root, pageURL)
 		}
 	}
 

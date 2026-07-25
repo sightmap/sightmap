@@ -32,7 +32,7 @@ func runGap(args []string) error {
 	cleanup := func() {}
 	defer func() { cleanup() }()
 
-	conn, dialErr := dialAddrTab(*addrFlag, *tabFlag)
+	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
 	if dialErr != nil {
 		if !*launchFlag {
 			return dialErr
@@ -78,11 +78,11 @@ func runGap(args []string) error {
 		return fmt.Errorf("gap: sightmap dir %q not found — run 'sightmap validate' to check setup", *sightmapDirFlag)
 	}
 
-	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
-	matches, matchErr := sess.MatchTree(root, pageURL)
-	if matchErr != nil {
-		return fmt.Errorf("gap: match tree: %v", matchErr)
+	corpus, loadErr := sightmap.Load(*sightmapDirFlag)
+	if loadErr != nil {
+		return fmt.Errorf("gap: load corpus: %v", loadErr)
 	}
+	matches := corpus.MatchTree(root, pageURL)
 
 	// ── Build parent map ─────────────────────────────────────────────────────
 	parentMap := coverage.BuildParentMap(root)
@@ -101,10 +101,7 @@ func runGap(args []string) error {
 		if scopeNode == nil {
 			// Component not found or not matched on page
 			// Check if it exists in the corpus
-			components, err := sess.Components(pageURL)
-			if err != nil {
-				return fmt.Errorf("gap: load components: %v", err)
-			}
+			components := corpus.Components(pageURL)
 			found := false
 			for _, comp := range components {
 				if comp.Name == *scopeFlag {

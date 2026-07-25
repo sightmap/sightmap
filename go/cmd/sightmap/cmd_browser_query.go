@@ -63,19 +63,16 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 		return nil, fmt.Errorf("resolve query: get URL: %w", err)
 	}
 
-	sess := sightmap.NewSession(sightmap.DirLoader(sightmapDir))
-	matches, err := sess.MatchTree(root, pageURL)
+	corpus, err := sightmap.Load(sightmapDir)
 	if err != nil {
-		return nil, fmt.Errorf("resolve query: sightmap match: %w", err)
+		return nil, fmt.Errorf("resolve query: load corpus: %w", err)
 	}
+	matches := corpus.MatchTree(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf(
 			"resolve query: no sightmap components matched the page (need a corpus in %s)", sightmapDir)
 	}
-	components, err := sess.Components(pageURL)
-	if err != nil {
-		return nil, fmt.Errorf("resolve query: components: %w", err)
-	}
+	components := corpus.Components(pageURL)
 
 	// Extract properties only for nodes whose component name appears in the
 	// query — keeps the live extraction small and avoids the per-snapshot node

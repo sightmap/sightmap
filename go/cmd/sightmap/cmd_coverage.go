@@ -52,12 +52,9 @@ func runCoverage(args []string) error {
 		return err
 	}
 
-	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
-
-	// Load corpus for zero-match warnings (view component lookup by name).
-	var corpus *sightmap.Corpus
-	if c, cErr := sightmap.DirLoader(*sightmapDirFlag).Load(); cErr == nil {
-		corpus = c
+	corpus, err := sightmap.Load(*sightmapDirFlag)
+	if err != nil {
+		return fmt.Errorf("load corpus: %v", err)
 	}
 
 	// Group captures into their per-VIEW sets so dead-component detection runs over
@@ -78,7 +75,7 @@ func runCoverage(args []string) error {
 		var capGaps [][]coverage.ContentGap
 		headerView := ""
 		for _, e := range entries {
-			counts, leafCounts, vName, t3, gaps, ok := coverCapture(e.Path, sess, corpus, visible, *traceFlag)
+			counts, leafCounts, vName, t3, gaps, ok := coverCapture(e.Path, corpus, visible, *traceFlag)
 			if !ok {
 				failures++
 				continue
@@ -125,7 +122,7 @@ func runCoverage(args []string) error {
 // can't be loaded, parsed, or matched. Shared by coverage/report/multi-coverage so
 // every reader matches a capture the same route-aware way instead of
 // each re-implementing the load/parse/match boilerplate.
-func matchCapture(snapPath string, sess *sightmap.Session) (root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.SightmapMatch, route string, ok bool) {
+func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.SightmapMatch, route string, ok bool) {
 	treeFile := snapPath + ".tree.json"
 	data, err := os.ReadFile(treeFile)
 	if err != nil {
@@ -139,11 +136,7 @@ func matchCapture(snapPath string, sess *sightmap.Session) (root *comps.Componen
 		return nil, nil, "", false
 	}
 	route = parseSnapRoute(snapPath)
-	matches, err = sess.MatchTree(root, route)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s: match tree: %v\n", filepath.Base(snapPath), err)
-		return nil, nil, "", false
-	}
+	matches = corpus.MatchTree(root, route)
 	return root, matches, route, true
 }
 
@@ -154,8 +147,8 @@ func matchCapture(snapPath string, sess *sightmap.Session) (root *comps.Componen
 // genuinely-absent components), the view name from the snap header, the T3
 // count, the annotation-completeness gaps found in the capture,
 // and ok=false if the capture could not be loaded/parsed/matched.
-func coverCapture(snapPath string, sess *sightmap.Session, corpus *sightmap.Corpus, visible, trace bool) (counts map[string]int, leafCounts map[string]int, viewName string, t3 int, gaps []coverage.ContentGap, ok bool) {
-	root, matches, route, ok := matchCapture(snapPath, sess)
+func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool) (counts map[string]int, leafCounts map[string]int, viewName string, t3 int, gaps []coverage.ContentGap, ok bool) {
+	root, matches, route, ok := matchCapture(snapPath, corpus)
 	if !ok {
 		return nil, nil, "", 0, nil, false
 	}

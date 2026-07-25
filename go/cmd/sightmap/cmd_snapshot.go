@@ -93,7 +93,7 @@ func runSnapshot(args []string) error {
 	cleanup := func() {}
 	defer func() { cleanup() }()
 
-	conn, dialErr := dialAddrTab(*addrFlag, *tabFlag)
+	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
 	if dialErr != nil {
 		if !*launchFlag {
 			return fmt.Errorf(
@@ -152,22 +152,13 @@ func runSnapshot(args []string) error {
 	var viewComponents []match.SightmapComponent
 	var globalNames map[string]bool
 	if _, statErr := os.Stat(*sightmapDirFlag); statErr == nil {
-		sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
-		if m, mErr := sess.MatchTree(root, pageURL); mErr == nil {
-			snapshotMatches = m
+		if corpus, cErr := sightmap.Load(*sightmapDirFlag); cErr != nil {
+			fmt.Fprintf(os.Stderr, "snapshot: load corpus: %v\n", cErr)
 		} else {
-			fmt.Fprintf(os.Stderr, "snapshot: sightmap match: %v\n", mErr)
-		}
-		if v, vErr := sess.ViewForURL(pageURL); vErr == nil {
-			view = v
-		} else {
-			fmt.Fprintf(os.Stderr, "snapshot: view lookup: %v\n", vErr)
-		}
-		if components, cErr := sess.Components(pageURL); cErr == nil {
-			viewComponents = components
-		}
-		if gn, gnErr := sess.GlobalComponentNames(); gnErr == nil {
-			globalNames = gn
+			snapshotMatches = corpus.MatchTree(root, pageURL)
+			view = corpus.ViewForURL(pageURL)
+			viewComponents = corpus.Components(pageURL)
+			globalNames = corpus.GlobalComponentNames()
 		}
 		// Extract property values from the live DOM (skipped in offline mode).
 		if conn != nil && len(snapshotMatches) > 0 && len(viewComponents) > 0 {

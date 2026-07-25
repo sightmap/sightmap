@@ -27,11 +27,7 @@ func runMultiCoverage(args []string) error {
 		return err
 	}
 
-	loader := sightmap.DirLoader(*sightmapDirFlag)
-	sess := sightmap.NewSession(loader)
-
-	// Load corpus directly to check which names are already global.
-	corpus, err := loader.Load()
+	corpus, err := sightmap.Load(*sightmapDirFlag)
 	if err != nil {
 		return fmt.Errorf("load corpus: %v", err)
 	}
@@ -53,7 +49,7 @@ func runMultiCoverage(args []string) error {
 	for _, v := range viewNames {
 		var caps []map[string]int
 		for _, e := range sets[v] {
-			_, matches, _, ok := matchCapture(e.Path, sess)
+			_, matches, _, ok := matchCapture(e.Path, corpus)
 			if !ok {
 				continue
 			}

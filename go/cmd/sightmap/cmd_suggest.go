@@ -47,7 +47,7 @@ func runSuggest(args []string) error {
 	cleanup := func() {}
 	defer func() { cleanup() }()
 
-	conn, dialErr := dialAddrTab(*addrFlag, *tabFlag)
+	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
 	if dialErr != nil {
 		if !*launchFlag {
 			return dialErr
@@ -126,10 +126,8 @@ func runSuggest(args []string) error {
 	var knownSelectors []string
 	if *excludeKnownFlag {
 		if _, statErr := os.Stat(*sightmapDirFlag); statErr == nil {
-			sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
-			compsSlice, loadErr := sess.Components("")
-			if loadErr == nil {
-				for _, c := range compsSlice {
+			if corpus, loadErr := sightmap.Load(*sightmapDirFlag); loadErr == nil {
+				for _, c := range corpus.Components("") {
 					knownSelectors = append(knownSelectors, c.Selectors...)
 				}
 			}
@@ -320,11 +318,11 @@ func buildSightmapMatchMapForSuggest(
 	if err != nil {
 		return nil, fmt.Errorf("extract components (fallback): %v", err)
 	}
-	sess := sightmap.NewSession(sightmap.DirLoader(smDir))
-	matches, err := sess.MatchTree(root, pageURL)
+	corpus, err := sightmap.Load(smDir)
 	if err != nil {
-		return nil, fmt.Errorf("match tree (fallback): %v", err)
+		return nil, fmt.Errorf("load corpus (fallback): %v", err)
 	}
+	matches := corpus.MatchTree(root, pageURL)
 	m := make(map[string]string)
 	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {
@@ -346,11 +344,11 @@ func buildSightmapMatchMap(treeFile string, smDir string, pageURL string) (map[s
 	if err := json.Unmarshal(data, &root); err != nil {
 		return nil, fmt.Errorf("parse tree JSON: %v", err)
 	}
-	sess := sightmap.NewSession(sightmap.DirLoader(smDir))
-	matches, err := sess.MatchTree(&root, pageURL)
+	corpus, err := sightmap.Load(smDir)
 	if err != nil {
-		return nil, fmt.Errorf("match tree: %v", err)
+		return nil, fmt.Errorf("load corpus: %v", err)
 	}
+	matches := corpus.MatchTree(&root, pageURL)
 	m := make(map[string]string)
 	comps.Walk(&root, func(n *comps.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {

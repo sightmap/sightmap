@@ -31,64 +31,6 @@ func resolveNode(ctx context.Context, conn *browser.CDPConn, id string) (*comps.
 	return browser.ResolveBySightmapID(ctx, conn, id)
 }
 
-// dialAddrTab connects to Chrome for a page-affecting command. With an explicit
-// tabID it connects to that tab. Without one it auto-selects the single open
-// CONTENT tab, but errors (listing the tabs) when there are zero or several — so
-// concurrent agents can never silently drive each other's tab, and a command
-// never lands on the extension side panel.
-func dialAddrTab(addr, tabID string) (*browser.CDPConn, error) {
-	ctx := context.Background()
-	if tabID != "" {
-		conn, err := browser.ConnectTab(ctx, addr, tabID)
-		if err != nil {
-			return nil, fmt.Errorf("cannot connect to tab %s at %s\n"+
-				"Run 'sightmap browser tabs list' to see open tabs.", tabID, addr)
-		}
-		return conn, nil
-	}
-
-	tabs, err := browser.ListTabs(ctx, addr)
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to Chrome at %s\n"+
-			"Start a session first: sightmap browser start", addr)
-	}
-	switch len(tabs) {
-	case 0:
-		return nil, fmt.Errorf("no content tab open at %s\n"+
-			"Start a session first: sightmap browser start", addr)
-	case 1:
-		conn, err := browser.ConnectTab(ctx, addr, tabs[0].TargetID)
-		if err != nil {
-			return nil, fmt.Errorf("cannot connect to tab %s at %s", tabs[0].TargetID, addr)
-		}
-		return conn, nil
-	default:
-		return nil, ambiguousTabError(tabs)
-	}
-}
-
-// ambiguousTabError builds the "pass --tab" guidance shown when several content
-// tabs are open (the concurrent multi-agent case).
-func ambiguousTabError(tabs []browser.TabInfo) error {
-	var b strings.Builder
-	fmt.Fprintf(&b, "%d content tabs are open — pass --tab <ID> to choose one\n", len(tabs))
-	b.WriteString("(no default when a session has multiple tabs, to avoid cross-agent crosstalk):\n")
-	for _, t := range tabs {
-		url := t.URL
-		if len(url) > 70 {
-			url = url[:67] + "..."
-		}
-		fmt.Fprintf(&b, "  --tab %s  %s\n", t.TargetID, url)
-	}
-	b.WriteString("Your session's tab ID was printed by 'sightmap browser start'.")
-	return errors.New(b.String())
-}
-
-// dialAddr connects to the default page (backwards-compatible single-agent path).
-func dialAddr(addr string) (*browser.CDPConn, error) {
-	return dialAddrTab(addr, "")
-}
-
 // parseFlagsInterspersed parses fs allowing flags to appear AFTER positional
 // arguments. Go's stdlib flag stops at the first positional, which silently
 // drops flags like `click 'ComponentQuery' --tab X` — a multi-agent footgun where --tab is ignored. We reorder flags
@@ -136,7 +78,7 @@ func runClick(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -171,7 +113,7 @@ func runFill(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -201,7 +143,7 @@ func runHover(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -235,7 +177,7 @@ func runKeyPress(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -262,7 +204,7 @@ func runScroll(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -299,7 +241,7 @@ func runDrag(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -346,7 +288,7 @@ func runWaitFor(args []string) error {
 	)
 	defer cancel()
 
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -381,7 +323,7 @@ func runDialog(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -406,7 +348,7 @@ func runScreenshot(args []string) error {
 		return err
 	}
 
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -502,7 +444,7 @@ func runClearStorage(args []string) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	conn, err := dialAddrTab(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(*addrFlag, *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -643,7 +585,7 @@ func runTabsResize(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(sessionAddr(), *tabFlag)
+	conn, err := browser.Connect(sessionAddr(), *tabFlag)
 	if err != nil {
 		return err
 	}

@@ -74,7 +74,7 @@ func runCapture(args []string) error {
 	cleanup := func() {}
 	defer func() { cleanup() }()
 
-	conn, dialErr := dialAddrTab(*addrFlag, *tabFlag)
+	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
 	if dialErr != nil {
 		if !*launchFlag {
 			return fmt.Errorf(
@@ -126,21 +126,18 @@ func runCapture(args []string) error {
 	if _, statErr := os.Stat(*sightmapDirFlag); statErr != nil {
 		return fmt.Errorf("capture: no %s directory — capture appends to a corpus view set", *sightmapDirFlag)
 	}
-	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
-	snapshotMatches, mErr := sess.MatchTree(root, pageURL)
-	if mErr != nil {
-		return fmt.Errorf("capture: sightmap match: %v", mErr)
+	corpus, cErr := sightmap.Load(*sightmapDirFlag)
+	if cErr != nil {
+		return fmt.Errorf("capture: load corpus: %v", cErr)
 	}
-	view, vErr := sess.ViewForURL(pageURL)
-	if vErr != nil || view == nil {
+	snapshotMatches := corpus.MatchTree(root, pageURL)
+	view := corpus.ViewForURL(pageURL)
+	if view == nil {
 		return fmt.Errorf("capture: no view matches %q — capture appends to a view's set; "+
 			"use `snapshot` to observe an unmapped page, or add a view with a matching route", pageURL)
 	}
-	var viewComponents []match.SightmapComponent
-	if components, cErr := sess.Components(pageURL); cErr == nil {
-		viewComponents = components
-	}
-	globalNames, _ := sess.GlobalComponentNames()
+	viewComponents := corpus.Components(pageURL)
+	globalNames := corpus.GlobalComponentNames()
 
 	opts := printOpts{
 		trace:          *traceFlag,
@@ -155,7 +152,7 @@ func runCapture(args []string) error {
 	cov := coverage.Score(root, snapshotMatches, coverage.Options{VisibleOnly: visible})
 	if !*forceFlag {
 		cand := slotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
-		if res, write := noveltyGate(*sightmapDirFlag, viewBasename, cand, false); !write {
+		if res, write := noveltyGate(corpus, *sightmapDirFlag, viewBasename, cand, false); !write {
 			fmt.Fprintf(os.Stderr, "capture: nothing new vs %d capture(s) in %s — not saved (use --force to keep)\n",
 				res.ComparedTo, viewBasename)
 			return nil
@@ -198,11 +195,16 @@ func runCaptureAll(
 	}
 
 	ctx := context.Background()
-	conn, err := dialAddrTab(addr, tabID)
+	conn, err := browser.Connect(addr, tabID)
 	if err != nil {
 		return fmt.Errorf("capture --all: %w", err)
 	}
 	defer conn.Close()
+
+	corpus, err := sightmap.Load(sightmapDir)
+	if err != nil {
+		return fmt.Errorf("capture --all: load corpus: %v", err)
+	}
 
 	type result struct {
 		name              string
@@ -240,14 +242,10 @@ func runCaptureAll(
 			continue
 		}
 
-		sess := sightmap.NewSession(sightmap.DirLoader(sightmapDir))
-		snapshotMatches, _ := sess.MatchTree(root, pageURL)
-		view, _ := sess.ViewForURL(pageURL)
-		var viewComponents []match.SightmapComponent
-		if components, cErr := sess.Components(pageURL); cErr == nil {
-			viewComponents = components
-		}
-		globalNames, _ := sess.GlobalComponentNames()
+		snapshotMatches := corpus.MatchTree(root, pageURL)
+		view := corpus.ViewForURL(pageURL)
+		viewComponents := corpus.Components(pageURL)
+		globalNames := corpus.GlobalComponentNames()
 
 		opts := printOpts{
 			visibleOnly:    visible,
@@ -261,7 +259,7 @@ func runCaptureAll(
 		// Novelty gate: don't append a redundant capture to the view set.
 		if !force {
 			cand := slotsFromMatch(snapshotMatches, cov.Orphans, cov.ParentMap)
-			if res, write := noveltyGate(sightmapDir, v.ViewDir, cand, false); !write {
+			if res, write := noveltyGate(corpus, sightmapDir, v.ViewDir, cand, false); !write {
 				results = append(results, result{name: label, skipped: true, skippedVs: res.ComparedTo})
 				continue
 			}

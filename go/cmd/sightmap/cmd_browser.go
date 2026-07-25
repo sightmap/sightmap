@@ -525,7 +525,7 @@ func runNavigate(args []string) error {
 	}
 	url := args[0]
 
-	conn, err := dialAddrTab(addr, tabID)
+	conn, err := browser.Connect(addr, tabID)
 	if err != nil {
 		return err
 	}
@@ -554,7 +554,7 @@ func runEval(args []string) error {
 	}
 	script := args[0]
 
-	conn, err := dialAddrTab(addr, tabID)
+	conn, err := browser.Connect(addr, tabID)
 	if err != nil {
 		return err
 	}

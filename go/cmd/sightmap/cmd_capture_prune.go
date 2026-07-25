@@ -31,7 +31,10 @@ func runCapturePrune(args []string) error {
 		return fmt.Errorf("usage: sightmap capture-prune [--dry-run] (<view> | --all)")
 	}
 
-	sess := sightmap.NewSession(sightmap.DirLoader(*sightmapDirFlag))
+	corpus, err := sightmap.Load(*sightmapDirFlag)
+	if err != nil {
+		return fmt.Errorf("capture-prune: load corpus: %v", err)
+	}
 	all, _ := findSnapshots(*sightmapDirFlag, nil)
 	sets := groupSnapshotsByView(all)
 
@@ -46,7 +49,7 @@ func runCapturePrune(args []string) error {
 
 	totalPruned := 0
 	for _, view := range views {
-		totalPruned += pruneView(view, sets[view], sess, *dryRunFlag)
+		totalPruned += pruneView(view, sets[view], corpus, *dryRunFlag)
 	}
 	if *dryRunFlag && totalPruned > 0 {
 		fmt.Printf("\n(dry run \u2014 nothing deleted; re-run without --dry-run to prune)\n")
@@ -57,11 +60,11 @@ func runCapturePrune(args []string) error {
 // pruneView re-matches a view's captures against the current corpus and removes
 // the subsumed ones. Returns how many were pruned (or would be, under
 // --dry-run).
-func pruneView(view string, entries []snapEntry, sess *sightmap.Session, dryRun bool) int {
+func pruneView(view string, entries []snapEntry, corpus *sightmap.Corpus, dryRun bool) int {
 	paths := make([]string, 0, len(entries))
 	caps := make([]captureSlots, 0, len(entries))
 	for _, e := range entries {
-		cs, ok := extractCaptureSlots(e.Path, sess)
+		cs, ok := extractCaptureSlots(e.Path, corpus)
 		if !ok {
 			continue
 		}

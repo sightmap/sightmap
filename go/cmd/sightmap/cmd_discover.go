@@ -40,7 +40,7 @@ func runDiscover(args []string) error {
 	cleanup := func() {}
 	defer func() { cleanup() }()
 
-	conn, dialErr := dialAddrTab(*addrFlag, *tabFlag)
+	conn, dialErr := browser.Connect(*addrFlag, *tabFlag)
 	if dialErr != nil {
 		if !*launchFlag {
 			return dialErr
