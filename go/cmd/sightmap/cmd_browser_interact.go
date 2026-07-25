@@ -344,8 +344,19 @@ func runScreenshot(args []string) error {
 	jpegFlag := fs.Bool("jpeg", false, "Force JPEG output (skips PNG attempt; implies optimizeForSpeed)")
 	qualityFlag := fs.Int("quality", 80, "JPEG quality 0-100 (default: 80, ignored for PNG)")
 	noRetryFlag := fs.Bool("no-retry", false, "Disable automatic JPEG fallback on timeout")
+	componentFlag := fs.String("component", "", "Clip to the bounding box of this sightmap component (by name)")
+	selectorFlag := fs.String("selector", "", "Clip to the bounding box of elements matching this CSS selector")
+	expandPctFlag := fs.Float64("expand-pct", 0, "Grow the clip outward on all sides by this percent of its size (only with --component/--selector)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for --component)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
+	}
+
+	if *componentFlag != "" && *selectorFlag != "" {
+		return fmt.Errorf("screenshot: pass only one of --component or --selector")
+	}
+	if *expandPctFlag != 0 && *componentFlag == "" && *selectorFlag == "" {
+		return fmt.Errorf("screenshot: --expand-pct requires --component or --selector")
 	}
 
 	conn, err := browser.Connect(*addrFlag, *tabFlag)
@@ -353,6 +364,16 @@ func runScreenshot(args []string) error {
 		return err
 	}
 	defer conn.Close()
+
+	// Resolve an optional clip box (union of in-viewport matches) once, up front,
+	// so every capture attempt below clips identically.
+	var clip *browser.ScreenshotClip
+	if *componentFlag != "" || *selectorFlag != "" {
+		clip, err = resolveScreenshotClip(context.Background(), conn, *sightmapDirFlag, *componentFlag, *selectorFlag, *expandPctFlag)
+		if err != nil {
+			return err
+		}
+	}
 
 	timeout := time.Duration(*timeoutMsFlag) * time.Millisecond
 	outPath := *outFlag
@@ -369,6 +390,7 @@ func runScreenshot(args []string) error {
 			OptimizeForSpeed: true,
 			PauseAnimations:  true,
 			StopLoading:      true,
+			Clip:             clip,
 		})
 		if err != nil {
 			return fmt.Errorf("screenshot: %w", err)
@@ -387,6 +409,7 @@ func runScreenshot(args []string) error {
 			Format:          "png",
 			PauseAnimations: true,
 			StopLoading:     true,
+			Clip:            clip,
 		})
 		if err != nil {
 			if !*noRetryFlag && errors.Is(err, context.DeadlineExceeded) {
@@ -404,6 +427,7 @@ func runScreenshot(args []string) error {
 					OptimizeForSpeed: true,
 					PauseAnimations:  true,
 					StopLoading:      true,
+					Clip:             clip,
 				})
 				if err != nil {
 					return fmt.Errorf("screenshot (JPEG fallback): %w", err)

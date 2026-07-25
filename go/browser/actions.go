@@ -251,13 +251,25 @@ func ClearStorageForOrigin(ctx context.Context, conn *CDPConn, origin string) er
 	return nil
 }
 
+// ScreenshotClip is the region to capture, in viewport-relative CSS pixels —
+// the same coordinate space as Element.getBoundingClientRect and the
+// `browser bounds` command. ScreenshotWithOptions converts it to the
+// document-relative clip CDP expects by adding the current scroll offset.
+type ScreenshotClip struct {
+	X      float64
+	Y      float64
+	Width  float64
+	Height float64
+}
+
 // ScreenshotOptions controls how Page.captureScreenshot is issued.
 type ScreenshotOptions struct {
-	Format           string // "png" (default) or "jpeg"
-	Quality          int    // JPEG quality 0-100 (ignored for PNG); 0 → 80
-	OptimizeForSpeed bool   // CDP optimizeForSpeed flag — faster at cost of quality
-	PauseAnimations  bool   // send Animation.setPlaybackRate(0) before capture
-	StopLoading      bool   // call Page.stopLoading() before capture to halt ad/iframe repaints
+	Format           string          // "png" (default) or "jpeg"
+	Quality          int             // JPEG quality 0-100 (ignored for PNG); 0 → 80
+	OptimizeForSpeed bool            // CDP optimizeForSpeed flag — faster at cost of quality
+	PauseAnimations  bool            // send Animation.setPlaybackRate(0) before capture
+	StopLoading      bool            // call Page.stopLoading() before capture to halt ad/iframe repaints
+	Clip             *ScreenshotClip // nil = full viewport; otherwise clip to this (viewport-relative) box
 }
 
 // Screenshot captures the viewport as PNG, returns raw bytes.
@@ -302,6 +314,31 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 				params["fromSurface"] = true
 			}
 		}
+	}
+
+	// A clip captures a specific region addressed in document coordinates, so it
+	// needs the beyond-viewport surface and the scroll offset added to the
+	// (viewport-relative) box. This overrides the captureBeyondViewport:false set
+	// above for HTTP(S) pages.
+	if opts.Clip != nil {
+		sx, sy := 0.0, 0.0
+		if raw, err := EvalJSON(ctx, conn, `({x: window.scrollX, y: window.scrollY})`); err == nil {
+			var s struct {
+				X float64 `json:"x"`
+				Y float64 `json:"y"`
+			}
+			if json.Unmarshal(raw, &s) == nil {
+				sx, sy = s.X, s.Y
+			}
+		}
+		params["clip"] = map[string]interface{}{
+			"x":      opts.Clip.X + sx,
+			"y":      opts.Clip.Y + sy,
+			"width":  opts.Clip.Width,
+			"height": opts.Clip.Height,
+			"scale":  1,
+		}
+		params["captureBeyondViewport"] = true
 	}
 
 	if opts.StopLoading {
