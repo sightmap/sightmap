@@ -111,10 +111,15 @@ func runClick(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := browser.Click(ctx, conn, node); err != nil {
+	x, y, err := browser.Click(ctx, conn, node)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "clicked %s\n", actionLabel(fs.Arg(0), node))
+	if x >= 0 {
+		fmt.Fprintf(os.Stderr, "clicked %s @ (%d,%d)\n", fs.Arg(0), x, y)
+	} else {
+		fmt.Fprintf(os.Stderr, "clicked %s\n", fs.Arg(0))
+	}
 	return nil
 }
 
