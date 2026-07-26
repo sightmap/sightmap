@@ -92,17 +92,19 @@ component still needs a disambiguating property.
 ## Hard rules
 
 **NEVER write YAML without first verifying selectors.**
-Run `sightmap sel-probe 'selector'` on every new selector before committing
-it to YAML. Wrong match count = corrupt coverage.
+Run `sightmap sel-probe 'selector'` on every new selector before committing it to
+YAML. sel-probe queries the live DOM **and** cross-checks the offline matcher
+that `snapshot`/`coverage`/`capture` actually use — it prints both counts and a
+`⚠ offline/live divergence` warning when they disagree. Trust the **offline**
+count: that is what the corpus will see. Wrong match count = corrupt coverage.
 
-**Selector type matters for the Go matcher.**
-The Go tree matcher stores classes in `SelectorPart.Classes`, NOT in
-`Attrs["class"]`. This means:
-- ✓ `.QSIFeedBackLink` — class selector, works
-- ✗ `[class*="QSIFeedBackLink"]` — attribute selector on `class`, always matches 0
-
-Use `.classname` syntax for class-based selectors. `lint` will warn
-about `[class*=...]` patterns once implemented.
+**Prefer `.class` over `[class*=…]`, and `#id` over `[id…]`.**
+The Go tree matcher keeps classes in `SelectorPart.Classes` and `id` in a
+dedicated node field. `.classname` and `#id` are the reliable forms. Attribute
+selectors on `class` can behave differently offline depending on how the element
+was captured, and attribute selectors on `id` don't match offline at all — if you
+reach for one, `sel-probe`'s divergence check will flag it. Use `.classname` /
+`#id` when you can.
 
 **Pseudo-classes: `:not()`, `:is()`, `:where()`, `:has()` are supported**
 (both offline — `validate`/`snapshot`/`coverage`/`sel-check` — and live).
