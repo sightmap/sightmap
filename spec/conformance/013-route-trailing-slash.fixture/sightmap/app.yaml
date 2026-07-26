@@ -1,0 +1,8 @@
+version: 1
+views:
+  # Real apps (Django, Rails, many React-Router setups) append a trailing slash
+  # to every URL. A slash-free route pattern must still match such a path.
+  - name: Projects
+    route: /*/projects
+  - name: WorkItem
+    route: /*/projects/:id

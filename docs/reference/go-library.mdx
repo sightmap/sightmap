@@ -86,11 +86,7 @@ func main() {
 }
 ```
 
-`MatchTree` returns `map[*comps.ComponentNode]*match.SightmapMatch`. Each match contains the component `Name` and `Memory` notes. The current library selects the first view in corpus order whose route matches the URL pathname. If no view matches, global components still apply.
-
-<Warning>
-The stream 1 spec requires the most specific matching view, with declaration order used only to break ties. `ViewForURL` currently uses the first match in corpus order. Avoid overlapping routes when calling the library directly until this implementation gap is closed.
-</Warning>
+`MatchTree` returns `map[*comps.ComponentNode]*match.SightmapMatch`. Each match contains the component `Name` and `Memory` notes. The library selects the most specific view whose route matches the URL pathname, using declaration order only to break equal-specificity ties (per the stream 1 spec). Trailing slashes on the URL path are normalized away before matching. If no view matches, global components still apply.
 
 ## The Corpus handle
 
@@ -100,7 +96,7 @@ The stream 1 spec requires the most specific matching view, with declaration ord
 |---|---|
 | `MatchTree(root *comps.ComponentNode, pageURL string) map[*comps.ComponentNode]*match.SightmapMatch` | Apply the corpus to a tree for a URL |
 | `Components(pageURL string) []match.SightmapComponent` | Return the merged component list for a URL without matching a tree |
-| `ViewForURL(pageURL string) *sightmap.View` | Return the first matching view, or `nil` when no view matches |
+| `ViewForURL(pageURL string) *sightmap.View` | Return the most specific matching view, or `nil` when no view matches |
 | `ViewByName(name string) *sightmap.View` | Return the view with the given name, or `nil` |
 | `GlobalComponentNames() map[string]bool` | Return the names declared at global scope |
 
