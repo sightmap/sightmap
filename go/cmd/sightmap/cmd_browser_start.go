@@ -185,15 +185,13 @@ func runBrowserStart(args []string) error {
 		chromeArgs = append(chromeArgs, "--headless=new")
 	}
 	extPath := *extensionsFlag
-	extReinstalled := false
 	if extPath == "" {
-		extracted, reinstalled, extractErr := ensureExtension()
+		extracted, extractErr := ensureExtension()
 		if extractErr != nil {
 			return fmt.Errorf("start: cannot load extension: %w\n"+
 				"  Chrome will not be launched. Check the binary or clear ~/.sightmap/extension/ and retry.", extractErr)
 		}
 		extPath = extracted
-		extReinstalled = reinstalled
 	}
 	if extPath != "" {
 		absExt, absErr := filepath.Abs(extPath)
@@ -244,17 +242,6 @@ func runBrowserStart(args []string) error {
 		// Chrome profile has isolated storage, so sessions can't cross-talk.
 		if injErr := browser.InjectExtensionServerPort(ctx, cdpAddr, resolvedServerPort); injErr != nil {
 			fmt.Fprintf(os.Stderr, "start: warning: could not inject extension port: %v\n", injErr)
-		}
-		// If we just (re)installed a newer extension, force the service worker to
-		// re-register from the new on-disk files — Chrome otherwise restores a stale
-		// cached worker even across a full restart. Done before any
-		// navigation so the content script binds to the fresh worker.
-		if extReinstalled {
-			if rErr := browser.ReloadExtension(ctx, cdpAddr); rErr != nil {
-				fmt.Fprintf(os.Stderr, "start: warning: could not reload extension: %v\n", rErr)
-			} else {
-				fmt.Fprintln(os.Stderr, "  reloaded extension to the new version (no manual chrome://extensions reload needed)")
-			}
 		}
 		// Capture the initial tab ID.
 		if tabs, listErr := browser.ListTabs(ctx, cdpAddr); listErr == nil && len(tabs) > 0 {
