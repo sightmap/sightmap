@@ -41,7 +41,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 001 | `minimal` | Smallest valid sightmap; basic `match` |
 | 002 | `multi-file-merge` | Same view name across two files → `merge-collision-view` warning |
 | 003 | `route-precedence` | Most-specific-wins: literal &gt; `:param` &gt; `*` &gt; `**`, declaration order tie-breaks |
-| 004 | `param-normalization` | Express-style `:param` normalizes to `*` |
+| 004 | `param-normalization` | Express-style `:param` normalizes to `*` (requests); `:param` also matches a single view-route segment |
 | 005 | `selector-array` | `selector` accepts array; alternates tried in order |
 | 006 | `view-scoped-vs-global` | Global components match everywhere; scoped only on their view |
 | 007 | `request-method-filter` | `match` filters requests by HTTP method |
@@ -49,6 +49,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 010 | `component-ref` | `$ref` expansion, view attestation, and global+view-scoped dedup ([SEP-0002](../seps/0002-component-ref.md)) |
 | 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
 | 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
+| 013 | `route-trailing-slash` | Trailing slashes on the URL path are normalized away before matching |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

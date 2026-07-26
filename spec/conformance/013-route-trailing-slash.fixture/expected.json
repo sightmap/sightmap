@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/acme/projects/" },
+      "expected": { "result": { "view": { "name": "Projects" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/acme/projects" },
+      "expected": { "result": { "view": { "name": "Projects" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/acme/projects/42/" },
+      "expected": { "result": { "view": { "name": "WorkItem" } } }
+    }
+  ]
+}

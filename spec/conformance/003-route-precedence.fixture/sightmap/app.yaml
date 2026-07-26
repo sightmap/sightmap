@@ -1,8 +1,11 @@
 version: 1
 views:
-  - name: Specific
-    route: /users/me
+  # Generic routes are declared BEFORE the specific ones on purpose: resolution
+  # is most-specific-wins, not first-match, so declaration order must not decide
+  # the winner here.
   - name: Generic
     route: /users/*
   - name: Tree
     route: /admin/**
+  - name: Specific
+    route: /users/me

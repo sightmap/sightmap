@@ -118,58 +118,123 @@ func (c *Corpus) ComponentsForURL(pageURL string) []match.SightmapComponent {
 	return result
 }
 
-// ViewForURL returns the first View whose route matches pageURL's path,
-// or nil if no view matches. The returned View is a copy.
+// ViewForURL returns the View whose route most specifically matches pageURL's
+// path, or nil if no view matches. Specificity follows the spec's per-segment
+// scoring (literal > :param > * > **); when scores tie, the first-declared view
+// wins. The returned View is a copy.
 func (c *Corpus) ViewForURL(pageURL string) *View {
 	u, err := url.Parse(pageURL)
 	if err != nil {
 		return nil
 	}
-	path := u.Path
-	if path == "" {
-		path = "/"
-	}
+	path := normalizeRoutePath(u.Path)
+
+	best := -1
+	bestScore := -1
 	for i := range c.Views {
-		if MatchRoute(c.Views[i].Route, path) {
-			v := c.Views[i] // copy so caller doesn't share Corpus internals
-			return &v
+		if !MatchRoute(c.Views[i].Route, path) {
+			continue
+		}
+		if s := routeSpecificity(c.Views[i].Route); s > bestScore {
+			bestScore = s
+			best = i
 		}
 	}
-	return nil
+	if best < 0 {
+		return nil
+	}
+	v := c.Views[best] // copy so caller doesn't share Corpus internals
+	return &v
 }
 
-// MatchRoute reports whether the glob-style route pattern matches path.
-// ** matches any sequence of characters including slashes (one or more).
-// *  matches a single path segment (no slashes).
+// MatchRoute reports whether the glob-style route pattern matches path. A single
+// trailing slash is normalized off both sides first (except the root "/"), so
+// "/*/projects" matches "/acme/projects/".
+//   - **      matches any sequence of characters including slashes (one or more)
+//   - *       matches a single path segment (no slashes)
+//   - :param  matches a single path segment (no slashes)
 func MatchRoute(pattern, path string) bool {
-	re := regexp.MustCompile(routeToRegex(pattern))
-	return re.MatchString(path)
+	re := regexp.MustCompile(routeToRegex(normalizeRoutePath(pattern)))
+	return re.MatchString(normalizeRoutePath(path))
 }
 
-// routeToRegex converts a route glob pattern to an anchored regexp string.
+// normalizeRoutePath strips a trailing slash from a URL path or route pattern so
+// that matching is insensitive to it. The root "/" (or an all-slash/empty path)
+// normalizes to "/".
+func normalizeRoutePath(p string) string {
+	trimmed := strings.TrimRight(p, "/")
+	if trimmed == "" {
+		return "/"
+	}
+	return trimmed
+}
+
+// routeToRegex converts a normalized route glob pattern to an anchored regexp
+// string. `*` and `:param` segments each match a single path segment; `**`
+// matches any depth.
 func routeToRegex(pattern string) string {
 	var sb strings.Builder
 	sb.WriteByte('^')
+	atSegStart := true
 	for i := 0; i < len(pattern); {
-		if pattern[i] == '*' {
+		c := pattern[i]
+		if c == '*' {
 			if i+1 < len(pattern) && pattern[i+1] == '*' {
 				sb.WriteString("(.+)")
 				i += 2
-				continue
+			} else {
+				sb.WriteString("([^/]+)")
+				i++
 			}
-			sb.WriteString("([^/]+)")
-			i++
+			atSegStart = false
 			continue
 		}
-		c := pattern[i]
+		// Express-style :param — a whole segment starting with ':' — matches a
+		// single path segment, exactly like `*` but scoring higher (see
+		// routeSpecificity).
+		if c == ':' && atSegStart {
+			j := i + 1
+			for j < len(pattern) && pattern[j] != '/' {
+				j++
+			}
+			sb.WriteString("([^/]+)")
+			i = j
+			atSegStart = false
+			continue
+		}
 		// Escape regex metacharacters that can appear in URL patterns.
 		switch c {
 		case '.', '+', '?', '(', ')', '[', ']', '{', '}', '\\', '|', '^', '$':
 			sb.WriteByte('\\')
 		}
 		sb.WriteByte(c)
+		atSegStart = c == '/'
 		i++
 	}
 	sb.WriteByte('$')
 	return sb.String()
+}
+
+// routeSpecificity scores a route pattern per the spec's most-specific-wins
+// table: literal segments score 3, :param 2, `*` 1, and `**` or empty 0. The
+// score is summed over segments; the root route "/" scores 1.
+func routeSpecificity(pattern string) int {
+	pattern = normalizeRoutePath(pattern)
+	if pattern == "/" {
+		return 1
+	}
+	score := 0
+	for _, seg := range strings.Split(pattern, "/") {
+		switch {
+		case seg == "" || seg == "**":
+			// 0
+		case seg == "*":
+			score++
+		case strings.HasPrefix(seg, ":"):
+			score += 2
+		default:
+			score += 3
+		}
+	}
+	return score
 }
