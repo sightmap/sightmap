@@ -68,6 +68,10 @@ tree). Each line starts with a numeric component ID, then the node content:
 Properties are sorted alphabetically. The accessible name is shown last inside
 brackets when not suppressed (an exact match with a property value).
 
+If the page has **0 interactive nodes**, coverage renders `∅` (not `✓`) and
+`snapshot` exits non-zero — the page is blank or still loading. Wait for it with
+`browser wait-for --selector ...` (or `--wait N`) and re-snap before acting.
+
 ## Interaction (by ID or component query)
 
 `click`, `fill`, `hover`, and `scroll --component-id` accept **either** a numeric

@@ -90,9 +90,13 @@ func runCapture(args []string) error {
 	}
 	fmtOpts := observe.FormatOpts{Trace: *traceFlag, Selectors: *selectorsFlag}
 
-	// ── Novelty gate ──────────────────────────────────────────────────────────
+	// ── Novelty gate ────────────────────────────────────────────────────
 	viewBasename := res.View.SnapBasename()
 	cov := res.Coverage
+	// Never persist a blank/loading page as a view's baseline.
+	if cov.Empty() && !*forceFlag {
+		return fmt.Errorf("capture: %s has 0 interactive nodes — refusing to save a blank or still-loading page as this view's baseline (wait for it to render, or pass --force)", res.View.Name)
+	}
 	if !*forceFlag {
 		cand := viewset.SlotsFromMatch(res.Matches, cov.Orphans, cov.ParentMap)
 		if gres, write := viewset.Gate(corpus, *lf.sightmapDir, viewBasename, cand, false); !write {
@@ -151,6 +155,7 @@ func runCaptureAll(
 		err               error
 		skipped           bool // novelty gate: nothing new, not written
 		skippedVs         int  // captures compared against when skipped
+		empty             bool // 0 interactive nodes: blank/loading, not written
 	}
 	var results []result
 
@@ -176,6 +181,12 @@ func runCaptureAll(
 		}
 		fmtOpts := observe.FormatOpts{Selectors: selectors}
 		cov := res.Coverage
+
+		// Never persist a blank/loading page as a view's baseline.
+		if cov.Empty() && !force {
+			results = append(results, result{name: label, empty: true})
+			continue
+		}
 
 		// Novelty gate: don't append a redundant capture to the view set.
 		if !force {
@@ -207,6 +218,10 @@ func runCaptureAll(
 		}
 		if r.skipped {
 			fmt.Fprintf(os.Stderr, "%-20s  = nothing new vs %d capture(s) — not saved\n", r.name, r.skippedVs)
+			continue
+		}
+		if r.empty {
+			fmt.Fprintf(os.Stderr, "%-20s  ∅ 0 interactive — blank or still loading, not saved\n", r.name)
 			continue
 		}
 		check := "✓"

@@ -75,12 +75,14 @@ func runCoverage(args []string) error {
 		var capGaps [][]coverage.ContentGap
 		headerView := ""
 		for _, e := range entries {
-			counts, leafCounts, vName, t3, gaps, ok := coverCapture(e.Path, corpus, visible, *traceFlag)
+			counts, leafCounts, vName, t3, total, gaps, ok := coverCapture(e.Path, corpus, visible, *traceFlag)
 			if !ok {
 				failures++
 				continue
 			}
-			if t3 > 0 {
+			// A capture with orphans (T3) OR no interactive nodes at all fails the
+			// coverage gate — a blank/unrendered page is never a pass.
+			if t3 > 0 || total == 0 {
 				failures++
 			}
 			if vName != "" && headerView == "" {
@@ -147,10 +149,10 @@ func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.Compone
 // genuinely-absent components), the view name from the snap header, the T3
 // count, the annotation-completeness gaps found in the capture,
 // and ok=false if the capture could not be loaded/parsed/matched.
-func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool) (counts map[string]int, leafCounts map[string]int, viewName string, t3 int, gaps []coverage.ContentGap, ok bool) {
+func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool) (counts map[string]int, leafCounts map[string]int, viewName string, t3 int, total int, gaps []coverage.ContentGap, ok bool) {
 	root, matches, route, ok := matchCapture(snapPath, corpus)
 	if !ok {
-		return nil, nil, "", 0, nil, false
+		return nil, nil, "", 0, 0, nil, false
 	}
 
 	// Find view for memory note lookup (T2 trace) and leaf-probe component list.
@@ -165,14 +167,12 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 	}
 
 	cov := coverage.Score(root, matches, coverage.Options{VisibleOnly: visible})
-	t1, t2, total := cov.T1, cov.T2, cov.Total
+	t1, t2 := cov.T1, cov.T2
+	total = cov.Total
 	t3nodes, t2clusters, t2children := cov.Orphans, cov.Scopes, cov.ScopeChildren
 	parentMap := cov.ParentMap
 	t3 = cov.T3
-	check := "✓"
-	if t3 > 0 {
-		check = "✗"
-	}
+	check := cov.Mark()
 	suffix := ""
 	if visible {
 		suffix = " (visible only)"
@@ -234,7 +234,7 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 		observe.CheckRootComponents(os.Stdout, view.Components, globalNames, counts, view.Name)
 	}
 
-	return counts, leafCounts, viewset.ViewNameOf(snapPath), t3, gaps, true
+	return counts, leafCounts, viewset.ViewNameOf(snapPath), t3, total, gaps, true
 }
 
 // countLeafMatches returns the number of tree nodes that satisfy the leaf
