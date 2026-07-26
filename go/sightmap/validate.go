@@ -38,6 +38,10 @@ func (e ValidationError) Error() string {
 func Validate(c *Corpus) []ValidationError {
 	var errs []ValidationError
 
+	// Structural problems detected at load time (e.g. circular $ref chains that
+	// are expanded away before this point).
+	errs = append(errs, c.loadDiagnostics...)
+
 	// Check global components.
 	globalNames := make(map[string]string)
 	for _, comp := range c.GlobalComponents {

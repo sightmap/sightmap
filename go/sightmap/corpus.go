@@ -22,6 +22,11 @@ type Corpus struct {
 	// children flattened.
 	Views []View
 
+	// loadDiagnostics holds structural problems detected while loading that are
+	// no longer visible in the flattened data (e.g. a circular $ref chain, which
+	// is expanded away). Validate surfaces these alongside its own checks.
+	loadDiagnostics []ValidationError
+
 	// mu guards the lazily-built compiled-query cache.
 	mu    sync.Mutex
 	cache map[string]*queryCacheEntry

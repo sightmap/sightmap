@@ -165,8 +165,12 @@ func loadDir(path string) (*Corpus, error) {
 		}
 	}
 
+	// One flatten context is shared across the global list and every view so
+	// that $ref cycle detection and diagnostics accumulate in one place.
+	ctx := &flattenCtx{reg: reg}
+
 	// Flatten global components (hierarchy → compound descendant selectors).
-	globalComps := flattenAll(globalRaws, reg)
+	globalComps := flattenAll(globalRaws, ctx)
 
 	// Build views, expanding $refs and flattening each view's component list.
 	var views []View
@@ -195,7 +199,7 @@ func loadDir(path string) (*Corpus, error) {
 				Name:       rv.Name,
 				Route:      rv.Route,
 				Memory:     rv.Memory,
-				Components: flattenAll(rv.Components, reg),
+				Components: flattenAll(rv.Components, ctx),
 				Stability:  rv.Stability,
 				Access:     access,
 				URL:        vf.URL,
@@ -208,6 +212,7 @@ func loadDir(path string) (*Corpus, error) {
 	return &Corpus{
 		GlobalComponents: globalComps,
 		Views:            views,
+		loadDiagnostics:  ctx.diagnostics,
 	}, nil
 }
 
@@ -225,12 +230,37 @@ func rawPropsToMatch(rps []rawProperty) []match.Property {
 	return ps
 }
 
+// flattenCtx carries the shared state for a flattening pass: the $ref registry
+// and any structural diagnostics discovered along the way (currently circular
+// $ref chains, which are expanded away and so invisible downstream).
+type flattenCtx struct {
+	reg          map[string]rawComponent
+	diagnostics  []ValidationError
+	seenCircular map[string]bool // dedupe key → already-reported
+}
+
+// recordCircular records a $ref cycle diagnostic once per distinct chain.
+func (ctx *flattenCtx) recordCircular(chain []string) {
+	key := strings.Join(chain, "\x00")
+	if ctx.seenCircular == nil {
+		ctx.seenCircular = map[string]bool{}
+	}
+	if ctx.seenCircular[key] {
+		return
+	}
+	ctx.seenCircular[key] = true
+	ctx.diagnostics = append(ctx.diagnostics, ValidationError{
+		Component: chain[len(chain)-1],
+		Message:   "ref-circular: circular $ref chain " + strings.Join(chain, " → "),
+	})
+}
+
 // flattenAll flattens a slice of rawComponents into a flat list of
 // SightmapComponents with compound descendant selectors.
-func flattenAll(rcs []rawComponent, reg map[string]rawComponent) []match.SightmapComponent {
+func flattenAll(rcs []rawComponent, ctx *flattenCtx) []match.SightmapComponent {
 	var result []match.SightmapComponent
 	for _, rc := range rcs {
-		result = append(result, flattenOne(rc, nil, reg, nil)...)
+		result = append(result, flattenOne(rc, nil, ctx, nil, nil)...)
 	}
 	return result
 }
@@ -241,13 +271,23 @@ func flattenAll(rcs []rawComponent, reg map[string]rawComponent) []match.Sightma
 // selector. parentChain is the slice of ancestor component names (root-first)
 // carried through recursion and stored on each SightmapComponent so the
 // extension can scope child selectors to their parent's DOM subtree.
-func flattenOne(rc rawComponent, parentSels []string, reg map[string]rawComponent, parentChain []string) []match.SightmapComponent {
+// refStack is the chain of $ref names currently being expanded; it guards
+// against circular references, which would otherwise recurse forever.
+func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string) []match.SightmapComponent {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
 	if rc.Ref != "" {
-		global, ok := reg[rc.Ref]
-		if !ok {
-			return nil // unknown ref — skip silently
+		for _, prev := range refStack {
+			if prev == rc.Ref {
+				// Cycle: stop expanding rather than recurse forever.
+				ctx.recordCircular(append(append([]string(nil), refStack...), rc.Ref))
+				return nil
+			}
 		}
+		global, ok := ctx.reg[rc.Ref]
+		if !ok {
+			return nil // unknown ref — reported separately by strict validation
+		}
+		refStack = append(refStack, rc.Ref)
 		rc = global
 	}
 
@@ -287,27 +327,42 @@ func flattenOne(rc rawComponent, parentSels []string, reg map[string]rawComponen
 	// Recurse into children: extend the parent chain with this component's name.
 	childChain := append(append([]string(nil), parentChain...), rc.Name)
 	for _, child := range rc.Children {
-		result = append(result, flattenOne(child, mySels, reg, childChain)...)
+		result = append(result, flattenOne(child, mySels, ctx, childChain, refStack)...)
 	}
 
 	return result
 }
 
 // splitSelectors splits a comma-separated selector string and trims whitespace
-// from each alternative, returning only non-empty parts. The split is
-// paren-depth-aware so commas inside :is(), :where(), :not(), etc. are not
-// treated as selector-list separators.
+// from each alternative, returning only non-empty parts. The split ignores
+// commas that are not list separators: those inside a bracket or paren group
+// (`[attr="a,b"]`, `:is()`, `:where()`, `:not()`, `:nth-child()`, …) or inside a
+// quoted string. A backslash escapes the following character.
 func splitSelectors(s string) []string {
 	if s == "" {
 		return nil
 	}
 	var parts []string
 	depth, start := 0, 0
+	var quote byte // 0 outside a quoted string, else the opening quote char
 	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '(':
+		c := s[i]
+		if c == '\\' {
+			i++ // skip the escaped character
+			continue
+		}
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch c {
+		case '"', '\'':
+			quote = c
+		case '(', '[':
 			depth++
-		case ')':
+		case ')', ']':
 			if depth > 0 {
 				depth--
 			}
