@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
@@ -239,7 +240,7 @@ func runNetworkGet(args []string) error {
 	// Fetch the response body (to a file, or inline preview).
 	rbody, err := devtoolsGet(*sightmapDir, "/devtools/network/body", url.Values{"index": {strconv.Itoa(idx)}, "kind": {"response"}})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "network get: response body unavailable: %v\n", err)
+		fmt.Fprintf(os.Stderr, "network get: %s\n", friendlyBodyErr(err))
 		return nil
 	}
 	if *respFile != "" {
@@ -253,10 +254,21 @@ func runNetworkGet(args []string) error {
 	return nil
 }
 
+// friendlyBodyErr rewrites the raw daemon/CDP error from a network-body fetch
+// into an actionable message. Response bodies are only retained briefly, so the
+// common failure is the body having been evicted from the network cache.
+func friendlyBodyErr(err error) string {
+	s := err.Error()
+	if strings.Contains(s, "No resource with given identifier") || strings.Contains(s, "No data found") {
+		return "response body no longer available — it was evicted from the network cache (bodies are retained only briefly after the response arrives)"
+	}
+	return "response body unavailable: " + s
+}
+
 func saveBody(sightmapDir string, idx int, kind, path string) error {
 	b, err := devtoolsGet(sightmapDir, "/devtools/network/body", url.Values{"index": {strconv.Itoa(idx)}, "kind": {kind}})
 	if err != nil {
-		return fmt.Errorf("%s body: %w", kind, err)
+		return fmt.Errorf("%s body: %s", kind, friendlyBodyErr(err))
 	}
 	if err := os.WriteFile(path, b, 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
