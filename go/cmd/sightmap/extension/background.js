@@ -219,8 +219,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case "fetch-sightmap-version":
       getServer()
         .then((srv) => fetch(`${srv}/sightmap/version`))
-        .then((r) => r.text())
-        .then((v) => sendResponse({ ok: true, version: v.trim() }))
+        .then((r) => r.json())
+        .then((data) => sendResponse({ ok: true, version: data.version }))
         .catch((err) => sendResponse({ ok: false, error: err.message }));
       return true;
 

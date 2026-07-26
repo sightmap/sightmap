@@ -9,27 +9,28 @@ import (
 )
 
 // ensureExtension extracts the embedded Chrome extension to
-// ~/.sightmap/extension/ if it is missing or out of date.
-// It returns the path to the extracted directory and whether it (re)installed a
-// new version (so the caller can force a service-worker reload).
-func ensureExtension() (string, bool, error) {
+// ~/.sightmap/extension/ if it is missing or out of date, and returns the path
+// to the extracted directory. A fresh `browser start` always launches a new
+// Chrome process with --load-extension pointing here, so Chrome picks up a
+// newly-extracted version directly — no service-worker hot-reload is needed.
+func ensureExtension() (string, error) {
 	// 1. Read embedded manifest to get the bundled version.
 	embeddedData, err := extensionFS.ReadFile("extension/manifest.json")
 	if err != nil {
-		return "", false, fmt.Errorf("ensureExtension: read embedded manifest: %w", err)
+		return "", fmt.Errorf("ensureExtension: read embedded manifest: %w", err)
 	}
 	var embeddedManifest struct {
 		Version string `json:"version"`
 	}
 	if err := json.Unmarshal(embeddedData, &embeddedManifest); err != nil {
-		return "", false, fmt.Errorf("ensureExtension: parse embedded manifest: %w", err)
+		return "", fmt.Errorf("ensureExtension: parse embedded manifest: %w", err)
 	}
 	embeddedVersion := embeddedManifest.Version
 
 	// 2. Compute target directory.
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", false, fmt.Errorf("ensureExtension: home dir: %w", err)
+		return "", fmt.Errorf("ensureExtension: home dir: %w", err)
 	}
 	targetDir := filepath.Join(home, ".sightmap", "extension")
 
@@ -42,7 +43,7 @@ func ensureExtension() (string, bool, error) {
 		if jsonErr := json.Unmarshal(diskData, &diskManifest); jsonErr == nil {
 			// 4. Versions match — nothing to do.
 			if diskManifest.Version == embeddedVersion {
-				return targetDir, false, nil
+				return targetDir, nil
 			}
 		}
 	}
@@ -50,7 +51,7 @@ func ensureExtension() (string, bool, error) {
 	// 5. Version missing or differs — (re)install.
 	// a. Remove old directory.
 	if rmErr := os.RemoveAll(targetDir); rmErr != nil {
-		return "", false, fmt.Errorf("ensureExtension: remove old extension: %w", rmErr)
+		return "", fmt.Errorf("ensureExtension: remove old extension: %w", rmErr)
 	}
 
 	// b–c. Walk embedded FS and write every file.
@@ -78,11 +79,11 @@ func ensureExtension() (string, bool, error) {
 		}
 		return os.WriteFile(dest, data, 0o644)
 	}); walkErr != nil {
-		return "", false, fmt.Errorf("ensureExtension: extract files: %w", walkErr)
+		return "", fmt.Errorf("ensureExtension: extract files: %w", walkErr)
 	}
 
 	// d. Log installation.
 	fmt.Fprintf(os.Stderr, "[browser] installed extension v%s → %s\n", embeddedVersion, targetDir)
 
-	return targetDir, true, nil
+	return targetDir, nil
 }
