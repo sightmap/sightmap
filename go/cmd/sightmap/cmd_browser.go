@@ -100,16 +100,6 @@ Tabs:
 `)
 }
 
-// sessionFilePath delegates to the browser package's internal logic by
-// re-reading what WriteSessionInfo would write. We use a local copy of the
-// path-finding logic here for the stale-file cleanup case.
-func sessionFilePath() string {
-	if _, err := os.Stat(".sightmap"); err == nil {
-		return filepath.Join(".sightmap", ".session")
-	}
-	return filepath.Join(os.TempDir(), "sightmap-session")
-}
-
 // cdpVersionAlive reports whether a genuine Chrome DevTools endpoint is
 // listening at addr (host:port). It is deliberately stricter than a bare
 // TCP/HTTP probe: the sightmap HTTP server can occupy the same port and answer
@@ -162,11 +152,11 @@ func pollCDPReady(addr string) error {
 
 // ── stop ──────────────────────────────────────────────────────────────────────
 
-// defaultProfileDir reconstructs the Chrome --user-data-dir this site would use,
-// mirroring browser start. Lets stop/status reap a profile's Chrome even when the
-// session file is gone.
-func defaultProfileDir() string {
-	cfg := sightmap.LoadConfig(".sightmap")
+// defaultProfileDir reconstructs the Chrome --user-data-dir the corpus at
+// sightmapDir would use, mirroring browser start. Lets stop/status reap a
+// profile's Chrome even when the session file is gone.
+func defaultProfileDir(sightmapDir string) string {
+	cfg := sightmap.LoadConfig(sightmapDir)
 	name := cfg.Name
 	if name == "" {
 		name = filepath.Base(cwd())
@@ -189,8 +179,9 @@ func portOrProfileAlive(port int, profile string) bool {
 // the profile --user-data-dir (covers a missing session file and PID reuse), and
 // only remove the session file once the port AND profile are actually dead (so we
 // never leave an invisible orphan).
-func runStop(_ []string) error {
-	info, infoErr := browser.ReadSessionInfo()
+func runStop(args []string) error {
+	sightmapDir, _ := resolveSightmapDir(args)
+	info, infoErr := browser.ReadSessionInfo(sightmapDir)
 	hasSession := infoErr == nil && (info.Port > 0 || info.PID > 0 || info.Pgid > 0)
 
 	profile := ""
@@ -198,7 +189,7 @@ func runStop(_ []string) error {
 		profile = info.Profile
 	}
 	if profile == "" {
-		profile = defaultProfileDir()
+		profile = defaultProfileDir(sightmapDir)
 	}
 
 	acted := false
@@ -240,7 +231,7 @@ func runStop(_ []string) error {
 			"  try manually: pkill -f %q", profile)
 	}
 	if hasSession {
-		os.Remove(sessionFilePath())
+		os.Remove(browser.SessionFilePath(sightmapDir))
 	}
 	if !acted {
 		fmt.Fprintln(os.Stderr, "no active session")
@@ -253,13 +244,14 @@ func runStop(_ []string) error {
 // ── status ────────────────────────────────────────────────────────────────────
 
 func runStatus(args []string) error {
+	sightmapDir, args := resolveSightmapDir(args)
 	tabID, _ := resolveTab(args)
 
-	info, err := browser.ReadSessionInfo()
+	info, err := browser.ReadSessionInfo(sightmapDir)
 	if err != nil {
 		// No session file — but an orphan Chrome for this profile may still be alive
 		// (e.g. a prior stop dropped the file without reaping the process).
-		if profile := defaultProfileDir(); profileProcessAlive(profile) {
+		if profile := defaultProfileDir(sightmapDir); profileProcessAlive(profile) {
 			fmt.Printf("⚠ orphan  Chrome is running for this profile but there is no session file\n"+
 				"  profile: %s\n  run 'browser stop' to reap it.\n", profile)
 			return nil
@@ -282,7 +274,7 @@ func runStatus(args []string) error {
 			fmt.Println("  a Chrome process for this profile is still alive — run 'browser stop' to reap it.")
 		}
 		fmt.Println("  run 'browser start' to launch a fresh session.")
-		os.Remove(sessionFilePath())
+		os.Remove(browser.SessionFilePath(sightmapDir))
 		return nil
 	}
 
@@ -318,15 +310,29 @@ func runStatus(args []string) error {
 
 // ── navigate / eval ───────────────────────────────────────────────────────────
 
-// resolveAddr extracts the --addr flag value from args if present,
-// returning the address and the remaining args.
-func resolveAddr(args []string) (addr string, rest []string) {
+// resolveSightmapDir extracts the --sightmap-dir flag value from args if
+// present (defaulting to ".sightmap"), returning it and the remaining args. It
+// keys session-file lookup so concurrent sessions for different corpora stay
+// isolated.
+func resolveSightmapDir(args []string) (dir string, rest []string) {
+	for i, a := range args {
+		if a == "--sightmap-dir" && i+1 < len(args) {
+			return args[i+1], append(args[:i:i], args[i+2:]...)
+		}
+	}
+	return ".sightmap", args
+}
+
+// resolveAddr extracts the --addr flag value from args if present, returning the
+// address and the remaining args. When --addr is absent it falls back to the
+// CDP port recorded in the session file for the corpus at sightmapDir.
+func resolveAddr(args []string, sightmapDir string) (addr string, rest []string) {
 	for i, a := range args {
 		if a == "--addr" && i+1 < len(args) {
 			return args[i+1], append(args[:i:i], args[i+2:]...)
 		}
 	}
-	return browser.DefaultAddr(), args
+	return browser.DefaultAddr(sightmapDir), args
 }
 
 // resolveTab extracts the --tab flag value from args, returning the tabID and
@@ -353,7 +359,8 @@ func dial(addr string) (*browser.CDPConn, error) {
 }
 
 func runNavigate(args []string) error {
-	addr, args := resolveAddr(args)
+	sightmapDir, args := resolveSightmapDir(args)
+	addr, args := resolveAddr(args, sightmapDir)
 	tabID, args := resolveTab(args)
 	if len(args) == 0 {
 		return fmt.Errorf("usage: browser navigate <url>")
@@ -382,7 +389,8 @@ func runNavigate(args []string) error {
 }
 
 func runEval(args []string) error {
-	addr, args := resolveAddr(args)
+	sightmapDir, args := resolveSightmapDir(args)
+	addr, args := resolveAddr(args, sightmapDir)
 	tabID, args := resolveTab(args)
 	if len(args) == 0 {
 		return fmt.Errorf("usage: browser eval <script>")

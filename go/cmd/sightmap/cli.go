@@ -36,7 +36,7 @@ type liveFlags struct {
 // error messages.
 func addLiveFlags(fs *flag.FlagSet, cmd string) *liveFlags {
 	return &liveFlags{
-		addr:        fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)"),
+		addr:        fs.String("addr", "", "CDP address (host:port; default: the session for --sightmap-dir)"),
 		url:         fs.String("url", "", "Navigate to this URL before acting"),
 		wait:        fs.Float64("wait", 0, "Extra seconds to wait after DOM stability is detected (default 0; raise for unusually slow pages)"),
 		tab:         fs.String("tab", "", "Target tab ID (from 'browser start' output)"),
@@ -49,11 +49,24 @@ func addLiveFlags(fs *flag.FlagSet, cmd string) *liveFlags {
 // must be deferred by the caller. There is no auto-launch: start a session with
 // 'sightmap browser start' first (Connect's error says so).
 func (lf *liveFlags) connect(ctx context.Context) (*browser.CDPConn, func(), error) {
-	conn, err := browser.Connect(*lf.addr, *lf.tab)
+	conn, err := browser.Connect(resolveCDPAddr(*lf.addr, *lf.sightmapDir), *lf.tab)
 	if err != nil {
 		return nil, nil, err
 	}
 	return conn, func() { conn.Close() }, nil
+}
+
+// resolveCDPAddr returns the CDP address to connect to: the explicit --addr when
+// the user set one, otherwise the port recorded in the session file for the
+// corpus at sightmapDir (falling back to the default CDP port). Keying the
+// lookup on --sightmap-dir is what keeps concurrent sessions for different
+// corpora from finding each other's daemon. Commands pass "" for explicitAddr
+// when --addr was left at its empty default.
+func resolveCDPAddr(explicitAddr, sightmapDir string) string {
+	if explicitAddr != "" {
+		return explicitAddr
+	}
+	return browser.DefaultAddr(sightmapDir)
 }
 
 // navOpts tunes how navigate waits for the page to settle.

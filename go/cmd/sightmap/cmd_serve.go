@@ -148,7 +148,7 @@ func runServeSightmap(args []string) error {
 		json.NewEncoder(w).Encode(c)
 	})
 
-	addr := fmt.Sprintf(":%d", *portFlag)
+	addr := fmt.Sprintf("127.0.0.1:%d", *portFlag)
 	fmt.Fprintf(os.Stderr, "[serve-sightmap] listening on http://%s\n", addr)
 
 	srv := &http.Server{Addr: addr, Handler: mux}

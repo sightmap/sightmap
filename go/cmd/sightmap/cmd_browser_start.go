@@ -59,8 +59,10 @@ func runBrowserStart(args []string) error {
 	}
 	_ = os.MkdirAll(resolvedProfile, 0o700)
 
-	// ── Detect existing Chrome for this site ──────────────────────────────────
-	existingInfo, _ := browser.ReadSessionInfo()
+	// ── Detect existing Chrome for this corpus ────────────────────────────────
+	// The session file is keyed to --sightmap-dir, so this only ever matches a
+	// prior session for THIS corpus — never another agent's browser.
+	existingInfo, _ := browser.ReadSessionInfo(*sightmapDir)
 	if existingInfo.Port > 0 && isPortAlive(existingInfo.Port) {
 		// Chrome is already running — open a new tab and return immediately.
 		cdpAddr := fmt.Sprintf("localhost:%d", existingInfo.Port)
@@ -149,7 +151,11 @@ func runBrowserStart(args []string) error {
 	var collectorPtr atomic.Pointer[browser.Collector]
 	registerDevtoolsHandlers(mux, &collectorPtr)
 
-	srvAddr := fmt.Sprintf(":%d", resolvedServerPort)
+	// Bind the sightmap server on the IPv4 loopback (not the ":port" wildcard) so
+	// it shares an address family with Chrome's CDP and with FindFreePort's probe.
+	// This keeps concurrent daemons from landing one daemon's server on another's
+	// CDP port, and keeps the server local-only.
+	srvAddr := fmt.Sprintf("127.0.0.1:%d", resolvedServerPort)
 	srv := &http.Server{Addr: srvAddr, Handler: mux}
 	srvReady := make(chan error, 1)
 	go func() {
@@ -230,7 +236,7 @@ func runBrowserStart(args []string) error {
 	if cmd.Process != nil {
 		pid = cmd.Process.Pid
 	}
-	_ = browser.WriteSessionInfo(browser.SessionInfo{
+	_ = browser.WriteSessionInfo(*sightmapDir, browser.SessionInfo{
 		Port: resolvedCDPPort, PID: pid, Pgid: pid, Profile: resolvedProfile,
 		ServerPort: resolvedServerPort,
 	})
@@ -304,7 +310,7 @@ func runBrowserStart(args []string) error {
 		// Exit cleanly so the sightmap server releases its port.
 		fmt.Fprintln(os.Stderr, "\nChrome exited — sightmap server stopping")
 		// Chrome is already gone; skip the SIGTERM/kill below.
-		_ = browser.RemoveSessionFile()
+		_ = browser.RemoveSessionFile(*sightmapDir)
 		return nil
 	}
 
@@ -324,7 +330,7 @@ func runBrowserStart(args []string) error {
 	srv.Shutdown(shutCtx)
 
 	// Remove session file.
-	os.Remove(sessionFilePath())
+	os.Remove(browser.SessionFilePath(*sightmapDir))
 
 	return nil
 }

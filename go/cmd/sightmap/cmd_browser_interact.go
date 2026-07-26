@@ -68,9 +68,9 @@ func parseFlagsInterspersed(fs *flag.FlagSet, args []string) error {
 
 func runClick(args []string) error {
 	fs := flag.NewFlagSet("click", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	xFlag := fs.Int("x", -1, "Absolute x coordinate (skips node lookup)")
 	yFlag := fs.Int("y", -1, "Absolute y coordinate (skips node lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
@@ -78,7 +78,7 @@ func runClick(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -101,9 +101,9 @@ func runClick(args []string) error {
 
 func runFill(args []string) error {
 	fs := flag.NewFlagSet("fill", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	clearFlag := fs.Bool("clear", false, "Clear the field via JS before typing (use for React-controlled inputs)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
@@ -113,7 +113,7 @@ func runFill(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -133,9 +133,9 @@ func runFill(args []string) error {
 
 func runHover(args []string) error {
 	fs := flag.NewFlagSet("hover", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	xFlag := fs.Int("x", -1, "Absolute x coordinate (skips node lookup)")
 	yFlag := fs.Int("y", -1, "Absolute y coordinate (skips node lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
@@ -143,7 +143,7 @@ func runHover(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -166,8 +166,9 @@ func runHover(args []string) error {
 
 func runKeyPress(args []string) error {
 	fs := flag.NewFlagSet("keypress", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -177,7 +178,7 @@ func runKeyPress(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -190,9 +191,9 @@ func runKeyPress(args []string) error {
 
 func runScroll(args []string) error {
 	fs := flag.NewFlagSet("scroll", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	compID := fs.String("component-id", "", "Component ID or 'ComponentQuery' to scroll into view first")
 	deltaX := fs.Int("delta-x", 0, "Horizontal scroll delta in pixels")
 	deltaY := fs.Int("delta-y", 0, "Vertical scroll delta in pixels")
@@ -204,7 +205,7 @@ func runScroll(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -229,8 +230,9 @@ func runScroll(args []string) error {
 
 func runDrag(args []string) error {
 	fs := flag.NewFlagSet("drag", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	deltaX := fs.Int("delta-x", 0, "Horizontal drag delta in pixels")
 	deltaY := fs.Int("delta-y", 0, "Vertical drag delta in pixels")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
@@ -241,7 +243,7 @@ func runDrag(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -258,8 +260,9 @@ func runDrag(args []string) error {
 
 func runWaitFor(args []string) error {
 	fs := flag.NewFlagSet("wait-for", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	urlPattern := fs.String("url", "", "Wait until the page URL contains this pattern")
 	selector := fs.String("selector", "", "Wait until a DOM element matching this selector appears")
 	loadFlag := fs.Bool("load", false, "Wait for the page load event")
@@ -288,7 +291,7 @@ func runWaitFor(args []string) error {
 	)
 	defer cancel()
 
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -308,8 +311,9 @@ func runWaitFor(args []string) error {
 
 func runDialog(args []string) error {
 	fs := flag.NewFlagSet("dialog", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	text := fs.String("text", "", "Prompt input text (prompt dialogs only)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
@@ -323,7 +327,7 @@ func runDialog(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -336,7 +340,7 @@ func runDialog(args []string) error {
 
 func runScreenshot(args []string) error {
 	fs := flag.NewFlagSet("screenshot", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	outFlag := fs.String("out", "screenshot.png", "Output file path")
 	stdoutFlag := fs.Bool("stdout", false, "Write image bytes to stdout (for piping)")
@@ -359,7 +363,7 @@ func runScreenshot(args []string) error {
 		return fmt.Errorf("screenshot: --expand-pct requires --component or --selector")
 	}
 
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -459,8 +463,9 @@ func runScreenshot(args []string) error {
 // reset session state (including httpOnly cookies that JS cannot touch).
 func runClearStorage(args []string) error {
 	fs := flag.NewFlagSet("clear-storage", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address")
+	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	originFlag := fs.String("origin", "", "Origin to clear (default: current page origin)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
@@ -468,7 +473,7 @@ func runClearStorage(args []string) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
@@ -536,17 +541,18 @@ Subcommands:
 `)
 }
 
-func sessionAddr() string {
-	info, err := browser.ReadSessionInfo()
+func sessionAddr(sightmapDir string) string {
+	info, err := browser.ReadSessionInfo(sightmapDir)
 	if err != nil || info.Port <= 0 {
 		return fmt.Sprintf("localhost:%d", browser.DefaultCDPPort)
 	}
 	return fmt.Sprintf("localhost:%d", info.Port)
 }
 
-func runTabsList(_ []string) error {
+func runTabsList(args []string) error {
+	sightmapDir, _ := resolveSightmapDir(args)
 	ctx := context.Background()
-	tabs, err := browser.ListTabs(ctx, sessionAddr())
+	tabs, err := browser.ListTabs(ctx, sessionAddr(sightmapDir))
 	if err != nil {
 		return err
 	}
@@ -561,13 +567,14 @@ func runTabsList(_ []string) error {
 }
 
 func runTabsNew(args []string) error {
+	sightmapDir, args := resolveSightmapDir(args)
 	tabURL := ""
 	if len(args) > 0 {
 		tabURL = args[0]
 	}
 
 	ctx := context.Background()
-	addr := sessionAddr()
+	addr := sessionAddr(sightmapDir)
 
 	targetID, conn, err := browser.CreateTab(ctx, addr, tabURL)
 	if err != nil {
@@ -579,11 +586,12 @@ func runTabsNew(args []string) error {
 }
 
 func runTabsClose(args []string) error {
+	sightmapDir, args := resolveSightmapDir(args)
 	if len(args) == 0 {
 		return fmt.Errorf("usage: browser tabs close <target-id>")
 	}
 	ctx := context.Background()
-	if err := browser.CloseTab(ctx, sessionAddr(), args[0]); err != nil {
+	if err := browser.CloseTab(ctx, sessionAddr(sightmapDir), args[0]); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "closed tab %s\n", args[0])
@@ -593,6 +601,7 @@ func runTabsClose(args []string) error {
 func runTabsResize(args []string) error {
 	fs := flag.NewFlagSet("tabs-resize", flag.ContinueOnError)
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -609,7 +618,7 @@ func runTabsResize(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(sessionAddr(), *tabFlag)
+	conn, err := browser.Connect(sessionAddr(*sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}

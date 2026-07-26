@@ -33,10 +33,10 @@ type SessionInfo struct {
 	// TargetID removed — use --tab flag on individual commands instead
 }
 
-// ReadSessionInfo reads and parses the session file. Returns an error if
-// the file is absent or unparseable.
-func ReadSessionInfo() (SessionInfo, error) {
-	data, err := os.ReadFile(sessionFilePath())
+// ReadSessionInfo reads and parses the session file for the corpus at
+// sightmapDir. Returns an error if the file is absent or unparseable.
+func ReadSessionInfo(sightmapDir string) (SessionInfo, error) {
+	data, err := os.ReadFile(SessionFilePath(sightmapDir))
 	if err != nil {
 		return SessionInfo{}, err
 	}
@@ -80,7 +80,12 @@ func FindFreePortExcluding(start int, exclude ...int) (int, error) {
 		if excluded[port] {
 			continue
 		}
-		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+		// Probe on the IPv4 loopback specifically. Chrome's --remote-debugging-port
+		// binds 127.0.0.1, and the sightmap server binds the same, so a loopback
+		// probe detects BOTH. A bare ":port" probe binds the IPv6 wildcard on some
+		// systems and would miss an existing IPv4-loopback listener — letting a
+		// second daemon's server collide with a first daemon's CDP port.
+		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 		if err == nil {
 			ln.Close()
 			return port, nil
@@ -89,18 +94,18 @@ func FindFreePortExcluding(start int, exclude ...int) (int, error) {
 	return 0, fmt.Errorf("no free port found in range %d–%d", start, start+99)
 }
 
-// RemoveSessionFile deletes the session file, if present.
-func RemoveSessionFile() error {
-	return os.Remove(sessionFilePath())
+// RemoveSessionFile deletes the session file for the corpus at sightmapDir, if present.
+func RemoveSessionFile(sightmapDir string) error {
+	return os.Remove(SessionFilePath(sightmapDir))
 }
 
-// WriteSessionInfo writes info to the session file.
-func WriteSessionInfo(info SessionInfo) error {
+// WriteSessionInfo writes info to the session file for the corpus at sightmapDir.
+func WriteSessionInfo(sightmapDir string, info SessionInfo) error {
 	data, err := json.Marshal(info)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(sessionFilePath(), data, 0o600)
+	return os.WriteFile(SessionFilePath(sightmapDir), data, 0o600)
 }
 
 // FindChrome returns the path to the Chrome binary on the current platform,
@@ -169,22 +174,29 @@ func FindChrome() (string, error) {
 	}
 }
 
-// DefaultAddr reads the session file written by Launch and returns
+// DefaultAddr reads the session file for the corpus at sightmapDir and returns
 // "localhost:PORT". Falls back to the DefaultCDPPort if no file exists.
-func DefaultAddr() string {
-	info, err := ReadSessionInfo()
+func DefaultAddr(sightmapDir string) string {
+	info, err := ReadSessionInfo(sightmapDir)
 	if err != nil || info.Port <= 0 || info.Port > 65535 {
 		return fmt.Sprintf("localhost:%d", DefaultCDPPort)
 	}
 	return fmt.Sprintf("localhost:%d", info.Port)
 }
 
-// sessionFilePath returns the path where Launch writes the port number.
-// Uses .sightmap/.session if a .sightmap/ directory exists in the working
-// directory, otherwise falls back to $TMPDIR/sightmap-session.
-func sessionFilePath() string {
-	if _, err := os.Stat(".sightmap"); err == nil {
-		return filepath.Join(".sightmap", ".session")
+// SessionFilePath returns the path where the session for the corpus at
+// sightmapDir records its ports. The file lives inside the corpus directory
+// (<sightmapDir>/.session) so that concurrent sessions for different corpora
+// never share a rendezvous file — the root cause of cross-agent crosstalk. An
+// empty sightmapDir is treated as the default ".sightmap". Only when the corpus
+// directory does not exist does it fall back to a single shared file under
+// $TMPDIR (best-effort for the genuinely corpus-less case).
+func SessionFilePath(sightmapDir string) string {
+	if sightmapDir == "" {
+		sightmapDir = ".sightmap"
+	}
+	if fi, err := os.Stat(sightmapDir); err == nil && fi.IsDir() {
+		return filepath.Join(sightmapDir, ".session")
 	}
 	return filepath.Join(os.TempDir(), "sightmap-session")
 }
