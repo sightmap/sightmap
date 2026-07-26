@@ -44,7 +44,7 @@ Property predicates depend on `properties:` extraction. The Go CLI implements `p
 
 ### `browser click`
 
-Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Coordinates depend on the current layout. On success it echoes a confirmation to stderr, e.g. `clicked CartNavButton @ (674,30)`.
+Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Before dispatching, it scrolls the target to the center of the viewport and verifies that its center is the top-most element there. It **errors** instead of silently doing nothing when the target cannot be positioned in the viewport, or is `covered by another element` (an open overlay or modal). On success it echoes a confirmation with the real post-scroll coordinates, e.g. `clicked CartNavButton @ (674,30)`. (`--x`/`--y` coordinate clicks skip the scroll-and-verify step.)
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -66,7 +66,7 @@ Off-screen targets can be missed. Scroll the element into view first with `brows
 
 ### `browser fill`
 
-Types a value into an input. Takes two positionals: the target (probe ID or component query) and the value. On success it echoes `filled TARGET = "value"` to stderr.
+Types a value into an input. Takes two positionals: the target (probe ID or component query) and the value. After typing it reads the value back and **errors** when a non-empty value was typed but the field is still empty — the signature of a React-controlled input where plain typing doesn't stick; retry with `--clear`, which clears via the native value setter first. On success it echoes `filled TARGET = "value"` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|

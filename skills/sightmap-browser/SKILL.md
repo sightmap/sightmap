@@ -81,7 +81,7 @@ probe ID from snapshot output **or** a component query (see below):
 |---------|-------------|
 | `sightmap browser click <id>` | Click element by probe ID |
 | `sightmap browser click 'ComponentQuery'` | Click element by sightmap identity (preferred on dynamic pages) |
-| `sightmap browser fill <id-or-query> "text"` | Type into an input. May append on React-controlled inputs — see gotchas. |
+| `sightmap browser fill [--clear] <id-or-query> "text"` | Type into an input. Errors if the value doesn't stick — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
 | `sightmap browser keypress Enter` | Press a key (optionally focused on `<id>`) |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
@@ -144,11 +144,14 @@ sightmap browser navigate 'https://...'     # ✓ correct
 sightmap browser navigate --url 'https://'  # ✗ wrong — passes literal "--url" as the URL
 ```
 
-**`browser fill` may append on React-controlled inputs.**
-If filling the same field multiple times accumulates text, use `browser eval` with the native value setter:
+**`browser fill` detects when a value doesn't stick.**
+On some React-controlled inputs plain `fill` (select-all + type) leaves the field empty. `fill` now reads the value back and **errors** in that case, telling you to retry with `--clear` (which clears via the native value setter first). If filling the same field repeatedly *accumulates* text, also use `--clear`.
 ```bash
-sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "new value"); el.dispatchEvent(new Event("input", {bubbles: true}))'
+sightmap browser fill --clear 'SearchInput' 'burrito'
 ```
+
+**`browser click` scrolls the target into view and refuses off-screen / covered clicks.**
+`click` scrolls the element to the center of the viewport, then verifies its center is actually the top-most element there before dispatching. It **errors** (rather than silently no-op'ing) when the target can't be positioned in the viewport, or is `covered by another element` — the signal of an open overlay/modal or a target you need to reveal first. The confirmation line reports the real post-scroll coordinates it clicked.
 
 **`browser eval` cannot return DOM elements.**
 Only JSON-serializable values are returned. `document.querySelector(...)` returns an error reference. Extract what you need instead: `document.querySelector("sel")?.textContent`.

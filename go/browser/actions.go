@@ -490,20 +490,81 @@ func Drag(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, deltaX,
 	return nil
 }
 
-// Click dispatches a mouse click to the center of node's bounding box.
-// Falls back to JS click() via EvalJSON if node.Bounds is nil.
-func Click(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) error {
+// clickTarget is the live geometry of an element after scrolling it to the
+// center of the viewport: whether it is reachable (on-screen and not covered by
+// another element) and the viewport coordinates of its center.
+type clickTarget struct {
+	Found      bool `json:"found"`
+	InViewport bool `json:"inViewport"`
+	Hit        bool `json:"hit"`
+	CX         int  `json:"cx"`
+	CY         int  `json:"cy"`
+}
+
+// locateForClick scrolls the element carrying data-sightmap-id=id to the center
+// of the viewport and reports its resulting geometry, including whether its
+// center is actually the top-most element there (so a target hidden behind an
+// overlay is reported as not-hit rather than clicked through).
+func locateForClick(ctx context.Context, conn *CDPConn, id string) (clickTarget, error) {
+	script := fmt.Sprintf(`(function(){
+  var el=document.querySelector('[data-sightmap-id=%q]');
+  if(!el) return {found:false};
+  el.scrollIntoView({block:"center",inline:"center",behavior:"instant"});
+  var r=el.getBoundingClientRect();
+  var cx=Math.floor(r.left+r.width/2), cy=Math.floor(r.top+r.height/2);
+  var iv = r.width>0 && r.height>0 && cx>=0 && cy>=0 && cx<window.innerWidth && cy<window.innerHeight;
+  var hit=false;
+  if(iv){ var at=document.elementFromPoint(cx,cy); hit=!!at && (at===el||el.contains(at)||at.contains(el)); }
+  return {found:true,inViewport:iv,hit:hit,cx:cx,cy:cy};
+})()`, id)
+	raw, err := EvalJSON(ctx, conn, script)
+	if err != nil {
+		return clickTarget{}, err
+	}
+	var t clickTarget
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return clickTarget{}, err
+	}
+	return t, nil
+}
+
+// Click scrolls node into view, verifies it is reachable, and dispatches a mouse
+// click to its center, returning the viewport coordinates it clicked. It errors
+// loudly when the target cannot be positioned in the viewport or is covered by
+// another element, instead of silently dispatching a click into empty space (the
+// off-screen no-op). A node with no data-sightmap-id and no bounds falls back to
+// a selector-based JS click() and returns (-1, -1).
+func Click(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) (int, int, error) {
+	if node.Id != "" {
+		if t, err := locateForClick(ctx, conn, node.Id); err == nil && t.Found {
+			if !t.InViewport {
+				return -1, -1, fmt.Errorf("click: %q could not be scrolled into the viewport (it may be hidden or have zero size)", node.Id)
+			}
+			if !t.Hit {
+				return -1, -1, fmt.Errorf("click: %q is covered by another element at its center — it may be behind an overlay or modal", node.Id)
+			}
+			if err := ClickAt(ctx, conn, t.CX, t.CY); err != nil {
+				return -1, -1, err
+			}
+			return t.CX, t.CY, nil
+		}
+		// locate failed (no data-sightmap-id on the element, or an eval error);
+		// fall through to the bounds/selector paths below.
+	}
 	if node.Bounds == nil {
 		sel := selectorString(node.Selector)
 		if sel == "" {
-			return fmt.Errorf("Click: node %q has no bounds and no selector", node.Id)
+			return -1, -1, fmt.Errorf("click: node %q has no bounds and no selector", node.Id)
 		}
 		_, err := EvalJSON(ctx, conn, fmt.Sprintf("document.querySelector(%q)?.click()", sel))
-		return err
+		return -1, -1, err
 	}
 	x := node.Bounds.X + node.Bounds.Width/2
 	y := node.Bounds.Y + node.Bounds.Height/2
-	return ClickAt(ctx, conn, x, y)
+	if err := ClickAt(ctx, conn, x, y); err != nil {
+		return -1, -1, err
+	}
+	return x, y, nil
 }
 
 // Hover moves the mouse to the center of node's bounding box.
@@ -522,7 +583,7 @@ func Hover(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) error 
 // Fill clears the current value of a form field and types value into it.
 // Clicks the element first, then Ctrl+A to select all, then types each rune.
 func Fill(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, value string) error {
-	if err := Click(ctx, conn, node); err != nil {
+	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("Fill: click to focus: %w", err)
 	}
 	// Select all: modifiers=10 (Ctrl=2 | Meta/Cmd=8)
@@ -550,7 +611,41 @@ func Fill(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, value s
 			return fmt.Errorf("Fill: keyUp %q: %w", ch, err)
 		}
 	}
+	return verifyFilled(ctx, conn, node.Id, value)
+}
+
+// verifyFilled reads the target's value back after typing and reports an error
+// when a non-empty value was typed but the field is still empty — the signature
+// of a React-controlled input where plain Fill's select-all+type does not stick.
+// It is best-effort: an unreadable value (no id, non-input element) is not an
+// error, and a non-empty-but-transformed value (masked inputs) is accepted.
+func verifyFilled(ctx context.Context, conn *CDPConn, id, value string) error {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	if v, ok := readInputValue(ctx, conn, id); ok && strings.TrimSpace(v) == "" {
+		return fmt.Errorf("fill: typed %q but the field is still empty afterwards — it may be a React-controlled input; retry with --clear", value)
+	}
 	return nil
+}
+
+// readInputValue returns the current .value of the element carrying
+// data-sightmap-id=id. ok is false when the id is empty, the element is gone, or
+// it has no value property.
+func readInputValue(ctx context.Context, conn *CDPConn, id string) (string, bool) {
+	if id == "" {
+		return "", false
+	}
+	raw, err := EvalJSON(ctx, conn, fmt.Sprintf(
+		`(function(){var el=document.querySelector('[data-sightmap-id=%q]');if(!el||el.value==null)return null;return String(el.value)})()`, id))
+	if err != nil || len(raw) == 0 || string(raw) == "null" {
+		return "", false
+	}
+	var v string
+	if json.Unmarshal(raw, &v) != nil {
+		return "", false
+	}
+	return v, true
 }
 
 // ClearAndFill focuses node, clears its current value via the native JS setter
@@ -558,7 +653,7 @@ func Fill(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, value s
 // value using keystroke events. Use instead of Fill when a React input accumulates
 // text across multiple fill calls.
 func ClearAndFill(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, value string) error {
-	if err := Click(ctx, conn, node); err != nil {
+	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("ClearAndFill: click to focus: %w", err)
 	}
 	// Clear the field via JS native setter — works on React-controlled inputs.
@@ -590,7 +685,7 @@ func ClearAndFill(ctx context.Context, conn *CDPConn, node *comps.ComponentNode,
 			return fmt.Errorf("ClearAndFill: keyUp %q: %w", ch, err)
 		}
 	}
-	return nil
+	return verifyFilled(ctx, conn, node.Id, value)
 }
 
 // keyMap maps common key names to their CDP key/code/text representations.

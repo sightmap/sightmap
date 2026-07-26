@@ -305,7 +305,7 @@ func TestClick_WithBounds(t *testing.T) {
 		Id:     "test",
 		Bounds: &comps.Bounds{X: 100, Y: 200, Width: 60, Height: 40},
 	}
-	if err := Click(context.Background(), conn, node); err != nil {
+	if _, _, err := Click(context.Background(), conn, node); err != nil {
 		t.Fatal(err)
 	}
 
@@ -345,7 +345,7 @@ func TestClick_NoBounds(t *testing.T) {
 		Id:       "test",
 		Selector: &comps.SelectorPart{Tag: "button", Id: "submit"},
 	}
-	if err := Click(context.Background(), conn, node); err != nil {
+	if _, _, err := Click(context.Background(), conn, node); err != nil {
 		t.Fatal(err)
 	}
 
