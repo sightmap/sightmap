@@ -31,6 +31,19 @@ func resolveNode(ctx context.Context, conn *browser.CDPConn, id string) (*comps.
 	return browser.ResolveBySightmapID(ctx, conn, id)
 }
 
+// actionLabel builds a short human label for a confirmation line: the argument
+// the caller passed (a probe id or component query) plus the element's click
+// point when its bounds are known. Interaction commands echo one of these on
+// success so an agent driving the browser sees what happened.
+func actionLabel(arg string, node *comps.ComponentNode) string {
+	if node != nil && node.Bounds != nil {
+		x := node.Bounds.X + node.Bounds.Width/2
+		y := node.Bounds.Y + node.Bounds.Height/2
+		return fmt.Sprintf("%s @ (%d,%d)", arg, x, y)
+	}
+	return arg
+}
+
 // parseFlagsInterspersed parses fs allowing flags to appear AFTER positional
 // arguments. Go's stdlib flag stops at the first positional, which silently
 // drops flags like `click 'ComponentQuery' --tab X` — a multi-agent footgun where --tab is ignored. We reorder flags
@@ -85,7 +98,11 @@ func runClick(args []string) error {
 	defer conn.Close()
 
 	if *xFlag >= 0 && *yFlag >= 0 {
-		return browser.ClickAt(ctx, conn, *xFlag, *yFlag)
+		if err := browser.ClickAt(ctx, conn, *xFlag, *yFlag); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "clicked @ (%d,%d)\n", *xFlag, *yFlag)
+		return nil
 	}
 	if fs.NArg() == 0 {
 		return fmt.Errorf("usage: browser click (COMPONENT-ID | 'ComponentQuery' | --x N --y N)")
@@ -94,7 +111,11 @@ func runClick(args []string) error {
 	if err != nil {
 		return err
 	}
-	return browser.Click(ctx, conn, node)
+	if err := browser.Click(ctx, conn, node); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "clicked %s\n", actionLabel(fs.Arg(0), node))
+	return nil
 }
 
 // ── fill ──────────────────────────────────────────────────────────────────────
@@ -124,9 +145,14 @@ func runFill(args []string) error {
 		return err
 	}
 	if *clearFlag {
-		return browser.ClearAndFill(ctx, conn, node, fs.Arg(1))
+		if err := browser.ClearAndFill(ctx, conn, node, fs.Arg(1)); err != nil {
+			return err
+		}
+	} else if err := browser.Fill(ctx, conn, node, fs.Arg(1)); err != nil {
+		return err
 	}
-	return browser.Fill(ctx, conn, node, fs.Arg(1))
+	fmt.Fprintf(os.Stderr, "filled %s = %q\n", fs.Arg(0), fs.Arg(1))
+	return nil
 }
 
 // ── hover ─────────────────────────────────────────────────────────────────────
@@ -150,7 +176,11 @@ func runHover(args []string) error {
 	defer conn.Close()
 
 	if *xFlag >= 0 && *yFlag >= 0 {
-		return browser.HoverAt(ctx, conn, *xFlag, *yFlag)
+		if err := browser.HoverAt(ctx, conn, *xFlag, *yFlag); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "hovered @ (%d,%d)\n", *xFlag, *yFlag)
+		return nil
 	}
 	if fs.NArg() == 0 {
 		return fmt.Errorf("usage: browser hover (COMPONENT-ID | 'ComponentQuery' | --x N --y N)")
@@ -159,7 +189,11 @@ func runHover(args []string) error {
 	if err != nil {
 		return err
 	}
-	return browser.Hover(ctx, conn, node)
+	if err := browser.Hover(ctx, conn, node); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "hovered %s\n", actionLabel(fs.Arg(0), node))
+	return nil
 }
 
 // ── keypress ──────────────────────────────────────────────────────────────────
@@ -184,7 +218,11 @@ func runKeyPress(args []string) error {
 	}
 	defer conn.Close()
 
-	return browser.KeyPress(ctx, conn, fs.Arg(0))
+	if err := browser.KeyPress(ctx, conn, fs.Arg(0)); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "pressed %s\n", fs.Arg(0))
+	return nil
 }
 
 // ── scroll ────────────────────────────────────────────────────────────────────
@@ -219,9 +257,13 @@ func runScroll(args []string) error {
 		if err := browser.ScrollIntoView(ctx, conn, node); err != nil {
 			return err
 		}
+		fmt.Fprintf(os.Stderr, "scrolled %s into view\n", *compID)
 	}
 	if *deltaX != 0 || *deltaY != 0 {
-		return browser.ScrollBy(ctx, conn, *deltaX, *deltaY)
+		if err := browser.ScrollBy(ctx, conn, *deltaX, *deltaY); err != nil {
+			return err
+		}
+		fmt.Fprintf(os.Stderr, "scrolled by (%d,%d)\n", *deltaX, *deltaY)
 	}
 	return nil
 }
@@ -253,7 +295,11 @@ func runDrag(args []string) error {
 	if err != nil {
 		return err
 	}
-	return browser.Drag(ctx, conn, node, *deltaX, *deltaY)
+	if err := browser.Drag(ctx, conn, node, *deltaX, *deltaY); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "dragged %s by (%d,%d)\n", fs.Arg(0), *deltaX, *deltaY)
+	return nil
 }
 
 // ── wait-for ──────────────────────────────────────────────────────────────────
@@ -297,14 +343,30 @@ func runWaitFor(args []string) error {
 	}
 	defer conn.Close()
 
+	var waitErr error
+	var what, done string
 	switch {
 	case *urlPattern != "":
-		return browser.WaitForURL(ctx, conn, *urlPattern)
+		what = fmt.Sprintf("url to contain %q", *urlPattern)
+		done = fmt.Sprintf("url now contains %q", *urlPattern)
+		waitErr = browser.WaitForURL(ctx, conn, *urlPattern)
 	case *selector != "":
-		return browser.WaitForSelector(ctx, conn, *selector)
+		what = fmt.Sprintf("selector %q", *selector)
+		done = fmt.Sprintf("matched selector %q", *selector)
+		waitErr = browser.WaitForSelector(ctx, conn, *selector)
 	default:
-		return browser.WaitForLoad(ctx, conn)
+		what = "page load"
+		done = "page load complete"
+		waitErr = browser.WaitForLoad(ctx, conn)
 	}
+	if waitErr != nil {
+		if errors.Is(waitErr, context.DeadlineExceeded) {
+			return fmt.Errorf("wait-for: timed out after %dms waiting for %s", *timeoutMs, what)
+		}
+		return waitErr
+	}
+	fmt.Fprintln(os.Stderr, done)
+	return nil
 }
 
 // ── dialog ────────────────────────────────────────────────────────────────────
@@ -333,7 +395,14 @@ func runDialog(args []string) error {
 	}
 	defer conn.Close()
 
-	return browser.HandleDialog(ctx, conn, action, *text)
+	if err := browser.HandleDialog(ctx, conn, action, *text); err != nil {
+		if strings.Contains(err.Error(), "No dialog is showing") {
+			return fmt.Errorf("dialog: no dialog is currently open (nothing to %s)", action)
+		}
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "%sed dialog\n", action)
+	return nil
 }
 
 // ── screenshot ──────────────────────────────────────────────────────────────────
@@ -624,5 +693,9 @@ func runTabsResize(args []string) error {
 	}
 	defer conn.Close()
 
-	return browser.ResizeViewport(ctx, conn, width, height)
+	if err := browser.ResizeViewport(ctx, conn, width, height); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "resized viewport to %dx%d\n", width, height)
+	return nil
 }

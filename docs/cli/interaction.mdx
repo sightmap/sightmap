@@ -44,7 +44,7 @@ Property predicates depend on `properties:` extraction. The Go CLI implements `p
 
 ### `browser click`
 
-Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Coordinates depend on the current layout. Prints nothing on success.
+Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Coordinates depend on the current layout. On success it echoes a confirmation to stderr, e.g. `clicked CartNavButton @ (674,30)`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -66,7 +66,7 @@ Off-screen targets can be missed. Scroll the element into view first with `brows
 
 ### `browser fill`
 
-Types a value into an input. Takes two positionals: the target (probe ID or component query) and the value. Prints nothing on success.
+Types a value into an input. Takes two positionals: the target (probe ID or component query) and the value. On success it echoes `filled TARGET = "value"` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -91,7 +91,7 @@ sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object
 
 ### `browser hover`
 
-Moves the pointer over an element, such as a menu or tooltip trigger. It accepts the same targets as `click`: a probe ID, component query, or `--x` and `--y`. Prints nothing on success.
+Moves the pointer over an element, such as a menu or tooltip trigger. It accepts the same targets as `click`: a probe ID, component query, or `--x` and `--y`. On success it echoes a confirmation to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -109,7 +109,7 @@ sightmap browser hover 'AccountMenu'
 
 ### `browser keypress`
 
-Sends a key event to the focused element. Click or fill a field first when it needs focus. The key name is a positional argument, such as `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, or `Space`. Prints nothing on success.
+Sends a key event to the focused element. Click or fill a field first when it needs focus. The key name is a positional argument, such as `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, or `Space`. On success it echoes `pressed KEY` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -125,7 +125,7 @@ sightmap browser keypress Enter
 
 ### `browser scroll`
 
-Scrolls the page by pixel deltas, scrolls a component into view, or does both. When both are set, `--component-id` brings the target into view before applying the deltas. Prints nothing on success.
+Scrolls the page by pixel deltas, scrolls a component into view, or does both. When both are set, `--component-id` brings the target into view before applying the deltas. On success it echoes what it scrolled to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -145,7 +145,7 @@ sightmap browser scroll --component-id 'FooterLinks'
 
 ### `browser drag`
 
-Drags an element by pixel deltas. The target is a positional probe ID from snapshot output; this command does not accept component queries. Prints nothing on success.
+Drags an element by pixel deltas. The target is a positional probe ID from snapshot output; this command does not accept component queries. On success it echoes `dragged TARGET by (dx,dy)` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -162,7 +162,7 @@ sightmap browser drag 214 --delta-x 120 --delta-y 0
 
 ### `browser wait-for`
 
-Waits for exactly one condition: `--url`, `--selector`, or `--load`. It prints nothing on success and exits `1` if the timeout elapses. Use it after an action that triggers navigation or asynchronous rendering.
+Waits for exactly one condition: `--url`, `--selector`, or `--load`. On success it echoes what it matched to stderr; on timeout it exits `1` with a message like `wait-for: timed out after 10000ms waiting for selector "..."`. Use it after an action that triggers navigation or asynchronous rendering.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -182,7 +182,7 @@ sightmap browser wait-for --url '/checkout' --timeout-ms 15000
 
 ### `browser dialog`
 
-Resolves a blocking JavaScript dialog (`alert`, `confirm`, `prompt`). The action is a positional argument: `accept` or `dismiss`. Prints nothing on success.
+Resolves a blocking JavaScript dialog (`alert`, `confirm`, `prompt`). The action is a positional argument: `accept` or `dismiss`. On success it echoes `accepted dialog` / `dismissed dialog` to stderr; when no dialog is open it reports that clearly instead of surfacing a raw CDP error.
 
 | Flag | Default | Description |
 |------|---------|-------------|
