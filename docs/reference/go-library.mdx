@@ -24,20 +24,24 @@ All import paths are rooted at `github.com/sightmap/sightmap/go/`.
 
 | Package | Purpose |
 |---|---|
-| `sightmap` | Corpus loading, thread-safe `Session` matching cache, `Validate` and `Lint` |
+| `sightmap` | Corpus loading and matching (the thread-safe `Corpus` handle), plus `Validate`, `Lint`, and `LoadConfig` |
 | `comps` | Component model types (`ComponentNode`, `SelectorPart`, `Bounds`) and tree operations (`Walk`, `Collect`, `Filter`) |
 | `sel` | CSS selector parsing and single-node matching for the sightmap selector subset |
 | `match` | NFA multi-query matcher that applies component definitions in one tree traversal |
-| `extract` | Post-probe pipeline that merges accessibility data with probe output and rebuilds the tree; no browser dependency |
-| `browser` | Minimal `Page` interface plus a direct-CDP client for any Chrome debugging port (no chromedp) |
 | `compquery` | Component-query parser and resolver for queries such as `ProductCard[name^="Weber"]` |
+| `extract` | Post-probe pipeline that merges accessibility data with probe output and rebuilds the tree; no browser dependency |
 | `probe` | Embedded `probe.js` browser-side extractor, exposed as `probe.ProbeJS` |
+| `browser` | Minimal `Page` interface, a direct-CDP client for any Chrome debugging port (no chromedp), and the session `Collector` that buffers console/network |
+| `observe` | The live acquire-and-annotate operation: `observe.Page` connects, extracts, matches the corpus, and computes coverage; `observe.Format` renders it |
+| `coverage` | T1/T2/T3 coverage scoring, parent maps, orphan-slot analysis, and cluster traces |
+| `viewset` | View capture sets: paths, the novelty gate, and pruning |
+| `authoring` | Live DOM scans behind the authoring commands (`suggest` candidates, `discover` link patterns) |
 | `render` | Tree rendering for snapshot- and inspect-style output |
 | `conformance` | Fixture documentation and data used by the component-matching conformance tests |
 
 ## Load a corpus and match a tree
 
-The core flow uses three API calls. `DirLoader` creates a loader for a `.sightmap/` directory, `NewSession` adds a compiled-query cache, and `MatchTree` applies the corpus to a component tree for a page URL.
+The core flow uses two API calls. `sightmap.Load` parses a `.sightmap/` directory into a `Corpus` (a thread-safe handle with a compiled-query cache), and `Corpus.MatchTree` applies it to a component tree for a page URL.
 
 ```go main.go
 package main
@@ -53,8 +57,11 @@ import (
 )
 
 func main() {
-	// Load every YAML file under .sightmap/ (lazily, on first use).
-	sess := sightmap.NewSession(sightmap.DirLoader(".sightmap"))
+	// Load every YAML file under .sightmap/ into a Corpus.
+	corpus, err := sightmap.Load(".sightmap")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Read a component tree saved by `sightmap snapshot --tree-out`.
 	data, err := os.ReadFile("home.snap.tree.json")
@@ -67,10 +74,7 @@ func main() {
 	}
 
 	// Apply the corpus to the tree for this page URL.
-	matches, err := sess.MatchTree(root, "https://example.com/")
-	if err != nil {
-		log.Fatal(err)
-	}
+	matches := corpus.MatchTree(root, "https://example.com/")
 
 	// Walk the tree and print every matched node.
 	comps.Walk(root, func(n *comps.ComponentNode, depth int) bool {
@@ -88,25 +92,28 @@ func main() {
 The stream 1 spec requires the most specific matching view, with declaration order used only to break ties. `ViewForURL` currently uses the first match in corpus order. Avoid overlapping routes when calling the library directly until this implementation gap is closed.
 </Warning>
 
-## Sessions
+## The Corpus handle
 
-`sightmap.Session` is safe for concurrent use. It caches compiled match queries by corpus generation and page URL, so repeated `MatchTree` calls reuse the compiled queries.
+`sightmap.Corpus` is the single operational handle: load one with `Load`, then hold it for the life of a run. It is safe for concurrent use and caches compiled match queries by page URL, so repeated `MatchTree` calls reuse the compiled queries. To pick up on-disk edits in a long-lived process, call `Load` again and swap the handle.
 
 | Method | Purpose |
 |---|---|
-| `Refresh() error` | Reload the corpus and invalidate the cache; call after `.sightmap/` YAML edits |
-| `Components(pageURL string) ([]match.SightmapComponent, error)` | Return the merged component list for a URL without matching a tree |
-| `ViewForURL(pageURL string) (*sightmap.View, error)` | Return the first matching view, or `nil` when no view matches |
-| `GlobalComponentNames() (map[string]bool, error)` | Return the names declared at global scope |
+| `MatchTree(root *comps.ComponentNode, pageURL string) map[*comps.ComponentNode]*match.SightmapMatch` | Apply the corpus to a tree for a URL |
+| `Components(pageURL string) []match.SightmapComponent` | Return the merged component list for a URL without matching a tree |
+| `ViewForURL(pageURL string) *sightmap.View` | Return the first matching view, or `nil` when no view matches |
+| `ViewByName(name string) *sightmap.View` | Return the view with the given name, or `nil` |
+| `GlobalComponentNames() map[string]bool` | Return the names declared at global scope |
 
-The package also provides `StaticLoader(c *Corpus) Loader` for an existing corpus. The `LoaderFunc` type, `func() (*Corpus, error)`, implements the `Loader` interface.
+`Load(dir)` is shorthand for `DirLoader(dir).Load()`. For an existing in-memory corpus, `StaticLoader(c *Corpus) Loader` wraps it as a `Loader`; the `LoaderFunc` type, `func() (*Corpus, error)`, also implements `Loader`.
+
+Per-site tooling defaults (`.sightmap/config.yaml`) load separately via `sightmap.LoadConfig(dir) SiteConfig` — this is tooling configuration, not part of the spec.
 
 ## Validate and lint from Go
 
 The `Validate` and `Lint` functions run the same checks as `sightmap validate` and `sightmap lint`:
 
 ```go
-corpus, err := sightmap.DirLoader(".sightmap").Load()
+corpus, err := sightmap.Load(".sightmap")
 if err != nil {
 	log.Fatal(err)
 }
@@ -123,7 +130,7 @@ for _, w := range sightmap.Lint(corpus) {
 ## Where component trees come from
 
 - **Saved captures.** Auto-organized captures under `.sightmap/snapshots/{view}/` include a sibling `.snap.tree.json` file containing the raw `ComponentNode` tree. `sightmap snapshot --tree-out FILE` writes the tree to an explicit path. Unmarshal either form into `*comps.ComponentNode`, as in the example above.
-- **Live pages.** Call `browser.DialCDP` to connect to a Chrome debugging port, then pass a `browser.Page` to `browser.ExtractComponents`.
+- **Live pages.** Call `browser.Connect(addr, tabID)` to attach to a running session's tab, then pass a `browser.Page` to `browser.ExtractComponents` — or use the higher-level `observe.Page`, which connects, extracts, matches the corpus, and computes coverage in one call.
 - **Custom extraction.** Call `extract.BuildTree` with probe, accessibility, and DOM data. Native consumers can create `SelectorPart` values for non-DOM trees.
 
 <Note>

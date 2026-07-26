@@ -14,6 +14,14 @@ component tree and **act on elements by their semantic component identity**
 instead of brittle CSS. To build or maintain the corpus itself, see the
 `sightmap-authoring` skill.
 
+**What to reach for:**
+
+- **`snapshot`** — read page state as an annotated component tree (start here).
+- **interaction** (`click`/`fill`/`scroll`/…) — drive the page by component identity.
+- **`browser screenshot`** — visual evidence; clip to one component with `--component`.
+- **`console` / `network`** — debug what the page logged and requested.
+- **`inspect`** — raw DOM for authoring selectors (see `sightmap-authoring`).
+
 ## Installation
 
 Every command below needs the `sightmap` binary on your PATH. **Check first,
@@ -39,7 +47,7 @@ invocation). Use `npm` in instructions — the published package is identical un
 | `sightmap browser navigate 'URL'` | Navigate to URL (positional arg — no `--url` flag). |
 | `sightmap browser stop` | Stop Chrome session. |
 | `sightmap browser eval 'js'` | Evaluate JS in page context. Returns JSON-serializable values only — DOM element references return an error. |
-| `sightmap browser screenshot --out FILE.png` | Screenshot of the current page. |
+| `sightmap browser screenshot --out FILE.png` | Screenshot the page. Clip to a component with `--component NAME` (or `--selector CSS`), optionally `--expand-pct N` for context. |
 
 ## Reading the page: annotated snapshots
 
@@ -104,6 +112,25 @@ so nothing goes stale. Prefer queries on dynamic pages.
   property like `FulfillmentTileButton.label` is what makes the element
   addressable (see the `sightmap-authoring` skill).
 - `--sightmap-dir` (default `.sightmap`) controls which corpus resolves a query.
+
+## Debugging: console & network
+
+The `browser start` daemon owns the session and runs a **collector** that buffers
+console messages and network requests from every tab for the life of the session
+(bounded ring buffers, ~1000 of each). Read them with thin query commands — no
+re-attaching to Chrome, and history the transient page commands never saw:
+
+| Command | What it does |
+|---------|-------------|
+| `sightmap console list [--level error] [--tab ID] [--limit N]` | Captured console messages (uncaught exceptions fold in as `level=exception`). |
+| `sightmap console get <index>` | One console message by index. |
+| `sightmap network list [--type XHR] [--url /api] [--tab ID] [--limit N]` | Captured requests: `method url → status (type)`. |
+| `sightmap network get <index> [--response-file F]` | One request + its response body (fetched on demand; save with `--response-file`). |
+
+- These need a running `browser start` session — that's where the collector
+  lives. Entries from before the session started aren't available.
+- Reproduce the issue (navigate/click), then read `console list --level error`
+  and `network list` to see what failed; `network get <index>` pulls the body.
 
 ## Gotchas
 

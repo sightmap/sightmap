@@ -52,11 +52,11 @@ hot-reloads the corpus whenever you edit YAML.
 
 ### 2. Iterate on a page
 
-`iterate` is the primary edit-verify loop — it navigates, snaps, and prints
-coverage in one step:
+`snapshot --coverage --url` is the primary edit-verify loop — it navigates,
+snaps, and prints coverage in one step:
 
 ```bash
-sightmap iterate 'https://SITE.com/products'
+sightmap snapshot --coverage --url 'https://SITE.com/products'
 ```
 
 ```
@@ -96,14 +96,14 @@ global one), e.g.:
       extract: attr=aria-label
 ```
 
-Re-run `iterate` and repeat until `0 orphaned T3 ✓`.
+Re-run `snapshot --coverage --url` and repeat until `0 orphaned T3 ✓`.
 
 ### 3. Validate, snapshot, and check corpus health
 
 ```bash
 sightmap validate            # structural YAML correctness (exits non-zero on error)
 sightmap lint --warn-only    # advisory style checks
-sightmap snapshot --all      # refresh a saved snap for every view URL
+sightmap capture --all       # refresh a saved capture for every view URL
 sightmap report              # per-view T1/T2/T3 health table
 ```
 

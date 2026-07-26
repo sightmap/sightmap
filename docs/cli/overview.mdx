@@ -29,10 +29,15 @@ Several flags appear in multiple command groups:
 | `--sightmap-dir` | `.sightmap` | Path to the corpus directory |
 | `--addr` | `localhost:7892` | CDP address of the Chrome session (printed by `browser start`) |
 | `--tab` | the lone content tab | Target tab ID; required whenever two or more content tabs are open |
-| `--launch` | off | Auto-launch Chrome when `--addr` is unreachable (live analysis commands: `snapshot`, `capture`, `inspect`, `suggest`, `gap`, `discover`, `sel-probe`) |
 | `--include-hidden` | off | Count hidden and off-screen nodes too |
 
 **Address sessions by port and tab.** `sightmap browser start` launches Chrome with its DevTools endpoint on `localhost:7892` and the Sightmap HTTP server on port `7891`. Live commands use `--addr` to reach the session. When more than one content tab is open, page commands require `--tab` with the tab ID printed by `browser start`. See [Browser sessions](/cli/browser).
+
+**`browser start` is the only launcher.** Live commands attach to a session you started; there is no auto-launch. When none is running they stop with `Start a session first: sightmap browser start`. That single owner also hosts the console/network collector behind the [devtools commands](/cli/devtools).
+
+<Note>
+**Vocabulary.** A sightmap **view** is a route-scoped definition in the corpus; a browser **tab** is a live page in the session. They are different things — the [glossary](/reference/glossary) disambiguates `view`, `tab`, and related terms.
+</Note>
 
 **Visible-only counting is the default.** Coverage and analysis commands count visible interactive nodes only. Pass `--include-hidden` to include hidden and off-screen nodes. These nodes can increase the orphan count, so enable the flag only when you intend to audit them.
 
@@ -73,6 +78,9 @@ What counts as failure for the check-style commands:
   </Card>
   <Card title="Corpus checks" icon="file-lines" href="/cli/corpus">
     Check YAML structure and style, search the corpus, and discover URL patterns.
+  </Card>
+  <Card title="Devtools" icon="bug" href="/cli/devtools">
+    Read captured `console` messages and `network` requests from the running session.
   </Card>
   <Card title="Integration" icon="network-wired" href="/cli/integrate">
     Run the overlay server and install the bundled agent skills.

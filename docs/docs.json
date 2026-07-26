@@ -71,7 +71,8 @@
             "group": "Browser",
             "pages": [
               "cli/browser",
-              "cli/interaction"
+              "cli/interaction",
+              "cli/devtools"
             ]
           },
           {
