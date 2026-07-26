@@ -15,6 +15,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -143,6 +144,13 @@ func runSelProbe(args []string) error {
 	fmt.Printf("selector: %s\n", selector)
 	fmt.Printf("matches: %d\n", len(results))
 
+	// Cross-check against the OFFLINE matcher. sel-probe queries the live DOM,
+	// but snapshot/coverage/capture match the extracted component tree with the
+	// Go matcher, which supports a subset of CSS and a reduced node model. When
+	// the two disagree, a "verified" selector can be silently dead downstream, so
+	// surface the divergence loudly. Best-effort: never fail sel-probe on it.
+	printOfflineCheck(ctx, conn, selector, len(results))
+
 	if len(results) == 0 {
 		return nil
 	}
@@ -207,6 +215,99 @@ func runSelProbe(args []string) error {
 		}
 	}
 	return nil
+}
+
+// printOfflineCheck compares the live querySelectorAll count against the offline
+// matcher's count for the same selector and warns when they diverge. The offline
+// matcher is what snapshot/coverage/capture use, so a divergence means the
+// selector will behave differently there than sel-probe's live query suggests.
+// liveShown is the (possibly --max-capped) number of results already printed; the
+// true live total is re-counted here for an honest comparison.
+func printOfflineCheck(ctx context.Context, conn *browser.CDPConn, selector string, liveShown int) {
+	liveN, lErr := liveSelectorCount(ctx, conn, selector)
+	if lErr != nil {
+		liveN = liveShown // fall back to what we showed
+	}
+	offN, oErr := offlineSelectorCount(ctx, conn, selector)
+	if oErr != nil {
+		return // extraction/match unavailable — skip the cross-check silently
+	}
+
+	fmt.Printf("offline matcher: %d match%s (snapshot/coverage/capture use this)\n", offN, pluralS(offN))
+	if offN == liveN {
+		return
+	}
+	fmt.Printf("⚠ offline/live divergence: live DOM matches %d, but the offline matcher sees %d.\n"+
+		"  snapshot/coverage/capture will see %d — don't trust a live-only match here.\n", liveN, offN, offN)
+	for _, h := range offlineDivergenceHints(selector) {
+		fmt.Printf("  - %s\n", h)
+	}
+}
+
+// liveSelectorCount returns the true (uncapped) number of DOM elements matching
+// selector in the live page.
+func liveSelectorCount(ctx context.Context, conn *browser.CDPConn, selector string) (int, error) {
+	selJSON, _ := json.Marshal(selector)
+	raw, err := browser.EvalJSON(ctx, conn, fmt.Sprintf(
+		`(function(s){try{return document.querySelectorAll(s).length}catch(e){return -1}})(%s)`, string(selJSON)))
+	if err != nil {
+		return 0, err
+	}
+	var n int
+	if json.Unmarshal(raw, &n) != nil || n < 0 {
+		return 0, fmt.Errorf("live count eval failed")
+	}
+	return n, nil
+}
+
+// offlineSelectorCount extracts the component tree from the live page and counts
+// how many nodes the offline matcher assigns to selector — exactly what
+// snapshot/coverage/capture would see.
+func offlineSelectorCount(ctx context.Context, conn *browser.CDPConn, selector string) (int, error) {
+	page, err := conn.DefaultPage()
+	if err != nil {
+		return 0, err
+	}
+	root, err := browser.ExtractComponents(ctx, page)
+	if err != nil {
+		return 0, err
+	}
+	defs := []match.SightmapComponent{{Name: "__probe__", Selectors: []string{selector}}}
+	return len(match.ApplySightmap(root, defs)), nil
+}
+
+// offlineDivergenceHints returns human-readable reasons a selector might match
+// live but not offline, derived from the parsed selector. It recognizes the two
+// best-known traps — attribute selectors on `id` and on `class` — and otherwise
+// gives a general nudge about the reduced offline node model.
+func offlineDivergenceHints(selector string) []string {
+	ps, err := sel.ParseSightmapSelector(selector)
+	if err != nil {
+		return []string{"the offline selector parser could not parse this selector, so it matches nothing offline"}
+	}
+	var hints []string
+	seen := map[string]bool{}
+	add := func(h string) {
+		if !seen[h] {
+			seen[h] = true
+			hints = append(hints, h)
+		}
+	}
+	for _, part := range ps.Parts {
+		if part == nil {
+			continue
+		}
+		if _, ok := part.Attrs["id"]; ok {
+			add("attribute selectors on `id` (e.g. [id^=\"…\"]) don't match offline — `id` is a dedicated node field; use `#id` instead")
+		}
+		if _, ok := part.Attrs["class"]; ok {
+			add("attribute selectors on `class` (e.g. [class*=\"…\"]) never match offline — use a `.class` selector instead")
+		}
+	}
+	if len(hints) == 0 {
+		add("the offline node model may not capture the attribute(s) or structure this selector relies on (e.g. non-standard form attributes like `placeholder`, or `class` on SVG elements)")
+	}
+	return hints
 }
 
 // queryElements runs the inline JS and returns the parsed element list.
