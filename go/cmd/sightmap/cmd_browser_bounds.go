@@ -41,7 +41,7 @@ type boundsPx struct {
 
 func runBounds(args []string) error {
 	fs := flag.NewFlagSet("bounds", flag.ContinueOnError)
-	addrFlag := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
+	addrFlag := fs.String("addr", "", "CDP address (host:port; default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component-name queries)")
 	selectorFlag := fs.String("selector", "", "Query raw DOM elements by CSS selector instead of component name")
@@ -74,7 +74,7 @@ func runBounds(args []string) error {
 	}
 
 	ctx := context.Background()
-	conn, err := browser.Connect(*addrFlag, *tabFlag)
+	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}

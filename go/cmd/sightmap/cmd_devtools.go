@@ -21,8 +21,8 @@ import (
 // devtoolsGet fetches path (with query) from the daemon's HTTP server and
 // returns the raw body. It resolves the daemon via the session file's
 // ServerPort.
-func devtoolsGet(path string, query url.Values) ([]byte, error) {
-	info, err := browser.ReadSessionInfo()
+func devtoolsGet(sightmapDir, path string, query url.Values) ([]byte, error) {
+	info, err := browser.ReadSessionInfo(sightmapDir)
 	if err != nil || info.ServerPort == 0 {
 		return nil, fmt.Errorf("no running session — start one with 'sightmap browser start'")
 	}
@@ -80,6 +80,7 @@ func runConsoleList(args []string) error {
 	level := fs.String("level", "", "Filter by level: log, debug, info, warn, error, exception")
 	tab := fs.String("tab", "", "Filter by tab ID")
 	limit := fs.Int("limit", 0, "Show only the most recent N messages (0 = all)")
+	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -89,7 +90,7 @@ func runConsoleList(args []string) error {
 	if *limit > 0 {
 		q.Set("limit", strconv.Itoa(*limit))
 	}
-	body, err := devtoolsGet("/devtools/console", q)
+	body, err := devtoolsGet(*sightmapDir, "/devtools/console", q)
 	if err != nil {
 		return err
 	}
@@ -115,6 +116,7 @@ func runConsoleList(args []string) error {
 
 func runConsoleGet(args []string) error {
 	fs := flag.NewFlagSet("console get", flag.ContinueOnError)
+	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -122,7 +124,7 @@ func runConsoleGet(args []string) error {
 	if err != nil {
 		return err
 	}
-	body, err := devtoolsGet("/devtools/console", nil)
+	body, err := devtoolsGet(*sightmapDir, "/devtools/console", nil)
 	if err != nil {
 		return err
 	}
@@ -161,6 +163,7 @@ func runNetworkList(args []string) error {
 	urlSub := fs.String("url", "", "Filter by URL substring")
 	tab := fs.String("tab", "", "Filter by tab ID")
 	limit := fs.Int("limit", 0, "Show only the most recent N requests (0 = all)")
+	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -171,7 +174,7 @@ func runNetworkList(args []string) error {
 	if *limit > 0 {
 		q.Set("limit", strconv.Itoa(*limit))
 	}
-	body, err := devtoolsGet("/devtools/network", q)
+	body, err := devtoolsGet(*sightmapDir, "/devtools/network", q)
 	if err != nil {
 		return err
 	}
@@ -194,6 +197,7 @@ func runNetworkGet(args []string) error {
 	fs := flag.NewFlagSet("network get", flag.ContinueOnError)
 	respFile := fs.String("response-file", "", "Write the response body to this file")
 	reqFile := fs.String("request-file", "", "Write the request body (POST data) to this file")
+	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -202,7 +206,7 @@ func runNetworkGet(args []string) error {
 		return err
 	}
 
-	body, err := devtoolsGet("/devtools/network", nil)
+	body, err := devtoolsGet(*sightmapDir, "/devtools/network", nil)
 	if err != nil {
 		return err
 	}
@@ -228,12 +232,12 @@ func runNetworkGet(args []string) error {
 	fmt.Printf("Tab: %s\n", entry.Tab)
 
 	if *reqFile != "" {
-		if err := saveBody(idx, "request", *reqFile); err != nil {
+		if err := saveBody(*sightmapDir, idx, "request", *reqFile); err != nil {
 			return err
 		}
 	}
 	// Fetch the response body (to a file, or inline preview).
-	rbody, err := devtoolsGet("/devtools/network/body", url.Values{"index": {strconv.Itoa(idx)}, "kind": {"response"}})
+	rbody, err := devtoolsGet(*sightmapDir, "/devtools/network/body", url.Values{"index": {strconv.Itoa(idx)}, "kind": {"response"}})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "network get: response body unavailable: %v\n", err)
 		return nil
@@ -249,8 +253,8 @@ func runNetworkGet(args []string) error {
 	return nil
 }
 
-func saveBody(idx int, kind, path string) error {
-	b, err := devtoolsGet("/devtools/network/body", url.Values{"index": {strconv.Itoa(idx)}, "kind": {kind}})
+func saveBody(sightmapDir string, idx int, kind, path string) error {
+	b, err := devtoolsGet(sightmapDir, "/devtools/network/body", url.Values{"index": {strconv.Itoa(idx)}, "kind": {kind}})
 	if err != nil {
 		return fmt.Errorf("%s body: %w", kind, err)
 	}

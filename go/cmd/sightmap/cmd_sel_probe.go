@@ -91,7 +91,7 @@ type compAnnotation struct {
 
 func runSelProbe(args []string) error {
 	fs := flag.NewFlagSet("sel-probe", flag.ContinueOnError)
-	addr := fs.String("addr", browser.DefaultAddr(), "CDP address (host:port)")
+	addr := fs.String("addr", "", "CDP address (host:port; default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ directory for component annotation")
 	maxN := fs.Int("max", 10, "Max matches to show")
@@ -110,9 +110,10 @@ func runSelProbe(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	resolvedAddr := resolveCDPAddr(*addr, *sightmapDir)
 
 	if *allFlag {
-		return runSelProbeAll(fs.Args(), *sightmapDir, *addr, *tabFlag, *maxN, *full, *waitFlag)
+		return runSelProbeAll(fs.Args(), *sightmapDir, resolvedAddr, *tabFlag, *maxN, *full, *waitFlag)
 	}
 
 	remaining := fs.Args()
@@ -127,7 +128,7 @@ func runSelProbe(args []string) error {
 	ctx := context.Background()
 
 	// Step 1: connect to Chrome.
-	conn, err := browser.Connect(*addr, *tabFlag)
+	conn, err := browser.Connect(resolvedAddr, *tabFlag)
 	if err != nil {
 		return err
 	}
