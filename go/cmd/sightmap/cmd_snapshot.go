@@ -13,6 +13,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -73,9 +74,11 @@ func runSnapshot(args []string) error {
 	}
 
 	// ── Observe (extract + match + coverage + properties) ──────────────────────
+	// A present-but-malformed corpus is fatal (loudness for automation); a missing
+	// corpus is not — loadCorpus returns (nil, nil) for an absent dir.
 	corpus, cErr := lf.loadCorpus()
 	if cErr != nil {
-		fmt.Fprintf(os.Stderr, "snapshot: load corpus: %v\n", cErr)
+		return fmt.Errorf("snapshot: load corpus: %w", cErr)
 	}
 	res, err := observe.Page(ctx, conn, corpus, observe.Options{VisibleOnly: visible, ExtractProps: true})
 	if err != nil {
@@ -117,10 +120,20 @@ func runSnapshot(args []string) error {
 	// ── Write output ───────────────────────────────────────────────────────────
 	// snapshot only ever writes the rendered output to stdout or an explicit
 	// --out FILE. It never appends to the corpus capture set (that is `capture`).
-	return writeOut(*outFlag, func(w io.Writer) error {
+	if err := writeOut(*outFlag, func(w io.Writer) error {
 		observe.Format(w, res, fmtOpts)
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	// A page with zero interactive nodes is almost always blank or still loading.
+	// Render it (above) but exit non-zero so automation doesn't mistake an
+	// unrendered shell for a real observation.
+	if coverage.CountInteractive(res.Root, visible) == 0 {
+		return fmt.Errorf("snapshot: page has 0 interactive nodes — it may be blank or still loading (try 'browser wait-for --selector ...' or check the URL)")
+	}
+	return nil
 }
 
 // ── Output sections ───────────────────────────────────────────────────────────

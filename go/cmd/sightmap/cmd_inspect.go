@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
@@ -56,9 +57,11 @@ func runInspect(args []string) error {
 		return fmt.Errorf("extract components: %v", err)
 	}
 
-	// ── Load sightmap (optional, silent on error) ────────────────────────
+	// ── Load sightmap (optional enrichment; warn but don't fail on a bad corpus) ──
 	var inspectMatches map[*comps.ComponentNode]*match.SightmapMatch
-	if corpus, _ := lf.loadCorpus(); corpus != nil {
+	if corpus, cErr := lf.loadCorpus(); cErr != nil {
+		fmt.Fprintf(os.Stderr, "inspect: load corpus: %v (continuing without component names)\n", cErr)
+	} else if corpus != nil {
 		inspectMatches = corpus.MatchTree(root, pageURL)
 	}
 

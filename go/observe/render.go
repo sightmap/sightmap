@@ -196,17 +196,16 @@ func writeZeroMatchWarnings(
 
 // writeCoverage prints the [Coverage] section.
 func writeCoverage(w io.Writer, cov coverage.Result) {
-	check := "✗"
-	if cov.T3 == 0 {
-		check = "✓"
-	}
 	if cov.VisibleOnly {
 		fmt.Fprintf(w, "[Coverage] (visible only)\n")
 	} else {
 		fmt.Fprintf(w, "[Coverage]\n")
 	}
 	fmt.Fprintf(w, "%d interactive · %d direct T1 (%d%%) · %d scoped T2 (%d%%) · %d orphaned T3 %s\n",
-		cov.Total, cov.T1, coverage.Pct(cov.T1, cov.Total), cov.T2, coverage.Pct(cov.T2, cov.Total), cov.T3, check)
+		cov.Total, cov.T1, coverage.Pct(cov.T1, cov.Total), cov.T2, coverage.Pct(cov.T2, cov.Total), cov.T3, cov.Mark())
+	if cov.Empty() {
+		fmt.Fprintf(w, "⚠ no interactive nodes — the page may be blank or still loading (no coverage signal)\n")
+	}
 }
 
 // WriteTrace prints the "Unlabeled clusters" section for T3 (orphaned) nodes.

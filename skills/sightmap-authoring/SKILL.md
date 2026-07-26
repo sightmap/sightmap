@@ -142,13 +142,19 @@ sightmap snapshot --url 'https://www.example.com/page' --out page.snap --tree-ou
 Sites using client-side rendering (React/Next.js canvas, lazy hydration) may
 not have their content ready at `loadEventFired`. Homedepot.com's `snapshot`
 already includes `--wait 1`. For other slow pages add `--wait N` seconds.
+A page with **0 interactive nodes** renders `∅` (not `✓`) and `snapshot` exits
+non-zero — that is the blank/still-loading signal; raise `--wait` or use
+`browser wait-for --selector` and re-snap. `capture` refuses to persist such a
+page as a view's baseline (override with `--force`), and `coverage` counts it as
+a failure.
 
 **A snap is only valid for the page loaded when it was taken.**
 Re-snap after every YAML change. Do not reuse stale snaps.
 
 **0 orphaned is the only acceptable exit condition.**
 T3 > 0 means some interactive nodes have zero semantic context. Do not declare
-a page done until `[Coverage] (visible only) ... 0 orphaned ✓`.
+a page done until `[Coverage] (visible only) ... 0 orphaned ✓`. A `∅` mark (0
+interactive nodes) is never done — the page is blank or still loading.
 
 ---
 

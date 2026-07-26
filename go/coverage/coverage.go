@@ -83,6 +83,28 @@ func Score(root *comps.ComponentNode, matches Matches, opts Options) Result {
 	return res
 }
 
+// CountInteractive returns the number of interactive nodes in the tree, applying
+// the same visibility filter Score uses. It is the corpus-independent way to ask
+// "does this page have any actionable content?" — useful for detecting a blank or
+// still-loading page before a corpus is even involved.
+func CountInteractive(root *comps.ComponentNode, visibleOnly bool) int {
+	if root == nil {
+		return 0
+	}
+	n := 0
+	comps.Walk(root, func(node *comps.ComponentNode, _ int) bool {
+		if !node.IsInteractive {
+			return true
+		}
+		if visibleOnly && (!node.IsVisible || node.IsIgnored) {
+			return true
+		}
+		n++
+		return true
+	})
+	return n
+}
+
 // BuildParentMap returns a map from each non-root node to its parent.
 func BuildParentMap(root *comps.ComponentNode) ParentMap {
 	pm := make(ParentMap)
@@ -117,4 +139,28 @@ func Pct(a, b int) int {
 		return 0
 	}
 	return int(math.Round(float64(a) * 100 / float64(b)))
+}
+
+// Empty reports whether no interactive nodes were scored at all. An empty result
+// means the page carried no coverage signal — typically a blank or still-loading
+// page — and must not be treated as a pass.
+func (r Result) Empty() bool { return r.Total == 0 }
+
+// OK reports whether coverage is a clean pass: at least one interactive node was
+// scored and none were orphaned (T3). A page with zero interactive nodes is NOT
+// a pass — there is nothing to green-light.
+func (r Result) OK() bool { return r.Total > 0 && r.T3 == 0 }
+
+// Mark returns the status glyph for a coverage line: "✓" for a clean pass, "✗"
+// when there are orphaned (T3) nodes, and "∅" when there were no interactive
+// nodes at all (a blank or unrendered page, which is never a pass).
+func (r Result) Mark() string {
+	switch {
+	case r.Empty():
+		return "∅"
+	case r.T3 == 0:
+		return "✓"
+	default:
+		return "✗"
+	}
 }

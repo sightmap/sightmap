@@ -1,0 +1,8 @@
+---
+"@sightmap/sightmap": patch
+---
+
+Stop green-lighting broken corpora and blank pages:
+
+- `snapshot` now exits non-zero when the corpus is present but fails to parse (a missing corpus stays non-fatal — the tree still renders), and when the observed page has 0 interactive nodes (blank or still loading). It still renders whatever it observed first. `inspect` and `suggest` now warn on a bad corpus instead of silently ignoring it.
+- Coverage no longer marks a page with 0 interactive nodes as a pass. The coverage line renders a distinct `∅` mark (instead of `✓`), the `coverage` command counts empty captures as failures, and `capture` refuses to persist a blank/loading page as a view's baseline (override with `--force`).

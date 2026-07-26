@@ -46,7 +46,9 @@ func runSuggest(args []string) error {
 	// ── Optionally filter out known sightmap components ────────────────────
 	var knownSelectors []string
 	if *excludeKnownFlag {
-		if corpus, _ := lf.loadCorpus(); corpus != nil {
+		if corpus, cErr := lf.loadCorpus(); cErr != nil {
+			fmt.Fprintf(os.Stderr, "suggest: load corpus: %v (continuing without --exclude-known filtering)\n", cErr)
+		} else if corpus != nil {
 			for _, c := range corpus.Components("") {
 				knownSelectors = append(knownSelectors, c.Selectors...)
 			}
