@@ -11,6 +11,10 @@
       "const": 1,
       "description": "Must be 1 for files that conform to this version of the spec."
     },
+    "url": {
+      "type": "string",
+      "description": "File-level default representative URL, applied to every view in this file that does not declare its own. See the per-view `url`."
+    },
     "memory": {
       "$ref": "#/$defs/memory",
       "description": "File-level memory entries — surfaced whenever any definition from this file is active."
@@ -60,6 +64,10 @@
           "type": "string",
           "minLength": 1,
           "description": "Glob pattern matched against the URL pathname. * matches one segment, ** matches any depth."
+        },
+        "url": {
+          "type": "string",
+          "description": "Representative URL for this view: a concrete address that resolves to it, used by tooling to navigate to the view (report, capture --all, sel-probe --all, discover). Falls back to the file-level `url` when omitted."
         },
         "description": { "type": "string" },
         "source": { "type": "string" },
