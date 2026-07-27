@@ -140,6 +140,7 @@ func loadDir(path string) (*Corpus, error) {
 		path string
 	}
 	var viewFiles []viewFileWithPath
+	var fieldDiags []ValidationError
 
 	for _, p := range yamlPaths {
 		data, err := os.ReadFile(p)
@@ -149,6 +150,11 @@ func loadDir(path string) (*Corpus, error) {
 		var rf rawFile
 		if err := yaml.Unmarshal(data, &rf); err != nil {
 			return nil, fmt.Errorf("sightmap: parse %q: %w", p, err)
+		}
+		// config.yaml is tooling config (its own schema), not a corpus file —
+		// don't run the corpus unknown-field check over it.
+		if base := filepath.Base(p); base != "config.yaml" && base != "config.yml" {
+			fieldDiags = append(fieldDiags, unknownFieldWarnings(data, base)...)
 		}
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
@@ -224,7 +230,7 @@ func loadDir(path string) (*Corpus, error) {
 	return &Corpus{
 		GlobalComponents: globalComps,
 		Views:            views,
-		loadDiagnostics:  ctx.diagnostics,
+		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),
 	}, nil
 }
 
