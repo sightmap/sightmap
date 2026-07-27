@@ -56,6 +56,7 @@ type rawSnapshot struct {
 type rawView struct {
 	Name        string         `yaml:"name"`
 	Route       string         `yaml:"route"`
+	URL         string         `yaml:"url"`
 	Description string         `yaml:"description"`
 	Memory      []string       `yaml:"memory"`
 	Components  []rawComponent `yaml:"components"`
@@ -201,6 +202,11 @@ func loadDir(path string) (*Corpus, error) {
 			if rv.Access != nil {
 				access = Access{Status: rv.Access.Status, Reason: rv.Access.Reason}
 			}
+			// Per-view url wins; fall back to the file-level url as a default.
+			viewURL := rv.URL
+			if viewURL == "" {
+				viewURL = vf.URL
+			}
 			views = append(views, View{
 				Name:       rv.Name,
 				Route:      rv.Route,
@@ -208,7 +214,7 @@ func loadDir(path string) (*Corpus, error) {
 				Components: flattenAll(rv.Components, ctx),
 				Stability:  rv.Stability,
 				Access:     access,
-				URL:        vf.URL,
+				URL:        viewURL,
 				Snapshots:  snapshots,
 				SourceFile: basename,
 			})

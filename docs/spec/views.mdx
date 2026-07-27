@@ -23,7 +23,7 @@ views:
         method: POST
 ```
 
-`name` and `route` are required. `description` records the view's purpose, and `source` links it to a source file. See [Schema reference](/reference/schema#view) for every field.
+`name` and `route` are required. `url` gives the view a representative URL — a concrete address that resolves to it — which tooling uses to navigate to the view (coverage reporting, bulk capture, and probing); a file-level `url` supplies a default for views that omit their own. `description` records the view's purpose, and `source` links it to a source file. See [Schema reference](/reference/schema#view) for every field.
 
 ## Route matching
 
