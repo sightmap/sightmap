@@ -17,7 +17,7 @@ A component is a named DOM subtree, identified by one or more CSS selectors. Nam
       selector: '[role="gridcell"]'
 ```
 
-`name` and `selector` are required. See [Schema reference](/reference/schema#component) for the full field list, including `description`, `source`, and `memory`.
+`name` and `selector` are required. See [Schema reference](/reference/schema#component) for the full field list, including `description`, `source`, `memory`, and `properties`.
 
 ## Selectors
 
@@ -128,6 +128,29 @@ The conformance rules:
 - When a view-scoped `$ref` and a file-root global share a name, the view-scoped expansion **subsumes** the global for that view — implementations MUST NOT produce two matches.
 
 See the [schema reference](/reference/schema#component-references) for the full statement.
+
+
+## Properties
+
+A component can declare `properties:` — named values pulled from its matched element and shown alongside the name in enriched snapshots, so an agent sees not just *what* matched but *what state it is in*:
+
+```yaml
+- name: DateFilterButton
+  selector: '[data-testid="date-filter-button"]'
+  properties:
+    - name: label
+      extract: text          # → [DateFilterButton label="This Weekend"]
+- name: ProductCard
+  selector: '[data-testid="product-pod"]'
+  properties:
+    - name: price
+      extract: '[data-testid="price"]'   # a CSS sub-selector, read from the child
+      transform: first_dollar
+    - name: sold_out
+      extract: 'exists:[aria-label="Sold Out"]'   # boolean flag; omitted when absent
+```
+
+Each property has a `name` (the annotation key), an `extract` directive (`text`, `inner_text`, `text_only`, `inner_html`, `attr=NAME`, `exists:SEL`, or a CSS sub-selector), and an optional `transform` (`first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`). Extraction runs on the exact matched element, from the live DOM at snapshot time — offline tools omit the values. A value that comes back empty (or an `exists:`/sub-selector that finds nothing) is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md).
 
 ## Dependencies
 

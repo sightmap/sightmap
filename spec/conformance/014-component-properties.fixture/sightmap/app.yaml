@@ -1,0 +1,15 @@
+version: 1
+views:
+  - name: Results
+    route: /search
+    components:
+      - name: ProductCard
+        selector: '[data-testid="product-pod"]'
+        properties:
+          - name: price
+            extract: '[data-testid="price"]'
+            transform: first_dollar
+          - name: sold_out
+            extract: 'exists:[aria-label="Sold Out"]'
+          - name: label
+            extract: text
