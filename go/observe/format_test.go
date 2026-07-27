@@ -7,6 +7,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
+	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -52,6 +53,32 @@ func TestFormat_CoverageWithZeroMatches(t *testing.T) {
 	}
 	if !strings.Contains(out, "[Coverage]") || !strings.Contains(out, "5 interactive") {
 		t.Errorf("expected a [Coverage] line with 5 interactive, got:\n%s", out)
+	}
+}
+
+// TestFormat_Conflicts: runtime ambiguities (tied views + a node matched by
+// multiple components) surface in a [Conflicts] section.
+func TestFormat_Conflicts(t *testing.T) {
+	r := &Result{
+		Root:          &comps.ComponentNode{Id: "1", Role: "document", IsVisible: true},
+		URL:           "https://app.example.com/a/b",
+		CorpusApplied: true,
+		View:          &sightmap.View{Name: "AStar", Route: "/a/*"},
+		TiedViews:     []string{"AStar", "StarB"},
+		ComponentConflicts: []match.Conflict{{
+			Node:  &comps.ComponentNode{Id: "7", Role: "button", Name: "Save"},
+			Names: []string{"AppDialog", "LoginDialog"},
+		}},
+	}
+	out := renderResult(r)
+	if !strings.Contains(out, "[Conflicts]") {
+		t.Fatalf("expected a [Conflicts] section, got:\n%s", out)
+	}
+	if !strings.Contains(out, "equal specificity") || !strings.Contains(out, "AStar, StarB") {
+		t.Errorf("expected the tied-views line, got:\n%s", out)
+	}
+	if !strings.Contains(out, "AppDialog, LoginDialog") || !strings.Contains(out, "#7") {
+		t.Errorf("expected the component-conflict line, got:\n%s", out)
 	}
 }
 

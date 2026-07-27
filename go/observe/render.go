@@ -79,6 +79,9 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 		writeZeroMatchWarnings(w, r.Components, r.Matches, r.View, r.GlobalNames)
 	}
 
+	// ── [Conflicts] (runtime ambiguities) ──────────────────────────────────────
+	writeConflicts(w, r)
+
 	// ── [Coverage] ────────────────────────────────────────────────────────────
 	// Gated on CorpusApplied, not on Matches: a matched view with zero components
 	// (or a page where no component matched) still has a coverage story to tell
@@ -201,6 +204,42 @@ func writeZeroMatchWarnings(
 		fmt.Fprintln(w, w2)
 	}
 	fmt.Fprintln(w)
+}
+
+// writeConflicts prints the [Conflicts] section: runtime ambiguities where more
+// than one definition claims the same target and a fallback rule (declaration
+// order) silently picked the winner. Prints nothing when there are none.
+func writeConflicts(w io.Writer, r *Result) {
+	if len(r.TiedViews) < 2 && len(r.ComponentConflicts) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "[Conflicts]\n")
+	if len(r.TiedViews) >= 2 {
+		fmt.Fprintf(w, "⚠ %d views match this URL at equal specificity (%s) — declaration order decided the winner (%s)\n",
+			len(r.TiedViews), strings.Join(r.TiedViews, ", "), r.TiedViews[0])
+	}
+	for _, c := range r.ComponentConflicts {
+		fmt.Fprintf(w, "⚠ %s matched by %d components (%s) — only %s applied\n",
+			conflictNodeLabel(c.Node), len(c.Names), strings.Join(c.Names, ", "), c.Names[0])
+	}
+	fmt.Fprintln(w)
+}
+
+// conflictNodeLabel formats a node for a conflict line: its probe id plus role
+// and accessible name when present.
+func conflictNodeLabel(n *comps.ComponentNode) string {
+	if n == nil {
+		return "(node)"
+	}
+	role := n.Role
+	if role == "" {
+		role = "?"
+	}
+	label := fmt.Sprintf("#%s %s", n.Id, role)
+	if n.Name != "" {
+		label += fmt.Sprintf(" %q", render.TruncateRunes(n.Name, 40))
+	}
+	return label
 }
 
 // writeCoverage prints the [Coverage] section.

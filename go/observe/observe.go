@@ -30,6 +30,14 @@ type Result struct {
 	// lets the renderer tell "no corpus" apart from "corpus loaded but nothing
 	// matched" — the latter must not be silent.
 	CorpusApplied bool
+
+	// TiedViews holds the names of views that matched the URL at equal top
+	// specificity (>= 2 means the winner was decided only by declaration order).
+	// Empty when there's no ambiguity.
+	TiedViews []string
+	// ComponentConflicts holds DOM nodes claimed by more than one distinct
+	// component name (first-match-wins keeps only one; the rest are dropped).
+	ComponentConflicts []match.Conflict
 }
 
 // Options controls how a page is observed.
@@ -72,6 +80,12 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	res.Components = corpus.Components(url)
 	res.GlobalNames = corpus.GlobalComponentNames()
 	res.Coverage = coverage.Score(root, res.Matches, coverage.Options{VisibleOnly: opts.VisibleOnly})
+
+	// Runtime conflicts: ambiguities only visible against this page. TiedViews
+	// flags >=2 views matching the URL at equal specificity; ComponentConflicts
+	// flags a single node claimed by multiple distinct component names.
+	res.TiedViews = corpus.TiedViews(url)
+	res.ComponentConflicts = match.FindConflicts(root, res.Components)
 
 	if opts.ExtractProps && len(res.Matches) > 0 && len(res.Components) > 0 {
 		compByName := make(map[string]match.SightmapComponent, len(res.Components))

@@ -470,6 +470,8 @@ longer flagged — they appear under `[Presence]` with a `matched in K of N snap
 (last <stamp>)` recency line. T1/T2/T3 stats stay per-capture (they describe one
 DOM).
 
+**A `0 matches` warning can be a *conflict*, not a dead selector.** If a component reads `0 matches` but its selector is right, check the `[Conflicts]` section: when two components match the same node, first-match-wins keeps only the first and the other reports zero. Rename or narrow one so each node has a single owner (multi-match decomposition is not a v0 feature). `[Conflicts]` also flags two views matching a URL at equal specificity — give one a more specific route.
+
 Observing vs. persisting are **separate commands**. `snapshot` only ever renders
 to stdout (or `--out FILE`) — it never touches the corpus and never gates.
 `capture` (and the overlay's Snap-view button) *append* a timestamped capture to
