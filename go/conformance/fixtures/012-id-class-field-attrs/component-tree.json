@@ -1,0 +1,50 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "selector": {"tag": "div"},
+  "children": [
+    {
+      "id": "row1",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "selector": {"tag": "div", "id": "issue_9f1c"}
+    },
+    {
+      "id": "row2",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 2,
+      "selector": {"tag": "div", "id": "cycle_42"}
+    },
+    {
+      "id": "icon1",
+      "role": "image",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 3,
+      "selector": {"tag": "svg", "classes": ["lucide", "lucide-check"]}
+    }
+  ]
+}

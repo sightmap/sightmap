@@ -1,0 +1,6 @@
+- name: IssueRow
+  selectors:
+    - '[id^="issue_"]'
+- name: LucideIcon
+  selectors:
+    - '[class*="lucide"]'

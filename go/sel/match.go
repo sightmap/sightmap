@@ -106,7 +106,7 @@ func Matches(node, rule *comps.SelectorPart) bool {
 			}
 		}
 
-		nodeVal, present := node.Attrs[key]
+		nodeVal, present := effectiveAttrValue(node, key)
 		if !present {
 			// Attribute not present on node — only "[]" (presence-only) would
 			// logically not care, but absence means presence check fails too.
@@ -138,6 +138,29 @@ func Matches(node, rule *comps.SelectorPart) bool {
 	}
 
 	return true
+}
+
+// effectiveAttrValue resolves an attribute value on a node's SelectorPart for
+// matching. id and class live in dedicated fields (Id, Classes) — not always in
+// Attrs — so attribute selectors like [id^="issue_"] or [class*="card"] must see
+// them there to match offline the way the browser matches them live. Attrs is
+// consulted first (it wins when populated); id/class then fall back to their
+// dedicated fields. All other attributes come straight from Attrs.
+func effectiveAttrValue(node *comps.SelectorPart, key string) (string, bool) {
+	if v, ok := node.Attrs[key]; ok {
+		return v, true
+	}
+	switch key {
+	case "id":
+		if node.Id != "" {
+			return node.Id, true
+		}
+	case "class":
+		if len(node.Classes) > 0 {
+			return strings.Join(node.Classes, " "), true
+		}
+	}
+	return "", false
 }
 
 // attrMatches returns whether a node attribute value satisfies the operator

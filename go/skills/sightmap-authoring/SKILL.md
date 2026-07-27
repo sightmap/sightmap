@@ -98,13 +98,13 @@ that `snapshot`/`coverage`/`capture` actually use — it prints both counts and 
 `⚠ offline/live divergence` warning when they disagree. Trust the **offline**
 count: that is what the corpus will see. Wrong match count = corrupt coverage.
 
-**Prefer `.class` over `[class*=…]`, and `#id` over `[id…]`.**
-The Go tree matcher keeps classes in `SelectorPart.Classes` and `id` in a
-dedicated node field. `.classname` and `#id` are the reliable forms. Attribute
-selectors on `class` can behave differently offline depending on how the element
-was captured, and attribute selectors on `id` don't match offline at all — if you
-reach for one, `sel-probe`'s divergence check will flag it. Use `.classname` /
-`#id` when you can.
+**Attribute selectors on `class` and `id` match offline**, the same as live
+(`[class*=…]`, `[class^=…]`, `[class~=…]`, `[id^=…]`, `[id$=…]`, …). `class` and
+`id` are captured for every element (SVG included) and resolve to the same fields
+`.classname` / `#id` use. Prefer `.classname` / `#id` when a full class or id is
+stable — they're the shortest forms — but reach for the attribute forms when only
+a fragment is stable, e.g. `[id^="issue_"]` for dynamic `issue_<uuid>` ids.
+Verify any new selector with `sel-probe` regardless.
 
 **Pseudo-classes: `:not()`, `:is()`, `:where()`, `:has()` are supported**
 (both offline — `validate`/`snapshot`/`coverage`/`sel-check` — and live).
@@ -452,8 +452,6 @@ sightmap lint --warn-only   # deep-nesting warnings are expected; watch for new 
 **Async-rendered pages** (React/Next.js): use `--wait 1` or `--wait 2` for pages
 that render content after `loadEventFired`. Homedepot's `snapshot` includes
 `--wait 1` by default.
-
-**Class-attribute selectors** (`[class*="..."]`): don't work — use `.classname`.
 
 **Page non-determinism — a view needs MULTIPLE snapshots**. Real
 pages render differently load-to-load (lazy carousels, personalization, ad-driven

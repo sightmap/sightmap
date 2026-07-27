@@ -265,15 +265,19 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
                 selector += '#' + CSS.escape(element.id);
             }
 
-            if (element.className) {
-                const classes = element.className.split(/\s+/).filter(c => c);
-                for (const cls of classes) {
+            // Use classList, not className: on SVG elements className is an
+            // SVGAnimatedString (no .split), which would throw and lose the whole
+            // selector. classList is a DOMTokenList on both HTML and SVG.
+            const classList = element.classList;
+            if (classList && classList.length) {
+                for (const cls of classList) {
                     selector += '.' + CSS.escape(cls);
                 }
             }
 
-            // Key attributes that should always be included
-            const keyAttrs = ['type', 'name', 'href', 'role', 'for', 'tabindex', 'title', 'alt'];
+            // Key attributes that should always be included. placeholder is here
+            // so selectors like input[placeholder="..."] match offline too.
+            const keyAttrs = ['type', 'name', 'href', 'role', 'for', 'tabindex', 'title', 'alt', 'placeholder'];
             for (const attr of keyAttrs) {
                 const value = element.getAttribute(attr);
                 if (value) {
