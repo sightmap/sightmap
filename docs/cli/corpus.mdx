@@ -14,7 +14,7 @@ description: "Use validate, lint, search, and discover to check corpus structure
 
 ### `sightmap validate`
 
-Loads the YAML and checks the resulting corpus. It verifies component selectors, view routes, `stability:` and `access:` values, and duplicate name-plus-selector pairs within a scope. It reports two kinds of finding: **errors**, which fail validation (exit 1), and **warnings**, which are advisory and do not (exit 0). Run it after YAML edits and in CI.
+Loads the YAML and checks the resulting corpus. It verifies required fields (a view's `name` and `route`, a component's `name` and `selector`), that every `$ref` resolves, component selector syntax, `stability:` and `access:` values, and duplicate name-plus-selector pairs within a scope. It reports two kinds of finding: **errors**, which fail validation (exit 1) — including a missing required field or an unresolved `$ref`, both of which the loader previously dropped silently — and **warnings**, which are advisory and do not (exit 0). Run it after YAML edits and in CI.
 
 Warnings flag *corpus conflicts* — two definitions that collide on identity where only one can win and a fallback rule (declaration order) silently resolves it: duplicate view `name` (`merge-collision-view`), two views sharing a `route` (`route-conflict`), and duplicate root-level global component names with different selectors (`merge-collision-component`). The corpus still loads; the warning tells you which definition is shadowing another.
 
