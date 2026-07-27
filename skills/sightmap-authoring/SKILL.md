@@ -54,7 +54,7 @@ Use `npm` in instructions — it's the universal baseline. `pnpm`/`yarn` work to
 | `sightmap snapshot --url URL` | Observe: full annotated tree + coverage to stdout (add `--out FILE` / `--tree-out FILE` to save). |
 | `sightmap capture --url URL` | Persist a novelty-gated capture into the matched view's set. |
 | `sightmap sel-probe 'selector'` | Verify a selector: match count + parent chain. Run before writing any YAML. |
-| `sightmap validate` | Spec-validate `.sightmap/` YAML. No prepare step needed. |
+| `sightmap validate` | Spec-validate `.sightmap/` YAML (errors fail; corpus-conflict **warnings** — duplicate view name, shared route, duplicate global component — print but pass). No prepare step needed. |
 | `sightmap lint --warn-only` | Style checks (`--warn-only`; exits 0 always). |
 | `sightmap coverage --trace FILE.snap` | Offline T1/T2/T3 re-check on saved snap (requires `.snap.tree.json` companion). |
 | `sightmap multi-coverage` | Cross-page coverage matrix; surfaces global candidates. |

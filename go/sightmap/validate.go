@@ -9,14 +9,31 @@ import (
 	"github.com/sightmap/sightmap/go/sel"
 )
 
-// ValidationError describes a structural problem in the corpus that would
-// cause incorrect or undefined runtime behaviour.
+// Severity classifies a validation finding. Errors fail validation (nonzero
+// exit); warnings are advisory and do not (see runValidate).
+type Severity string
+
+const (
+	SeverityError   Severity = "error"
+	SeverityWarning Severity = "warning"
+)
+
+// ValidationError describes a structural problem in the corpus. Despite the
+// name it carries a Severity: an error is a hard problem that fails validation,
+// a warning is an advisory finding (e.g. a corpus conflict resolved by a
+// fallback rule) that the author should see but that does not fail the corpus.
 type ValidationError struct {
-	File      string // source YAML file path (empty for in-memory corpus)
-	Component string // component name (empty if file-level error)
-	Selector  string // offending selector string (empty if not selector-specific)
-	Message   string
+	File      string   // source YAML file path (empty for in-memory corpus)
+	Component string   // component name (empty if file-level error)
+	Selector  string   // offending selector string (empty if not selector-specific)
+	Message   string   //
+	Code      string   // stable diagnostic code, e.g. "ref-circular", "merge-collision-view"
+	Severity  Severity // empty is treated as SeverityError
 }
+
+// IsError reports whether this finding fails validation. The zero-value
+// Severity ("") is treated as an error, so existing checks stay errors.
+func (e ValidationError) IsError() bool { return e.Severity != SeverityWarning }
 
 func (e ValidationError) Error() string {
 	parts := []string{}
@@ -85,7 +102,101 @@ func Validate(c *Corpus) []ValidationError {
 		}
 	}
 
+	// Corpus-conflict warnings: definitions that collide on identity and are
+	// resolved silently by a fallback rule. These are advisory (warnings), not
+	// errors — the corpus still loads, but the author should know one definition
+	// is shadowing another.
+	// Duplicate GLOBAL component names are detected at load time (loader.go),
+	// not here: flattening a child component reused under several parents
+	// produces multiple same-name entries in GlobalComponents, so the collision
+	// is only distinguishable from the raw top-level definitions.
+	errs = append(errs, checkViewNameCollisions(c.Views)...)
+	errs = append(errs, checkRouteCollisions(c.Views)...)
+
 	return errs
+}
+
+// checkViewNameCollisions warns when two or more views share a name. View names
+// should be unique across the corpus; when they collide, lookups by name and the
+// snapshot header become ambiguous. (Merging same-named views is a future SEP,
+// not v0 behaviour.)
+func checkViewNameCollisions(views []View) []ValidationError {
+	byName := map[string][]View{}
+	var order []string
+	for _, v := range views {
+		if v.Name == "" {
+			continue
+		}
+		if _, seen := byName[v.Name]; !seen {
+			order = append(order, v.Name)
+		}
+		byName[v.Name] = append(byName[v.Name], v)
+	}
+	var out []ValidationError
+	for _, name := range order {
+		vs := byName[name]
+		if len(vs) < 2 {
+			continue
+		}
+		out = append(out, ValidationError{
+			Component: name,
+			Code:      "merge-collision-view",
+			Severity:  SeverityWarning,
+			Message: fmt.Sprintf("view name %q is defined %d times (%s); view names should be unique",
+				name, len(vs), viewLocList(vs)),
+		})
+	}
+	return out
+}
+
+// checkRouteCollisions warns when two or more views share the same (normalized)
+// route. Only one view can win for a given URL — resolution falls back to
+// declaration order — so the later views' components silently stop applying.
+func checkRouteCollisions(views []View) []ValidationError {
+	byRoute := map[string][]View{}
+	var order []string
+	for _, v := range views {
+		if v.Route == "" {
+			continue
+		}
+		r := normalizeRoutePath(v.Route)
+		if _, seen := byRoute[r]; !seen {
+			order = append(order, r)
+		}
+		byRoute[r] = append(byRoute[r], v)
+	}
+	var out []ValidationError
+	for _, r := range order {
+		vs := byRoute[r]
+		if len(vs) < 2 {
+			continue
+		}
+		names := make([]string, 0, len(vs))
+		for _, v := range vs {
+			names = append(names, v.Name)
+		}
+		out = append(out, ValidationError{
+			Code:     "route-conflict",
+			Severity: SeverityWarning,
+			Message: fmt.Sprintf("route %q is claimed by %d views (%s); only the first (%s) applies to that URL",
+				r, len(vs), strings.Join(names, ", "), vs[0].Name),
+		})
+	}
+	return out
+}
+
+// viewLocList formats a set of views as "file:route" entries for a collision
+// message.
+func viewLocList(vs []View) string {
+	parts := make([]string, 0, len(vs))
+	for _, v := range vs {
+		f := v.SourceFile
+		if f == "" {
+			f = "?"
+		}
+		parts = append(parts, fmt.Sprintf("%s:%s", f, v.Route))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // validateComponent validates a single component against the shared seen map.

@@ -14,7 +14,9 @@ description: "Use validate, lint, search, and discover to check corpus structure
 
 ### `sightmap validate`
 
-Loads the YAML and checks the resulting corpus. It verifies component selectors, view routes, `stability:` and `access:` values, and duplicate name-plus-selector pairs within a scope. It exits 1 on any load or validation error. Run it after YAML edits and in CI.
+Loads the YAML and checks the resulting corpus. It verifies component selectors, view routes, `stability:` and `access:` values, and duplicate name-plus-selector pairs within a scope. It reports two kinds of finding: **errors**, which fail validation (exit 1), and **warnings**, which are advisory and do not (exit 0). Run it after YAML edits and in CI.
+
+Warnings flag *corpus conflicts* — two definitions that collide on identity where only one can win and a fallback rule (declaration order) silently resolves it: duplicate view `name` (`merge-collision-view`), two views sharing a `route` (`route-conflict`), and duplicate root-level global component names with different selectors (`merge-collision-component`). The corpus still loads; the warning tells you which definition is shadowing another.
 
 The command also rejects selector syntax outside Sightmap's supported subset. For example, `:nth-child()` produces a parse error; the supported pseudo-classes are `:not()`, `:is()`, `:where()`, and `:has()`.
 
@@ -32,13 +34,15 @@ sightmap validate
 ✓ no validation errors
 ```
 
-On a broken corpus, each problem prints as one `error:` line and the command exits 1:
+On a broken corpus, each error prints as one `error:` line and the command exits 1; warnings print as `warning:` lines and do not affect the exit code:
 
 ```text
-error: ProductPod: duplicate component name and selector
 error: BrowsePage: view has empty route
-sightmap validate: 2 validation error(s)
+warning: route "/products" is claimed by 2 views (ProductList, Browse); only the first (ProductList) applies to that URL
+sightmap validate: 1 validation error(s), 1 warning(s)
 ```
+
+When only warnings are present the command prints `✓ no errors (N warning(s))` and exits 0.
 
 ---
 
