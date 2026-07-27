@@ -42,6 +42,18 @@ func TestFilter_Drop_Invisible(t *testing.T) {
 	}
 }
 
+// Invisible subtrees are dropped regardless of interactivity, so the rendered
+// tree stays in lockstep with coverage (which skips the same nodes). probe.js
+// reports effective visibility, so an interactive control hidden by an ancestor
+// (e.g. a closed opacity:0 menu's item) arrives here as invisible and must not
+// appear.
+func TestFilter_Drop_InvisibleInteractive(t *testing.T) {
+	root := node("1", "button", "Hidden", false /* visible */, true /* interactive */, false)
+	if comp := Filter(root, nil); comp != nil {
+		t.Errorf("expected nil for invisible interactive node, got role=%q", comp.Role)
+	}
+}
+
 func TestFilter_Drop_Script(t *testing.T) {
 	root := nodeWithTag("1", "none", "", "script", true, false, false)
 	comp := Filter(root, nil)
