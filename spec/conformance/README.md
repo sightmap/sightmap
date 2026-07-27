@@ -52,6 +52,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 013 | `route-trailing-slash` | Trailing slashes on the URL path are normalized away before matching |
 | 014 | `component-properties` | `properties:` (`name`/`extract`/`transform`) validates ([SEP-0003](../seps/0003-component-properties.md)) |
 | 015 | `view-url` | `url:` on a view (and a file-level default) validates |
+| 016 | `stability-tooling-fields` | `stability:` (view + component) validates; reserved tooling fields `access:`/`snapshots:` are permitted |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 
