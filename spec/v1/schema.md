@@ -84,6 +84,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `dependencies` | string[] | no | Supplementary files (minimatch globs, project-root-anchored, `!` negates) whose changes should trigger re-curation of this component. See [Dependencies](#dependencies). |
 | `description` | string | no | Free-text. Not surfaced at runtime. |
 | `memory` | string[] | no | Component-level memory entries. |
+| `properties` | [Property](#component-properties)[] | no | Named DOM-value extractions surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Extracted from the live DOM at snapshot time; unavailable to offline tools. See [Component properties](#component-properties). |
 | `children` | (Component \| [ComponentRef](#component-references))[] | no | Nested components. Child selectors are scoped to the parent's subtree. Entries may be either inline definitions or `$ref` reference objects. |
 
 ### Component references
@@ -112,6 +113,42 @@ See [SEP-0002](../seps/0002-component-ref.md) for the full proposal and rational
 - A list of strings is tried in order; the first selector that matches wins.
 - Selectors in `children` are evaluated **within** their parent's matched subtree, not globally. This scoping is how Sightmap avoids naming collisions between, say, two different card components that both contain a `button.primary`.
 - Selectors are not required to be unique at their level. If a selector matches multiple elements, all matches are named.
+
+
+### Component properties
+
+A component may declare `properties: Property[]` — named values extracted from its matched DOM element and surfaced alongside the component name in enriched snapshots, e.g. `[DateFilterButton label="This Weekend"]`. Extraction operates on the exact element the selector matched (not an ancestor, not the AX node). Properties are read from the **live DOM at snapshot time**; SDKs operating on saved component-tree data MUST omit the values rather than approximate them (the declarations are not an error offline). When a component's selector matches multiple elements, extraction runs independently on each. See [SEP-0003](../seps/0003-component-properties.md).
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Key used in the annotation (`name="value"`). Must match `^[a-z][a-z0-9_]*$`. The name `value` is reserved: it may be declared to override the AX built-in, and SDKs MUST prefer a declared `value` over the AX tree's own value. |
+| `extract` | string | yes | Extraction directive (see below). |
+| `transform` | string | no | Optional post-processing applied to the extracted string (see below). |
+
+**Extract modes.** The `extract` value is interpreted in this order (named modes match by exact, case-sensitive equality before the `attr=`/`exists:` prefixes):
+
+| Value | Source |
+|---|---|
+| `text` | `element.textContent.trim()`, internal whitespace collapsed to single spaces |
+| `inner_text` | `element.innerText.trim()` — layout-aware; use when `text` runs adjacent inline elements together |
+| `text_only` | `textContent` after removing `img`, `svg`, and `[alt]` descendants — use when icon alt-text bleeds into the label |
+| `inner_html` | `element.innerHTML` |
+| `attr=NAME` | `element.getAttribute(NAME)` |
+| `exists:SEL` | `"true"` if `element.querySelector(SEL)` matches; the property is **omitted** when it does not (boolean state flag) |
+| *any other string* | Treated as a CSS sub-selector: `element.querySelector(VALUE)?.textContent.trim()`; omitted when it matches nothing |
+
+**Transforms.** When `transform` is set it is applied to the trimmed extracted string; if the value is empty or absent, the transform is skipped and the property omitted. Exactly one transform may be given (not composable in v1).
+
+| Value | Effect |
+|---|---|
+| `first_word` | First whitespace-delimited token |
+| `last_word` | Last whitespace-delimited token |
+| `first_number` | First substring matching `\d[\d,.]*` |
+| `first_dollar` | First substring matching `\$[\d,.]+` |
+| `number` | Strip all non-digit, non-decimal characters |
+| `slug` | Lowercase; spaces and underscores → hyphens; strip non-`[a-z0-9-]` |
+
+**Value omission is silent** — a property that extracts to an empty string (or whose `exists:`/sub-selector finds nothing) is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
 
 ## Dependencies
 

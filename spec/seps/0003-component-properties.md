@@ -2,11 +2,11 @@
 sep: 0003
 title: Component property extraction via `properties[]`
 author: Joel Webber (@joelgwebber)
-status: Draft
+status: Accepted
 created: 2026-05-27
-updated: 2026-05-27
+updated: 2026-07-27
 spec-version-target: 1
-related-issues: []
+related-issues: [52]
 related-discussions: []
 ---
 
