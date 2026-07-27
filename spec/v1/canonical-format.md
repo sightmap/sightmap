@@ -115,6 +115,7 @@ Structural problems in a `.sightmap/` corpus. **Errors** are inputs with no vali
 | `merge-collision-view` | warning | Two or more views share a `name`. Names should be unique; lookups by name and the snapshot header become ambiguous. |
 | `merge-collision-component` | warning | Two or more root-level global components share a `name` with different selectors. Both match every view; resolution falls back to declaration order. |
 | `route-conflict` | warning | Two or more views share the same (normalized) `route`. Only the first-declared view applies to that URL. |
+| `unknown-field` | warning | A key not defined by the spec at its position (a typo like `memroy:`, or an experimental field). Warned rather than rejected so authors can stash work-in-progress fields; recognized fields — including the reserved tooling fields `access` and `snapshots` — are not flagged. |
 
 ## `.sightmap/config.yaml`
 

@@ -18,6 +18,8 @@ Loads the YAML and checks the resulting corpus. It verifies required fields (a v
 
 Warnings flag *corpus conflicts* — two definitions that collide on identity where only one can win and a fallback rule (declaration order) silently resolves it: duplicate view `name` (`merge-collision-view`), two views sharing a `route` (`route-conflict`), and duplicate root-level global component names with different selectors (`merge-collision-component`). The corpus still loads; the warning tells you which definition is shadowing another.
 
+Warnings also flag **unknown fields** (`unknown-field`) — a key the spec doesn't define at its position, such as a typo (`memroy:`) or an experimental field. These warn rather than fail, so you can stash work-in-progress fields during development; recognized fields (including the reserved tooling fields `access` and `snapshots`) are never flagged.
+
 The command also rejects selector syntax outside Sightmap's supported subset. For example, `:nth-child()` produces a parse error; the supported pseudo-classes are `:not()`, `:is()`, `:where()`, and `:has()`.
 
 **Flags:**
