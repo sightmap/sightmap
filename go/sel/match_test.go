@@ -100,6 +100,68 @@ func TestMatches_AttrPresence(t *testing.T) {
 	}
 }
 
+func TestMatches_AttrOnID_ResolvesToIdField(t *testing.T) {
+	// id lives in the dedicated Id field, not Attrs. Attribute selectors on id
+	// ([id^=...] etc.) must still resolve to it so they match offline like live.
+	node := nodeWith("div", "issue_9f1c-42", nil, nil)
+
+	prefix := &comps.SelectorPart{
+		Attrs:   map[string]string{"id": "issue_"},
+		AttrOps: map[string]string{"id": "^="},
+	}
+	if !sel.Matches(node, prefix) {
+		t.Error(`[id^="issue_"] should match id="issue_9f1c-42"`)
+	}
+
+	exact := &comps.SelectorPart{Attrs: map[string]string{"id": "issue_9f1c-42"}}
+	if !sel.Matches(node, exact) {
+		t.Error(`[id="issue_9f1c-42"] should match`)
+	}
+
+	presence := &comps.SelectorPart{
+		Attrs:   map[string]string{"id": ""},
+		AttrOps: map[string]string{"id": "[]"},
+	}
+	if !sel.Matches(node, presence) {
+		t.Error("[id] presence should match a node with an id")
+	}
+
+	bad := &comps.SelectorPart{
+		Attrs:   map[string]string{"id": "cycle_"},
+		AttrOps: map[string]string{"id": "^="},
+	}
+	if sel.Matches(node, bad) {
+		t.Error(`[id^="cycle_"] should not match id="issue_9f1c-42"`)
+	}
+
+	noID := nodeWith("div", "", nil, nil)
+	if sel.Matches(noID, presence) {
+		t.Error("[id] presence should not match a node with no id")
+	}
+}
+
+func TestMatches_AttrOnClass_ResolvesToClassesField(t *testing.T) {
+	// class stored only in the Classes field (no Attrs["class"]) must still be
+	// reachable by attribute selectors like [class*=...].
+	node := nodeWith("svg", "", []string{"lucide", "lucide-check"}, nil)
+
+	contains := &comps.SelectorPart{
+		Attrs:   map[string]string{"class": "lucide-check"},
+		AttrOps: map[string]string{"class": "*="},
+	}
+	if !sel.Matches(node, contains) {
+		t.Error(`[class*="lucide-check"] should match Classes {lucide, lucide-check}`)
+	}
+
+	word := &comps.SelectorPart{
+		Attrs:   map[string]string{"class": "lucide"},
+		AttrOps: map[string]string{"class": "~="},
+	}
+	if !sel.Matches(node, word) {
+		t.Error(`[class~="lucide"] should match`)
+	}
+}
+
 func TestMatches_AttrPrefix(t *testing.T) {
 	node := nodeWith("a", "", nil, map[string]string{"href": "https://example.com"})
 	rule := &comps.SelectorPart{

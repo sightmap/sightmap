@@ -176,7 +176,7 @@ plp/filtered              sel=[data-testid="product-pod"]  18 matches
 pdp                       sel=[data-testid="product-pod"]  1 match
 ```
 
-Alongside the live `matches:` count, `sel-probe` runs the same selector through the **offline matcher** that `snapshot`, `coverage`, and `capture` use, and prints its count. When the two disagree it emits a `⚠ offline/live divergence` warning with a hint — for example, attribute selectors on `id` (`[id^="…"]`) match live but never offline, because `id` is a dedicated node field. Trust the offline count: that is what the corpus sees. This makes "probe before you write YAML" honest rather than a source of false confidence.
+Alongside the live `matches:` count, `sel-probe` runs the same selector through the **offline matcher** that `snapshot`, `coverage`, and `capture` use, and prints its count. When the two disagree it emits a `⚠ offline/live divergence` warning with a hint — typically the selector targets nodes the offline tree doesn't carry (a subtree hidden at capture time, or content that only appears after an interaction). Trust the offline count: that is what the corpus sees. This makes "probe before you write YAML" honest rather than a source of false confidence.
 
 <Note>
 `sel-probe` exits 0 when the selector matches nothing because `matches: 0` is a valid diagnostic result. Use `sel-check` when automation needs a non-zero exit code for zero matches. Match counts are capped by `--max`, including with `--all`; raise the limit when you need the full count. `sel-probe` also does not create transient UI state. Open a menu or focus an input with a browser interaction before probing elements that only exist in that state.
