@@ -75,7 +75,7 @@ Viewport bounding box in pixels.
 | Properties | map[string]string | `properties` | post-merge | Additional A11Y properties (`aria-*` etc.). |
 | Selector | \*SelectorPart | `selector` | pre-merge | Structured CSS identity. Nil for virtual nodes. |
 | Bounds | \*Bounds | `bounds` | pre-merge | Viewport bounding box. |
-| IsVisible | bool | `isVisible` | pre-merge | Element is not CSS-hidden. |
+| IsVisible | bool | `isVisible` | pre-merge | Effective visibility, computed in-browser via `Element.checkVisibility` — false when the element or any ancestor is hidden (`display:none`, `visibility:hidden`, `opacity:0`, `content-visibility`). |
 | IsInteractive | bool | `isInteractive` | pre-merge | Element is actionable per probe heuristics. |
 | InViewport | bool | `inViewport` | pre-merge | Bounds intersect the viewport. |
 | IsIgnored | bool | `isIgnored` | post-merge | A11Y tree marks this node as ignored. |

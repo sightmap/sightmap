@@ -81,20 +81,44 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
     }
 
     /**
-     * Computes visibility properties for an element
+     * Computes EFFECTIVE visibility for an element.
+     *
+     * We defer to the browser's own style engine via Element.checkVisibility(),
+     * which — unlike a per-element getComputedStyle — accounts for ANCESTORS: it
+     * returns false when the element or any ancestor is hidden by display:none,
+     * visibility:hidden/collapse, opacity:0, or content-visibility. That is the
+     * signal coverage and the tree renderer both need: a control inside a closed
+     * opacity:0 overlay (a dismissed dropdown/context menu) has computed
+     * opacity:1 of its own, so a per-element check reports it visible while it is
+     * really painted nowhere. Keeping the layout/rendering judgment in the real
+     * browser avoids re-deriving CSS semantics on the Go side.
      */
     function computeVisibility(element, bounds) {
         try {
-            const styles = window.getComputedStyle(element);
+            // Zero-size boxes never paint.
+            if (bounds.width <= 0 || bounds.height <= 0) return false;
 
-            // Check CSS visibility properties
+            if (typeof element.checkVisibility === 'function') {
+                // Standardized option names (opacityProperty/visibilityProperty/
+                // contentVisibilityAuto) plus their pre-standard aliases
+                // (checkOpacity/checkVisibilityCSS), so older engines that only
+                // know the aliases still honor the opacity/visibility checks.
+                // Unknown dictionary members are ignored per WebIDL.
+                return element.checkVisibility({
+                    opacityProperty: true,
+                    visibilityProperty: true,
+                    contentVisibilityAuto: true,
+                    checkOpacity: true,
+                    checkVisibilityCSS: true,
+                });
+            }
+
+            // Fallback for engines without checkVisibility: per-element checks
+            // only (no ancestor awareness).
+            const styles = window.getComputedStyle(element);
             if (styles.display === 'none') return false;
             if (styles.visibility === 'hidden') return false;
             if (styles.opacity === '0') return false;
-
-            // Check bounds
-            if (bounds.width <= 0 || bounds.height <= 0) return false;
-
             return true;
         } catch (e) {
             return false;

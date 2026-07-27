@@ -39,7 +39,7 @@ type FormatOpts struct {
 // Filter builds a compact, filtered Comp tree from a raw ComponentNode tree.
 // It applies the shouldFilter algorithm:
 //   - style/script/noscript tags are dropped (with their subtrees)
-//   - invisible, non-interactive nodes are dropped
+//   - invisible nodes are dropped (with their subtrees)
 //   - role="none" structural wrappers (without a sightmap match) are made
 //     transparent (removed; their children are promoted)
 //   - AX-ignored nodes (without a sightmap match) are made transparent
@@ -178,8 +178,11 @@ func decide(node *comps.ComponentNode, matched bool) disposition {
 		}
 	}
 
-	// Drop invisible and non-interactive subtrees entirely.
-	if !node.IsVisible && !node.IsInteractive {
+	// Drop invisible subtrees entirely. IsVisible is effective visibility
+	// (probe.js consults the browser's style engine, so ancestor-hidden nodes
+	// like a closed opacity:0 menu's items are already false), so this keeps the
+	// rendered tree in lockstep with coverage, which skips the same nodes.
+	if !node.IsVisible {
 		return dropNode
 	}
 

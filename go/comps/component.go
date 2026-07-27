@@ -88,7 +88,11 @@ type ComponentNode struct {
 	// Bounds is the viewport bounding box. (pre-merge)
 	Bounds *Bounds `json:"bounds,omitempty"`
 
-	// IsVisible reports whether the element is visible (not hidden by CSS). (pre-merge)
+	// IsVisible reports whether the element is EFFECTIVELY visible. probe.js
+	// computes it in-browser via Element.checkVisibility, so it already accounts
+	// for ancestor-driven hiding (display:none, visibility:hidden, opacity:0,
+	// content-visibility): a node inside a hidden container is false too.
+	// Coverage and the tree renderer both read this one signal. (pre-merge)
 	IsVisible bool `json:"isVisible"`
 
 	// IsInteractive reports whether the element is actionable (clickable,
