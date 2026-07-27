@@ -103,14 +103,18 @@ These are authoring-side diagnostic codes. Each has a stable `code` string, a `s
 
 ### Corpus
 
-Conflicts where two definitions collide on identity and only one can win. These are **warnings**: the corpus still loads and a fallback rule resolves the winner (declaration order), but the author should know one definition is shadowing another. A circular `$ref` is an **error** because it has no defined resolution.
+Structural problems in a `.sightmap/` corpus. **Errors** are inputs with no valid interpretation — a missing required field, or a `$ref` that cannot be resolved. **Warnings** are conflicts where two definitions collide on identity and only one can win: the corpus still loads and a fallback rule resolves the winner (declaration order), but the author should know one definition is shadowing another.
 
 | Code | Severity | Meaning |
 |---|---|---|
+| `missing-name` | error | A view or component is missing its required `name`. |
+| `missing-route` | error | A view is missing its required `route`. |
+| `missing-selector` | error | A component is missing its required `selector`. |
+| `ref-unresolved` | error | A `$ref` names a component that no file's root `components:` defines. |
+| `ref-circular` | error | A `$ref` chain is circular (e.g. `A → B → A`, or a component referencing itself). |
 | `merge-collision-view` | warning | Two or more views share a `name`. Names should be unique; lookups by name and the snapshot header become ambiguous. |
 | `merge-collision-component` | warning | Two or more root-level global components share a `name` with different selectors. Both match every view; resolution falls back to declaration order. |
 | `route-conflict` | warning | Two or more views share the same (normalized) `route`. Only the first-declared view applies to that URL. |
-| `ref-circular` | error | A `$ref` chain is circular (e.g. `A → B → A`, or a component referencing itself). |
 
 ## `.sightmap/config.yaml`
 

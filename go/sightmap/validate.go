@@ -67,9 +67,18 @@ func Validate(c *Corpus) []ValidationError {
 
 	// Check views.
 	for _, view := range c.Views {
+		if view.Name == "" {
+			errs = append(errs, ValidationError{
+				Code:     "missing-name",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("view with route %q is missing a name", view.Route),
+			})
+		}
 		if view.Route == "" {
 			errs = append(errs, ValidationError{
 				Component: view.Name,
+				Code:      "missing-route",
+				Severity:  SeverityError,
 				Message:   "view has empty route",
 			})
 		}

@@ -282,22 +282,27 @@ func globalNameCollisions(globals []rawComponent) []ValidationError {
 // and any structural diagnostics discovered along the way (currently circular
 // $ref chains, which are expanded away and so invisible downstream).
 type flattenCtx struct {
-	reg          map[string]rawComponent
-	diagnostics  []ValidationError
-	seenCircular map[string]bool // dedupe key → already-reported
+	reg         map[string]rawComponent
+	diagnostics []ValidationError
+	seen        map[string]bool // dedupe key (code + identity) → already-reported
+}
+
+// addDiag appends a diagnostic once per distinct key, so a component reused via
+// $ref at several sites does not report the same problem repeatedly.
+func (ctx *flattenCtx) addDiag(key string, ve ValidationError) {
+	if ctx.seen == nil {
+		ctx.seen = map[string]bool{}
+	}
+	if ctx.seen[key] {
+		return
+	}
+	ctx.seen[key] = true
+	ctx.diagnostics = append(ctx.diagnostics, ve)
 }
 
 // recordCircular records a $ref cycle diagnostic once per distinct chain.
 func (ctx *flattenCtx) recordCircular(chain []string) {
-	key := strings.Join(chain, "\x00")
-	if ctx.seenCircular == nil {
-		ctx.seenCircular = map[string]bool{}
-	}
-	if ctx.seenCircular[key] {
-		return
-	}
-	ctx.seenCircular[key] = true
-	ctx.diagnostics = append(ctx.diagnostics, ValidationError{
+	ctx.addDiag("ref-circular\x00"+strings.Join(chain, "\x00"), ValidationError{
 		Component: chain[len(chain)-1],
 		Code:      "ref-circular",
 		Severity:  SeverityError,
@@ -335,14 +340,40 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		}
 		global, ok := ctx.reg[rc.Ref]
 		if !ok {
-			return nil // unknown ref — reported separately by strict validation
+			// Unresolved $ref: the referenced global does not exist. The spec
+			// requires this to be a hard error, so surface it instead of
+			// silently dropping the reference.
+			ctx.addDiag("ref-unresolved\x00"+rc.Ref, ValidationError{
+				Component: rc.Ref,
+				Code:      "ref-unresolved",
+				Severity:  SeverityError,
+				Message:   fmt.Sprintf("$ref %q does not resolve to any global component", rc.Ref),
+			})
+			return nil
 		}
 		refStack = append(refStack, rc.Ref)
 		rc = global
 	}
 
-	// Skip components that lack a name or a selector.
-	if rc.Name == "" || string(rc.Selector) == "" {
+	// A real (non-$ref) component that lacks a required field would otherwise be
+	// dropped silently, so it never reaches Validate. Surface it as an error
+	// (schema requires both name and selector).
+	if rc.Name == "" {
+		ctx.addDiag("missing-name\x00"+string(rc.Selector), ValidationError{
+			Selector: string(rc.Selector),
+			Code:     "missing-name",
+			Severity: SeverityError,
+			Message:  "component is missing a name",
+		})
+		return nil
+	}
+	if string(rc.Selector) == "" {
+		ctx.addDiag("missing-selector\x00"+rc.Name, ValidationError{
+			Component: rc.Name,
+			Code:      "missing-selector",
+			Severity:  SeverityError,
+			Message:   "component is missing a selector",
+		})
 		return nil
 	}
 
