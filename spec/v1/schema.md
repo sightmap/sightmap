@@ -50,6 +50,7 @@ A named screen in the app, identified by a URL route.
 |---|---|---|---|
 | `name` | string | yes | Shown in the snapshot header. Should be unique across the sightmap. |
 | `route` | string | yes | Glob pattern matched against the URL pathname. See [Route matching](#route-matching). |
+| `url` | string | no | Representative URL for this view — a concrete address that resolves to it. Tooling uses it to navigate to the view (e.g. coverage reporting and bulk capture/probe). A file-root `url` supplies a default for every view in the file that omits its own. |
 | `description` | string | no | Free-text. Not surfaced at runtime but useful for PR review and future maintenance. |
 | `source` | string | no | Relative path to the source file. |
 | `dependencies` | string[] | no | Supplementary files (minimatch globs, project-root-anchored, `!` negates) whose changes should trigger re-curation of this view. See [Dependencies](#dependencies). |

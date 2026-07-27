@@ -1,0 +1,9 @@
+version: 1
+url: https://example.com
+views:
+  - name: Home
+    route: /
+    url: https://example.com/
+  - name: Search
+    route: /search
+    # no per-view url — inherits the file-level default
