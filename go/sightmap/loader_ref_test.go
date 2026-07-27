@@ -2,7 +2,6 @@ package sightmap_test
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -44,7 +43,7 @@ components:
 		errs := sightmap.Validate(r.c)
 		found := false
 		for _, e := range errs {
-			if strings.Contains(e.Message, "ref-circular") {
+			if e.Code == "ref-circular" {
 				found = true
 			}
 		}
@@ -78,7 +77,7 @@ components:
 		errs := sightmap.Validate(c)
 		found := false
 		for _, e := range errs {
-			if strings.Contains(e.Message, "ref-circular") {
+			if e.Code == "ref-circular" {
 				found = true
 			}
 		}

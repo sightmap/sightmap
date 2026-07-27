@@ -101,6 +101,17 @@ These are authoring-side diagnostic codes. Each has a stable `code` string, a `s
 |---|---|---|
 | `config.invalid-version` | error | `.sightmap/config.yaml` `version` field missing, malformed, or unsupported. |
 
+### Corpus
+
+Conflicts where two definitions collide on identity and only one can win. These are **warnings**: the corpus still loads and a fallback rule resolves the winner (declaration order), but the author should know one definition is shadowing another. A circular `$ref` is an **error** because it has no defined resolution.
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `merge-collision-view` | warning | Two or more views share a `name`. Names should be unique; lookups by name and the snapshot header become ambiguous. |
+| `merge-collision-component` | warning | Two or more root-level global components share a `name` with different selectors. Both match every view; resolution falls back to declaration order. |
+| `route-conflict` | warning | Two or more views share the same (normalized) `route`. Only the first-declared view applies to that URL. |
+| `ref-circular` | error | A `$ref` chain is circular (e.g. `A → B → A`, or a component referencing itself). |
+
 ## `.sightmap/config.yaml`
 
 Optional in any project; pins the spec version. Schema: [`config.schema.json`](./config.schema.json). A missing, malformed, or unsupported `version` field surfaces `config.invalid-version` (see above).

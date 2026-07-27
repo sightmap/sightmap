@@ -49,7 +49,7 @@ What counts as failure for the check-style commands:
 
 | Command | Exits `1` when |
 |---------|----------------|
-| `validate` | the corpus has structural errors (including an unresolved or circular `$ref`) |
+| `validate` | the corpus has structural **errors** (empty route, circular `$ref`, …). Corpus-conflict **warnings** (duplicate view name, shared route, duplicate global component name) print but do **not** fail validation. |
 | `lint` | any warning exists (`--warn-only` prevents warnings from causing exit `1`) |
 | `snapshot` | the corpus is present but fails to parse, or the observed page has **0 interactive nodes** (blank or still loading). A *missing* corpus is not an error — the tree still renders. |
 | `coverage` | any capture has orphaned (T3) nodes, has **0 interactive nodes** (a blank/unrendered page is never a pass), or a snap file cannot be loaded (dead components print warnings but do not fail) |

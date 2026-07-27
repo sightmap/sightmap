@@ -169,6 +169,12 @@ func loadDir(path string) (*Corpus, error) {
 	// that $ref cycle detection and diagnostics accumulate in one place.
 	ctx := &flattenCtx{reg: reg}
 
+	// Warn on duplicate top-level global component names. This must run on the
+	// RAW globals, not the flattened list: flattening a child component reused
+	// under several parents yields multiple same-name entries, which would
+	// otherwise look like a collision.
+	ctx.diagnostics = append(ctx.diagnostics, globalNameCollisions(globalRaws)...)
+
 	// Flatten global components (hierarchy → compound descendant selectors).
 	globalComps := flattenAll(globalRaws, ctx)
 
@@ -230,6 +236,48 @@ func rawPropsToMatch(rps []rawProperty) []match.Property {
 	return ps
 }
 
+// globalNameCollisions warns when two or more top-level global components share a
+// name with different selectors. A duplicated global name is ambiguous — both
+// match every view and resolution falls back to declaration order. (Same
+// name + same selector is a true duplicate, reported as an error elsewhere, so
+// it is skipped here.)
+func globalNameCollisions(globals []rawComponent) []ValidationError {
+	type acc struct {
+		count int
+		sels  map[string]bool
+	}
+	byName := map[string]*acc{}
+	var order []string
+	for _, g := range globals {
+		if g.Name == "" {
+			continue
+		}
+		a := byName[g.Name]
+		if a == nil {
+			a = &acc{sels: map[string]bool{}}
+			byName[g.Name] = a
+			order = append(order, g.Name)
+		}
+		a.count++
+		a.sels[string(g.Selector)] = true
+	}
+	var out []ValidationError
+	for _, name := range order {
+		a := byName[name]
+		if a.count < 2 || len(a.sels) < 2 {
+			continue
+		}
+		out = append(out, ValidationError{
+			Component: name,
+			Code:      "merge-collision-component",
+			Severity:  SeverityWarning,
+			Message: fmt.Sprintf("global component name %q is defined %d times with different selectors; only the first applies to a given node",
+				name, a.count),
+		})
+	}
+	return out
+}
+
 // flattenCtx carries the shared state for a flattening pass: the $ref registry
 // and any structural diagnostics discovered along the way (currently circular
 // $ref chains, which are expanded away and so invisible downstream).
@@ -251,7 +299,9 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 	ctx.seenCircular[key] = true
 	ctx.diagnostics = append(ctx.diagnostics, ValidationError{
 		Component: chain[len(chain)-1],
-		Message:   "ref-circular: circular $ref chain " + strings.Join(chain, " → "),
+		Code:      "ref-circular",
+		Severity:  SeverityError,
+		Message:   "circular $ref chain " + strings.Join(chain, " → "),
 	})
 }
 

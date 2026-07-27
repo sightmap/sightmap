@@ -20,13 +20,31 @@ func runValidate(args []string) error {
 		return fmt.Errorf("load corpus: %w", err)
 	}
 
-	errs := sightmap.Validate(corpus)
-	if len(errs) == 0 {
-		fmt.Fprintf(os.Stderr, "✓ no validation errors\n")
+	findings := sightmap.Validate(corpus)
+
+	// Print errors first, then warnings. Warnings are advisory (corpus conflicts
+	// resolved by a fallback rule) and do NOT fail validation; only errors do.
+	var errCount, warnCount int
+	for _, f := range findings {
+		if f.IsError() {
+			errCount++
+			fmt.Fprintf(os.Stderr, "error: %s\n", f.Error())
+		}
+	}
+	for _, f := range findings {
+		if !f.IsError() {
+			warnCount++
+			fmt.Fprintf(os.Stderr, "warning: %s\n", f.Error())
+		}
+	}
+
+	if errCount > 0 {
+		return fmt.Errorf("%d validation error(s), %d warning(s)", errCount, warnCount)
+	}
+	if warnCount > 0 {
+		fmt.Fprintf(os.Stderr, "✓ no errors (%d warning(s))\n", warnCount)
 		return nil
 	}
-	for _, e := range errs {
-		fmt.Fprintf(os.Stderr, "error: %s\n", e.Error())
-	}
-	return fmt.Errorf("%d validation error(s)", len(errs))
+	fmt.Fprintf(os.Stderr, "✓ no validation errors\n")
+	return nil
 }
