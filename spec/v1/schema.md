@@ -51,6 +51,7 @@ A named screen in the app, identified by a URL route.
 | `name` | string | yes | Shown in the snapshot header. Should be unique across the sightmap. |
 | `route` | string | yes | Glob pattern matched against the URL pathname. See [Route matching](#route-matching). |
 | `url` | string | no | Representative URL for this view — a concrete address that resolves to it. Tooling uses it to navigate to the view (e.g. coverage reporting and bulk capture/probe). A file-root `url` supplies a default for every view in the file that omits its own. |
+| `stability` | string | no | Authoring-confidence marker: `stub` or `deferred`. See [Stability](#stability). |
 | `description` | string | no | Free-text. Not surfaced at runtime but useful for PR review and future maintenance. |
 | `source` | string | no | Relative path to the source file. |
 | `dependencies` | string[] | no | Supplementary files (minimatch globs, project-root-anchored, `!` negates) whose changes should trigger re-curation of this view. See [Dependencies](#dependencies). |
@@ -85,6 +86,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `dependencies` | string[] | no | Supplementary files (minimatch globs, project-root-anchored, `!` negates) whose changes should trigger re-curation of this component. See [Dependencies](#dependencies). |
 | `description` | string | no | Free-text. Not surfaced at runtime. |
 | `memory` | string[] | no | Component-level memory entries. |
+| `stability` | string | no | Authoring-confidence marker: `uncertain` or `unstable`. See [Stability](#stability). |
 | `properties` | [Property](#component-properties)[] | no | Named DOM-value extractions surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Extracted from the live DOM at snapshot time; unavailable to offline tools. See [Component properties](#component-properties). |
 | `children` | (Component \| [ComponentRef](#component-references))[] | no | Nested components. Child selectors are scoped to the parent's subtree. Entries may be either inline definitions or `$ref` reference objects. |
 
@@ -319,6 +321,29 @@ views:
       - name: DashboardLayout       # scoped — only on /dashboard
         selector: '[data-component="DashboardLayout"]'
 ```
+
+
+## Stability
+
+Both views and components may carry an optional `stability` marker recording how much the author trusts the definition. It is advisory metadata — it does not change matching — and conforming tools SHOULD surface it (e.g. in enriched output or lint) so agents know which parts of the map are provisional.
+
+| On | Value | Meaning |
+|---|---|---|
+| View | `stub` | A placeholder view, not yet fleshed out. |
+| View | `deferred` | Intentionally left unmapped for now. |
+| Component | `uncertain` | The selector is a best guess and unverified. |
+| Component | `unstable` | Known to break across renders. |
+
+Omit the field for an active view or a stable component.
+
+## Reserved tooling fields
+
+Some fields are consumed by tooling built on Sightmap (the reference CLI's capture and probe workflows) but are **not part of this spec's matching or merge semantics**. They are permitted by the schema so corpora that use them validate, but conforming SDKs MAY ignore them:
+
+- **`access`** (on a view) — reachability of the view for a tool's reference account: `status` (`open` | `blocked` | `needs-data`) and an optional `reason`.
+- **`snapshots`** (file-level) — named page states to capture (`name`, `notes`, `url`), used to enumerate capture/probe targets.
+
+These are reserved rather than standardized: their shape may change, and other tooling need not implement them. Do not rely on them for cross-SDK matching behavior.
 
 ## Conformance
 

@@ -32,6 +32,12 @@
       "type": "array",
       "description": "Global requests — matched against every view.",
       "items": { "$ref": "#/$defs/request" }
+    },
+    "snapshots": {
+      "$comment": "Reserved tooling field. Not part of the spec's matching or merge semantics; conforming SDKs MAY ignore it. Consumed by the reference CLI's capture/probe workflow.",
+      "type": "array",
+      "description": "Non-normative tooling field: named page states to capture for the views in this file (used by capture/probe tooling).",
+      "items": { "$ref": "#/$defs/snapshot" }
     }
   },
   "$defs": {
@@ -68,6 +74,21 @@
         "url": {
           "type": "string",
           "description": "Representative URL for this view: a concrete address that resolves to it, used by tooling to navigate to the view (report, capture --all, sel-probe --all, discover). Falls back to the file-level `url` when omitted."
+        },
+        "stability": {
+          "type": "string",
+          "enum": ["stub", "deferred"],
+          "description": "Authoring-confidence marker. 'stub': a placeholder not yet fleshed out. 'deferred': intentionally left unmapped for now. Omit for an active view."
+        },
+        "access": {
+          "$comment": "Reserved tooling field. Not part of the spec's matching or merge semantics; conforming SDKs MAY ignore it.",
+          "type": "object",
+          "description": "Non-normative tooling field: reachability of this view for the reference capture account.",
+          "additionalProperties": false,
+          "properties": {
+            "status": { "type": "string", "enum": ["open", "blocked", "needs-data"] },
+            "reason": { "type": "string" }
+          }
         },
         "description": { "type": "string" },
         "source": { "type": "string" },
@@ -122,6 +143,11 @@
           "description": "Optional list of supplementary files (minimatch globs, '!' negation, project-root-anchored) whose changes should trigger re-curation of this component. See spec/v1/schema.md#dependencies for semantics."
         },
         "description": { "type": "string" },
+        "stability": {
+          "type": "string",
+          "enum": ["uncertain", "unstable"],
+          "description": "Authoring-confidence marker. 'uncertain': the selector is a best guess. 'unstable': known to break across renders. Omit for a stable component."
+        },
         "memory": { "$ref": "#/$defs/memory" },
         "properties": {
           "type": "array",
@@ -202,6 +228,16 @@
         "name": { "type": "string", "minLength": 1 },
         "type": { "type": "string" },
         "description": { "type": "string" }
+      }
+    },
+    "snapshot": {
+      "$comment": "Reserved tooling field. Not part of the spec's matching or merge semantics.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "notes": { "type": "string" },
+        "url": { "type": "string" }
       }
     }
   }

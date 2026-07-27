@@ -1,0 +1,20 @@
+version: 1
+snapshots:
+  - name: base
+    notes: default state
+    url: https://example.com/
+components:
+  - name: Flaky
+    selector: '.flaky'
+    stability: unstable
+views:
+  - name: Draft
+    route: /draft
+    stability: stub
+    access:
+      status: blocked
+      reason: requires admin role
+    components:
+      - name: Guess
+        selector: '.guess'
+        stability: uncertain
