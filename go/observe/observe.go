@@ -24,6 +24,12 @@ type Result struct {
 	GlobalNames map[string]bool
 	Props       map[string]map[string]string
 	Coverage    coverage.Result
+
+	// CorpusApplied is true when a corpus was supplied and matched against the
+	// tree, even if no view matched the URL or no component matched a node. It
+	// lets the renderer tell "no corpus" apart from "corpus loaded but nothing
+	// matched" — the latter must not be silent.
+	CorpusApplied bool
 }
 
 // Options controls how a page is observed.
@@ -59,6 +65,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	if corpus == nil {
 		return res, nil
 	}
+	res.CorpusApplied = true
 
 	res.Matches = corpus.MatchTree(root, url)
 	res.View = corpus.ViewForURL(url)
