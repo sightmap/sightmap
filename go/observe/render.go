@@ -43,6 +43,11 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 			}
 		}
 		fmt.Fprintln(w)
+	} else if r.CorpusApplied {
+		// A corpus is loaded but no view's route matched this URL. Say so, so the
+		// caller knows the page is off the map rather than trusting an unmapped
+		// tree (e.g. an auth redirect to a login page).
+		fmt.Fprintf(w, "[No view matched] %s\n\n", r.URL)
 	}
 
 	// ── [Guide] ───────────────────────────────────────────────────────────────
@@ -75,7 +80,11 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 	}
 
 	// ── [Coverage] ────────────────────────────────────────────────────────────
-	if r.Matches != nil {
+	// Gated on CorpusApplied, not on Matches: a matched view with zero components
+	// (or a page where no component matched) still has a coverage story to tell
+	// (every interactive node is an orphan), and hiding it left the documented
+	// "make a view, run snapshot --coverage" bootstrap with nothing to show.
+	if r.CorpusApplied {
 		fmt.Fprintln(w)
 		cov := r.Coverage
 		writeCoverage(w, cov)
