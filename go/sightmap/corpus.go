@@ -152,7 +152,39 @@ func (c *Corpus) ViewForURL(pageURL string) *View {
 	return &v
 }
 
-// MatchRoute reports whether the glob-style route pattern matches path. A single
+// TiedViews returns the names of the views that tie for the most specific match
+// of pageURL — i.e. share the top specificity score. A result of length >= 2
+// means the winning view is decided only by declaration order (an ambiguity that
+// depends on the exact URL, so it can't be caught statically). Length 0 or 1
+// means no conflict. Names are in declaration order.
+func (c *Corpus) TiedViews(pageURL string) []string {
+	u, err := url.Parse(pageURL)
+	if err != nil {
+		return nil
+	}
+	path := normalizeRoutePath(u.Path)
+	topScore := -1
+	var names []string
+	for i := range c.Views {
+		if !MatchRoute(c.Views[i].Route, path) {
+			continue
+		}
+		s := routeSpecificity(c.Views[i].Route)
+		switch {
+		case s > topScore:
+			topScore = s
+			names = []string{c.Views[i].Name}
+		case s == topScore:
+			names = append(names, c.Views[i].Name)
+		}
+	}
+	if len(names) < 2 {
+		return nil
+	}
+	return names
+}
+
+// MatchRoute reports whether the glob-style route pattern matches path.
 // trailing slash is normalized off both sides first (except the root "/"), so
 // "/*/projects" matches "/acme/projects/".
 //   - **      matches any sequence of characters including slashes (one or more)

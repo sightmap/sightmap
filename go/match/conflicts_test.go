@@ -1,0 +1,59 @@
+package match_test
+
+import (
+	"testing"
+
+	"github.com/sightmap/sightmap/go/match"
+)
+
+// TestFindConflicts_NodeClaimedByTwoNames: one node matched by two distinct
+// component names is a conflict.
+func TestFindConflicts_NodeClaimedByTwoNames(t *testing.T) {
+	root := node("root", "div", nil,
+		nodeAttr("dlg", "div", map[string]string{"role": "dialog", "data-testid": "login"}),
+	)
+	defs := []match.SightmapComponent{
+		{Name: "AppDialog", Selectors: []string{`[role="dialog"]`}},
+		{Name: "LoginDialog", Selectors: []string{`[data-testid="login"]`}},
+	}
+	conflicts := match.FindConflicts(root, defs)
+	if len(conflicts) != 1 {
+		t.Fatalf("expected 1 conflict, got %d: %+v", len(conflicts), conflicts)
+	}
+	if conflicts[0].Node.Id != "dlg" {
+		t.Errorf("conflict on wrong node: %s", conflicts[0].Node.Id)
+	}
+	if len(conflicts[0].Names) != 2 {
+		t.Errorf("expected 2 competing names, got %v", conflicts[0].Names)
+	}
+}
+
+// TestFindConflicts_SameNameManyNodes: one component name matching many nodes is
+// normal, not a conflict.
+func TestFindConflicts_SameNameManyNodes(t *testing.T) {
+	root := node("root", "div", nil,
+		node("c1", "div", []string{"card"}),
+		node("c2", "div", []string{"card"}),
+		node("c3", "div", []string{"card"}),
+	)
+	defs := []match.SightmapComponent{{Name: "Card", Selectors: []string{".card"}}}
+	if c := match.FindConflicts(root, defs); len(c) != 0 {
+		t.Errorf("same name matching many nodes must not conflict, got %+v", c)
+	}
+}
+
+// TestFindConflicts_DistinctNodes: two names matching two different nodes is not
+// a conflict.
+func TestFindConflicts_DistinctNodes(t *testing.T) {
+	root := node("root", "div", nil,
+		node("a", "div", []string{"a"}),
+		node("b", "div", []string{"b"}),
+	)
+	defs := []match.SightmapComponent{
+		{Name: "A", Selectors: []string{".a"}},
+		{Name: "B", Selectors: []string{".b"}},
+	}
+	if c := match.FindConflicts(root, defs); len(c) != 0 {
+		t.Errorf("distinct nodes must not conflict, got %+v", c)
+	}
+}
