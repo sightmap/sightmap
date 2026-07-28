@@ -1779,7 +1779,7 @@ footer {
 
 .blog-post__draft-banner {
   position: fixed;
-  top: 0;
+  top: 56px; /* nav's height (see `nav { height: 56px }` above) — sit below it, not on top of it */
   left: 0;
   right: 0;
   z-index: 200;
