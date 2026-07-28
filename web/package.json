@@ -6,8 +6,9 @@
   "packageManager": "pnpm@10.32.1",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "tsx scripts/build-blog.ts && vite",
+    "build:blog": "tsx scripts/build-blog.ts",
+    "build": "tsx scripts/build-blog.ts && tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -12,6 +12,7 @@
 # Node / JS (web/)
 node_modules/
 dist/
+web/src/generated/
 
 # npm release packaging staging (go/npm/scripts/build-npm-packages.mjs)
 /npm-staging/
