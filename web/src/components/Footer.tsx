@@ -14,7 +14,6 @@ export default function Footer() {
             <a href="https://github.com/sightmap/sightmap" target="_blank" rel="noreferrer">GitHub</a>
             <a href="https://www.npmjs.com/package/@sightmap/sightmap" target="_blank" rel="noreferrer">CLI on npm</a>
             <a href="https://github.com/sightmap/sightmap/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT License</a>
-            <a href="https://subtext.fullstory.com" target="_blank" rel="noreferrer">Subtext</a>
           </div>
         </div>
       </div>
