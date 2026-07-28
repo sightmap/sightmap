@@ -26,10 +26,16 @@ describe('loadPosts', () => {
   })
 
   it('excludes drafts unless asked for them', async () => {
-    const published = await loadPosts(fixture('valid'))
-    const all = await loadPosts(fixture('valid'), { includeDrafts: true })
+    const published = await loadPosts(fixture('with-draft'))
     expect(published).toHaveLength(1)
-    expect(all).toHaveLength(1)
+    expect(published[0].frontmatter.slug).toBe('published-post')
+
+    const all = await loadPosts(fixture('with-draft'), { includeDrafts: true })
+    expect(all).toHaveLength(2)
+    expect(all.map((p) => p.frontmatter.slug).sort()).toEqual([
+      'draft-post',
+      'published-post',
+    ])
   })
 })
 
