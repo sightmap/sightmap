@@ -3,11 +3,19 @@ import Logo from './Logo'
 export default function Navigation() {
   return (
     <nav data-component="Navigation">
-      <a href="#" className="nav-logo" aria-label="sightmap home"><Logo /></a>
+      <a href="/" className="nav-logo" aria-label="sightmap home"><Logo /></a>
       <div className="nav-links">
-        <a href="#spec">Spec</a>
-        <a href="#memory">Memory</a>
-        <a href="#start">Get started</a>
+        {/*
+          Root-relative rather than bare fragments. These target sections that
+          only exist on the homepage, so `#spec` from /blog appends a fragment
+          to the blog URL and goes nowhere. `/#spec` is a same-document
+          fragment navigation on the homepage (the path already matches, so the
+          browser scrolls without reloading) and a real navigation from any
+          other route.
+        */}
+        <a href="/#spec">Spec</a>
+        <a href="/#memory">Memory</a>
+        <a href="/#start">Get started</a>
         <a href="/blog">Blog</a>
         <a href="https://docs.sightmap.org">Docs</a>
         <a href="https://github.com/sightmap/sightmap" target="_blank" rel="noreferrer" className="nav-gh">
