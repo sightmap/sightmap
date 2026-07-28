@@ -5,8 +5,9 @@
 // without an account, and the docs site already publishes a changelog feed.
 import fs from 'node:fs'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { loadPosts } from './lib/posts'
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, escXml } from './lib/site'
+import { SITE_URL, SITE_NAME, BLOG_DESCRIPTION, escXml } from './lib/site'
 
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
@@ -43,7 +44,7 @@ export function buildRss(posts: FeedPost[], now: Date): string {
   <channel>
     <title>${escXml(SITE_NAME)}</title>
     <link>${SITE_URL}/blog</link>
-    <description>${escXml(SITE_DESCRIPTION)}</description>
+    <description>${escXml(BLOG_DESCRIPTION)}</description>
     <language>en-us</language>
     <lastBuildDate>${now.toUTCString()}</lastBuildDate>
     <atom:link href="${SITE_URL}/rss.xml" rel="self" type="application/rss+xml"/>
@@ -102,7 +103,14 @@ async function main() {
   console.log(`  wrote dist/rss.xml and dist/sitemap.xml (${posts.length} post(s))`)
 }
 
-if (process.argv[1]?.endsWith('generate-feeds.ts')) {
+// Only run when invoked directly, so the test can import buildRss and
+// buildSitemap. Compares resolved URLs rather than a filename suffix check
+// (`.endsWith('generate-feeds.ts')`) so a different runner — a symlink, a
+// wrapper script, being required under another name — can't silently skip
+// feed generation with no error. This is the last step of `pnpm build`, so a
+// skipped run would ship stale feeds with exit 0 and no output at all.
+const entry = process.argv[1]
+if (entry && import.meta.url === pathToFileURL(entry).href) {
   main().catch((err) => {
     console.error('Feed generation failed:\n', err instanceof Error ? err.message : err)
     process.exit(1)

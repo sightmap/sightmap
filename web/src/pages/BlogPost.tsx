@@ -28,7 +28,10 @@ export default function BlogPost() {
   const html = entry.slug === slug ? entry.html : null
 
   useEffect(() => {
-    if (html !== null) return
+    // Hooks run before the <Navigate> guards below, so without the `meta`
+    // check an unknown slug fires a dynamic import that can never resolve and
+    // logs a load error on its way to the redirect.
+    if (!meta || html !== null) return
     let cancelled = false
     setLoadFailed(false)
     loadPostHtml(slug)
@@ -43,7 +46,7 @@ export default function BlogPost() {
     return () => {
       cancelled = true
     }
-  }, [slug, html])
+  }, [slug, html, meta])
 
   const body = useMemo(() => (html ? renderPostBody(html) : null), [html])
 

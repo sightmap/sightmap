@@ -7,6 +7,19 @@ export const SITE_NAME = 'Sightmap'
 export const SITE_DESCRIPTION =
   'An open YAML spec and CLI that maps views, components, and API requests to source files, with memory for runtime behavior.'
 
+// The blog's own tagline, distinct from SITE_DESCRIPTION (which is the
+// CLI/spec pitch). Used for /blog's meta description, the copy under the /blog
+// heading, and the RSS <channel><description> — feed readers show that as the
+// feed's subtitle, and subscribers came for the blog, not the CLI.
+//
+// src/pages/BlogIndex.tsx imports this, which is the one place app code reaches
+// into scripts/. It is deliberate: this module is the single source of site
+// copy, and duplicating the line into src/ is exactly the drift this finding
+// was about. Keep this file free of node: imports and side effects so it stays
+// safe to pull into the browser bundle.
+export const BLOG_DESCRIPTION =
+  'Research and release notes from the people building the sightmap spec.'
+
 // Escape for use inside an HTML attribute value. Ampersand goes first so the
 // entities introduced by the later replacements are not themselves escaped.
 export const esc = (s: string): string =>

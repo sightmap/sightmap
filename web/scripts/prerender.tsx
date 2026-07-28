@@ -11,8 +11,9 @@ import { pathToFileURL } from 'node:url'
 import { renderToString } from 'react-dom/server'
 import { StaticRouter } from 'react-router'
 import App from '../src/App'
+import { setServerPostHtml, clearServerPostHtml } from '../src/lib/postHtml'
 import { loadPosts, renderPostHtml } from './lib/posts'
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, esc } from './lib/site'
+import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, BLOG_DESCRIPTION, esc } from './lib/site'
 
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
@@ -120,7 +121,15 @@ function renderRoute(shell: string, route: string, meta: PageMeta, extraHead = '
   )
   let html = renderMeta(shell, meta)
   if (extraHead) html = html.replace('</head>', `  ${extraHead}\n</head>`)
-  html = html.replace('<div id="root"></div>', `<div id="root">${body}</div>`)
+  // Stamp which route this markup was rendered for. Netlify's catch-all serves
+  // the homepage dist/index.html for every route with no prerendered file, so
+  // "#root has children" is not enough to know the markup belongs to the URL
+  // in the address bar. src/main.tsx compares this stamp against
+  // location.pathname and only hydrates on a match.
+  html = html.replace(
+    '<div id="root"></div>',
+    `<div id="root" data-prerender-route="${esc(route)}">${body}</div>`
+  )
   if (inlineJson) html = html.replace('</body>', `${inlineJson}\n</body>`)
   return html
 }
@@ -180,7 +189,7 @@ async function main() {
     renderRoute(shell, '/blog', {
       url: `${SITE_URL}/blog`,
       title: `Blog — ${SITE_NAME}`,
-      description: 'Research and release notes from the people building the sightmap spec.',
+      description: BLOG_DESCRIPTION,
       image: `${SITE_URL}/og-image.png`,
       imageAlt: DEFAULT_IMAGE_ALT,
       imageDimensionsKnown: true,
@@ -230,24 +239,34 @@ async function main() {
 
     const inline = renderInlinePostJson(fm.slug, html)
 
-    write(
-      `blog/${fm.slug}`,
-      renderRoute(
-        shell,
-        `/blog/${fm.slug}`,
-        {
-          url,
-          title: `${fm.title} — ${SITE_NAME}`,
-          description: fm.excerpt,
-          image,
-          imageAlt,
-          imageDimensionsKnown,
-          type: 'article',
-        },
-        head,
-        inline
+    // src/lib/postHtml.ts reads the body through readPostHtml(), which on the
+    // client finds the inlined JSON tag in the DOM. There is no DOM here, so
+    // hand it the same string directly for the duration of this render —
+    // otherwise the prerendered page contains nav, title, byline and footer
+    // and no article at all.
+    setServerPostHtml(fm.slug, html)
+    try {
+      write(
+        `blog/${fm.slug}`,
+        renderRoute(
+          shell,
+          `/blog/${fm.slug}`,
+          {
+            url,
+            title: `${fm.title} — ${SITE_NAME}`,
+            description: fm.excerpt,
+            image,
+            imageAlt,
+            imageDimensionsKnown,
+            type: 'article',
+          },
+          head,
+          inline
+        )
       )
-    )
+    } finally {
+      clearServerPostHtml()
+    }
   }
 
   console.log(`\n  prerender complete: ${posts.length + 2} page(s)`)

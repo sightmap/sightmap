@@ -8,7 +8,7 @@ export default function SkillVsSightmap() {
   const wall = Array.from({ length: 11 })
 
   return (
-    <figure className="smap-svs code-dark">
+    <figure className="smap-svs">
       <div className="smap-svs__title">
         <span className="smap-svs__title-dim">A skill</span>
         <span className="smap-svs__title-vs"> vs. </span>

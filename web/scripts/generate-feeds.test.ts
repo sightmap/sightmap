@@ -11,7 +11,7 @@ const POSTS: FeedPost[] = [
   },
   {
     slug: 'older',
-    title: 'An older post',
+    title: 'Sightmaps & agents',
     excerpt: 'Second.',
     date: '2026-01-01',
     author: 'Chip Lay',
@@ -38,6 +38,10 @@ describe('buildRss', () => {
   it('escapes apostrophes and ampersands in titles and descriptions', () => {
     const xml = buildRss(POSTS, NOW)
     expect(xml).toContain('It&apos;s a map, not a movie.')
+    expect(xml).toContain('<title>Sightmaps &amp; agents</title>')
+    // The raw ampersand must not survive anywhere — an unescaped `&` is the
+    // single most common way to hand a feed reader invalid XML.
+    expect(xml).not.toMatch(/&(?!amp;|apos;|lt;|gt;|quot;)/)
   })
 
   it('formats pubDate as RFC 822', () => {
