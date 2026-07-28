@@ -1,5 +1,5 @@
 ---
-title: 'Sightmaps: the runtime map of your app'
+title: 'Sightmap: the runtime map of your app'
 excerpt: 'A sightmap gives every view, component, and API request in your app a semantic name, so your agent sees meaning instead of DOM noise and carries forward the instructions for how to operate your app.'
 topic: 'research'
 date: '2026-07-29'
