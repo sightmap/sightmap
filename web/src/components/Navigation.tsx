@@ -1,7 +1,9 @@
+import Logo from './Logo'
+
 export default function Navigation() {
   return (
     <nav data-component="Navigation">
-      <a href="#" className="nav-logo">.sightmap<span>/</span></a>
+      <a href="#" className="nav-logo" aria-label="sightmap home"><Logo /></a>
       <div className="nav-links">
         <a href="#spec">Spec</a>
         <a href="#memory">Memory</a>

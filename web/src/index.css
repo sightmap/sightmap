@@ -63,15 +63,17 @@ nav {
 }
 
 .nav-logo {
-  font-family: var(--mono);
-  font-weight: 700;
-  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
   color: var(--text-bright);
   text-decoration: none;
-  letter-spacing: -0.02em;
 }
 
-.nav-logo span { color: var(--accent); }
+.nav-logo svg {
+  height: 22px;
+  width: auto;
+  display: block;
+}
 
 .nav-links {
   display: flex;
