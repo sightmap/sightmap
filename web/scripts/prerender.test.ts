@@ -29,9 +29,11 @@ describe('renderMeta', () => {
   it('rewrites title, description, canonical, and og:url', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/blog/x',
+      ogUrl: 'https://sightmap.org/blog/x',
       title: 'A post — Sightmap',
       description: 'About the post.',
       image: 'https://sightmap.org/blog/og/x.png',
+      ogImage: 'https://sightmap.org/blog/og/x.png',
       imageAlt: 'A post',
       imageDimensionsKnown: true,
       type: 'article',
@@ -47,9 +49,11 @@ describe('renderMeta', () => {
   it('escapes quotes in titles so the attribute cannot break out', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/',
+      ogUrl: 'https://sightmap.org/',
       title: 'He said "hi"',
       description: 'x',
       image: 'https://sightmap.org/og-image.png',
+      ogImage: 'https://sightmap.org/og-image.png',
       imageAlt: 'x',
       imageDimensionsKnown: true,
       type: 'website',
@@ -60,9 +64,11 @@ describe('renderMeta', () => {
   it('rewrites twitter:description independently of og:description', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/blog',
+      ogUrl: 'https://sightmap.org/blog',
       title: 'Blog — Sightmap',
       description: 'Research and release notes.',
       image: 'https://sightmap.org/og-image.png',
+      ogImage: 'https://sightmap.org/og-image.png',
       imageAlt: 'x',
       imageDimensionsKnown: true,
       type: 'website',
@@ -76,9 +82,11 @@ describe('renderMeta', () => {
   it('rewrites og:image:alt and twitter:image:alt per route', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/blog/x',
+      ogUrl: 'https://sightmap.org/blog/x',
       title: 'A post — Sightmap',
       description: 'About the post.',
       image: 'https://sightmap.org/blog/og/x.png',
+      ogImage: 'https://sightmap.org/blog/og/x.png',
       imageAlt: 'A post — Sightmap',
       imageDimensionsKnown: true,
       type: 'article',
@@ -91,9 +99,11 @@ describe('renderMeta', () => {
   it('keeps og:image:type/width/height when the image is a known-dimension card', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/',
+      ogUrl: 'https://sightmap.org/',
       title: 'Sightmap',
       description: 'x',
       image: 'https://sightmap.org/og-image.png',
+      ogImage: 'https://sightmap.org/og-image.png',
       imageAlt: 'x',
       imageDimensionsKnown: true,
       type: 'website',
@@ -106,9 +116,11 @@ describe('renderMeta', () => {
   it('drops og:image:type/width/height when the image is not a known-dimension card', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/blog/x',
+      ogUrl: 'https://sightmap.org/blog/x',
       title: 'A post — Sightmap',
       description: 'x',
       image: 'https://sightmap.org/blog/hero/x.jpg',
+      ogImage: 'https://sightmap.org/blog/hero/x.jpg',
       imageAlt: 'x',
       imageDimensionsKnown: false,
       type: 'article',
@@ -119,6 +131,34 @@ describe('renderMeta', () => {
     // og:image:alt uses the same "og:image:" prefix — make sure it survives
     // the strip, i.e. the regexes above are specific to the tag they target.
     expect(out).toContain('og:image:alt')
+  })
+
+  // Deploy-preview regression: a preview build resolves `ogUrl`/`ogImage`
+  // from DEPLOY_PRIME_URL while `url`/`image` stay pinned to SITE_URL (see
+  // scripts/prerender.tsx). Canonical and twitter:image must not follow
+  // og:url/og:image onto the preview host.
+  it('lets og:url and og:image diverge from canonical/twitter when ogUrl/ogImage differ from url/image', () => {
+    const out = renderMeta(SHELL, {
+      url: 'https://sightmap.org/blog/x',
+      ogUrl: 'https://deploy-preview-1--sightmap.netlify.app/blog/x',
+      title: 'A post — Sightmap',
+      description: 'About the post.',
+      image: 'https://sightmap.org/blog/og/x.png',
+      ogImage: 'https://deploy-preview-1--sightmap.netlify.app/blog/og/x.png',
+      imageAlt: 'A post',
+      imageDimensionsKnown: true,
+      type: 'article',
+    })
+    expect(out).toContain('href="https://sightmap.org/blog/x"')
+    expect(out).toContain(
+      'property="og:url" content="https://deploy-preview-1--sightmap.netlify.app/blog/x"'
+    )
+    expect(out).toContain(
+      'property="og:image" content="https://deploy-preview-1--sightmap.netlify.app/blog/og/x.png"'
+    )
+    expect(out).toContain(
+      'name="twitter:image" content="https://sightmap.org/blog/og/x.png"'
+    )
   })
 })
 

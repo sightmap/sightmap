@@ -1259,12 +1259,24 @@ footer {
 
 .prose p {
   margin-bottom: 1.25em;
+  overflow-wrap: break-word;
 }
 
 .prose a {
   color: var(--accent);
   text-decoration: underline;
   text-underline-offset: 2px;
+  /* Post prose can contain bare long URLs (schema/SKILL.md links, etc.) with
+     no natural break points. `anywhere` (not `break-word`) so the browser
+     also counts the break when measuring min-content width, which keeps a
+     long link from forcing the whole prose column wider on narrow
+     viewports instead of just wrapping in place. Not `word-break: break-all`
+     — that breaks ordinary words mid-syllable too; `overflow-wrap` only
+     breaks when a token would otherwise overflow. `.prose pre`, `.blog-code*`,
+     `.smap-widget__tree`, and `.smap-svs*` keep their own `white-space: pre`
+     + `overflow-x: auto` scrolling untouched by this — `overflow-wrap` never
+     introduces a break inside `white-space: pre` content. */
+  overflow-wrap: anywhere;
 }
 
 .prose a:hover {
@@ -1284,6 +1296,7 @@ footer {
 
 .prose li {
   margin-bottom: 0.5em;
+  overflow-wrap: break-word;
 }
 
 .prose ul li {

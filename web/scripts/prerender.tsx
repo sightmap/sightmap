@@ -27,16 +27,39 @@ import {
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
 
+// Netlify sets DEPLOY_PRIME_URL on deploy previews and branch deploys (and
+// URL, which already equals SITE_URL, on production). Locally and in
+// production neither DEPLOY_PRIME_URL nor this fallback changes anything, so
+// a preview build is the only case where this differs from SITE_URL.
+//
+// Deliberately computed here rather than exported from scripts/lib/site.ts:
+// that module is imported by src/pages/BlogIndex.tsx and src/pages/BlogPost.tsx
+// and gets pulled into the browser bundle (see its file header comment), where
+// `process` does not exist. This file only runs under Node.
+const DEPLOY_URL = process.env.DEPLOY_PRIME_URL || SITE_URL
+
 export interface PageMeta {
+  // Canonical, production-authoritative URL. Feeds <link rel="canonical">
+  // (and, for posts, JSON-LD mainEntityOfPage) — always SITE_URL-based, even
+  // on a deploy preview, since a preview should never claim to be canonical
+  // for itself.
   url: string
+  // og:url. DEPLOY_URL-based so a deploy preview's social card links back to
+  // the preview it was actually generated from, not production.
+  ogUrl: string
   title: string
   description: string
+  // twitter:image (and, for posts, JSON-LD image) — always SITE_URL-based,
+  // paired with the canonical `url` above.
   image: string
+  // og:image. DEPLOY_URL-based for the same reason as ogUrl: a preview-only
+  // image should be advertised at a host that can actually serve it.
+  ogImage: string
   // Alt text for og:image / twitter:image. These describe the *image*, not
   // the page, so they get their own field rather than reusing title.
   imageAlt: string
-  // True only when `image` is guaranteed to be the site's 1200x630 PNG
-  // (currently: the og-image.png fallback used by the homepage and blog
+  // True only when `image`/`ogImage` are guaranteed to be the site's 1200x630
+  // PNG (currently: the og-image.png fallback used by the homepage and blog
   // index). Post images come from frontmatter `image`, which the zod schema
   // in scripts/lib/posts.ts only validates as "starts with /" — nothing
   // enforces its dimensions or format — so for those we cannot honestly claim
@@ -61,7 +84,7 @@ export function renderMeta(shell: string, meta: PageMeta): string {
       `<meta name="description" content="${esc(meta.description)}">`
     )
     .replace(/<link\s+rel="canonical"[\s\S]*?>/, `<link rel="canonical" href="${meta.url}">`)
-    .replace(/<meta\s+property="og:url"[\s\S]*?>/, `<meta property="og:url" content="${meta.url}">`)
+    .replace(/<meta\s+property="og:url"[\s\S]*?>/, `<meta property="og:url" content="${meta.ogUrl}">`)
     .replace(
       /<meta\s+property="og:type"[\s\S]*?>/,
       `<meta property="og:type" content="${meta.type}">`
@@ -76,7 +99,7 @@ export function renderMeta(shell: string, meta: PageMeta): string {
     )
     .replace(
       /<meta\s+property="og:image"[\s\S]*?>/,
-      `<meta property="og:image" content="${meta.image}">`
+      `<meta property="og:image" content="${meta.ogImage}">`
     )
     .replace(
       /<meta\s+property="og:image:alt"[\s\S]*?>/,
@@ -122,7 +145,14 @@ export function renderMeta(shell: string, meta: PageMeta): string {
   return html
 }
 
-function renderRoute(shell: string, route: string, meta: PageMeta, extraHead = '', inlineJson = ''): string {
+function renderRoute(
+  shell: string,
+  route: string,
+  meta: PageMeta,
+  extraHead = '',
+  inlineJson = '',
+  stamp = true
+): string {
   const body = renderToString(
     <StaticRouter location={route}>
       <App />
@@ -135,10 +165,26 @@ function renderRoute(shell: string, route: string, meta: PageMeta, extraHead = '
   // "#root has children" is not enough to know the markup belongs to the URL
   // in the address bar. src/main.tsx compares this stamp against
   // location.pathname and only hydrates on a match.
-  html = html.replace(
-    '<div id="root"></div>',
-    `<div id="root" data-prerender-route="${esc(route)}">${body}</div>`
-  )
+  //
+  // `stamp` is false only for a draft post, rendered here at
+  // `/blog/<slug>?preview=true` so BlogPost renders the article instead of its
+  // `<Navigate>` redirect. That route string (with the query) is not what a
+  // visitor's address bar shows when they open the bare `/blog/<slug>` — and
+  // Netlify serves this same static file for both, since query strings don't
+  // affect static-file resolution. Stamping it would make main.tsx hydrate
+  // the bare URL against markup rendered for a route it doesn't match
+  // (client-side BlogPost would redirect instead), reproducing the exact
+  // hydration mismatch this stamp exists to prevent. Leaving drafts unstamped
+  // means main.tsx always falls through to createRoot and renders fresh
+  // client-side, so there's no mismatch either way. Crawlers/unfurlers still
+  // get the full prerendered article regardless, since they never run JS to
+  // notice the stamp is absent.
+  html = stamp
+    ? html.replace(
+        '<div id="root"></div>',
+        `<div id="root" data-prerender-route="${esc(route)}">${body}</div>`
+      )
+    : html.replace('<div id="root"></div>', `<div id="root">${body}</div>`)
   if (inlineJson) html = html.replace('</body>', `${inlineJson}\n</body>`)
   return html
 }
@@ -182,9 +228,11 @@ async function main() {
     shellPath,
     renderRoute(shell, '/', {
       url: `${SITE_URL}/`,
+      ogUrl: `${DEPLOY_URL}/`,
       title: HOME_TITLE,
       description: SITE_DESCRIPTION,
       image: `${SITE_URL}/og-image.png`,
+      ogImage: `${DEPLOY_URL}/og-image.png`,
       imageAlt: DEFAULT_IMAGE_ALT,
       imageDimensionsKnown: true,
       type: 'website',
@@ -197,23 +245,35 @@ async function main() {
     'blog',
     renderRoute(shell, '/blog', {
       url: `${SITE_URL}/blog`,
+      ogUrl: `${DEPLOY_URL}/blog`,
       title: BLOG_INDEX_TITLE,
       description: BLOG_DESCRIPTION,
       image: `${SITE_URL}/og-image.png`,
+      ogImage: `${DEPLOY_URL}/og-image.png`,
       imageAlt: DEFAULT_IMAGE_ALT,
       imageDimensionsKnown: true,
       type: 'website',
     })
   )
 
-  // One page per published post. The post body is inlined as JSON so the
-  // client can seed its first render from it and hydrate without a mismatch
-  // (see src/lib/postHtml.ts).
-  const posts = await loadPosts(CONTENT_DIR)
+  // Netlify sets CONTEXT to 'production', 'deploy-preview', or
+  // 'branch-deploy'; it's unset in a plain local build. Drafts get a
+  // prerendered page everywhere except production, so a deploy preview can
+  // publish a reviewable link for a draft post — sharing one on production
+  // would leak an unpublished post, so that path must stay exactly as before.
+  const isProductionBuild = !process.env.CONTEXT || process.env.CONTEXT === 'production'
+
+  // One page per post (published always; drafts too on a non-production
+  // build — see above). The post body is inlined as JSON so the client can
+  // seed its first render from it and hydrate without a mismatch (see
+  // src/lib/postHtml.ts).
+  const posts = await loadPosts(CONTENT_DIR, { includeDrafts: !isProductionBuild })
   for (const post of posts) {
     const fm = post.frontmatter
     const url = `${SITE_URL}/blog/${fm.slug}`
+    const ogUrl = `${DEPLOY_URL}/blog/${fm.slug}`
     const image = fm.image ? `${SITE_URL}${fm.image}` : `${SITE_URL}/og-image.png`
+    const ogImage = fm.image ? `${DEPLOY_URL}${fm.image}` : `${DEPLOY_URL}/og-image.png`
     // frontmatter `image` is only validated as "starts with /" (see
     // scripts/lib/posts.ts) — nothing guarantees it is the 1200x630 PNG a
     // future OG-card-generation step would produce, so we can't assert
@@ -255,22 +315,32 @@ async function main() {
     // and no article at all.
     setServerPostHtml(fm.slug, html)
     try {
+      // A draft is only reachable client-side at `?preview=true` (see
+      // BlogPost's <Navigate> guard) — route the StaticRouter render through
+      // that same query so the prerendered output is the article, not a
+      // redirect. The file still publishes at the normal
+      // dist/blog/<slug>/index.html path; Netlify's static lookup ignores
+      // query strings. `stamp: false` leaves the page unstamped — see the
+      // comment at the stamp site in renderRoute for why.
       write(
         `blog/${fm.slug}`,
         renderRoute(
           shell,
-          `/blog/${fm.slug}`,
+          fm.draft ? `/blog/${fm.slug}?preview=true` : `/blog/${fm.slug}`,
           {
             url,
+            ogUrl,
             title: postTitle(fm.title),
             description: fm.excerpt,
             image,
+            ogImage,
             imageAlt,
             imageDimensionsKnown,
             type: 'article',
           },
           head,
-          inline
+          inline,
+          !fm.draft
         )
       )
     } finally {
