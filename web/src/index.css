@@ -31,6 +31,7 @@
   --code-accent: #e87da0;
   --code-border: #2a2a40;
   --code-header-bg: rgba(255, 255, 255, 0.04);
+  --code-caption: #9aa3b2;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1316,6 +1317,134 @@ footer {
   font-size: 0.875em;
 }
 
+/* Fenced code blocks (see CodeBlock.tsx). widgets.tsx swaps every
+   <pre><code> from a markdown fence for this component, both during server
+   prerendering and in the browser, so `.prose pre`/`.prose pre code` above
+   are now only a fallback for a bare <pre> with no <code> child. Named
+   `.blog-code*` (not `.code-block*`) because `.code-block`/`.code-header`
+   already exist as the static hand-authored demo panels on the homepage
+   (Hero/AgentSection/CTASection/SpecSection) — reusing that name would bleed
+   styles between the two. Always dark regardless of page theme, like
+   `.smap-widget__tree` and `.smap-svs`, so this uses --bg-code/--code-*
+   rather than the light-theme tokens used elsewhere in .prose. Unscoped from
+   `.prose` (not `.prose .blog-code`) so the same rules also style the
+   expanded overlay, which portals onto <body>, outside `.prose`. */
+.blog-code {
+  background: var(--bg-code);
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 0 0 1.5em;
+}
+
+.blog-code__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0.5rem 0.4rem 1rem;
+  background: var(--code-header-bg);
+  border-bottom: 1px solid var(--code-border);
+}
+
+.blog-code__lang {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.blog-code__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.blog-code__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.blog-code__btn:hover {
+  color: var(--text-bright);
+  background: color-mix(in srgb, var(--text-bright) 12%, transparent);
+}
+
+.blog-code__btn:focus-visible {
+  outline: 2px solid var(--code-accent);
+  outline-offset: 1px;
+}
+
+.blog-code__btn.is-copied {
+  color: var(--code-accent);
+}
+
+.blog-code__btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.blog-code__body {
+  overflow: hidden;
+}
+
+/* Defensive reset: react-syntax-highlighter sets these inline, but ensure
+   the generated <pre> never inherits `.prose pre`'s border/radius/margin. */
+.blog-code pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/* Expand lightbox */
+.blog-code-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.blog-code-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-code) 80%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.blog-code-overlay__panel {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
+  max-height: 85vh;
+  margin: 0;
+  overflow: auto;
+  box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.55);
+}
+
+.blog-code-overlay__panel .blog-code__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .prose blockquote {
   border-left: 3px solid var(--accent);
   padding: 1.5em 0 1.5em 1.5em;
@@ -1336,7 +1465,8 @@ footer {
   margin: 2em 0;
   max-width: 100%;
   width: 100%;
-  object-fit: cover;
+  height: auto;
+  object-fit: contain;
 }
 
 /* Images break out of the content gutter on desktop */
@@ -1348,13 +1478,14 @@ footer {
     width: calc(100% + 6rem);
   }
 
-  /* Hero image: full-width breakout with max-height */
+  /* Wider breakout for the first image only. No max-height/crop here: prose
+     images (e.g. a wide screenshot) must never be cropped — only the gutter
+     is wider for it. */
   .prose img:first-of-type {
     margin-left: -6rem;
     margin-right: -6rem;
     max-width: calc(100% + 12rem);
     width: calc(100% + 12rem);
-    max-height: 480px;
     border-radius: 12px;
   }
 }
@@ -1480,7 +1611,7 @@ footer {
 .prose .smap-widget figcaption {
   margin-top: 0.85rem;
   font-size: 0.85rem;
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 /* Skill vs. sightmap diagram (see SkillVsSightmap.tsx). Two labeled panels:
@@ -1652,18 +1783,18 @@ footer {
 
 .prose .smap-svs__cap {
   margin: 0.7rem 0 0;
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1.45;
-  color: var(--code-com);
+  color: var(--code-caption);
 }
 
 .prose .smap-svs__foot {
   margin: 0.9rem 0 0;
   padding-top: 0.7rem;
   border-top: 1px solid var(--code-border);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   line-height: 1.45;
-  color: var(--code-com);
+  color: var(--code-caption);
   text-align: center;
 }
 

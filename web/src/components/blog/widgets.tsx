@@ -1,4 +1,5 @@
 import parse, { Element, type HTMLReactParserOptions } from 'html-react-parser'
+import CodeBlock from './CodeBlock'
 import SightmapSnapshot from './SightmapSnapshot'
 import SkillVsSightmap from './SkillVsSightmap'
 
@@ -18,15 +19,42 @@ const WIDGETS: Record<string, (attribs: Record<string, string>) => React.ReactEl
   'skill-vs-sightmap': () => <SkillVsSightmap />,
 }
 
+// Recursively collect the raw text of a parsed <code> element, so a fenced
+// code block's contents can be handed to CodeBlock as a plain string.
+function extractText(node: Element): string {
+  return node.children
+    .map((child) => {
+      if (child.type === 'text') return (child as unknown as { data: string }).data
+      if (child instanceof Element) return extractText(child)
+      return ''
+    })
+    .join('')
+}
+
 export const parserOptions: HTMLReactParserOptions = {
   replace: (domNode) => {
     if (!(domNode instanceof Element)) return
-    if (domNode.name !== 'div') return
-    const widget = domNode.attribs?.['data-widget']
-    if (!widget) return
-    const render = WIDGETS[widget]
-    if (!render) return
-    return render(domNode.attribs)
+    if (domNode.name === 'div') {
+      const widget = domNode.attribs?.['data-widget']
+      if (!widget) return
+      const render = WIDGETS[widget]
+      if (!render) return
+      return render(domNode.attribs)
+    }
+    // Fenced code blocks: `marked` renders ```lang blocks as
+    // <pre><code class="language-lang">...</code></pre>. Swap that for the
+    // interactive CodeBlock (syntax highlighting, line numbers, copy button)
+    // both during server prerendering and in the browser, same as the
+    // data-widget markers above.
+    if (domNode.name === 'pre') {
+      const codeEl = domNode.children.find(
+        (child): child is Element => child instanceof Element && child.name === 'code'
+      )
+      if (!codeEl) return
+      const code = extractText(codeEl).replace(/\n$/, '')
+      const language = /language-([\w-]+)/.exec(codeEl.attribs.class ?? '')?.[1]
+      return <CodeBlock code={code} language={language} />
+    }
   },
 }
 
