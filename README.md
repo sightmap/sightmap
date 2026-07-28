@@ -28,10 +28,23 @@ implementation, and both websites in one place:
 
 Each area has its own README with build and contribution details.
 
+## Install
+
+The `sightmap` CLI is published to npm. Install it globally:
+
+```bash
+npm install -g @sightmap/sightmap
+sightmap version
+```
+
+Or run it without installing: `npx @sightmap/sightmap <command>`. Building from
+source (Go) is covered in [`go/`](go/).
+
 ## Quickstart
 
-Drop a `.sightmap/` directory at your project root. Every `*.yaml` / `*.yml`
-file under it is discovered recursively and merged.
+Install the CLI (above), then drop a `.sightmap/` directory at your project
+root. Every `*.yaml` / `*.yml` file under it is discovered recursively and
+merged.
 
 ```yaml
 # .sightmap/home.yaml
