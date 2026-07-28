@@ -1455,7 +1455,7 @@ footer {
   padding: 0.75rem 1rem;
   border-radius: 8px;
   border: 1px solid var(--accent-dim);
-  background: color-mix(in srgb, var(--accent-dim) 10%, var(--bg-raised));
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-raised));
 }
 
 .prose .smap-widget__guide-label {
