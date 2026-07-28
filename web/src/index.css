@@ -1924,3 +1924,27 @@ footer {
   color: var(--bg);
   background: var(--accent);
 }
+
+/* ---- NOT FOUND ---- */
+.not-found {
+  min-height: calc(100vh - 56px); /* 56px: nav's fixed height, see `nav { height: 56px }` above */
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+  display: flex;
+  align-items: center;
+}
+
+.not-found .container {
+  text-align: center;
+}
+
+.not-found .section-desc {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.not-found__actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}

@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams, useSearchParams } from 'react-router'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
+import Seo from '@/components/Seo'
 import { formatDate } from '@/components/BlogCard'
 import { renderPostBody } from '@/components/blog/widgets'
 import { readPostHtml, loadPostHtml } from '@/lib/postHtml'
 import { blogPosts } from '@/generated/blog-manifest'
+// Shared with scripts/prerender.tsx so a client-side navigation to a post and
+// a fresh/prerendered load of that same post produce an identical <title>.
+import { postTitle } from '../../scripts/lib/site'
 
 export default function BlogPost() {
   const { slug = '' } = useParams()
@@ -55,6 +59,7 @@ export default function BlogPost() {
 
   return (
     <>
+      <Seo title={postTitle(meta.title)} description={meta.excerpt} />
       {meta.draft && (
         <div className="blog-post__draft-banner">Draft preview — not published</div>
       )}

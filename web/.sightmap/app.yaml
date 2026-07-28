@@ -134,6 +134,14 @@ views:
         source: src/components/blog/SkillVsSightmap.tsx
         description: Static SVG contrasting skill-dump context with contextual disclosure
 
+  - name: NotFound
+    route: '*'
+    description: Catch-all 404 page for any unmatched route
+    source: src/pages/NotFound.tsx
+    memory:
+      - "netlify.toml rewrites every path to /index.html with a 200 status, so this always renders as a soft 404 (HTTP 200 with 404 content), never a true 404 response"
+      - The prerender never emits a page for this route; it only ever renders client-side, after the catch-all route match
+
 components:
   - name: Navigation
     selector: '[data-component="Navigation"]'

@@ -20,6 +20,16 @@ export const SITE_DESCRIPTION =
 export const BLOG_DESCRIPTION =
   'Research and release notes from the people building the sightmap spec.'
 
+// Per-route <title> builders. scripts/prerender.tsx (the source of truth
+// crawlers and unfurlers read) and src/components/Seo.tsx (which fixes the
+// tab title on client-side navigation, since useEffect never runs during
+// prerender's renderToString) both build titles from these instead of
+// inlining their own template strings, so the two can't drift into different
+// titles for the same route.
+export const HOME_TITLE = `${SITE_NAME} — runtime context for agents using your web app`
+export const BLOG_INDEX_TITLE = `Blog — ${SITE_NAME}`
+export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`
+
 // Escape for use inside an HTML attribute value. Ampersand goes first so the
 // entities introduced by the later replacements are not themselves escaped.
 export const esc = (s: string): string =>

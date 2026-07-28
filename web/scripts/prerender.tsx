@@ -13,7 +13,16 @@ import { StaticRouter } from 'react-router'
 import App from '../src/App'
 import { setServerPostHtml, clearServerPostHtml } from '../src/lib/postHtml'
 import { loadPosts, renderPostHtml } from './lib/posts'
-import { SITE_URL, SITE_NAME, SITE_DESCRIPTION, BLOG_DESCRIPTION, esc } from './lib/site'
+import {
+  SITE_URL,
+  SITE_NAME,
+  SITE_DESCRIPTION,
+  BLOG_DESCRIPTION,
+  HOME_TITLE,
+  BLOG_INDEX_TITLE,
+  postTitle,
+  esc,
+} from './lib/site'
 
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
@@ -173,7 +182,7 @@ async function main() {
     shellPath,
     renderRoute(shell, '/', {
       url: `${SITE_URL}/`,
-      title: `${SITE_NAME} — runtime context for agents using your web app`,
+      title: HOME_TITLE,
       description: SITE_DESCRIPTION,
       image: `${SITE_URL}/og-image.png`,
       imageAlt: DEFAULT_IMAGE_ALT,
@@ -188,7 +197,7 @@ async function main() {
     'blog',
     renderRoute(shell, '/blog', {
       url: `${SITE_URL}/blog`,
-      title: `Blog — ${SITE_NAME}`,
+      title: BLOG_INDEX_TITLE,
       description: BLOG_DESCRIPTION,
       image: `${SITE_URL}/og-image.png`,
       imageAlt: DEFAULT_IMAGE_ALT,
@@ -253,7 +262,7 @@ async function main() {
           `/blog/${fm.slug}`,
           {
             url,
-            title: `${fm.title} — ${SITE_NAME}`,
+            title: postTitle(fm.title),
             description: fm.excerpt,
             image,
             imageAlt,
