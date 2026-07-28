@@ -1,0 +1,64 @@
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1200px; height: 630px; overflow: hidden;
+    background: #faf8f6; position: relative;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .topbar {
+    position: absolute; left: 0; top: 0; width: 1200px; height: 6px;
+    background: #c9456d;
+  }
+  .logo { position: absolute; left: 76px; top: 68px; height: 30px; }
+  .topic {
+    position: absolute; left: 76px; top: 130px; margin: 0;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 20px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #c9456d;
+  }
+  h1 {
+    position: absolute; left: 76px; top: 180px; width: 1048px; margin: 0;
+    font-size: 58px; font-weight: 700; line-height: 1.15;
+    letter-spacing: -0.03em; color: #1a1714;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+  .footer {
+    position: absolute; left: 76px; bottom: 58px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 22px; color: #8a8272;
+  }
+</style>
+<div class="topbar"></div>
+<img class="logo" src="lockup.svg" alt="sightmap">
+<div class="topic" id="topic"></div>
+<h1 id="title"></h1>
+<div class="footer" id="footer"></div>
+<script src="font-guard.js"></script>
+<script>
+  // Values arrive via URL query params (render.mjs builds
+  // file://.../post-card.html?title=...&topic=...). Assigning via
+  // textContent — never innerHTML/string concatenation — is what makes this
+  // safe: the browser escapes the text automatically, so a title containing
+  // quotes, `<`, or `&` is rendered literally and can never break the markup.
+  const params = new URLSearchParams(location.search);
+  document.getElementById('topic').textContent = params.get('topic') || '';
+  document.getElementById('title').textContent = params.get('title') || '';
+  const author = params.get('author') || '';
+  const date = params.get('date') || '';
+  document.getElementById('footer').textContent =
+    author && date ? `${author}  ·  ${date}` : author || date;
+
+  // Every distinct family/weight/size this card actually sets, so load()
+  // verifies real availability rather than just asking whether the network
+  // requests finished.
+  assertFontsLoaded([
+    "700 20px 'JetBrains Mono'",
+    "700 58px 'DM Sans'",
+    "700 22px 'JetBrains Mono'",
+  ]);
+</script>
