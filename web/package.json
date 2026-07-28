@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "tsx scripts/build-blog.ts && vite",
     "build:blog": "tsx scripts/build-blog.ts",
-    "build": "tsx scripts/build-blog.ts && tsc -b && vite build && tsx scripts/prerender.tsx",
+    "build": "tsx scripts/build-blog.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/generate-feeds.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
