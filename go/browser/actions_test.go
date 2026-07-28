@@ -80,13 +80,17 @@ func newFakeCDP(t *testing.T, handler func(method string, params json.RawMessage
 					"result": result,
 				})
 
-				// Fire a loadEventFired event 50 ms after any navigate.
+				// Fire loadEventFired then frameNavigated 50 ms after any navigate.
 				if req.Method == "Page.navigate" {
 					go func() {
 						time.Sleep(50 * time.Millisecond)
 						writeMsg(map[string]interface{}{
 							"method": "Page.loadEventFired",
 							"params": map[string]interface{}{"timestamp": 1.0},
+						})
+						writeMsg(map[string]interface{}{
+							"method": "Page.frameNavigated",
+							"params": map[string]interface{}{"frame": map[string]interface{}{"url": "about:blank"}},
 						})
 					}()
 				}

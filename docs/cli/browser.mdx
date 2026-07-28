@@ -124,7 +124,7 @@ With no session it prints `○ no session`. If a Chrome process for the site's p
 
 ### `browser navigate`
 
-Navigates the session to a URL and waits for the page to load. The URL is a positional argument. After a server-side redirect, `navigate` prints the requested and final URLs.
+Navigates the session to a URL and waits for the page to load. The URL is a positional argument. After a redirect — server-side or client-side (an SPA auth guard bouncing `/login → /`, or `/ → /workspace`) — `navigate` prints the requested and final URLs, so you know where you actually landed.
 
 | Flag | Default | Description |
 |------|---------|-------------|

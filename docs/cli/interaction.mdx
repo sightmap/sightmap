@@ -44,7 +44,7 @@ Property predicates depend on `properties:` extraction. The Go CLI implements `p
 
 ### `browser click`
 
-Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Before dispatching, it scrolls the target to the center of the viewport and verifies that its center is the top-most element there. It **errors** instead of silently doing nothing when the target cannot be positioned in the viewport, or is `covered by another element` (an open overlay or modal). On success it echoes a confirmation with the real post-scroll coordinates, e.g. `clicked CartNavButton @ (674,30)`. (`--x`/`--y` coordinate clicks skip the scroll-and-verify step.)
+Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Before dispatching, it scrolls the target to the center of the viewport and verifies that its center is the top-most element there. It **errors** instead of silently doing nothing when the target cannot be positioned in the viewport, or is `covered by another element` (an open overlay or modal). On success it echoes a confirmation with the real post-scroll coordinates, e.g. `clicked CartNavButton @ (674,30)`. A click may trigger navigation that settles **after** the command returns (client-side SPA routing is asynchronous); `click` does not wait for it. Follow an action that should navigate with an explicit [`wait-for`](#browser-wait-for) on the destination — the same act-then-wait split Playwright and Selenium use. (`--x`/`--y` coordinate clicks skip the scroll-and-verify step.)
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -162,20 +162,25 @@ sightmap browser drag 214 --delta-x 120 --delta-y 0
 
 ### `browser wait-for`
 
-Waits for exactly one condition: `--url`, `--selector`, or `--load`. On success it echoes what it matched to stderr; on timeout it exits `1` with a message like `wait-for: timed out after 10000ms waiting for selector "..."`. Use it after an action that triggers navigation or asynchronous rendering.
+Waits for exactly one condition. It is the explicit step boundary after an action that triggers navigation or asynchronous rendering: act, then `wait-for` the postcondition. On success it echoes what it matched to stderr; on timeout it exits `1` with a message like `wait-for: timed out after 10000ms waiting for selector "..."`.
+
+The semantic conditions are corpus-aware and auto-retry until they hold: `--view` waits until the current URL resolves to a named sightmap view, and `--component` waits until a component query (name plus optional property filters, e.g. `WorkItemRow[key="FALCON-7"]`) matches at least one node on the live page. `--url` (a plain URL substring, not a glob or regex), `--selector`, and `--load` are the raw DOM/URL escape hatches — prefer `--view`/`--component` when the destination is in the corpus, since they absorb dynamic path segments and wait for real rendered content rather than a URL proxy.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | `localhost:7892` | CDP address |
+| `--component` | none | Wait until this component query matches a node (e.g. `WorkItemDetail`) |
 | `--load` | off | Wait for the page load event |
-| `--selector` | none | Wait until a DOM element matching this selector appears |
+| `--selector` | none | Wait until a DOM element matching this CSS selector appears |
 | `--tab` | the lone content tab | Target tab ID |
 | `--timeout-ms` | `10000` | Timeout in milliseconds |
-| `--url` | none | Wait until the page URL contains this pattern |
+| `--url` | none | Wait until the page URL contains this **substring** (a plain substring, not a glob or regex) |
+| `--view` | none | Wait until the page URL resolves to this sightmap view |
 
 ```bash
 sightmap browser click 'CheckoutButton'
-sightmap browser wait-for --url '/checkout' --timeout-ms 15000
+sightmap browser wait-for --view Checkout            # URL resolves to the Checkout view
+sightmap browser wait-for --component 'OrderSummary' # or wait until a component appears
 ```
 
 ---
