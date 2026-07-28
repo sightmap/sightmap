@@ -10,3 +10,13 @@
 .nav-logo {
   height: 20px !important;
 }
+
+/* Hide the "Ask Assistant" entry points. The AI assistant is disabled for this
+   site, but the topbar button is site chrome the dashboard toggle doesn't always
+   remove. If the assistant is ever enabled, delete this rule. Selectors are
+   Mintlify's documented hooks:
+   https://www.mintlify.com/docs/customize/custom-scripts */
+#assistant-entry,
+#assistant-entry-mobile {
+  display: none;
+}
