@@ -21,15 +21,19 @@
   }
   h1 .accent {
     color: #c9456d;
-    border-bottom: 4px solid rgba(201, 69, 109, 0.35);
-    padding-bottom: 4px;
+  }
+  h1 .rule {
+    position: absolute; left: 0; top: 94px;
+    width: 664px; height: 6px;
+    background: rgba(201, 69, 109, 0.35);
   }
   .footer {
     position: absolute; left: 76px; bottom: 58px;
     font-family: 'JetBrains Mono', monospace; font-weight: 700;
     font-size: 26px; color: #8a8272;
   }
-  .footer .site { color: #1a1714; }
+  .footer .label { font-family: 'DM Sans', system-ui, sans-serif; }
+  .footer .site { color: #2a2518; }
   .chip {
     box-sizing: border-box;
     position: absolute; right: 70px; bottom: 55px;
@@ -43,8 +47,8 @@
 </style>
 <div class="topbar"></div>
 <img class="logo" src="lockup.svg" alt="sightmap">
-<h1><span class="accent">Runtime context</span><br>for agents using your<br>web app.</h1>
-<div class="footer">Open YAML spec + CLI · <span class="site">sightmap.org</span></div>
+<h1><span class="accent">Runtime context</span><div class="rule"></div><br>for agents using your<br>web app.</h1>
+<div class="footer"><span class="label">Open YAML spec + CLI</span> · <span class="site">sightmap.org</span></div>
 <div class="chip"><span class="c-com"># .sightmap/home.yaml</span>
 <span class="c-key">views:</span>
 <span class="c-text">  - </span><span class="c-key">name</span><span class="c-text">: </span><span class="c-str">FlightSearch</span>
