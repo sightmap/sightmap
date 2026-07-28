@@ -72,7 +72,8 @@ export default function SkillVsSightmap() {
       </div>
 
       <p className="smap-svs__foot">
-        Rough token counts from the burrito demo corpus: the full map versus a single view.
+        What the agent carries each turn, measured on our demo app: the whole rule library versus
+        one view.
       </p>
     </figure>
   )
