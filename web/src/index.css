@@ -31,6 +31,7 @@
   --code-accent: #e87da0;
   --code-border: #2a2a40;
   --code-header-bg: rgba(255, 255, 255, 0.04);
+  --code-caption: #9aa3b2;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1160,11 +1161,16 @@ footer {
   text-align: center;
 }
 
+/* Stacked and centred at every width, not just on mobile. This was
+   `space-between` with `flex-wrap`, intending attribution-left /
+   links-right — but `.container` caps at 860px and the two blocks are wider
+   than that together, so the row always wrapped. A lone flex item on a
+   wrapped `space-between` line sits at the start, which left the
+   attribution stranded left under centred links. */
 .footer-inner {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
   gap: 1rem;
 }
 
@@ -1217,4 +1223,746 @@ footer {
   .hero { padding-top: 7rem; }
   section { padding: 3.5rem 0; }
   .nav-links a:not(.nav-gh) { display: none; }
+}
+
+/* ---- BLOG ---- */
+.prose {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.prose h1,
+.prose h3 {
+  color: var(--text-bright);
+  font-family: var(--sans);
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+}
+
+.prose h2 {
+  color: var(--text-bright);
+  font-family: var(--sans);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+}
+
+.prose h1 {
+  font-size: 2rem;
+}
+
+.prose h2 {
+  font-size: 1.2rem;
+}
+
+.prose h3 {
+  font-size: 1.25rem;
+}
+
+.prose p {
+  margin-bottom: 1.25em;
+  overflow-wrap: break-word;
+}
+
+.prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  /* Post prose can contain bare long URLs (schema/SKILL.md links, etc.) with
+     no natural break points. `anywhere` (not `break-word`) so the browser
+     also counts the break when measuring min-content width, which keeps a
+     long link from forcing the whole prose column wider on narrow
+     viewports instead of just wrapping in place. Not `word-break: break-all`
+     — that breaks ordinary words mid-syllable too; `overflow-wrap` only
+     breaks when a token would otherwise overflow. `.prose pre`, `.blog-code*`,
+     `.smap-widget__tree`, and `.smap-svs*` keep their own `white-space: pre`
+     + `overflow-x: auto` scrolling untouched by this — `overflow-wrap` never
+     introduces a break inside `white-space: pre` content. */
+  overflow-wrap: anywhere;
+}
+
+.prose a:hover {
+  color: var(--text-bright);
+}
+
+.prose strong {
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.prose ul,
+.prose ol {
+  margin-bottom: 1.25em;
+  padding-left: 1.5em;
+}
+
+.prose li {
+  margin-bottom: 0.5em;
+  overflow-wrap: break-word;
+}
+
+.prose ul li {
+  list-style-type: disc;
+}
+
+.prose ol li {
+  list-style-type: decimal;
+}
+
+.prose code {
+  font-family: var(--mono);
+  background: var(--bg-code);
+  color: var(--code-text);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.875em;
+}
+
+.prose pre {
+  background: var(--bg-code);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  padding: 1.25em;
+  overflow-x: auto;
+  margin-bottom: 1.5em;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.875em;
+}
+
+/* Fenced code blocks (see CodeBlock.tsx). widgets.tsx swaps every
+   <pre><code> from a markdown fence for this component, both during server
+   prerendering and in the browser, so `.prose pre`/`.prose pre code` above
+   are now only a fallback for a bare <pre> with no <code> child. Named
+   `.blog-code*` (not `.code-block*`) because `.code-block`/`.code-header`
+   already exist as the static hand-authored demo panels on the homepage
+   (Hero/AgentSection/CTASection/SpecSection) — reusing that name would bleed
+   styles between the two. Always dark regardless of page theme, like
+   `.smap-widget__tree` and `.smap-svs`, so this uses --bg-code/--code-*
+   rather than the light-theme tokens used elsewhere in .prose. Unscoped from
+   `.prose` (not `.prose .blog-code`) so the same rules also style the
+   expanded overlay, which portals onto <body>, outside `.prose`. */
+.blog-code {
+  background: var(--bg-code);
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 0 0 1.5em;
+}
+
+.blog-code__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0.5rem 0.4rem 1rem;
+  background: var(--code-header-bg);
+  border-bottom: 1px solid var(--code-border);
+}
+
+.blog-code__lang {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.blog-code__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.blog-code__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.blog-code__btn:hover {
+  color: var(--text-bright);
+  background: color-mix(in srgb, var(--text-bright) 12%, transparent);
+}
+
+.blog-code__btn:focus-visible {
+  outline: 2px solid var(--code-accent);
+  outline-offset: 1px;
+}
+
+.blog-code__btn.is-copied {
+  color: var(--code-accent);
+}
+
+.blog-code__btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.blog-code__body {
+  overflow: hidden;
+}
+
+/* Defensive reset: react-syntax-highlighter sets these inline, but ensure
+   the generated <pre> never inherits `.prose pre`'s border/radius/margin. */
+.blog-code pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+/* Expand lightbox */
+.blog-code-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.blog-code-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-code) 80%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.blog-code-overlay__panel {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
+  max-height: 85vh;
+  margin: 0;
+  overflow: auto;
+  box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.55);
+}
+
+.blog-code-overlay__panel .blog-code__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.prose blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 1.5em 0 1.5em 1.5em;
+  margin: 2em 0;
+  color: var(--text-bright);
+  font-style: normal;
+  font-family: var(--sans);
+  font-size: 1.8rem;
+  line-height: 1.4;
+}
+
+.prose blockquote p {
+  margin-bottom: 0;
+}
+
+.prose img {
+  border-radius: 8px;
+  margin: 2em 0;
+  max-width: 100%;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* Images break out of the content gutter on desktop */
+@media (min-width: 768px) {
+  .prose img {
+    margin-left: -3rem;
+    margin-right: -3rem;
+    max-width: calc(100% + 6rem);
+    width: calc(100% + 6rem);
+  }
+
+  /* Wider breakout for the first image only. No max-height/crop here: prose
+     images (e.g. a wide screenshot) must never be cropped — only the gutter
+     is wider for it. */
+  .prose img:first-of-type {
+    margin-left: -6rem;
+    margin-right: -6rem;
+    max-width: calc(100% + 12rem);
+    width: calc(100% + 12rem);
+    border-radius: 12px;
+  }
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
+}
+
+/* Sightmap snapshot widget: toggle between the raw a11y tree a browser tool
+   sees and the same tree once a sightmap has named everything in it. */
+.prose .smap-widget {
+  margin: 2rem 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-subtle);
+}
+
+.prose .smap-widget__controls {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 0.85rem;
+  border-radius: 10px;
+  background: var(--border);
+  border: 1px solid var(--border);
+}
+
+.prose .smap-widget__btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 0.4rem 0.7rem;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: var(--mono);
+  line-height: 1.2;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.prose .smap-widget__btn:hover {
+  color: var(--text);
+}
+
+.prose .smap-widget__btn.is-active {
+  background: var(--bg-raised);
+  color: var(--text-bright);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.prose .smap-widget__btn-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.prose .smap-widget__btn-tok {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+}
+
+.prose .smap-widget__tree {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.prose .smap-widget__tree pre {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  overflow: visible;
+}
+
+.prose .smap-widget__tree code {
+  display: block;
+  background: none;
+  padding: 0;
+  color: var(--code-text);
+  white-space: pre;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.prose .smap-widget__guide {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent-dim);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-raised));
+}
+
+.prose .smap-widget__guide-label {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--accent);
+  margin-bottom: 0.4rem;
+}
+
+.prose .smap-widget__guide ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.prose .smap-widget__guide li + li {
+  margin-top: 0.35rem;
+}
+
+.prose .smap-widget figcaption {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+/* Skill vs. sightmap diagram (see SkillVsSightmap.tsx). Two labeled panels:
+   a skill dumping the whole rule library vs a sightmap disclosing one
+   component. Always dark, like Sightmap's own code blocks, regardless of
+   the page theme — so this uses --bg-code and the --code-* tokens rather
+   than the light-theme text/bg tokens used elsewhere in .prose. */
+.prose .smap-svs {
+  margin: 2rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--code-border);
+  border-radius: 12px;
+  background: var(--bg-code);
+}
+
+.prose .smap-svs__title {
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin-bottom: 1.1rem;
+}
+.prose .smap-svs__title-dim {
+  color: var(--code-com);
+}
+.prose .smap-svs__title-vs {
+  color: var(--code-text);
+}
+.prose .smap-svs__title-hi {
+  color: var(--code-accent);
+}
+
+.prose .smap-svs__panels {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 0.85rem;
+}
+
+.prose .smap-svs__panel {
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-code) 85%, white);
+  display: flex;
+  flex-direction: column;
+}
+
+.prose .smap-svs__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.prose .smap-svs__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--code-text);
+}
+.prose .smap-svs__count {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--code-accent);
+  white-space: nowrap;
+}
+
+.prose .smap-svs__screen {
+  flex: 1;
+  padding: 0.65rem;
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  background: var(--bg-code);
+  font-family: var(--mono);
+}
+.prose .smap-svs__screen-tab {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--code-com);
+  margin-bottom: 0.55rem;
+}
+
+.prose .smap-svs__wall {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prose .smap-svs__wall-line {
+  height: 6px;
+  border-radius: 2px;
+  background: var(--code-com);
+  opacity: 0.32;
+}
+.prose .smap-svs__wall-line:nth-child(3n) {
+  opacity: 0.2;
+}
+
+.prose .smap-svs__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 0.7rem;
+}
+.prose .smap-svs__chip {
+  font-size: 0.6rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--code-accent);
+  border: 1px solid color-mix(in srgb, var(--code-accent) 45%, transparent);
+  background: color-mix(in srgb, var(--code-accent) 12%, transparent);
+}
+
+.prose .smap-svs__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.prose .smap-svs__row {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid var(--code-border);
+  background: color-mix(in srgb, var(--bg-code) 78%, white);
+  font-size: 0.68rem;
+  color: var(--code-text);
+}
+.prose .smap-svs__row--hi {
+  color: var(--code-accent);
+  font-weight: 600;
+  border-color: var(--code-accent);
+  background: color-mix(in srgb, var(--code-accent) 14%, transparent);
+  animation: smap-svs-hi 4s ease-in-out infinite;
+}
+@keyframes smap-svs-hi {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 16px 1px color-mix(in srgb, var(--code-accent) 45%, transparent);
+  }
+}
+
+.prose .smap-svs__arrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--code-accent);
+}
+.prose .smap-svs__arrow-label {
+  font-size: 0.56rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--code-com);
+  white-space: nowrap;
+}
+.prose .smap-svs__arrow-svg {
+  width: 46px;
+  height: 16px;
+}
+
+.prose .smap-svs__cap {
+  margin: 0.7rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--code-caption);
+}
+
+.prose .smap-svs__foot {
+  margin: 0.9rem 0 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--code-border);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--code-caption);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .prose .smap-svs__panels {
+    grid-template-columns: 1fr;
+  }
+  .prose .smap-svs__arrow {
+    flex-direction: row;
+  }
+  .prose .smap-svs__arrow-svg {
+    transform: rotate(90deg);
+  }
+}
+
+/* ---- BLOG INDEX ---- */
+.blog-index {
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+}
+
+.blog-index__header {
+  margin-bottom: 3rem;
+}
+
+.blog-index__empty {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.blog-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.blog-card {
+  display: block;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.blog-card:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 2px 16px rgba(201, 69, 109, 0.08);
+}
+
+.blog-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  margin-bottom: 0.6rem;
+}
+
+.blog-card__meta time {
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.blog-card__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.4rem;
+}
+
+.blog-card__excerpt {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+/* ---- BLOG POST ---- */
+.blog-post {
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+}
+
+.blog-post__back {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-decoration: none;
+  margin-bottom: 2rem;
+}
+
+.blog-post__back:hover { color: var(--text-bright); }
+
+.blog-post__header {
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.blog-post__byline {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.blog-post__draft-banner {
+  position: fixed;
+  top: 56px; /* nav's height (see `nav { height: 56px }` above) — sit below it, not on top of it */
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 0.5rem 1rem;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+}
+
+/* ---- NOT FOUND ---- */
+.not-found {
+  min-height: calc(100vh - 56px); /* 56px: nav's fixed height, see `nav { height: 56px }` above */
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+  display: flex;
+  align-items: center;
+}
+
+.not-found .container {
+  text-align: center;
+}
+
+.not-found .section-desc {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.not-found__actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
 }
