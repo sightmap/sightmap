@@ -1161,11 +1161,16 @@ footer {
   text-align: center;
 }
 
+/* Stacked and centred at every width, not just on mobile. This was
+   `space-between` with `flex-wrap`, intending attribution-left /
+   links-right — but `.container` caps at 860px and the two blocks are wider
+   than that together, so the row always wrapped. A lone flex item on a
+   wrapped `space-between` line sits at the start, which left the
+   attribution stranded left under centred links. */
 .footer-inner {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
   gap: 1rem;
 }
 
