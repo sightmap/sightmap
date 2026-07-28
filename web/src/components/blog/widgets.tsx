@@ -5,12 +5,14 @@ import SkillVsSightmap from './SkillVsSightmap'
 // Interactive figures are authored in markdown as
 //
 //   <div data-widget="sightmap-snapshot" data-figure="checkout">
-//     ...static fallback markup...
+//     ...anything here is ignored...
 //   </div>
 //
-// `marked` passes that through untouched, so the fallback is what the
-// prerender and any non-JS reader sees. Here the marker is swapped for the
-// live component.
+// `marked` passes that div through untouched. `replace` below then swaps the
+// whole node for the live component, both during server prerendering
+// (renderToString) and in the browser, so crawlers and non-JS readers get
+// the real component output. Any children authored inside a marker are
+// discarded and never render anywhere.
 const WIDGETS: Record<string, (attribs: Record<string, string>) => React.ReactElement> = {
   'sightmap-snapshot': (a) => <SightmapSnapshot figure={a['data-figure']} />,
   'skill-vs-sightmap': () => <SkillVsSightmap />,
