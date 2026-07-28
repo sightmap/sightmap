@@ -87,7 +87,9 @@ probe ID from snapshot output **or** a component query (see below):
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |
-| `sightmap browser wait-for --selector "[data-loaded]"` | Wait for element |
+| `sightmap browser wait-for --view <Name>` | Wait until the URL resolves to a sightmap view (the step boundary after a navigating action) |
+| `sightmap browser wait-for --component '<Query>'` | Wait until a component query matches a node |
+| `sightmap browser wait-for --selector "[data-loaded]"` | Wait until a CSS selector matches (also `--url SUBSTRING` (plain substring, not glob), `--load`) |
 | `sightmap browser tabs list` | List open tabs |
 
 ### Component queries (CSS-shaped, over sightmap components + extracted properties)
@@ -153,6 +155,14 @@ sightmap browser fill --clear 'SearchInput' 'burrito'
 **`browser click` scrolls the target into view and refuses off-screen / covered clicks.**
 `click` scrolls the element to the center of the viewport, then verifies its center is actually the top-most element there before dispatching. It **errors** (rather than silently no-op'ing) when the target can't be positioned in the viewport, or is `covered by another element` — the signal of an open overlay/modal or a target you need to reveal first. The confirmation line reports the real post-scroll coordinates it clicked.
 
+**After an action that should navigate, wait for the destination — don't snapshot immediately.**
+SPA (client-side) navigation lands *after* `click` returns, so a snapshot taken right away shows the old page. `click` deliberately does not guess or wait; make the wait an explicit step, the way Playwright/Selenium do:
+```
+sightmap browser click 'WorkItemRow[key="FALCON-7"]'
+sightmap browser wait-for --view WorkItemDetail      # or --component 'WorkItemDetail', or --url '/browse/'
+```
+`wait-for` auto-retries until the postcondition holds or it times out (loudly). Record per-app async quirks (which actions navigate, slow routes) in the relevant view/component `memory` so the next agent knows to wait.
+
 **`browser eval` cannot return DOM elements.**
 Only JSON-serializable values are returned. `document.querySelector(...)` returns an error reference. Extract what you need instead: `document.querySelector("sel")?.textContent`.
 
@@ -163,4 +173,4 @@ Only JSON-serializable values are returned. `document.querySelector(...)` return
 Page commands auto-pick the lone content tab but error (listing tabs) when zero or several are open. `browser start` prints your tab ID; thread it through as `--tab <ID>`.
 
 **`browser navigate` prints the final URL.**
-After a server-side redirect, `navigate` prints `(redirected to FINAL)` so you know where you actually landed.
+After a redirect — server-side *or* client-side (an SPA auth guard bouncing `/login → /`, or `/ → /workspace`) — `navigate` prints `(redirected to FINAL)` so you know where you actually landed, not just the URL you asked for.

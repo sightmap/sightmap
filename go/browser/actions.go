@@ -59,6 +59,72 @@ func NavigateAndWait(ctx context.Context, conn *CDPConn, url string) error {
 	}
 }
 
+// AwaitNavigation waits up to maxWait for the page to navigate — either a full
+// document navigation (Page.frameNavigated) or a same-document SPA navigation
+// via history.pushState/replaceState (Page.navigatedWithinDocument). It returns
+// the settled final URL and true once a navigation is observed, or ("", false)
+// if none happens within maxWait. After the first navigation it waits a short
+// grace for chained redirects (e.g. /login → / → /workspace) to settle, so the
+// returned URL is the final destination rather than an intermediate hop.
+//
+// This surfaces async navigation that a click or a client-side redirect triggers
+// AFTER the initial load event has already fired — the signal an agent needs to
+// know an action actually moved the page. Callers should compare the result
+// against the pre-action URL and only report a move when it actually changed.
+func AwaitNavigation(ctx context.Context, conn *CDPConn, maxWait time.Duration) (string, bool) {
+	if err := conn.EnableDomain(ctx, "Page"); err != nil {
+		return "", false
+	}
+	frameCh := conn.Subscribe("Page.frameNavigated")
+	defer conn.Unsubscribe("Page.frameNavigated", frameCh)
+	docCh := conn.Subscribe("Page.navigatedWithinDocument")
+	defer conn.Unsubscribe("Page.navigatedWithinDocument", docCh)
+
+	const grace = 400 * time.Millisecond
+	overall := time.NewTimer(maxWait)
+	defer overall.Stop()
+	var graceTimer *time.Timer
+	var graceCh <-chan time.Time // nil until the first navigation; a nil channel never selects
+	navigated := false
+
+	for {
+		select {
+		case <-frameCh:
+			navigated = true
+		case <-docCh:
+			navigated = true
+		case <-graceCh:
+			url, _ := GetURL(ctx, conn)
+			return url, true
+		case <-overall.C:
+			if navigated {
+				url, _ := GetURL(ctx, conn)
+				return url, true
+			}
+			return "", false
+		case <-ctx.Done():
+			return "", false
+		case <-conn.done:
+			return "", false
+		}
+		// A navigation was seen; (re)arm the grace timer to absorb chained
+		// redirects, and return once navigations go quiet for `grace`.
+		if graceTimer == nil {
+			graceTimer = time.NewTimer(grace)
+			defer graceTimer.Stop()
+		} else {
+			if !graceTimer.Stop() {
+				select {
+				case <-graceTimer.C:
+				default:
+				}
+			}
+			graceTimer.Reset(grace)
+		}
+		graceCh = graceTimer.C
+	}
+}
+
 // GetURL returns the current page URL.
 // Uses Target.getTargetInfo — the result has a targetInfo.url field.
 func GetURL(ctx context.Context, conn *CDPConn) (string, error) {
@@ -533,6 +599,7 @@ func locateForClick(ctx context.Context, conn *CDPConn, id string) (clickTarget,
 // loudly when the target cannot be positioned in the viewport or is covered by
 // another element, instead of silently dispatching a click into empty space (the
 // off-screen no-op). A node with no data-sightmap-id and no bounds falls back to
+// A node with no data-sightmap-id and no bounds falls back to
 // a selector-based JS click() and returns (-1, -1).
 func Click(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) (int, int, error) {
 	if node.Id != "" {
