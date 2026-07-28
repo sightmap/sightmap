@@ -5,7 +5,6 @@ topic: 'research'
 date: '2026-07-29'
 author: 'Clint Ayres'
 slug: 'sightmap'
-draft: true
 image: '/blog/og/sightmap.png'
 ---
 
