@@ -1,9 +1,10 @@
 version: 1
 
 memory:
-  - sightmap.org is a single-page landing site for the open-source sightmap spec
-  - Password gate uses 'argus' — stored in PasswordGate component; gates entry to the whole site
-  - All sections live in src/components/ and compose into src/pages/Home.tsx
+  - sightmap.org is the landing site for the open-source sightmap spec, plus a blog at /blog
+  - All homepage sections live in src/components/ and compose into src/pages/Home.tsx
+  - Posts are markdown in content/blog/; scripts/build-blog.ts generates the manifest and per-post HTML modules
+  - Pages are statically prerendered by scripts/prerender.tsx; the client hydrates rather than mounting fresh
 
 views:
   - name: HomePage
@@ -90,6 +91,49 @@ views:
           - name: gs-ctas
             selector: ".gs-ctas"
 
+  - name: BlogIndex
+    route: /blog
+    description: Reverse-chronological list of published posts
+    source: src/pages/BlogIndex.tsx
+    memory:
+      - Drafts are filtered out here; reach one directly at /blog/<slug>?preview=true
+    components:
+      - name: BlogCard
+        selector: '[data-component="BlogCard"]'
+        source: src/components/BlogCard.tsx
+        description: One post summary — topic, date, title, excerpt
+        children:
+          - name: blog-card-title
+            selector: '.blog-card__title'
+          - name: blog-card-excerpt
+            selector: '.blog-card__excerpt'
+
+  - name: BlogPost
+    route: /blog/:slug
+    description: A single post — header, article body, and any embedded figures
+    source: src/pages/BlogPost.tsx
+    memory:
+      - Body HTML is inlined by the prerender into a script#__SIGHTMAP_POST__ tag and read synchronously on first render, so hydration matches
+      - Interactive figures are authored as <div data-widget="..."> in the markdown and swapped by src/components/blog/widgets.tsx
+      - "Draft posts render a fixed banner (top: 56px, below the nav) and redirect to /blog without ?preview=true"
+      - The prerender skips drafts entirely, so a draft post has no page in dist/
+    components:
+      - name: SightmapSnapshot
+        selector: '.smap-widget'
+        source: src/components/blog/SightmapSnapshot.tsx
+        description: Toggles one accessibility tree between raw and sightmap-enriched
+        memory:
+          - The checkout figure defaults to raw; the datepicker figure defaults to sightmap
+        children:
+          - name: smap-widget-controls
+            selector: '.smap-widget__controls'
+          - name: smap-widget-guide
+            selector: '.smap-widget__guide'
+      - name: SkillVsSightmap
+        selector: '.smap-svs'
+        source: src/components/blog/SkillVsSightmap.tsx
+        description: Static SVG contrasting skill-dump context with contextual disclosure
+
 components:
   - name: Navigation
     selector: '[data-component="Navigation"]'
@@ -102,15 +146,6 @@ components:
         selector: ".nav-links"
       - name: nav-gh
         selector: ".nav-gh"
-
-  - name: PasswordGate
-    selector: '[data-component="PasswordGate"]'
-    source: src/components/PasswordGate.tsx
-    description: Full-page password gate rendered before the rest of the site
-    memory:
-      - Password is `argus`
-      - Stored in localStorage after successful submit; does not re-prompt on reload
-      - Gates the entire app — nothing else renders until this clears
 
   - name: Footer
     selector: '[data-component="Footer"]'
