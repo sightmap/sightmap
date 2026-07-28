@@ -1,5 +1,5 @@
 import { existsSync } from 'fs'
-import { resolve } from 'path'
+import { resolve, sep } from 'path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -28,7 +28,22 @@ function prerenderedRouteRedirect(distDir: string): Plugin {
           next()
           return
         }
-        if (existsSync(resolve(distDir, `.${pathname}/index.html`))) {
+        // `pathname` comes straight off the request line and can contain
+        // "..". Resolve it against distDir first, then require the result to
+        // stay inside distDir before touching the filesystem — comparing
+        // against `distDir + sep` (not a bare startsWith(distDir)) so a
+        // sibling directory that merely shares distDir as a string prefix
+        // (e.g. "distXYZ") can't pass. Without this, a request like
+        // `/../../../etc/passwd` clears both guards above (no trailing
+        // slash, no dot in the last segment) and existsSync becomes a
+        // file-existence oracle for the whole filesystem. Preview-only,
+        // never ships in dist/, but there is no reason to leave it open.
+        const candidate = resolve(distDir, `.${pathname}`, 'index.html')
+        if (!candidate.startsWith(distDir + sep)) {
+          next()
+          return
+        }
+        if (existsSync(candidate)) {
           res.statusCode = 301
           res.setHeader('Location', `${pathname}/${search ? `?${search}` : ''}`)
           res.end()
