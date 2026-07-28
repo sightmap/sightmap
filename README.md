@@ -1,4 +1,4 @@
-<img width="400" alt="LOCKUP - HORZ - TRANSPARENT - BW" src="https://github.com/user-attachments/assets/13211f04-9608-4721-b660-3444a153eaaf" />
+# Sightmap
 
 Sightmap is an open YAML format and CLI that maintain a shared memory of a web
 app for AI agents. A `.sightmap/` directory in your repo names the app's
