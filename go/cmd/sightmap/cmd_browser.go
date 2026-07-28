@@ -373,14 +373,21 @@ func runNavigate(args []string) error {
 	}
 	defer conn.Close()
 
-	if err := browser.NavigateAndWait(context.Background(), conn, url); err != nil {
+	ctx := context.Background()
+	if err := browser.NavigateAndWait(ctx, conn, url); err != nil {
 		return err
 	}
-	// Print the FINAL url after any server-side redirects, not the one we asked
-	// for — e.g. HD silently redirects some category URLs to a different
-	// category, and a caller needs to know where it actually landed.
-	finalURL, urlErr := browser.GetURL(context.Background(), conn)
-	if urlErr == nil && finalURL != "" && finalURL != url {
+	// The URL right after load reflects server-side (HTTP) redirects — e.g. HD
+	// silently redirects some category URLs, and a caller needs to know where it
+	// actually landed.
+	finalURL, _ := browser.GetURL(ctx, conn)
+	// A client-side (SPA) redirect fires AFTER the load event (an auth guard
+	// bouncing /login → /, or / → /last-workspace). GetURL alone misses it; wait
+	// briefly for a follow-up navigation so we report the real destination.
+	if clientURL, moved := browser.AwaitNavigation(ctx, conn, 2*time.Second); moved && clientURL != "" {
+		finalURL = clientURL
+	}
+	if finalURL != "" && finalURL != url {
 		fmt.Fprintf(os.Stderr, "navigated to %s\n  (redirected to %s)\n", url, finalURL)
 	} else {
 		fmt.Fprintf(os.Stderr, "navigated to %s\n", url)

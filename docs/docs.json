@@ -12,7 +12,10 @@
     "dark": "/images/logo-dark.svg",
     "href": "https://sightmap.org"
   },
-  "favicon": "/favicon.svg",
+  "favicon": {
+    "light": "/favicon.png",
+    "dark": "/favicon-dark.png"
+  },
   "fonts": {
     "family": "DM Sans"
   },

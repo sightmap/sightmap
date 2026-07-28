@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
+	"github.com/sightmap/sightmap/go/compquery"
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // ── Component ID resolution ───────────────────────────────────────────────────
@@ -120,6 +122,10 @@ func runClick(args []string) error {
 	} else {
 		fmt.Fprintf(os.Stderr, "clicked %s\n", fs.Arg(0))
 	}
+	// A click may trigger async (SPA) navigation that only settles after this
+	// returns. We deliberately do NOT wait here — waiting is the caller's explicit
+	// step: follow an action that should navigate with `wait-for --view/--component`
+	// (or --url), matching how Playwright/Selenium separate the act from the wait.
 	return nil
 }
 
@@ -314,8 +320,10 @@ func runWaitFor(args []string) error {
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
-	urlPattern := fs.String("url", "", "Wait until the page URL contains this pattern")
-	selector := fs.String("selector", "", "Wait until a DOM element matching this selector appears")
+	urlPattern := fs.String("url", "", "Wait until the page URL contains this substring (not a glob/regex; prefer --view)")
+	selector := fs.String("selector", "", "Wait until a DOM element matching this CSS selector appears")
+	viewName := fs.String("view", "", "Wait until the page URL resolves to this sightmap view")
+	component := fs.String("component", "", "Wait until this component query matches a node (e.g. 'WorkItemDetail')")
 	loadFlag := fs.Bool("load", false, "Wait for the page load event")
 	timeoutMs := fs.Int("timeout-ms", 10000, "Timeout in milliseconds (default 10 000)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
@@ -323,17 +331,13 @@ func runWaitFor(args []string) error {
 	}
 
 	n := 0
-	if *urlPattern != "" {
-		n++
-	}
-	if *selector != "" {
-		n++
-	}
-	if *loadFlag {
-		n++
+	for _, set := range []bool{*urlPattern != "", *selector != "", *viewName != "", *component != "", *loadFlag} {
+		if set {
+			n++
+		}
 	}
 	if n != 1 {
-		return fmt.Errorf("usage: browser wait-for (--url PATTERN | --selector SEL | --load)")
+		return fmt.Errorf("usage: browser wait-for (--url PATTERN | --selector SEL | --view NAME | --component QUERY | --load)")
 	}
 
 	ctx, cancel := context.WithTimeout(
@@ -359,6 +363,14 @@ func runWaitFor(args []string) error {
 		what = fmt.Sprintf("selector %q", *selector)
 		done = fmt.Sprintf("matched selector %q", *selector)
 		waitErr = browser.WaitForSelector(ctx, conn, *selector)
+	case *viewName != "":
+		what = fmt.Sprintf("view %q", *viewName)
+		done = fmt.Sprintf("view %q now matches the page URL", *viewName)
+		waitErr = waitForView(ctx, conn, *sightmapDirFlag, *viewName)
+	case *component != "":
+		what = fmt.Sprintf("component query %q", *component)
+		done = fmt.Sprintf("component query %q now matches", *component)
+		waitErr = waitForComponent(ctx, conn, *sightmapDirFlag, *component)
 	default:
 		what = "page load"
 		done = "page load complete"
@@ -372,6 +384,50 @@ func runWaitFor(args []string) error {
 	}
 	fmt.Fprintln(os.Stderr, done)
 	return nil
+}
+
+// waitForView polls until the current page URL resolves to the view named
+// viewName in the corpus at sightmapDir, or ctx expires. The corpus is loaded
+// once up front (view routes don't change mid-wait); only the URL is re-read.
+func waitForView(ctx context.Context, conn *browser.CDPConn, sightmapDir, viewName string) error {
+	corpus, err := sightmap.Load(sightmapDir)
+	if err != nil {
+		return fmt.Errorf("wait-for --view: load corpus: %w", err)
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		url, _ := browser.GetURL(ctx, conn)
+		if v := corpus.ViewForURL(url); v != nil && v.Name == viewName {
+			return nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// waitForComponent polls until the component query matches at least one node on
+// the live page, or ctx expires. The query syntax is validated up front so a
+// typo fails immediately instead of silently timing out. Each poll re-extracts
+// the live tree (so property-filtered queries like `Row[state="Done"]` are
+// honored), which is the same resolve path a `click 'Query'` uses.
+func waitForComponent(ctx context.Context, conn *browser.CDPConn, sightmapDir, query string) error {
+	if _, err := compquery.ParseQuery(query); err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if node, err := resolveComponentQuery(ctx, conn, sightmapDir, query); err == nil && node != nil {
+			return nil
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
 }
 
 // ── dialog ────────────────────────────────────────────────────────────────────

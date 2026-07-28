@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "og": "node og/render.mjs",
     "og:card": "tsx scripts/og/generate-og-card.ts"
   },
   "dependencies": {

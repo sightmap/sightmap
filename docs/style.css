@@ -1,0 +1,12 @@
+/* Brand lockup sizing.
+
+   Mintlify sizes the navbar logo by height and lets width follow (h-7 = 28px on
+   desktop, h-[26px] compact). The lockup's aspect is 6.05:1, so 28px renders it
+   ~170px wide — too heavy for the ~120px nav field. 20px yields ~121px, matching
+   the homepage nav at sightmap.org.
+
+   !important is needed because Tailwind's h-7 / h-[26px] utilities are also
+   single-class selectors, so specificity alone would not win. */
+.nav-logo {
+  height: 20px !important;
+}
