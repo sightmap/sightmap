@@ -135,9 +135,9 @@ describe('renderMeta', () => {
 
   // Deploy-preview regression: a preview build resolves `ogUrl`/`ogImage`
   // from DEPLOY_PRIME_URL while `url`/`image` stay pinned to SITE_URL (see
-  // scripts/prerender.tsx). Canonical and twitter:image must not follow
-  // og:url/og:image onto the preview host.
-  it('lets og:url and og:image diverge from canonical/twitter when ogUrl/ogImage differ from url/image', () => {
+  // scripts/prerender.tsx). Canonical must not follow og:url/og:image onto the
+  // preview host; the two card-image tags must.
+  it('sends both card images to the deploy host while canonical stays on production', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/blog/x',
       ogUrl: 'https://deploy-preview-1--sightmap.netlify.app/blog/x',
@@ -156,7 +156,15 @@ describe('renderMeta', () => {
     expect(out).toContain(
       'property="og:image" content="https://deploy-preview-1--sightmap.netlify.app/blog/og/x.png"'
     )
+    // twitter:image tracks og:image, not canonical. A card image is an asset
+    // the unfurling client fetches, so both tags must name a host that can
+    // actually serve it — otherwise the same page unfurls differently
+    // depending on which tag the client reads, and a preview-only card is
+    // invisible to anything reading twitter:image.
     expect(out).toContain(
+      'name="twitter:image" content="https://deploy-preview-1--sightmap.netlify.app/blog/og/x.png"'
+    )
+    expect(out).not.toContain(
       'name="twitter:image" content="https://sightmap.org/blog/og/x.png"'
     )
   })
