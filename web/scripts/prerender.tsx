@@ -49,11 +49,15 @@ export interface PageMeta {
   ogUrl: string
   title: string
   description: string
-  // twitter:image (and, for posts, JSON-LD image) — always SITE_URL-based,
-  // paired with the canonical `url` above.
+  // JSON-LD image — always SITE_URL-based, paired with the canonical `url`
+  // above. Structured data describes the page's canonical identity, so it
+  // should not shift to whatever host happens to be serving a preview.
   image: string
-  // og:image. DEPLOY_URL-based for the same reason as ogUrl: a preview-only
-  // image should be advertised at a host that can actually serve it.
+  // og:image AND twitter:image. DEPLOY_URL-based for the same reason as
+  // ogUrl: a card image is an asset the unfurling client has to fetch, so it
+  // must be advertised at a host that can actually serve it. On a preview
+  // that is the preview host, which is the only way a preview-only card can
+  // be seen at all.
   ogImage: string
   // Alt text for og:image / twitter:image. These describe the *image*, not
   // the page, so they get their own field rather than reusing title.
@@ -115,7 +119,7 @@ export function renderMeta(shell: string, meta: PageMeta): string {
     )
     .replace(
       /<meta\s+name="twitter:image"[\s\S]*?>/,
-      `<meta name="twitter:image" content="${meta.image}">`
+      `<meta name="twitter:image" content="${meta.ogImage}">`
     )
     .replace(
       /<meta\s+name="twitter:image:alt"[\s\S]*?>/,
