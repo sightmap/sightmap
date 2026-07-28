@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-// Toggle widget for the sightmaps post: the same accessibility tree, shown
+// Toggle widget for the sightmap post: the same accessibility tree, shown
 // once as a browser-automation tool would see it raw, and once after a
 // sightmap has named everything in it. Same DOM, same pixels: only the
 // labels and the attached memory change.

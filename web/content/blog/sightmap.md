@@ -4,9 +4,9 @@ excerpt: 'A sightmap gives every view, component, and API request in your app a 
 topic: 'research'
 date: '2026-07-29'
 author: 'Clint Ayres'
-slug: 'sightmaps'
+slug: 'sightmap'
 draft: true
-image: '/blog/og/sightmaps.png'
+image: '/blog/og/sightmap.png'
 ---
 
 Today we're open-sourcing [Sightmap](https://github.com/sightmap/sightmap) (yes, *sight*map, not sitemap), a runtime map that annotates your app for the agents operating it: every view, component, and API request gets a semantic name and a memory of how it behaves.
