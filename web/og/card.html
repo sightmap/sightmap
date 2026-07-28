@@ -1,0 +1,51 @@
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    width: 1200px; height: 630px; overflow: hidden;
+    background: #faf8f6; position: relative;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .topbar {
+    position: absolute; left: 0; top: 0; width: 1200px; height: 6px;
+    background: #c9456d;
+  }
+  .logo { position: absolute; left: 76px; top: 74px; height: 30px; }
+  h1 {
+    position: absolute; left: 76px; top: 140px; margin: 0;
+    font-size: 86px; font-weight: 700; line-height: 1.08;
+    letter-spacing: -0.03em; color: #1a1714;
+  }
+  h1 .accent {
+    color: #c9456d;
+    border-bottom: 4px solid rgba(201, 69, 109, 0.35);
+    padding-bottom: 4px;
+  }
+  .footer {
+    position: absolute; left: 76px; bottom: 58px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 26px; color: #8a8272;
+  }
+  .footer .site { color: #1a1714; }
+  .chip {
+    box-sizing: border-box;
+    position: absolute; right: 70px; bottom: 55px;
+    width: 310px; padding: 22px;
+    background: #1a1a2e; border: 1px solid #2a2a40; border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 17px;
+    line-height: 1.75; white-space: pre;
+  }
+  .c-com { color: #555e6b; } .c-key { color: #7eb6f6; }
+  .c-str { color: #7ee8a8; } .c-text { color: #c9d1d9; }
+</style>
+<div class="topbar"></div>
+<img class="logo" src="lockup.svg" alt="sightmap">
+<h1><span class="accent">Runtime context</span><br>for agents using your<br>web app.</h1>
+<div class="footer">Open YAML spec + CLI · <span class="site">sightmap.org</span></div>
+<div class="chip"><span class="c-com"># .sightmap/home.yaml</span>
+<span class="c-key">views:</span>
+<span class="c-text">  - </span><span class="c-key">name</span><span class="c-text">: </span><span class="c-str">FlightSearch</span>
+<span class="c-text">    </span><span class="c-key">route</span><span class="c-text">: </span><span class="c-str">/search</span></div>
