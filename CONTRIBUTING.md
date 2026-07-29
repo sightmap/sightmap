@@ -95,19 +95,14 @@ versions, `CHANGELOG.md`, or the plugin manifest versions — the tooling does i
    Pick `patch` / `minor` / `major`, write a short summary, and commit the
    generated `.changeset/*.md`.
 
-2. **On merge to `main`**, the `changesets` workflow opens a "Version Packages"
+2. **On merge to `main`**, the `release` workflow opens a "Version Packages"
    PR that bumps `go/npm/package.json`, writes `go/npm/CHANGELOG.md`, and syncs
    the plugin manifest versions.
 
-3. **A maintainer** merges that PR, then cuts the release by pushing the tag:
-
-   ```sh
-   git tag v<version> && git push origin v<version>
-   ```
-
-   which triggers goreleaser + the npm publish. (The tag push is manual by
-   design — a workflow-pushed tag wouldn't trigger the release.) More detail in
-   [`.changeset/README.md`](.changeset/README.md).
+3. **A maintainer merges that PR.** That merge triggers the `release` workflow
+   again; with no changesets left to consume, it tags the release, runs
+   goreleaser, and publishes the npm packages automatically — no manual tag
+   push. More detail in [`.changeset/README.md`](.changeset/README.md).
 
 ## Developer Certificate of Origin
 

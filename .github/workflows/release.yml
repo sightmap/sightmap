@@ -1,44 +1,105 @@
 name: release
 
-# Push a semver tag (e.g. v0.13.1) to cut a release:
-#   1. goreleaser builds cross-platform binaries (config: go/.goreleaser.yml),
-#      publishes a GitHub release on sightmap/sightmap, and its archives are
+# Three jobs, one workflow, on every push to main:
+#
+#   1. version: if there are pending .changeset/*.md files, changesets/action
+#      opens/updates a "Version Packages" PR that bumps go/npm/package.json,
+#      writes go/npm/CHANGELOG.md, and syncs the plugin manifest versions
+#      (scripts/sync-manifest-versions.mjs). Nothing is tagged or published yet.
+#      Once that PR is merged (no changesets left to consume), this job also
+#      tags the release and pushes the tag.
+#
+#   2. goreleaser: builds cross-platform binaries (config: go/.goreleaser.yml)
+#      and publishes a GitHub release on sightmap/sightmap; its archives are
 #      handed to the npm job as a workflow artifact.
-#   2. those archives are repackaged into npm packages and published:
+#
+#   3. publish-npm: repackages those archives into npm packages and publishes:
 #        - one @sightmap/sightmap-<os>-<arch> package per platform (the binary,
 #          gated by os/cpu), and
 #        - the @sightmap/sightmap meta package, which lists them as
 #          optionalDependencies so npm installs only the matching one (no
 #          post-install download, no install scripts).
+#      npm auth uses OIDC "trusted publishing" — there is NO NPM_TOKEN secret.
 #
-# npm auth uses OIDC "trusted publishing" — there is NO NPM_TOKEN secret.
-# One-time setup on npmjs.com: register a Trusted Publisher (GitHub Actions,
-# repository "sightmap/sightmap", workflow "release.yml") on EACH published
-# package — the meta package AND all six @sightmap/sightmap-<os>-<arch>
-# packages. The repo must be public (npm rejects provenance from a private
-# source repo with E422). GITHUB_TOKEN is provided automatically.
+# We never depend on the tag push (job 1) triggering a second workflow: a tag
+# pushed by a workflow's own GITHUB_TOKEN would not start a new run, so jobs 2
+# and 3 live in this same workflow, gated on job 1's output, instead of behind
+# a `push: tags` trigger. They no-op if the current go/npm/package.json version
+# is already tagged, so ordinary pushes to main (e.g. docs-only merges) are
+# harmless.
 #
-# NOTE: npm is already at 0.13.0. The pushed tag MUST be greater than the latest
-# published version and must not reuse any existing version, or `latest` moves
-# backward / the publish fails.
+# One-time npm setup: register a Trusted Publisher (GitHub Actions, repository
+# "sightmap/sightmap", workflow "release.yml") on EACH published package — the
+# meta package AND all six @sightmap/sightmap-<os>-<arch> packages. The repo
+# must be public (npm rejects provenance from a private source repo with E422).
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 # Least privilege by default; each job widens only what it needs.
 permissions:
   contents: read
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the Version Packages PR branch + the release tag
+      pull-requests: write
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Version Packages PR
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          version: npm run version-packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for unreleased version
+        id: check
+        if: steps.changesets.outputs.hasChangesets == 'false'
+        run: |
+          VERSION=$(node -p "require('./go/npm/package.json').version")
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION already tagged, nothing to release"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tag release
+        if: steps.check.outputs.should_release == 'true'
+        run: |
+          git tag "v${{ steps.check.outputs.version }}"
+          git push origin "v${{ steps.check.outputs.version }}"
+
   goreleaser:
+    needs: version
+    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub release and upload the binary assets
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: v${{ needs.version.outputs.version }}
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
@@ -67,13 +128,16 @@ jobs:
           retention-days: 1
 
   publish-npm:
-    needs: goreleaser
+    needs: [version, goreleaser]
+    if: needs.version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # mint the OIDC token npm uses for trusted publishing
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version.outputs.version }}
 
       - name: Download release archives
         uses: actions/download-artifact@v4
@@ -93,7 +157,7 @@ jobs:
 
       # Build the per-platform packages + version-synced meta from the archives.
       - name: Assemble npm packages
-        run: node go/npm/scripts/build-npm-packages.mjs --version "${GITHUB_REF_NAME#v}" --dist dist-archives --out npm-staging
+        run: node go/npm/scripts/build-npm-packages.mjs --version "${{ needs.version.outputs.version }}" --dist dist-archives --out npm-staging
 
       # Publish platform packages first, then the meta (so its optional deps
       # already exist). No NODE_AUTH_TOKEN: npm exchanges the OIDC token via each

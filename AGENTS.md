@@ -90,10 +90,10 @@ Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
 `go` (gofmt + build + `go test` + embedded-skills drift check; also triggered by
 `skills/**`), `spec` (schema-validate examples + conformance),
 `docs` (schema-page sync check + `mint validate` + `mint broken-links`), `web`
-(build). On push to `main`, `changesets` opens/updates the "Version Packages" PR
-when changesets are pending. A pushed `v*` tag triggers `release` — goreleaser
-(config `go/.goreleaser.yml`) plus the npm publish of `@sightmap/sightmap` from
-`go/npm/`.
+(build). On every push to `main`, `release` opens/updates the "Version Packages"
+PR when changesets are pending; once that PR is merged (no changesets left), the
+same workflow tags the release, runs goreleaser (config `go/.goreleaser.yml`),
+and publishes `@sightmap/sightmap` from `go/npm/` to npm — no manual tag push.
 
 ## Releasing
 
@@ -103,18 +103,17 @@ scoped to the `@sightmap/sightmap` package (the `go/npm` workspace). The flow:
 1. **Per change:** if a PR affects the published package, add a changeset
    (`npm run changeset`) and commit the resulting `.changeset/*.md`. Infra/docs
    changes that don't affect the package can skip it.
-2. **Per release (automatic):** when changesets land on `main`, the `changesets`
+2. **Per release (automatic):** when changesets land on `main`, the `release`
    workflow opens a "Version Packages" PR that bumps `go/npm/package.json`, writes
    `go/npm/CHANGELOG.md`, runs `scripts/sync-manifest-versions.mjs`, and deletes
    the consumed changesets.
-3. **Per release (manual):** merge that PR, then push the tag it implies —
-   `git tag v<version> && git push origin v<version>` — which triggers `release`
-   (goreleaser + npm publish). The tag is pushed by a human on purpose: a tag
-   pushed by a workflow (`GITHUB_TOKEN`) would not trigger `release`.
+3. **Per release (automatic):** merging that PR is itself a push to `main`, so
+   `release` runs again; with no changesets left to consume, it tags the commit,
+   runs goreleaser, and publishes the npm packages — all in that same run.
 
-So the only hand steps are: write a changeset in your PR, merge the Version
-Packages PR, and push the tag. Everything else (version math, changelog, manifest
-sync, build, publish) is automatic.
+So the only hand step is: write a changeset in your PR, and merge the Version
+Packages PR when you're ready to ship it. Everything else (version math,
+changelog, manifest sync, tagging, build, publish) is automatic.
 
 ## Conventions
 
