@@ -231,12 +231,10 @@ Considered `classification: string[]` (more explicit about intent, avoids any co
 UI "tag chip" affordances) and `labels: string[]` (matches the Kubernetes/GitHub convention
 for open-vocabulary string sets attached to an entity).
 
-Ruled out in favor of `tags`, but noted as the closest open question (see below):
-`tags` is shorter, and it's the term already used by the motivating reference
-implementation and the pipeline consuming it, so keeping the name avoids a rename before any
-real corpus exists using it. `labels` was the strongest runner-up on prior-art grounds; if a
-reviewer has a strong preference either way, this is a cheap, purely cosmetic change to make
-before merge.
+Ruled out in favor of `tags`, decided: `tags` is shorter, and it's the term already used by
+the motivating reference implementation and the pipeline consuming it, so keeping the name
+avoids a rename before any real corpus exists using it. `labels` was the strongest runner-up
+on prior-art grounds but doesn't warrant displacing a name already proven in production.
 
 ### 3. Structured tags (`{name, value}` pairs) instead of plain strings
 
@@ -299,26 +297,22 @@ merged-but-unimplemented spec change.
 
 ## Open questions
 
-1. **Field name.** `tags` vs. `labels` vs. `classification` — see Alternative 2. No strong
-   objection is anticipated, but this is the cheapest thing to change before merge if a
-   reviewer feels strongly.
-2. **Structured/valued tags.** Should a future SEP revisit `{name, value}` tags once real
+1. **Structured/valued tags.** Should a future SEP revisit `{name, value}` tags once real
    demand exists? See Alternative 3. Deliberately left unaddressed here.
-3. **Non-DOM classification (network, console).** The motivating use case eventually wants
+2. **Non-DOM classification (network, console).** The motivating use case eventually wants
    classification on non-DOM signals too — an API request, a console error — not just DOM
    components. This SEP scopes to `Component.tags` only. Whether `requests:` gets its own
    `tags:` field (once its route-matching semantics support the kind of ancestor-composition
    this SEP relies on) is left to a follow-on SEP; requests don't currently have an analogous
    containment hierarchy to union across.
-4. **Canonical formatting.** `dependencies[]` (SEP-0001) is canonicalized — sorted and
+3. **Canonical formatting.** `dependencies[]` (SEP-0001) is canonicalized — sorted and
    deduplicated — by the `fmt` command, with a dedicated conformance fixture
    (`108-fmt-dependencies-canonical`). Should `tags[]`, being similarly an unordered set
    rather than an ordered list (unlike `properties[]`, where authoring order is meaningful),
    get the same treatment? This SEP proposes runtime resolution be deduplicated and stably
    ordered (see Semantics) but does not commit to a specific canonical-format fixture number
-   or a MUST-level authoring-time formatting rule — left for reviewers to decide alongside
-   the field-name question.
-5. **Tag namespacing.** Should there be any reserved-prefix or namespacing convention (as
+   or a MUST-level authoring-time formatting rule — left for reviewers to decide.
+4. **Tag namespacing.** Should there be any reserved-prefix or namespacing convention (as
    `stability:` has a closed enum of reserved values) to avoid two authors' tags colliding in
    meaning across a large, multi-team corpus? No convention is proposed in v1; tags are a
    flat, open vocabulary, consistent with how `name` itself has no namespacing today.
