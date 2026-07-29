@@ -52,7 +52,7 @@ A bare accessibility snapshot has no view name, component identity, or indicatio
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/start/quickstart">
-    Install the CLI, start a browser session, and build a `.sightmap/` against any running web app.
+    Install the CLI, then have your agent build a `.sightmap/` against any running web app.
   </Card>
   <Card title="CLI reference" icon="terminal" href="/cli/overview">
     `sightmap` commands for browser sessions, snapshots, coverage, selectors, and corpus health.
@@ -67,18 +67,20 @@ A bare accessibility snapshot has no view name, component identity, or indicatio
 
 ## How Sightmap works
 
+An agent does the mapping. You install the skills once and review the diff before it lands.
+
 <Steps>
-  <Step title="Install the CLI and skills">
-    Install the `sightmap` binary with `npm install -g @sightmap/sightmap`, then run `sightmap skills install` to add the bundled authoring and browser skills to your agent harness.
+  <Step title="Install the skills (once)">
+    Run `npm install -g @sightmap/sightmap`, then `sightmap skills install` to add the `sightmap-authoring` and `sightmap-browser` skills to your agent harness. This is the one-time human setup.
   </Step>
-  <Step title="Start a browser session">
-    `sightmap browser start` launches Chrome and a local corpus server that reloads the YAML when it changes.
+  <Step title="Point your agent at the running app">
+    Give your agent the app's URL and ask it to build a sightmap. It runs `sightmap browser start` to launch Chrome and a local corpus server that reloads the YAML as it changes.
   </Step>
-  <Step title="Let an agent iterate">
-    Run `sightmap snapshot --coverage --url <url>` for each route. The command reads the page and identifies unattributed interactive nodes. The agent names those components and runs it again until the view reports zero orphaned nodes.
+  <Step title="The agent maps each view">
+    Through the `sightmap-authoring` skill, the agent runs `sightmap snapshot --coverage` on each route, names the interactive nodes that come back unattributed, and repeats until every view reports zero orphaned nodes.
   </Step>
-  <Step title="Check it in">
-    Run `sightmap validate`, `sightmap lint`, and `sightmap report`, then commit `.sightmap/`. Sightmap-enabled agents and tools can now read the same checked-in context.
+  <Step title="Review and check in">
+    The agent validates and lints as it goes. You review the diff and commit `.sightmap/` — Sightmap-enabled agents and tools then read the same checked-in context.
   </Step>
 </Steps>
 

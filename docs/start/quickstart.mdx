@@ -4,33 +4,40 @@ sidebarTitle: "Quickstart"
 description: "Install the CLI, start a browser session, and build a checked-in .sightmap/ against your running app."
 ---
 
-Use the `sightmap-authoring` skill to inspect a running app and write a `.sightmap/` directory in your repo. The CLI can reach a local dev server, preview deployment, or hosted URL. The agent writes the YAML; you review the diff before committing it.
+Hand a running app to your agent and it builds a `.sightmap/` directory in your repo — driving the browser and running the CLI through the `sightmap-authoring` skill. The app can be a local dev server, preview deployment, or hosted URL. The agent writes the YAML; you review the diff before committing it.
 
 <Steps>
-  <Step title="Install the CLI and skills">
+  <Step title="Install the CLI and skills (once)">
     ```bash
     npm install -g @sightmap/sightmap
     sightmap skills install
     ```
 
     `sightmap skills install` writes `sightmap-authoring` and `sightmap-browser` to `~/.agents/skills`. Pass `--target <dir>` to use another directory. See [Install](/start/install) for the `npx`, Go, and browser-install options.
+
+    This is the one-time human setup. From here on, your agent runs the browser session and the CLI through these skills.
   </Step>
 
-  <Step title="Start a browser session">
+  <Step title="Hand your agent the app">
+    Point your agent at the running app and give it a prompt like:
+
+    > Build a sightmap for this app at `http://localhost:3000/`. Start a browser session, inspect the main routes with `sightmap snapshot --coverage`, verify each selector with `sightmap sel-probe`, and name components until every view has zero orphaned T3 nodes. Let me review the YAML before committing it.
+
+    Through the `sightmap-authoring` skill, the agent starts the session itself:
+
     ```bash
-    cd my-app
     sightmap browser start --url 'http://localhost:3000/'
     ```
 
-    Run this from your project root. `browser start` launches Chrome and the local corpus server in the foreground. Leave it running, then use another terminal for the remaining commands.
+    `browser start` launches Chrome and the local corpus server, which reloads the YAML whenever the agent changes it.
+
+    <Note>
+    Prefer to drive it yourself? Run `sightmap browser start` from your project root, leave it in the foreground, and use another terminal for the loop commands below.
+    </Note>
   </Step>
 
-  <Step title="Have an agent build the corpus">
-    Give your agent this prompt:
-
-    > Build a sightmap for this app. Inspect the main routes with `sightmap snapshot --coverage`, verify each selector with `sightmap sel-probe`, and name components until every view has zero orphaned T3 nodes. Let me review the YAML before committing it.
-
-    The agent repeats this edit-and-verify loop:
+  <Step title="The agent runs the edit-verify loop">
+    For each route, the agent repeats this loop:
 
     ```bash
     sightmap snapshot --coverage --url 'http://localhost:3000/'
@@ -50,16 +57,18 @@ Use the `sightmap-authoring` skill to inspect a running app and write a `.sightm
            → [data-testid="product-pod"] button
     ```
 
-    `T1` nodes have their own component name. `T2` nodes sit inside a named component. `T3` nodes have no named ancestor. Keep iterating until each view reports `0 orphaned T3 ✓`.
+    `T1` nodes have their own component name. `T2` nodes sit inside a named component. `T3` nodes have no named ancestor. The agent keeps iterating until each view reports `0 orphaned T3 ✓`.
   </Step>
 
-  <Step title="Validate and review">
+  <Step title="Review and commit">
+    The agent validates and lints as it works:
+
     ```bash
     sightmap validate
     sightmap lint
     ```
 
-    `validate` checks the YAML structure and exits nonzero on errors. `lint` reports advisory quality issues. Review the new or changed YAML before committing it:
+    `validate` checks the YAML structure and exits nonzero on errors; `lint` reports advisory quality issues. When the agent reports the views clean, review the new or changed YAML and commit it:
 
     ```text
     .sightmap/
@@ -76,7 +85,7 @@ Use the `sightmap-authoring` skill to inspect a running app and write a `.sightm
 
 If the app has no stable selector for a component, add `data-component="ComponentName"` to the source. This gives Sightmap an explicit runtime hook.
 
-When a route or component changes, rerun `sightmap snapshot --coverage` on the affected pages. Existing selectors and `memory` entries remain in the corpus, while coverage exposes new orphaned nodes.
+When a route or component changes, have your agent rerun `sightmap snapshot --coverage` on the affected pages. Existing selectors and `memory` entries remain in the corpus, while coverage exposes new orphaned nodes.
 
 ## Next steps
 
