@@ -53,6 +53,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 014 | `component-properties` | `properties:` (`name`/`extract`/`transform`) validates ([SEP-0003](../seps/0003-component-properties.md)) |
 | 015 | `view-url` | `url:` on a view (and a file-level default) validates |
 | 016 | `stability-tooling-fields` | `stability:` (view + component) validates; reserved tooling fields `access:`/`snapshots:` are permitted |
+| 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, and views ([SEP-0004](../seps/0004-component-tags.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

@@ -98,6 +98,11 @@
           "description": "Optional list of supplementary files (minimatch globs, '!' negation, project-root-anchored) whose changes should trigger re-curation of this view. See spec/v1/schema.md#dependencies for semantics."
         },
         "memory": { "$ref": "#/$defs/memory" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Open-vocabulary classification labels for this view. Resolved as a union across every view whose route matches the URL, not just the most-specific-wins view that supplies the active view identity. See SEP-0004."
+        },
         "components": {
           "type": "array",
           "description": "View-scoped components. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",
@@ -154,6 +159,11 @@
           "description": "Ordered list of DOM-value extractions surfaced in enriched snapshot output. See SEP-0003.",
           "items": { "$ref": "#/$defs/componentProperty" }
         },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Open-vocabulary classification labels applied to matches of this component, e.g. \"defect\". Resolved as a union across every matching ancestor level, not just the nearest-enclosing match used for naming. See SEP-0004."
+        },
         "children": {
           "type": "array",
           "description": "Nested components. Selectors are scoped to the parent's matched subtree. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",
@@ -207,7 +217,12 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         },
-        "memory": { "$ref": "#/$defs/memory" }
+        "memory": { "$ref": "#/$defs/memory" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Open-vocabulary classification labels for this request. Every request definition that matches applies its own tags — there is no single-winner resolution to shadow, unlike components or views. See SEP-0004."
+        }
       }
     },
     "payload": {
