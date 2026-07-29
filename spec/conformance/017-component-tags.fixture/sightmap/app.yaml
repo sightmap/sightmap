@@ -1,0 +1,13 @@
+version: 1
+components:
+  - name: CheckoutForm
+    selector: '.checkout-form'
+    tags: [defect, ui-risk]
+    children:
+      - name: SubmitButton
+        selector: 'button[type="submit"]'
+      - name: ErrorBanner
+        selector: '.error-banner'
+        tags: [defect]
+  - name: NavFooter
+    selector: '#footer'
