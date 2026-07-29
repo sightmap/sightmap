@@ -115,7 +115,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Hand the built archives to the npm job (avoids re-downloading the release
-      # we just cut, and keeps the two jobs' privileges separate).
+      # we just cut, and keeps build and publish privileges separate).
       - name: Upload release archives
         uses: actions/upload-artifact@v4
         with:
