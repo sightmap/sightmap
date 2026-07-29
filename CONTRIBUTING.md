@@ -69,6 +69,21 @@ The repo is split by area; set up only what you're touching.
 
 CI runs the relevant checks per area on every PR.
 
+### Generated files
+
+A couple of artifacts are **generated from a canonical source and checked in**, and CI fails if they drift:
+
+- `docs/reference/schema.md` — generated from `spec/v1/schema.md`. Regenerate with `npm run sync-docs` (or `node docs/scripts/sync-spec.mjs`).
+- `go/skills/<name>/` — generated from the canonical `skills/`. Regenerate with `go generate ./skills/...` from `go/`.
+
+If you edit `spec/v1/schema.md`, run `npm run sync-docs` and commit the regenerated page in the same PR. To have this happen automatically on commit, enable the opt-in git hooks once:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+The hook regenerates and stages the schema page only when its inputs are staged; bypass any time with `git commit --no-verify`.
+
 ## Pull request expectations
 
 - **One concern per PR.** If you fix two unrelated bugs, that's two PRs. Small PRs get reviewed fast.
