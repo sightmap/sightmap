@@ -1,7 +1,7 @@
 # Changesets
 
-This directory holds [changeset](https://github.com/changesets/changesets) files
-— per-change descriptions that drive the version bump for the
+This directory holds [changeset](https://github.com/changesets/changesets) files:
+per-change descriptions that drive the version bump for the
 `@sightmap/sightmap` npm package (the `go/npm` workspace).
 
 ## Workflow
@@ -16,8 +16,8 @@ This directory holds [changeset](https://github.com/changesets/changesets) files
    Pick `patch` / `minor` / `major`, write a short summary, and commit the
    resulting `.changeset/*.md` file with your PR.
 
-2. **PR merges to `main`.** The `changesets` workflow
-   (`.github/workflows/changesets.yml`) notices the pending changesets and opens
+2. **PR merges to `main`.** The `release` workflow
+   (`.github/workflows/release.yml`) notices the pending changesets and opens
    a "Version Packages" PR that:
    - Runs `changeset version` to bump `go/npm/package.json` and write
      `go/npm/CHANGELOG.md`.
@@ -26,18 +26,11 @@ This directory holds [changeset](https://github.com/changesets/changesets) files
      `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`).
    - Deletes the consumed `.changeset/*.md` files.
 
-3. **You merge the Version Packages PR.** This is the version bump.
-
-4. **You cut the release** by pushing the tag:
-
-   ```sh
-   git tag v<version> && git push origin v<version>
-   ```
-
-   That triggers `release.yml` (goreleaser + the npm publish). The tag step is
-   **manual on purpose**: a tag pushed by a workflow (using `GITHUB_TOKEN`) does
-   not trigger other workflows, so a human pushes it. Use the version that the
-   Version Packages PR set in `go/npm/package.json`.
+3. **A maintainer merges the Version Packages PR.** That merge is itself a push
+   to `main`, so the `release` workflow runs again. With no changesets left to
+   consume, it tags the release, runs goreleaser (cross-platform binaries +
+   GitHub release), and publishes the `@sightmap/sightmap` npm packages, all
+   in the same run. No manual `git tag` step.
 
 ## Skipping the changeset
 
