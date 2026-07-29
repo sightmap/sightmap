@@ -1,7 +1,7 @@
 # Changesets
 
-This directory holds [changeset](https://github.com/changesets/changesets) files
-— per-change descriptions that drive the version bump for the
+This directory holds [changeset](https://github.com/changesets/changesets) files:
+per-change descriptions that drive the version bump for the
 `@sightmap/sightmap` npm package (the `go/npm` workspace).
 
 ## Workflow
@@ -29,7 +29,7 @@ This directory holds [changeset](https://github.com/changesets/changesets) files
 3. **A maintainer merges the Version Packages PR.** That merge is itself a push
    to `main`, so the `release` workflow runs again. With no changesets left to
    consume, it tags the release, runs goreleaser (cross-platform binaries +
-   GitHub release), and publishes the `@sightmap/sightmap` npm packages — all
+   GitHub release), and publishes the `@sightmap/sightmap` npm packages, all
    in the same run. No manual `git tag` step.
 
 ## Skipping the changeset

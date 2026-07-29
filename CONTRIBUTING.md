@@ -101,7 +101,7 @@ versions, `CHANGELOG.md`, or the plugin manifest versions — the tooling does i
 
 3. **A maintainer merges that PR.** That merge triggers the `release` workflow
    again; with no changesets left to consume, it tags the release, runs
-   goreleaser, and publishes the npm packages automatically — no manual tag
+   goreleaser, and publishes the npm packages automatically. No manual tag
    push. More detail in [`.changeset/README.md`](.changeset/README.md).
 
 ## Developer Certificate of Origin

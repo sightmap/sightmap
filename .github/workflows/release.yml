@@ -2,12 +2,12 @@ name: release
 
 # Three jobs, one workflow, on every push to main:
 #
-#   1. version: if there are pending .changeset/*.md files, changesets/action
-#      opens/updates a "Version Packages" PR that bumps go/npm/package.json,
-#      writes go/npm/CHANGELOG.md, and syncs the plugin manifest versions
-#      (scripts/sync-manifest-versions.mjs). Nothing is tagged or published yet.
-#      Once that PR is merged (no changesets left to consume), this job also
-#      tags the release and pushes the tag.
+#   1. version: while changesets are pending, changesets/action opens/updates
+#      a "Version Packages" PR that bumps go/npm/package.json, writes
+#      go/npm/CHANGELOG.md, and syncs the plugin manifest versions
+#      (scripts/sync-manifest-versions.mjs). Nothing is tagged or published
+#      yet. Once that PR merges (no changesets left), this job also tags the
+#      release and pushes the tag.
 #
 #   2. goreleaser: builds cross-platform binaries (config: go/.goreleaser.yml)
 #      and publishes a GitHub release on sightmap/sightmap; its archives are
@@ -19,18 +19,17 @@ name: release
 #        - the @sightmap/sightmap meta package, which lists them as
 #          optionalDependencies so npm installs only the matching one (no
 #          post-install download, no install scripts).
-#      npm auth uses OIDC "trusted publishing" — there is NO NPM_TOKEN secret.
+#      npm auth uses OIDC trusted publishing; no NPM_TOKEN secret.
 #
-# We never depend on the tag push (job 1) triggering a second workflow: a tag
-# pushed by a workflow's own GITHUB_TOKEN would not start a new run, so jobs 2
-# and 3 live in this same workflow, gated on job 1's output, instead of behind
-# a `push: tags` trigger. They no-op if the current go/npm/package.json version
-# is already tagged, so ordinary pushes to main (e.g. docs-only merges) are
-# harmless.
+# A tag pushed by a workflow's own GITHUB_TOKEN doesn't trigger another
+# workflow, so jobs 2 and 3 never rely on the tag push (job 1) to start them;
+# they're gated on job 1's output instead of a `push: tags` trigger. They
+# no-op if the current go/npm/package.json version is already tagged, so
+# ordinary pushes to main (docs-only merges, etc.) are harmless.
 #
 # One-time npm setup: register a Trusted Publisher (GitHub Actions, repository
-# "sightmap/sightmap", workflow "release.yml") on EACH published package — the
-# meta package AND all six @sightmap/sightmap-<os>-<arch> packages. The repo
+# "sightmap/sightmap", workflow "release.yml") on each published package: the
+# meta package and all six @sightmap/sightmap-<os>-<arch> packages. The repo
 # must be public (npm rejects provenance from a private source repo with E422).
 
 on:

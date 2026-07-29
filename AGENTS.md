@@ -93,7 +93,7 @@ Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
 (build). On every push to `main`, `release` opens/updates the "Version Packages"
 PR when changesets are pending; once that PR is merged (no changesets left), the
 same workflow tags the release, runs goreleaser (config `go/.goreleaser.yml`),
-and publishes `@sightmap/sightmap` from `go/npm/` to npm — no manual tag push.
+and publishes `@sightmap/sightmap` from `go/npm/` to npm. No manual tag push.
 
 ## Releasing
 
@@ -109,7 +109,7 @@ scoped to the `@sightmap/sightmap` package (the `go/npm` workspace). The flow:
    the consumed changesets.
 3. **Per release (automatic):** merging that PR is itself a push to `main`, so
    `release` runs again; with no changesets left to consume, it tags the commit,
-   runs goreleaser, and publishes the npm packages — all in that same run.
+   runs goreleaser, and publishes the npm packages, all in that same run.
 
 So the only hand step is: write a changeset in your PR, and merge the Version
 Packages PR when you're ready to ship it. Everything else (version math,
