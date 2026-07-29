@@ -12,13 +12,16 @@ related-discussions: []
 
 ## Summary
 
-Add an optional `tags: string[]` field to `Component` entries. A tag is an open-vocabulary
-classification label — `defect`, `ui-risk`, whatever an author needs — distinct from a
-component's `name`. Where `name` answers "what is this element called," `tags` answers
-"does anything that happens here belong to some cross-cutting classification I care about."
-Unlike name resolution, which is nearest-enclosing-wins, tag resolution is a **union across
-every matching ancestor level** — a tag authored on a broad container rides everything
-inside it, not just the target element itself.
+Add an optional `tags: string[]` field to `Component`, `View`, and `Request` entries. A tag
+is an open-vocabulary classification label — `defect`, `ui-risk`, whatever an author needs —
+distinct from a component's `name` or a view/request's identity. Where identity answers
+"what is this," `tags` answers "does this belong to some cross-cutting classification I
+care about." Each of these three entity types already has its own rule for resolving
+*identity* when more than one definition could apply to the same match (nearest-enclosing
+wins for components, most-specific-route wins for views, all-matches-apply for requests).
+Tags deliberately do **not** follow whichever of those rules applies — they resolve as a
+**union across every applicable definition**, so a broad, tagged definition is never
+shadowed by a narrower, untagged one that happens to win identity.
 
 ## Motivation
 
@@ -61,6 +64,20 @@ on a more specific, untagged child, and nearest-wins would let that child's abse
 shadow the parent's presence of one. The feature would work in the trivial case (tagging the
 exact leaf a user clicks) and silently fail in the common case (tagging the container that
 gives that leaf meaning).
+
+**The same shadowing risk exists wherever a sightmap picks a single winner:**
+
+- **Views** resolve identity by most-specific-route-wins (`/checkout/payment` beats
+  `/checkout/**`). Tagging the broad `/checkout/**` view `defect` needs that judgment to
+  survive on URLs where a narrower, untagged view wins view identity.
+- **Requests** have no winner to begin with — every matching definition already applies.
+  A request's `tags` are just another field on the one definition that was always going to
+  apply; no new resolution logic, included for completeness.
+
+Scoping this SEP to `Component` alone would be an arbitrary line: the identical authoring
+pattern — classify the container, not just the thing that wins identity — recurs for views
+for the same structural reason. One decision, applied everywhere the spec already has an
+identity-resolution rule to bypass.
 
 ## Proposal
 
@@ -113,36 +130,79 @@ A component may declare more than one tag, and multiple ancestor levels may each
 A node matching `ErrorBanner` resolves `tags: [defect, ui-risk]` — the union of every
 matched level, deduplicated and returned in a stable order (see Semantics).
 
+The same field, same semantics, on a view:
+
+```yaml
+views:
+  - name: Checkout
+    route: /checkout/**
+    tags: [defect]
+  - name: CheckoutPayment
+    route: /checkout/payment   # more specific: wins view IDENTITY for this URL
+```
+
+The URL `/checkout/payment` resolves to view identity `CheckoutPayment` (most-specific-route
+wins, unchanged) but still resolves `tags: [defect]`, inherited from the broader `Checkout`
+view — exactly the same shadowing concern as the component example, applied to route
+specificity instead of DOM ancestry.
+
+And on a request, where there is no shadowing concern to begin with:
+
+```yaml
+requests:
+  - name: SubmitPayment
+    route: /api/checkout/payment
+    method: POST
+    tags: [defect]
+```
+
+Every request whose route (and optional method) matches already applies in full — `tags`
+here is not resolving anything new, it is simply another field on the one definition that
+was always going to apply.
+
 ### Field reference
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `tags` | string[] | no | Open-vocabulary classification labels for this component. Not surfaced as a name; see Semantics for how these compose across the ancestor chain. |
+| Field | Type | Required | Applies to | Description |
+|---|---|---|---|---|
+| `tags` | string[] | no | Component, View, Request | Open-vocabulary classification labels. Not surfaced as an identity; see Semantics for how these compose (differently, per entity type). |
 
 ### JSON Schema diff
 
-The `$defs.component` object gains one new optional property:
+Three sibling `$defs` objects — `component`, `view`, `request` — each gain the identical new
+optional property:
 
 ```
 $defs.component.properties.tags:
+$defs.view.properties.tags:
+$defs.request.properties.tags:
   type: array
   items: { type: string, minLength: 1 }
   description: >
-    Open-vocabulary classification labels applied to matches of this component,
-    e.g. "defect". Resolved as a union across every matching ancestor level, not
-    just the nearest-enclosing match used for naming. See SEP-0004.
+    Open-vocabulary classification labels applied to matches of this <entity>,
+    e.g. "defect". Resolved as a union across every applicable definition — see
+    SEP-0004 for the per-entity resolution rule (this is NOT the same rule used
+    to resolve <entity> identity).
 ```
 
-No new `$defs` entry is required — unlike SEP-0003's `componentProperty`, a tag is a bare
-string with no further structure. `children` already recurses through
-`$defs.componentOrRef`, so a nested component gains the ability to declare `tags:` with no
-further schema change, exactly as SEP-0003 noted for `properties`.
+(The description differs slightly per entity to name the specific identity-resolution rule
+tags bypass — see the schema file for the exact text of each.)
+
+No new `$defs` entry is required for any of the three — unlike SEP-0003's
+`componentProperty`, a tag is a bare string with no further structure. `children` already
+recurses through `$defs.componentOrRef`, so a nested component gains the ability to declare
+`tags:` with no further schema change, exactly as SEP-0003 noted for `properties`.
 
 ### Semantics
 
-**Two resolution rules for the same ancestor walk.** Given a matched DOM node's ancestor
-chain (root → leaf, the same chain the matching algorithm already walks to resolve a name),
-there are now two independent things to compute over it:
+**The general principle.** Every entity type in scope already has a rule for resolving
+*identity* — which single definition (or, for requests, which set of definitions) actually
+applies to a given match. Tags never follow that rule. Instead, the effective tag set for a
+match is the union of every definition's `tags` that is *applicable* to that match, whether
+or not that definition wins identity. This is one principle, instantiated three times below.
+
+**Component.** Given a matched DOM node's ancestor chain (root → leaf, the same chain the
+matching algorithm already walks to resolve a name), there are two independent things to
+compute over it:
 
 - **Name** (existing, unchanged): nearest-enclosing wins. The walk from the target toward
   the root stops at the first level where any definition matches, and returns the name(s) at
@@ -151,25 +211,34 @@ there are now two independent things to compute over it:
   the walk — not just the nearest — is checked for a matching definition, and every tag any
   matching definition at any level declares is included in the result.
 
-These are deliberately different rules for the same walk, because they answer different
-questions. Naming needs exactly one right answer (the most specific thing this element is).
-Classification does not have that constraint — a leaf can simultaneously be "the submit
-button" and "part of the defect-worthy checkout area," and a container-level judgment must
-not be shadowed by a leaf that happens to be named more specifically.
+A leaf can simultaneously be "the submit button" (its name, resolved nearest-wins) and "part
+of the defect-worthy checkout area" (its tags, resolved by union) — a container-level
+judgment must not be shadowed by a leaf that happens to be named more specifically.
 
-**Combining multiple contributing definitions.** When several definitions match at
-different levels of the same chain (as in the two-tag example above), or when several
-definitions match at the *same* level (analogous to name's existing "multiple matches at
-that level" behavior), all of their `tags` contribute. The effective tag set for a matched
-node is the union of every matching definition's `tags`, across every level, deduplicated.
+**View.** Given a URL, view *identity* resolves by most-specific-route-wins (see
+[Route matching](../v1/schema.md#view-matching-most-specific-wins)): exactly one view is
+"the current view." Tags do not follow this rule — the effective tag set for a URL is the
+union of `tags` from **every** view whose route matches that URL, not just the one that wins
+identity. A broad `/checkout/**` tagged `defect` still contributes that tag on
+`/checkout/payment`, even though a narrower, untagged `/checkout/payment` view is what
+actually supplies the view identity for that URL.
 
-**Ordering.** The resolved tag set MUST be deduplicated. Conforming SDKs SHOULD return it in
-a stable, lexicographically sorted order wherever it is serialized for display, logging, or
-wire transmission, so two runs over the same session produce byte-identical output and
-consumers can diff results deterministically. Internal in-memory representation is not
-constrained beyond determinism.
+**Request.** No identity-resolution rule to bypass — "all matches apply" was already the
+rule before this SEP. A matching request's `tags` are included for the same reason its
+`name` already is: no new logic needed.
 
-**Omission.** A component that declares no `tags` field contributes nothing; this is not an
+**Multiple contributing definitions.** Whether several component definitions match at
+different ancestor levels (or the same level — analogous to name's existing "multiple
+matches at that level" behavior) or several views' routes match the same URL, all of their
+`tags` contribute to one deduplicated union.
+
+**Ordering.** The resolved tag set MUST be deduplicated, for all three entity types.
+Conforming SDKs SHOULD return it in a stable, lexicographically sorted order wherever it is
+serialized for display, logging, or wire transmission, so two runs over the same input
+produce byte-identical output and consumers can diff results deterministically. Internal
+in-memory representation is not constrained beyond determinism.
+
+**Omission.** A definition that declares no `tags` field contributes nothing; this is not an
 error. `tags: []` and an absent `tags` field are equivalent — both contribute nothing. This
 mirrors SEP-0003's "value omission is silent, not an error" rule.
 
@@ -177,28 +246,44 @@ mirrors SEP-0003's "value omission is silent, not an error" rule.
 into the deep copy exactly like every other field. No override mechanism is proposed — the
 entire definition, tags included, is deep-copied, consistent with SEP-0002's existing
 "Property-level override... Deferred" position and SEP-0003's identical choice for
-`properties`.
+`properties`. (`$ref` is component-only in the current spec; it does not apply to views or
+requests, so this interaction is specific to the component case.)
 
 **Interaction with `properties` (SEP-0003).** Fully orthogonal. A component may declare
 both `properties` and `tags`; extraction and tag resolution do not interact.
 
-**Interaction with `stability`.** A component marked `stability: unstable` or `uncertain`
-may still declare `tags`; this SEP does not couple the two. Whether a consumer should
-discount tags contributed by an unstable ancestor is a consumer-side policy question, not a
-spec-level rule.
+**Interaction with `stability`.** A component or view marked with a `stability` marker may
+still declare `tags`; this SEP does not couple the two. Whether a consumer should discount
+tags contributed by an unstable or uncertain definition is a consumer-side policy question,
+not a spec-level rule.
+
+**Interaction with global vs. view-scoped composition.** A view's effective component and
+request lists are already additive (global plus view-scoped, per
+[Global vs view-scoped](../v1/schema.md#global-vs-view-scoped)). Tags need no special rule
+here either: a view-scoped component's or request's `tags` are simply that definition's own
+`tags`, folded into the same union as everything else applicable to the match. There is no
+separate "view-scoped tags override global tags" behavior — composition is additive, same as
+identity.
 
 ### Conformance
 
-- SDKs MUST accept an optional `tags: string[]` field on any component definition, at file
-  root, within a view, or under `children:`, at any nesting depth.
-- SDKs MUST resolve a matched node's effective tag set as the union of every definition's
-  `tags` that matches anywhere along the node's ancestor chain — not restricted to the
-  nearest-matching level used for naming.
-- SDKs MUST deduplicate the resolved tag set.
-- SDKs MUST treat a component with no `tags` field, and a component with `tags: []`,
-  identically: contributing no tags, not an error.
-- SDKs MUST carry `tags` through `$ref` expansion as part of the deep copy; no override
-  mechanism exists.
+- SDKs MUST accept an optional `tags: string[]` field on any component definition (at file
+  root, within a view, or under `children:`, at any nesting depth), any view definition, and
+  any request definition (global or view-scoped).
+- SDKs MUST resolve a matched component's effective tag set as the union of every
+  definition's `tags` that matches anywhere along the node's ancestor chain — not restricted
+  to the nearest-matching level used for naming.
+- SDKs MUST resolve a URL's effective view-tag set as the union of every view definition's
+  `tags` whose route matches that URL — not restricted to the single most-specific view that
+  wins view identity.
+- SDKs MUST include a matching request definition's `tags` in its output; since all matching
+  requests already apply, no additional union logic beyond the existing "all matches apply"
+  rule is required.
+- SDKs MUST deduplicate the resolved tag set, for all three entity types.
+- SDKs MUST treat a definition with no `tags` field, and one with `tags: []`, identically:
+  contributing no tags, not an error.
+- SDKs MUST carry `tags` through `$ref` expansion as part of the deep copy (component only;
+  `$ref` does not apply to views or requests); no override mechanism exists.
 - SDKs SHOULD emit the resolved tag set in a stable (lexicographically sorted) order
   wherever it is serialized for display or over the wire.
 - SDKs MAY expose which specific definition(s) contributed each tag, for authoring or
@@ -211,19 +296,19 @@ spec-level rule.
 
 ## Alternatives considered
 
-### 1. Nearest-wins-only (the same rule as naming)
+### 1. Identity-resolution-only (the same rule each entity already uses)
 
-Resolve `tags` with the identical nearest-enclosing-wins rule already used for `name`, for
-consistency with the existing resolution model and to avoid introducing a second kind of
-walk.
+Resolve `tags` with whichever identity rule the entity already has: nearest-enclosing-wins
+for components, most-specific-route-wins for views. (Requests have no such rule to reuse —
+this alternative is moot there.)
 
-Ruled out: this defeats the motivating use case outlined above. The dominant authoring
-pattern names specific, often generic leaf elements while a classification judgment is
-naturally made about a broader container. Nearest-wins would mean a tag never applies
-whenever any untagged, more specific definition also matches the target — which is nearly
-always true in real corpora, since sightmaps name leaves far more often than they tag
-containers. A consistency argument is not worth shipping a feature that doesn't work for
-its primary case.
+Ruled out: this defeats the motivating use case for both entity types it would apply to
+(see Motivation). The dominant authoring pattern names or identifies specific, often generic
+things — a leaf element, the most specific matching route — while a classification judgment
+is naturally made about something broader. Identity-resolution-only would mean a tag never
+applies whenever any untagged, more specific definition also matches — nearly always true in
+real corpora. Consistency with the identity-resolution rule isn't worth a feature that
+doesn't work for its primary case, twice over.
 
 ### 2. A different field name: `classification` or `labels`
 
@@ -250,19 +335,29 @@ question to answer. If a genuine need for valued tags emerges, it composes clean
 later, additive SEP without disturbing plain-string tags: a bare string is the natural
 degenerate case of `{name}` with no value.
 
-### 4. A new top-level `tags:` concept, mapping selectors to tags directly
+### 4. A new top-level `tags:` concept, mapping selectors/routes to tags directly
 
-Rather than a field on `Component`, introduce a top-level section (a peer to `views:`,
-`components:`, `requests:`) that maps selectors or component names to tag lists
-independently of component definitions — e.g. so tags could be authored without touching
-existing component entries at all.
+Rather than a field on each entity, introduce a top-level section (a peer to `views:`,
+`components:`, `requests:`) that maps selectors, component names, or routes to tag lists
+independently of the entity definitions themselves — e.g. so tags could be authored without
+touching existing entries at all.
 
-Ruled out: this duplicates the exact selector-matching machinery `components:` already
-provides — a name plus one or more selectors, with the same descendant/child-scoping rules
-— purely to attach a different label to the same match. It would mean two independent
-matching systems doing the same DOM-resolution work in one spec, doubling what every SDK and
-the shared conformance suite must implement, for no expressive gain over "a tag is just
-another field on the thing that already knows how to match a DOM subtree."
+Ruled out, more decisively with three entity types than it would be with one: this
+duplicates the matching machinery `components:`, `views:`, and `requests:` already provide
+— selector matching with descendant scoping, route-glob matching with specificity scoring —
+purely to attach a label to the same matches a fourth, independent system would have to
+rediscover. No expressive gain over "a tag is just another field on the thing that already
+knows how to match."
+
+### 5. Component-only, deferring views and requests to follow-on SEPs
+
+Ship `tags` on `Component` alone now, and propose `View.tags`/`Request.tags` later, once
+there's demonstrated demand for each.
+
+Ruled out: the view case has the identical shadowing risk motivating this SEP in the first
+place (see Motivation) — deferring it ships a known gap and asks the ecosystem to
+rediscover the same problem later. The request case costs nothing to include (no new
+resolution logic, just a field), so excluding it would be arbitrary, not conservative.
 
 ## Migration
 
@@ -285,7 +380,7 @@ properties` schema error, not a silent ignore.
 | Component | Action | Gated on |
 |---|---|---|
 | `sightmap/spec` | This SEP merges; schema published | — |
-| `sightmap-go` | Re-vendor schema; implement `tags` union-across-levels resolution in the matcher | spec merge |
+| `sightmap-go` | Re-vendor schema; implement `tags` resolution for components (union across ancestor levels), views (union across matching routes), and requests (already-applying) | spec merge |
 | `sightmap-js` | Re-vendor schema; implement identical resolution semantics, independently verified against the shared conformance fixture | spec merge |
 | Docs (`sightmap.org` authoring guide) | Document `tags:` alongside `properties:`/`memory:` | at least one SDK landing |
 | Adopters | Pin to the new SDK version(s) before authoring `tags:` in any corpus | relevant SDK release |
@@ -299,12 +394,10 @@ merged-but-unimplemented spec change.
 
 1. **Structured/valued tags.** Should a future SEP revisit `{name, value}` tags once real
    demand exists? See Alternative 3. Deliberately left unaddressed here.
-2. **Non-DOM classification (network, console).** The motivating use case eventually wants
-   classification on non-DOM signals too — an API request, a console error — not just DOM
-   components. This SEP scopes to `Component.tags` only. Whether `requests:` gets its own
-   `tags:` field (once its route-matching semantics support the kind of ancestor-composition
-   this SEP relies on) is left to a follow-on SEP; requests don't currently have an analogous
-   containment hierarchy to union across.
+2. **Console/exception classification.** Console and exception events aren't a matchable
+   entity in the spec today (no selector or route to attach a definition to). Tags there
+   would need a different mechanism than this SEP proposes — left to a follow-on SEP if a
+   real use case emerges.
 3. **Canonical formatting.** `dependencies[]` (SEP-0001) is canonicalized — sorted and
    deduplicated — by the `fmt` command, with a dedicated conformance fixture
    (`108-fmt-dependencies-canonical`). Should `tags[]`, being similarly an unordered set
@@ -328,16 +421,17 @@ merged-but-unimplemented spec change.
   SEP's structure follows most closely.
 - [`spec/v1/sightmap.schema.json`](../v1/sightmap.schema.json) — the schema update this SEP
   proposes.
-- [`spec/v1/schema.md`](../v1/schema.md) — the human-readable counterpart, `## Component`
-  section and field table.
+- [`spec/v1/schema.md`](../v1/schema.md) — the human-readable counterpart: field tables for
+  `Component`/`View`/`Request`, and the dedicated `## Tags` section.
 - [`spec/VERSIONING.md`](../VERSIONING.md) — the additive-field/coordinated-release policy
   this SEP's Migration section follows.
-- Conformance fixture `017-component-tags.fixture/` — schema-shape validation, verified
-  against the schema change in this SEP (`npm run validate:conformance`: 29 files checked,
-  0 failures) alongside the full existing conformance and example suites. The offline,
-  cross-language conformance suite has no live DOM to walk, so it cannot exercise the
-  union-across-levels resolution rule itself (the same limitation SEP-0003's `properties`
+- Conformance fixture `017-tags.fixture/` — schema-shape validation across all three entity
+  types, verified against the schema change in this SEP (`npm run validate:conformance`: 29
+  files checked, 0 failures) alongside the full existing conformance and example suites. The
+  offline, cross-language conformance suite has no live DOM or URL router to exercise, so it
+  cannot test the union resolution rule itself (the same limitation SEP-0003's `properties`
   extraction ran into); that behavior is asserted by each SDK's own test suite instead.
-- Reference implementation: Fullstory's internal Subtext session-review signal pipeline
-  (Go) implements and unit-tests this exact union-across-levels resolution rule today. Not
-  a public repository — cited here for provenance, not as a checkable link.
+- Reference implementation: Fullstory's internal Subtext session-review signal pipeline (Go)
+  implements and unit-tests the component case's union-across-levels resolution today (the
+  view and request cases are new in this SEP, not yet implemented anywhere). Not a public
+  repository — cited here for provenance, not as a checkable link.

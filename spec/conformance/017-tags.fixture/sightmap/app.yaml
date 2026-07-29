@@ -11,3 +11,19 @@ components:
         tags: [defect]
   - name: NavFooter
     selector: '#footer'
+
+requests:
+  - name: SubmitPayment
+    route: /api/checkout/payment
+    method: POST
+    tags: [defect]
+  - name: TrackEvent
+    route: /api/analytics/track
+    method: POST
+
+views:
+  - name: Checkout
+    route: /checkout/**
+    tags: [defect]
+  - name: CheckoutPayment
+    route: /checkout/payment

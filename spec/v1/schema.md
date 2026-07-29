@@ -56,6 +56,7 @@ A named screen in the app, identified by a URL route.
 | `source` | string | no | Relative path to the source file. |
 | `dependencies` | string[] | no | Supplementary files (minimatch globs, project-root-anchored, `!` negates) whose changes should trigger re-curation of this view. See [Dependencies](#dependencies). |
 | `memory` | string[] | no | View-level memory entries. |
+| `tags` | string[] | no | Open-vocabulary classification labels for this view. See [Tags](#tags). |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | View-scoped components. Additive with globals (but a view-scoped `$ref` subsumes the matching global for that view — see [Component references](#component-references)). |
 | `requests` | [Request](#request)[] | no | View-scoped requests. Additive with globals. |
 
@@ -88,6 +89,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `memory` | string[] | no | Component-level memory entries. |
 | `stability` | string | no | Authoring-confidence marker: `uncertain` or `unstable`. See [Stability](#stability). |
 | `properties` | [Property](#component-properties)[] | no | Named DOM-value extractions surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Extracted from the live DOM at snapshot time; unavailable to offline tools. See [Component properties](#component-properties). |
+| `tags` | string[] | no | Open-vocabulary classification labels for this component. See [Tags](#tags). |
 | `children` | (Component \| [ComponentRef](#component-references))[] | no | Nested components. Child selectors are scoped to the parent's subtree. Entries may be either inline definitions or `$ref` reference objects. |
 
 ### Component references
@@ -222,6 +224,7 @@ A named API endpoint.
 | `response` | [Payload](#payload) | no | Expected response shape. |
 | `headers` | string[] | no | Notable header names to highlight in the network detail view. |
 | `memory` | string[] | no | Request-level memory entries. |
+| `tags` | string[] | no | Open-vocabulary classification labels for this request. See [Tags](#tags). |
 
 ### Payload
 
@@ -336,6 +339,40 @@ Both views and components may carry an optional `stability` marker recording how
 
 Omit the field for an active view or a stable component.
 
+## Tags
+
+Views, components, and requests may all carry an optional `tags: string[]` — open-vocabulary
+classification labels (e.g. `defect`) distinct from `name`. Where `name` (or a view/request's
+identity) answers "what is this," `tags` answers "does this belong to some cross-cutting
+classification I care about." See [SEP-0004](../seps/0004-component-tags.md) for the full
+proposal and rationale.
+
+Each entity type already has a rule for resolving *identity* when more than one definition
+could apply to the same match. Tags deliberately do **not** follow that rule — a broader,
+tagged definition must not be shadowed by a narrower, untagged one that wins identity. Tag
+resolution is instead a **union across every applicable definition**:
+
+| Entity | Identity resolution (unchanged) | Tag resolution (this field) |
+|---|---|---|
+| Component | Nearest-enclosing wins — the walk from the target node toward the root stops at the first matching level. | Union across every matching ancestor level, not just the nearest. |
+| View | Most-specific-route wins (see [View matching](#view-matching-most-specific-wins)). | Union across every view whose route matches the URL, not just the most-specific one. |
+| Request | Not applicable — [all matching requests already apply](#request-matching-all-matches-apply); there is no single winner to begin with. | Union across every matching request — the existing "all matches apply" rule already gives this for free. |
+
+A component example: a `CheckoutForm` tagged `defect` with an untagged `SubmitButton` child
+— a click on the button resolves `name: SubmitButton` (nearest-enclosing, unchanged) and
+`tags: [defect]` (inherited from the tagged ancestor).
+
+A view example: a broad `/checkout/**` view tagged `defect`, and a more specific
+`/checkout/payment` view with no tags of its own. The URL `/checkout/payment` resolves the
+**view identity** `CheckoutPayment` (most-specific wins, unchanged) but still carries
+`tags: [defect]` from the broader, tagged view — exactly the same shadowing concern
+component tags solve, applied to route specificity instead of DOM depth.
+
+In every case the resolved tag set MUST be deduplicated, and SHOULD be emitted in a stable
+(lexicographically sorted) order wherever it is serialized. A definition that declares no
+`tags` contributes nothing; this is not an error, and `tags: []` is equivalent to omitting
+the field entirely.
+
 ## Reserved tooling fields
 
 Some fields are consumed by tooling built on Sightmap (the reference CLI's capture and probe workflows) but are **not part of this spec's matching or merge semantics**. They are permitted by the schema so corpora that use them validate, but conforming SDKs MAY ignore them:
@@ -353,6 +390,7 @@ A conforming SDK:
 - MUST reject any file that does not
 - MUST implement route matching as specified
 - MUST implement global vs view-scoped precedence as specified
+- MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
