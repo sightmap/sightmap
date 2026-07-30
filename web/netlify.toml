@@ -6,3 +6,11 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Inject the visitor's consent region into app HTML (replaces <!--CC_REGION-->).
+# The function guards on content-type, so non-HTML responses pass through;
+# assets are excluded outright to avoid pointless invocations.
+[[edge_functions]]
+  function = "geo-region"
+  path = "/*"
+  excludedPath = ["/assets/*"]

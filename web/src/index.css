@@ -1194,14 +1194,25 @@ footer {
   justify-content: center;
 }
 
-.footer-links a {
+.footer-links a,
+.footer-links button {
   font-family: var(--mono);
   font-size: 0.75rem;
   color: var(--text-dim);
   text-decoration: none;
 }
 
-.footer-links a:hover { color: var(--text); }
+/* The consent entry point is a button (it opens a dialog, it does not navigate)
+   but should read as one more footer link. */
+.footer-links button {
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.footer-links a:hover,
+.footer-links button:hover { color: var(--text); }
 
 /* ---- DIVIDERS ---- */
 .divider {
@@ -1965,4 +1976,161 @@ footer {
   display: flex;
   justify-content: center;
   gap: 1rem;
+}
+
+/* ---- CONSENT ---- */
+.consent-banner {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 50;
+  width: calc(100% - 2rem);
+  max-width: 24rem;
+  padding: 1.25rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(26, 23, 20, 0.14);
+}
+
+.consent-copy {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.consent-copy a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.consent-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.consent-actions-end {
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+/* Accept and Decline are deliberately the same size and weight: steering the
+   visitor toward Accept with styling would undercut the consent being asked for. */
+.consent-btn {
+  flex: 1;
+  padding: 0.65rem 1.5rem;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.consent-btn:hover {
+  border-color: var(--text-dim);
+  background: var(--bg-subtle);
+}
+
+.consent-btn-primary {
+  background: var(--text-bright);
+  color: var(--bg);
+  border-color: var(--text-bright);
+  font-weight: 600;
+}
+
+.consent-btn-primary:hover {
+  background: var(--text-bright);
+  border-color: var(--text-bright);
+  opacity: 0.88;
+}
+
+.consent-actions-end .consent-btn { flex: 0 0 auto; }
+
+.consent-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(26, 23, 20, 0.5);
+}
+
+.consent-panel {
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.5rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-bright);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(26, 23, 20, 0.2);
+  outline: none;
+}
+
+.consent-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 0.5rem;
+}
+
+.consent-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.consent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.consent-row-toggle { cursor: pointer; }
+
+.consent-row-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.consent-row-desc {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 0.15rem;
+}
+
+.consent-row-locked {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.consent-row-toggle input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .consent-banner {
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    border-radius: 12px 12px 0 0;
+  }
 }
