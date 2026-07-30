@@ -1,0 +1,9 @@
+---
+label: "sightmap 0.15.8"
+date: "2026-07-27"
+tags: ["cli"]
+---
+
+Coverage and the annotated tree now agree on what counts as visible. `probe.js` set each node's `isVisible` from that element's _own_ computed style, which misses ancestor-driven hiding: a control inside a closed `opacity:0` overlay (a dismissed dropdown or context menu) has computed `opacity:1` of its own, so it reported visible even though it is painted nowhere. Coverage counted these while the renderer dropped the hidden container's subtree, so on real apps a large share of a page's interactive nodes (all the closed menus) silently inflated the count and tanked the score.
+
+`probe.js` now computes `isVisible` with the browser's own `Element.checkVisibility`, which accounts for ancestors hidden by `display:none`, `visibility:hidden`, `opacity:0`, or `content-visibility` — keeping the layout/rendering judgment in the real browser instead of re-deriving CSS semantics. `snapshot`/`coverage` "(visible only)" now excludes descendants of hidden containers; `--include-hidden` still counts every interactive node. The renderer also drops invisible subtrees regardless of interactivity so it and coverage read one signal.

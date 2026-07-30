@@ -1,0 +1,23 @@
+---
+label: "sightmap 0.15.7"
+date: "2026-07-27"
+tags: ["cli"]
+---
+
+`snapshot` now surfaces runtime match conflicts in a `[Conflicts]` section — the ambiguities that only exist against a live page, complementing the static corpus-conflict warnings `validate` emits. Two triggers:
+
+- **A single DOM node matched by more than one distinct component name.** Matching is first-match-wins, so only one applied and the others were silently dropped — which is also why a correct-looking component can report `0 matches`. The section names the node, the competing components, and which one won.
+- **Two or more views matching the current URL at equal specificity**, where declaration order alone decided the winner.
+
+Adds `match.FindConflicts` and `Corpus.TiedViews`; both are computed during `observe.Page`. (The view-tie half is provisional pending the route-specificity decision in the functional-decomposition proposal.)
+
+`validate` now surfaces two classes of invalid corpus the loader previously dropped silently (so they shipped with a green check):
+
+- **Missing required fields** — a component with no `selector` (or no `name`), and a view with no `name`, are now errors (`missing-selector` / `missing-name` / `missing-route`) instead of being quietly discarded during load.
+- **Unresolved `$ref`** — a `$ref` naming a component that no file defines is now a `ref-unresolved` error (matching the spec's MUST), instead of the reference being silently skipped.
+
+Both exit non-zero. The spec's diagnostic-code table documents the new error codes alongside the corpus-conflict warnings.
+
+`validate` now warns on unknown fields. The typed loader silently ignored any YAML key it didn't recognize, so a typo like `memroy:` — or a half-baked field — vanished without a trace. `validate` now walks the raw YAML and emits an `unknown-field` **warning** (not an error) for any key the spec doesn't define at its position, at any nesting depth. It warns rather than rejects, so authors can stash experimental fields (e.g. `macros:`) during development; recognized fields — including the reserved tooling fields `access` and `snapshots` — are never flagged, and `.sightmap/config.yaml` is excluded. This completes strict `validate` alongside the earlier required-field and `$ref` checks.
+
+Fix `report` and make the view `url:` field first-class. `url:` is now read **per view** (with a file-level `url:` as a default for views that omit their own), instead of only at the file level. Previously per-view `url:` was silently dropped, so `report` — which needs a representative URL per view — errored with `no views with URLs found` even when every view declared one. `url:` is also now part of the published schema (SEP-accepted alongside `properties`), so a corpus that declares it validates instead of failing `additionalProperties: false`.
