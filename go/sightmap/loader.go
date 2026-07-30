@@ -41,6 +41,7 @@ func DirLoader(path string) Loader {
 
 type rawFile struct {
 	Version    int            `yaml:"version"`
+	Memory     []string       `yaml:"memory"`
 	Components []rawComponent `yaml:"components"`
 	Views      []rawView      `yaml:"views"`
 	URL        string         `yaml:"url"`
@@ -134,6 +135,7 @@ func loadDir(path string) (*Corpus, error) {
 		return nil, fmt.Errorf("sightmap: walk %q: %w", path, err)
 	}
 
+	var memory []string
 	var globalRaws []rawComponent
 	type viewFileWithPath struct {
 		rf   rawFile
@@ -156,6 +158,7 @@ func loadDir(path string) (*Corpus, error) {
 		if base := filepath.Base(p); base != "config.yaml" && base != "config.yml" {
 			fieldDiags = append(fieldDiags, unknownFieldWarnings(data, base)...)
 		}
+		memory = append(memory, rf.Memory...)
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
 		}
@@ -228,6 +231,7 @@ func loadDir(path string) (*Corpus, error) {
 	}
 
 	return &Corpus{
+		Memory:           memory,
 		GlobalComponents: globalComps,
 		Views:            views,
 		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),

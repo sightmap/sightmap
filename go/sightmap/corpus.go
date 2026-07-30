@@ -14,6 +14,14 @@ import (
 // handle callers hold: load one with Load (or a Loader), then MatchTree a live
 // component tree against it. Safe for concurrent use.
 type Corpus struct {
+	// Memory holds file-level memory entries from every corpus file, in
+	// file-path order. The spec activates these per source file ("applies
+	// whenever any definition from that file is active"); we don't track
+	// which flattened component or view came from which file, so entries
+	// are concatenated corpus-wide instead of scoped to their file's
+	// definitions. Tighten this if per-file activation is ever needed.
+	Memory []string
+
 	// GlobalComponents is the flat list of globally-defined components
 	// (from components.yaml), with children already flattened.
 	GlobalComponents []match.SightmapComponent
