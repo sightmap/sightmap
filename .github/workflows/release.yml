@@ -7,7 +7,12 @@ name: release
 #      go/npm/CHANGELOG.md, and syncs the plugin manifest versions
 #      (scripts/sync-manifest-versions.mjs). Nothing is tagged or published
 #      yet. Once that PR merges (no changesets left), this job also tags the
-#      release and pushes the tag.
+#      release and pushes the tag — both a bare vX.Y.Z (what goreleaser/npm/
+#      the "already tagged" check below key off) and go/vX.Y.Z (required for
+#      `go get github.com/sightmap/sightmap/go@vX.Y.Z` to resolve at all,
+#      since Go's module versioning requires a nested module's tags to be
+#      prefixed with its subdirectory — this module lives in go/, not the
+#      repo root).
 #
 #   2. goreleaser: builds cross-platform binaries (config: go/.goreleaser.yml)
 #      and publishes a GitHub release on sightmap/sightmap; its archives are
@@ -87,7 +92,8 @@ jobs:
         if: steps.check.outputs.should_release == 'true'
         run: |
           git tag "v${{ steps.check.outputs.version }}"
-          git push origin "v${{ steps.check.outputs.version }}"
+          git tag "go/v${{ steps.check.outputs.version }}"
+          git push origin "v${{ steps.check.outputs.version }}" "go/v${{ steps.check.outputs.version }}"
 
   goreleaser:
     needs: version

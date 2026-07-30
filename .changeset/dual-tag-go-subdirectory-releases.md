@@ -1,0 +1,5 @@
+---
+"@sightmap/sightmap": patch
+---
+
+The release workflow now pushes a `go/vX.Y.Z` tag alongside the existing `vX.Y.Z` tag. This module lives in the repo's `go/` subdirectory rather than at the root, and Go's module versioning requires a nested module's tags to be prefixed with that subdirectory — so `go get github.com/sightmap/sightmap/go@vX.Y.Z` has never actually resolved to a tagged release, only to `@latest`'s branch-tip pseudo-version. The bare tag is unchanged and still drives everything else (goreleaser, npm publishing, the release-already-tagged check).
