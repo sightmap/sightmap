@@ -32,6 +32,13 @@ jobs:
           node docs/scripts/sync-spec.mjs
           git diff --exit-code docs/reference/schema.md
 
+      # changelog.mdx is assembled from changelog/entries/ and checked in for
+      # the same reason. Fail when it drifts.
+      - name: Changelog page in sync
+        run: |
+          node docs/scripts/build-changelog.mjs
+          git diff --exit-code docs/changelog.mdx
+
       - name: Install Mintlify CLI
         run: npm i -g mint
 

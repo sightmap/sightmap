@@ -1,0 +1,9 @@
+---
+label: "sightmap 0.15.5"
+date: "2026-07-26"
+tags: ["cli"]
+---
+
+Make `browser click` and `fill` fail loudly instead of silently no-op'ing. `click` now scrolls the target to the center of the viewport and verifies its center is the top-most element there before dispatching — it errors when the target can't be positioned in the viewport (previously an off-screen target below the fold was clicked at a coordinate that hit nothing and still exited 0) or is covered by another element (an open overlay/modal). The success confirmation reports the real post-scroll coordinates. `fill` now reads the value back after typing and errors when a non-empty value was typed but the field is still empty — the signature of a React-controlled input where plain typing doesn't stick — telling you to retry with `--clear`.
+
+`sel-probe` now cross-checks the offline matcher. It queries the live DOM as before, but also runs the same selector through the offline matcher that `snapshot`/`coverage`/`capture` use, prints that count, and emits a `⚠ offline/live divergence` warning (with a hint) when the two disagree. This closes the false-confidence trap where a selector "verified" against the live DOM is silently dead in the corpus — e.g. attribute selectors on `id` (`[id^="…"]`) match live but never offline, because `id` is a dedicated node field rather than a matchable attribute.

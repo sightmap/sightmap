@@ -1,0 +1,20 @@
+---
+label: "sightmap 0.15.9"
+date: "2026-07-28"
+tags: ["cli"]
+---
+
+Offline selector matching now matches the live DOM for `id`, `class`, and SVG. Three gaps are closed so a selector `sel-probe` verifies live behaves the same way `snapshot`/`coverage`/`capture` see it offline:
+
+- **Attribute selectors on `id`** (`[id^="issue_"]`, `[id$=…]`, …) now match. `id` lives in a dedicated node field, so the matcher resolves `id`/`class` attribute selectors to those fields — not only to captured `attrs`.
+- **`placeholder`** is captured, so `input[placeholder="…"]` matches offline.
+- **SVG classes** are captured. On SVG elements `className` is an `SVGAnimatedString`, which broke the old extraction (it threw and dropped the whole selector); `probe.js` now uses `classList`, so `svg.lucide`, `[class*="lucide"]`, and `:has(svg.lucide-x)` match offline.
+
+The authoring skill and docs are corrected accordingly: attribute selectors on `class` and `id` are no longer described as "don't work offline" — they work, for HTML and SVG alike.
+
+Better handling of asynchronous SPA navigation, without baking implicit waits into `click`.
+
+- **`navigate` now reports client-side redirects.** It previously only saw server-side (HTTP) redirects, which are reflected by the load event; a client-side redirect that fires during hydration (an auth guard bouncing `/login → /`, or `/ → /workspace`) went unreported, so the caller was told it was somewhere it wasn't. `navigate` now waits briefly after load for a follow-up navigation and prints `(redirected to FINAL)` for those too.
+- **`wait-for` gains `--view` and `--component`.** These are the explicit, corpus-aware step boundaries to use after an action that should navigate (the act-then-wait split Playwright and Selenium use): `--view <Name>` waits until the current URL resolves to a named sightmap view, and `--component '<Query>'` waits until a component query — including property filters like `WorkItemRow[key="FALCON-7"]` — matches a node. Both auto-retry until they hold or time out loudly. `--url`, `--selector`, and `--load` remain the raw equivalents.
+
+`click` deliberately does **not** wait for or guess about resulting navigation — it acts, reports, and keeps its loud covered/off-screen refusals. Adds `browser.AwaitNavigation` (waits for `Page.frameNavigated` / `Page.navigatedWithinDocument`, settling chained redirects) behind `navigate`.
