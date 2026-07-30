@@ -1,0 +1,26 @@
+id: fm08-survey-yaml-corpus-warning
+title: "The tool's own survey.yaml is flagged with a corpus unknown-field warning"
+failure_mode: FM8
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The agent created survey.yaml (read by `sightmap discover`) and validate
+    reported `warning: survey.yaml: unknown field "surveyed" (line 1)` — the
+    tool warning about its own file format, adding noise exactly while the
+    agent was trying to isolate the real schema problem.
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_not_match: 'survey\.yaml: unknown field'
+      why: >
+        survey.yaml is a tooling file with its own schema (like config.yaml,
+        which is already exempted in loader.go); the corpus unknown-field
+        check should skip it.
+known_failing: true
+recommended_fix: PR-9
+notes: >
+  Root cause: go/sightmap/loader.go:158 exempts only config.yaml/config.yml
+  from unknownFieldWarnings.

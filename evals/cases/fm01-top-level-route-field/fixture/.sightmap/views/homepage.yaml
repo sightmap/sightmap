@@ -1,0 +1,10 @@
+route: /
+components:
+  - name: AboutModal
+    selector: '#about-modal'
+    children:
+      - name: AboutCloseButton
+        selector: '#about-close'
+        properties:
+          - name: label
+            extract: text

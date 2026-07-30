@@ -1,0 +1,30 @@
+id: fm01-top-level-route-field
+title: "route: at the file root gets a generic unknown-field warning instead of teaching the views: structure"
+failure_mode: FM1
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The agent created views/homepage.yaml with `route: /` at the top level
+    (exactly what the authoring skill's "Create .sightmap/views/PAGE.yaml with
+    route:" instruction suggests). validate printed only
+    `warning: homepage.yaml: unknown field "route" (line 1)` and passed, so the
+    agent concluded the field was "just cosmetic" and spent the next ~40 tool
+    calls (including string-dumping the release binary) trying to discover the
+    real schema.
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'views:'
+      why: >
+        A root-level "route" is view metadata in the wrong place. The
+        diagnostic should say view fields belong under a top-level `views:`
+        list (ideally with a two-line example), not just "unknown field".
+known_failing: true
+recommended_fix: PR-2
+notes: >
+  Root cause: go/sightmap/unknownfields.go knows "route" is a valid *view*
+  field but reports it at file root with the same generic message as a typo.
+  loader.go then silently treats the file's `components:` as globals.

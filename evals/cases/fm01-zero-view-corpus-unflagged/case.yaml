@@ -1,0 +1,30 @@
+id: fm01-zero-view-corpus-unflagged
+title: "A corpus with global components and zero views validates clean"
+failure_mode: FM1
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The agent eventually gave up on views entirely and moved all 60 components
+    into components.yaml as globals ("I'll put all components as globals ...
+    the tool's component matching works fine for coverage regardless of view
+    matching"). validate and lint were both clean on the final corpus, and it
+    was committed — but a viewless corpus can never match a view, so capture,
+    report, per-view coverage sets, and route-scoped semantics are all
+    permanently unavailable, and admin-page selectors (e.g. `.table-wrap`)
+    silently annotate homepage nodes.
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)(0 views|zero views|no views)'
+      why: >
+        validate should surface a corpus-level notice when there are global
+        components but no views at all — the corpus is structurally hobbled
+        even though every file parses.
+known_failing: true
+recommended_fix: PR-2
+notes: >
+  The fixture is a faithful reduction of the components.yaml the transcript
+  committed (commit e95f06d in the whichbars repo).

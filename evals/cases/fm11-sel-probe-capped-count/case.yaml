@@ -1,0 +1,27 @@
+id: fm11-sel-probe-capped-count
+title: "sel-probe's headline `matches:` silently reports the --max display cap, not the true live count"
+failure_mode: FM11
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    `sel-probe -- 'tr[data-id]'` printed "matches: 10" (the --max=10 display
+    cap) against "offline matcher: 142 matches". The agent had to reason out
+    that "the live count is limited by --max 10 default display" — the tool
+    already computes the true live total internally (printOfflineCheck's
+    liveN) but never corrects the headline.
+requires: [manual]
+run:
+  args: [sel-probe, --, "tr[data-id]"]
+  fixture: fixture
+expect:
+  output:
+    - must_match: 'matches: \d+ \(showing \d+'
+      why: >
+        The headline should print the true live total with the display cap
+        made explicit, e.g. "matches: 142 (showing 10)".
+known_failing: true
+recommended_fix: PR-8
+notes: >
+  Requires a live browser session against a page with >10 matching rows
+  (whichbars.com homepage table is the original reproduction), so this case
+  is marked manual and always skipped by the runner. Kept as dataset.

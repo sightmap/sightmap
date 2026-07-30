@@ -1,0 +1,25 @@
+id: fm10-init-scaffold-missing
+title: "There is no `sightmap init` — an agent's literal first guess — so the first YAML is always written from memory"
+failure_mode: FM10
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The agent's very first schema probe was `sightmap init --help` →
+    `sightmap: unknown command "init"`. It then hand-wrote the corpus from
+    the skill text — incorrectly (FM1). A scaffold that emits a commented,
+    schema-correct .sightmap/ (components.yaml + views/example.yaml with the
+    views: wrapper and version: 1) would have made the wrong shape
+    impossible to reach.
+run:
+  args: [init]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_not_match: 'unknown command'
+      why: init should exist (or the top-level error should suggest the real entry point)
+  files:
+    - exists: .sightmap
+      why: init should scaffold a .sightmap/ directory with commented examples
+known_failing: true
+recommended_fix: PR-10

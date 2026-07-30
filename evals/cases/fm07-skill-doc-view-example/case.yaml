@@ -1,0 +1,24 @@
+id: fm07-skill-doc-view-example
+title: "The authoring skill tells agents to create view files 'with route:' but never shows the required views: wrapper"
+failure_mode: FM7
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The agent read the installed skill before writing any YAML and followed it
+    literally: "Create .sightmap/views/PAGE.yaml with route: \"/pattern/**\""
+    and "seed the route: field of each views/*.yaml". The 495-line skill never
+    once shows a view file's actual top-level structure (a views: list of
+    {name, route, ...}), which is what made FM1 possible.
+expect:
+  docs:
+    - file: skills/sightmap-authoring/SKILL.md
+      must_match: '(?s)views:\s*\n\s+- name:'
+      why: >
+        The skill must contain at least one complete view-file example showing
+        the views: list wrapper, so an agent's first file is structurally
+        correct.
+known_failing: true
+recommended_fix: PR-7
+notes: >
+  Docs-only case (no run: section). Checks the canonical skill at repo root;
+  go/skills/ is a generated copy kept in sync by `go generate ./skills/...`.

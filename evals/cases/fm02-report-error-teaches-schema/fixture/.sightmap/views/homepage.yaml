@@ -1,0 +1,4 @@
+url: "http://localhost:3000/"
+components:
+  - name: AboutModal
+    selector: '#about-modal'

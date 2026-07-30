@@ -1,0 +1,21 @@
+id: ok-report-lists-views
+title: "Regression guard: report finds a view that has route: and url:"
+failure_mode: baseline
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    Counterfactual to FM2: with the correct schema, report lists the view and
+    tells you what to do next (capture), instead of "no views with URLs found".
+    (report deliberately exits nonzero while the view has no captures — that
+    is its health-gate behavior, not the FM2 failure.)
+run:
+  args: [report]
+  fixture: fixture
+expect:
+  output:
+    - must_match: 'homepage'
+      why: "the view defined with the correct views: wrapper is found"
+    - must_match: 'capture --all'
+      why: report points at the next action for a capture-less view
+    - must_not_match: 'no views with URLs found'
+known_failing: false

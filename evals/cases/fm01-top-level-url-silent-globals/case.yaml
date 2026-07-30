@@ -1,0 +1,31 @@
+id: fm01-top-level-url-silent-globals
+title: "A view file with root-level url: + components: silently becomes a global components file"
+failure_mode: FM1
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    After the route: warning, the agent switched to `url:` — which IS a valid
+    file-root field (the file-level default URL for views) — and validate
+    reported "✓ no validation errors". The file defined zero views; its
+    components became corpus-wide globals; every later snapshot printed
+    "[No view matched]" and report errored, with no diagnostic ever pointing
+    at the actual problem.
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)(no views|views:)'
+      why: >
+        A file under views/ that has a url: and components: but no views: list
+        is almost certainly a malformed view file. The loader should say the
+        file defines no views (and that its components are therefore global)
+        instead of validating clean.
+known_failing: true
+recommended_fix: PR-2
+notes: >
+  This is the single most expensive trap in the transcript: it is completely
+  silent. Root cause: go/sightmap/loader.go loadDir() routes any file with
+  top-level components: into the global list, and "url"/"components" are both
+  legal file-root fields per go/sightmap/unknownfields.go.

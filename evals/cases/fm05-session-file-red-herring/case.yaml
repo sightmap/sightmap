@@ -1,0 +1,31 @@
+id: fm05-session-file-red-herring
+title: "A session file with unrecognized keys parses to port 0 and triggers a misleading 'known startup collision' hint"
+failure_mode: FM5
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The agent hand-wrote `.sightmap/.session` as {"cdp_port":9222,"pid":...}.
+    json.Unmarshal ignored the unknown keys, Port stayed 0, and `browser
+    status` printed "the sightmap server and CDP were assigned the same port
+    (0) — a known startup collision". The agent then brute-forced JSON key
+    names ({"CdpPort":...}, {"cdp":...}, {"port":...}) until one worked.
+run:
+  args: [browser, status]
+  fixture: fixture
+expect:
+  output:
+    - must_not_match: 'assigned the same port'
+      why: >
+        Port 0 here means "the file didn't parse into the expected fields",
+        not a port collision; the collision hint should require ServerPort > 0.
+    - must_match: '(?i)(unrecognized|invalid|expected)'
+      why: >
+        status should say the session file format was not recognized and show
+        the expected shape ({"port":N,"pid":N,...}) so a hand-written or
+        corrupted file is a one-step fix.
+known_failing: true
+recommended_fix: PR-4
+notes: >
+  Root cause: go/browser/launcher.go ReadSessionInfo accepts any JSON object
+  without validating Port > 0, and go/cmd/sightmap/cmd_browser.go:270 prints
+  the collision hint whenever ServerPort == Port — including 0 == 0.

@@ -1,0 +1,25 @@
+id: fm06-browser-register-missing
+title: "The authoring skill documents `browser register --addr` for attaching to an existing Chrome; the command does not exist"
+failure_mode: FM6
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    After `browser start` kept timing out, the agent launched Chrome manually
+    and tried `sightmap browser register --addr localhost:9222` — the exact
+    command the sightmap-authoring skill documents ("To connect to an existing
+    Chrome session: sightmap browser register --addr localhost:PORT") — and
+    got `unknown subcommand "register"`. With no attach path, the agent
+    resorted to reverse-engineering the .session file format.
+run:
+  args: [browser, register, --addr, "127.0.0.1:1"]
+  fixture: fixture
+expect:
+  output:
+    - must_not_match: 'unknown subcommand'
+      why: >
+        Either implement register/attach (validate the CDP endpoint, write a
+        proper session file) or remove it from the skill; this eval pins the
+        documented spelling. A connection error against the dead 127.0.0.1:1
+        endpoint is a passing outcome — the command exists and did its job.
+known_failing: true
+recommended_fix: PR-6

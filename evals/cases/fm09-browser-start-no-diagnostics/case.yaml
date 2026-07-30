@@ -1,0 +1,34 @@
+id: fm09-browser-start-no-diagnostics
+title: "browser start times out after 10s, kills Chrome, and reports nothing about which binary ran or why it failed"
+failure_mode: FM9
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    Four separate `sightmap browser start` attempts (before AND after
+    `browser install`) failed with only "chrome did not become ready: timed
+    out waiting for CDP at 127.0.0.1:7894". No Chrome binary path, no Chrome
+    stderr, no profile path, no hint. Manual launches of both stable Chrome
+    and Chrome for Testing worked on the same machine, so the difference had
+    to be reverse-engineered blind. The agent spent ~15 tool calls here.
+requires: [linux]
+run:
+  args: [browser, start, --url, "http://127.0.0.1:1/"]
+  fixture: fixture
+  path_prepend: fixture/bin
+  timeout_seconds: 45
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'FAKE-CHROME-STDERR|google-chrome'
+      why: >
+        On timeout the error should include the resolved Chrome binary path
+        and the tail of Chrome's captured stderr (the fixture's fake Chrome
+        prints a distinctive line), so the failure is diagnosable in one shot.
+known_failing: true
+recommended_fix: PR-5
+notes: >
+  The fixture prepends a fake `google-chrome` (prints to stderr, never opens
+  CDP) to PATH; FindChrome on Linux resolves via PATH, so the case is hermetic.
+  Root causes: go/cmd/sightmap/cmd_browser.go pollCDPReady's fixed 10s
+  deadline, and cmd_browser_start.go launching Chrome with stdout/stderr
+  discarded. Case takes ~11s (one full poll cycle).

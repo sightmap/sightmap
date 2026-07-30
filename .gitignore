@@ -34,6 +34,8 @@ go/cmd/sightmap/sightmap-go
 
 # Local Chrome session state (go/ browser)
 .session
+# … but eval fixtures deliberately commit malformed session files
+!evals/cases/*/fixture/.sightmap/.session
 
 # npm wrapper: downloaded binary
 go/npm/vendor/

@@ -1,0 +1,31 @@
+id: fm02-report-error-teaches-schema
+title: "report's zero-view error says 'Add a url: field' — the one hint that reinforced the wrong schema"
+failure_mode: FM2
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    `sightmap report` failed with "no views with URLs found / Add a url: field
+    to your views/*.yaml files" while capture said "add a view with a matching
+    route". The agent's file HAD a url: field at the root — so this message
+    confirmed their wrong mental model, and the two messages contradicted each
+    other (url vs route), driving the route:/url:/urls:/pattern: guessing loop.
+run:
+  args: [report]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'views:'
+      why: >
+        The error should distinguish "no views are defined at all" from "views
+        exist but lack url:", and show the minimal correct shape (a views:
+        list entry with name/route/url).
+    - must_match: 'route'
+      why: >
+        Guidance should name both required pieces (route: for matching, url:
+        for navigation) so it cannot contradict capture's advice.
+known_failing: true
+recommended_fix: PR-3
+notes: >
+  Root cause: go/cmd/sightmap/cmd_report.go:97-100 collapses both situations
+  into one message written for the "views exist but lack url" case.

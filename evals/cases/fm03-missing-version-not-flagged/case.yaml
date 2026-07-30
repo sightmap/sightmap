@@ -1,0 +1,22 @@
+id: fm03-missing-version-not-flagged
+title: "Spec requires `version: 1` in every corpus file; validate never mentions it"
+failure_mode: FM3
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    None of the YAML the agent wrote across the whole session contains
+    `version: 1`, and no tool ever flagged it. spec/v1/schema.md says "Every
+    file must begin with version: 1".
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)version'
+      why: >
+        A missing required field should at least warn, both to keep corpora
+        forward-compatible and because the warning teaches the schema's
+        existence (a reader who sees `version: 1` can find the spec).
+known_failing: true
+recommended_fix: PR-2

@@ -1,0 +1,16 @@
+id: ok-typo-field-warns
+title: "Regression guard: a genuinely unknown field (memroy:) still warns"
+failure_mode: baseline
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The unknown-field system itself is valuable (it exists to catch typos like
+    memroy:). FM1/FM8 fixes must sharpen it, not silence it.
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'unknown field "memroy"'
+known_failing: false

@@ -1,0 +1,26 @@
+id: fm04-help-exits-nonzero
+title: "--help exits 1 and appends 'flag: help requested' to every help text"
+failure_mode: FM4
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    Every exploratory `sightmap <cmd> --help` in the transcript surfaced as
+    "Error: Exit code 1" in the agent harness, with trailing noise like
+    "sightmap validate: flag: help requested". Agents treat nonzero exits as
+    failures, so the very first contact with each subcommand looked broken.
+run:
+  args: [validate, --help]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)usage'
+      why: help text should still be printed
+    - must_not_match: 'flag: help requested'
+      why: flag.ErrHelp is a successful outcome, not an error to report
+known_failing: true
+recommended_fix: PR-1
+notes: >
+  Root cause: subcommands use flag.ContinueOnError; fset.Parse returns
+  flag.ErrHelp, which go/cmd/sightmap/main.go:86 prints and converts to
+  exit 1 like any other error.

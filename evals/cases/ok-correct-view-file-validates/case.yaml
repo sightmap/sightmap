@@ -1,0 +1,19 @@
+id: ok-correct-view-file-validates
+title: "Regression guard: a correctly-shaped view file (views: list, version: 1) validates clean"
+failure_mode: baseline
+source:
+  transcript: evals/transcripts/2026-07-29-whichbars.md
+  moment: >
+    The shape the whole transcript was trying to discover. Pins the happy
+    path so FM1/FM2 fixes (new warnings for malformed files) don't leak
+    warnings onto correct corpora.
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'no validation errors'
+    - must_not_match: '(?i)warning'
+      why: a correct corpus must stay warning-free after the FM1 diagnostics land
+known_failing: false
