@@ -1,6 +1,6 @@
 module github.com/sightmap/sightmap/go
 
-go 1.25.2
+go 1.23
 
 require (
 	github.com/fsnotify/fsnotify v1.10.1

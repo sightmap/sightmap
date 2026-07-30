@@ -16,7 +16,7 @@ import (
 //
 // The known-key sets below mirror sightmap.schema.json (the source of truth),
 // NOT the Go structs — the structs are deliberately incomplete (e.g. rawFile
-// doesn't read file-level memory/requests), which would produce false positives.
+// doesn't read requests), which would produce false positives.
 // stability/access/snapshots/url/properties are all recognized here.
 
 var (
