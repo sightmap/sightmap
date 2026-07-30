@@ -1,5 +1,11 @@
 # @sightmap/sightmap
 
+## 0.15.10
+
+### Patch Changes
+
+- 882499d: Verify the changesets release automation end-to-end: no functional change.
+
 ## 0.15.9
 
 ### Patch Changes
