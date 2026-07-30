@@ -14,11 +14,11 @@ Complete [Install](/start/install) and [Quickstart](/start/quickstart) first. Yo
 - A running copy of the web app.
 - A `.sightmap/` directory in the project.
 
-The CLI drives Chrome, applies the corpus to the live DOM, and reports which interactive nodes remain unnamed.
+The agent drives Chrome through the CLI, applies the corpus to the live DOM, and reads back which interactive nodes remain unnamed.
 
 ## Run the edit-verify loop
 
-Work through one route at a time.
+The commands below are what the agent runs through the `sightmap-authoring` skill; you review the diff before it lands. The agent works through one route at a time.
 
 <Steps>
 <Step title="Start a session">
@@ -28,12 +28,12 @@ cd my-app
 sightmap browser start --url 'https://example.com/products'
 ```
 
-`browser start` launches Chrome and the corpus server in the foreground. Leave it running and use another terminal for the remaining commands. The server reloads the YAML whenever it changes.
+The agent starts the session with `browser start`, which launches Chrome and the corpus server. The server reloads the YAML whenever the agent changes it.
 
 </Step>
 <Step title="Iterate a page">
 
-Run `snapshot --coverage` with the page URL:
+The agent runs `snapshot --coverage` with the page URL:
 
 ```bash
 sightmap snapshot --coverage --url 'https://example.com/products'
@@ -65,20 +65,20 @@ Coverage assigns every interactive node a tier:
 </Step>
 <Step title="Verify the suggested selector">
 
-Probe the suggested selector against the live page before adding it to YAML:
+The agent probes the suggested selector against the live page before adding it to YAML:
 
 ```bash
 sightmap sel-probe -- '[data-testid="product-pod"] button'
 ```
 
-`sel-probe` reports the match count, key attributes, and parent chain for each match. Check that the count and matched elements are what you intended.
+`sel-probe` reports the match count, key attributes, and parent chain for each match — the agent checks that the count and matched elements are what it intended.
 
 See [Selector tools](/cli/selectors) for live and offline checks, and [Selectors](/concepts/selectors) for selector strategy.
 
 </Step>
 <Step title="Name what's unnamed">
 
-Add the component to the matching view:
+The agent adds the component to the matching view:
 
 ```yaml .sightmap/views/products.yaml
 version: 1
@@ -94,7 +94,7 @@ views:
             selector: 'button[data-testid="atc"]'
 ```
 
-Validate after each edit:
+It validates after each edit:
 
 ```bash
 sightmap validate
@@ -107,7 +107,7 @@ See [Components](/spec/components) for the complete component format.
 </Step>
 <Step title="Repeat">
 
-Re-run `snapshot --coverage` and work through the remaining T3 clusters. A route reaches the baseline when coverage reports `0 orphaned T3 ✓`. Then review its T2 scopes.
+The agent re-runs `snapshot --coverage` and works through the remaining T3 clusters. A route reaches the baseline when coverage reports `0 orphaned T3 ✓`. Then it reviews the T2 scopes.
 
 </Step>
 </Steps>
@@ -122,7 +122,7 @@ Zero T3 means every interactive node has a named ancestor. It does not mean ever
 
 A **T2-tight** scope has one unnamed interactive child under a named component. Its role and accessible name may be enough to identify it. A **T2-loose** scope has several unnamed interactive children under the same component, which makes attribution ambiguous.
 
-Run `sightmap snapshot --trace` to inspect those scopes. Add child components where stable selectors exist. If a third-party widget or generated markup has no stable selector, record that limitation in `memory`.
+The agent runs `sightmap snapshot --trace` to inspect those scopes and adds child components where stable selectors exist. If a third-party widget or generated markup has no stable selector, it records that limitation in `memory`.
 
 See [Coverage](/cli/coverage) for the complete T1, T2, and T3 model.
 
@@ -149,7 +149,7 @@ sightmap lint
 
 Keep the corpus current as the app changes:
 
-- Re-run `snapshot --coverage` on affected pages. Coverage exposes new orphaned nodes while existing selectors and `memory` remain in the corpus.
+- Have your agent re-run `snapshot --coverage` on affected pages. Coverage exposes new orphaned nodes while existing selectors and `memory` remain in the corpus.
 - Remove stale selectors and `memory`. If you can fix a documented quirk in the app, fix it and delete the note.
 - Run `sightmap validate` and `sightmap lint` in CI.
 - If you maintain saved view sets, refresh them with `sightmap capture --all`, then run `sightmap report`.
