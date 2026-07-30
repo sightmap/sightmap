@@ -97,48 +97,23 @@ func findLintSnapshotTreeFiles(sightmapDir string) ([]string, error) {
 // Components absent from any of the tree files will have a count of 0 in the
 // returned map.
 func computeSnapshotCounts(corpus *sightmap.Corpus, treeFiles []string) (map[string]int, error) {
-	// Collect unique (name, selectors) pairs from the corpus.
-	// View lists include $ref-expanded globals, so deduplicate by name.
-	type compEntry struct {
-		name      string
-		selectors []string
-	}
-	seen := make(map[string]bool)
-	var components []compEntry
-
-	addComp := func(name string, selectors []string) {
-		if name == "" || seen[name] {
-			return
-		}
-		seen[name] = true
-		components = append(components, compEntry{name: name, selectors: selectors})
-	}
-
-	for _, c := range corpus.GlobalComponents {
-		addComp(c.Name, c.Selectors)
-	}
-	for _, view := range corpus.Views {
-		for _, c := range view.Components {
-			addComp(c.Name, c.Selectors)
-		}
-	}
-
 	// Pre-parse selectors: component index → slice of last SelectorParts.
 	type parsedEntry struct {
 		name      string
 		lastParts []*comps.SelectorPart
 	}
-	parsed := make([]parsedEntry, 0, len(components))
-	for _, comp := range components {
+	all := corpus.AllComponents()
+	parsed := make([]parsedEntry, 0, len(all))
+	for _, comp := range all {
 		var lasts []*comps.SelectorPart
-		for _, selStr := range comp.selectors {
+		for _, selStr := range comp.Selectors {
 			ps, err := sel.ParseSightmapSelector(selStr)
 			if err != nil || len(ps.Parts) == 0 {
 				continue
 			}
 			lasts = append(lasts, ps.Parts[len(ps.Parts)-1])
 		}
-		parsed = append(parsed, parsedEntry{name: comp.name, lastParts: lasts})
+		parsed = append(parsed, parsedEntry{name: comp.Name, lastParts: lasts})
 	}
 
 	// counts starts at 0 for every component (explicit presence distinguishes

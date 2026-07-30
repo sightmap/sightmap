@@ -13,7 +13,9 @@ import (
 type SightmapComponent struct {
 	Name        string     `json:"name"`
 	Selectors   []string   `json:"selectors"`
+	Source      string     `json:"source,omitempty"`
 	Memory      []string   `json:"memory,omitempty"`
+	Tags        []string   `json:"tags,omitempty"`
 	Properties  []Property `json:"properties,omitempty"`
 	ParentChain []string   `json:"parentChain,omitempty"` // ancestor component names, root-first
 	Stability   string     `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"
@@ -30,6 +32,7 @@ type Property struct {
 type SightmapMatch struct {
 	Name   string
 	Memory []string
+	Tags   []string
 }
 
 // ParseQueries parses SightmapComponent definitions into MatchQuery values.
@@ -92,6 +95,7 @@ func ApplySightmap(root *comps.ComponentNode, defs []SightmapComponent) map[*com
 		result[node] = &SightmapMatch{
 			Name:   q.Name,
 			Memory: def.Memory,
+			Tags:   def.Tags,
 		}
 	})
 
