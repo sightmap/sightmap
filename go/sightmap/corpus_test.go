@@ -372,6 +372,36 @@ func TestComponentsForURL(t *testing.T) {
 	})
 }
 
+func TestAllComponents(t *testing.T) {
+	globalA := match.SightmapComponent{Name: "A", Selectors: []string{"#a"}}
+	globalB := match.SightmapComponent{Name: "B", Selectors: []string{"#b-global"}}
+	viewB := match.SightmapComponent{Name: "B", Selectors: []string{"#b-view"}} // $ref-expanded global, same name
+	viewC := match.SightmapComponent{Name: "C", Selectors: []string{"#c"}}
+
+	corpus := &sightmap.Corpus{
+		GlobalComponents: []match.SightmapComponent{globalA, globalB},
+		Views: []sightmap.View{
+			{Route: "/page", Components: []match.SightmapComponent{viewB, viewC}},
+		},
+	}
+
+	list := corpus.AllComponents()
+	byName := indexByName(list)
+	if len(byName) != 3 {
+		t.Fatalf("want 3 unique comps, got %d: %v", len(byName), compNames(list))
+	}
+	// B appears in both GlobalComponents and a view; the global (first-seen) wins.
+	if b := byName["B"]; len(b.Selectors) == 0 || b.Selectors[0] != "#b-global" {
+		t.Errorf("B: first-seen (global) should win; got selectors %v", byName["B"].Selectors)
+	}
+	if _, ok := byName["A"]; !ok {
+		t.Error("A missing from AllComponents")
+	}
+	if _, ok := byName["C"]; !ok {
+		t.Error("C missing from AllComponents")
+	}
+}
+
 // ---- 6. MatchTree end-to-end ------------------------------------------------
 
 func TestMatchTreeEndToEnd(t *testing.T) {

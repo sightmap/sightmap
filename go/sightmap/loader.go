@@ -81,7 +81,9 @@ type rawComponent struct {
 	Ref         string         `yaml:"$ref"`
 	Selector    rawSelector    `yaml:"selector"`
 	Description string         `yaml:"description"`
+	Source      string         `yaml:"source"`
 	Memory      []string       `yaml:"memory"`
+	Tags        []string       `yaml:"tags"`
 	Children    []rawComponent `yaml:"children"`
 	Properties  []rawProperty  `yaml:"properties"`
 	Stability   string         `yaml:"stability"`
@@ -415,7 +417,9 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 	result := []match.SightmapComponent{{
 		Name:        rc.Name,
 		Selectors:   mySels,
+		Source:      rc.Source,
 		Memory:      rc.Memory,
+		Tags:        rc.Tags,
 		Properties:  rawPropsToMatch(rc.Properties),
 		ParentChain: parentChain, // nil for top-level; omitted from JSON
 		Stability:   rc.Stability,

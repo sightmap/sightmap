@@ -131,6 +131,33 @@ func (c *Corpus) ComponentsForURL(pageURL string) []match.SightmapComponent {
 	return result
 }
 
+// AllComponents returns every component definition in the corpus — GlobalComponents plus
+// every View's Components — deduped by first-seen name. View lists include $ref-expanded
+// globals, so a global reused in a view would otherwise appear twice; the first occurrence
+// (global list first, then views in corpus order) wins. Route is not considered — this is
+// for a whole-corpus consumer (a linter, a coverage report, an upload payload builder), not
+// a per-page match; use ComponentsForURL for a single page's applicable list.
+func (c *Corpus) AllComponents() []match.SightmapComponent {
+	seen := make(map[string]bool)
+	var out []match.SightmapComponent
+	add := func(comp match.SightmapComponent) {
+		if comp.Name == "" || seen[comp.Name] {
+			return
+		}
+		seen[comp.Name] = true
+		out = append(out, comp)
+	}
+	for _, gc := range c.GlobalComponents {
+		add(gc)
+	}
+	for _, v := range c.Views {
+		for _, vc := range v.Components {
+			add(vc)
+		}
+	}
+	return out
+}
+
 // ViewForURL returns the View whose route most specifically matches pageURL's
 // path, or nil if no view matches. Specificity follows the spec's per-segment
 // scoring (literal > :param > * > **); when scores tie, the first-declared view

@@ -22,7 +22,7 @@ import (
 var (
 	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "snapshots")
 	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "dependencies", "memory", "components", "requests")
-	componentFields = set("name", "selector", "source", "dependencies", "description", "stability", "memory", "properties", "children")
+	componentFields = set("name", "selector", "source", "dependencies", "description", "stability", "memory", "tags", "properties", "children")
 	refFields       = set("$ref")
 	requestFields   = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory")
 	payloadFields   = set("fields")

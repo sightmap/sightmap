@@ -33,6 +33,49 @@ func TestLoadDir_FileLevelMemoryAccumulatesInPathOrder(t *testing.T) {
 	}
 }
 
+// A component's tags: and source: flatten onto its match.SightmapComponent, and neither
+// is inherited by children — matching Memory/Properties/Stability's existing convention
+// (only the selector prefix cascades to a child).
+func TestLoadDir_ComponentTagsAndSourceDoNotInheritToChildren(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `
+version: 1
+components:
+  - name: CheckoutError
+    selector: .error-banner
+    source: src/components/CheckoutForm.tsx
+    tags: [defect]
+    children:
+      - name: CheckoutErrorText
+        selector: .error-text
+`
+	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	corpus, err := loadDir(dir)
+	if err != nil {
+		t.Fatalf("loadDir: %v", err)
+	}
+	if len(corpus.GlobalComponents) != 2 {
+		t.Fatalf("want 2 flattened components, got %d: %+v", len(corpus.GlobalComponents), corpus.GlobalComponents)
+	}
+	parent, child := corpus.GlobalComponents[0], corpus.GlobalComponents[1]
+
+	if parent.Source != "src/components/CheckoutForm.tsx" {
+		t.Errorf("parent.Source = %q, want the declared source", parent.Source)
+	}
+	if !reflect.DeepEqual(parent.Tags, []string{"defect"}) {
+		t.Errorf("parent.Tags = %v, want [defect]", parent.Tags)
+	}
+	if child.Source != "" {
+		t.Errorf("child.Source = %q, want empty (source is not inherited)", child.Source)
+	}
+	if child.Tags != nil {
+		t.Errorf("child.Tags = %v, want nil (tags are not inherited)", child.Tags)
+	}
+}
+
 func TestSplitSelectors_ParenAware(t *testing.T) {
 	cases := []struct {
 		input string
