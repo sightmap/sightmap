@@ -12,13 +12,11 @@ related-discussions: []
 
 ## Summary
 
-Introduce a new top-level `messages` concept, peer to `views`/`components`/`requests`: a named, declarative pattern matching console output and runtime exceptions by `level` and a `message` regex. It gives console/exception activity the same thing `requests:` already gives network activity — a named, referenceable entity — which is the piece [SEP-0007](0007-signals.md) (`signals:`) needs to express a rule like "this recurring exception means X" under its "must reference an entity, don't redeclare match criteria" principle.
+Introduce a new top-level `messages` concept, peer to `views`/`components`/`requests`: a named, declarative pattern matching console output and runtime exceptions by `level` and a `message` regex. It gives console/exception activity the same thing `requests:` already gives network activity — a named, referenceable entity.
 
 ## Motivation
 
-Every other kind of runtime activity the spec can name has an entity for it: a DOM element has `components:`, a network call has `requests:`. Console output and exceptions have nothing. There is no way today to say, declaratively, "a `cart version mismatch` error means the checkout flow is broken" — a consumer wanting that has to hand-roll its own level/message matching, independently, with no shared vocabulary and nothing for another entity to reference.
-
-[SEP-0007](0007-signals.md) (`signals:`) requires a rule to `ref:` an entity that already declares its match criteria, rather than declaring `level`/`message` itself. No entity exists today for console/exception patterns. This SEP creates it.
+Every other kind of runtime activity the spec can name has an entity for it: a DOM element has `components:`, a network call has `requests:`. Console output and exceptions have nothing. There is no way today to say, declaratively, "a `cart version mismatch` error means the checkout flow is broken" — a consumer wanting that has to hand-roll its own level/message matching, independently, with no shared vocabulary, and nothing else in the corpus can point at it by name.
 
 ## Proposal
 
@@ -37,7 +35,7 @@ messages:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | yes | Referenced by `ref:` in a [SEP-0007](0007-signals.md) `signals:` rule. |
+| `name` | string | yes | A stable identifier for this pattern, addressable by name by other tooling. |
 | `level` | string | no | Exact match, case-insensitive, against the console record's level (`ERROR`, `WARN`, `INFO`, …). Match-any if omitted. |
 | `message` | string | no | Regex matched against the console record's message text. Match-any if omitted. |
 | `description` | string | no | What this pattern means, for a human reading the corpus. |
@@ -57,7 +55,7 @@ Unlike `requests:` ([SEP-0005](0005-request-properties.md)), `messages:` has no 
 
 #### Matching
 
-A live console record matches a `messages:` entry when every declared field (`level`, `message`) agrees; an omitted field matches anything. When more than one `messages:` entry could match the same live record, conformance requires a diagnosable ambiguity, not silent first-match-wins — see [Conformance](#conformance) and [SEP-0007](0007-signals.md)'s own note on ambiguous `ref:` resolution.
+A live console record matches a `messages:` entry when every declared field (`level`, `message`) agrees; an omitted field matches anything. When more than one `messages:` entry could match the same live record, conformance requires a diagnosable ambiguity, not silent first-match-wins — see [Conformance](#conformance).
 
 ### Conformance
 
@@ -74,7 +72,7 @@ New top-level property, peer to `views`/`components`/`requests`:
 properties.messages:
   type: array
   items: { $ref: "#/$defs/message" }
-  description: "Declarative console/exception patterns, referenceable by name (see SEP-0007 signals:)."
+  description: "Declarative console/exception patterns, addressable by name."
 ```
 
 New `$defs` entry:
@@ -88,7 +86,7 @@ $defs.message:
     name:
       type: string
       minLength: 1
-      description: "Referenced by ref: in a signals: rule (SEP-0007)."
+      description: "A stable identifier for this pattern."
     level:
       type: string
       description: "Exact, case-insensitive match against the console record's level. Match-any if omitted."
@@ -118,11 +116,11 @@ Instead of a new, narrow `messages:` entity, introduce a generic `events:` conce
 
 Deferred, not rejected. `requests:` is an established, widely-used entity with its own field set (`route`, `method`, `headers`, `Payload`) that doesn't map cleanly onto a console pattern's fields (`level`, `message`) — forcing them under one polymorphic shape now would either bloat every entry with irrelevant optional fields or require a discriminated-union schema this spec hasn't needed anywhere else yet. A narrow, purpose-built `messages:` entity is the smaller, more legible change; generalizing later — once there's a second or third entity kind with the same shape — is the point at which a supertype would actually pay for its complexity.
 
-### 3. Do nothing — leave console/exception patterns unreferenceable
+### 3. Do nothing — leave console/exception patterns unnameable
 
-The status quo. A `signals:` rule (SEP-0007) simply can't express a console/exception classification under "must reference" without this SEP.
+The status quo: no shared vocabulary for "this recurring console/exception pattern means X," and nothing else in the corpus can point at one by name.
 
-Ruled out per Motivation: without this entity, [SEP-0007](0007-signals.md)'s reference-based `signals:` cannot express a `cart.abandoned`-style classification at all.
+Ruled out per Motivation.
 
 ## Migration
 
@@ -132,7 +130,7 @@ Existing SDKs that encounter a `messages:` key MUST treat it as an unknown top-l
 
 1. This SEP merges (status: Accepted).
 2. `sightmap/sightmap` implements `messages:` parsing and matching. Bumped to a minor release.
-3. Consumers (e.g. Subtext) pin `github.com/sightmap/sightmap/go >= <new version>` before authoring `messages:` or building [SEP-0007](0007-signals.md) support that assumes it exists.
+3. Consumers (e.g. Subtext) pin `github.com/sightmap/sightmap/go >= <new version>` before authoring `messages:`.
 
 ## Open questions
 
@@ -142,6 +140,4 @@ Existing SDKs that encounter a `messages:` key MUST treat it as an unknown top-l
 
 ## References
 
-- [SEP-0005](0005-request-properties.md) — the network-side entity-property precedent this SEP's sibling proposal establishes; referenced here mainly for the shared "why a narrow entity, not a generalized one" reasoning.
-- [SEP-0007](0007-signals.md) — the motivating consumer: a `signals:` rule that references a `messages:` entry.
 - Subtext (a sightmap consumer) models a JS exception as an ERROR-level console record rather than a distinct entity — the real-world precedent behind this proposal's "one entity, not two" call in Semantics.
