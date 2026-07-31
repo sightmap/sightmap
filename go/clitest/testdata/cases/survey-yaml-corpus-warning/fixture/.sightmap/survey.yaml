@@ -1,0 +1,3 @@
+surveyed:
+  - pattern: /
+    reason: homepage covered by the homepage view

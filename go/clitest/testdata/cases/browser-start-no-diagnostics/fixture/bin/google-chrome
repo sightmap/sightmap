@@ -1,0 +1,5 @@
+#!/bin/sh
+# Simulates the transcript's Chrome that never opened its CDP port:
+# prints a diagnostic to stderr (as real Chrome does) and never becomes ready.
+echo "FAKE-CHROME-STDERR: refusing to start (simulated launch failure)" >&2
+exec sleep 600

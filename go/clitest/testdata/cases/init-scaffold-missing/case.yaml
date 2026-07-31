@@ -1,0 +1,14 @@
+title: "There is no `sightmap init` — an agent's literal first guess — so the first YAML is always written from memory"
+issue: 120
+known_bug: true
+run:
+  args: [init]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_not_match: 'unknown command'
+      why: init should exist (or the top-level error should point at the real entry point)
+  files:
+    - exists: .sightmap
+      why: init should scaffold a .sightmap/ directory with commented, schema-correct examples

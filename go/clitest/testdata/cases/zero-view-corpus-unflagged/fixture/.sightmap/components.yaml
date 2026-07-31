@@ -1,0 +1,44 @@
+components:
+  # ── Shared across all pages ──
+  - name: SiteHeader
+    selector: 'body > header'
+    children:
+      - name: LogoLink
+        selector: 'a[aria-label="Which Bars"]'
+        properties:
+          - name: label
+            extract: attr=aria-label
+  - name: HeaderNav
+    selector: 'header nav'
+    children:
+      - name: HeaderNavLink
+        selector: 'a'
+        properties:
+          - name: label
+            extract: text
+  - name: Toast
+    selector: '#toast'
+  # ── Homepage (/) ──
+  - name: HandlebarTable
+    selector: '#table'
+    children:
+      - name: HandlebarRow
+        selector: 'tr[data-id]'
+        properties:
+          - name: id
+            extract: attr=data-id
+  # ── Admin (/admin.html) ──
+  - name: AdminTable
+    selector: '.table-wrap'
+    children:
+      - name: AdminRow
+        selector: '#admin-tbody tr[data-id]'
+        properties:
+          - name: id
+            extract: attr=data-id
+  # ── Request (/request.html) ──
+  - name: RequestForm
+    selector: '#request-form'
+    children:
+      - name: RequestBrandInput
+        selector: '#brand'

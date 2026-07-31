@@ -1,0 +1,15 @@
+title: "A corpus with global components and zero views validates clean"
+issue: 89
+known_bug: true
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)(0 views|zero views|no views)'
+      why: >
+        validate should surface a corpus-level notice when there are global
+        components but no views at all — the corpus is structurally hobbled
+        (no capture, report, per-view coverage, or route scoping) even though
+        every file parses.

@@ -1,0 +1,10 @@
+title: "Guard: a genuinely unknown field (memroy:) still warns"
+known_bug: false
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'unknown field "memroy"'
+      why: the malformed-file diagnostics must sharpen the unknown-field check, not silence it

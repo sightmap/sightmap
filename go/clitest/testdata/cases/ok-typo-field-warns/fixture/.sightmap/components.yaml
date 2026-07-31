@@ -1,0 +1,6 @@
+version: 1
+memroy:
+  - a typo'd memory field
+components:
+  - name: SiteHeader
+    selector: 'body > header'

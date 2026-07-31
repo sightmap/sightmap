@@ -1,0 +1,17 @@
+title: "A session file with unrecognized keys parses to port 0 and triggers a misleading 'known startup collision' hint"
+issue: 118
+known_bug: true
+run:
+  args: [browser, status]
+  fixture: fixture
+expect:
+  output:
+    - must_not_match: 'assigned the same port'
+      why: >
+        Port 0 here means "the file didn't parse into the expected fields",
+        not a port collision; the collision hint should require ServerPort > 0.
+    - must_match: '(?i)(unrecognized|invalid|expected)'
+      why: >
+        status should say the session file format was not recognized and show
+        the expected shape ({"port":N,"pid":N,...}) so a hand-written or
+        corrupted file is a one-step fix.

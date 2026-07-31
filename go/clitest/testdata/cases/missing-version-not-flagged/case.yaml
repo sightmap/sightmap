@@ -1,0 +1,13 @@
+title: "Spec requires version: 1 in every corpus file; validate never mentions it"
+issue: 89
+known_bug: true
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)version'
+      why: >
+        A missing required field should at least warn — it keeps corpora
+        forward-compatible and the warning teaches the schema's existence.
