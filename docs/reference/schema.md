@@ -280,7 +280,8 @@ Design points:
 Routes use glob patterns against the URL pathname.
 
 - `*` matches exactly one path segment: `/users/*` matches `/users/42`, not `/users/42/edit`
-- `**` matches any depth of segments: `/admin/**` matches `/admin`, `/admin/users`, `/admin/users/42/edit`
+- `**` is a globstar: **as a whole path segment** it matches zero or more segments, so `/admin/**` matches `/admin`, `/admin/users`, and `/admin/users/42/edit`, and `/a/**/b` matches `/a/b`, `/a/x/b`, …
+- A `**` **glued into a segment** (e.g. `/foo**`) is treated as a regular `*` — an in-segment wildcard that does not cross a `/`. Write `**` as its own segment when you mean "any depth".
 - Literal segments match themselves
 - Matching is case-sensitive
 - Query string and fragment are ignored

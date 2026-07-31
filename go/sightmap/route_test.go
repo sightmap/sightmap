@@ -39,6 +39,45 @@ func TestMatchRouteTrailingSlash(t *testing.T) {
 	}
 }
 
+// ---- Route matching: ** globstar semantics ----------------------------------
+
+func TestMatchRouteGlobstar(t *testing.T) {
+	cases := []struct {
+		pattern, path string
+		want          bool
+	}{
+		// A whole "**" segment matches zero or more segments, including the
+		// parent itself (the spec's stated behaviour).
+		{"/admin/**", "/admin", true},
+		{"/admin/**", "/admin/", true},
+		{"/admin/**", "/admin/users", true},
+		{"/admin/**", "/admin/users/42/edit", true},
+		{"/admin/**", "/adminx", false}, // ** is segment-bounded, not a bare prefix
+		{"/admin/**", "/other", false},
+		// Interior globstar matches zero or more segments between literals.
+		{"/a/**/b", "/a/b", true},
+		{"/a/**/b", "/a/x/b", true},
+		{"/a/**/b", "/a/x/y/b", true},
+		{"/a/**/b", "/a/b/c", false},
+		// Leading globstar.
+		{"/**/foo", "/foo", true},
+		{"/**/foo", "/x/y/foo", true},
+		// Bare "/**" matches any path, including the root.
+		{"/**", "/", true},
+		{"/**", "/anything/at/all", true},
+		// A "**" glued into a segment is a regular *, matching within one segment
+		// only (it does not cross a slash).
+		{"/messages**", "/messages", true},
+		{"/messages**", "/messages-archive", true},
+		{"/messages**", "/messages/compose", false},
+	}
+	for _, tc := range cases {
+		if got := sightmap.MatchRoute(tc.pattern, tc.path); got != tc.want {
+			t.Errorf("MatchRoute(%q, %q) = %v, want %v", tc.pattern, tc.path, got, tc.want)
+		}
+	}
+}
+
 // ---- View resolution: most specific wins ------------------------------------
 
 func TestViewForURLMostSpecificWins(t *testing.T) {
