@@ -88,10 +88,19 @@ requests:
     route: /api/checkout/pay
     method: POST
     tags: [defect]
+    request:
+      fields:
+        - name: card_token
+          type: string
+    response:
+      fields:
+        - name: status
+          type: string
+          description: "approved | declined"
     properties:
       - name: status
         field: rsp.body.status
-      - name: rateLimitRemaining
+      - name: rate_limit_remaining
         pattern: 'X-RateLimit-Remaining:\s*(\d+)'
 `
 	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte(yaml), 0o644); err != nil {
@@ -112,14 +121,53 @@ requests:
 	if !reflect.DeepEqual(req.Tags, []string{"defect"}) {
 		t.Errorf("request.Tags = %v, want [defect]", req.Tags)
 	}
+	if req.Request == nil || len(req.Request.Fields) != 1 || req.Request.Fields[0].Name != "card_token" {
+		t.Errorf("request.Request = %+v, want one field named card_token", req.Request)
+	}
+	if req.Response == nil || len(req.Response.Fields) != 1 || req.Response.Fields[0].Description != "approved | declined" {
+		t.Errorf("request.Response = %+v, want one field with the declared description", req.Response)
+	}
 	if len(req.Properties) != 2 {
 		t.Fatalf("want 2 properties, got %d: %+v", len(req.Properties), req.Properties)
 	}
 	if req.Properties[0].Name != "status" || req.Properties[0].Field != "rsp.body.status" || req.Properties[0].Pattern != "" {
 		t.Errorf("properties[0] = %+v, want a field-only extraction named status", req.Properties[0])
 	}
-	if req.Properties[1].Name != "rateLimitRemaining" || req.Properties[1].Pattern == "" || req.Properties[1].Field != "" {
-		t.Errorf("properties[1] = %+v, want a pattern-only extraction named rateLimitRemaining", req.Properties[1])
+	if req.Properties[1].Name != "rate_limit_remaining" || req.Properties[1].Pattern == "" || req.Properties[1].Field != "" {
+		t.Errorf("properties[1] = %+v, want a pattern-only extraction named rate_limit_remaining", req.Properties[1])
+	}
+}
+
+// A view-scoped request round-trips onto View.Requests, independently of
+// GlobalRequests — mirroring how view-scoped components work.
+func TestLoadDir_ViewScopedRequest(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `
+version: 1
+views:
+  - name: Checkout
+    route: /checkout
+    requests:
+      - name: CheckoutPayment
+        route: /api/checkout/pay
+        method: POST
+`
+	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	corpus, err := loadDir(dir)
+	if err != nil {
+		t.Fatalf("loadDir: %v", err)
+	}
+	if len(corpus.GlobalRequests) != 0 {
+		t.Fatalf("want 0 global requests, got %d: %+v", len(corpus.GlobalRequests), corpus.GlobalRequests)
+	}
+	if len(corpus.Views) != 1 || len(corpus.Views[0].Requests) != 1 {
+		t.Fatalf("want 1 view with 1 request, got %+v", corpus.Views)
+	}
+	if got := corpus.Views[0].Requests[0].Name; got != "CheckoutPayment" {
+		t.Errorf("view request name = %q, want CheckoutPayment", got)
 	}
 }
 
