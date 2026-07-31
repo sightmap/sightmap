@@ -18,7 +18,7 @@ Add an optional `properties: RequestProperty[]` field to `Request` entries. Each
 
 A `Request` entry today names an endpoint and optionally documents the *shape* of its payload (`request.fields[]`/`response.fields[]` — see [Payload](../v1/schema.md#payload)), but nothing lets a consumer pull a specific value out of a *live* request to reason about it. The gap surfaces concretely in a case that looks harmless by every structured signal available today: a checkout payment endpoint returns `200 OK`, but the response body reads `{"status": "declined"}`. The HTTP status says success; the only place the real outcome lives is inside the body's own `status` field, and nothing in the spec today can name that field, let alone extract it.
 
-This matters beyond the network layer's own diagnostics — it's the prerequisite for [SEP-0007](0007-signals.md) (`signals:`), where a rule must reference an already-declared property instead of independently re-parsing a body, per the "must reference, don't redeclare" principle established for that SEP. Without this SEP, a `requests:` entry has nothing for a `signals:` rule to filter on beyond its own already-structured identity (`method`, route match, status code) — exactly the fields that don't distinguish `checkout.payment.declined` from `checkout.payment.approved`, since both are `200 OK` responses from the same endpoint.
+Today, a `Request` entry has nothing a consumer can filter or reason about beyond its own already-structured identity (`method`, route, status code) — exactly the fields that don't distinguish `checkout.payment.declined` from `checkout.payment.approved`, since both are `200 OK` responses from the same endpoint.
 
 Other concrete cases:
 
@@ -60,7 +60,7 @@ A `Request` entry gains an optional `properties` array. Each entry is a `Request
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | yes | The key a consumer (e.g. a `signals:` `filter:`) refers to this value by. Must be a valid identifier (`[a-z][a-z0-9_]*`), matching `componentProperty.name`'s pattern. |
+| `name` | string | yes | The key a consumer refers to this value by. Must be a valid identifier (`[a-z][a-z0-9_]*`), matching `componentProperty.name`'s pattern. |
 | `field` | string | one of `field`/`pattern` | A dot-path into the parsed request/response body: a root of `req` or `rsp`, then `.body.<path>`, `.headers.<name>`, or one of the already-structured request-identity names (`status`, `method`, `duration`) — see [Semantics](#semantics). |
 | `pattern` | string | one of `field`/`pattern` | A regex evaluated against the same rooted target as `field` would resolve to, for content `field`'s JSON-path addressing can't reach (a raw header string, a non-JSON body). |
 | `transform` | string | no | Same enum as `componentProperty.transform` (SEP-0003): `first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`. |
@@ -73,7 +73,7 @@ Exactly one of `field`/`pattern` is required — declaring both, or neither, is 
 
 `field`/`pattern` addresses one of two roots: `req` (the request payload) or `rsp` (the response payload), each with two children: `.body` (the parsed JSON body — `field` walks its keys; `pattern` is matched against its raw serialized text if walking fails or isn't applicable) and `.headers` (matched by header name, case-insensitive, always via `pattern` against the raw header value string — headers have no JSON structure to walk with `field`).
 
-`status`, `method`, and `duration` are reserved top-level names, addressing the request's own already-structured identity (HTTP status code, HTTP method, timing) rather than anything inside `req`/`rsp`. A consumer MAY reference these directly wherever a property name is expected without a `properties:` declaration — see [SEP-0007](0007-signals.md)'s `filter:` semantics for where this matters in practice. This SEP does not require a `Request` entry to declare them.
+`status`, `method`, and `duration` are reserved top-level names, addressing the request's own already-structured identity (HTTP status code, HTTP method, timing) rather than anything inside `req`/`rsp`. A consumer MAY reference these directly wherever a property name is expected without a `properties:` declaration. This SEP does not require a `Request` entry to declare them.
 
 #### Live-traffic requirement
 
@@ -107,7 +107,7 @@ Omission is silent, mirroring SEP-0003 exactly — no error, no warning; consume
 $defs.request.properties.properties:
   type: array
   items: { $ref: "#/$defs/requestProperty" }
-  description: "Ordered list of live-traffic-value extractions, for consumers (e.g. SEP-0007 signals:) to filter on."
+  description: "Ordered list of live-traffic-value extractions, for consumers to filter or reason about."
 ```
 
 New `$defs` entry:
@@ -124,7 +124,7 @@ $defs.requestProperty:
     name:
       type: string
       pattern: "^[a-z][a-z0-9_]*$"
-      description: "Key a consumer refers to this value by (e.g. in a signals: filter:)."
+      description: "Key a consumer refers to this value by."
     field:
       type: string
       minLength: 1
@@ -157,7 +157,7 @@ Ruled out: real response bodies aren't reliably JSON, and headers have no JSON s
 
 The status quo: any consumer wanting "what does this response actually say" reimplements its own field/regex matching against raw request data, independently, with no shared vocabulary.
 
-Ruled out per Motivation — this is exactly the case [SEP-0007](0007-signals.md) needs solved to let a `signals:` rule reference a request property instead of redeclaring its own independent body-matching logic.
+Ruled out per Motivation.
 
 ## Migration
 
@@ -167,7 +167,7 @@ Existing SDKs that encounter a `properties:` entry under a `request:` MUST treat
 
 1. This SEP merges (status: Accepted).
 2. `sightmap/sightmap` implements request-property extraction in its network-capture pipeline. Bumped to a minor release.
-3. Consumers (e.g. Subtext) pin `github.com/sightmap/sightmap/go >= <new version>` before adding `properties:` to a `requests:` entry, and before building anything (SEP-0007) that assumes it exists.
+3. Consumers (e.g. Subtext) pin `github.com/sightmap/sightmap/go >= <new version>` before adding `properties:` to a `requests:` entry.
 
 ## Open questions
 
@@ -179,4 +179,3 @@ Existing SDKs that encounter a `properties:` entry under a `request:` MUST treat
 
 - [SEP-0003](0003-component-properties.md) — the direct DOM-side precedent this SEP mirrors; its "Alternatives considered #1" already flagged requests as the place a properties-like mechanism would eventually need its own treatment.
 - [SEP-0004](0004-component-tags.md) — `tags[]` already extended from components to requests/views; same "generalize a component-only mechanism once a second entity needs it" shape as this SEP.
-- [SEP-0007](0007-signals.md) — the motivating consumer: a `signals:` rule that references a `Request` and filters on its declared properties.
