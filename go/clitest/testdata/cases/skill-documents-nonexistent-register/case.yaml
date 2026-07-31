@@ -1,0 +1,13 @@
+title: "The authoring skill documents `browser register --addr`, a command that does not exist"
+issue: 122
+known_bug: true
+expect:
+  repo:
+    - file: skills/sightmap-authoring/SKILL.md
+      must_not_match: 'browser register'
+      why: >
+        The skill directs agents to `sightmap browser register --addr ...`,
+        which is not a real subcommand, so following it dead-ends. Until an
+        attach path exists (#70) the skill should not document it. This case
+        flips to passing once the reference is removed. (Repo-content case: no
+        run.)

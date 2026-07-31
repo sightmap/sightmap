@@ -1,4 +1,5 @@
 title: "route: at the file root gets a generic unknown-field warning instead of teaching the views: structure"
+issue: 89
 known_bug: true
 run:
   args: [validate]

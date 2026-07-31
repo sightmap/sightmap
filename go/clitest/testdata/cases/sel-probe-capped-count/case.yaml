@@ -1,4 +1,5 @@
 title: "sel-probe's headline `matches:` reports the --max display cap, not the true live count"
+issue: 121
 known_bug: true
 requires: [manual]
 run:
