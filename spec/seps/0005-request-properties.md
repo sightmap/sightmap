@@ -50,7 +50,7 @@ A `Request` entry gains an optional `properties` array. Each entry is a `Request
   route: /api/checkout/pay/retry
   method: POST
   properties:
-    - name: rateLimitRemaining
+    - name: rate_limit_remaining
       pattern: 'rsp\.headers\.X-RateLimit-Remaining:\s*(\d+)'   # illustrative; see Open questions on capture groups
     - name: outcome
       field: rsp.body.status
