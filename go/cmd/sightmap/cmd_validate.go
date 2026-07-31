@@ -22,6 +22,18 @@ func runValidate(args []string) error {
 
 	findings := sightmap.Validate(corpus)
 
+	// A corpus with global components but no views can never match a view, so
+	// capture, report, per-view coverage, and route scoping are all unavailable.
+	// This is almost always an authoring mistake (the views: list was never
+	// created); nudge, but don't fail.
+	if len(corpus.Views) == 0 && len(corpus.GlobalComponents) > 0 {
+		findings = append(findings, sightmap.ValidationError{
+			Code:     "no-views",
+			Severity: sightmap.SeverityWarning,
+			Message:  fmt.Sprintf("corpus defines %d global component(s) but no views — add a top-level \"views:\" list so pages can be matched (capture, report, and per-view coverage need it)", len(corpus.GlobalComponents)),
+		})
+	}
+
 	// Print errors first, then warnings. Warnings are advisory (corpus conflicts
 	// resolved by a fallback rule) and do NOT fail validation; only errors do.
 	var errCount, warnCount int
