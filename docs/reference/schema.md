@@ -233,6 +233,38 @@ A named API endpoint.
 | `headers` | string[] | no | Notable header names to highlight in the network detail view. |
 | `memory` | string[] | no | Request-level memory entries. |
 | `tags` | string[] | no | Open-vocabulary classification labels for this request. See [Tags](#tags). |
+| `properties` | [RequestProperty](#request-properties)[] | no | Named values extracted from live traffic. See [Request properties](#request-properties). |
+
+### Request properties
+
+A request may declare `properties: RequestProperty[]` — named values extracted from a **live** request/response pair, for a consumer to filter or reason about (e.g. a response body that says a payment was declined even though the HTTP status is `200`).
+
+```yaml
+- name: CheckoutPayment
+  route: /api/checkout/pay
+  method: POST
+  properties:
+    - name: status
+      field: rsp.body.status
+
+- name: CheckoutRetryPayment
+  route: /api/checkout/pay/retry
+  method: POST
+  properties:
+    - name: rate_limit_remaining
+      pattern: 'X-RateLimit-Remaining:\s*(\d+)'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
+| `field` | string | one of `field`/`pattern` | Dot-path into the extraction root: `req`\|`rsp` × `body`\|`headers`, or a reserved already-structured name (`status`, `method`, `duration`). |
+| `pattern` | string | one of `field`/`pattern` | Regex evaluated against the same rooted target `field` would resolve to — for content `field`'s path addressing can't reach (a header value, a non-JSON body). |
+| `transform` | string | no | Same vocabulary as [Component properties](#component-properties)' transform. |
+
+Exactly one of `field`/`pattern` is required. **Value omission is silent** — a property that doesn't resolve (a missing key, no pattern match) is simply absent; consumers MUST NOT treat omission as an error. Like component properties, extraction requires **live traffic**: a tool operating on static corpus definitions alone MUST treat `properties:` as declared-but-unavailable, not an error.
+
+`properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](https://github.com/sightmap/sightmap/blob/main/spec/seps/0005-request-properties.md).
 
 ### Payload
 
@@ -399,6 +431,7 @@ A conforming SDK:
 - MUST implement route matching as specified
 - MUST implement global vs view-scoped precedence as specified
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
+- MUST extract a request's `properties:` only from live traffic, and MUST NOT error on a `properties:`-declaring request used in a static/offline context — omit the values instead, per [Request properties](#request-properties)
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
