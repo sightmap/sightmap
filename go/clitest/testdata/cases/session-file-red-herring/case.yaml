@@ -1,6 +1,5 @@
 title: "A session file with unrecognized keys parses to port 0 and triggers a misleading 'known startup collision' hint"
 issue: 118
-known_bug: true
 run:
   args: [browser, status]
   fixture: fixture

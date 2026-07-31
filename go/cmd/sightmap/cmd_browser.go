@@ -249,6 +249,15 @@ func runStatus(args []string) error {
 
 	info, err := browser.ReadSessionInfo(sightmapDir)
 	if err != nil {
+		// A session file that exists but doesn't parse is a different situation
+		// from no session at all: report it loudly with the expected shape so a
+		// hand-written or corrupted file is a one-step fix, not a red herring.
+		if _, statErr := os.Stat(browser.SessionFilePath(sightmapDir)); statErr == nil {
+			fmt.Printf("✗ unreadable session file: %v\n"+
+				"  expected shape: {\"port\":N,\"pid\":N,...}\n"+
+				"  delete it and run 'browser start' to launch a fresh session.\n", err)
+			return nil
+		}
 		// No session file — but an orphan Chrome for this profile may still be alive
 		// (e.g. a prior stop dropped the file without reaping the process).
 		if profile := defaultProfileDir(sightmapDir); profileProcessAlive(profile) {
@@ -267,7 +276,7 @@ func runStatus(args []string) error {
 		// session is unusable — clear it and tell the user how to recover.
 		fmt.Printf("✗ unreachable  cdp=%d pid=%d  (CDP not responding; removing stale session file)\n",
 			info.Port, info.PID)
-		if info.ServerPort == info.Port {
+		if info.ServerPort > 0 && info.ServerPort == info.Port {
 			fmt.Printf("  the sightmap server and CDP were assigned the same port (%d) — a known startup collision\n", info.Port)
 		}
 		if profileProcessAlive(info.Profile) {
