@@ -151,13 +151,13 @@ Ruled out: `Payload.fields[]` documents *expected shape for a reader*, unenforce
 
 Simpler schema: one extraction mechanism, not two.
 
-Ruled out: real response bodies aren't reliably JSON (the checkout example — and the shipped, pre-this-SEP mn implementation of `signals:` — used a raw regex against the response body specifically because it couldn't assume a parseable JSON shape), and headers have no JSON structure to walk with a dot-path at all. `pattern` is required for header extraction regardless of body format, so dropping it doesn't even fully simplify the schema — it just makes header extraction impossible.
+Ruled out: real response bodies aren't reliably JSON, and headers have no JSON structure to walk with a dot-path at all. `pattern` is required for header extraction regardless of body format, so dropping it doesn't even fully simplify the schema — it just makes header extraction impossible.
 
 ### 3. Do nothing — leave extraction to each consumer's own ad hoc logic
 
 The status quo: any consumer wanting "what does this response actually say" reimplements its own field/regex matching against raw request data, independently, with no shared vocabulary.
 
-Ruled out per Motivation — this is exactly the case SEP-0007 needs solved to let a `signals:` rule reference a request property instead of redeclaring its own independent body-matching logic, and the shipped-then-reverted first pass at `signals:` (mn PR #108644) is a direct demonstration of the duplication this causes without a shared mechanism.
+Ruled out per Motivation — this is exactly the case [SEP-0007](0007-signals.md) needs solved to let a `signals:` rule reference a request property instead of redeclaring its own independent body-matching logic.
 
 ## Migration
 
