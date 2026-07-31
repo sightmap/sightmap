@@ -65,7 +65,7 @@ requests:
     route: "/api/checkout/pay/retry"
     method: POST
     properties:
-      - name: rateLimitRemaining
+      - name: rate_limit_remaining
         field: "rsp.headers.X-RateLimit-Remaining"
       - name: outcome
         field: "rsp.body.status"
@@ -76,7 +76,7 @@ signals:
     ref: CheckoutRetryPayment
     filter:
       status: 200                    # already-structured identity — no properties: needed
-      rateLimitRemaining: "0"        # declared property, extracted from a response header
+      rate_limit_remaining: "0"        # declared property, extracted from a response header
       outcome: [queued, deferred]    # declared property, extracted from the response body; membership match
 ```
 
