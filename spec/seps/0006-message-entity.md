@@ -18,18 +18,7 @@ Introduce a new top-level `messages` concept, peer to `views`/`components`/`requ
 
 Every other kind of runtime activity the spec can name has an entity for it: a DOM element has `components:`, a network call has `requests:`. Console output and exceptions have nothing. There is no way today to say, declaratively, "a `cart version mismatch` error means the checkout flow is broken" — a consumer wanting that has to hand-roll its own level/message matching, independently, with no shared vocabulary and nothing for another entity to reference.
 
-This gap is not hypothetical: the original design sketch for SEP-0007 included exactly this case —
-
-```yaml
-# what SEP-0007 needs to express, and can't, without this SEP:
-signals:
-  - name: cart.abandoned
-    kind: exception
-    level: ERROR
-    message: cart version mismatch
-```
-
-Under SEP-0007's reference-based design, a `signals:` rule may not declare `level`/`message` match criteria itself — it must `ref:` an entity that already declares them. No such entity exists for console/exception patterns. This SEP creates it.
+[SEP-0007](0007-signals.md) (`signals:`) requires a rule to `ref:` an entity that already declares its match criteria, rather than declaring `level`/`message` itself. No entity exists today for console/exception patterns. This SEP creates it.
 
 ## Proposal
 
@@ -119,7 +108,7 @@ $defs.message:
 
 ### 1. A `kind: console | exception` discriminator field
 
-Split the entity explicitly by origin, matching the shipped-then-reverted first pass at `signals:` (mn PR #108644), which had a `kind` field alongside `level`/`message`.
+Split the entity explicitly by origin, with a `kind` field alongside `level`/`message`.
 
 Ruled out — see [Semantics](#semantics): at least one real consumer already collapses both into one console-record concept distinguished by `level` alone. Adding `kind` back would ask every implementation to maintain a distinction that at least one real implementation doesn't have, for no matching behavior it would actually gate. If a future implementation genuinely needs to distinguish uncaught exceptions from explicit console calls at the entity level, that's additive — this SEP doesn't foreclose it, just doesn't require it now.
 
@@ -133,7 +122,7 @@ Deferred, not rejected. `requests:` is an established, widely-used entity with i
 
 The status quo. A `signals:` rule (SEP-0007) simply can't express a console/exception classification under "must reference" without this SEP.
 
-Ruled out per Motivation: this is a real, already-identified regression from the shipped-then-reverted first pass at `signals:`, which could express `cart.abandoned`. Accepting the reference-based design (SEP-0007) without this SEP would mean shipping a strictly less capable `signals:` than what already existed.
+Ruled out per Motivation: without this entity, [SEP-0007](0007-signals.md)'s reference-based `signals:` cannot express a `cart.abandoned`-style classification at all.
 
 ## Migration
 
