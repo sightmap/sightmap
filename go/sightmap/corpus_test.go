@@ -435,6 +435,20 @@ func TestAllRequests(t *testing.T) {
 	}
 }
 
+// AllMessages is a direct accessor (messages: has no view-scoping to merge),
+// unlike AllComponents/AllRequests.
+func TestAllMessages(t *testing.T) {
+	corpus := &sightmap.Corpus{
+		Messages: []match.Message{
+			{Name: "CartVersionMismatch", Level: "ERROR"},
+		},
+	}
+	got := corpus.AllMessages()
+	if len(got) != 1 || got[0].Name != "CartVersionMismatch" {
+		t.Errorf("AllMessages() = %+v, want [CartVersionMismatch]", got)
+	}
+}
+
 // ---- 6. MatchTree end-to-end ------------------------------------------------
 
 func TestMatchTreeEndToEnd(t *testing.T) {
