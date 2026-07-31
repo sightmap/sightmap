@@ -16,22 +16,9 @@ Add a new top-level `signals` concept: a rule that references an existing entity
 
 ## Motivation
 
-A consumer reasoning about a session (or any other stream of runtime activity a sightmap corpus describes) regularly needs to surface a classification that no single existing field captures: a `200 OK` network response whose body says a payment was declined; a component whose extracted text reads "declined" even though its mere presence is expected either way. Today, expressing this means writing bespoke match logic outside the spec entirely, independent of whatever entity (component/request) the classification is actually about.
+A consumer reasoning about a session (or any other stream of runtime activity a sightmap corpus describes) regularly needs to surface a classification that no single existing field captures: a `200 OK` network response whose body says a payment was declined; a component whose extracted text reads "declined" even though its mere presence is expected either way. Today, expressing this means writing bespoke match logic outside the spec entirely, independent of whatever entity (component/request) the classification is actually about — a rule that redeclares its own route glob and body pattern has no structural relationship to the `Request` entity it's actually about, so the two silently drift apart the moment the endpoint's declared route changes.
 
-A first, shipped-then-reconsidered attempt at this (in a Subtext consumer) let a rule declare its own independent match criteria — kind, method, route, status, a body regex — with no connection to any other entity in the corpus:
-
-```yaml
-# rejected shape — a rule as an independent island
-signals:
-  - name: checkout.payment.declined
-    tags: [defect]
-    kind: network
-    method: POST
-    route: "/api/checkout/pay"
-    rsp_body: '"status"\s*:\s*"declined"'
-```
-
-Review of that shape surfaced the problem directly: it re-implements matching logic (route globs, body inspection) the corpus already does elsewhere for `Request`/`Component` definitions, and gives the resulting classification no structural relationship to anything else in the corpus — if the referenced endpoint's route ever changes, the rule silently drifts out of sync with it, since there's nothing to keep them coupled. This SEP proposes the fix directly: a rule must reference an entity, not redeclare its shape.
+This SEP proposes the fix directly: a `signals:` rule must reference an entity (`ref:`) and, optionally, filter on that entity's own already-declared properties — never redeclare a selector, route, or body pattern of its own.
 
 ## Proposal
 
@@ -47,7 +34,7 @@ signals:
       <property>: [<value>...]  # membership (any of)
 ```
 
-Rewriting the motivating example under this shape, with the request's declared property from SEP-0005:
+The checkout example from Motivation, under this shape, using the request's declared property from SEP-0005:
 
 ```yaml
 requests:
@@ -208,11 +195,21 @@ $defs.signal:
 
 ## Alternatives considered
 
-### 1. Independent match criteria per rule (the original, rejected shape)
+### 1. Independent match criteria per rule
 
-A `signals:` rule declares its own `kind`/`method`/`route`/`status`/`rsp_body`/`level`/`message` fields directly, matching signal fields with no reference to any other entity — the shape shown in [Motivation](#motivation).
+A `signals:` rule declares its own `kind`/`method`/`route`/`status`/`body` fields directly, matching signal fields with no reference to any other entity:
 
-Ruled out on review: it re-implements matching logic the corpus already does elsewhere, and creates no structural link between the classification and the entity it's actually about — if the referenced endpoint's declared route changes, an independent rule silently drifts out of sync with it, since nothing connects them. The reference-based shape in this proposal makes that link unbreakable by construction: there's no route/selector for the rule to independently duplicate or let drift.
+```yaml
+signals:
+  - name: checkout.payment.declined
+    tags: [defect]
+    kind: network
+    method: POST
+    route: "/api/checkout/pay"
+    rsp_body: '"status"\s*:\s*"declined"'
+```
+
+Ruled out: it re-implements matching logic the corpus already does elsewhere, and creates no structural link between the classification and the entity it's actually about — if the referenced endpoint's declared route changes, an independent rule silently drifts out of sync with it, since nothing connects them. The reference-based shape in this proposal makes that link unbreakable by construction: there's no route/selector for the rule to independently duplicate or let drift.
 
 ### 2. Mutate the matched entity/instance directly instead of generating a new classification
 
@@ -223,8 +220,6 @@ Ruled out: a classification frequently needs to survive independently of how its
 ## Migration
 
 `signals:` is a new top-level key — purely additive, no existing sightmap corpus references it today. No migration is required for existing sightmaps.
-
-A shipped, pre-this-SEP consumer implementation used the independent-match-criteria shape from [Alternatives considered #1](#1-independent-match-criteria-per-rule-the-original-rejected-shape); that implementation is being rebuilt against this SEP directly rather than migrated incrementally, since no real corpus authored the old shape in production.
 
 Existing SDKs that encounter a `signals:` key MUST treat it as an unknown top-level field; under `additionalProperties: false` at the root, existing SDKs reject sightmaps that use it until they implement this SEP. Release playbook, matching SEP-0001/SEP-0003's pattern:
 
