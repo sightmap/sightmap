@@ -1,0 +1,16 @@
+title: "report's 'no views with URLs' error names the wrong field and never shows the views: shape"
+known_bug: true
+run:
+  args: [report]
+  fixture: fixture
+expect:
+  output:
+    - must_match: 'views:'
+      why: >
+        The error should distinguish "no views defined at all" from "views
+        exist but lack url:", and show the minimal correct shape (a views: list
+        entry with name/route/url).
+    - must_match: 'route'
+      why: >
+        Guidance should name both pieces (route: matches, url: navigates) so it
+        cannot contradict capture's advice.

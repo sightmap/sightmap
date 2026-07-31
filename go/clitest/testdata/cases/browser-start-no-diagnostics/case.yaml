@@ -1,0 +1,18 @@
+title: "browser start times out, kills Chrome, and reports nothing about which binary ran or why it failed"
+known_bug: true
+requires: [linux]
+run:
+  args: [browser, start, --url, "http://127.0.0.1:1/"]
+  fixture: fixture
+  path_prepend: bin
+  timeout_seconds: 45
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'FAKE-CHROME-STDERR|google-chrome'
+      why: >
+        On timeout the error should include the resolved Chrome binary path and
+        the tail of Chrome's captured stderr, so the failure is diagnosable in
+        one shot. The fixture prepends a fake google-chrome that prints a
+        distinctive stderr line and never opens CDP, so the case is hermetic
+        (linux, where FindChrome resolves via PATH).

@@ -1,0 +1,14 @@
+title: "A view file with root-level url: + components: silently becomes a global components file"
+known_bug: true
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)(no views|views:)'
+      why: >
+        A file under views/ with url: and components: but no views: list is
+        almost certainly a malformed view file. The loader should say the file
+        defines no views (so its components are global) rather than validate
+        clean.

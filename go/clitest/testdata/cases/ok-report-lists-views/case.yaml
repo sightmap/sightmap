@@ -1,0 +1,12 @@
+title: "Guard: report finds a view that has route: and url: and points at the next action"
+known_bug: false
+run:
+  args: [report]
+  fixture: fixture
+expect:
+  output:
+    - must_match: 'homepage'
+      why: "the view defined with the correct views: wrapper is found"
+    - must_match: 'capture --all'
+      why: report points at the next action for a capture-less view
+    - must_not_match: 'no views with URLs found'

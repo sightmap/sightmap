@@ -1,0 +1,11 @@
+title: "Guard: a correctly-shaped view file (views: list, version: 1) validates clean"
+known_bug: false
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'no validation errors'
+    - must_not_match: '(?i)warning'
+      why: a correct corpus must stay warning-free once the malformed-file diagnostics land

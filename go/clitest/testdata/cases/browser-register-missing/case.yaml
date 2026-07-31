@@ -1,0 +1,13 @@
+title: "The authoring skill documents `browser register --addr` for attaching to an existing Chrome; the command does not exist"
+known_bug: true
+run:
+  args: [browser, register, --addr, "127.0.0.1:1"]
+  fixture: fixture
+expect:
+  output:
+    - must_not_match: 'unknown subcommand'
+      why: >
+        Either implement register/attach (validate the CDP endpoint, write a
+        session file) or drop it from the skill; this case pins the documented
+        spelling. A connection error against the dead endpoint is a passing
+        outcome — the command exists and ran.

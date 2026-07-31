@@ -1,0 +1,3 @@
+# The root .gitignore drops `.session` everywhere (local browser state). Inside
+# test fixtures a `.session` is deliberate test data, so re-include it here.
+!.session

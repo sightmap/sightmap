@@ -1,0 +1,13 @@
+title: "sel-probe's headline `matches:` reports the --max display cap, not the true live count"
+known_bug: true
+requires: [manual]
+run:
+  args: [sel-probe, --, "tr[data-id]"]
+expect:
+  output:
+    - must_match: 'matches: \d+ \(showing \d+'
+      why: >
+        The headline should print the true live total with the display cap made
+        explicit, e.g. "matches: 142 (showing 10)". Requires a live browser
+        against a page with >10 matching rows, so this case is manual (always
+        skipped) and kept as dataset.

@@ -1,0 +1,8 @@
+version: 1
+views:
+  - name: homepage
+    route: /
+    url: "http://localhost:3000/"
+    components:
+      - name: AboutModal
+        selector: '#about-modal'

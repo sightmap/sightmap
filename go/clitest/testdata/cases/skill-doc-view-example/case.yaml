@@ -1,0 +1,10 @@
+title: "The authoring skill tells agents to create view files 'with route:' but never shows the views: wrapper"
+known_bug: true
+expect:
+  repo:
+    - file: skills/sightmap-authoring/SKILL.md
+      must_match: '(?s)views:\s*\n\s+- name:'
+      why: >
+        The skill must contain at least one complete view-file example showing
+        the views: list wrapper, so an agent's first file is structurally
+        correct. (Repo-content case: no run.)

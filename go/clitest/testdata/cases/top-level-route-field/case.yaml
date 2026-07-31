@@ -1,0 +1,13 @@
+title: "route: at the file root gets a generic unknown-field warning instead of teaching the views: structure"
+known_bug: true
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'views:'
+      why: >
+        A root-level "route" is view metadata in the wrong place. The
+        diagnostic should point at the top-level `views:` list (ideally with a
+        short example), not just "unknown field".

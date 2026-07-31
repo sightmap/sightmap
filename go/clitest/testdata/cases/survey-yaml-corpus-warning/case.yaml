@@ -1,0 +1,12 @@
+title: "The tool's own survey.yaml is flagged with a corpus unknown-field warning"
+known_bug: true
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_not_match: 'survey\.yaml: unknown field'
+      why: >
+        survey.yaml is a tooling file with its own schema (like config.yaml,
+        already exempted); the corpus unknown-field check should skip it.
