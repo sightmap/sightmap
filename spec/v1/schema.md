@@ -21,6 +21,7 @@ memory:      # optional, string[] — file-level notes (see "Memory")
 views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
 requests:    # optional, Request[] — global, matched on every view
+messages:    # optional, Message[] — corpus-root only, no view-scoping
 ```
 
 | Field | Type | Required | Description |
@@ -30,6 +31,7 @@ requests:    # optional, Request[] — global, matched on every view
 | `views` | [View](#view)[] | no | Views defined in this file. |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
 | `requests` | [Request](#request)[] | no | **Global** requests — matched against every view. |
+| `messages` | [Message](#message)[] | no | Declarative console/exception patterns. Corpus-root only — no view-scoping. |
 
 ## View
 
@@ -280,6 +282,31 @@ request:
 | `type` | string | no | Free-text type label: `string`, `number`, `boolean`, `array`, `object`, or anything else an SDK author finds useful. |
 | `description` | string | no | Free-text description. |
 
+## Message
+
+A declarative console/exception pattern, matched by `level` and a `message` regex — corpus-root only, no view-scoping.
+
+```yaml
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+
+  - name: SlowNetworkWarning
+    level: WARN
+    message: 'request .* took over \d+ms'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | A stable identifier for this pattern, addressable by name by other tooling. |
+| `level` | string | no | Exact, case-insensitive match against the console record's level (`ERROR`, `WARN`, `INFO`, …). Match-any if omitted. |
+| `message` | string | no | Regex matched against the console record's message text. Match-any if omitted. |
+| `description` | string | no | What this pattern means, for a human reading the corpus. |
+| `source` | string | no | Relative path to the source most likely to emit this, mirroring `Request.source`/`Component.source`. |
+
+A live console record matches a `messages:` entry when every declared field (`level`, `message`) agrees; an omitted field matches anything. `messages:` has no `properties:`/extraction mechanism — a console/exception pattern's own `level`+`message` combination usually already fully identifies the case a corpus author cares about. See [SEP-0006](../seps/0006-message-entity.md).
+
 ## Memory
 
 Memory entries are short freeform notes attached to any definition — file, view, component, or request. They exist so that agents can carry forward context that isn't recoverable from the source code: quirks, invariants, workarounds, "you have to click this twice" lore.
@@ -424,6 +451,7 @@ A conforming SDK:
 - MUST implement global vs view-scoped precedence as specified
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
 - MUST extract a request's `properties:` only from live traffic, and MUST NOT error on a `properties:`-declaring request used in a static/offline context — omit the values instead, per [Request properties](#request-properties)
+- MUST match a `messages:` entry using case-insensitive exact match on `level` (when declared) and regex match on `message` (when declared); an omitted field imposes no constraint, per [Message](#message)
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs

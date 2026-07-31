@@ -171,6 +171,42 @@ views:
 	}
 }
 
+// messages: entries are corpus-root only (no view-scoping) and round-trip
+// onto match.Message unchanged, including description/source.
+func TestLoadDir_Messages(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `
+version: 1
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    description: Checkout flow is broken when this fires
+    source: src/cart/sync.ts
+  - name: SlowNetworkWarning
+    level: WARN
+    message: 'request .* took over \d+ms'
+`
+	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	corpus, err := loadDir(dir)
+	if err != nil {
+		t.Fatalf("loadDir: %v", err)
+	}
+	if len(corpus.Messages) != 2 {
+		t.Fatalf("want 2 messages, got %d: %+v", len(corpus.Messages), corpus.Messages)
+	}
+	m := corpus.Messages[0]
+	if m.Name != "CartVersionMismatch" || m.Level != "ERROR" || m.Message != "cart version mismatch" {
+		t.Errorf("messages[0] identity = %+v, want CartVersionMismatch/ERROR/cart version mismatch", m)
+	}
+	if m.Description != "Checkout flow is broken when this fires" || m.Source != "src/cart/sync.ts" {
+		t.Errorf("messages[0] description/source = %+v, want the declared values", m)
+	}
+}
+
 func TestSplitSelectors_ParenAware(t *testing.T) {
 	cases := []struct {
 		input string

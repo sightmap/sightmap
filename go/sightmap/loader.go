@@ -45,6 +45,7 @@ type rawFile struct {
 	Components []rawComponent `yaml:"components"`
 	Views      []rawView      `yaml:"views"`
 	Requests   []rawRequest   `yaml:"requests"`
+	Messages   []rawMessage   `yaml:"messages"`
 	URL        string         `yaml:"url"`
 	Snapshots  []rawSnapshot  `yaml:"snapshots"`
 }
@@ -107,6 +108,14 @@ type rawRequestProperty struct {
 	Field     string `yaml:"field"`
 	Pattern   string `yaml:"pattern"`
 	Transform string `yaml:"transform"`
+}
+
+type rawMessage struct {
+	Name        string `yaml:"name"`
+	Level       string `yaml:"level"`
+	Message     string `yaml:"message"`
+	Description string `yaml:"description"`
+	Source      string `yaml:"source"`
 }
 
 type rawComponent struct {
@@ -173,6 +182,7 @@ func loadDir(path string) (*Corpus, error) {
 	var memory []string
 	var globalRaws []rawComponent
 	var globalRequests []rawRequest
+	var globalMessages []rawMessage
 	type viewFileWithPath struct {
 		rf   rawFile
 		path string
@@ -200,6 +210,9 @@ func loadDir(path string) (*Corpus, error) {
 		}
 		if len(rf.Requests) > 0 {
 			globalRequests = append(globalRequests, rf.Requests...)
+		}
+		if len(rf.Messages) > 0 {
+			globalMessages = append(globalMessages, rf.Messages...)
 		}
 		if len(rf.Views) > 0 {
 			viewFiles = append(viewFiles, viewFileWithPath{rf: rf, path: p})
@@ -274,6 +287,7 @@ func loadDir(path string) (*Corpus, error) {
 		Memory:           memory,
 		GlobalComponents: globalComps,
 		GlobalRequests:   rawRequestsToMatch(globalRequests),
+		Messages:         rawMessagesToMatch(globalMessages),
 		Views:            views,
 		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),
 	}, nil
@@ -327,6 +341,25 @@ func rawRequestPropsToMatch(rps []rawRequestProperty) []match.RequestProperty {
 		ps[i] = match.RequestProperty{Name: rp.Name, Field: rp.Field, Pattern: rp.Pattern, Transform: rp.Transform}
 	}
 	return ps
+}
+
+// rawMessagesToMatch converts a slice of rawMessage to match.Message. Messages
+// are corpus-root only (no view-scoping, no hierarchy) — a direct conversion.
+func rawMessagesToMatch(rms []rawMessage) []match.Message {
+	if len(rms) == 0 {
+		return nil
+	}
+	out := make([]match.Message, len(rms))
+	for i, rm := range rms {
+		out[i] = match.Message{
+			Name:        rm.Name,
+			Level:       rm.Level,
+			Message:     rm.Message,
+			Description: rm.Description,
+			Source:      rm.Source,
+		}
+	}
+	return out
 }
 
 // rawPropsToMatch converts a slice of rawProperty to match.Property.

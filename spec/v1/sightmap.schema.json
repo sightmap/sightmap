@@ -33,6 +33,11 @@
       "description": "Global requests — matched against every view.",
       "items": { "$ref": "#/$defs/request" }
     },
+    "messages": {
+      "type": "array",
+      "description": "Declarative console/exception patterns, addressable by name. Corpus-root only — no view-scoping. See SEP-0006.",
+      "items": { "$ref": "#/$defs/message" }
+    },
     "snapshots": {
       "$comment": "Reserved tooling field. Not part of the spec's matching or merge semantics; conforming SDKs MAY ignore it. Consumed by the reference CLI's capture/probe workflow.",
       "type": "array",
@@ -259,6 +264,32 @@
           "type": "string",
           "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
           "description": "Optional post-processing applied to the extracted string. Same vocabulary as componentProperty.transform (SEP-0003)."
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "description": "A declarative console/exception pattern, matched by level and a message regex. See SEP-0006.",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A stable identifier for this pattern, addressable by name by other tooling."
+        },
+        "level": {
+          "type": "string",
+          "description": "Exact, case-insensitive match against the console record's level. Match-any if omitted."
+        },
+        "message": {
+          "type": "string",
+          "description": "Regex matched against the console record's message text. Match-any if omitted."
+        },
+        "description": { "type": "string" },
+        "source": {
+          "type": "string",
+          "description": "Relative path to the source most likely to emit this pattern."
         }
       }
     },

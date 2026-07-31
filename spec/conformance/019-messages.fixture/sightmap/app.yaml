@@ -1,0 +1,8 @@
+version: 1
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+  - name: SlowNetworkWarning
+    level: WARN
+    message: 'request .* took over \d+ms'

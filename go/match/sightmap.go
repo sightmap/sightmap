@@ -67,6 +67,16 @@ type RequestProperty struct {
 	Transform string `json:"transform,omitempty"`
 }
 
+// Message is a named, declarative pattern matching console output and runtime
+// exceptions by Level and a Message regex. See SEP-0006.
+type Message struct {
+	Name        string `json:"name"`
+	Level       string `json:"level,omitempty"`   // exact, case-insensitive match; match-any if empty
+	Message     string `json:"message,omitempty"` // regex; match-any if empty
+	Description string `json:"description,omitempty"`
+	Source      string `json:"source,omitempty"`
+}
+
 // SightmapMatch records which component definition matched a node.
 type SightmapMatch struct {
 	Name   string

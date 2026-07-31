@@ -31,6 +31,10 @@ type Corpus struct {
 	// not a flatten.
 	GlobalRequests []match.Request
 
+	// Messages is the flat list of declarative console/exception patterns.
+	// Corpus-root only — no view-scoping. See SEP-0006.
+	Messages []match.Message
+
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
 	Views []View
@@ -187,6 +191,14 @@ func (c *Corpus) AllRequests() []match.Request {
 		}
 	}
 	return out
+}
+
+// AllMessages returns every declarative console/exception pattern in the
+// corpus. Messages are corpus-root only (see SEP-0006) — this is a direct
+// accessor, not a merge, but named to match AllComponents/AllRequests for a
+// uniform whole-corpus API.
+func (c *Corpus) AllMessages() []match.Message {
+	return c.Messages
 }
 
 // ViewForURL returns the View whose route most specifically matches pageURL's
