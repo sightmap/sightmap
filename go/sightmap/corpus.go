@@ -26,6 +26,11 @@ type Corpus struct {
 	// (from components.yaml), with children already flattened.
 	GlobalComponents []match.SightmapComponent
 
+	// GlobalRequests is the flat list of globally-defined requests. Unlike
+	// components, requests have no hierarchy — this is a direct conversion,
+	// not a flatten.
+	GlobalRequests []match.Request
+
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
 	Views []View
@@ -60,6 +65,7 @@ type View struct {
 	Route      string
 	Memory     []string
 	Components []match.SightmapComponent
+	Requests   []match.Request
 	Stability  string     // "" (default/active), "stub", or "deferred"
 	Access     Access     // reachability for the reference capture account
 	URL        string     // Representative URL for this view
@@ -153,6 +159,31 @@ func (c *Corpus) AllComponents() []match.SightmapComponent {
 	for _, v := range c.Views {
 		for _, vc := range v.Components {
 			add(vc)
+		}
+	}
+	return out
+}
+
+// AllRequests returns every request definition in the corpus — GlobalRequests
+// plus every View's Requests, deduped by first-seen name. Mirrors AllComponents:
+// for a whole-corpus consumer (a linter, an upload payload builder), not a
+// per-page match.
+func (c *Corpus) AllRequests() []match.Request {
+	seen := make(map[string]bool)
+	var out []match.Request
+	add := func(req match.Request) {
+		if req.Name == "" || seen[req.Name] {
+			return
+		}
+		seen[req.Name] = true
+		out = append(out, req)
+	}
+	for _, gr := range c.GlobalRequests {
+		add(gr)
+	}
+	for _, v := range c.Views {
+		for _, vr := range v.Requests {
+			add(vr)
 		}
 	}
 	return out

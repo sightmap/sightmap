@@ -15,21 +15,22 @@ import (
 // that authors can stash experimental fields during development.
 //
 // The known-key sets below mirror sightmap.schema.json (the source of truth),
-// NOT the Go structs — the structs are deliberately incomplete (e.g. rawFile
-// doesn't read requests), which would produce false positives.
+// NOT the Go structs — the structs may still lag a schema addition, which
+// would otherwise produce false positives.
 // stability/access/snapshots/url/properties are all recognized here.
 
 var (
-	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "snapshots")
-	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "dependencies", "memory", "components", "requests")
-	componentFields = set("name", "selector", "source", "dependencies", "description", "stability", "memory", "tags", "properties", "children")
-	refFields       = set("$ref")
-	requestFields   = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory")
-	payloadFields   = set("fields")
-	fieldFields     = set("name", "type", "description")
-	propertyFields  = set("name", "extract", "transform")
-	accessFields    = set("status", "reason")
-	snapshotFields  = set("name", "notes", "url")
+	fileRootFields        = set("version", "url", "memory", "views", "components", "requests", "snapshots")
+	viewFields            = set("name", "route", "url", "stability", "access", "description", "source", "dependencies", "memory", "components", "requests")
+	componentFields       = set("name", "selector", "source", "dependencies", "description", "stability", "memory", "tags", "properties", "children")
+	refFields             = set("$ref")
+	requestFields         = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
+	payloadFields         = set("fields")
+	fieldFields           = set("name", "type", "description")
+	propertyFields        = set("name", "extract", "transform")
+	requestPropertyFields = set("name", "field", "pattern", "transform")
+	accessFields          = set("status", "reason")
+	snapshotFields        = set("name", "notes", "url")
 )
 
 func set(keys ...string) map[string]bool {
@@ -133,6 +134,7 @@ func walkRequest(node *yaml.Node, file string, out *[]ValidationError) {
 	if p := v["response"]; p != nil {
 		walkPayload(p, file, out)
 	}
+	forEachItem(v["properties"], func(n *yaml.Node) { checkKeys(n, requestPropertyFields, file, out) })
 }
 
 func walkPayload(node *yaml.Node, file string, out *[]ValidationError) {

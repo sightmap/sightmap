@@ -76,6 +76,53 @@ components:
 	}
 }
 
+// A request's properties: (field or pattern extraction) round-trip onto its
+// match.Request, and a view-scoped request is kept separate from a global one
+// with the same route.
+func TestLoadDir_RequestProperties(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `
+version: 1
+requests:
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    method: POST
+    tags: [defect]
+    properties:
+      - name: status
+        field: rsp.body.status
+      - name: rateLimitRemaining
+        pattern: 'X-RateLimit-Remaining:\s*(\d+)'
+`
+	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	corpus, err := loadDir(dir)
+	if err != nil {
+		t.Fatalf("loadDir: %v", err)
+	}
+	if len(corpus.GlobalRequests) != 1 {
+		t.Fatalf("want 1 global request, got %d: %+v", len(corpus.GlobalRequests), corpus.GlobalRequests)
+	}
+	req := corpus.GlobalRequests[0]
+	if req.Route != "/api/checkout/pay" || req.Method != "POST" {
+		t.Errorf("request identity = %+v, want route=/api/checkout/pay method=POST", req)
+	}
+	if !reflect.DeepEqual(req.Tags, []string{"defect"}) {
+		t.Errorf("request.Tags = %v, want [defect]", req.Tags)
+	}
+	if len(req.Properties) != 2 {
+		t.Fatalf("want 2 properties, got %d: %+v", len(req.Properties), req.Properties)
+	}
+	if req.Properties[0].Name != "status" || req.Properties[0].Field != "rsp.body.status" || req.Properties[0].Pattern != "" {
+		t.Errorf("properties[0] = %+v, want a field-only extraction named status", req.Properties[0])
+	}
+	if req.Properties[1].Name != "rateLimitRemaining" || req.Properties[1].Pattern == "" || req.Properties[1].Field != "" {
+		t.Errorf("properties[1] = %+v, want a pattern-only extraction named rateLimitRemaining", req.Properties[1])
+	}
+}
+
 func TestSplitSelectors_ParenAware(t *testing.T) {
 	cases := []struct {
 		input string

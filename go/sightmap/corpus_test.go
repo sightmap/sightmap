@@ -402,6 +402,39 @@ func TestAllComponents(t *testing.T) {
 	}
 }
 
+func TestAllRequests(t *testing.T) {
+	globalA := match.Request{Name: "GetProfile", Route: "/api/profile", Method: "GET"}
+	globalB := match.Request{Name: "SubmitPayment", Route: "/api/checkout/pay-global", Method: "POST"}
+	viewB := match.Request{Name: "SubmitPayment", Route: "/api/checkout/pay-view", Method: "POST"} // same name, view-scoped
+	viewC := match.Request{Name: "TrackEvent", Route: "/api/track", Method: "POST"}
+
+	corpus := &sightmap.Corpus{
+		GlobalRequests: []match.Request{globalA, globalB},
+		Views: []sightmap.View{
+			{Route: "/checkout", Requests: []match.Request{viewB, viewC}},
+		},
+	}
+
+	list := corpus.AllRequests()
+	byName := make(map[string]match.Request, len(list))
+	for _, r := range list {
+		byName[r.Name] = r
+	}
+	if len(byName) != 3 {
+		t.Fatalf("want 3 unique requests, got %d", len(byName))
+	}
+	// SubmitPayment appears in both GlobalRequests and a view; the global (first-seen) wins.
+	if got := byName["SubmitPayment"].Route; got != "/api/checkout/pay-global" {
+		t.Errorf("SubmitPayment: first-seen (global) should win; got route %q", got)
+	}
+	if _, ok := byName["GetProfile"]; !ok {
+		t.Error("GetProfile missing from AllRequests")
+	}
+	if _, ok := byName["TrackEvent"]; !ok {
+		t.Error("TrackEvent missing from AllRequests")
+	}
+}
+
 // ---- 6. MatchTree end-to-end ------------------------------------------------
 
 func TestMatchTreeEndToEnd(t *testing.T) {

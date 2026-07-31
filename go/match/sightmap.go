@@ -28,6 +28,45 @@ type Property struct {
 	Transform string `json:"transform"` // optional post-processing
 }
 
+// Request is a single named API endpoint definition. See SEP-0005 for the
+// live-traffic property extraction Properties adds.
+type Request struct {
+	Name        string            `json:"name"`
+	Route       string            `json:"route"`
+	Method      string            `json:"method,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Source      string            `json:"source,omitempty"`
+	Request     *Payload          `json:"request,omitempty"`
+	Response    *Payload          `json:"response,omitempty"`
+	Headers     []string          `json:"headers,omitempty"`
+	Memory      []string          `json:"memory,omitempty"`
+	Tags        []string          `json:"tags,omitempty"`
+	Properties  []RequestProperty `json:"properties,omitempty"`
+}
+
+// Payload documents the expected shape of a request or response body. It is
+// descriptive only — not enforced, and not the same thing as RequestProperty's
+// live-traffic extraction (see SEP-0005 §Relationship to request:/response:).
+type Payload struct {
+	Fields []Field `json:"fields,omitempty"`
+}
+
+// Field is one documented (not enforced) field of a Payload.
+type Field struct {
+	Name        string `json:"name"`
+	Type        string `json:"type,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+// RequestProperty describes a value extracted from a live request/response
+// pair. Exactly one of Field/Pattern is set. See SEP-0005.
+type RequestProperty struct {
+	Name      string `json:"name"`
+	Field     string `json:"field,omitempty"`   // dot-path into the extraction root; e.g. "rsp.body.status"
+	Pattern   string `json:"pattern,omitempty"` // regex, for content Field's path addressing can't reach
+	Transform string `json:"transform,omitempty"`
+}
+
 // SightmapMatch records which component definition matched a node.
 type SightmapMatch struct {
 	Name   string

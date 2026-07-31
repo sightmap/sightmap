@@ -222,6 +222,43 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "description": "Open-vocabulary classification labels for this request. Every request definition that matches applies its own tags — there is no single-winner resolution to shadow, unlike components or views. See SEP-0004."
+        },
+        "properties": {
+          "type": "array",
+          "description": "Ordered list of live-traffic-value extractions, for a consumer to filter or reason about. See SEP-0005.",
+          "items": { "$ref": "#/$defs/requestProperty" }
+        }
+      }
+    },
+    "requestProperty": {
+      "type": "object",
+      "description": "A named value extracted from a live request/response pair. See SEP-0005.",
+      "required": ["name"],
+      "additionalProperties": false,
+      "oneOf": [
+        { "required": ["field"] },
+        { "required": ["pattern"] }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Key a consumer refers to this value by."
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dot-path into the extraction root (req|rsp × body|headers, or a reserved already-structured name: status, method, duration). See SEP-0005 §Extraction root."
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Regex evaluated against the same rooted target field would resolve to."
+        },
+        "transform": {
+          "type": "string",
+          "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
+          "description": "Optional post-processing applied to the extracted string. Same vocabulary as componentProperty.transform (SEP-0003)."
         }
       }
     },

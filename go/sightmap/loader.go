@@ -44,6 +44,7 @@ type rawFile struct {
 	Memory     []string       `yaml:"memory"`
 	Components []rawComponent `yaml:"components"`
 	Views      []rawView      `yaml:"views"`
+	Requests   []rawRequest   `yaml:"requests"`
 	URL        string         `yaml:"url"`
 	Snapshots  []rawSnapshot  `yaml:"snapshots"`
 }
@@ -61,6 +62,7 @@ type rawView struct {
 	Description string         `yaml:"description"`
 	Memory      []string       `yaml:"memory"`
 	Components  []rawComponent `yaml:"components"`
+	Requests    []rawRequest   `yaml:"requests"`
 	Stability   string         `yaml:"stability"`
 	Access      *rawAccess     `yaml:"access"`
 }
@@ -73,6 +75,37 @@ type rawAccess struct {
 type rawProperty struct {
 	Name      string `yaml:"name"`
 	Extract   string `yaml:"extract"`
+	Transform string `yaml:"transform"`
+}
+
+type rawRequest struct {
+	Name        string               `yaml:"name"`
+	Route       string               `yaml:"route"`
+	Method      string               `yaml:"method"`
+	Description string               `yaml:"description"`
+	Source      string               `yaml:"source"`
+	Request     *rawPayload          `yaml:"request"`
+	Response    *rawPayload          `yaml:"response"`
+	Headers     []string             `yaml:"headers"`
+	Memory      []string             `yaml:"memory"`
+	Tags        []string             `yaml:"tags"`
+	Properties  []rawRequestProperty `yaml:"properties"`
+}
+
+type rawPayload struct {
+	Fields []rawField `yaml:"fields"`
+}
+
+type rawField struct {
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	Description string `yaml:"description"`
+}
+
+type rawRequestProperty struct {
+	Name      string `yaml:"name"`
+	Field     string `yaml:"field"`
+	Pattern   string `yaml:"pattern"`
 	Transform string `yaml:"transform"`
 }
 
@@ -139,6 +172,7 @@ func loadDir(path string) (*Corpus, error) {
 
 	var memory []string
 	var globalRaws []rawComponent
+	var globalRequests []rawRequest
 	type viewFileWithPath struct {
 		rf   rawFile
 		path string
@@ -163,6 +197,9 @@ func loadDir(path string) (*Corpus, error) {
 		memory = append(memory, rf.Memory...)
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
+		}
+		if len(rf.Requests) > 0 {
+			globalRequests = append(globalRequests, rf.Requests...)
 		}
 		if len(rf.Views) > 0 {
 			viewFiles = append(viewFiles, viewFileWithPath{rf: rf, path: p})
@@ -223,6 +260,7 @@ func loadDir(path string) (*Corpus, error) {
 				Route:      rv.Route,
 				Memory:     rv.Memory,
 				Components: flattenAll(rv.Components, ctx),
+				Requests:   rawRequestsToMatch(rv.Requests),
 				Stability:  rv.Stability,
 				Access:     access,
 				URL:        viewURL,
@@ -235,12 +273,61 @@ func loadDir(path string) (*Corpus, error) {
 	return &Corpus{
 		Memory:           memory,
 		GlobalComponents: globalComps,
+		GlobalRequests:   rawRequestsToMatch(globalRequests),
 		Views:            views,
 		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),
 	}, nil
 }
 
 // ---- flattening helpers -----------------------------------------------------
+
+// rawRequestsToMatch converts a slice of rawRequest to match.Request. Unlike
+// components, requests have no hierarchy/selector composition — this is a
+// straight field-by-field conversion, not a recursive flatten.
+func rawRequestsToMatch(rrs []rawRequest) []match.Request {
+	if len(rrs) == 0 {
+		return nil
+	}
+	out := make([]match.Request, len(rrs))
+	for i, rr := range rrs {
+		out[i] = match.Request{
+			Name:        rr.Name,
+			Route:       rr.Route,
+			Method:      rr.Method,
+			Description: rr.Description,
+			Source:      rr.Source,
+			Request:     rawPayloadToMatch(rr.Request),
+			Response:    rawPayloadToMatch(rr.Response),
+			Headers:     rr.Headers,
+			Memory:      rr.Memory,
+			Tags:        rr.Tags,
+			Properties:  rawRequestPropsToMatch(rr.Properties),
+		}
+	}
+	return out
+}
+
+func rawPayloadToMatch(rp *rawPayload) *match.Payload {
+	if rp == nil {
+		return nil
+	}
+	fields := make([]match.Field, len(rp.Fields))
+	for i, rf := range rp.Fields {
+		fields[i] = match.Field{Name: rf.Name, Type: rf.Type, Description: rf.Description}
+	}
+	return &match.Payload{Fields: fields}
+}
+
+func rawRequestPropsToMatch(rps []rawRequestProperty) []match.RequestProperty {
+	if len(rps) == 0 {
+		return nil
+	}
+	ps := make([]match.RequestProperty, len(rps))
+	for i, rp := range rps {
+		ps[i] = match.RequestProperty{Name: rp.Name, Field: rp.Field, Pattern: rp.Pattern, Transform: rp.Transform}
+	}
+	return ps
+}
 
 // rawPropsToMatch converts a slice of rawProperty to match.Property.
 func rawPropsToMatch(rps []rawProperty) []match.Property {
