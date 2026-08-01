@@ -1,11 +1,14 @@
 name: docs
 
+# go/npm/CHANGELOG.md is in the path filter so the changelog-coverage check
+# below runs on the "Version Packages" PR, which touches no docs/ files but is
+# exactly where a release without an entry would slip through.
 on:
   push:
     branches: [main]
-    paths: ['docs/**', 'spec/v1/**', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'spec/v1/**', 'go/npm/CHANGELOG.md', 'scripts/changelog-entry.mjs', '.github/workflows/docs.yml']
   pull_request:
-    paths: ['docs/**', 'spec/v1/**', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'spec/v1/**', 'go/npm/CHANGELOG.md', 'scripts/changelog-entry.mjs', '.github/workflows/docs.yml']
 
 permissions:
   contents: read
@@ -42,6 +45,13 @@ jobs:
         run: |
           node docs/scripts/build-changelog.mjs
           git diff --exit-code docs/changelog.mdx
+
+      # The drift check above only proves the page matches the entries — it
+      # passes just fine when a release has no entry at all, which is how the
+      # docs site fell a version behind npm. This asserts coverage instead:
+      # every released version in go/npm/CHANGELOG.md has an entry.
+      - name: Every release has a changelog entry
+        run: node scripts/changelog-entry.mjs --check
 
       - name: Install Mintlify CLI
         run: npm i -g mint
