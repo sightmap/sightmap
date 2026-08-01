@@ -8,6 +8,12 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.17.0" description="Released July 31, 2026" tags={["go"]}>
+
+Go library: components can now carry `source:` (relative path to the implementing file — already schema-recognized, previously dropped by the loader) and `tags:` (authored classification labels, e.g. `defect`). Neither is inherited by children, matching `memory`/`properties`/`stability`'s existing convention. `Tags` also flows through `ApplySightmap`'s match result alongside `Memory`. New `Corpus.AllComponents()` returns every component in the corpus (globals plus every view's), deduped by first-seen name — the flat, whole-corpus list a consumer building an upload payload or a lint/coverage report wants, replacing an equivalent hand-rolled loop in `cmd_lint.go`.
+
+</Update>
+
 <Update label="sightmap 0.16.1" description="Released July 30, 2026" tags={["go"]}>
 
 The release workflow now pushes a `go/vX.Y.Z` tag alongside the existing `vX.Y.Z` tag. This module lives in the repo's `go/` subdirectory rather than at the root, and Go's module versioning requires a nested module's tags to be prefixed with that subdirectory — so `go get github.com/sightmap/sightmap/go@vX.Y.Z` has never actually resolved to a tagged release, only to `@latest`'s branch-tip pseudo-version. The bare tag is unchanged and still drives everything else (goreleaser, npm publishing, the release-already-tagged check).
