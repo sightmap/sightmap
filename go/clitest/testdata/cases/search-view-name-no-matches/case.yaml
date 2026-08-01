@@ -1,6 +1,5 @@
 title: "search prints a bare 'no matches' when the pattern names a view the corpus contains"
 issue: 144
-known_bug: true
 run:
   args: [search, TablePage]
   fixture: fixture

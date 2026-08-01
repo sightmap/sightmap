@@ -1,6 +1,5 @@
 title: "Spec says version must be 1; a version: 2 file validates clean with no error or warning"
 issue: 89
-known_bug: true
 run:
   args: [validate]
   fixture: fixture
