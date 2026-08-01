@@ -1,6 +1,5 @@
 title: "browser start times out, kills Chrome, and reports nothing about which binary ran or why it failed"
 issue: 45
-known_bug: true
 requires: [linux]
 run:
   args: [browser, start, --url, "http://127.0.0.1:1/"]

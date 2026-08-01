@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -30,6 +31,9 @@ func runBrowserStart(args []string) error {
 	profileFlag := fset.String("profile", "", "Chrome user data dir (default: ~/.sightmap/profiles/default)")
 	headlessFlag := fset.Bool("headless", false, "Run headless")
 	waitFlag := fset.Float64("wait", 0, "Seconds to wait after navigation")
+	chromeBinaryFlag := fset.String("chrome-binary", "", "Path to a specific Chrome binary (overrides auto-detection)")
+	var chromeFlags stringSliceFlag
+	fset.Var(&chromeFlags, "chrome-flag", "Extra flag to pass to Chrome (repeatable), e.g. --chrome-flag=--no-sandbox")
 	if err := fset.Parse(args); err != nil {
 		return err
 	}
@@ -175,9 +179,13 @@ func runBrowserStart(args []string) error {
 	}
 
 	// ── Launch Chrome ─────────────────────────────────────────────────────────
-	chromePath, err := browser.FindChrome()
-	if err != nil {
-		return err
+	chromePath := *chromeBinaryFlag
+	if chromePath == "" {
+		found, findErr := browser.FindChrome()
+		if findErr != nil {
+			return findErr
+		}
+		chromePath = found
 	}
 
 	chromeArgs := []string{
@@ -210,7 +218,14 @@ func runBrowserStart(args []string) error {
 		)
 	}
 
+	// Root containers (the standard agent/CI env) need --no-sandbox or Chrome
+	// refuses to start; add it automatically. Caller --chrome-flag values append
+	// last so they can override.
+	chromeArgs = finalChromeArgs(chromeArgs, os.Geteuid(), chromeFlags)
+
+	var chromeStderr boundedBuffer
 	cmd := exec.Command(chromePath, chromeArgs...)
+	cmd.Stderr = &chromeStderr
 	setSysProcAttr(cmd) // platform-specific detach (defined in sysproc_*.go)
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("start: launch chrome: %w", err)
@@ -219,7 +234,10 @@ func runBrowserStart(args []string) error {
 	cdpAddr := fmt.Sprintf("127.0.0.1:%d", resolvedCDPPort)
 	if pollErr := pollCDPReady(cdpAddr); pollErr != nil {
 		cmd.Process.Kill()
-		return fmt.Errorf("start: chrome did not become ready: %w", pollErr)
+		_ = cmd.Wait() // let the stderr copy goroutine finish before reading the buffer
+		return fmt.Errorf("start: chrome did not become ready: %w\n"+
+			"  binary: %s\n  args:   %s\n%s",
+			pollErr, chromePath, strings.Join(chromeArgs, " "), chromeStderr.tailReport())
 	}
 
 	// Start the console/network collector against the now-ready session and
