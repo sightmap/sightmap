@@ -33,6 +33,8 @@ func main() {
 
 	var err error
 	switch cmd {
+	case "init":
+		err = runInit(args)
 	case "browser":
 		err = runBrowser(args)
 	case "inspect":
@@ -129,6 +131,7 @@ Commands:
   network  list [--type T] [--url SUBSTR] [--tab T] [--limit N]  captured network requests
   network  get INDEX [--response-file F] [--request-file F]  one request + body by index
 
+  init     [--sightmap-dir DIR]                             scaffold a schema-correct .sightmap/ corpus
   skills install [--target DIR]                             install sightmap authoring skill to ~/.agents/skills/
   version                                                    print version and exit
 
