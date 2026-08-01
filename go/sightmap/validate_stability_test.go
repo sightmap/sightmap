@@ -49,7 +49,7 @@ components:
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			yamlPath := filepath.Join(tmpDir, "components.yaml")
-			if err := os.WriteFile(yamlPath, []byte(tt.yaml), 0644); err != nil {
+			if err := os.WriteFile(yamlPath, []byte("version: 1\n"+tt.yaml), 0644); err != nil {
 				t.Fatal(err)
 			}
 
@@ -125,7 +125,7 @@ views:
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
 			yamlPath := filepath.Join(tmpDir, "views.yaml")
-			if err := os.WriteFile(yamlPath, []byte(tt.yaml), 0644); err != nil {
+			if err := os.WriteFile(yamlPath, []byte("version: 1\n"+tt.yaml), 0644); err != nil {
 				t.Fatal(err)
 			}
 

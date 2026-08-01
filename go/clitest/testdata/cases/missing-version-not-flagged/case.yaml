@@ -1,6 +1,5 @@
 title: "Spec requires version: 1 in every corpus file; validate never mentions it"
 issue: 89
-known_bug: true
 run:
   args: [validate]
   fixture: fixture

@@ -1,6 +1,5 @@
 title: "A corpus with global components and zero views validates clean"
 issue: 89
-known_bug: true
 run:
   args: [validate]
   fixture: fixture

@@ -2,6 +2,8 @@ package sightmap
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -88,11 +90,77 @@ func forEachItem(seq *yaml.Node, fn func(*yaml.Node)) {
 }
 
 func walkFile(node *yaml.Node, file string, out *[]ValidationError) {
-	v := checkKeys(node, fileRootFields, file, out)
+	known := fileRootFields
+	if node != nil && node.Kind == yaml.MappingNode {
+		known = fileRootDiagnostics(node, file, out)
+	}
+	v := checkKeys(node, known, file, out)
 	forEachItem(v["views"], func(n *yaml.Node) { walkView(n, file, out) })
 	forEachItem(v["components"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 	forEachItem(v["requests"], func(n *yaml.Node) { walkRequest(n, file, out) })
 	forEachItem(v["snapshots"], func(n *yaml.Node) { checkKeys(n, snapshotFields, file, out) })
+}
+
+// fileRootDiagnostics emits targeted diagnostics for the common file-root
+// mistakes an author makes before they've discovered the schema — a misplaced
+// view field (the views: wrapper was forgotten), a missing version:, and a
+// view-shaped file (url: + components:, no views:) that silently becomes a
+// globals file. It returns the set of keys checkKeys should treat as known, so a
+// misplaced view field gets the teaching message here instead of a bare
+// "unknown field".
+func fileRootDiagnostics(node *yaml.Node, file string, out *[]ValidationError) map[string]bool {
+	seen := map[string]bool{}
+	var misplaced []string
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		k := node.Content[i].Value
+		seen[k] = true
+		if !fileRootFields[k] && viewFields[k] {
+			misplaced = append(misplaced, k)
+		}
+	}
+
+	if len(misplaced) > 0 {
+		sort.Strings(misplaced)
+		quoted := make([]string, len(misplaced))
+		for i, k := range misplaced {
+			quoted[i] = fmt.Sprintf("%q", k)
+		}
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "view-field-at-file-root",
+			Severity: SeverityWarning,
+			Message: fmt.Sprintf("field(s) %s at the file root look like view fields — view fields belong under a top-level \"views:\" list, e.g.:\n  views:\n    - name: Home\n      route: /",
+				strings.Join(quoted, ", ")),
+		})
+	}
+	if !seen["version"] {
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "missing-version",
+			Severity: SeverityWarning,
+			Message:  `missing "version:" — every corpus file should begin with "version: 1"`,
+		})
+	}
+	if seen["url"] && seen["components"] && !seen["views"] {
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "no-views-in-file",
+			Severity: SeverityWarning,
+			Message:  `this file sets "url:" and "components:" but defines no "views:" — its components are treated as global. Did you mean to nest them under a "views:" list?`,
+		})
+	}
+
+	if len(misplaced) == 0 {
+		return fileRootFields
+	}
+	known := make(map[string]bool, len(fileRootFields)+len(misplaced))
+	for k := range fileRootFields {
+		known[k] = true
+	}
+	for _, k := range misplaced {
+		known[k] = true
+	}
+	return known
 }
 
 func walkView(node *yaml.Node, file string, out *[]ValidationError) {

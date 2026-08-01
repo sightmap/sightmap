@@ -1,6 +1,5 @@
 title: "A view file with root-level url: + components: silently becomes a global components file"
 issue: 89
-known_bug: true
 run:
   args: [validate]
   fixture: fixture
