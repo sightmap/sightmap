@@ -1,0 +1,6 @@
+version: 1
+views:
+  - name: [unclosed
+      route: /x
+   components:
+  - selector

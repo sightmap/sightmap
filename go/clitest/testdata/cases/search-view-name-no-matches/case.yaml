@@ -1,0 +1,15 @@
+title: "search prints a bare 'no matches' when the pattern names a view the corpus contains"
+issue: 144
+known_bug: true
+run:
+  args: [search, TablePage]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)view'
+      why: >
+        search covers component fields only (documented) — but "no matches for
+        TablePage" reads as "not in the corpus" when TablePage exists as a
+        view. The output should name the near-miss: it exists as a view, and
+        search skips view/request fields.

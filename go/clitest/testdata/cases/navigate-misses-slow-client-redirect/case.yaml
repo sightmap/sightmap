@@ -1,0 +1,17 @@
+title: "navigate reports the pre-redirect URL when a client-side redirect resolves ~3s after load"
+issue: 141
+known_bug: true
+requires: [manual]
+run:
+  args: [browser, navigate, "http://127.0.0.1:8901/guard.html"]
+  fixture: fixture
+expect:
+  output:
+    - must_match: 'redirected to .*landed\.html'
+      why: >
+        guard.html client-redirects to landed.html 3s after load — slower than
+        AwaitNavigation's 2s budget — so today no "(redirected to …)" prints
+        and the caller is told it is on guard.html while the browser is on
+        landed.html. The same page redirecting at 1s does print the line, so
+        the budget, not the mechanism, is the bug. Manual steps: serve page/,
+        browser start, then run.

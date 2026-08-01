@@ -1,0 +1,21 @@
+<!doctype html><html><head><title>Companies</title><style>
+  .scroller { overflow: auto; height: 400px; }
+  .rowgroup { display: contents; }  /* box-less "tbody": zero-size box, visible children */
+  .row { display: flex; gap: 12px; padding: 4px; }
+</style></head><body>
+<div data-component="RecordTable" class="scroller" role="table"><div class="rowgroup" role="rowgroup"></div></div>
+<script>
+  const g = document.querySelector('.rowgroup');
+  const names = ["Cisco","Microsoft","Google","Airbnb","Figma"];
+  for (let i = 1; i <= 60; i++) {
+    const name = names[i % names.length] + " " + i;
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.setAttribute('role', 'row');
+    row.setAttribute('data-testid', 'row-id-' + crypto.randomUUID());
+    row.innerHTML = '<a href="/c/' + i + '">' + name + '</a>' +
+                    '<span>' + name.toLowerCase().replace(/ /g,'') + '.com</span>' +
+                    '<button>Open ' + i + '</button>';
+    g.appendChild(row);
+  }
+</script></body></html>

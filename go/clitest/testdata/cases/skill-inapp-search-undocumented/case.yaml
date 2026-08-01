@@ -1,0 +1,12 @@
+title: "The authoring skill does not treat in-app search as a first-class navigation surface to map"
+issue: 146
+known_bug: true
+expect:
+  repo:
+    - file: skills/sightmap-authoring/SKILL.md
+      must_match: '(?i)in-app search|app''s (own )?search'
+      why: >
+        In the Twenty evaluation's consumption trials the app's own search box
+        won 5 of 6 runs and the corpus didn't map it. Agents will find search
+        anyway; the skill should direct authors to map the search surface (and
+        its quirks) early. (Repo-content case: no run.)

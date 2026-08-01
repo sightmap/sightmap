@@ -1,0 +1,21 @@
+title: "snapshot renders a matched container as a leaf: 60 rows counted in [Guide] never appear in the tree"
+issue: 139
+known_bug: true
+requires: [manual]
+run:
+  args: [snapshot]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'Cisco'
+      why: >
+        Content matched by the corpus must be present (greppable) in the
+        printed tree. The fixture's rowgroup uses display:contents (a box-less
+        wrapper), which the probe marks isVisible:false, and render.Filter
+        drops the whole subtree — 60 visible, matched rows — while [Guide]
+        counts them and coverage reports 100% scoped ✓. Manual steps: serve
+        page/ (python3 -m http.server 8901), browser start, navigate to
+        /table.html, then run snapshot from this directory.
+    - must_match: '\[RecordTableRow'
+      why: matched rows should render with their component annotation, not vanish.

@@ -1,0 +1,8 @@
+version: 1
+views:
+  - name: SpaPage
+    route: /spa.html
+    url: http://127.0.0.1:8901/spa.html
+    components:
+      - name: ActionList
+        selector: '#app'

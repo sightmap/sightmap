@@ -1,0 +1,20 @@
+title: "snapshot exits 0 on a partial page even while printing 'wrong page captured?' and 0-match warnings"
+issue: 142
+known_bug: true
+requires: [manual]
+run:
+  args: [snapshot]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'wrong page captured'
+      why: >
+        The page is a 2-button shell of a view whose root components are all
+        absent; snapshot already detects and prints every wrong-page signal it
+        has ([Snapshot check], per-component 0-match warnings, 100% orphans ✗)
+        — and still exits 0, so automation gating on the exit code sees
+        success. The blank-page guard fires only at exactly 0 interactive
+        nodes. Manual steps: serve page/, browser start, navigate to
+        /partial.html, then run. Coordinate with #51 before coupling exit
+        status to this check.
