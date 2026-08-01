@@ -1,0 +1,19 @@
+title: "browser install --help executes the 184 MB install instead of printing usage"
+issue: 143
+known_bug: true
+requires: [manual]
+run:
+  args: [browser, install, --help]
+  timeout_seconds: 30
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)usage'
+      why: >
+        --help on any subcommand must print usage and exit 0 with no side
+        effects. runBrowserInstall discards its args entirely, so --help (or
+        any typo) starts the Chrome for Testing download and creates
+        ~/.sightmap/browsers/. Manual not because a browser is needed, but
+        because running the current behaviour in CI downloads 184 MB.
+    - must_not_match: '(?i)download'
+      why: a help request must not begin an install.

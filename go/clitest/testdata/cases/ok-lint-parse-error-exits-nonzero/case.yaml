@@ -1,0 +1,13 @@
+title: "lint exits non-zero and names the file when the corpus does not parse"
+run:
+  args: [lint]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'parse "\.sightmap/broken\.yaml"'
+      why: >
+        CI gates on lint; a corpus that cannot parse must be a hard, named
+        failure. Pinned after an outside evaluation reported lint exiting 0
+        here — that did not reproduce on HEAD or the published 0.17.0, and
+        this case keeps it that way.

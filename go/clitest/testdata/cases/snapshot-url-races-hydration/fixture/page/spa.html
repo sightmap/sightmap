@@ -1,0 +1,14 @@
+<!doctype html><html><head><title>SPA</title></head><body>
+<div id="app"></div>
+<script>
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      const app = document.getElementById('app');
+      for (let i = 1; i <= 20; i++) {
+        const b = document.createElement('button');
+        b.textContent = 'Action ' + i;
+        app.appendChild(b);
+      }
+    }, 2500);
+  });
+</script></body></html>

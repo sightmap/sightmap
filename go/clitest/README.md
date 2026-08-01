@@ -51,10 +51,14 @@ expect:
       must_match: '(?s)views:\s*\n\s+- name:'
 ```
 
-`requires: [manual]` marks cases needing a live browser against a real page;
-they are always skipped but stay in the dataset with their desired behaviour
-encoded. `requires: [chrome]` runs only where a Chrome is on PATH (override
-with `SIGHTMAP_TEST_CHROME=1`).
+`requires: [manual]` marks cases the suite must never run on its own — usually
+because they need a live browser against a real page, occasionally because the
+*current* behaviour has side effects unsafe for CI (e.g. a `--help` that starts
+a 184 MB download). They are always skipped but stay in the dataset with their
+desired behaviour encoded; ship the runnable fixture (page + corpus) and put the
+hand-repro steps in a `why`, so a human can replay the case in minutes.
+`requires: [chrome]` runs only where a Chrome is on PATH (override with
+`SIGHTMAP_TEST_CHROME=1`).
 
 ## The xfail ratchet
 
@@ -81,6 +85,9 @@ If a moment is worth a checked-in case it's worth a public issue (or it's an
 ordinary unit test with no external ref). Decontextualized provenance — the
 transcript or report a case came from, scrubbed so a later reader needs no prior
 knowledge of the app it was captured against — belongs in that issue, not here.
+For an outside evaluation, that means linking the report (or its PR) and naming
+the finding's ID in the issue body, so the case → issue → report chain survives
+without any of the three repeating the others.
 
 ## Intake ritual — turning a real session into cases
 
@@ -103,3 +110,7 @@ evaluation, often against a private or unreproducible app. Route each finding:
    thing it did say). Mark it `known_bug: true` and link the `issue:`.
 5. When the behaviour ships, drop `known_bug` in the same PR — the `FIXED`
    failure will remind you if you forget.
+6. **A claim that does not reproduce** — after a genuine attempt against both
+   HEAD and the released binary — is still information: pin the correct
+   behaviour with an `ok-` case so the suite proves the claim false from now
+   on, and report the non-repro back to the source instead of filing an issue.

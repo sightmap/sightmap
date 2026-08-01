@@ -1,0 +1,10 @@
+version: 1
+views:
+  - name: PartialPage
+    route: /partial.html
+    url: http://127.0.0.1:8901/partial.html
+    components:
+      - name: SearchBar
+        selector: '[data-component="SearchBar"]'
+      - name: BigTable
+        selector: '[data-component="BigTable"]'

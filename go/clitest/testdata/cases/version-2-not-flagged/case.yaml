@@ -1,0 +1,16 @@
+title: "Spec says version must be 1; a version: 2 file validates clean with no error or warning"
+issue: 89
+known_bug: true
+run:
+  args: [validate]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: '(?i)version'
+      why: >
+        The spec's conformance section requires rejecting any version other
+        than 1 (schema.md "Must be 1"; JSON Schema const: 1). An explicit
+        version: 2 must be a named error so the forward-compat story holds —
+        today the loader parses the field and nothing checks it. Companion to
+        missing-version-not-flagged, which covers the absent-field warning.

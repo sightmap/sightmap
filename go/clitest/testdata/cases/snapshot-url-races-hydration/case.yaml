@@ -1,0 +1,21 @@
+title: "snapshot --url re-navigates a page the browser is already on and races SPA hydration to a 0-node error"
+issue: 140
+known_bug: true
+requires: [manual]
+run:
+  args: [snapshot, --url, "http://127.0.0.1:8901/spa.html"]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'Action 1'
+      why: >
+        The browser is already sitting on the fully rendered URL; --url must
+        observe it (navigate only when the current URL differs, then wait for
+        render), not re-navigate and snapshot the pre-hydration shell. Manual
+        steps: serve page/, browser start, browser navigate to /spa.html, wait
+        4s (content renders 2.5s after load with no network activity — first
+        networkIdle fires before it), then run. Without --url the identical
+        snapshot succeeds; with it, today: "0 interactive nodes" hard error.
+    - must_not_match: '0 interactive nodes'
+      why: re-navigation must not turn an already-rendered page into a blank observation.

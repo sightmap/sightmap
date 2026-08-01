@@ -1,0 +1,14 @@
+title: "The authoring skill never teaches that navigation quirks belong on the component you act on"
+issue: 146
+known_bug: true
+expect:
+  repo:
+    - file: skills/sightmap-authoring/SKILL.md
+      must_match: '(?i)component you (act on|click)'
+      why: >
+        Component memory surfaces wherever the component matches — before the
+        action; view memory appears only after arrival, too late to steer
+        navigation. The skill should state the placement rule: quirks about
+        reaching a view go on the component you act on, not the destination
+        view. (Repo-content case: no run. Wording may vary — adjust the regex
+        with the fix if needed.)

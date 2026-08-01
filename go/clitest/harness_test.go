@@ -236,7 +236,7 @@ func requirementsMet(requires []string) (string, bool) {
 				return "requires chrome (none in PATH; set SIGHTMAP_TEST_CHROME=1 to force)", false
 			}
 		case "manual":
-			return "manual: needs a live browser session against a real page", false
+			return "manual: not CI-runnable (live browser or unsafe side effects) — see the case's why for hand-repro steps", false
 		default:
 			return "unknown requirement: " + req, false
 		}

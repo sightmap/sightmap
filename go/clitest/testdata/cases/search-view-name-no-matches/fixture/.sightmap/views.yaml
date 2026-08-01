@@ -1,0 +1,7 @@
+version: 1
+views:
+  - name: TablePage
+    route: /table
+    components:
+      - name: RecordTable
+        selector: '[data-component="RecordTable"]'
