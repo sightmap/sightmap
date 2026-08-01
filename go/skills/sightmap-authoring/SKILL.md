@@ -307,11 +307,6 @@ The overlay extension is embedded in the binary and auto-extracted to
 
 If the site has a `package.json` with `g:*` scripts, those are convenience wrappers around the same commands and work equally well.
 
-To connect to an existing Chrome session:
-```bash
-sightmap browser register --addr localhost:PORT
-```
-
 ---
 
 ## Phase 1: Per-page iteration

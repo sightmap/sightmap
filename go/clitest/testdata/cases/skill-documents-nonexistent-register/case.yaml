@@ -1,6 +1,5 @@
 title: "The authoring skill documents `browser register --addr`, a command that does not exist"
 issue: 122
-known_bug: true
 expect:
   repo:
     - file: skills/sightmap-authoring/SKILL.md
