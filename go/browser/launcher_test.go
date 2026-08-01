@@ -3,9 +3,50 @@ package browser
 import (
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// TestFindChromeManagedPreferredPerOS is the #44 regression guard: a managed
+// Chrome-for-Testing install must be returned on every platform (Linux and
+// Windows previously ignored it, so `browser install` → `browser start` failed).
+func TestFindChromeManagedPreferredPerOS(t *testing.T) {
+	bin := filepath.Join(t.TempDir(), "chrome")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	managed := func() (string, bool) { return bin, true }
+	for _, goos := range []string{"linux", "windows", "darwin"} {
+		got, err := findChrome(goos, managed)
+		if err != nil {
+			t.Errorf("findChrome(%q, managed) error: %v", goos, err)
+			continue
+		}
+		if got != bin {
+			t.Errorf("findChrome(%q, managed) = %q, want managed %q", goos, got, bin)
+		}
+	}
+}
+
+// TestFindChromeLinuxErrorMentionsInstall verifies the Linux no-Chrome error
+// points at `browser install` (the docs' remedy), rather than the old bare
+// "no Chrome binary found in PATH".
+func TestFindChromeLinuxErrorMentionsInstall(t *testing.T) {
+	for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser"} {
+		if _, err := exec.LookPath(name); err == nil {
+			t.Skip("a system chrome is on PATH; skipping the no-chrome error test")
+		}
+	}
+	_, err := findChrome("linux", func() (string, bool) { return "", false })
+	if err == nil {
+		t.Fatal("expected an error with no managed install and no PATH chrome")
+	}
+	if !strings.Contains(err.Error(), "browser install") {
+		t.Errorf("Linux no-chrome error should mention `browser install`, got: %v", err)
+	}
+}
 
 // TestSessionFileIsolationByCorpus is the regression guard for cross-agent
 // crosstalk: the session file must live inside the corpus directory so that

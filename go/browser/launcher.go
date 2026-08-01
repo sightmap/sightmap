@@ -117,66 +117,68 @@ func WriteSessionInfo(sightmapDir string, info SessionInfo) error {
 // FindChrome returns the path to the Chrome binary on the current platform,
 // or an error if none is found.
 func FindChrome() (string, error) {
-	switch runtime.GOOS {
+	return findChrome(runtime.GOOS, InstalledCfTPath)
+}
+
+// findChrome resolves a Chrome binary for goos. managed supplies the
+// sightmap-managed Chrome-for-Testing path (what `browser install` downloads);
+// it is preferred on every platform because it supports --load-extension.
+// InstalledCfTPath only reports ok when the binary actually exists. goos is a
+// parameter so per-OS resolution is unit-testable on any host.
+func findChrome(goos string, managed func() (string, bool)) (string, error) {
+	// Managed Chrome for Testing first, on every platform. This is the #44 fix:
+	// Linux and Windows previously ignored the managed install, so the documented
+	// `browser install` → `browser start` flow failed on those OSes.
+	if p, ok := managed(); ok {
+		return p, nil
+	}
+
+	switch goos {
 	case "darwin":
-		// Build candidate list: prefer Chrome for Testing (supports --load-extension),
-		// then Canary, then stable Chrome (which blocks --load-extension on macOS).
+		// Prefer a legacy agent-browser CfT, then system Chrome (Canary before
+		// stable; both block --load-extension but work for non-extension flows).
 		var candidates []string
-
-		// 1. Sightmap-managed CfT install (~/.sightmap/browsers/).
-		if p, ok := InstalledCfTPath(); ok {
-			candidates = append(candidates, p)
-		}
-
-		// 2. agent-browser-managed CfT (~/.agent-browser/browsers/) — legacy.
 		if home, err := os.UserHomeDir(); err == nil {
 			if matches, _ := filepath.Glob(filepath.Join(home, ".agent-browser", "browsers", "chrome-*",
 				"Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing")); len(matches) > 0 {
-				// filepath.Glob returns sorted; take the last for the highest version.
 				candidates = append(candidates, matches[len(matches)-1])
 			}
 		}
-
-		// 3. System Chrome (Canary before stable; both block --load-extension but
-		//    are useful as a fallback for non-extension workflows).
 		candidates = append(candidates,
 			"/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
 			"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 			"/Applications/Chromium.app/Contents/MacOS/Chromium",
 		)
 		for _, p := range candidates {
-			if p == "" {
-				continue
-			}
-			if _, err := os.Stat(p); err == nil {
-				return p, nil
+			if p != "" {
+				if _, err := os.Stat(p); err == nil {
+					return p, nil
+				}
 			}
 		}
-		return "", fmt.Errorf("chrome: no Chrome binary found on macOS")
+		return "", fmt.Errorf("chrome: no Chrome found — run `sightmap browser install` for a managed Chrome for Testing, or install Google Chrome")
 
 	case "linux":
-		names := []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser"}
-		for _, name := range names {
+		for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser"} {
 			if p, err := exec.LookPath(name); err == nil {
 				return p, nil
 			}
 		}
-		return "", fmt.Errorf("chrome: no Chrome binary found in PATH on Linux")
+		return "", fmt.Errorf("chrome: no Chrome found — run `sightmap browser install` to fetch a managed Chrome for Testing into ~/.sightmap/browsers/, or put google-chrome/chromium on PATH")
 
 	case "windows":
-		candidates := []string{
+		for _, p := range []string{
 			filepath.Join(os.Getenv("LOCALAPPDATA"), "Google", "Chrome", "Application", "chrome.exe"),
 			filepath.Join(os.Getenv("PROGRAMFILES"), "Google", "Chrome", "Application", "chrome.exe"),
-		}
-		for _, p := range candidates {
+		} {
 			if _, err := os.Stat(p); err == nil {
 				return p, nil
 			}
 		}
-		return "", fmt.Errorf("chrome: no Chrome binary found on Windows")
+		return "", fmt.Errorf("chrome: no Chrome found — run `sightmap browser install` for a managed Chrome for Testing, or install Google Chrome")
 
 	default:
-		return "", fmt.Errorf("chrome: unsupported OS %q", runtime.GOOS)
+		return "", fmt.Errorf("chrome: unsupported OS %q", goos)
 	}
 }
 
