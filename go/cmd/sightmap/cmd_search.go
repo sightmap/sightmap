@@ -17,6 +17,11 @@ type srchFile struct {
 	Version    int        `yaml:"version"`
 	Components []srchComp `yaml:"components"`
 	Views      []srchView `yaml:"views"`
+	Requests   []srchReq  `yaml:"requests"`
+}
+
+type srchReq struct {
+	Name string `yaml:"name"`
 }
 
 type srchView struct {
@@ -69,6 +74,10 @@ func runSearch(args []string) error {
 	}
 
 	matchCount := 0
+	// Name hits on views/requests — search covers component fields only, so these
+	// don't count as matches, but they explain a "no matches" near-miss.
+	var viewHits, reqHits []string
+	nameSearch := *field == "all" || *field == "name"
 
 	walkErr := filepath.WalkDir(*sightmapDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -117,10 +126,18 @@ func runSearch(args []string) error {
 
 		// Walk views.
 		for _, view := range sf.Views {
+			if nameSearch && view.Name != "" && re.MatchString(view.Name) {
+				viewHits = append(viewHits, view.Name)
+			}
 			viewCrumb := fmt.Sprintf("%s [%s %s]", relPath, view.Name, view.Route)
 			for _, comp := range view.Components {
 				n := searchComp(comp, re, *field, []string{viewCrumb}, relPath, view.Name, view.Route)
 				matchCount += n
+			}
+		}
+		for _, r := range sf.Requests {
+			if nameSearch && r.Name != "" && re.MatchString(r.Name) {
+				reqHits = append(reqHits, r.Name)
 			}
 		}
 
@@ -132,7 +149,20 @@ func runSearch(args []string) error {
 	}
 
 	if matchCount == 0 {
-		fmt.Fprintf(os.Stderr, "no matches for %s\n", pattern)
+		var notes []string
+		if len(viewHits) > 0 {
+			notes = append(notes, fmt.Sprintf("a view named %s", strings.Join(viewHits, ", ")))
+		}
+		if len(reqHits) > 0 {
+			notes = append(notes, fmt.Sprintf("a request named %s", strings.Join(reqHits, ", ")))
+		}
+		if len(notes) > 0 {
+			fmt.Fprintf(os.Stderr, "no component matches for %q — but the corpus has %s. "+
+				"search covers component fields (name, selector, description, memory), not view or request names.\n",
+				pattern, strings.Join(notes, " and "))
+		} else {
+			fmt.Fprintf(os.Stderr, "no matches for %s\n", pattern)
+		}
 	}
 
 	return nil

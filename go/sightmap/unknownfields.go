@@ -111,9 +111,13 @@ func walkFile(node *yaml.Node, file string, out *[]ValidationError) {
 func fileRootDiagnostics(node *yaml.Node, file string, out *[]ValidationError) map[string]bool {
 	seen := map[string]bool{}
 	var misplaced []string
+	versionVal := ""
 	for i := 0; i+1 < len(node.Content); i += 2 {
 		k := node.Content[i].Value
 		seen[k] = true
+		if k == "version" {
+			versionVal = node.Content[i+1].Value
+		}
 		if !fileRootFields[k] && viewFields[k] {
 			misplaced = append(misplaced, k)
 		}
@@ -139,6 +143,13 @@ func fileRootDiagnostics(node *yaml.Node, file string, out *[]ValidationError) m
 			Code:     "missing-version",
 			Severity: SeverityWarning,
 			Message:  `missing "version:" — every corpus file should begin with "version: 1"`,
+		})
+	} else if versionVal != "1" {
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "unsupported-version",
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("unsupported version %q — this tooling supports version: 1", versionVal),
 		})
 	}
 	if seen["url"] && seen["components"] && !seen["views"] {

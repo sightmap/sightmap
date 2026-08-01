@@ -1,6 +1,5 @@
 title: "browser install --help executes the 184 MB install instead of printing usage"
 issue: 143
-known_bug: true
 requires: [manual]
 run:
   args: [browser, install, --help]
