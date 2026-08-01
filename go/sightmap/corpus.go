@@ -222,9 +222,13 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 // MatchRoute reports whether the glob-style route pattern matches path.
 // trailing slash is normalized off both sides first (except the root "/"), so
 // "/*/projects" matches "/acme/projects/".
-//   - **      matches any sequence of characters including slashes (one or more)
-//   - *       matches a single path segment (no slashes)
-//   - :param  matches a single path segment (no slashes)
+//   - literal  matches itself
+//   - *        matches exactly one path segment (no slashes)
+//   - :param   matches exactly one path segment (like *, but scores higher)
+//   - **       a whole "**" segment matches zero or more path segments, so
+//     "/admin/**" matches "/admin", "/admin/x", and "/admin/x/y"
+//   - a "**" glued into a segment (e.g. "/foo**") is treated as a regular *,
+//     matching within that one segment only
 func MatchRoute(pattern, path string) bool {
 	re := regexp.MustCompile(routeToRegex(normalizeRoutePath(pattern)))
 	return re.MatchString(normalizeRoutePath(path))
@@ -241,49 +245,60 @@ func normalizeRoutePath(p string) string {
 	return trimmed
 }
 
-// routeToRegex converts a normalized route glob pattern to an anchored regexp
-// string. `*` and `:param` segments each match a single path segment; `**`
-// matches any depth.
+// routeToRegex converts a normalized route glob pattern into an anchored regexp
+// string. It is segment-oriented: the pattern is split on "/", and each segment
+// becomes a regex fragment. A whole-segment "**" is a globstar that matches zero
+// or more path segments (consuming the slash that would precede them, so
+// "/a/**/b" matches "/a/b"); "*" and ":param" each match exactly one segment; any
+// other segment is a literal in which a run of "*" (including a glued "**") is an
+// in-segment wildcard that never crosses a slash.
 func routeToRegex(pattern string) string {
+	if pattern == "/" {
+		return "^/$"
+	}
 	var sb strings.Builder
 	sb.WriteByte('^')
-	atSegStart := true
-	for i := 0; i < len(pattern); {
-		c := pattern[i]
-		if c == '*' {
-			if i+1 < len(pattern) && pattern[i+1] == '*' {
-				sb.WriteString("(.+)")
-				i += 2
-			} else {
-				sb.WriteString("([^/]+)")
+	for i, seg := range strings.Split(pattern, "/") {
+		if i == 0 && seg == "" {
+			continue // leading slash
+		}
+		if seg == "**" {
+			// Globstar: zero or more segments, including the leading slash. An
+			// empty match collapses with the next segment's slash.
+			sb.WriteString("(?:/.*)?")
+			continue
+		}
+		sb.WriteByte('/')
+		sb.WriteString(routeSegBody(seg))
+	}
+	sb.WriteByte('$')
+	return sb.String()
+}
+
+// routeSegBody converts a single non-globstar route segment (without its leading
+// slash) to a regex fragment. A bare "*" or ":param" is one whole segment; inside
+// any other segment a run of "*" (including a glued "**") is an in-segment
+// wildcard that never crosses a "/".
+func routeSegBody(seg string) string {
+	if seg == "*" || strings.HasPrefix(seg, ":") {
+		return "[^/]+" // exactly one segment
+	}
+	var sb strings.Builder
+	for i := 0; i < len(seg); {
+		if seg[i] == '*' {
+			for i < len(seg) && seg[i] == '*' { // collapse a run of stars (incl. glued **)
 				i++
 			}
-			atSegStart = false
+			sb.WriteString("[^/]*") // in-segment wildcard
 			continue
 		}
-		// Express-style :param — a whole segment starting with ':' — matches a
-		// single path segment, exactly like `*` but scoring higher (see
-		// routeSpecificity).
-		if c == ':' && atSegStart {
-			j := i + 1
-			for j < len(pattern) && pattern[j] != '/' {
-				j++
-			}
-			sb.WriteString("([^/]+)")
-			i = j
-			atSegStart = false
-			continue
-		}
-		// Escape regex metacharacters that can appear in URL patterns.
-		switch c {
+		switch seg[i] {
 		case '.', '+', '?', '(', ')', '[', ']', '{', '}', '\\', '|', '^', '$':
 			sb.WriteByte('\\')
 		}
-		sb.WriteByte(c)
-		atSegStart = c == '/'
+		sb.WriteByte(seg[i])
 		i++
 	}
-	sb.WriteByte('$')
 	return sb.String()
 }
 
