@@ -326,8 +326,23 @@ sightmap discover                  # URL patterns — find unseen routes
 Prefer selectors with `data-testid`, `data-component^=`, `#id`. Avoid
 class selectors (volatile) and auto-generated IDs.
 
-Create `.sightmap/views/PAGE.yaml` with `route: "/pattern/**"`. Run
-`sightmap validate` before snapping.
+Create a view file `.sightmap/views/PAGE.yaml`. **View fields go under a
+top-level `views:` list** — `route:`/`url:`/`name:` are *not* file-root fields
+(putting them at the root silently makes the file a globals file, matching no
+view):
+
+```yaml
+version: 1
+views:
+  - name: Home
+    route: "/"                     # glob matched against the URL path (** = any depth)
+    url: "https://example.com/"    # a representative URL, used by report/capture
+    components:
+      - name: SearchBar
+        selector: '[data-testid="search"]'
+```
+
+Run `sightmap validate` before snapping.
 
 ### Step 1b — Snap and read coverage
 

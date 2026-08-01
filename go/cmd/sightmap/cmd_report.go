@@ -20,6 +20,16 @@ import (
 	"github.com/sightmap/sightmap/go/viewset"
 )
 
+// viewSchemaExample is the canonical minimal view-file snippet the CLI prints
+// when a view is missing or malformed, so report and capture teach the same
+// shape and the same field roles (route: matches the page, url: is navigated to).
+func viewSchemaExample() string {
+	return "  views:\n" +
+		"    - name: Home\n" +
+		"      route: /                    # glob matched against the URL path\n" +
+		"      url: https://example.com/   # representative URL to navigate to"
+}
+
 // captureCoverage is one capture's per-DOM coverage tiers plus its largest T2
 // scope, the unit report aggregates over a view's set.
 type captureCoverage struct {
@@ -95,8 +105,12 @@ func runReport(args []string) error {
 	}
 
 	if len(views) == 0 {
-		return fmt.Errorf("no views with URLs found\n" +
-			"Add a url: field to your views/*.yaml files")
+		if len(corpus.Views) == 0 {
+			return fmt.Errorf("no views defined — report needs at least one view with a url:.\n"+
+				"Define views under a top-level \"views:\" list:\n%s", viewSchemaExample())
+		}
+		return fmt.Errorf("%d view(s) defined but none has a url: — add a url: (the URL report navigates to) to your views:\n%s",
+			len(corpus.Views), viewSchemaExample())
 	}
 
 	// visibleOnly: visible-by-default; overridden by include_hidden: true in config.

@@ -85,8 +85,9 @@ func runCapture(args []string) error {
 		return fmt.Errorf("capture: observe: %v", err)
 	}
 	if res.View == nil {
-		return fmt.Errorf("capture: no view matches %q — capture appends to a view's set; "+
-			"use `snapshot` to observe an unmapped page, or add a view with a matching route", res.URL)
+		return fmt.Errorf("capture: no view matches %q — capture appends to a matched view's set.\n"+
+			"Use `snapshot` to observe an unmapped page, or add a view whose route: matches this URL:\n%s",
+			res.URL, viewSchemaExample())
 	}
 	fmtOpts := observe.FormatOpts{Trace: *traceFlag, Selectors: *selectorsFlag}
 
