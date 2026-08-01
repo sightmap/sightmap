@@ -1,6 +1,5 @@
 title: "The tool's own survey.yaml is flagged with a corpus unknown-field warning"
 issue: 119
-known_bug: true
 run:
   args: [validate]
   fixture: fixture

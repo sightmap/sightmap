@@ -47,6 +47,12 @@ func ReadSessionInfo(sightmapDir string) (SessionInfo, error) {
 		if err := json.Unmarshal([]byte(s), &info); err != nil {
 			return SessionInfo{}, fmt.Errorf("session file: %w", err)
 		}
+		// A parsed-but-portless object (e.g. a hand-written file whose keys don't
+		// match, so Port stays 0) is not a usable session — surface it as an
+		// unrecognized format rather than returning a silent Port:0.
+		if info.Port <= 0 || info.Port > 65535 {
+			return SessionInfo{}, fmt.Errorf(`session file: unrecognized format (expected {"port":N,"pid":N,...})`)
+		}
 		return info, nil
 	}
 	// Legacy format: plain port number.

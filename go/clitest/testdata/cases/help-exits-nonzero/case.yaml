@@ -1,6 +1,5 @@
 title: "--help exits 1 and appends 'flag: help requested' to every help text"
 issue: 117
-known_bug: true
 run:
   args: [validate, --help]
   fixture: fixture

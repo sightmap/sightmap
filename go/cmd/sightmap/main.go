@@ -17,6 +17,8 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"fmt"
 	"os"
 )
@@ -84,6 +86,11 @@ func main() {
 	}
 
 	if err != nil {
+		// A subcommand's --help/-h parses to flag.ErrHelp; the flag package has
+		// already printed its usage, so a help request is success, not an error.
+		if errors.Is(err, flag.ErrHelp) {
+			return
+		}
 		fmt.Fprintf(os.Stderr, "sightmap %s: %v\n", cmd, err)
 		os.Exit(1)
 	}

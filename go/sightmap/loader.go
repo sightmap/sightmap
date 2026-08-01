@@ -155,9 +155,9 @@ func loadDir(path string) (*Corpus, error) {
 		if err := yaml.Unmarshal(data, &rf); err != nil {
 			return nil, fmt.Errorf("sightmap: parse %q: %w", p, err)
 		}
-		// config.yaml is tooling config (its own schema), not a corpus file —
-		// don't run the corpus unknown-field check over it.
-		if base := filepath.Base(p); base != "config.yaml" && base != "config.yml" {
+		// Tooling files (config.yaml, survey.yaml) have their own schemas and are
+		// not corpus files — don't run the corpus unknown-field check over them.
+		if base := filepath.Base(p); base != "config.yaml" && base != "config.yml" && base != "survey.yaml" && base != "survey.yml" {
 			fieldDiags = append(fieldDiags, unknownFieldWarnings(data, base)...)
 		}
 		memory = append(memory, rf.Memory...)
