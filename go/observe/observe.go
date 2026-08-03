@@ -75,9 +75,10 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	}
 	res.CorpusApplied = true
 
-	res.Matches = corpus.MatchTree(root, url)
+	m := sightmap.NewMatcher(corpus)
+	res.Matches = m.MatchTree(root, url)
 	res.View = corpus.ViewForURL(url)
-	res.Components = corpus.Components(url)
+	res.Components = m.Components(url)
 	res.GlobalNames = corpus.GlobalComponentNames()
 	res.Coverage = coverage.Score(root, res.Matches, coverage.Options{VisibleOnly: opts.VisibleOnly})
 

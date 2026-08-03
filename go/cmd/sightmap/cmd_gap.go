@@ -9,6 +9,7 @@ import (
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func runGap(args []string) error {
@@ -53,7 +54,7 @@ func runGap(args []string) error {
 	if loadErr != nil {
 		return loadErr
 	}
-	matches := corpus.MatchTree(root, pageURL)
+	matches := sightmap.NewMatcher(corpus).MatchTree(root, pageURL)
 
 	// ── Build parent map ─────────────────────────────────────────────────────
 	parentMap := coverage.BuildParentMap(root)
@@ -72,7 +73,7 @@ func runGap(args []string) error {
 		if scopeNode == nil {
 			// Component not found or not matched on page
 			// Check if it exists in the corpus
-			components := corpus.Components(pageURL)
+			components := sightmap.NewMatcher(corpus).Components(pageURL)
 			found := false
 			for _, comp := range components {
 				if comp.Name == *scopeFlag {

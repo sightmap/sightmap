@@ -14,6 +14,7 @@ import (
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/render"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func runInspect(args []string) error {
@@ -62,7 +63,7 @@ func runInspect(args []string) error {
 	if corpus, cErr := lf.loadCorpus(); cErr != nil {
 		fmt.Fprintf(os.Stderr, "inspect: load corpus: %v (continuing without component names)\n", cErr)
 	} else if corpus != nil {
-		inspectMatches = corpus.MatchTree(root, pageURL)
+		inspectMatches = sightmap.NewMatcher(corpus).MatchTree(root, pageURL)
 	}
 
 	// ── Render ────────────────────────────────────────────────────────────────

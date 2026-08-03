@@ -4,15 +4,14 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/sightmap/sightmap/go/match"
 )
 
-// Corpus is the parsed, $ref-expanded, hierarchy-flattened sightmap data, plus a
-// lazily-populated cache of compiled match queries. It is the single operational
-// handle callers hold: load one with Load (or a Loader), then MatchTree a live
-// component tree against it. Safe for concurrent use.
+// Corpus is the parsed, $ref-expanded, hierarchy-flattened sightmap data. It is
+// pure, serializable data: load one with Load (or a Loader) and read it with the
+// ComponentsForURL / ViewForURL / RequestsForURL queries. To match a live
+// component tree against it, build a Matcher with NewMatcher(corpus).
 type Corpus struct {
 	// Memory holds file-level memory entries from every corpus file, in
 	// file-path order. The spec activates these per source file ("applies
@@ -40,10 +39,6 @@ type Corpus struct {
 	// no longer visible in the flattened data (e.g. a circular $ref chain, which
 	// is expanded away). Validate surfaces these alongside its own checks.
 	loadDiagnostics []ValidationError
-
-	// mu guards the lazily-built compiled-query cache.
-	mu    sync.Mutex
-	cache map[string]*queryCacheEntry
 }
 
 // Access describes the reachability of a view for the reference capture account.
