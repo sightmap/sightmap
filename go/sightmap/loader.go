@@ -44,6 +44,7 @@ type rawFile struct {
 	Memory     []string       `yaml:"memory"`
 	Components []rawComponent `yaml:"components"`
 	Views      []rawView      `yaml:"views"`
+	Requests   []rawRequest   `yaml:"requests"`
 	URL        string         `yaml:"url"`
 	Snapshots  []rawSnapshot  `yaml:"snapshots"`
 }
@@ -61,6 +62,7 @@ type rawView struct {
 	Description string         `yaml:"description"`
 	Memory      []string       `yaml:"memory"`
 	Components  []rawComponent `yaml:"components"`
+	Requests    []rawRequest   `yaml:"requests"`
 	Stability   string         `yaml:"stability"`
 	Access      *rawAccess     `yaml:"access"`
 }
@@ -74,6 +76,28 @@ type rawProperty struct {
 	Name      string `yaml:"name"`
 	Extract   string `yaml:"extract"`
 	Transform string `yaml:"transform"`
+}
+
+type rawRequest struct {
+	Name        string      `yaml:"name"`
+	Route       string      `yaml:"route"`
+	Method      string      `yaml:"method"`
+	Description string      `yaml:"description"`
+	Source      string      `yaml:"source"`
+	Request     *rawPayload `yaml:"request"`
+	Response    *rawPayload `yaml:"response"`
+	Headers     []string    `yaml:"headers"`
+	Memory      []string    `yaml:"memory"`
+}
+
+type rawPayload struct {
+	Fields []rawField `yaml:"fields"`
+}
+
+type rawField struct {
+	Name        string `yaml:"name"`
+	Type        string `yaml:"type"`
+	Description string `yaml:"description"`
 }
 
 type rawComponent struct {
@@ -139,6 +163,7 @@ func loadDir(path string) (*Corpus, error) {
 
 	var memory []string
 	var globalRaws []rawComponent
+	var globalRequestRaws []rawRequest
 	type viewFileWithPath struct {
 		rf   rawFile
 		path string
@@ -163,6 +188,9 @@ func loadDir(path string) (*Corpus, error) {
 		memory = append(memory, rf.Memory...)
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
+		}
+		if len(rf.Requests) > 0 {
+			globalRequestRaws = append(globalRequestRaws, rf.Requests...)
 		}
 		if len(rf.Views) > 0 {
 			viewFiles = append(viewFiles, viewFileWithPath{rf: rf, path: p})
@@ -189,6 +217,10 @@ func loadDir(path string) (*Corpus, error) {
 
 	// Flatten global components (hierarchy → compound descendant selectors).
 	globalComps := flattenAll(globalRaws, ctx)
+
+	// Global (file-root) request definitions. Requests are flat — no $ref,
+	// hierarchy, or selector cascade — so they convert directly.
+	globalRequests := toRequestDefs(globalRequestRaws, ctx)
 
 	// Build views, expanding $refs and flattening each view's component list.
 	var views []View
@@ -223,6 +255,7 @@ func loadDir(path string) (*Corpus, error) {
 				Route:      rv.Route,
 				Memory:     rv.Memory,
 				Components: flattenAll(rv.Components, ctx),
+				Requests:   toRequestDefs(rv.Requests, ctx),
 				Stability:  rv.Stability,
 				Access:     access,
 				URL:        viewURL,
@@ -236,6 +269,7 @@ func loadDir(path string) (*Corpus, error) {
 		Memory:           memory,
 		GlobalComponents: globalComps,
 		Views:            views,
+		Requests:         globalRequests,
 		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),
 	}, nil
 }
@@ -252,6 +286,59 @@ func rawPropsToMatch(rps []rawProperty) []match.Property {
 		ps[i] = match.Property{Name: rp.Name, Extract: rp.Extract, Transform: rp.Transform}
 	}
 	return ps
+}
+
+// toRequestDefs converts raw request definitions into RequestDefs. A request
+// missing its required name or route is dropped with a diagnostic (the schema
+// requires both), mirroring how flattenOne surfaces missing component fields.
+func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
+	if len(rrs) == 0 {
+		return nil
+	}
+	out := make([]RequestDef, 0, len(rrs))
+	for _, rr := range rrs {
+		if rr.Name == "" {
+			ctx.addDiag("request-missing-name\x00"+rr.Route, ValidationError{
+				Code:     "missing-name",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("request is missing a name (route %q)", rr.Route),
+			})
+			continue
+		}
+		if rr.Route == "" {
+			ctx.addDiag("request-missing-route\x00"+rr.Name, ValidationError{
+				Component: rr.Name,
+				Code:      "missing-route",
+				Severity:  SeverityError,
+				Message:   fmt.Sprintf("request %q is missing a route", rr.Name),
+			})
+			continue
+		}
+		out = append(out, RequestDef{
+			Name:        rr.Name,
+			Route:       rr.Route,
+			Method:      rr.Method,
+			Description: rr.Description,
+			Source:      rr.Source,
+			Request:     toPayload(rr.Request),
+			Response:    toPayload(rr.Response),
+			Headers:     rr.Headers,
+			Memory:      rr.Memory,
+		})
+	}
+	return out
+}
+
+// toPayload converts an optional raw payload (request or response body shape).
+func toPayload(rp *rawPayload) *Payload {
+	if rp == nil {
+		return nil
+	}
+	p := &Payload{}
+	for _, rf := range rp.Fields {
+		p.Fields = append(p.Fields, Field{Name: rf.Name, Type: rf.Type, Description: rf.Description})
+	}
+	return p
 }
 
 // globalNameCollisions warns when two or more top-level global components share a
@@ -329,7 +416,10 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 }
 
 // flattenAll flattens a slice of rawComponents into a flat list of
-// ComponentDefs with compound descendant selectors.
+// ComponentDefs with compound descendant selectors. Order is deterministic and
+// stable: components in declaration order, each parent immediately before its
+// flattened children (pre-order). Combined with loadDir's lexical file walk this
+// gives the corpus a reproducible flattened/wire ordering.
 func flattenAll(rcs []rawComponent, ctx *flattenCtx) []match.ComponentDef {
 	var result []match.ComponentDef
 	for _, rc := range rcs {
