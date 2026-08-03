@@ -17,7 +17,7 @@ func Load(dir string) (*Corpus, error) {
 // queryCacheEntry stores the merged component list and compiled queries for one
 // page URL. Compilation is the expensive step, so it is cached per URL.
 type queryCacheEntry struct {
-	components []match.SightmapComponent
+	components []match.ComponentDef
 	queries    []match.MatchQuery
 }
 
@@ -42,19 +42,19 @@ func (c *Corpus) entryFor(pageURL string) *queryCacheEntry {
 // selects the matching view (falling back to global components), compiles the
 // queries if not already cached, then runs the NFA matcher over root. Returns
 // nil when root is nil or no queries apply.
-func (c *Corpus) MatchTree(root *comps.ComponentNode, pageURL string) map[*comps.ComponentNode]*match.SightmapMatch {
+func (c *Corpus) MatchTree(root *comps.ComponentNode, pageURL string) map[*comps.ComponentNode]*match.ComponentMatch {
 	entry := c.entryFor(pageURL)
 	if root == nil || len(entry.queries) == 0 {
 		return nil
 	}
 
 	// Map component name → definition for memory resolution at match time.
-	byName := make(map[string]*match.SightmapComponent, len(entry.components))
+	byName := make(map[string]*match.ComponentDef, len(entry.components))
 	for i := range entry.components {
 		byName[entry.components[i].Name] = &entry.components[i]
 	}
 
-	result := make(map[*comps.ComponentNode]*match.SightmapMatch)
+	result := make(map[*comps.ComponentNode]*match.ComponentMatch)
 	match.FindAllMatches(root, entry.queries, func(node *comps.ComponentNode, q *match.MatchQuery) {
 		if _, already := result[node]; already {
 			return // first-match-wins
@@ -63,7 +63,7 @@ func (c *Corpus) MatchTree(root *comps.ComponentNode, pageURL string) map[*comps
 		if def := byName[q.Name]; def != nil {
 			memory = def.Memory
 		}
-		result[node] = &match.SightmapMatch{Name: q.Name, Memory: memory}
+		result[node] = &match.ComponentMatch{Name: q.Name, Memory: memory}
 	})
 	return result
 }
@@ -71,7 +71,7 @@ func (c *Corpus) MatchTree(root *comps.ComponentNode, pageURL string) map[*comps
 // Components returns the merged component list for pageURL (view components plus
 // non-colliding globals) — the compiled inventory, for tools that need the
 // definitions without a tree to match against. Cached alongside the queries.
-func (c *Corpus) Components(pageURL string) []match.SightmapComponent {
+func (c *Corpus) Components(pageURL string) []match.ComponentDef {
 	return c.entryFor(pageURL).components
 }
 

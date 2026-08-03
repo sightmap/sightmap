@@ -111,7 +111,7 @@ func (q *Query) String() string {
 // disambiguates.
 func Resolve(
 	root *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	props map[string]map[string]string,
 	q *Query,
 ) (*comps.ComponentNode, error) {
@@ -136,7 +136,7 @@ func Resolve(
 // (descendant semantics). Results are in document (pre-order) order.
 func FindCandidates(
 	root *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	props map[string]map[string]string,
 	q *Query,
 ) []*comps.ComponentNode {
@@ -171,7 +171,7 @@ func FindCandidates(
 func satisfies(
 	node *comps.ComponentNode,
 	part Part,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	props map[string]map[string]string,
 ) bool {
 	m := matches[node]
@@ -195,7 +195,7 @@ func satisfies(
 func subsequence(
 	prefix []Part,
 	ancestors []*comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	props map[string]map[string]string,
 ) bool {
 	i := 0
@@ -213,7 +213,7 @@ func subsequence(
 func ambiguityError(
 	q *Query,
 	cands []*comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	props map[string]map[string]string,
 ) error {
 	var b strings.Builder

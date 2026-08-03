@@ -20,7 +20,7 @@ func TestHas_FormGroupScoping(t *testing.T) {
 		formGroup("protection", nodeAttr("rb", "input", map[string]string{"type": "radio"})),
 	)
 
-	defs := []match.SightmapComponent{{
+	defs := []match.ComponentDef{{
 		Name:      "AssemblyOption",
 		Selectors: []string{`[data-testid="form-group"]:has(input[type="checkbox"])`},
 	}}
@@ -37,7 +37,7 @@ func TestHas_DirectChildScoping(t *testing.T) {
 		node("hasDirect", "div", []string{"box"}, node("b1", "button", nil)),
 		node("hasNested", "div", []string{"box"}, node("", "span", nil, node("b2", "button", nil))),
 	)
-	defs := []match.SightmapComponent{{
+	defs := []match.ComponentDef{{
 		Name:      "BoxWithButton",
 		Selectors: []string{"div.box:has(> button)"},
 	}}

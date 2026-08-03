@@ -18,9 +18,9 @@ import (
 type Result struct {
 	Root        *comps.ComponentNode
 	URL         string
-	Matches     map[*comps.ComponentNode]*match.SightmapMatch
+	Matches     map[*comps.ComponentNode]*match.ComponentMatch
 	View        *sightmap.View
-	Components  []match.SightmapComponent
+	Components  []match.ComponentDef
 	GlobalNames map[string]bool
 	Props       map[string]map[string]string
 	Coverage    coverage.Result
@@ -88,7 +88,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	res.ComponentConflicts = match.FindConflicts(root, res.Components)
 
 	if opts.ExtractProps && len(res.Matches) > 0 && len(res.Components) > 0 {
-		compByName := make(map[string]match.SightmapComponent, len(res.Components))
+		compByName := make(map[string]match.ComponentDef, len(res.Components))
 		for _, c := range res.Components {
 			compByName[c.Name] = c
 		}

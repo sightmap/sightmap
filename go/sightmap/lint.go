@@ -243,14 +243,14 @@ func LintWithCounts(c *Corpus, counts map[string]int) []LintWarning {
 
 // lintComponent runs per-component lint rules.
 // global controls whether rules restricted to global scope are applied.
-func lintComponent(comp match.SightmapComponent, global bool) []LintWarning {
+func lintComponent(comp match.ComponentDef, global bool) []LintWarning {
 	return lintComponentWithCounts(comp, global, nil)
 }
 
 // lintComponentWithCounts is the full implementation of per-component lint
 // rules. counts (component name → match count) optionally augments the
 // multi-instance-no-property warning; pass nil to use static heuristics only.
-func lintComponentWithCounts(comp match.SightmapComponent, global bool, counts map[string]int) []LintWarning {
+func lintComponentWithCounts(comp match.ComponentDef, global bool, counts map[string]int) []LintWarning {
 	var warnings []LintWarning
 
 	name := comp.Name

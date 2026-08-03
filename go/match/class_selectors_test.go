@@ -90,12 +90,12 @@ func TestClassAttrSelectors(t *testing.T) {
 				},
 			}
 
-			comp := match.SightmapComponent{
+			comp := match.ComponentDef{
 				Name:      "TestButton",
 				Selectors: []string{tt.selector},
 			}
 
-			matches := match.ApplySightmap(node, []match.SightmapComponent{comp})
+			matches := match.ApplySightmap(node, []match.ComponentDef{comp})
 			got := len(matches) > 0
 
 			if got != tt.want {

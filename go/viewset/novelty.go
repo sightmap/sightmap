@@ -16,7 +16,7 @@ import (
 // by the offline path (SlotsForCapture) and the live capture path (the capture
 // command) so both gate on the same notion of "new".
 func SlotsFromMatch(
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	orphans []*comps.ComponentNode,
 	parentMap coverage.ParentMap,
 ) Slots {

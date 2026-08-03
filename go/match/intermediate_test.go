@@ -63,7 +63,7 @@ func buildBreadcrumbTree() *comps.ComponentNode {
 // structural nodes sit between the Breadcrumb container and the link.
 func TestChildAnnotation_ThroughStructuralIntermediate(t *testing.T) {
 	root := buildBreadcrumbTree()
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		{Name: "Breadcrumb", Selectors: []string{`[data-component^="breadcrumbs:Breadcrumbs"]`}},
 		// Flattened child selector: parent + " " + child
 		{Name: "BreadcrumbLink", Selectors: []string{`[data-component^="breadcrumbs:Breadcrumbs"] a`}},
@@ -107,7 +107,7 @@ func TestChildAnnotation_ThroughStructuralIntermediate(t *testing.T) {
 // claim a BreadcrumbLink node before the scoped match fires.
 func TestChildAnnotation_BroadGlobalDoesNotSteal(t *testing.T) {
 	root := buildBreadcrumbTree()
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		// FooterLink: broad global "a" selector — listed FIRST (lower index)
 		{Name: "FooterLink", Selectors: []string{`a`}},
 		// Breadcrumb + scoped child — listed AFTER FooterLink

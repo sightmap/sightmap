@@ -20,7 +20,7 @@ import (
 )
 
 // Matches maps a component node to the sightmap rule it matched.
-type Matches = map[*comps.ComponentNode]*match.SightmapMatch
+type Matches = map[*comps.ComponentNode]*match.ComponentMatch
 
 // ParentMap maps each non-root node to its parent.
 type ParentMap = map[*comps.ComponentNode]*comps.ComponentNode

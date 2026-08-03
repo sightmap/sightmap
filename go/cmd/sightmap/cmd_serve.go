@@ -44,7 +44,7 @@ type compiledSightmapJSON struct {
 	ViewComponents map[string][]compiledComponent `json:"viewComponents"`
 }
 
-func normaliseComponent(c match.SightmapComponent) compiledComponent {
+func normaliseComponent(c match.ComponentDef) compiledComponent {
 	chain := c.ParentChain
 	if chain == nil {
 		chain = []string{} // always emit [], never null

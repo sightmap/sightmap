@@ -329,9 +329,9 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 }
 
 // flattenAll flattens a slice of rawComponents into a flat list of
-// SightmapComponents with compound descendant selectors.
-func flattenAll(rcs []rawComponent, ctx *flattenCtx) []match.SightmapComponent {
-	var result []match.SightmapComponent
+// ComponentDefs with compound descendant selectors.
+func flattenAll(rcs []rawComponent, ctx *flattenCtx) []match.ComponentDef {
+	var result []match.ComponentDef
 	for _, rc := range rcs {
 		result = append(result, flattenOne(rc, nil, ctx, nil, nil)...)
 	}
@@ -342,11 +342,11 @@ func flattenAll(rcs []rawComponent, ctx *flattenCtx) []match.SightmapComponent {
 // parentSels holds the already-computed selectors of the nearest ancestor;
 // they are prepended (with a space) to every alternative in this component's
 // selector. parentChain is the slice of ancestor component names (root-first)
-// carried through recursion and stored on each SightmapComponent so the
+// carried through recursion and stored on each ComponentDef so the
 // extension can scope child selectors to their parent's DOM subtree.
 // refStack is the chain of $ref names currently being expanded; it guards
 // against circular references, which would otherwise recurse forever.
-func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string) []match.SightmapComponent {
+func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string) []match.ComponentDef {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
 	if rc.Ref != "" {
 		for _, prev := range refStack {
@@ -414,7 +414,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		}
 	}
 
-	result := []match.SightmapComponent{{
+	result := []match.ComponentDef{{
 		Name:        rc.Name,
 		Selectors:   mySels,
 		Source:      rc.Source,

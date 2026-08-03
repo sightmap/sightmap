@@ -82,13 +82,13 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	for _, part := range q.Parts {
 		queryNames[part.Name] = true
 	}
-	relevant := make(map[*comps.ComponentNode]*match.SightmapMatch)
+	relevant := make(map[*comps.ComponentNode]*match.ComponentMatch)
 	for n, m := range matches {
 		if queryNames[m.Name] {
 			relevant[n] = m
 		}
 	}
-	compByName := make(map[string]match.SightmapComponent, len(components))
+	compByName := make(map[string]match.ComponentDef, len(components))
 	for _, c := range components {
 		compByName[c.Name] = c
 	}

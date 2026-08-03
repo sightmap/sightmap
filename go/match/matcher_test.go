@@ -38,7 +38,7 @@ func nodeInvisible(id, tag string) *comps.ComponentNode {
 // ---------- helpers ----------------------------------------------------------
 
 // applyDefs is a shorthand: build defs, apply, return matched node IDs by name.
-func applyDefs(t *testing.T, root *comps.ComponentNode, defs []match.SightmapComponent) map[string][]string {
+func applyDefs(t *testing.T, root *comps.ComponentNode, defs []match.ComponentDef) map[string][]string {
 	t.Helper()
 	m := match.ApplySightmap(root, defs)
 	result := make(map[string][]string)
@@ -111,7 +111,7 @@ func makeTree() *comps.ComponentNode {
 
 func TestSingleTag(t *testing.T) {
 	root := makeTree()
-	defs := []match.SightmapComponent{{Name: "Nav", Selectors: []string{"nav"}}}
+	defs := []match.ComponentDef{{Name: "Nav", Selectors: []string{"nav"}}}
 	got := applyDefs(t, root, defs)
 	assertIDs(t, got, "Nav", "nav")
 }
@@ -119,7 +119,7 @@ func TestSingleTag(t *testing.T) {
 func TestDescendant_TwoLevels(t *testing.T) {
 	// nav.main-nav a.nav-link: anchor inside nav, bridging intermediate nodes.
 	root := makeTree()
-	defs := []match.SightmapComponent{{Name: "NavLink", Selectors: []string{"nav.main-nav a.nav-link"}}}
+	defs := []match.ComponentDef{{Name: "NavLink", Selectors: []string{"nav.main-nav a.nav-link"}}}
 	got := applyDefs(t, root, defs)
 	assertIDs(t, got, "NavLink", "a1", "a2")
 }
@@ -127,7 +127,7 @@ func TestDescendant_TwoLevels(t *testing.T) {
 func TestDescendant_DeepNesting(t *testing.T) {
 	// div button: button anywhere inside a div, even deeply nested.
 	root := makeTree()
-	defs := []match.SightmapComponent{{Name: "Btn", Selectors: []string{"div button"}}}
+	defs := []match.ComponentDef{{Name: "Btn", Selectors: []string{"div button"}}}
 	got := applyDefs(t, root, defs)
 	// root is div, so all buttons (btn1, btn2, btn3) are descendants.
 	assertIDs(t, got, "Btn", "btn1", "btn2", "btn3")
@@ -136,7 +136,7 @@ func TestDescendant_DeepNesting(t *testing.T) {
 func TestDirectChild_Matches(t *testing.T) {
 	// form.search > button.submit: button DIRECTLY under form.
 	root := makeTree()
-	defs := []match.SightmapComponent{{Name: "SubmitBtn", Selectors: []string{"form.search > button.submit"}}}
+	defs := []match.ComponentDef{{Name: "SubmitBtn", Selectors: []string{"form.search > button.submit"}}}
 	got := applyDefs(t, root, defs)
 	assertIDs(t, got, "SubmitBtn", "btn3")
 }
@@ -144,7 +144,7 @@ func TestDirectChild_Matches(t *testing.T) {
 func TestDirectChild_DoesNotMatchGrandchild(t *testing.T) {
 	// form.search > button.submit should NOT match btn1/btn2 (inside section > div.container).
 	root := makeTree()
-	defs := []match.SightmapComponent{{Name: "DirectBtn", Selectors: []string{"div.container > button"}}}
+	defs := []match.ComponentDef{{Name: "DirectBtn", Selectors: []string{"div.container > button"}}}
 	got := applyDefs(t, root, defs)
 	// btn1 and btn2 are direct children of div.container
 	assertIDs(t, got, "DirectBtn", "btn1", "btn2")
@@ -172,7 +172,7 @@ func TestDirectChild_TwoHops(t *testing.T) {
 			},
 		},
 	}
-	defs := []match.SightmapComponent{{Name: "Link", Selectors: []string{"ul > li > a"}}}
+	defs := []match.ComponentDef{{Name: "Link", Selectors: []string{"ul > li > a"}}}
 	got := applyDefs(t, root, defs)
 	assertIDs(t, got, "Link", "a")
 }
@@ -192,7 +192,7 @@ func TestDirectChild_NotTwoLevelsDeep(t *testing.T) {
 			},
 		},
 	}
-	defs := []match.SightmapComponent{{Name: "Link", Selectors: []string{"ul > a"}}}
+	defs := []match.ComponentDef{{Name: "Link", Selectors: []string{"ul > a"}}}
 	got := applyDefs(t, root, defs)
 	assertNoMatch(t, got, "Link")
 }
@@ -200,7 +200,7 @@ func TestDirectChild_NotTwoLevelsDeep(t *testing.T) {
 func TestMultiQuery_SinglePass(t *testing.T) {
 	// Two definitions matched in one pass; verify no state leakage between them.
 	root := makeTree()
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		{Name: "NavLink", Selectors: []string{"nav.main-nav a.nav-link"}},
 		{Name: "SearchInput", Selectors: []string{`input[type="email"]`}},
 	}
@@ -214,7 +214,7 @@ func TestFirstMatchWins(t *testing.T) {
 	root := node("root", "div", nil,
 		node("btn", "button", []string{"primary", "submit"}),
 	)
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		{Name: "Primary", Selectors: []string{"button.primary"}},
 		{Name: "Submit", Selectors: []string{"button.submit"}},
 	}
@@ -230,7 +230,7 @@ func TestInvisibleNodesIncluded(t *testing.T) {
 		nodeInvisible("hidden", "button"),
 		node("visible", "button", nil),
 	)
-	defs := []match.SightmapComponent{{Name: "Btn", Selectors: []string{"button"}}}
+	defs := []match.ComponentDef{{Name: "Btn", Selectors: []string{"button"}}}
 	got := applyDefs(t, root, defs)
 	// Both nodes should match, regardless of IsVisible.
 	assertIDs(t, got, "Btn", "hidden", "visible")
@@ -245,7 +245,7 @@ func TestNilSelectorNode_DoesNotMatchSpecificRule(t *testing.T) {
 			{Id: "child", Selector: &comps.SelectorPart{Tag: "button"}},
 		},
 	}
-	defs := []match.SightmapComponent{{Name: "Btn", Selectors: []string{"button"}}}
+	defs := []match.ComponentDef{{Name: "Btn", Selectors: []string{"button"}}}
 	got := applyDefs(t, root, defs)
 	// Only "child" should match; "root" has no selector.
 	assertIDs(t, got, "Btn", "child")
@@ -256,7 +256,7 @@ func TestAttrSelector_Substring(t *testing.T) {
 		nodeAttr("n1", "div", map[string]string{"aria-label": "Search products"}),
 		nodeAttr("n2", "div", map[string]string{"aria-label": "Filter results"}),
 	)
-	defs := []match.SightmapComponent{{Name: "Search", Selectors: []string{`[aria-label*="Search"]`}}}
+	defs := []match.ComponentDef{{Name: "Search", Selectors: []string{`[aria-label*="Search"]`}}}
 	got := applyDefs(t, root, defs)
 	assertIDs(t, got, "Search", "n1")
 }
@@ -266,7 +266,7 @@ func TestNotPseudo(t *testing.T) {
 		node("enabled", "button", []string{"primary"}),
 		node("disabled", "button", []string{"primary", "disabled"}),
 	)
-	defs := []match.SightmapComponent{{Name: "Active", Selectors: []string{"button:not(.disabled)"}}}
+	defs := []match.ComponentDef{{Name: "Active", Selectors: []string{"button:not(.disabled)"}}}
 	got := applyDefs(t, root, defs)
 	assertIDs(t, got, "Active", "enabled")
 }
@@ -278,7 +278,7 @@ func TestFramePrefixedIDs_Traversed(t *testing.T) {
 			node("1_5", "a", []string{"nav-link"}),
 		),
 	)
-	defs := []match.SightmapComponent{{Name: "NavLink", Selectors: []string{"nav a.nav-link"}}}
+	defs := []match.ComponentDef{{Name: "NavLink", Selectors: []string{"nav a.nav-link"}}}
 	got := applyDefs(t, root, defs)
 	assertIDs(t, got, "NavLink", "1_5")
 }
@@ -298,7 +298,7 @@ func TestMobileSyntheticSelector(t *testing.T) {
 			},
 		},
 	}
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		{Name: "AddToCart", Selectors: []string{`UIButton[label="Add to Cart"]`}},
 	}
 	got := applyDefs(t, root, defs)
@@ -306,7 +306,7 @@ func TestMobileSyntheticSelector(t *testing.T) {
 }
 
 func TestParseQueries_InvalidSelectorSkipped(t *testing.T) {
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		{Name: "Valid", Selectors: []string{"button"}},
 		{Name: "Invalid", Selectors: []string{":hover"}}, // unsupported pseudo
 	}
@@ -320,7 +320,7 @@ func TestParseQueries_InvalidSelectorSkipped(t *testing.T) {
 }
 
 func TestApplySightmap_NilRoot(t *testing.T) {
-	defs := []match.SightmapComponent{{Name: "X", Selectors: []string{"div"}}}
+	defs := []match.ComponentDef{{Name: "X", Selectors: []string{"div"}}}
 	result := match.ApplySightmap(nil, defs)
 	if result != nil {
 		t.Errorf("expected nil for nil root, got %v", result)

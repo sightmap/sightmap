@@ -22,7 +22,7 @@ type InspectNode struct {
 	IsVisible     bool
 	IsIgnored     bool
 	IsInteractive bool
-	Match         *match.SightmapMatch // non-nil when a sightmap definition matched
+	Match         *match.ComponentMatch // non-nil when a sightmap definition matched
 	Children      []*InspectNode
 	Original      *comps.ComponentNode
 }
@@ -45,14 +45,14 @@ type InspectOpts struct {
 // Inspect builds an unfiltered InspectNode tree from a raw ComponentNode tree.
 // Every node is preserved — hidden, ignored, and structural nodes all appear.
 // If matches is non-nil, matched nodes have their Match field populated.
-func Inspect(root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.SightmapMatch) *InspectNode {
+func Inspect(root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.ComponentMatch) *InspectNode {
 	if root == nil {
 		return nil
 	}
 	return buildInspectNode(root, matches)
 }
 
-func buildInspectNode(node *comps.ComponentNode, matches map[*comps.ComponentNode]*match.SightmapMatch) *InspectNode {
+func buildInspectNode(node *comps.ComponentNode, matches map[*comps.ComponentNode]*match.ComponentMatch) *InspectNode {
 	tag := ""
 	if node.Selector != nil && node.Selector.Tag != "" {
 		tag = node.Selector.Tag
