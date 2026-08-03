@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "changeset": "npx --yes @changesets/cli@^2.27.0",
-    "version-packages": "npx --yes @changesets/cli@^2.27.0 version && node scripts/sync-manifest-versions.mjs"
+    "version-packages": "npx --yes @changesets/cli@^2.27.0 version && node scripts/sync-manifest-versions.mjs",
+    "sync-docs": "node docs/scripts/sync-spec.mjs"
   }
 }

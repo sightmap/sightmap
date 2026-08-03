@@ -1,0 +1,26 @@
+#!/bin/sh
+# Opt-in pre-commit hook. Enable once with:
+#
+#   git config core.hooksPath .githooks
+#
+# Keeps generated-then-checked-in artifacts from drifting locally so you don't
+# discover it in CI. Currently guards the docs schema page, which is generated
+# from the canonical spec (see docs/scripts/sync-spec.mjs).
+#
+# Only regenerates when the inputs are staged, so ordinary commits stay fast.
+# Bypass with `git commit --no-verify` if you ever need to.
+
+set -e
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+# Schema page: regenerate when the canonical spec or the generator is staged,
+# then re-stage the result if it changed.
+if git diff --cached --name-only | grep -qE '^(spec/v1/schema\.md|docs/scripts/sync-spec\.mjs)$'; then
+  node docs/scripts/sync-spec.mjs >/dev/null
+  if ! git diff --quiet -- docs/reference/schema.md; then
+    git add docs/reference/schema.md
+    echo "pre-commit: regenerated docs/reference/schema.md from spec/v1/schema.md and staged it."
+  fi
+fi

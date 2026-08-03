@@ -30,7 +30,11 @@ jobs:
       - name: Schema page in sync
         run: |
           node docs/scripts/sync-spec.mjs
-          git diff --exit-code docs/reference/schema.md
+          if ! git diff --exit-code docs/reference/schema.md; then
+            echo "::error::docs/reference/schema.md is out of sync with spec/v1/schema.md."
+            echo "Run 'npm run sync-docs' (or 'node docs/scripts/sync-spec.mjs') and commit docs/reference/schema.md."
+            exit 1
+          fi
 
       # changelog.mdx is assembled from changelog/entries/ and checked in for
       # the same reason. Fail when it drifts.
