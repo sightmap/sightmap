@@ -35,11 +35,11 @@ func TestWriteAnnotatedJSON_MatchedNode(t *testing.T) {
 		InViewport:    true,
 	}
 
-	sm := &match.SightmapMatch{
+	sm := &match.ComponentMatch{
 		Name:   "SiteLogoLink",
 		Memory: []string{"main navigation logo"},
 	}
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{
 		node: sm,
 	}
 	propValues := map[string]map[string]string{
@@ -101,7 +101,7 @@ func TestWriteAnnotatedJSON_UnmatchedNode(t *testing.T) {
 
 	// node is NOT in the matches map
 	other := &comps.ComponentNode{Id: "99"}
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{
 		other: {Name: "SomeOtherComponent"},
 	}
 

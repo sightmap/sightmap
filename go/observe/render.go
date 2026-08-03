@@ -110,7 +110,7 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 
 // writeGuide prints the [Guide] section: component names and match counts,
 // sorted by count descending then name ascending.
-func writeGuide(w io.Writer, matches map[*comps.ComponentNode]*match.SightmapMatch) {
+func writeGuide(w io.Writer, matches map[*comps.ComponentNode]*match.ComponentMatch) {
 	counts := make(map[string]int)
 	for _, m := range matches {
 		if m != nil {
@@ -158,8 +158,8 @@ func writeGuide(w io.Writer, matches map[*comps.ComponentNode]*match.SightmapMat
 // excluded from the page-check since they match on any page.
 func writeZeroMatchWarnings(
 	w io.Writer,
-	viewComponents []match.SightmapComponent,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	viewComponents []match.ComponentDef,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	view *sightmap.View,
 	globalNames map[string]bool,
 ) {
@@ -342,7 +342,7 @@ func WriteT2Trace(
 	w io.Writer,
 	t2clusters map[*comps.ComponentNode]int,
 	t2children map[*comps.ComponentNode][]*comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	view *sightmap.View,
 ) {
 	const minT2Count = 2 // ≥2 children required (single-child = simple wrapper)
@@ -423,7 +423,7 @@ func WriteT2Trace(
 // route (the topwork wizard returning the Dashboard). globalNames excludes
 // shared components (Header, TopworkApp, etc.) that match any page and would
 // suppress the warning spuriously. Pass nil to skip the exclusion.
-func CheckRootComponents(w io.Writer, viewComponents []match.SightmapComponent, globalNames map[string]bool, counts map[string]int, viewName string) {
+func CheckRootComponents(w io.Writer, viewComponents []match.ComponentDef, globalNames map[string]bool, counts map[string]int, viewName string) {
 	var topNames []string
 	for _, comp := range viewComponents {
 		if comp.Name == "" || len(comp.Selectors) == 0 || len(comp.ParentChain) > 0 {

@@ -32,10 +32,10 @@ type annotatedNode struct {
 }
 
 // buildAnnotatedNode recursively constructs an annotatedNode tree by joining
-// each ComponentNode pointer with its SightmapMatch and any extracted props.
+// each ComponentNode pointer with its ComponentMatch and any extracted props.
 func buildAnnotatedNode(
 	node *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	propValues map[string]map[string]string, // nodeID → {propName → value}; may be nil
 ) *annotatedNode {
 	an := &annotatedNode{
@@ -88,14 +88,14 @@ func writeAnnotatedJSON(
 	root *comps.ComponentNode,
 	path string,
 	view *sightmap.View,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
 	propValues map[string]map[string]string,
 ) error {
 	if root == nil {
 		return nil
 	}
 	if matches == nil {
-		matches = map[*comps.ComponentNode]*match.SightmapMatch{}
+		matches = map[*comps.ComponentNode]*match.ComponentMatch{}
 	}
 
 	out := annotatedOutput{

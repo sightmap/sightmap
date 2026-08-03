@@ -48,7 +48,7 @@ func TestInspect_NoFilteringVsFilter(t *testing.T) {
 // TestInspect_MatchAnnotation verifies that match is propagated onto InspectNode.
 func TestInspect_MatchAnnotation(t *testing.T) {
 	btn := node("1", "button", "OK", true, true, false)
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{
 		btn: {Name: "SubmitBtn"},
 	}
 
@@ -192,7 +192,7 @@ func TestFormatInspect_Selectors_ShowsAll(t *testing.T) {
 // TestFormatInspect_MatchAnnotation verifies ★Name is shown for matched nodes.
 func TestFormatInspect_MatchAnnotation(t *testing.T) {
 	btn := node("3", "button", "Shop", true, true, false)
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{
 		btn: {Name: "ShopButton"},
 	}
 	in := Inspect(btn, matches)

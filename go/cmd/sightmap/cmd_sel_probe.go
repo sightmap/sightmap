@@ -272,7 +272,7 @@ func offlineSelectorCount(ctx context.Context, conn *browser.CDPConn, selector s
 	if err != nil {
 		return 0, err
 	}
-	defs := []match.SightmapComponent{{Name: "__probe__", Selectors: []string{selector}}}
+	defs := []match.ComponentDef{{Name: "__probe__", Selectors: []string{selector}}}
 	return len(match.ApplySightmap(root, defs)), nil
 }
 

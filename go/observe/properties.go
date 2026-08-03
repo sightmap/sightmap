@@ -19,8 +19,8 @@ import (
 func ExtractProperties(
 	ctx context.Context,
 	conn *browser.CDPConn,
-	matches map[*comps.ComponentNode]*match.SightmapMatch,
-	compByName map[string]match.SightmapComponent,
+	matches map[*comps.ComponentNode]*match.ComponentMatch,
+	compByName map[string]match.ComponentDef,
 ) map[string]map[string]string {
 	type specProp struct {
 		Name      string `json:"name"`

@@ -24,7 +24,7 @@ type Corpus struct {
 
 	// GlobalComponents is the flat list of globally-defined components
 	// (from components.yaml), with children already flattened.
-	GlobalComponents []match.SightmapComponent
+	GlobalComponents []match.ComponentDef
 
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
@@ -59,7 +59,7 @@ type View struct {
 	Name       string
 	Route      string
 	Memory     []string
-	Components []match.SightmapComponent
+	Components []match.ComponentDef
 	Stability  string     // "" (default/active), "stub", or "deferred"
 	Access     Access     // reachability for the reference capture account
 	URL        string     // Representative URL for this view
@@ -109,7 +109,7 @@ func (v *View) SnapBasename() string {
 // ComponentsForURL returns the merged flat component list for a given URL:
 // view components first, then global components that don't collide on name.
 // Returns GlobalComponents only if no view matches.
-func (c *Corpus) ComponentsForURL(pageURL string) []match.SightmapComponent {
+func (c *Corpus) ComponentsForURL(pageURL string) []match.ComponentDef {
 	v := c.ViewForURL(pageURL)
 	if v == nil {
 		return c.GlobalComponents
@@ -121,7 +121,7 @@ func (c *Corpus) ComponentsForURL(pageURL string) []match.SightmapComponent {
 		viewNames[vc.Name] = true
 	}
 
-	result := make([]match.SightmapComponent, 0, len(v.Components)+len(c.GlobalComponents))
+	result := make([]match.ComponentDef, 0, len(v.Components)+len(c.GlobalComponents))
 	result = append(result, v.Components...)
 	for _, gc := range c.GlobalComponents {
 		if !viewNames[gc.Name] {
@@ -137,10 +137,10 @@ func (c *Corpus) ComponentsForURL(pageURL string) []match.SightmapComponent {
 // (global list first, then views in corpus order) wins. Route is not considered — this is
 // for a whole-corpus consumer (a linter, a coverage report, an upload payload builder), not
 // a per-page match; use ComponentsForURL for a single page's applicable list.
-func (c *Corpus) AllComponents() []match.SightmapComponent {
+func (c *Corpus) AllComponents() []match.ComponentDef {
 	seen := make(map[string]bool)
-	var out []match.SightmapComponent
-	add := func(comp match.SightmapComponent) {
+	var out []match.ComponentDef
+	add := func(comp match.ComponentDef) {
 		if comp.Name == "" || seen[comp.Name] {
 			return
 		}

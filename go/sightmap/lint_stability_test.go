@@ -10,12 +10,12 @@ import (
 func TestLint_StabilitySuppression(t *testing.T) {
 	tests := []struct {
 		name     string
-		comp     match.SightmapComponent
+		comp     match.ComponentDef
 		wantRule string // empty if no warning expected
 	}{
 		{
 			name: "unstable suppresses multi-instance warning",
-			comp: match.SightmapComponent{
+			comp: match.ComponentDef{
 				Name:       "VolatileButton",
 				Selectors:  []string{"button.css-module-xyz"},
 				Stability:  "unstable",
@@ -25,7 +25,7 @@ func TestLint_StabilitySuppression(t *testing.T) {
 		},
 		{
 			name: "uncertain does not suppress multi-instance warning",
-			comp: match.SightmapComponent{
+			comp: match.ComponentDef{
 				Name:       "UncertainButton",
 				Selectors:  []string{"button.btn-primary"},
 				Stability:  "uncertain",
@@ -35,7 +35,7 @@ func TestLint_StabilitySuppression(t *testing.T) {
 		},
 		{
 			name: "no stability triggers warning",
-			comp: match.SightmapComponent{
+			comp: match.ComponentDef{
 				Name:       "GenericButton",
 				Selectors:  []string{"button.btn"},
 				Stability:  "",
@@ -47,7 +47,7 @@ func TestLint_StabilitySuppression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := corpusFrom([]match.SightmapComponent{tt.comp}, nil)
+			c := corpusFrom([]match.ComponentDef{tt.comp}, nil)
 			warnings := sightmap.Lint(c)
 
 			foundRule := ""

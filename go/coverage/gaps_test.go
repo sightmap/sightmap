@@ -38,7 +38,7 @@ func gapsFixture() (root, banner, image *comps.ComponentNode, parentMap map[*com
 
 func TestAnnotationGaps_FlaggedWhenNoContext(t *testing.T) {
 	root, _, image, pm := gapsFixture()
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{} // nothing matched
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{} // nothing matched
 
 	gaps := Gaps(root, matches, pm, true)
 	if len(gaps) != 1 {
@@ -59,7 +59,7 @@ func TestAnnotationGaps_FlaggedWhenNoContext(t *testing.T) {
 func TestAnnotationGaps_NotFlaggedWhenDirectlyMatched(t *testing.T) {
 	root, _, image, pm := gapsFixture()
 	// The content node itself is now captured by a component (T1).
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{
 		image: {Name: "BannerImage"},
 	}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
@@ -70,7 +70,7 @@ func TestAnnotationGaps_NotFlaggedWhenDirectlyMatched(t *testing.T) {
 func TestAnnotationGaps_NotFlaggedWhenAncestorMatched(t *testing.T) {
 	root, banner, _, pm := gapsFixture()
 	// A matched ancestor gives the node component context → precision guard.
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{
 		banner: {Name: "HeroBanner"},
 	}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
@@ -89,7 +89,7 @@ func TestAnnotationGaps_ShortAndEmptyNamesIgnored(t *testing.T) {
 		Children:  []*comps.ComponentNode{short, empty, symbols},
 	}
 	pm := BuildParentMap(root)
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{}
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps for short/empty/symbol names, got %d: %+v", len(gaps), gaps)
 	}
@@ -111,7 +111,7 @@ func TestAnnotationGaps_InteractiveSkipped(t *testing.T) {
 		Children:  []*comps.ComponentNode{link},
 	}
 	pm := BuildParentMap(root)
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{}
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps for interactive node, got %d: %+v", len(gaps), gaps)
 	}
@@ -131,7 +131,7 @@ func TestAnnotationGaps_VisibleOnly(t *testing.T) {
 		Children:  []*comps.ComponentNode{hidden},
 	}
 	pm := BuildParentMap(root)
-	matches := map[*comps.ComponentNode]*match.SightmapMatch{}
+	matches := map[*comps.ComponentNode]*match.ComponentMatch{}
 
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("visibleOnly: want 0 gaps for hidden node, got %d", len(gaps))

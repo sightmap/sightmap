@@ -35,7 +35,7 @@ func TestConformance(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read sightmap: %v", err)
 			}
-			var defs []match.SightmapComponent
+			var defs []match.ComponentDef
 			if err := yaml.Unmarshal(smData, &defs); err != nil {
 				t.Fatalf("parse sightmap: %v", err)
 			}

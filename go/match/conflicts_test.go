@@ -12,7 +12,7 @@ func TestFindConflicts_NodeClaimedByTwoNames(t *testing.T) {
 	root := node("root", "div", nil,
 		nodeAttr("dlg", "div", map[string]string{"role": "dialog", "data-testid": "login"}),
 	)
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		{Name: "AppDialog", Selectors: []string{`[role="dialog"]`}},
 		{Name: "LoginDialog", Selectors: []string{`[data-testid="login"]`}},
 	}
@@ -36,7 +36,7 @@ func TestFindConflicts_SameNameManyNodes(t *testing.T) {
 		node("c2", "div", []string{"card"}),
 		node("c3", "div", []string{"card"}),
 	)
-	defs := []match.SightmapComponent{{Name: "Card", Selectors: []string{".card"}}}
+	defs := []match.ComponentDef{{Name: "Card", Selectors: []string{".card"}}}
 	if c := match.FindConflicts(root, defs); len(c) != 0 {
 		t.Errorf("same name matching many nodes must not conflict, got %+v", c)
 	}
@@ -49,7 +49,7 @@ func TestFindConflicts_DistinctNodes(t *testing.T) {
 		node("a", "div", []string{"a"}),
 		node("b", "div", []string{"b"}),
 	)
-	defs := []match.SightmapComponent{
+	defs := []match.ComponentDef{
 		{Name: "A", Selectors: []string{".a"}},
 		{Name: "B", Selectors: []string{".b"}},
 	}

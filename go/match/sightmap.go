@@ -7,10 +7,10 @@ import (
 	"github.com/sightmap/sightmap/go/sel"
 )
 
-// SightmapComponent is a single flattened sightmap component definition.
+// ComponentDef is a single flattened sightmap component definition.
 // Hierarchical YAML selectors should be pre-flattened by the caller into
 // compound descendant selectors before calling ParseQueries.
-type SightmapComponent struct {
+type ComponentDef struct {
 	Name        string     `json:"name"`
 	Selectors   []string   `json:"selectors"`
 	Source      string     `json:"source,omitempty"`
@@ -28,18 +28,18 @@ type Property struct {
 	Transform string `json:"transform"` // optional post-processing
 }
 
-// SightmapMatch records which component definition matched a node.
-type SightmapMatch struct {
+// ComponentMatch records which component definition matched a node.
+type ComponentMatch struct {
 	Name   string
 	Memory []string
 	Tags   []string
 }
 
-// ParseQueries parses SightmapComponent definitions into MatchQuery values.
+// ParseQueries parses ComponentDef definitions into MatchQuery values.
 // Each selector string in each component becomes a separate MatchQuery.
 // Invalid selectors are skipped; their errors are returned alongside the
 // valid queries (non-fatal).
-func ParseQueries(defs []SightmapComponent) ([]MatchQuery, []error) {
+func ParseQueries(defs []ComponentDef) ([]MatchQuery, []error) {
 	var queries []MatchQuery
 	var errs []error
 
@@ -62,12 +62,12 @@ func ParseQueries(defs []SightmapComponent) ([]MatchQuery, []error) {
 }
 
 // ApplySightmap runs the NFA against root and returns a map from matched
-// ComponentNode to the SightmapMatch that claimed it. First-match-wins: when
+// ComponentNode to the ComponentMatch that claimed it. First-match-wins: when
 // multiple definitions match the same node, the one earliest in defs order
 // (and earliest selector within that definition) takes precedence.
 //
 // Returns nil if defs is empty or root is nil.
-func ApplySightmap(root *comps.ComponentNode, defs []SightmapComponent) map[*comps.ComponentNode]*SightmapMatch {
+func ApplySightmap(root *comps.ComponentNode, defs []ComponentDef) map[*comps.ComponentNode]*ComponentMatch {
 	if root == nil || len(defs) == 0 {
 		return nil
 	}
@@ -77,14 +77,14 @@ func ApplySightmap(root *comps.ComponentNode, defs []SightmapComponent) map[*com
 		return nil
 	}
 
-	// Build a lookup from query name → SightmapMatch so we can resolve the
+	// Build a lookup from query name → ComponentMatch so we can resolve the
 	// component definition at match time.
-	defByName := make(map[string]*SightmapComponent, len(defs))
+	defByName := make(map[string]*ComponentDef, len(defs))
 	for i := range defs {
 		defByName[defs[i].Name] = &defs[i]
 	}
 
-	result := make(map[*comps.ComponentNode]*SightmapMatch)
+	result := make(map[*comps.ComponentNode]*ComponentMatch)
 
 	FindAllMatches(root, queries, func(node *comps.ComponentNode, q *MatchQuery) {
 		// First-match-wins: skip if already claimed.
@@ -92,7 +92,7 @@ func ApplySightmap(root *comps.ComponentNode, defs []SightmapComponent) map[*com
 			return
 		}
 		def := defByName[q.Name]
-		result[node] = &SightmapMatch{
+		result[node] = &ComponentMatch{
 			Name:   q.Name,
 			Memory: def.Memory,
 			Tags:   def.Tags,
@@ -116,7 +116,7 @@ type Conflict struct {
 // normal and never reported; a single node claimed by several names is the
 // ambiguity, since ApplySightmap keeps only the first. It reuses the same
 // traversal as ApplySightmap, so it sees exactly the same matches.
-func FindConflicts(root *comps.ComponentNode, defs []SightmapComponent) []Conflict {
+func FindConflicts(root *comps.ComponentNode, defs []ComponentDef) []Conflict {
 	if root == nil || len(defs) == 0 {
 		return nil
 	}
