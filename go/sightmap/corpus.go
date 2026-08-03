@@ -20,15 +20,21 @@ type Corpus struct {
 	// which flattened component or view came from which file, so entries
 	// are concatenated corpus-wide instead of scoped to their file's
 	// definitions. Tighten this if per-file activation is ever needed.
-	Memory []string
+	Memory []string `json:"memory,omitempty"`
 
 	// GlobalComponents is the flat list of globally-defined components
 	// (from components.yaml), with children already flattened.
-	GlobalComponents []match.ComponentDef
+	GlobalComponents []match.ComponentDef `json:"globals,omitempty"`
 
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
-	Views []View
+	Views []View `json:"views,omitempty"`
+
+	// Requests is the flat list of globally-defined API request definitions
+	// (from a file-root `requests:` list). View-scoped requests live on each
+	// View instead. Match against an observed network request via
+	// RequestsForURL.
+	Requests []RequestDef `json:"requests,omitempty"`
 
 	// loadDiagnostics holds structural problems detected while loading that are
 	// no longer visible in the flattened data (e.g. a circular $ref chain, which
@@ -56,15 +62,18 @@ func (a Access) IsOpen() bool {
 
 // View is a per-URL-pattern view definition from the sightmap corpus.
 type View struct {
-	Name       string
-	Route      string
-	Memory     []string
-	Components []match.ComponentDef
-	Stability  string     // "" (default/active), "stub", or "deferred"
-	Access     Access     // reachability for the reference capture account
-	URL        string     // Representative URL for this view
-	Snapshots  []Snapshot // List of snapshots for this view
-	SourceFile string     // Source YAML filename (without .yaml extension)
+	Name       string               `json:"name"`
+	Route      string               `json:"route,omitempty"`
+	Memory     []string             `json:"memory,omitempty"`
+	Components []match.ComponentDef `json:"components,omitempty"`
+	Requests   []RequestDef         `json:"requests,omitempty"` // view-scoped API request definitions
+
+	// Authoring/tooling fields — kept out of the serialized wire form.
+	Stability  string     `json:"-"` // "" (default/active), "stub", or "deferred"
+	Access     Access     `json:"-"` // reachability for the reference capture account
+	URL        string     `json:"-"` // Representative URL for this view
+	Snapshots  []Snapshot `json:"-"` // List of snapshots for this view
+	SourceFile string     `json:"-"` // Source YAML filename (without .yaml extension)
 }
 
 // ViewByName returns a pointer to the first View with the given name, or nil.
