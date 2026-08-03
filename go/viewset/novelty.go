@@ -45,7 +45,7 @@ func SlotsForCapture(snapPath string, corpus *sightmap.Corpus) (Slots, bool) {
 	if json.Unmarshal(data, &root) != nil {
 		return Slots{}, false
 	}
-	matches := corpus.MatchTree(&root, RouteOf(snapPath))
+	matches := sightmap.NewMatcher(corpus).MatchTree(&root, RouteOf(snapPath))
 	cov := coverage.Score(&root, matches, coverage.Options{VisibleOnly: true})
 	return SlotsFromMatch(matches, cov.Orphans, cov.ParentMap), true
 }

@@ -68,12 +68,12 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	if err != nil {
 		return nil, fmt.Errorf("resolve query: load corpus: %w", err)
 	}
-	matches := corpus.MatchTree(root, pageURL)
+	matches := sightmap.NewMatcher(corpus).MatchTree(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf(
 			"resolve query: no sightmap components matched the page (need a corpus in %s)", sightmapDir)
 	}
-	components := corpus.Components(pageURL)
+	components := sightmap.NewMatcher(corpus).Components(pageURL)
 
 	// Extract properties only for nodes whose component name appears in the
 	// query — keeps the live extraction small and avoids the per-snapshot node
