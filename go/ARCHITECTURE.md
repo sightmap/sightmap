@@ -75,9 +75,11 @@ These are the composed entrypoints external callers reach for. Signatures are
 indicative, not final.
 
 ```go
-// Load + compile a corpus once; share it for a whole run.
-corpus, err := sightmap.Load(dir)          // *sightmap.Corpus
-corpus.MatchTree(root, url)                 // matches
+// Load a corpus once (pure, serializable data); build a Matcher (the engine
+// that compiles + caches queries) to run it against live trees.
+corpus, err := sightmap.Load(dir)          // *sightmap.Corpus (pure data)
+m := sightmap.NewMatcher(corpus)           // *sightmap.Matcher (compiled-query cache)
+m.MatchTree(root, url)                      // matches
 corpus.ViewForURL(url)                      // *View
 
 // Attach to an already-running browser (own the lifecycle yourself),

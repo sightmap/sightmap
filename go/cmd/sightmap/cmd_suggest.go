@@ -49,7 +49,7 @@ func runSuggest(args []string) error {
 		if corpus, cErr := lf.loadCorpus(); cErr != nil {
 			fmt.Fprintf(os.Stderr, "suggest: load corpus: %v (continuing without --exclude-known filtering)\n", cErr)
 		} else if corpus != nil {
-			for _, c := range corpus.Components("") {
+			for _, c := range sightmap.NewMatcher(corpus).Components("") {
 				knownSelectors = append(knownSelectors, c.Selectors...)
 			}
 		}
@@ -242,7 +242,7 @@ func buildSightmapMatchMapForSuggest(
 	if err != nil {
 		return nil, fmt.Errorf("load corpus (fallback): %v", err)
 	}
-	matches := corpus.MatchTree(root, pageURL)
+	matches := sightmap.NewMatcher(corpus).MatchTree(root, pageURL)
 	m := make(map[string]string)
 	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {
@@ -268,7 +268,7 @@ func buildSightmapMatchMap(treeFile string, smDir string, pageURL string) (map[s
 	if err != nil {
 		return nil, fmt.Errorf("load corpus: %v", err)
 	}
-	matches := corpus.MatchTree(&root, pageURL)
+	matches := sightmap.NewMatcher(corpus).MatchTree(&root, pageURL)
 	m := make(map[string]string)
 	comps.Walk(&root, func(n *comps.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {

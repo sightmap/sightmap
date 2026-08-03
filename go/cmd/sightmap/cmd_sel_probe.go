@@ -357,7 +357,7 @@ func loadCompAnnotations(dir string) []compAnnotation {
 	if err != nil {
 		return nil
 	}
-	components := corpus.Components("")
+	components := sightmap.NewMatcher(corpus).Components("")
 
 	annotations := make([]compAnnotation, 0, len(components))
 	for _, comp := range components {

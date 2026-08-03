@@ -138,7 +138,7 @@ func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.Compone
 		return nil, nil, "", false
 	}
 	route = viewset.RouteOf(snapPath)
-	matches = corpus.MatchTree(root, route)
+	matches = sightmap.NewMatcher(corpus).MatchTree(root, route)
 	return root, matches, route, true
 }
 
