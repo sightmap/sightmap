@@ -1,6 +1,6 @@
 {
   "name": "sightmap",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "Author and maintain .sightmap/ corpora and drive a live browser via annotated component snapshots",
   "author": {
     "name": "Sightmap",
