@@ -1,0 +1,20 @@
+version: 1
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    description: The cart was mutated by another tab; checkout will fail.
+    source: src/cart/sync.ts
+
+  - name: SlowNetworkWarning
+    level: WARN
+    message: 'request .* took over \d+ms'
+
+  # An uncaught exception arrives as level `exception`, not `error`, so a corpus
+  # that wants exceptions has to say so.
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    message: 'Cannot read propert(y|ies) .* of (null|undefined)'
+
+  # Neither level nor message: legal, matches every record.
+  - name: AnyRecord

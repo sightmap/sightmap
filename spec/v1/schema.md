@@ -21,6 +21,7 @@ memory:      # optional, string[] — file-level notes (see "Memory")
 views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
 requests:    # optional, Request[] — global, matched on every view
+messages:    # optional, Message[] — console/exception patterns
 ```
 
 | Field | Type | Required | Description |
@@ -30,6 +31,7 @@ requests:    # optional, Request[] — global, matched on every view
 | `views` | [View](#view)[] | no | Views defined in this file. |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
 | `requests` | [Request](#request)[] | no | **Global** requests — matched against every view. |
+| `messages` | [Message](#message)[] | no | Console-output and exception patterns. Corpus-root only; there is no view-scoped form. |
 
 ## View
 
@@ -294,6 +296,58 @@ request:
 | `type` | string | no | Free-text type label: `string`, `number`, `boolean`, `array`, `object`, or anything else an SDK author finds useful. |
 | `description` | string | no | Free-text description. |
 
+## Message
+
+A named console-output or runtime-exception pattern. This gives console activity what `requests:` gives network activity: a named entity the rest of the corpus can point at, so "a cart version mismatch broke checkout" is stated once rather than re-matched by every consumer.
+
+```yaml
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    description: The cart was mutated by another tab; checkout will fail.
+    source: src/cart/sync.ts
+
+  - name: SlowNetworkWarning
+    level: WARN
+    message: 'request .* took over \d+ms'
+
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    message: 'Cannot read propert(y|ies) .* of (null|undefined)'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Stable identifier, addressable by name by other tooling. |
+| `level` | string | no | Exact, case-insensitive match against the observed record's level. Match-any if omitted. |
+| `message` | string | no | Regex matched against the record's text. Match-any if omitted. |
+| `description` | string | no | What this pattern means, for a human reading the corpus. |
+| `source` | string | no | Relative path to the source most likely to emit this. |
+
+A record matches when every declared constraint holds. Declaring neither `level` nor `message` matches every record, which is legal but rarely useful.
+
+### Message levels
+
+The reference capture emits these levels:
+
+| Level | Origin |
+|---|---|
+| `log`, `debug`, `info` | `console.log` / `.debug` / `.info` |
+| `warn` | `console.warn` |
+| `error` | `console.error`, `console.assert` |
+| `exception` | An uncaught exception or unhandled rejection |
+
+**An uncaught exception arrives as `exception`, not as `error`.** So `level: ERROR` does not match one, and a corpus that wants exceptions must say `level: EXCEPTION`. Console output and exceptions still share one entity rather than needing a `kind:` discriminator, because the origin is carried as a level value.
+
+The vocabulary is open: `level` is free text, not an enum, so a corpus may name a level this capture never emits. That is deliberate, since another consumer's capture may have levels of its own. The tradeoff is that a typo (`level: WARNING`, which this capture normalizes to `warn`) matches nothing rather than being rejected.
+
+### Ambiguous matches
+
+Two entries that can match the same record are reported as `message-conflict` (a warning) when the overlap is statically decidable: the same `level`, or one omitting it, with an identical or absent `message`. Deciding whether two different regexes can both match some record is not decidable in general.
+
+A consumer evaluating live records MUST surface an ambiguity when a record matches more than one entry, rather than silently resolving to a first match. See [SEP-0006](../seps/0006-message-entity.md).
+
 ## Memory
 
 Memory entries are short freeform notes attached to any definition — file, view, component, or request. They exist so that agents can carry forward context that isn't recoverable from the source code: quirks, invariants, workarounds, "you have to click this twice" lore.
@@ -439,6 +493,7 @@ A conforming SDK:
 - MUST implement global vs view-scoped precedence as specified
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
 - MUST reject a `RequestProperty` declaring both `field` and `pattern`, or neither
+- MUST reject a `messages:` entry whose `message` is not a valid regular expression
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
@@ -448,8 +503,10 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - MUST resolve `properties:` only from live traffic, and MUST NOT error when a `properties:`-declaring request is used in a static context — omit the value instead
 - MUST omit an unresolved property value silently, without a diagnostic
 - SHOULD apply `transform` as [Component properties](#component-properties) does: skipped on an empty or absent raw value, single transform only, not composable
+- MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
+- MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `field`/`pattern` path and applies no `transform`. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `field`/`pattern` path, applies no `transform`, and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

@@ -3,6 +3,7 @@ package sightmap
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -67,6 +68,8 @@ func Lint(c *Corpus) []LintWarning {
 			warnings = append(warnings, lintComponent(comp, false)...)
 		}
 	}
+
+	warnings = append(warnings, lintMessageLevels(c.Messages)...)
 
 	// Deduplicate: view lists include $ref-expanded globals, so the same
 	// component can appear multiple times. Keep first occurrence of each
@@ -228,6 +231,8 @@ func LintWithCounts(c *Corpus, counts map[string]int) []LintWarning {
 		}
 	}
 
+	warnings = append(warnings, lintMessageLevels(c.Messages)...)
+
 	type warnKey struct{ rule, comp, sel string }
 	seen := make(map[warnKey]bool, len(warnings))
 	deduped := warnings[:0]
@@ -239,6 +244,35 @@ func LintWithCounts(c *Corpus, counts map[string]int) []LintWarning {
 		}
 	}
 	return deduped
+}
+
+// lintMessageLevels warns when a messages: entry names a level the reference
+// capture never emits, so it can never match.
+//
+// This is advisory rather than a validation error because `level` is
+// deliberately open: another consumer's capture may have levels of its own. But
+// the failure mode is silent, and the near-miss is easy to hit — CDP itself
+// spells the level "warning", which this capture normalizes to "warn", so
+// `level: WARNING` matches nothing and says nothing.
+func lintMessageLevels(msgs []MessageDef) []LintWarning {
+	var warnings []LintWarning
+	for _, m := range msgs {
+		if m.Level == "" || m.Name == "" {
+			continue
+		}
+		if slices.ContainsFunc(KnownMessageLevels, func(k string) bool {
+			return strings.EqualFold(k, m.Level)
+		}) {
+			continue
+		}
+		warnings = append(warnings, LintWarning{
+			Component: m.Name,
+			Rule:      "message-level-unknown",
+			Message: fmt.Sprintf("level %q is not one of %s, so this entry can never match a record from the reference capture",
+				m.Level, strings.Join(KnownMessageLevels, ", ")),
+		})
+	}
+	return warnings
 }
 
 // lintComponent runs per-component lint rules.
