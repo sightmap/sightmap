@@ -329,7 +329,7 @@ Expected response fields:{'\n'}
         {/* -------------------- DIRECTORY CALLOUT -------------------- */}
         <div className="concept concept--last">
           <div className="concept-header">
-            <h3 className="concept-closer">Organize however.</h3>
+            <h3 className="concept-closer">Organize it your way.</h3>
           </div>
           <p className="concept-intro">
             Sightmap recursively loads and merges every <code>*.yaml</code> and <code>*.yml</code> file under <code>.sightmap/</code>. Split definitions by feature or view, or keep everything in one file.
