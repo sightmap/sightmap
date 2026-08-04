@@ -54,7 +54,8 @@ func runGap(args []string) error {
 	if loadErr != nil {
 		return loadErr
 	}
-	matches := sightmap.NewMatcher(corpus).MatchTree(root, pageURL)
+	m := sightmap.NewMatcher(corpus)
+	matches := m.MatchTree(root, pageURL)
 
 	// ── Build parent map ─────────────────────────────────────────────────────
 	parentMap := coverage.BuildParentMap(root)
@@ -73,7 +74,7 @@ func runGap(args []string) error {
 		if scopeNode == nil {
 			// Component not found or not matched on page
 			// Check if it exists in the corpus
-			components := sightmap.NewMatcher(corpus).Components(pageURL)
+			components := m.Components(pageURL)
 			found := false
 			for _, comp := range components {
 				if comp.Name == *scopeFlag {
