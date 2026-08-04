@@ -30,6 +30,7 @@ views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
 requests:    # optional, Request[] — global, matched on every view
 messages:    # optional, Message[] — console/exception patterns
+signals:     # optional, Signal[] — classifications composed from the above
 ```
 
 | Field | Type | Required | Description |
@@ -40,6 +41,7 @@ messages:    # optional, Message[] — console/exception patterns
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
 | `requests` | [Request](#request)[] | no | **Global** requests — matched against every view. |
 | `messages` | [Message](#message)[] | no | Console-output and exception patterns. Corpus-root only; there is no view-scoped form. |
+| `signals` | [Signal](#signal)[] | no | Classification rules composed from other entities. Corpus-root only; there is no view-scoped form. |
 
 ## View
 
@@ -356,6 +358,71 @@ Two entries that can match the same record are reported as `message-conflict` (a
 
 A consumer evaluating live records MUST surface an ambiguity when a record matches more than one entry, rather than silently resolving to a first match. See [SEP-0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md).
 
+## Signal
+
+A named, tagged classification composed from an entity the corpus already defines. A signal references that entity by name and optionally filters on its declared properties. It never declares a selector, route, or body pattern of its own, so a classification cannot drift away from the thing it is about.
+
+```yaml
+requests:
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    method: POST
+    properties:
+      - name: outcome
+        field: rsp.body.status
+
+signals:
+  - name: checkout.payment.declined
+    tags: [defect]
+    ref: CheckoutPayment
+    filter:
+      outcome: declined
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Semantic identity of the generated classification. |
+| `ref` | string | yes | Name of an existing `components:`/`requests:`/`messages:`/`views:` entry. Must resolve, and must not be ambiguous across entity kinds. |
+| `tags` | string[] | no | Labels carried onto the generated classification. See [Tags](#tags). |
+| `filter` | object | no | Property constraints, ANDed across keys. Omitted means the rule fires on every match of `ref`. |
+
+Omitting `filter` is equivalent to a static `tags:` entry on the referenced entity, so `signals:` is a superset of that mechanism rather than a parallel one. Reach for `filter` only when the entity's mere presence is not itself the classification.
+
+### Filter values
+
+A key's value is either one accepted value (equality) or a list of them (membership). Keys are ANDed; there is no `OR` in v1, so a classification needing one is expressed as several `signals:` entries.
+
+Values compare as canonical text, and an unquoted integer or boolean is accepted so the natural spelling works:
+
+```yaml
+filter:
+  status: 200                    # integer, compares as "200"
+  outcome: [queued, deferred]    # membership
+  rate_limit_remaining: "0"      # quoted, compares as "0"
+```
+
+An integer compares as its **numeric value in decimal**, not as the characters you typed. YAML accepts octal, hexadecimal, and underscore-separated integers, so `0200` is 128, `0x1F` is 31, and `1_000` is 1000. Comparing lexemes instead would make `0x1F` and `31` two different values for one number.
+
+A `null` (a bare `key:`), a float, and an empty list are all invalid: the first has nothing to compare, a float has no single canonical text (`1.50` versus `1.5`), and an empty list can never match.
+
+### Filter key resolution
+
+A filter key must resolve on the referenced entity. In order:
+
+1. A property the entity declares — `properties:` on a [Request](#request-properties) or a [Component](#component-properties).
+2. For a `Request` ref, a reserved identity name: `status`, `method`, `duration`.
+3. For a `Component` ref, the built-in `value`.
+
+A declared property shadows a reserved name of the same name; see [Request properties](#request-properties).
+
+A `Message` or `View` ref accepts **no** filter keys. A message's own `level`/`message` already identify it fully, and a view has no extractable property, so reference either without a filter.
+
+A key resolving to none of the above is an error (`signal-filter-unknown`). This is what keeps a signal tied to its entity: without it, a filter naming a property that was renamed or never existed would pass silently and the rule would simply never fire.
+
+### Multiple matching rules
+
+Each rule is evaluated independently. When more than one references the same entity and both match the same live instance, both fire — nothing is deduped or merged. A consumer sees one classification per firing rule, not one classification with several names. See [SEP-0007](https://github.com/sightmap/sightmap/blob/main/spec/seps/0007-signals.md).
+
 ## Memory
 
 Memory entries are short freeform notes attached to any definition — file, view, component, or request. They exist so that agents can carry forward context that isn't recoverable from the source code: quirks, invariants, workarounds, "you have to click this twice" lore.
@@ -502,6 +569,8 @@ A conforming SDK:
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
 - MUST reject a `RequestProperty` declaring both `field` and `pattern`, or neither
 - MUST reject a `messages:` entry whose `message` is not a valid regular expression
+- MUST reject a `signals:` entry whose `ref` does not resolve, or resolves across more than one entity kind
+- MUST reject a `signals:` `filter` key that does not resolve on the referenced entity
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
@@ -513,8 +582,10 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - SHOULD apply `transform` as [Component properties](#component-properties) does: skipped on an empty or absent raw value, single transform only, not composable
 - MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
+- MUST evaluate each `signals:` rule independently: a live instance matched by several rules produces one classification per matching rule
+- SHOULD carry the referenced entity's name on the generated classification, so its derivation stays explicit
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `field`/`pattern` path, applies no `transform`, and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `field`/`pattern` path, applies no `transform`, matches no `messages:` entry against a console record, and evaluates no `signals:` rule. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

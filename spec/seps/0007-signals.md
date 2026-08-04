@@ -146,6 +146,9 @@ A classification produced by a `signals:` match carries the referenced entity's 
 - MUST reject a `signals:` entry whose `ref:` does not resolve to a known `Component`/`Request`/`Message`/`View` name. Diagnostic code: `signal-ref-unresolved` (mirrors the existing `ref-unresolved` code for `$ref`).
 - MUST reject (not silently resolve) a `ref:` name that collides across entity kinds (e.g. a `Component` and a `Request` sharing a name) — unlike DOM tree matching, there is no adjacency/tree-position reason to prefer one over the other. Diagnostic code: `signal-ref-ambiguous`.
 - MUST evaluate every declared `filter:` key with AND semantics; MUST support both scalar (equality) and array (membership) values per key.
+- MUST reject a `filter:` key that does not resolve on the referenced entity, i.e. is neither one of its declared `properties:` nor a reserved name available for its kind (`status`/`method`/`duration` on a `Request`, `value` on a `Component`). Diagnostic code: `signal-filter-unknown`. Without this check the structural link this SEP is built on is unenforced: a filter naming a renamed or never-existent property passes silently and the rule simply never fires.
+- MUST reject any `filter:` key on a `Message` or `View` ref. A message's own `level`/`message` already identify it fully and a view has no extractable property, so a filter there is authoring confusion rather than a constraint.
+- MUST compare `filter:` values as canonical text, normalizing an integer before comparison so `0200` and `200` agree with an SDK that reads the same corpus as JSON.
 - MUST fire a rule with no `filter:` on every match of its `ref:`.
 - MUST evaluate each `signals:` rule independently — a live instance matched by more than one rule produces one classification per matching rule.
 - MUST NOT require a numeric-comparison filter operator (`>=`, ranges) in v1 — see [Open questions](#open-questions).
@@ -187,9 +190,11 @@ $defs.signal:
       description: "Property-name → value (equality) or value-list (membership) constraints, ANDed across keys, evaluated against the referenced entity's declared properties and already-structured identity fields. Omitted = unconditional."
       additionalProperties:
         oneOf:
-          - { type: string }
-          - { type: array, items: { type: string }, minItems: 1 }
+          - { type: [string, integer, boolean] }
+          - { type: array, items: { type: [string, integer, boolean] }, minItems: 1 }
 ```
+
+Note the value types. An earlier draft of this diff allowed only `string`, which made this proposal's own multi-key example above invalid: `status: 200` is an unquoted YAML integer, and the reserved `status` identity genuinely *is* an integer. Integers and booleans are accepted and compared as canonical text, so the natural spelling works. `integer` rather than `number` is deliberate: a float has no single canonical text (`1.50` versus `1.5`), which would become a cross-SDK divergence. `null` and an empty list stay invalid, the first having nothing to compare and the second never matching.
 
 `fileRootFields` gains `"signals"`.
 

@@ -299,3 +299,73 @@ messages:
 		t.Fatalf("want 1 unknown-field for the typo, got %d: %v", len(w), w)
 	}
 }
+
+// A filter accepts a string, integer, or boolean so `status: 200` reads
+// naturally. Null, float, and an empty list are rejected, matching ajv.
+func TestFieldTypeInvalid_SignalFilterValues(t *testing.T) {
+	bad := map[string]string{
+		"bare key (null)": "status:",
+		"float":           "duration: 1.5",
+		"empty list":      "code: []",
+		"float in list":   "code: [200, 1.5]",
+	}
+	for name, body := range bad {
+		t.Run(name, func(t *testing.T) {
+			got := findingsWithCode(t, "field-type-invalid",
+				"version: 1\nsignals:\n  - name: s\n    ref: R\n    filter:\n      "+body+"\n")
+			if len(got) == 0 {
+				t.Fatalf("want field-type-invalid, got none")
+			}
+		})
+	}
+
+	good := map[string]string{
+		"integer": "status: 200",
+		"boolean": "flag: true",
+		"string":  `status: "200"`,
+		"list":    "code: [200, 404]",
+	}
+	for name, body := range good {
+		t.Run(name, func(t *testing.T) {
+			got := findingsWithCode(t, "field-type-invalid",
+				"version: 1\nsignals:\n  - name: s\n    ref: R\n    filter:\n      "+body+"\n")
+			if len(got) != 0 {
+				t.Fatalf("want clean, got %v", got)
+			}
+		})
+	}
+}
+
+func TestUnknownField_SignalsNoFalsePositives(t *testing.T) {
+	w := unknownWarnings(t, `
+version: 1
+requests:
+  - name: R
+    route: /api/x
+    properties:
+      - name: outcome
+        field: rsp.body.status
+signals:
+  - name: checkout.payment.declined
+    ref: R
+    tags: [defect]
+    filter:
+      outcome: declined
+      status: 200
+`)
+	if len(w) != 0 {
+		t.Fatalf("valid signals must not warn: %v", w)
+	}
+}
+
+func TestUnknownField_SignalTypo(t *testing.T) {
+	w := unknownWarnings(t, `
+version: 1
+signals:
+  - name: s
+    reff: R
+`)
+	if len(w) != 1 {
+		t.Fatalf("want 1 unknown-field for the typo, got %d: %v", len(w), w)
+	}
+}
