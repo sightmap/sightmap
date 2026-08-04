@@ -222,6 +222,40 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
           "description": "Open-vocabulary classification labels for this request. Every request definition that matches applies its own tags — there is no single-winner resolution to shadow, unlike components or views. See SEP-0004."
+        },
+        "properties": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/requestProperty" },
+          "description": "Ordered list of live-traffic value extractions, for a consumer to filter or reason about. See SEP-0005."
+        }
+      }
+    },
+    "requestProperty": {
+      "type": "object",
+      "description": "A named value extracted from a live request/response pair. See SEP-0005.",
+      "required": ["name"],
+      "additionalProperties": false,
+      "oneOf": [{ "required": ["field"] }, { "required": ["pattern"] }],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Key a consumer refers to this value by. Declaring one of the reserved request identity names (status, method, duration) shadows that identity; the reference CLI warns."
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Rooted path: req|rsp, then .body.<path> for JSON object-key traversal or .headers.<name> for one header value (name matched case-insensitively). Also accepts a reserved identity name: status, method, duration. See SEP-0005 §Extraction root."
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Regex matched against the raw text of the response body, for content field's object-key traversal cannot reach (a non-JSON body, or a value embedded in a larger string). Carries no root of its own."
+        },
+        "transform": {
+          "type": "string",
+          "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
+          "description": "Optional post-processing applied to the extracted string. Same vocabulary as componentProperty.transform (SEP-0003)."
         }
       }
     },

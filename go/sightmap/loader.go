@@ -79,15 +79,24 @@ type rawProperty struct {
 }
 
 type rawRequest struct {
-	Name        string      `yaml:"name"`
-	Route       string      `yaml:"route"`
-	Method      string      `yaml:"method"`
-	Description string      `yaml:"description"`
-	Source      string      `yaml:"source"`
-	Request     *rawPayload `yaml:"request"`
-	Response    *rawPayload `yaml:"response"`
-	Headers     []string    `yaml:"headers"`
-	Memory      []string    `yaml:"memory"`
+	Name        string               `yaml:"name"`
+	Route       string               `yaml:"route"`
+	Method      string               `yaml:"method"`
+	Description string               `yaml:"description"`
+	Source      string               `yaml:"source"`
+	Request     *rawPayload          `yaml:"request"`
+	Response    *rawPayload          `yaml:"response"`
+	Headers     []string             `yaml:"headers"`
+	Memory      []string             `yaml:"memory"`
+	Tags        []string             `yaml:"tags"`
+	Properties  []rawRequestProperty `yaml:"properties"`
+}
+
+type rawRequestProperty struct {
+	Name      string `yaml:"name"`
+	Field     string `yaml:"field"`
+	Pattern   string `yaml:"pattern"`
+	Transform string `yaml:"transform"`
 }
 
 type rawPayload struct {
@@ -324,6 +333,28 @@ func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
 			Response:    toPayload(rr.Response),
 			Headers:     rr.Headers,
 			Memory:      rr.Memory,
+			Tags:        rr.Tags,
+			Properties:  toRequestProperties(rr.Properties),
+		})
+	}
+	return out
+}
+
+// toRequestProperties converts raw property declarations (SEP-0005). Shape
+// constraints (a valid name, exactly one of field/pattern) are reported by
+// checkRequestProperties at validation time rather than dropped here, so an
+// author sees every problem at once instead of losing entries silently.
+func toRequestProperties(rps []rawRequestProperty) []RequestProperty {
+	if len(rps) == 0 {
+		return nil
+	}
+	out := make([]RequestProperty, 0, len(rps))
+	for _, rp := range rps {
+		out = append(out, RequestProperty{
+			Name:      rp.Name,
+			Field:     rp.Field,
+			Pattern:   rp.Pattern,
+			Transform: rp.Transform,
 		})
 	}
 	return out

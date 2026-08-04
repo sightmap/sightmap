@@ -1,0 +1,31 @@
+version: 1
+requests:
+  # `status` shadows the reserved request identity of the same name. Legal, and
+  # warned about: a signal filtering on `status` here sees the body value, not
+  # the HTTP status code.
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    method: POST
+    properties:
+      - name: status
+        field: rsp.body.status
+
+  # A header, addressed by `field`. No shadowing, so no diagnostic.
+  - name: CheckoutRetryPayment
+    route: /api/checkout/pay/retry
+    method: POST
+    properties:
+      - name: rate_limit_remaining
+        field: rsp.headers.X-RateLimit-Remaining
+        transform: number
+      - name: outcome
+        field: rsp.body.status
+
+  # `pattern` reaches a body `field` cannot traverse: this response is
+  # form-encoded, so it has no JSON keys to walk.
+  - name: LegacyCheckoutCallback
+    route: /api/checkout/callback
+    method: POST
+    properties:
+      - name: outcome
+        pattern: '(?:declined|approved|deferred)'
