@@ -4,15 +4,15 @@ title: Request property extraction via `properties[]`
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-08-04
 spec-version-target: 1
-related-issues: []
+related-issues: [157]
 related-discussions: []
 ---
 
 ## Summary
 
-Add an optional `properties: RequestProperty[]` field to `Request` entries. Each property declares a named value extracted from a live request's own request/response body or headers — `field` for a dot-path into parsed JSON, `pattern` for a regex against unstructured text. It is the request-side analogue of SEP-0003's DOM `properties[]`: SEP-0003 answers "what state is this element in," this answers "what does this endpoint's traffic actually say."
+Add an optional `properties: RequestProperty[]` field to `Request` entries. Each property declares a named value extracted from a live request's own request/response body or headers — `field` for a dot-path into parsed JSON or a named header, `pattern` for a regex against raw body text. It is the request-side analogue of SEP-0003's DOM `properties[]`: SEP-0003 answers "what state is this element in," this answers "what does this endpoint's traffic actually say."
 
 ## Motivation
 
@@ -30,7 +30,7 @@ Other concrete cases:
 
 ### Shape
 
-A `Request` entry gains an optional `properties` array. Each entry is a `RequestProperty` object with a `name` and exactly one of `field` (a dot-path into the parsed JSON request or response body) or `pattern` (a regex, for content that isn't clean JSON — a header value, a non-JSON body, or a JSON body where only presence/shape matters).
+A `Request` entry gains an optional `properties` array. Each entry is a `RequestProperty` object with a `name` and exactly one of `field` (a dot-path into the parsed JSON body, or a named header) or `pattern` (a regex, for body content `field`'s object-key traversal can't reach — a non-JSON body, or a value embedded in a larger string).
 
 ```yaml
 # Before — request with no property extraction
@@ -51,9 +51,18 @@ A `Request` entry gains an optional `properties` array. Each entry is a `Request
   method: POST
   properties:
     - name: rate_limit_remaining
-      pattern: 'rsp\.headers\.X-RateLimit-Remaining:\s*(\d+)'   # illustrative; see Open questions on capture groups
+      field: rsp.headers.X-RateLimit-Remaining   # a named header, addressed by `field`
     - name: outcome
       field: rsp.body.status
+
+# `pattern` is for a body `field` can't traverse — here the response is
+# form-encoded, so it has no JSON keys to walk.
+- name: LegacyCheckoutCallback
+  route: /api/checkout/callback
+  method: POST
+  properties:
+    - name: outcome
+      pattern: '(?:declined|approved|deferred)'   # the whole match is the value; see Open questions on capture groups
 ```
 
 ### Property field reference
@@ -61,8 +70,8 @@ A `Request` entry gains an optional `properties` array. Each entry is a `Request
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | The key a consumer refers to this value by. Must be a valid identifier (`[a-z][a-z0-9_]*`), matching `componentProperty.name`'s pattern. |
-| `field` | string | one of `field`/`pattern` | A dot-path into the parsed request/response body: a root of `req` or `rsp`, then `.body.<path>`, `.headers.<name>`, or one of the already-structured request-identity names (`status`, `method`, `duration`) — see [Semantics](#semantics). |
-| `pattern` | string | one of `field`/`pattern` | A regex evaluated against the same rooted target as `field` would resolve to, for content `field`'s JSON-path addressing can't reach (a raw header string, a non-JSON body). |
+| `field` | string | one of `field`/`pattern` | A rooted path: `req` or `rsp`, then either `.body.<path>` (object-key traversal into the parsed JSON body) or `.headers.<name>` (one header's value, name matched case-insensitively). Also accepts one of the already-structured request-identity names (`status`, `method`, `duration`) — see [Semantics](#semantics). |
+| `pattern` | string | one of `field`/`pattern` | A regex matched against the raw text of the response body, for content `field`'s object-key traversal can't reach (a non-JSON body, or a value embedded in a larger string). |
 | `transform` | string | no | Same enum as `componentProperty.transform` (SEP-0003): `first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`. |
 
 Exactly one of `field`/`pattern` is required — declaring both, or neither, is a schema violation (`oneOf`, not `anyOf`).
@@ -71,7 +80,12 @@ Exactly one of `field`/`pattern` is required — declaring both, or neither, is 
 
 #### Extraction root
 
-`field`/`pattern` addresses one of two roots: `req` (the request payload) or `rsp` (the response payload), each with two children: `.body` (the parsed JSON body — `field` walks its keys; `pattern` is matched against its raw serialized text if walking fails or isn't applicable) and `.headers` (matched by header name, case-insensitive, always via `pattern` against the raw header value string — headers have no JSON structure to walk with `field`).
+`field` addresses one of two roots: `req` (the request payload) or `rsp` (the response payload), each with two children:
+
+- `.body.<path>` — object-key traversal into the parsed JSON body.
+- `.headers.<name>` — one header's value. The name is matched case-insensitively, and the value is the raw header string with no traversal below it.
+
+`pattern` takes no root. It is matched against the raw text of the response body, for a body `field` can't traverse: one that isn't JSON, or one where the value sits inside a larger string.
 
 `status`, `method`, and `duration` are reserved top-level names, addressing the request's own already-structured identity (HTTP status code, HTTP method, timing) rather than anything inside `req`/`rsp`. A consumer MAY reference these directly wherever a property name is expected without a `properties:` declaration. This SEP does not require a `Request` entry to declare them.
 
@@ -128,11 +142,11 @@ $defs.requestProperty:
     field:
       type: string
       minLength: 1
-      description: "Dot-path into the extraction root. See SEP-0005 §Extraction root."
+      description: "Rooted path: req|rsp, then .body.<path> (JSON object-key traversal) or .headers.<name> (one header value). See SEP-0005 §Extraction root."
     pattern:
       type: string
       minLength: 1
-      description: "Regex evaluated against the same rooted target field would resolve to."
+      description: "Regex matched against the raw text of the response body, for content field's object-key traversal cannot reach."
     transform:
       type: string
       enum: [first_word, last_word, first_number, first_dollar, number, slug]
@@ -151,7 +165,9 @@ Ruled out: `Payload.fields[]` documents *expected shape for a reader*, unenforce
 
 Simpler schema: one extraction mechanism, not two.
 
-Ruled out: real response bodies aren't reliably JSON, and headers have no JSON structure to walk with a dot-path at all. `pattern` is required for header extraction regardless of body format, so dropping it doesn't even fully simplify the schema — it just makes header extraction impossible.
+Ruled out: real response bodies aren't reliably JSON. A form-encoded or plain-text body has no keys for `field` to traverse, and neither does a JSON body whose interesting value sits embedded inside a larger string. `pattern` is the only way to reach either.
+
+This is the weakest of the three rejections, and worth reviewer attention. `field` covers headers as well as JSON bodies (see [Extraction root](#extraction-root)), so `pattern` now earns its place solely on non-traversable bodies. If reviewers don't see a near-term case for one, dropping `pattern` from v1 is a coherent alternative: it removes the `oneOf` constraint, the `transform`-versus-capture-group question ([Open questions](#open-questions) #2), and one of the two extraction mechanisms a consumer has to implement. Regex extraction could return in a later SEP once a real body demands it.
 
 ### 3. Do nothing — leave extraction to each consumer's own ad hoc logic
 
@@ -173,7 +189,8 @@ Existing SDKs that encounter a `properties:` entry under a `request:` MUST treat
 
 1. **Array indexing in `field`.** `rsp.body.items[0].status` — is index syntax in scope for v1, or is `field` restricted to plain dot-paths (object-key traversal only) until a real case demands array addressing?
 2. **Capture groups in `pattern`.** Today's sketch treats `pattern` as match-or-no-match against a whole target string, with the *entire matched substring* as the extracted value. Does a real case need a capture group (`pattern: 'remaining: (\d+)'` → extract just the digits) instead of relying on `transform: number` as a second pass?
-3. **This SEP does not resolve** `schema.md`'s existing open question on validating `response.fields[]`'s *shape* against real traffic (enforcement, not extraction) — that's a distinct problem (type-checking a declared shape vs. naming a value to pull out) and stays open for a future SEP.
+3. **Should `pattern` address targets other than the response body?** As specified it takes no root, so a non-JSON *request* body is unreachable. Adding a root would mean either a companion `target:` key or allowing `field` and `pattern` together (`field` selects, `pattern` extracts a substring from what it finds). The latter would also answer #2, since a regex applied to an already-selected value has an obvious target. Both are larger changes than this SEP needs, and neither has a case demanding it yet.
+4. **This SEP does not resolve** `schema.md`'s existing open question on validating `response.fields[]`'s *shape* against real traffic (enforcement, not extraction) — that's a distinct problem (type-checking a declared shape vs. naming a value to pull out) and stays open for a future SEP.
 
 ## References
 
