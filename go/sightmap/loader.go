@@ -45,8 +45,17 @@ type rawFile struct {
 	Components []rawComponent `yaml:"components"`
 	Views      []rawView      `yaml:"views"`
 	Requests   []rawRequest   `yaml:"requests"`
+	Messages   []rawMessage   `yaml:"messages"`
 	URL        string         `yaml:"url"`
 	Snapshots  []rawSnapshot  `yaml:"snapshots"`
+}
+
+type rawMessage struct {
+	Name        string `yaml:"name"`
+	Level       string `yaml:"level"`
+	Message     string `yaml:"message"`
+	Description string `yaml:"description"`
+	Source      string `yaml:"source"`
 }
 
 type rawSnapshot struct {
@@ -174,6 +183,7 @@ func loadDir(path string) (*Corpus, error) {
 	var memory []string
 	var globalRaws []rawComponent
 	var globalRequestRaws []rawRequest
+	var messageRaws []rawMessage
 	type viewFileWithPath struct {
 		rf   rawFile
 		path string
@@ -201,6 +211,9 @@ func loadDir(path string) (*Corpus, error) {
 		}
 		if len(rf.Requests) > 0 {
 			globalRequestRaws = append(globalRequestRaws, rf.Requests...)
+		}
+		if len(rf.Messages) > 0 {
+			messageRaws = append(messageRaws, rf.Messages...)
 		}
 		if len(rf.Views) > 0 {
 			viewFiles = append(viewFiles, viewFileWithPath{rf: rf, path: p})
@@ -280,6 +293,7 @@ func loadDir(path string) (*Corpus, error) {
 		GlobalComponents: globalComps,
 		Views:            views,
 		Requests:         globalRequests,
+		Messages:         toMessageDefs(messageRaws),
 		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),
 	}, nil
 }
@@ -357,6 +371,27 @@ func toRequestProperties(rps []rawRequestProperty) []RequestProperty {
 			Field:     rp.Field,
 			Pattern:   rp.Pattern,
 			Transform: rp.Transform,
+		})
+	}
+	return out
+}
+
+// toMessageDefs converts raw console/exception patterns (SEP-0006). Shape
+// problems (a missing name, a duplicate, an uncompilable regex) are reported by
+// checkMessages at validation time rather than dropped here, so an author sees
+// every problem at once.
+func toMessageDefs(rms []rawMessage) []MessageDef {
+	if len(rms) == 0 {
+		return nil
+	}
+	out := make([]MessageDef, 0, len(rms))
+	for _, rm := range rms {
+		out = append(out, MessageDef{
+			Name:        rm.Name,
+			Level:       rm.Level,
+			Message:     rm.Message,
+			Description: rm.Description,
+			Source:      rm.Source,
 		})
 	}
 	return out

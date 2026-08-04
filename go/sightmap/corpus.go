@@ -35,6 +35,10 @@ type Corpus struct {
 	// RequestsForURL.
 	Requests []RequestDef `json:"requests,omitempty"`
 
+	// Messages is the flat list of console-output and exception patterns (from a
+	// file-root `messages:` list). There is no view-scoped form.
+	Messages []MessageDef `json:"messages,omitempty"`
+
 	// loadDiagnostics holds structural problems detected while loading that are
 	// no longer visible in the flattened data (e.g. a circular $ref chain, which
 	// is expanded away). Validate surfaces these alongside its own checks.
