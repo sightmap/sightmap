@@ -26,12 +26,14 @@ var (
 	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "dependencies", "memory", "components", "requests")
 	componentFields = set("name", "selector", "source", "dependencies", "description", "stability", "memory", "tags", "properties", "children")
 	refFields       = set("$ref")
-	requestFields   = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory")
+	requestFields   = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
 	payloadFields   = set("fields")
 	fieldFields     = set("name", "type", "description")
 	propertyFields  = set("name", "extract", "transform")
 	accessFields    = set("status", "reason")
 	snapshotFields  = set("name", "notes", "url")
+
+	requestPropertyFields = set("name", "field", "pattern", "transform")
 )
 
 func set(keys ...string) map[string]bool {
@@ -77,6 +79,37 @@ func checkKeys(node *yaml.Node, known map[string]bool, file string, out *[]Valid
 		}
 	}
 	return vals
+}
+
+// checkStringScalars reports a scalar value whose resolved YAML tag is not
+// !!str for a field the schema types as a string.
+//
+// This exists because yaml.v3 decodes any scalar into a Go string field by
+// taking the raw lexeme, without consulting the resolved tag. So `level: 500`
+// and `message: 404` load cleanly as "500" and "404", while ajv rejects both —
+// the Go SDK would accept corpora the reference JSON Schema refuses. A bare
+// `key:` is worse than a type mismatch: it resolves to !!null and lands as the
+// empty string, so a filter or pattern silently matches nothing.
+//
+// Only scalars need checking. A mapping or sequence where the schema wants a
+// string already fails in yaml.Unmarshal before this walker runs.
+func checkStringScalars(vals map[string]*yaml.Node, fields []string, file string, out *[]ValidationError) {
+	for _, name := range fields {
+		n := vals[name]
+		if n == nil || n.Kind != yaml.ScalarNode {
+			continue
+		}
+		if n.Tag == "" || n.Tag == "!!str" {
+			continue
+		}
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "field-type-invalid",
+			Severity: SeverityError,
+			Message: fmt.Sprintf("field %q must be a string (line %d); quote the value: %s: %q",
+				name, n.Line, name, n.Value),
+		})
+	}
 }
 
 // forEachItem calls fn on each element of a sequence node (no-op otherwise).
@@ -212,6 +245,10 @@ func walkRequest(node *yaml.Node, file string, out *[]ValidationError) {
 	if p := v["response"]; p != nil {
 		walkPayload(p, file, out)
 	}
+	forEachItem(v["properties"], func(n *yaml.Node) {
+		pv := checkKeys(n, requestPropertyFields, file, out)
+		checkStringScalars(pv, []string{"name", "field", "pattern", "transform"}, file, out)
+	})
 }
 
 func walkPayload(node *yaml.Node, file string, out *[]ValidationError) {
