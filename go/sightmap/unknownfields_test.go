@@ -239,3 +239,65 @@ requests:
 		t.Fatalf("want 1 unknown-field for the typo, got %d: %v", len(w), w)
 	}
 }
+
+// Message level/message are a vocabulary word and a regex, so an unquoted
+// number is always a mistake — and `message: 404` is the natural way to write a
+// pattern for an HTTP-status console error. ajv rejects all of these.
+func TestFieldTypeInvalid_MessageNonStringScalars(t *testing.T) {
+	for _, body := range []string{"message: 404", "level: 500", "message: true", "message:"} {
+		got := findingsWithCode(t, "field-type-invalid", "version: 1\nmessages:\n  - name: M\n    "+body+"\n")
+		if len(got) != 1 {
+			t.Errorf("%q: want 1 field-type-invalid, got %d: %v", body, len(got), got)
+		}
+	}
+}
+
+func TestFieldTypeInvalid_MessageQuotedIsClean(t *testing.T) {
+	got := findingsWithCode(t, "field-type-invalid", `
+version: 1
+messages:
+  - name: M
+    message: "404"
+    level: EXCEPTION
+`)
+	if len(got) != 0 {
+		t.Fatalf("quoted scalars must be clean, got %v", got)
+	}
+}
+
+// ajv rejects a message with no name or an empty one; Go must agree.
+func TestValidate_MessageEmptyNameMatchesAjv(t *testing.T) {
+	for _, body := range []string{"level: ERROR", `name: ""`} {
+		got := findingsWithCode(t, "missing-name", "version: 1\nmessages:\n  - "+body+"\n")
+		if len(got) != 1 {
+			t.Errorf("%q: want 1 missing-name, got %d: %v", body, len(got), got)
+		}
+	}
+}
+
+func TestUnknownField_MessagesNoFalsePositives(t *testing.T) {
+	w := unknownWarnings(t, `
+version: 1
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    description: Cart mutated elsewhere
+    source: src/cart/sync.ts
+`)
+	if len(w) != 0 {
+		t.Fatalf("valid messages must not warn: %v", w)
+	}
+}
+
+func TestUnknownField_MessageTypo(t *testing.T) {
+	w := unknownWarnings(t, `
+version: 1
+messages:
+  - name: M
+    lvl: ERROR
+`)
+	if len(w) != 1 {
+		t.Fatalf("want 1 unknown-field for the typo, got %d: %v", len(w), w)
+	}
+}

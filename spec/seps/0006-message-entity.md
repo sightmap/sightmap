@@ -47,7 +47,9 @@ At least one of `level`/`message` should be declared in practice (an entry match
 
 #### One entity, not two ("console" vs "exception")
 
-The obvious first cut of this proposal used a `kind: console | exception` discriminator, splitting the entity by origin. It's dropped: at least one real consumer implementation already models a JS exception as simply an ERROR-level console record, with no second axis to discriminate origin beyond `level` itself, which this proposal already has. A `messages:` entry with `level: ERROR` matches what another implementation might call an "exception"; one with `level: WARN`/`INFO` matches what it might call a plain console message. No `kind` field is needed to express that distinction — see [Alternatives considered #1](#1-a-kind-console--exception-discriminator-field).
+The obvious first cut of this proposal used a `kind: console | exception` discriminator, splitting the entity by origin. It's dropped, because **origin is already carried as a level value**. The reference capture emits `log`, `debug`, `info`, `warn`, `error`, and `exception`, folding uncaught exceptions and unhandled rejections into the same record stream under their own level. So a `messages:` entry with `level: EXCEPTION` selects exceptions, one with `level: ERROR` selects `console.error`, and one with `level: WARN`/`INFO` selects plain console output. A second axis would only restate what `level` says.
+
+Note the correction this implies for anyone reading an earlier draft: `level: ERROR` does **not** match an exception. The two levels stay distinct, so a corpus that wants exceptions has to name them. That is a sharper distinction than a `kind:` field would have given, not a weaker one, and it still needs no extra field — see [Alternatives considered #1](#1-a-kind-console--exception-discriminator-field).
 
 #### No extraction mechanism (yet)
 
@@ -60,7 +62,10 @@ A live console record matches a `messages:` entry when every declared field (`le
 ### Conformance
 
 - MUST match a live console record against a `messages:` entry using case-insensitive exact match on `level` (when declared) and regex match on `message` (when declared); an omitted field imposes no constraint.
-- MUST warn (not silently resolve) when a live record matches more than one `messages:` entry with the same `name` collision potential — mirrors the existing `$ref`/component-name-collision diagnostic discipline.
+- MUST reject a `message` that is not a valid regular expression. Diagnostic code: `message-regex-invalid`.
+- MUST warn when two or more `messages:` entries share a `name`. Diagnostic code: `merge-collision-message`, mirroring `merge-collision-view`. Without this, a name is ambiguous and a [SEP-0007](0007-signals.md) `ref:` resolves to it silently.
+- MUST warn when two entries can match the same record and that overlap is statically decidable: the same `level` (or one omitting it) with an identical or absent `message`. Diagnostic code: `message-conflict`, mirroring `route-conflict`. Deciding whether two *different* regexes can both match some record is not decidable in general and is out of scope.
+- MUST warn (not silently resolve) when a **live** record matches more than one `messages:` entry. This is the runtime half of the rule above and applies only to a consumer that evaluates records.
 - MUST NOT require `properties:` support for `messages:` entries in this SEP's scope.
 - MAY additionally match `source` for tooling purposes (e.g. surfacing "likely emitted from `src/cart/sync.ts`" in a UI); this SEP does not require any behavior tied to `source` beyond documentary purposes, mirroring `Request.source`/`Component.source`.
 
@@ -136,7 +141,7 @@ Existing SDKs that encounter a `messages:` key MUST treat it as an unknown top-l
 
 1. **Naming.** `messages:` vs. `errors:` vs. something else — `errors:` reads naturally for the ERROR-level case but oddly for an INFO/WARN-level console message that isn't an "error" at all. `messages:` is the more neutral choice made here; open to reviewer pushback.
 2. **Should `properties:`/extraction ever be added here?** Flagged as future, non-blocking work in Semantics — worth confirming reviewers agree it's genuinely not needed for v1 rather than a gap being silently deferred.
-3. **Ambiguous-match diagnostics.** This SEP requires a diagnosable warning on ambiguous matches (Conformance) but doesn't specify an exact diagnostic code — left for the implementation PR to define, consistent with existing codes like `ref-unresolved`.
+3. ~~**Ambiguous-match diagnostics.**~~ **Resolved.** The static half is split across `merge-collision-message` (a duplicated name) and `message-conflict` (two entries that can match the same record), both warnings, both named in [Conformance](#conformance). The runtime half stays a consumer obligation, since it needs a live record.
 
 ## References
 

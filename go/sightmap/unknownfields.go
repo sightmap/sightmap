@@ -22,7 +22,7 @@ import (
 // stability/access/snapshots/url/properties are all recognized here.
 
 var (
-	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "snapshots")
+	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "messages", "snapshots")
 	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "dependencies", "memory", "components", "requests")
 	componentFields = set("name", "selector", "source", "dependencies", "description", "stability", "memory", "tags", "properties", "children")
 	refFields       = set("$ref")
@@ -34,6 +34,7 @@ var (
 	snapshotFields  = set("name", "notes", "url")
 
 	requestPropertyFields = set("name", "source", "field", "pattern", "transform")
+	messageFields         = set("name", "level", "message", "description", "source")
 )
 
 func set(keys ...string) map[string]bool {
@@ -131,6 +132,7 @@ func walkFile(node *yaml.Node, file string, out *[]ValidationError) {
 	forEachItem(v["views"], func(n *yaml.Node) { walkView(n, file, out) })
 	forEachItem(v["components"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 	forEachItem(v["requests"], func(n *yaml.Node) { walkRequest(n, file, out) })
+	forEachItem(v["messages"], func(n *yaml.Node) { walkMessage(n, file, out) })
 	forEachItem(v["snapshots"], func(n *yaml.Node) { checkKeys(n, snapshotFields, file, out) })
 }
 
@@ -249,6 +251,15 @@ func walkRequest(node *yaml.Node, file string, out *[]ValidationError) {
 		pv := checkKeys(n, requestPropertyFields, file, out)
 		checkStringScalars(pv, []string{"name", "source", "field", "pattern", "transform"}, file, out)
 	})
+}
+
+func walkMessage(node *yaml.Node, file string, out *[]ValidationError) {
+	v := checkKeys(node, messageFields, file, out)
+	// `message` is a regex and `level` a fixed vocabulary word, so an unquoted
+	// number here is always a mistake: `message: 404` is the natural way to
+	// write a pattern for an HTTP-status console error, and the JSON Schema
+	// rejects it.
+	checkStringScalars(v, []string{"name", "level", "message", "description", "source"}, file, out)
 }
 
 func walkPayload(node *yaml.Node, file string, out *[]ValidationError) {
