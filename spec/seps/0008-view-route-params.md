@@ -163,7 +163,7 @@ Ship `:name` binding with nothing else: no query extraction, no transform, no re
 
 Ruled out: the query-string gap is already a known, named gap (see Motivation), and would immediately need a follow-up SEP. Shipping the binding without the array either leaves that gap open or forces a second SEP one release later for a mechanism this one could carry now.
 
-### 3. `extract: path` / `extract: full` (whole-URL extraction, mirroring Fullstory's internal `UrlValue.path`/`.full` arms)
+### 3. `extract: path` / `extract: full` (whole-URL extraction)
 
 Add a mode that extracts the full matched path, or the full URL, as a single property value.
 
@@ -194,7 +194,7 @@ This SEP also reserves conformance fixture number `021` by convention (the next 
 
 1. **`host` and `fragment` extraction.** Both are deferred, not ruled out, for a design reason rather than a scope reason: both look like they eventually want `:param`-style parameterization (`:tenant.app.com`; `:param` matching inside a hash-routed fragment) rather than a bare opaque-string read, and shipping the shallow read now risks needing to support both forms side by side later. Is the hash-routed-SPA case, where the entire route lives in the fragment and is unmappable by this spec today, common enough that reviewers want the shallow `extract: fragment` read now, ahead of a real parameterization design?
 2. **Extending `:param` binding to `Request` routes.** SEP-0005's `field` grammar addresses `req`/`rsp` body and headers, but not the request's own URL params. A `req.url.param.<name>` addition to that grammar is a natural follow-on but is scoped out of this SEP to keep it to one decision.
-3. **PII and cardinality.** A bound path segment or query value can be an email address, a token, or other sensitive data. This SEP takes the same position the Subtext-internal SEP-0005-vs-DOC-3780 comparison already took on `__fs__redacted`: sightmap declares where the value lives, and whichever consumer resolves it against real traffic owns redaction. Does the spec need even an advisory marker for this, or is silence (as with SEP-0005) sufficient?
+3. **PII and cardinality.** A bound path segment or query value can be an email address, a token, or other sensitive data. This SEP takes the same position SEP-0005 already took on redaction: sightmap declares where the value lives, and whichever consumer resolves it against real traffic owns redaction and any placeholder convention that implies. Does the spec need even an advisory marker for this, or is silence (as with SEP-0005) sufficient?
 4. Should a corpus-linting tool check a view's `url:` (its representative concrete URL) against its own `route:`'s `:param` segments, now that those segments are semantically meaningful rather than purely cosmetic?
 
 ## References
