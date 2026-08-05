@@ -38,6 +38,11 @@
       "description": "Declarative console/exception patterns, addressable by name. Corpus-root only — no view-scoping. See SEP-0006.",
       "items": { "$ref": "#/$defs/message" }
     },
+    "signals": {
+      "type": "array",
+      "description": "Rules composing a named, tagged classification from an existing entity's identity and declared properties. Corpus-root only — no view-scoping. See SEP-0007.",
+      "items": { "$ref": "#/$defs/signal" }
+    },
     "snapshots": {
       "$comment": "Reserved tooling field. Not part of the spec's matching or merge semantics; conforming SDKs MAY ignore it. Consumed by the reference CLI's capture/probe workflow.",
       "type": "array",
@@ -261,6 +266,46 @@
           "type": "string",
           "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
           "description": "Optional post-processing applied to the extracted string. Same vocabulary as componentProperty.transform (SEP-0003)."
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "description": "A rule composing a named, tagged classification from an existing entity. See SEP-0007.",
+      "required": ["name", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Semantic identity of the generated classification, e.g. checkout.payment.declined."
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of an existing components:/requests:/messages:/views: entry this rule composes. Must resolve; must not be ambiguous across entity kinds."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Open-vocabulary classification labels carried onto the generated classification. See SEP-0004."
+        },
+        "filter": {
+          "type": "object",
+          "description": "Property name → an accepted value (equality) or list of them (membership), ANDed across keys, evaluated against the referenced entity's declared properties and already-structured identity fields. Omitted means unconditional. A key must resolve on the referenced entity; a message or view ref accepts no keys.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": ["string", "integer", "boolean"],
+                "description": "Compared as canonical text, so an unquoted 200 or true reads naturally. Quote anything whose exact text matters."
+              },
+              {
+                "type": "array",
+                "items": { "type": ["string", "integer", "boolean"] },
+                "minItems": 1
+              }
+            ]
+          }
         }
       }
     },

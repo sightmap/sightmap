@@ -69,3 +69,39 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 		t.Errorf("authoring fields should be empty after a wire round-trip: %+v", back.Views[0])
 	}
 }
+
+// The three SEP entities must survive serialization into the uploaded wire
+// form. A field without a JSON tag would silently vanish from the payload.
+func TestCorpusWire_IncludesSEPEntities(t *testing.T) {
+	c := &sightmap.Corpus{
+		Requests: []sightmap.RequestDef{{
+			Name:  "CheckoutPayment",
+			Route: "/api/checkout/pay",
+			Tags:  []string{"checkout"},
+			Properties: []sightmap.RequestProperty{
+				{Name: "outcome", Field: "rsp.body.status", Transform: "slug"},
+			},
+		}},
+		Messages: []sightmap.MessageDef{{Name: "CartVersionMismatch", Level: "ERROR", Message: "mismatch"}},
+		Signals: []sightmap.SignalDef{{
+			Name:   "checkout.payment.declined",
+			Ref:    "CheckoutPayment",
+			Tags:   []string{"defect"},
+			Filter: map[string][]string{"outcome": {"declined"}},
+		}},
+	}
+	b, err := json.Marshal(c)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	wire := string(b)
+	for _, want := range []string{
+		`"requests"`, `"properties"`, `"field":"rsp.body.status"`, `"transform":"slug"`, `"tags":["checkout"]`,
+		`"messages"`, `"level":"ERROR"`,
+		`"signals"`, `"ref":"CheckoutPayment"`, `"filter":{"outcome":["declined"]}`,
+	} {
+		if !strings.Contains(wire, want) {
+			t.Errorf("wire form is missing %s\ngot: %s", want, wire)
+		}
+	}
+}

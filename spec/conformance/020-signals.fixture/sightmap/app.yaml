@@ -1,0 +1,71 @@
+version: 1
+requests:
+  # `status` shadows the reserved HTTP identity, so the filter below sees the
+  # body value. Warned about by request-property-shadows-reserved.
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    method: POST
+    properties:
+      - name: status
+        field: rsp.body.status
+
+  - name: CheckoutRetryPayment
+    route: /api/checkout/pay/retry
+    method: POST
+    properties:
+      - name: rate_limit_remaining
+        field: rsp.headers.X-RateLimit-Remaining
+      - name: outcome
+        field: rsp.body.status
+
+views:
+  - name: CheckoutView
+    route: /checkout
+
+components:
+  - name: PaymentBanner
+    selector: .payment-status-banner
+    properties:
+      - name: text
+        extract: text
+
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+
+signals:
+  # Filters a declared property that shadows a reserved name.
+  - name: checkout.payment.declined
+    tags: [defect]
+    ref: CheckoutPayment
+    filter:
+      status: declined
+
+  # A reserved identity name needs no declaration, and an unquoted integer is
+  # accepted (compared as canonical text). Every other key is declared above.
+  - name: checkout.payment.throttled_silently
+    tags: [defect]
+    ref: CheckoutRetryPayment
+    filter:
+      method: POST
+      rate_limit_remaining: "0"
+      outcome: [queued, deferred]
+
+  # A component's declared property, plus the built-in `value`.
+  - name: checkout.payment.declined.banner
+    tags: [defect]
+    ref: PaymentBanner
+    filter:
+      text: declined
+
+  # A message ref takes no filter: its own level/message already identify it.
+  - name: cart.abandoned
+    tags: [defect]
+    ref: CartVersionMismatch
+
+  # A view ref scopes a classification to "observed while this view is active".
+  # It has no extractable property, so it takes no filter either.
+  - name: checkout.view.active
+    tags: [checkout]
+    ref: CheckoutView
