@@ -1,0 +1,25 @@
+title: "Guard: stats --json emits the published field names (views/components/requests/properties/memory/per_view) with deduped totals"
+known_bug: false
+run:
+  args: [stats, --json]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '"views": 2'
+    - must_match: '"components": 6'
+      why: the corpus-wide total dedupes the $ref-reused global by first-seen name
+    - must_match: '"requests": 2'
+    - must_match: '"properties": 1'
+    - must_match: '"memory": 2'
+    - must_match: '"per_view": \['
+      why: >
+        the field names are a published contract consumed by CI in other
+        repos — views/components/requests/properties/memory/per_view, and
+        name/route/components/requests per row — and must never be renamed
+    - must_match: '"name": "Checkout"'
+    - must_match: '"route": "/checkout"'
+    - must_match: '"components": 4'
+      why: the Checkout row counts its expanded components (shared Navigation included)
+    - must_not_match: 'sightmap stats ·'
+      why: --json output must be pure JSON, with no human header for a consumer to strip

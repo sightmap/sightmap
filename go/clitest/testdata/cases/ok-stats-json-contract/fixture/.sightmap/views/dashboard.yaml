@@ -1,0 +1,12 @@
+version: 1
+
+views:
+  - name: Dashboard
+    route: /dashboard
+    components:
+      - $ref: Navigation
+      - name: ActivityFeed
+        selector: '[data-component="ActivityFeed"]'
+        properties:
+          - name: count
+            extract: text

@@ -1,0 +1,15 @@
+version: 1
+
+components:
+  - name: Navigation
+    selector: 'nav[data-component="Navigation"]'
+    memory:
+      - sticky on scroll
+
+  - name: Footer
+    selector: 'footer[data-component="Footer"]'
+
+requests:
+  - name: GetCurrentUser
+    route: /api/me
+    method: GET
