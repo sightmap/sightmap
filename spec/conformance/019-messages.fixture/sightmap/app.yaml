@@ -16,5 +16,8 @@ messages:
     level: EXCEPTION
     message: 'Cannot read propert(y|ies) .* of (null|undefined)'
 
-  # Neither level nor message: legal, matches every record.
-  - name: AnyRecord
+  # A level-only entry is legal, but it overlaps CartVersionMismatch: both match
+  # an ERROR record, so `message-conflict` warns that a consumer must surface the
+  # ambiguity rather than silently pick one.
+  - name: AnyCartError
+    level: ERROR
