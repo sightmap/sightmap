@@ -22,7 +22,7 @@ The command reads the atlas index, resolves `SLUG` to an entry, fetches that ent
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--force` | off | Install into a non-empty target directory, replacing its contents |
+| `--force` | off | Install into a non-empty target directory, replacing its contents (refused unless it holds only corpus files) |
 | `--index` | `https://raw.githubusercontent.com/sightmap/atlas/main/index.json` | Atlas `index.json` URL (for mirrors and tests) |
 | `--target` | `.sightmap` | Directory to install the corpus into |
 
@@ -65,6 +65,23 @@ Installed acme-shop (Acme Shop): 3 files → .sightmap. Next:
   sightmap validate
 ```
 
+**What `--force` refuses.** Replacing a directory deletes what was in it, so `--force` only applies to a directory that is visibly a corpus. It refuses two ways, both before anything is fetched:
+
+| Refusal | What it covers |
+| --- | --- |
+| By location | The current working directory, any directory above it, your home directory, and a filesystem root. `--target . --force` and `--target .. --force` are refusals — they are not a way to install into your project root. |
+| By contents | Every top-level entry of the target must be a `.yaml` or `.yml` file, or one of `views/`, `snapshots/`, `review/` (macOS's `.DS_Store` is tolerated). A `.git`, a `.env`, a `go.mod`, a `src/` — anything else — means the target is a project directory, not a corpus. |
+
+```text
+sightmap add: refusing to replace the install target /Users/you/app: it holds ".env", ".git", "go.mod" and 1 more, which is not sightmap corpus content — replacing it deletes everything in it, so this looks like a project directory, not a corpus. Install into a corpus directory instead (for example /Users/you/app/.sightmap), or delete /Users/you/app yourself if you really did mean to replace it
+```
+
+The contents rule is an allowlist, so it refuses content it does not recognize rather than only the names someone thought to list. Point `--target` at `.sightmap` (the default) and `--force` works as it always has: it replaces the corpus and nothing else.
+
+<Note>
+The previous contents are moved aside, not deleted, until the corpus that replaced them has been loaded from the target. If the atlas entry turns out not to load, `add` puts your corpus back and says so — you are never left with neither.
+</Note>
+
 **What `add` guarantees.** A `--index` URL you were handed by a stranger is untrusted input, and so is every string inside the index it points at. The command enforces the following, whatever the index says:
 
 | Guarantee | What it covers |
@@ -72,7 +89,8 @@ Installed acme-shop (Acme Shop): 3 files → .sightmap. Next:
 | HTTPS only | Both the index and every file are fetched over `https://`. Plain `http://` is refused except for loopback hosts (`localhost`, `127.0.0.1`, `::1`), so local mirrors and tests still work. The check is re-applied to every redirect hop, so a `302` cannot downgrade a fetch to plaintext after the fact. Chains stop after 5 redirects. |
 | Fail-closed paths | An entry's slug, commit, and file paths are validated before they reach a URL or the filesystem. A slug with a path separator or `..`, a file path outside `.sightmap/`, a backslash, a relative segment, or any control character (including `ESC`, the terminal-escape injection vector) refuses the whole install. Atlas-supplied text is escaped before it is printed. |
 | Commit pinning | When an entry publishes a 40-character commit, its files are fetched at that commit, so the index and the content cannot straddle an atlas push. An unpinned entry is fetched at the index's own ref and says so on stderr. |
-| Atomic install | Every file is fetched before any is written, the result is staged in a temporary directory, and the staged corpus is loaded to prove it works before a rename swaps it into place. A failed install — a 404, a broken entry, a full disk — leaves the target exactly as it was. |
+| Atomic install | Every file is fetched before any is written, the result is staged in a temporary directory, and a rename swaps it into place. Whatever the target held is moved aside, not deleted, until the installed corpus has been loaded from the target; a corpus that does not load undoes the swap. A failed install — a 404, a broken entry, a full disk — leaves the target exactly as it was. |
+| Bounded `--force` | Replacing is refused for anything that is not visibly a corpus directory: the working directory, a directory above it, your home directory, a filesystem root, or a target holding a `.git`, a `.env`, or any other content `add` itself would not have written. |
 | Size caps | 8 MiB for the index, 4 MiB per file, and 32 MiB and 256 files per entry — the file limit is checked before the first file is requested. Each fetch also has a 30-second timeout, but a timeout bounds how long a response takes, not how large it is; the byte caps are what stop a hostile mirror. |
 
 An entry with no published commit warns, because the guarantee above is the one it cannot offer:

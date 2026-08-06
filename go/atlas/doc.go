@@ -76,7 +76,37 @@
 //
 // [Install] checks local preconditions before touching the network, fetches
 // every file before writing any, stages the result in a temporary directory,
-// loads the staged corpus to prove the atlas entry actually works, and only
-// then swaps it into place. An install therefore either lands whole or leaves
-// the target exactly as it was.
+// renames it onto the target, and loads the corpus that landed to prove the
+// atlas entry actually works. Whatever the target held is moved aside, not
+// deleted, until that load succeeds; a corpus that does not load undoes the
+// rename and puts the previous contents back. An install therefore either
+// lands whole or leaves the target exactly as it was.
+//
+// # Replacing a target
+//
+// [Options.Replace] is destructive: the target's previous contents do not
+// survive. So it is confined to directories that are visibly a corpus and
+// nothing else. Two rules, both fail-closed, both reported as
+// [ErrUnsafeReplace]:
+//
+//   - Location. The working directory, any directory containing it, the user's
+//     home directory, any directory containing that, and a filesystem root are
+//     refused whatever they hold. A mistyped target is the whole hazard here,
+//     and no inspection of the contents makes deleting one of those the
+//     caller's intent.
+//   - Contents. Every top-level entry of the target must be corpus content: a
+//     .yaml or .yml file, or one of the corpus's own subdirectories (views,
+//     snapshots, review). A .git directory, a .env, a go.mod, a src — anything
+//     else — means the target is a project directory that happens to hold
+//     YAML. macOS's .DS_Store is the single exception: it holds nothing of the
+//     user's, and refusing every corpus someone has opened in Finder would
+//     read as a bug.
+//
+// The contents rule is an allowlist rather than a list of alarming names on
+// purpose: a blocklist only refuses the destruction someone thought of in
+// advance, while the allowlist confines Replace to directories shaped like the
+// ones Install itself writes. It reads one level deep, which is what it takes
+// to establish that the target *is* a corpus directory; proving every byte
+// beneath it is corpus content would mean walking a snapshot set on every
+// install.
 package atlas

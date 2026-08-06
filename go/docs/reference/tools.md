@@ -13,7 +13,7 @@ See also: [The outer loop](outer-loop.md) · [Lint rules](lint-rules.md)
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--force` | off | Install into a non-empty target, replacing its contents (a swap, never a merge) |
+| `--force` | off | Install into a non-empty target, replacing its contents (a swap, never a merge) — refused unless the target holds only corpus files |
 | `--index` | `https://raw.githubusercontent.com/sightmap/atlas/main/index.json` | Atlas `index.json` URL — every other fetch URL is derived from it, so this redirects a whole install at a mirror |
 | `--target` | `.sightmap` | Directory to install into |
 
@@ -30,6 +30,19 @@ Installed acme-shop (Acme Shop): 3 files → .sightmap. Next:
 An unknown slug prints the closest published slugs. Flags work before or after `SLUG`.
 
 **Never merges.** A non-empty target is refused (`pass --force to replace it`), and `--force` replaces the whole directory, so files the entry no longer publishes cannot survive into a hybrid corpus. Hand-authored YAML in `.sightmap/` is safe from an accidental `add`.
+
+**`--force` only replaces a corpus.** Because replacing deletes what was there, it is refused for any target that is not visibly a corpus directory:
+
+- **By location** — the working directory, anything above it, your home directory, or a filesystem root. `--target . --force` and `--target .. --force` are refusals, not a way to install into the project root.
+- **By contents** — every top-level entry must be a `.yaml`/`.yml` file or one of `views/`, `snapshots/`, `review/`. A `.git`, a `.env`, a `go.mod`, a `src/` means the target is a project directory, and `--force` stops:
+
+```text
+sightmap add: refusing to replace the install target /Users/you/app: it holds ".env", ".git", "go.mod" and 1 more, which is not sightmap corpus content — replacing it deletes everything in it, so this looks like a project directory, not a corpus. Install into a corpus directory instead (for example /Users/you/app/.sightmap), or delete /Users/you/app yourself if you really did mean to replace it
+```
+
+The rule is an allowlist, so it refuses unfamiliar content rather than only the names someone thought to list. Install into `.sightmap/` (the default target) and `--force` behaves exactly as it always has.
+
+**Rollback is real.** The previous contents are moved aside, not deleted, until the corpus that replaced them has been loaded from the target. A broken atlas entry restores what you had and says so; it does not leave you with neither.
 
 **Untrusted by construction.** The index and every entry string are untrusted: fetches are HTTPS-only (loopback excepted) with the policy re-applied to every redirect, slugs/commits/paths are validated fail-closed before they reach a URL or the filesystem, and responses are size-capped. The install is staged and swapped, so a failure leaves the target untouched. An entry that publishes no commit is fetched from a floating ref and warns.
 

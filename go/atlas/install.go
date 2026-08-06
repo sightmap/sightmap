@@ -29,6 +29,12 @@ type Options struct {
 	// Replace permits installing over a non-empty target. The target's
 	// previous contents are *replaced*, not merged: files the entry no longer
 	// publishes do not survive, so an install never yields a hybrid corpus.
+	//
+	// Because that is destructive, it is confined to directories that are
+	// visibly a corpus: a target that holds anything which is not corpus
+	// content, or that is the working directory, the home directory, or a
+	// filesystem root, is refused with [ErrUnsafeReplace]. The full rule is in
+	// the package doc.
 	Replace bool
 	// Client fetches the index and the files. Nil means [NewClient].
 	Client *Client
@@ -63,13 +69,17 @@ func (r *Result) Label() string {
 //     blamed on the user, before any atlas entry is in hand.
 //  2. Local preconditions are checked *before any network I/O*, so a user with
 //     an existing corpus and no connectivity gets the actionable refusal
-//     instead of a dial timeout.
+//     instead of a dial timeout. Replacing a target is checked here too: a
+//     directory that is not visibly a corpus is refused outright.
 //  3. The index is fetched, gated on its schema version, and the entry is
 //     validated fail-closed.
 //  4. Every file is fetched (concurrently) before any is written.
-//  5. The files are staged in a temporary directory and the staged corpus is
-//     loaded, so a broken atlas entry is caught before it touches the target.
-//  6. The staging directory is swapped into place with a rename.
+//  5. The files are staged in a temporary directory beside the target, and the
+//     staging directory is swapped into place with a rename. Whatever the
+//     target held is moved aside, not deleted.
+//  6. The *installed* corpus is loaded. Only once it does load are the
+//     previous contents discarded; a corpus that does not load undoes the swap
+//     and puts them back.
 //
 // An install therefore either lands whole or leaves the target exactly as it
 // was: no partial corpus, no half-overwritten one, and nothing installed that
@@ -102,8 +112,16 @@ func Install(ctx context.Context, slug string, opts Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	if state == targetNonEmpty && !opts.Replace {
-		return nil, fmt.Errorf("%w: %s", ErrTargetNotEmpty, opts.Target)
+	if state == targetNonEmpty {
+		if !opts.Replace {
+			return nil, fmt.Errorf("%w: %s", ErrTargetNotEmpty, opts.Target)
+		}
+		// Replacing deletes whatever is there. Decide that against the
+		// directory itself, before the fetch, so the refusal is the same with
+		// or without connectivity.
+		if err := checkReplaceable(absTarget); err != nil {
+			return nil, err
+		}
 	}
 
 	indexData, err := client.Fetch(ctx, indexURL, MaxIndexBytes)
@@ -249,11 +267,16 @@ func fetchEntryFiles(ctx context.Context, client *Client, src Source, ref string
 }
 
 // writeAtomically stages the fetched corpus in a temporary directory beside
-// the target, proves it loads, and renames it into place. Staging is what
-// makes the install atomic: a mid-loop MkdirAll or WriteFile failure (an entry
-// whose files collide, a full disk) leaves the target untouched instead of
-// half-overwritten, replacing a target is a swap rather than a merge, and
-// rolling back a broken atlas entry costs one RemoveAll.
+// the target, renames it into place, and proves the installed corpus loads.
+// Staging is what makes the install atomic: a mid-loop MkdirAll or WriteFile
+// failure (an entry whose files collide, a full disk) leaves the target
+// untouched instead of half-overwritten, and replacing a target is a swap
+// rather than a merge.
+//
+// Nothing the target held is deleted until the corpus that replaced it has
+// loaded. The load check is therefore a real gate rather than a report: a
+// broken atlas entry is undone, and the user gets their previous corpus back
+// instead of the message that theirs is gone and the new one does not work.
 func writeAtomically(target string, entry *Entry, rels []string, bodies [][]byte, replace bool) (warnings []string, replaced bool, err error) {
 	parent := filepath.Dir(target)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
@@ -265,7 +288,9 @@ func writeAtomically(target string, entry *Entry, rels []string, bodies [][]byte
 	if err != nil {
 		return nil, false, fmt.Errorf("create staging directory in %s: %w", parent, err)
 	}
-	defer os.RemoveAll(staging) // a no-op once the rename below has moved it
+	// A no-op once the rename below has moved the staging directory — and the
+	// cleanup for the failed install a rollback moves back onto this path.
+	defer os.RemoveAll(staging)
 
 	for i, rel := range rels {
 		dest := filepath.Join(staging, filepath.FromSlash(rel))
@@ -280,37 +305,40 @@ func writeAtomically(target string, entry *Entry, rels []string, bodies [][]byte
 		return nil, false, fmt.Errorf("set permissions on staging directory: %w", err)
 	}
 
-	warnings, err = checkStagedCorpus(staging, entry)
+	sw, err := swapIntoPlace(staging, target, replace)
 	if err != nil {
 		return nil, false, err
 	}
-
-	replaced, err = swapIntoPlace(staging, target, replace)
+	warnings, err = checkInstalledCorpus(target, entry)
 	if err != nil {
-		return nil, false, err
+		if rollbackErr := sw.rollback(staging, target); rollbackErr != nil {
+			return nil, false, fmt.Errorf("%w; and undoing the install failed: %v%s", err, rollbackErr, sw.strandedNote())
+		}
+		return nil, false, fmt.Errorf("%w%s", err, sw.undoneNote(target))
 	}
-	return warnings, replaced, nil
+	sw.commit()
+	return warnings, sw.replaced, nil
 }
 
-// checkStagedCorpus loads the staged corpus before it is installed. An entry
-// that does not load is a *published* defect: without this check `add` writes
-// it, prints success, and the user discovers the breakage later against their
-// own files with no hint that the atlas entry is at fault.
+// checkInstalledCorpus loads the corpus that has just landed on the target. An
+// entry that does not load is a *published* defect: without this check `add`
+// writes it, prints success, and the user discovers the breakage later against
+// their own files with no hint that the atlas entry is at fault.
 //
-// A load failure is fatal and the install is abandoned — the corpus is
-// unusable, and while it is still staged rolling back costs nothing. Validation
-// findings are only warnings: a corpus that loads is installable, the findings
-// may be deliberate, and refusing them here would reject entries the atlas
-// itself accepts. Either way the message names the atlas entry, not the user's
+// A load failure is fatal and the install is undone — the corpus is unusable,
+// and whatever the target held is still sitting beside it. Validation findings
+// are only warnings: a corpus that loads is installable, the findings may be
+// deliberate, and refusing them here would reject entries the atlas itself
+// accepts. Either way the message names the atlas entry, not the user's
 // project.
-func checkStagedCorpus(staging string, entry *Entry) ([]string, error) {
-	corpus, err := sightmap.Load(staging)
+func checkInstalledCorpus(target string, entry *Entry) ([]string, error) {
+	corpus, err := sightmap.Load(target)
 	if err != nil {
-		// Rewrite the staging path out of the message — the user has no
-		// business seeing a temp directory, and the corpus-relative path is
-		// what they would report to the atlas.
-		msg := strings.ReplaceAll(err.Error(), staging+string(filepath.Separator), corpusPrefix)
-		return nil, fmt.Errorf("atlas entry %q publishes a corpus that does not load: %s — the atlas entry is broken; nothing was installed", SafeText(entry.Slug), msg)
+		// Rewrite the target path out of the message: the corpus-relative path
+		// is the one the user would quote when reporting the entry to the
+		// atlas, and it does not change with --target.
+		msg := strings.ReplaceAll(err.Error(), target+string(filepath.Separator), corpusPrefix)
+		return nil, fmt.Errorf("atlas entry %q publishes a corpus that does not load: %s — the atlas entry is broken", SafeText(entry.Slug), msg)
 	}
 	var problems []string
 	for _, f := range sightmap.Validate(corpus) {
@@ -326,50 +354,110 @@ func checkStagedCorpus(staging string, entry *Entry) ([]string, error) {
 		SafeText(entry.Slug), len(problems), SafeText(problems[0]))}, nil
 }
 
+// swap is a completed rename of the staged corpus onto the target, plus what
+// it takes to undo it. It exists so the post-install load check can be a gate:
+// the previous contents are kept, untouched, until the corpus that replaced
+// them has proved it loads.
+type swap struct {
+	replaced   bool        // whether a non-empty target was replaced
+	backup     string      // where its contents were moved; "" when there were none
+	priorEmpty bool        // whether the target existed and was empty
+	priorMode  os.FileMode // that empty directory's permissions, to recreate it
+}
+
+// commit discards what the target held. Called only after the installed corpus
+// has loaded.
+func (s *swap) commit() {
+	if s.backup != "" {
+		os.RemoveAll(s.backup)
+	}
+}
+
+// rollback undoes the swap, leaving the target as it was found. The failed
+// install is moved back to the staging path first rather than deleted, so the
+// previous contents are never removed to make room for a restore that could
+// itself fail; writeAtomically's deferred RemoveAll takes it from there.
+func (s *swap) rollback(staging, target string) error {
+	if err := os.Rename(target, staging); err != nil {
+		return err
+	}
+	if s.backup != "" {
+		return os.Rename(s.backup, target)
+	}
+	if s.priorEmpty {
+		return os.Mkdir(target, s.priorMode)
+	}
+	return nil
+}
+
+// undoneNote says what a rolled-back install left behind, in the user's terms.
+func (s *swap) undoneNote(target string) string {
+	if s.backup != "" {
+		return fmt.Sprintf("; the previous contents of %s were restored", target)
+	}
+	return "; nothing was installed"
+}
+
+// strandedNote points at the backup when a rollback could not put it back.
+func (s *swap) strandedNote() string {
+	if s.backup == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (the previous contents are in %s)", s.backup)
+}
+
 // swapIntoPlace moves the staged corpus onto the target. The target's state is
 // re-read here, immediately before the write, so a directory that was created
-// or filled during the (multi-second) fetch is not silently overwritten.
-func swapIntoPlace(staging, target string, replace bool) (replaced bool, err error) {
+// or filled during the (multi-second) fetch is not silently overwritten — and
+// what --force would destroy is judged on what the target holds now, not on
+// what it held before the fetch.
+func swapIntoPlace(staging, target string, replace bool) (*swap, error) {
 	state, err := inspectTarget(target)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	switch state {
 	case targetAbsent:
 		if err := os.Rename(staging, target); err != nil {
-			return false, fmt.Errorf("install into %s: %w", target, err)
+			return nil, fmt.Errorf("install into %s: %w", target, err)
 		}
-		return false, nil
+		return &swap{}, nil
 	case targetEmpty:
+		info, err := os.Stat(target)
+		if err != nil {
+			return nil, fmt.Errorf("install into %s: %w", target, err)
+		}
 		// os.Remove refuses a directory that gained an entry since the check,
 		// so a file that appeared during the fetch turns into an error rather
 		// than a silent overwrite.
 		if err := os.Remove(target); err != nil {
-			return false, fmt.Errorf("install into %s: %w", target, err)
+			return nil, fmt.Errorf("install into %s: %w", target, err)
 		}
 		if err := os.Rename(staging, target); err != nil {
-			return false, fmt.Errorf("install into %s: %w", target, err)
+			return nil, fmt.Errorf("install into %s: %w", target, err)
 		}
-		return false, nil
+		return &swap{priorEmpty: true, priorMode: info.Mode().Perm()}, nil
 	default:
 		if !replace {
-			return false, fmt.Errorf("%w: %s", ErrTargetNotEmpty, target)
+			return nil, fmt.Errorf("%w: %s", ErrTargetNotEmpty, target)
+		}
+		if err := checkReplaceable(target); err != nil {
+			return nil, err
 		}
 		// Replace, don't merge: the old tree moves aside whole, so files the
 		// entry no longer publishes cannot survive into a hybrid corpus.
 		backup := staging + ".replaced"
 		if err := os.Rename(target, backup); err != nil {
-			return false, fmt.Errorf("move existing %s aside: %w", target, err)
+			return nil, fmt.Errorf("move existing %s aside: %w", target, err)
 		}
 		if err := os.Rename(staging, target); err != nil {
 			// Put the user's corpus back before reporting the failure.
 			if restoreErr := os.Rename(backup, target); restoreErr != nil {
-				return false, fmt.Errorf("install into %s: %w (the previous contents are in %s)", target, err, backup)
+				return nil, fmt.Errorf("install into %s: %w (the previous contents are in %s)", target, err, backup)
 			}
-			return false, fmt.Errorf("install into %s: %w", target, err)
+			return nil, fmt.Errorf("install into %s: %w", target, err)
 		}
-		os.RemoveAll(backup)
-		return true, nil
+		return &swap{replaced: true, backup: backup}, nil
 	}
 }
 

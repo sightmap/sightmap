@@ -27,7 +27,7 @@ func runAddOut(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("add", flag.ContinueOnError)
 	indexURL := fs.String("index", atlas.DefaultIndexURL, "Atlas index.json URL (for mirrors and tests)")
 	target := fs.String("target", ".sightmap", "Directory to install the corpus into")
-	force := fs.Bool("force", false, "Install into a non-empty target directory, replacing its contents")
+	force := fs.Bool("force", false, "Install into a non-empty target directory, replacing its contents (refused unless it holds only corpus files)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: sightmap add SLUG [--index URL] [--target DIR] [--force]\n\n")

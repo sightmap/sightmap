@@ -313,6 +313,207 @@ func TestInstall_replaceReplacesTheWholeTarget(t *testing.T) {
 	assertNoLeftovers(t, filepath.Dir(target))
 }
 
+// ── --force guardrails ────────────────────────────────────────────────────────
+
+// projectFiles is a directory that is plainly not a corpus: a git checkout with
+// secrets, a manifest, and source. Replacing it would delete work no atlas
+// entry can put back.
+func projectFiles() map[string]string {
+	return map[string]string{
+		".git/HEAD":   "ref: refs/heads/main\n",
+		".env":        "STRIPE_KEY=sk_live_xxx\n",
+		"go.mod":      "module example.com/app\n",
+		"src/main.go": "package main\n",
+		"config.yaml": "version: 1\n",
+	}
+}
+
+// assertIntact re-reads every file of a layout and fails on the first one that
+// changed or vanished.
+func assertIntact(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	for p, want := range files {
+		if want == "" && strings.HasSuffix(p, "/") {
+			continue
+		}
+		if got := readFile(t, filepath.Join(root, filepath.FromSlash(p))); got != want {
+			t.Errorf("%s = %q, want %q — the refused install deleted or rewrote it", p, got, want)
+		}
+	}
+}
+
+// The reported destruction: `--target . --force` in a git repo renamed the
+// whole checkout aside and RemoveAll'd it, exit 0.
+func TestInstall_forceRefusesAProjectDirectory(t *testing.T) {
+	srv := newFakeAtlas(t, standardFiles())
+	target := t.TempDir()
+	files := projectFiles()
+	writeTree(t, target, files)
+
+	_, err := install(t, "square-pos", Options{IndexURL: srv.indexURL(), Target: target, Replace: true})
+	if !errors.Is(err, ErrUnsafeReplace) {
+		t.Fatalf("error = %v, want ErrUnsafeReplace", err)
+	}
+	for _, want := range []string{".git", ".env", target} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to name %q", err, want)
+		}
+	}
+	assertIntact(t, target, files)
+	// The refusal is a local precondition, so it holds with or without
+	// connectivity — and nothing is fetched for an install that cannot land.
+	if paths := srv.paths(); len(paths) != 0 {
+		t.Errorf("the atlas was contacted before the local refusal: %v", paths)
+	}
+}
+
+// `--target .` — the resolved target is the working directory. The directory
+// here is corpus-shaped, so only the location rule can be refusing it.
+func TestInstall_forceRefusesTheWorkingDirectory(t *testing.T) {
+	srv := newFakeAtlas(t, standardFiles())
+	target := t.TempDir()
+	files := map[string]string{"config.yaml": "version: 1\n# mine\n", "views/mine.yaml": viewYAML}
+	writeTree(t, target, files)
+	chdir(t, target)
+
+	_, err := install(t, "square-pos", Options{IndexURL: srv.indexURL(), Target: ".", Replace: true})
+	if !errors.Is(err, ErrUnsafeReplace) {
+		t.Fatalf("error = %v, want ErrUnsafeReplace", err)
+	}
+	if !strings.Contains(err.Error(), "current working directory") {
+		t.Errorf("error = %v, want it to name the working directory", err)
+	}
+	assertIntact(t, target, files)
+	if paths := srv.paths(); len(paths) != 0 {
+		t.Errorf("the atlas was contacted before the local refusal: %v", paths)
+	}
+}
+
+// `--target ..` from inside the corpus.
+func TestInstall_forceRefusesAnAncestorOfTheWorkingDirectory(t *testing.T) {
+	srv := newFakeAtlas(t, standardFiles())
+	target := t.TempDir()
+	files := map[string]string{"config.yaml": "version: 1\n# mine\n", "views/mine.yaml": viewYAML}
+	writeTree(t, target, files)
+	chdir(t, filepath.Join(target, "views"))
+
+	_, err := install(t, "square-pos", Options{IndexURL: srv.indexURL(), Target: "..", Replace: true})
+	if !errors.Is(err, ErrUnsafeReplace) {
+		t.Fatalf("error = %v, want ErrUnsafeReplace", err)
+	}
+	if !strings.Contains(err.Error(), "contains the current working directory") {
+		t.Errorf("error = %v, want it to name the working directory it contains", err)
+	}
+	assertIntact(t, target, files)
+	if paths := srv.paths(); len(paths) != 0 {
+		t.Errorf("the atlas was contacted before the local refusal: %v", paths)
+	}
+}
+
+// The emptiness check runs before a multi-second fetch, so what --force
+// destroys has to be judged again at the swap — on what the target holds now.
+func TestInstall_forceRefusesAProjectThatAppearedDuringTheFetch(t *testing.T) {
+	srv := newFakeAtlas(t, standardFiles())
+	parent := t.TempDir()
+	target := filepath.Join(parent, ".sightmap")
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := projectFiles()
+	srv.before = func(path string) {
+		if strings.HasSuffix(path, "config.yaml") {
+			writeTree(t, target, files)
+		}
+	}
+
+	_, err := install(t, "square-web", Options{IndexURL: srv.indexURL(), Target: target, Replace: true})
+	if !errors.Is(err, ErrUnsafeReplace) {
+		t.Fatalf("error = %v, want ErrUnsafeReplace", err)
+	}
+	assertIntact(t, target, files)
+	assertNoLeftovers(t, parent)
+}
+
+// The feature --force exists for: a real corpus directory, replaced wholesale.
+func TestInstall_forceStillReplacesACorpusDirectory(t *testing.T) {
+	srv := newFakeAtlas(t, standardFiles())
+	parent := t.TempDir()
+	target := filepath.Join(parent, ".sightmap")
+	writeTree(t, target, map[string]string{
+		"config.yaml":          "version: 1\n# old\n",
+		"components.yaml":      "version: 1\n",
+		"views/stale.yaml":     viewYAML,
+		"snapshots/plp/a.snap": "{}",
+		"review/notes.yaml":    "- look at the header\n",
+		".DS_Store":            "\x00\x00finder\n",
+	})
+
+	res, err := install(t, "square-web", Options{IndexURL: srv.indexURL(), Target: target, Replace: true})
+	if err != nil {
+		t.Fatalf("a corpus directory was refused: %v", err)
+	}
+	if !res.Replaced {
+		t.Error("Replaced = false, want true")
+	}
+	if got := readFile(t, filepath.Join(target, "config.yaml")); got != configYAML {
+		t.Errorf("config.yaml = %q, want the fetched content", got)
+	}
+	for _, gone := range []string{"components.yaml", "views/stale.yaml", "snapshots/plp/a.snap", "review/notes.yaml", ".DS_Store"} {
+		if _, statErr := os.Stat(filepath.Join(target, filepath.FromSlash(gone))); !os.IsNotExist(statErr) {
+			t.Errorf("%s survived a --force install (stat err = %v)", gone, statErr)
+		}
+	}
+	// The backup of the previous contents is discarded once the installed
+	// corpus loads — success must not leave a copy of it beside the target.
+	assertNoLeftovers(t, parent)
+	entries, err := os.ReadDir(parent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != ".sightmap" {
+		t.Errorf("%s holds %d entries after a successful install, want only the target", parent, len(entries))
+	}
+}
+
+// ── rollback ──────────────────────────────────────────────────────────────────
+
+// The load check is a gate, not a report: what the target held is kept until
+// the corpus that replaced it loads. Otherwise a broken atlas entry costs the
+// user their corpus *and* leaves them with one that does not work.
+func TestInstall_forceRestoresThePreviousCorpusWhenTheInstalledOneDoesNotLoad(t *testing.T) {
+	srv := newFakeAtlas(t, map[string]string{
+		"/main/index.json": `{"schema_version": 1, "entries": [{"slug": "broken", "files": [".sightmap/views/checkout.yaml"]}]}`,
+		"/main/entries/broken/.sightmap/views/checkout.yaml": "views:\n\t- name: bad tabs\n",
+	})
+	parent := t.TempDir()
+	target := filepath.Join(parent, ".sightmap")
+	files := map[string]string{
+		"config.yaml":     "version: 1\n# mine\n",
+		"views/mine.yaml": viewYAML,
+	}
+	writeTree(t, target, files)
+
+	_, err := install(t, "broken", Options{IndexURL: srv.indexURL(), Target: target, Replace: true})
+	if err == nil {
+		t.Fatal("expected a load failure")
+	}
+	for _, want := range []string{"broken", "does not load", "were restored"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to mention %q", err, want)
+		}
+	}
+	// "nothing was installed" would be a lie here: something was, and undone.
+	if strings.Contains(err.Error(), "nothing was installed") {
+		t.Errorf("error = %v, want it to say the previous corpus was restored", err)
+	}
+	assertIntact(t, target, files)
+	if _, statErr := os.Stat(filepath.Join(target, "views", "checkout.yaml")); !os.IsNotExist(statErr) {
+		t.Error("the broken entry's file survived the rollback")
+	}
+	// The restore moves the backup back; nothing may be left beside the target.
+	assertNoLeftovers(t, parent)
+}
+
 func assertNoLeftovers(t *testing.T, dir string) {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
