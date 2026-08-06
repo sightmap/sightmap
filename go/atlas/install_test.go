@@ -514,6 +514,43 @@ func TestInstall_forceRestoresThePreviousCorpusWhenTheInstalledOneDoesNotLoad(t 
 	assertNoLeftovers(t, parent)
 }
 
+// ── size caps ─────────────────────────────────────────────────────────────────
+
+// The per-file cap does not bound an entry: 256 files of 4 MiB is a gigabyte.
+// The aggregate cap is enforced from inside the concurrent fetch, where a
+// regression is silent — nothing else fails when it stops being checked.
+func TestInstall_refusesAnEntryOverTheTotalSizeLimit(t *testing.T) {
+	const each = MaxFileBytes // exactly at the per-file cap, so only the total can refuse it
+	n := MaxEntryBytes/each + 1
+	body := strings.Repeat("y", each)
+
+	files := map[string]string{}
+	paths := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		p := fmt.Sprintf(".sightmap/views/v%02d.yaml", i)
+		paths = append(paths, fmt.Sprintf("%q", p))
+		files["/main/entries/huge/"+p] = body
+	}
+	files["/main/index.json"] = fmt.Sprintf(`{"schema_version": 1, "entries": [{"slug": "huge", "files": [%s]}]}`, strings.Join(paths, ","))
+	srv := newFakeAtlas(t, files)
+	parent := t.TempDir()
+	target := filepath.Join(parent, ".sightmap")
+
+	_, err := install(t, "huge", Options{IndexURL: srv.indexURL(), Target: target})
+	if err == nil {
+		t.Fatalf("an entry of %d bytes was installed, over the %d-byte limit", n*each, int64(MaxEntryBytes))
+	}
+	for _, want := range []string{"huge", "total size limit", "refusing to install"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to mention %q", err, want)
+		}
+	}
+	if _, statErr := os.Stat(target); !os.IsNotExist(statErr) {
+		t.Error("an over-limit entry was written")
+	}
+	assertNoLeftovers(t, parent)
+}
+
 func assertNoLeftovers(t *testing.T, dir string) {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
