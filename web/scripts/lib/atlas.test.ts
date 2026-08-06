@@ -1,6 +1,16 @@
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { isLocalUrl, isSafeUrl, loadAtlas, renderAtlasBody, resolveScreenshots } from './atlas'
+import {
+  MAX_CORPUS_FILE_BYTES,
+  isLocalUrl,
+  isSafeUrl,
+  loadAtlas,
+  renderAtlasBody,
+  resolveCorpus,
+  resolveScreenshots,
+} from './atlas'
 
 const FIXTURES = path.resolve(__dirname, '__fixtures__/atlas')
 
@@ -141,6 +151,56 @@ describe('resolveScreenshots', () => {
     // not exist — rather than escaping upward.
     const { urls } = resolveScreenshots(FIXTURES, 'alpha-site', ['../../../index.json'])
     expect(urls).toEqual([])
+  })
+})
+
+describe('resolveCorpus', () => {
+  // A corpus staged outside the fixtures directory, so cases that need a
+  // symlink or a 4 MiB file don't have to live in the repo.
+  const staged = (build: (root: string) => void): string => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-corpus-'))
+    const root = path.join(dir, 'staged-site', '.sightmap')
+    fs.mkdirSync(root, { recursive: true })
+    build(root)
+    return dir
+  }
+
+  it('collects the vendored tree as .sightmap-prefixed members, in byte order', () => {
+    const { files, problems } = resolveCorpus(FIXTURES, 'alpha-site')
+    expect(problems).toEqual([])
+    expect(files.map((f) => f.name)).toEqual([
+      '.sightmap/app.yaml',
+      '.sightmap/config.yaml',
+      '.sightmap/shared/nav.yaml',
+    ])
+  })
+
+  it('returns nothing at all for an entry with no vendored corpus', () => {
+    // The site still builds and the entry still renders; only the install
+    // command has nothing behind it. build-atlas.ts warns about that.
+    expect(resolveCorpus(FIXTURES, 'beta-site')).toEqual({ files: [], problems: [] })
+  })
+
+  it('reports a symlink rather than publishing whatever it points at', () => {
+    // tar would follow it and publish the target's bytes under a name the
+    // atlas never reviewed.
+    const dir = staged((root) => {
+      fs.writeFileSync(path.join(root, 'config.yaml'), 'version: 1\n')
+      fs.symlinkSync('/etc/passwd', path.join(root, 'secrets.yaml'))
+    })
+    const { problems } = resolveCorpus(dir, 'staged-site')
+    expect(problems).toEqual(['.sightmap/secrets.yaml is a symlink'])
+  })
+
+  it('reports a file over the limit the CLI extractor enforces', () => {
+    // Emitting it would publish an install that fails on the user's machine
+    // while the build reports success.
+    const dir = staged((root) => {
+      fs.writeFileSync(path.join(root, 'huge.yaml'), Buffer.alloc(MAX_CORPUS_FILE_BYTES + 1))
+    })
+    const { files, problems } = resolveCorpus(dir, 'staged-site')
+    expect(files).toEqual([])
+    expect(problems[0]).toMatch(/huge\.yaml is \d+ bytes, over the 4194304-byte file limit/)
   })
 })
 

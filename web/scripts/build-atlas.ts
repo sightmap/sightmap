@@ -3,10 +3,16 @@
 //   1. src/generated/atlas-manifest.ts — a typed manifest the app imports, the
 //      same shape of generated module scripts/build-blog.ts produces for posts.
 //   2. public/atlas/ — the servable side: screenshots, the verbatim index.json,
-//      and one verbatim `<slug>.md` per entry. Vite copies public/ into dist/
-//      untouched and `vite dev` serves it, so this is what makes both the
-//      images and the machine twins (P4.3) work in dev and in a build with no
-//      route handling of their own.
+//      one verbatim `<slug>.md` per entry, and one `<slug>.tar.gz` holding that
+//      entry's corpus. Vite copies public/ into dist/ untouched and `vite dev`
+//      serves it, so this is what makes the images, the machine twins (P4.3),
+//      and the install work in dev and in a build with no route handling of
+//      their own.
+//
+// The tarball is what `sightmap atlas add <slug>` fetches. It is served from
+// here rather than from raw.githubusercontent so a takedown binds both
+// surfaces: an entry removed from the vendored tree stops being installable in
+// the same rebuild that stops it being listed.
 //
 // public/atlas/ is generated and gitignored — it is wiped and rewritten on
 // every run so a slug removed upstream (a takedown) actually disappears from
@@ -19,7 +25,8 @@
 // blog posts live there for the same reason.
 import fs from 'node:fs'
 import path from 'node:path'
-import { atlasCategories, loadAtlas, resolveScreenshots } from './lib/atlas'
+import { atlasCategories, loadAtlas, resolveCorpus, resolveScreenshots } from './lib/atlas'
+import { tarGz } from './lib/tar'
 
 const DATA_DIR = path.resolve('src/data/atlas')
 const GENERATED_DIR = path.resolve('src/generated')
@@ -49,8 +56,37 @@ async function main() {
       for (const file of files) fs.copyFileSync(file, path.join(outDir, path.basename(file)))
     }
 
+    // /atlas/<slug>.tar.gz — the corpus `sightmap atlas add` pulls. Same
+    // per-entry, non-fatal contract as the schema check: a corpus that would
+    // not install is left unpublished with a warning, and the rest of the site
+    // ships. The page keeps rendering; the command on it 404s, which is the
+    // honest outcome for an entry with nothing behind it.
+    const corpus = resolveCorpus(DATA_DIR, entry.slug)
+    let members = 0
+    if (corpus.problems.length > 0) {
+      console.warn(
+        `  ! atlas entry ${entry.slug} publishes no corpus archive:\n` +
+          corpus.problems.map((p) => `    - ${p}`).join('\n')
+      )
+    } else if (corpus.files.length === 0) {
+      console.warn(`  ! atlas entry ${entry.slug} has no vendored .sightmap/ — sightmap atlas add will 404`)
+    } else {
+      // Packing reads community-vendored files off disk, so it stays inside
+      // the per-entry contract: whatever goes wrong costs this entry its
+      // archive, never the build.
+      try {
+        const archive = tarGz(corpus.files.map((f) => ({ name: f.name, body: fs.readFileSync(f.path) })))
+        fs.writeFileSync(path.join(PUBLIC_DIR, `${entry.slug}.tar.gz`), archive)
+        members = corpus.files.length
+      } catch (err) {
+        console.warn(
+          `  ! atlas entry ${entry.slug} publishes no corpus archive: ${err instanceof Error ? err.message : err}`
+        )
+      }
+    }
+
     console.log(
-      `  built ${entry.slug} (${entry.stats.views} view(s), ${files.length} screenshot(s)${
+      `  built ${entry.slug} (${entry.stats.views} view(s), ${files.length} screenshot(s), ${members} corpus file(s)${
         md === undefined ? ', no README' : ''
       })`
     )

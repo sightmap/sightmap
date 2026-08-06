@@ -1,0 +1,40 @@
+version: 1
+
+views:
+  - name: BlogPost
+    route: /blog/:slug
+    url: https://sightmap.org/blog/sightmap
+    description: A single post — title, publication date, prose, and fenced code blocks.
+    memory:
+      - More specific than BlogIndex's `/blog`, so the matcher picks this view for
+        any post URL; `/blog` itself still resolves to BlogIndex.
+      - Three separate controls lead back to the index (the nav link, a "← Back to
+        blog" link above the article, and the footer link). Prefer BackToBlogLink.
+      - Code blocks repeat once per fenced block, so CodeBlock matches many
+        elements on a long post.
+    components:
+      - name: BlogPostMain
+        selector: '[data-component^="BlogPost"]'
+        properties:
+          - name: title
+            extract: text
+            transform: first_line
+        children:
+          - name: BlogPostTitle
+            selector: h1
+            properties:
+              - name: title
+                extract: text
+          - name: BlogPostDate
+            selector: time
+            properties:
+              - name: published
+                extract: attr=datetime
+          - name: BackToBlogLink
+            selector: 'a[href="/blog"]'
+
+      - name: CodeBlock
+        selector: '[data-component^="CodeBlock"]'
+        properties:
+          - name: code
+            extract: text

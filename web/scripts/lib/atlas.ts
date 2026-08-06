@@ -16,6 +16,7 @@ import { Marked } from 'marked'
 import { z } from 'zod'
 import type { AtlasEntry, AtlasEntryMeta } from '../../src/types/atlas'
 import { esc } from './site'
+import { MAX_MEMBER_NAME_BYTES } from './tar'
 
 // Atlas READMEs are community-authored, which makes them a different trust
 // class from content/blog/*.md (written by maintainers). scripts/lib/posts.ts
@@ -184,6 +185,112 @@ export function resolveScreenshots(
     files.push(full)
   }
   return { urls, files }
+}
+
+// Caps on what one entry may publish as an archive, mirrored from the CLI's
+// extractor (go/atlas/install.go). The CLI refuses an archive that breaks any
+// of them, so emitting one would publish an install that fails on the user's
+// machine with the site reporting success. Checking here turns that into a
+// build-log warning against the entry that caused it.
+export const MAX_CORPUS_FILE_BYTES = 4 << 20 // 4 MiB, one file
+export const MAX_CORPUS_BYTES = 32 << 20 // 32 MiB, decompressed total
+export const MAX_CORPUS_MEMBERS = 512
+
+/** The one directory an atlas archive may publish files under. */
+const CORPUS_PREFIX = '.sightmap/'
+
+export interface CorpusFile {
+  /** Archive member name: `.sightmap/`-prefixed, slash-separated, relative. */
+  name: string
+  /** The vendored file this member is read from. */
+  path: string
+  size: number
+}
+
+export interface ResolvedCorpus {
+  files: CorpusFile[]
+  /** Reasons this corpus is not publishable, one line each. */
+  problems: string[]
+}
+
+/** Rejects a name that could not survive a round trip through tar and back. */
+function isSafeName(name: string): boolean {
+  if (name === '' || name === '.' || name === '..') return false
+  if (name.includes('/') || name.includes('\\')) return false
+  // Control characters, including the ESC that would turn a filename the CLI
+  // prints into a terminal escape sequence.
+  return !/[\u0000-\u001f\u007f]/.test(name)
+}
+
+function walkCorpus(dir: string, prefix: string, into: ResolvedCorpus): void {
+  const dirents = fs
+    .readdirSync(dir, { withFileTypes: true })
+    // Byte order, not locale order, so the archive is identical whatever the
+    // build machine's locale is.
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+
+  for (const dirent of dirents) {
+    const name = `${prefix}${dirent.name}`
+    const full = path.join(dir, dirent.name)
+    if (!isSafeName(dirent.name)) {
+      into.problems.push(`${JSON.stringify(name)} is not a safe file name`)
+      continue
+    }
+    // A symlink reads as a regular file after tar follows it, which is exactly
+    // the substitution the CLI refuses members for. Report it instead.
+    if (dirent.isSymbolicLink()) {
+      into.problems.push(`${name} is a symlink`)
+      continue
+    }
+    if (dirent.isDirectory()) {
+      walkCorpus(full, `${name}/`, into)
+      continue
+    }
+    if (!dirent.isFile()) {
+      into.problems.push(`${name} is not a regular file`)
+      continue
+    }
+    if (Buffer.byteLength(name, 'utf-8') > MAX_MEMBER_NAME_BYTES) {
+      into.problems.push(`${name} is longer than ${MAX_MEMBER_NAME_BYTES} bytes`)
+      continue
+    }
+    const { size } = fs.statSync(full)
+    if (size > MAX_CORPUS_FILE_BYTES) {
+      into.problems.push(`${name} is ${size} bytes, over the ${MAX_CORPUS_FILE_BYTES}-byte file limit`)
+      continue
+    }
+    into.files.push({ name, path: full, size })
+  }
+}
+
+/**
+ * Collects the `.sightmap/` corpus vendored for one entry, as archive members.
+ *
+ * This is the payload behind `sightmap atlas add <slug>`: index.json's `files[]`
+ * names it, and without it the install command on the entry's page has nothing
+ * to fetch. The vendored tree is the source of truth rather than `files[]` —
+ * what ships is what someone can read in this repo.
+ *
+ * `problems` is non-empty when the corpus is there but not publishable. A
+ * caller should skip the whole archive rather than publish what is left: a
+ * corpus missing a file installs, loads, and quietly maps less of the site than
+ * the entry claims.
+ */
+export function resolveCorpus(dataDir: string, slug: string): ResolvedCorpus {
+  const root = path.join(dataDir, slug, '.sightmap')
+  const resolved: ResolvedCorpus = { files: [], problems: [] }
+  if (!fs.existsSync(root)) return resolved
+
+  walkCorpus(root, CORPUS_PREFIX, resolved)
+
+  if (resolved.files.length > MAX_CORPUS_MEMBERS) {
+    resolved.problems.push(`holds ${resolved.files.length} files, over the ${MAX_CORPUS_MEMBERS}-file limit`)
+  }
+  const total = resolved.files.reduce((sum, f) => sum + f.size, 0)
+  if (total > MAX_CORPUS_BYTES) {
+    resolved.problems.push(`is ${total} bytes, over the ${MAX_CORPUS_BYTES}-byte limit`)
+  }
+  return resolved
 }
 
 export async function loadAtlas(dataDir: string): Promise<LoadedAtlas> {
