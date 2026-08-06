@@ -8,7 +8,7 @@ Add a top-level `messages:` entity ([SEP-0006](https://github.com/sightmap/sight
 
 New validation:
 
-- `message-regex-invalid` (error) compiles `message` at validation time, matching how component selectors are already checked. The corpus no longer stores a pattern nobody has proven is a pattern.
+- `message-regex-invalid` (error) compiles `message` at validation time, matching how component selectors are already checked. The corpus no longer stores a pattern nobody has proven is a pattern. The dialect is pinned to **RE2** (Go `regexp` / the `re2` npm package for JS): a linear-time syntax with no backreferences or lookaround, so authoring-time validation and runtime matching agree across SDKs.
 - `merge-collision-message` (warning) reports a duplicated name. This one is load-bearing for SEP-0007: `ref:` resolution counts distinct entity kinds, so two messages sharing a name collapse to one kind and the ambiguity check never fires.
 - `message-conflict` (warning) reports two entries that can match the same record, where that overlap is statically decidable: same `level`, identical or absent `message`.
 - `message-level-unknown` (lint) catches a level outside the emitted vocabulary. The realistic trap is `WARNING`, CDP's own spelling, which the capture normalizes to `warn`.

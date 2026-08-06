@@ -22,9 +22,10 @@ type MessageDef struct {
 	// An uncaught exception arrives as level "exception", NOT as "error", so
 	// `level: ERROR` does not match one. See LevelException.
 	Level string `json:"level,omitempty"`
-	// Message is a regex matched against the record's text. Match-any when
-	// empty. Compiled at validation time so a malformed pattern is reported to
-	// the author rather than failing later.
+	// Message is an RE2 regex (Go's regexp; no backreferences or lookaround)
+	// matched against the record's text. Match-any when empty. Compiled at
+	// validation time so a malformed pattern is reported to the author rather
+	// than failing later.
 	Message     string `json:"message,omitempty"`
 	Description string `json:"description,omitempty"`
 	Source      string `json:"source,omitempty"`

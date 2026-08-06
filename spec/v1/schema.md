@@ -332,11 +332,15 @@ messages:
 |---|---|---|---|
 | `name` | string | yes | Stable identifier, addressable by name by other tooling. |
 | `level` | string | no | Exact, case-insensitive match against the observed record's level. Match-any if omitted. |
-| `message` | string | no | Regex matched against the record's text. Match-any if omitted. |
+| `message` | string | no | [RE2](#regular-expression-syntax) regex matched against the record's text. Match-any if omitted. |
 | `description` | string | no | What this pattern means, for a human reading the corpus. |
 | `source` | string | no | Relative path to the source most likely to emit this. |
 
 A record matches when every declared constraint holds. Declaring neither `level` nor `message` matches every record, which is legal but rarely useful.
+
+### Regular expression syntax
+
+The `message` regex uses **RE2** syntax — the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package for JavaScript. RE2 is pinned deliberately: it matches in guaranteed linear time (no catastrophic backtracking), and because these patterns are validated at authoring time by one SDK and matched against a live console/exception stream at runtime by another, a single predictable dialect is what keeps the two from disagreeing about the same pattern. The tradeoff is expressivity: RE2 has **no backreferences and no lookahead/lookbehind**. Character classes, alternation, quantifiers, anchors, and groups all work, which covers essentially every message pattern in practice. A conforming SDK MUST reject a `message` that is not a valid RE2 pattern (the reference CLI reports `message-regex-invalid`).
 
 ### Message levels
 
@@ -507,7 +511,7 @@ A conforming SDK:
 - MUST reject a `RequestProperty` that declares neither `field` nor `pattern`
 - MUST reject a `RequestProperty` whose `source` is a headers source but omits `field`
 - MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression
-- MUST reject a `messages:` entry whose `message` is not a valid regular expression
+- MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expression syntax](#regular-expression-syntax))
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
