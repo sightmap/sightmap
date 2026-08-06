@@ -30,12 +30,20 @@ const ATLAS: FeedAtlasEntry[] = [
     name: 'Sightmap',
     description: 'Marketing site and blog for the Sightmap spec.',
     updated: '2026-08-06',
+    domains: ['sightmap.org'],
+    last_verified: '2026-08-06',
+    stats: { views: 4, components: 28, requests: 2 },
   },
   {
+    // No full stop on the description and two domains, both of which an entry
+    // line has to cope with.
     slug: 'example-shop',
     name: 'Example & Co',
-    description: 'A storefront.',
+    description: 'A storefront',
     updated: '2026-03-02',
+    domains: ['example.test', 'shop.example.test'],
+    last_verified: '2026-03-01',
+    stats: { views: 1, components: 1, requests: 1 },
   },
 ]
 
@@ -127,18 +135,37 @@ describe('buildLlmsTxt', () => {
     expect(txt).toContain('> An open YAML spec and CLI')
   })
 
-  it('links each atlas entry to its markdown twin, not its HTML page', () => {
+  it('teaches the lookup an agent holding a hostname actually needs', () => {
+    // What an agent has when it lands here is a hostname. The section has to
+    // get it from there to a corpus on disk, so both verbs are spelled out.
+    const txt = buildLlmsTxt(POSTS, ATLAS)
+    expect(txt).toContain('sightmap atlas find <domain>')
+    expect(txt).toContain('sightmap atlas add <slug>')
+    expect(txt).toContain('Check here before exploring a site by hand.')
+    // The retired un-namespaced verb must not survive anywhere in the file.
+    expect(txt).not.toMatch(/`?sightmap add /)
+  })
+
+  it('leads each entry line with the hostnames it covers', () => {
+    // The whole point of carrying the domains here: an agent can match its own
+    // hostname in this file and never fetch index.json at all.
     const txt = buildLlmsTxt(POSTS, ATLAS)
     expect(txt).toContain(
-      '- [Sightmap](https://sightmap.org/atlas/sightmap-org.md): Marketing site and blog for the Sightmap spec.'
+      '- [Sightmap](https://sightmap.org/atlas/sightmap-org.md): sightmap.org. Marketing site and blog for the Sightmap spec. 4 views, 28 components, 2 requests. Verified 2026-08-06. `sightmap atlas add sightmap-org`'
     )
-    expect(txt).toContain('- [Example & Co](https://sightmap.org/atlas/example-shop.md): A storefront.')
+    // Every domain, singular counts, and a description with no full stop of
+    // its own still running into the sentence after it.
+    expect(txt).toContain(
+      '- [Example & Co](https://sightmap.org/atlas/example-shop.md): example.test, shop.example.test. A storefront. 1 view, 1 component, 1 request. Verified 2026-03-01. `sightmap atlas add example-shop`'
+    )
     // The HTML page is linked from the Atlas heading's index pointer only.
     expect(txt).not.toContain('](https://sightmap.org/atlas/sightmap-org)')
   })
 
-  it('points at the machine index so an agent never has to scrape the gallery', () => {
-    expect(buildLlmsTxt(POSTS, ATLAS)).toContain('https://sightmap.org/atlas/index.json')
+  it('points at the machine index so an agent without the CLI has a path too', () => {
+    const txt = buildLlmsTxt(POSTS, ATLAS)
+    expect(txt).toContain('https://sightmap.org/atlas/index.json')
+    expect(txt).toContain("each entry's `domains[]`")
   })
 
   it('emits one line per post', () => {
@@ -152,9 +179,19 @@ describe('buildLlmsTxt', () => {
     // A newline inside a community-authored description would split one entry
     // into two malformed ones, so oneLine() collapses whitespace first.
     const txt = buildLlmsTxt(POSTS, [
-      { slug: 'multi', name: 'Multi\nLine', description: 'First line.\n\nSecond line.', updated: '2026-01-01' },
+      {
+        slug: 'multi',
+        name: 'Multi\nLine',
+        description: 'First line.\n\nSecond line.',
+        updated: '2026-01-01',
+        domains: ['multi.test'],
+        last_verified: '2026-01-01',
+        stats: { views: 0, components: 0, requests: 0 },
+      },
     ])
-    expect(txt).toContain('- [Multi Line](https://sightmap.org/atlas/multi.md): First line. Second line.')
+    expect(txt).toContain(
+      '- [Multi Line](https://sightmap.org/atlas/multi.md): multi.test. First line. Second line. 0 views, 0 components, 0 requests.'
+    )
   })
 
   it('says so rather than emitting an empty section when nothing is published', () => {
