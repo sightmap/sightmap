@@ -47,6 +47,7 @@ Foundation (offline, no browser dependency):
 | `sightmap` | Loads `.sightmap/` YAML into a compiled, queryable **`Corpus`** (renamed from `Session`). Stays browser-free so every offline tool can use it. Also owns site config (`config.yaml`) and view-URL enumeration. |
 | `probe` | Embeds the canonical `cdp-probe.js` browser-side extractor. |
 | `render` | Formats a `comps` tree (+ matches) into the annotated snapshot and the raw `inspect` tree. Presentation only. |
+| `atlas` | The community atlas wire contract: index schema, the raw-URL layout, fail-closed entry validation, the fetch policy, and the corpus `Install` operation. Talks HTTPS, never a browser. Its exported surface is shared with the `sightmap/atlas` publisher CI so both sides enforce one definition of a valid entry. |
 | `coverage` **(planned)** | Pure T1/T2/T3 coverage math over a tree + matches: parent map, orphan slots, annotation gaps, T2/T3 cluster traces. |
 | `viewset` **(planned)** | On-disk capture sets: paths, discovery, stamps, the novelty gate, and the prune planner. Offline; built on `coverage`. |
 
@@ -119,6 +120,7 @@ read (it uses no bespoke DOM JS). This is why callers never need a
 | `sel-check` | authoring (offline) | `render`/`comps` + `sel` |
 | `coverage` / `multi-coverage` / `report` | authoring (offline) | `viewset` + `coverage` (+ `sightmap`) |
 | `capture-novelty` / `capture-prune` | authoring (offline) | `viewset` (+ `coverage`) |
+| `add` | authoring | `atlas` (which loads the staged corpus through `sightmap`) |
 | `validate` / `lint` / `search` / `stats` | authoring (offline) | `sightmap` |
 | `serve-sightmap` | authoring | `sightmap` + http |
 | `skills` | — | `skills` |
