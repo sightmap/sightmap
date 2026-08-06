@@ -281,7 +281,7 @@
         },
         "message": {
           "type": "string",
-          "description": "Regex matched against the observed record's message text. Match-any if omitted. Compiled at validation time, so a malformed pattern is reported to the author."
+          "description": "RE2 regex (no backreferences or lookaround) matched against the observed record's message text. Match-any if omitted. Compiled at validation time, so a malformed pattern is reported to the author."
         },
         "description": {
           "type": "string"

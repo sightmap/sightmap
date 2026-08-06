@@ -57,12 +57,12 @@ Unlike `requests:` ([SEP-0005](0005-request-properties.md)), `messages:` has no 
 
 #### Matching
 
-A live console record matches a `messages:` entry when every declared field (`level`, `message`) agrees; an omitted field matches anything. When more than one `messages:` entry could match the same live record, conformance requires a diagnosable ambiguity, not silent first-match-wins — see [Conformance](#conformance).
+A live console record matches a `messages:` entry when every declared field (`level`, `message`) agrees; an omitted field matches anything. `message` is an **RE2** regular expression (Go's `regexp`, the `re2` npm package for JavaScript): a predictable, linear-time dialect with no backreferences or lookaround, pinned so that authoring-time validation and runtime matching agree across SDKs. When more than one `messages:` entry could match the same live record, conformance requires a diagnosable ambiguity, not silent first-match-wins — see [Conformance](#conformance).
 
 ### Conformance
 
 - MUST match a live console record against a `messages:` entry using case-insensitive exact match on `level` (when declared) and regex match on `message` (when declared); an omitted field imposes no constraint.
-- MUST reject a `message` that is not a valid regular expression. Diagnostic code: `message-regex-invalid`.
+- MUST reject a `message` that is not a valid RE2 regular expression (Go `regexp` semantics; no backreferences or lookaround). Diagnostic code: `message-regex-invalid`.
 - MUST warn when two or more `messages:` entries share a `name`. Diagnostic code: `merge-collision-message`, mirroring `merge-collision-view`. Without this, a name is ambiguous and a [SEP-0007](0007-signals.md) `ref:` resolves to it silently.
 - MUST warn when two entries can match the same record and that overlap is statically decidable: the same `level` (or one omitting it) with an identical or absent `message`. Diagnostic code: `message-conflict`, mirroring `route-conflict`. Deciding whether two *different* regexes can both match some record is not decidable in general and is out of scope.
 - MUST warn (not silently resolve) when a **live** record matches more than one `messages:` entry. This is the runtime half of the rule above and applies only to a consumer that evaluates records.
