@@ -167,7 +167,6 @@ export default function AtlasEntryPage() {
                 <MetaRow label="Commit">
                   {entry.commit ? <code>{entry.commit.slice(0, 12)}</code> : ''}
                 </MetaRow>
-                <MetaRow label="Files">{entry.files.length || ''}</MetaRow>
               </dl>
 
               <div className="atlas-meta__machine">

@@ -113,9 +113,9 @@ export default function AtlasIndex() {
           */}
           {atlasEntries.length === 0 ? (
             <p className="atlas-index__empty">
-              No entries yet. The atlas is open —{' '}
+              No entries yet.{' '}
               <a href="https://github.com/sightmap/atlas" target="_blank" rel="noreferrer">
-                contribute the first one
+                Contribute the first one
               </a>
               .
             </p>
@@ -133,9 +133,13 @@ export default function AtlasIndex() {
                   <AtlasCard key={entry.slug} entry={entry} />
                 ))}
               </div>
+              {/* Unfiltered, "1 of 1 entry" is noise — just say how many there
+                  are. The x-of-y form only earns its place once a filter is
+                  hiding something. */}
               <p className="atlas-index__count">
-                {shown.length} of {atlasEntries.length} {atlasEntries.length === 1 ? 'entry' : 'entries'}
-                {filtered ? ' shown' : ''}
+                {filtered
+                  ? `${shown.length} of ${atlasEntries.length} shown`
+                  : `${atlasEntries.length} ${atlasEntries.length === 1 ? 'entry' : 'entries'}`}
               </p>
             </>
           )}

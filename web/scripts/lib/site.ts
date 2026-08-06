@@ -25,8 +25,11 @@ export const BLOG_DESCRIPTION =
 // pitch and not the blog. Used for /atlas's meta description and the copy
 // under its heading, and imported by src/pages/AtlasIndex.tsx for the same
 // single-source reason BLOG_DESCRIPTION is.
+// Sits directly under the /atlas heading ("Sightmaps of real sites"), so it
+// must not restate it — and it has to stand alone as the page's meta
+// description and its llms.txt section summary.
 export const ATLAS_DESCRIPTION =
-  'Community sightmaps of real websites — views, components, and requests, mapped from the outside with no source access.'
+  'Community-contributed maps of views, components, and requests, made by browsing the live site with no source access.'
 
 // Per-route <title> builders. scripts/prerender.tsx (the source of truth
 // crawlers and unfurlers read) and src/components/Seo.tsx (which fixes the
