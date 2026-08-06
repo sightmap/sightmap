@@ -47,7 +47,7 @@ Foundation (offline, no browser dependency):
 | `sightmap` | Loads `.sightmap/` YAML into a compiled, queryable **`Corpus`** (renamed from `Session`). Stays browser-free so every offline tool can use it. Also owns site config (`config.yaml`) and view-URL enumeration. |
 | `probe` | Embeds the canonical `cdp-probe.js` browser-side extractor. |
 | `render` | Formats a `comps` tree (+ matches) into the annotated snapshot and the raw `inspect` tree. Presentation only. |
-| `atlas` | The community atlas wire contract: index schema, the raw-URL layout, fail-closed entry validation, the fetch policy, and the corpus `Install` operation. Talks HTTPS, never a browser. Its exported surface is shared with the `sightmap/atlas` publisher CI so both sides enforce one definition of a valid entry. |
+| `atlas` | The community atlas: the index schema and its cache, domain-ranked search, fail-closed entry validation, the fetch policy, and the corpus `Install` operation. Talks HTTPS, never a browser. Search reads the index; `Install` fetches one archive and does not, so an index outage cannot stop an install. Its exported surface is shared with the `sightmap/atlas` publisher CI so both sides enforce one definition of a valid entry. |
 | `coverage` **(planned)** | Pure T1/T2/T3 coverage math over a tree + matches: parent map, orphan slots, annotation gaps, T2/T3 cluster traces. |
 | `viewset` **(planned)** | On-disk capture sets: paths, discovery, stamps, the novelty gate, and the prune planner. Offline; built on `coverage`. |
 
@@ -120,7 +120,8 @@ read (it uses no bespoke DOM JS). This is why callers never need a
 | `sel-check` | authoring (offline) | `render`/`comps` + `sel` |
 | `coverage` / `multi-coverage` / `report` | authoring (offline) | `viewset` + `coverage` (+ `sightmap`) |
 | `capture-novelty` / `capture-prune` | authoring (offline) | `viewset` (+ `coverage`) |
-| `add` | authoring | `atlas` (which loads the staged corpus through `sightmap`) |
+| `atlas find` / `atlas list` | authoring | `atlas` |
+| `atlas add` | authoring | `atlas` (which loads the staged corpus through `sightmap`) |
 | `validate` / `lint` / `search` / `stats` | authoring (offline) | `sightmap` |
 | `serve-sightmap` | authoring | `sightmap` + http |
 | `skills` | — | `skills` |
@@ -136,15 +137,18 @@ The command surface splits cleanly along the two agent skills:
   the default page-observation primitive and yields the component ids the
   interaction commands act on.
 - **Authoring** (`sightmap-authoring` skill — everything browser-use plus corpus
-  work): `capture`, `inspect`, `suggest`, `discover`, `gap`, `sel-probe` /
-  `sel-check`, `coverage` / `multi-coverage` / `report`, `validate` / `lint` /
-  `search` / `stats`.
+  work): `atlas find` / `atlas list` / `atlas add`, `capture`, `inspect`,
+  `suggest`, `discover`, `gap`, `sel-probe` / `sel-check`, `coverage` /
+  `multi-coverage` / `report`, `validate` / `lint` / `search` / `stats`.
 
 `snapshot` (observe) and `capture` (persist) share `observe.Page` but sit on
 opposite sides of this line — matching the two-skill split exactly.
 
-The CLI stays **flat** (no subcommand namespaces) for now; this taxonomy is the
-grouping to reach for if/when flat becomes unwieldy.
+The CLI is **flat by default**, with a namespace only where a bare verb would
+be ambiguous: `browser <verb>` (the verbs are generic — `click`, `eval`, `stop`)
+and `atlas <verb>` (a bare `add` in a corpus-authoring tool could as easily mean
+adding a view). This taxonomy is the grouping to reach for if flat becomes
+unwieldy elsewhere.
 
 ## Harmonization with sibling tools
 

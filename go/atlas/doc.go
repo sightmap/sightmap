@@ -14,9 +14,9 @@
 // # Search and install are decoupled
 //
 // [LoadIndex] reads the catalog. [Install] fetches one archive from a URL
-// template and never reads the index. That split is deliberate: an install
-// keeps working through an index outage or a schema change, and the index can
-// grow fields without a CLI release.
+// template and never reads the index. The split is what keeps an install
+// working through an index outage or a schema change, and lets the index grow
+// fields without a CLI release.
 //
 //	idx, err := atlas.LoadIndex(ctx, atlas.IndexOptions{})
 //	hits := idx.Index.Search(atlas.Query{Text: "squareup.com"})
@@ -63,10 +63,12 @@
 // URL, a bare hostname, and a www. hostname resolve to the same entry. An
 // empty query matches everything, which is what `sightmap atlas list` runs.
 //
-// Every string in the index is untrusted input. An entry [Entry.Validate]
-// rejects never appears in results, and every index-supplied string that
-// reaches a terminal goes through [SafeText] — searching prints far more
-// atlas-authored text than installing ever did.
+// Every string in the index is untrusted input. Results carry an install
+// command, so an entry whose slug [ValidateSlug] rejects never appears in one;
+// every other index-supplied string that reaches a terminal goes through
+// [SafeText] and [Entry.Detail]. Searching prints far more atlas-authored text
+// than installing ever did. [Entry.Validate] is the stricter, publisher-side
+// check that catches the same bytes at the source.
 //
 // # Transport policy
 //

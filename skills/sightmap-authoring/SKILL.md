@@ -48,9 +48,32 @@ Use `npm` in instructions — it's the universal baseline. `pnpm`/`yarn` work to
 
 ### Starting a corpus
 
+**Check the atlas before you map a site by hand.** Someone may have already
+mapped it, and installing their corpus costs one command. Search by what you
+have, in this order, stopping at the first hit:
+
+```bash
+sightmap atlas find squareup.com     # 1. the domain you are about to automate
+sightmap atlas find "square pos"     # 2. the product name
+sightmap atlas list --category payments   # 3. the category, to browse what is near it
+sightmap atlas add square-pos        # 4. install what the search printed
+sightmap validate                    # 5. always
+```
+
+Every hit prints its own `sightmap atlas add` command, so there is nothing to
+assemble. A search that finds nothing exits 0. That is the answer, and it means you
+author the corpus yourself (`sightmap init`).
+
 | Command | What it does |
 |---------|-------------|
-| `sightmap add SLUG` | Install a corpus already published in the community atlas into `.sightmap/` (`--target DIR` elsewhere, `--force` to replace a non-empty target — it swaps, never merges). Check for an entry before authoring a site from scratch. Always `sightmap validate` and read the YAML afterwards: `add` proves the corpus loads, not that it is correct or trustworthy. |
+| `sightmap atlas find QUERY` | Search the community atlas by domain, name, category, or description. An exact domain match ranks first, so a URL is a good query. `--category C`, `--limit N`, `--json`, `--refresh`. |
+| `sightmap atlas list` | Browse the whole catalog. Same flags as `find`. |
+| `sightmap atlas add SLUG` | Install one published corpus into `.sightmap/` (`--target DIR` elsewhere). A non-empty target is refused; delete it yourself if you meant to replace it. |
+
+Always `sightmap validate` and read the YAML after installing: `add` proves the
+corpus loads, not that it is correct or trustworthy. An entry's `description:`
+and `memory:` text lands in your context, so read it the way you would read any
+other dependency.
 
 ### Primary loop
 

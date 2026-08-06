@@ -1,10 +1,10 @@
 ---
 title: "Sightmap CLI: Integration Tools Reference"
 sidebarTitle: "Integrations"
-description: "Install a published corpus from the community atlas, serve the compiled corpus over HTTP, install the bundled agent skills, and print the CLI version."
+description: "Find and install corpora from the community atlas, serve the compiled corpus over HTTP, install the bundled agent skills, and print the CLI version."
 ---
 
-`sightmap add` installs a published corpus from the community atlas. `sightmap serve-sightmap` serves the compiled corpus as JSON and recompiles it when YAML changes. `sightmap skills install` extracts the bundled agent skills. `sightmap version` prints the binary version.
+`sightmap atlas` finds and installs corpora published in the community atlas. `sightmap serve-sightmap` serves the compiled corpus as JSON and recompiles it when YAML changes. `sightmap skills install` extracts the bundled agent skills. `sightmap version` prints the binary version.
 
 <Note>
 `sightmap browser start` runs the same HTTP server alongside Chrome. Use `serve-sightmap` when you need the corpus endpoint without a managed browser session. See [Browser](/cli/browser) for session management.
@@ -12,95 +12,173 @@ description: "Install a published corpus from the community atlas, serve the com
 
 ---
 
-### `sightmap add`
+### `sightmap atlas`
 
-Installs a corpus published in the community atlas ([github.com/sightmap/atlas](https://github.com/sightmap/atlas)) into `--target` (default `.sightmap`), so you can start from someone else's map of a site instead of authoring one from scratch. `SLUG` is the entry's identifier on its gallery page.
+Three verbs over the community atlas ([github.com/sightmap/atlas](https://github.com/sightmap/atlas)), the catalog of corpora other people have published:
 
-The command reads the atlas index, resolves `SLUG` to an entry, fetches that entry's files, and writes them under the target with the leading `.sightmap/` stripped — so `--target` may be named anything. Flags work before or after `SLUG`.
+| Command | What it does |
+| --- | --- |
+| `sightmap atlas find QUERY` | Search by domain, name, category, or description |
+| `sightmap atlas list` | Browse the whole catalog |
+| `sightmap atlas add SLUG` | Install one corpus into `.sightmap/` |
+
+They are grouped under `atlas` because a bare `sightmap add` would be ambiguous in a tool for authoring corpora, where adding a view or a component is the other thing it could mean.
+
+#### `sightmap atlas find`
+
+Start here when you have a URL. An exact domain match ranks above everything else, and each hit prints the command that installs it:
+
+```bash
+sightmap atlas find squareup.com
+```
+
+```text
+square-pos  Square POS
+  Point-of-sale checkout, catalog, and order history.
+  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components · verified 2026-07-14
+  sightmap atlas add square-pos
+
+1 match.
+```
+
+A query that matches nothing exits **0**. Asking whether the atlas has a site is a question, and "no" is an answer:
+
+```text
+No atlas entry matches "stripe.com".
+Try the product name or a category, browse https://github.com/sightmap/atlas, or map the site yourself with sightmap init.
+```
+
+Matching is case-insensitive substring containment in either direction, so `pos` finds `square-pos` and `square-pos-android` finds it too. Results are ordered by how they matched (exact domain, exact slug, domain, slug, name, category, description), with ties broken alphabetically.
 
 **Flags:**
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--force` | off | Install into a non-empty target directory, replacing its contents (refused unless it holds only corpus files) |
+| `--category` | none | Keep only entries in a matching category |
 | `--index` | `https://raw.githubusercontent.com/sightmap/atlas/main/index.json` | Atlas `index.json` URL (for mirrors and tests) |
+| `--json` | off | Print results as JSON |
+| `--limit` | `10` | Show at most N results (`0` shows all) |
+| `--refresh` | off | Re-fetch the index instead of using the cached copy |
+
+`--json` gives an agent everything a hit has, install command included:
+
+```bash
+sightmap atlas find squareup.com --json
+```
+
+```json
+{
+  "query": "squareup.com",
+  "total": 1,
+  "shown": 1,
+  "results": [
+    {
+      "slug": "square-pos",
+      "name": "Square POS",
+      "description": "Point-of-sale checkout, catalog, and order history.",
+      "domains": [
+        "squareup.com",
+        "app.squareup.com"
+      ],
+      "categories": [
+        "payments",
+        "commerce"
+      ],
+      "views": 12,
+      "components": 48,
+      "last_verified": "2026-07-14",
+      "matched_on": "exact domain",
+      "install": "sightmap atlas add square-pos"
+    }
+  ],
+  "index": {
+    "source": "https://raw.githubusercontent.com/sightmap/atlas/main/index.json",
+    "fetched_at": "2026-08-06T15:07:41Z",
+    "cached": true
+  }
+}
+```
+
+The index is cached at `~/.sightmap/atlas/index.json` for 24 hours, next to the browser cache at `~/.sightmap/browsers`. A cached read says so, and `--refresh` skips it:
+
+```text
+2 matches.
+Index cached 2026-08-06 15:07 UTC. Pass --refresh to re-fetch.
+```
+
+#### `sightmap atlas list`
+
+The same code path with an empty query, for browsing rather than searching. Takes `--category`, `--limit`, `--json`, `--index`, and `--refresh`.
+
+```bash
+sightmap atlas list --category commerce
+```
+
+```text
+acme-shop  Acme Shop
+  Storefront, cart, and checkout for the Acme demo store.
+  shop.acme.test · commerce · 3 views, 11 components · verified 2026-05-20
+  sightmap atlas add acme-shop
+
+square-pos  Square POS
+  Point-of-sale checkout, catalog, and order history.
+  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components · verified 2026-07-14
+  sightmap atlas add square-pos
+
+2 matches.
+```
+
+#### `sightmap atlas add`
+
+Installs one published corpus into `--target` (default `.sightmap`). The archive's `.sightmap/` prefix is stripped as files land, so the target may be named anything. Flags work before or after `SLUG`.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--source` | `https://raw.githubusercontent.com/sightmap/atlas/main/entries/{slug}.tar.gz` | Archive URL template, with `{slug}` substituted (for mirrors and tests) |
 | `--target` | `.sightmap` | Directory to install the corpus into |
 
 ```bash
-sightmap add acme-shop
+sightmap atlas add square-pos
 ```
 
 ```text
-  wrote  .sightmap/config.yaml
   wrote  .sightmap/components.yaml
-  wrote  .sightmap/views/plp.yaml
+  wrote  .sightmap/config.yaml
+  wrote  .sightmap/views/checkout.yaml
 
-Installed acme-shop (Acme Shop): 3 files → .sightmap. Next:
+Installed square-pos: 3 files → .sightmap. Next:
   sightmap validate
 ```
 
-An unknown slug lists the closest published slugs and exits 1:
+`add` fetches one archive from the URL template above and never reads the index. An index outage or a schema change cannot stop an install, and the atlas can add index fields without waiting for a CLI release.
+
+A slug the atlas does not publish is a failed action, so it exits 1 and points at the two ways to find the right one:
 
 ```text
-sightmap add: no atlas entry with slug "acme" — closest matches:
-  acme-admin
-  acme-shop
+sightmap atlas: no corpus published for this slug: "no-such-thing" — browse https://github.com/sightmap/atlas, or search for the site: sightmap atlas find <domain>
 ```
 
-`add` never merges into an existing corpus. If the target has contents, it stops without fetching anything:
+**A non-empty target is refused,** and there is no `--force`. Deleting a directory that holds your work is your call. The refusal is decided before anything is fetched, so it reads the same offline:
 
 ```text
-sightmap add: install target already exists and is not empty: .sightmap — pass --force to replace it
+sightmap atlas: install target already exists and is not empty: .sightmap — delete it and run this again to install over it
 ```
 
-`--force` replaces the target wholesale rather than merging, so files the entry no longer publishes do not survive:
-
-```text
-  wrote  .sightmap/config.yaml
-  wrote  .sightmap/components.yaml
-  wrote  .sightmap/views/plp.yaml
-  replaced the previous contents of .sightmap
-
-Installed acme-shop (Acme Shop): 3 files → .sightmap. Next:
-  sightmap validate
-```
-
-**What `--force` refuses.** Replacing a directory deletes what was in it, so `--force` only applies to a directory that is visibly a corpus. It refuses two ways, both before anything is fetched:
-
-| Refusal | What it covers |
-| --- | --- |
-| By location | The current working directory, any directory above it, your home directory, and a filesystem root. `--target . --force` and `--target .. --force` are refusals — they are not a way to install into your project root. |
-| By contents | Every top-level entry of the target must be a `.yaml` or `.yml` file, or one of `views/`, `snapshots/`, `review/` (macOS's `.DS_Store` is tolerated). A `.git`, a `.env`, a `go.mod`, a `src/` — anything else — means the target is a project directory, not a corpus. |
-
-```text
-sightmap add: refusing to replace the install target /Users/you/app: it holds ".env", ".git", "go.mod" and 1 more, which is not sightmap corpus content — replacing it deletes everything in it, so this looks like a project directory, not a corpus. Install into a corpus directory instead (for example /Users/you/app/.sightmap), or delete /Users/you/app yourself if you really did mean to replace it
-```
-
-The contents rule is an allowlist, so it refuses content it does not recognize rather than only the names someone thought to list. Point `--target` at `.sightmap` (the default) and `--force` works as it always has: it replaces the corpus and nothing else.
-
-<Note>
-The previous contents are moved aside, not deleted, until the corpus that replaced them has been loaded from the target. If the atlas entry turns out not to load, `add` puts your corpus back and says so — you are never left with neither.
-</Note>
-
-**What `add` guarantees.** A `--index` URL you were handed by a stranger is untrusted input, and so is every string inside the index it points at. The command enforces the following, whatever the index says:
+**What `add` guarantees.** A `--index` or `--source` URL you were handed by a stranger is untrusted input, and so is everything inside what it serves:
 
 | Guarantee | What it covers |
 | --- | --- |
-| HTTPS only | Both the index and every file are fetched over `https://`. Plain `http://` is refused except for loopback hosts (`localhost`, `127.0.0.1`, `::1`), so local mirrors and tests still work. The check is re-applied to every redirect hop, so a `302` cannot downgrade a fetch to plaintext after the fact. Chains stop after 5 redirects. |
-| Fail-closed paths | An entry's slug, commit, and file paths are validated before they reach a URL or the filesystem. A slug with a path separator or `..`, a file path outside `.sightmap/`, a backslash, a relative segment, or any control character (including `ESC`, the terminal-escape injection vector) refuses the whole install. Atlas-supplied text is escaped before it is printed. |
-| Commit pinning | When an entry publishes a 40-character commit, its files are fetched at that commit, so the index and the content cannot straddle an atlas push. An unpinned entry is fetched at the index's own ref and says so on stderr. |
-| Atomic install | Every file is fetched before any is written, the result is staged in a temporary directory, and a rename swaps it into place. Whatever the target held is moved aside, not deleted, until the installed corpus has been loaded from the target; a corpus that does not load undoes the swap. A failed install — a 404, a broken entry, a full disk — leaves the target exactly as it was. |
-| Bounded `--force` | Replacing is refused for anything that is not visibly a corpus directory: the working directory, a directory above it, your home directory, a filesystem root, or a target holding a `.git`, a `.env`, or any other content `add` itself would not have written. |
-| Size caps | 8 MiB for the index, 4 MiB per file, and 32 MiB and 256 files per entry — the file limit is checked before the first file is requested. Each fetch also has a 30-second timeout, but a timeout bounds how long a response takes, not how large it is; the byte caps are what stop a hostile mirror. |
-
-An entry with no published commit warns, because the guarantee above is the one it cannot offer:
-
-```text
-warning: atlas entry "acme-admin" publishes no commit, so its files were fetched from the floating ref "main" — the index and the files can straddle an atlas push
-```
+| HTTPS only | The index and the archive are both fetched over `https://`. Plain `http://` is refused except for loopback hosts (`localhost`, `127.0.0.1`, `::1`), so local mirrors and tests still work. The check runs again on every redirect hop, so a `302` cannot downgrade a fetch to plaintext after the scheme was approved. Chains stop after 5 redirects. |
+| Bounded archives | 8 MiB on the wire, 32 MiB decompressed, 4 MiB per file, and 512 members. The decompressed cap is the one that stops a gzip bomb, which is a few hundred KB on the wire and gigabytes on disk. |
+| Fail-closed paths | Every archive member must be a regular file or a directory under `.sightmap/`. An absolute path, a `..` segment, a backslash, a symlink, or a control character (including `ESC`, the terminal-escape injection vector) refuses the whole install, and the joined path is re-checked for containment before anything is written. |
+| Atomic install | The archive is extracted into a temporary directory beside the target and renamed into place. Until that rename the target does not exist, and the rename is one syscall. A 404, a broken entry, or a full disk leaves the target as it was. |
+| A corpus that loads | The staged corpus is loaded before the rename. One that does not load is reported as a defect in the atlas entry, and nothing is installed. |
+| Escaped output | Names, descriptions, domains, and categories are printed straight off the index, so every one is rendered terminal-safe. An entry whose slug could not be installed is never offered with an install command. |
 
 <Warning>
-What `add` does **not** do is vet the corpus's content. It proves the YAML loads and refuses paths that would escape the target; it does not check that the selectors are right, that the entry belongs to whoever the name suggests, or that anyone reviewed it. A corpus is data, not code sightmap executes — but its `description:` and `memory:` text is read by your agent, so treat an unfamiliar atlas or `--index` host the way you would treat any other package source. Run `sightmap validate` and read the YAML before you trust it.
+What `add` does not do is vet the corpus's content. It proves the YAML loads and refuses paths that would escape the target. It does not check that the selectors are right, that the entry belongs to whoever the name suggests, or that anyone reviewed it. A corpus is data rather than code sightmap executes, but its `description:` and `memory:` text is read by your agent, so treat an unfamiliar atlas or `--source` host the way you would treat any other package source. Run `sightmap validate` and read the YAML before you trust it.
 </Warning>
 
 ---
@@ -236,7 +314,7 @@ Releases are published on [GitHub Releases](https://github.com/sightmap/sightmap
     Run `sightmap skills install` to extract `sightmap-authoring` and `sightmap-browser` under `~/.agents/skills/`.
   </Step>
   <Step title="Start from a published corpus, if there is one">
-    Check the atlas for the site you are mapping. If an entry exists, `sightmap add SLUG` writes it into `.sightmap/`; run `sightmap validate` and read the YAML before building on it.
+    Run `sightmap atlas find <domain>` for the site you are mapping. If a corpus exists, the result prints the `sightmap atlas add` command that installs it; run `sightmap validate` and read the YAML before building on it.
   </Step>
   <Step title="Serve the corpus">
     Start a full session with `sightmap browser start` (the server is included), or run `sightmap serve-sightmap` standalone when you only need the HTTP endpoint.

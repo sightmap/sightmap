@@ -5,48 +5,55 @@ See also: [The outer loop](outer-loop.md) · [Lint rules](lint-rules.md)
 
 ---
 
-## `sightmap add SLUG`
+## `sightmap atlas find QUERY` / `list` / `add SLUG`
 
-**Solves:** Starting from a corpus someone already published, instead of authoring one from scratch. Installs an entry from the community atlas (`github.com/sightmap/atlas`) into `--target` (default `.sightmap/`).
+**Solves:** Finding out whether the site you are about to map has already been mapped, and starting from that corpus instead of authoring one from scratch. `find` searches the community atlas (`github.com/sightmap/atlas`), `list` browses it, `add` installs one entry into `--target` (default `.sightmap/`).
 
-**Key flags:**
-
-| Flag | Default | Purpose |
-|------|---------|---------|
-| `--force` | off | Install into a non-empty target, replacing its contents (a swap, never a merge) — refused unless the target holds only corpus files |
-| `--index` | `https://raw.githubusercontent.com/sightmap/atlas/main/index.json` | Atlas `index.json` URL — every other fetch URL is derived from it, so this redirects a whole install at a mirror |
-| `--target` | `.sightmap` | Directory to install into |
+**Start with the domain.** An agent about to automate a site has a URL, not a slug. An exact domain match ranks first, and every hit prints the command that installs it:
 
 ```bash
-sightmap add acme-shop
-  wrote  .sightmap/config.yaml
-  wrote  .sightmap/components.yaml
-  wrote  .sightmap/views/plp.yaml
+sightmap atlas find squareup.com
+square-pos  Square POS
+  Point-of-sale checkout, catalog, and order history.
+  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components · verified 2026-07-14
+  sightmap atlas add square-pos
 
-Installed acme-shop (Acme Shop): 3 files → .sightmap. Next:
+1 match.
+```
+
+Then install what it printed:
+
+```bash
+sightmap atlas add square-pos
+  wrote  .sightmap/components.yaml
+  wrote  .sightmap/config.yaml
+  wrote  .sightmap/views/checkout.yaml
+
+Installed square-pos: 3 files → .sightmap. Next:
   sightmap validate
 ```
 
-An unknown slug prints the closest published slugs. Flags work before or after `SLUG`.
+**Key flags:**
 
-**Never merges.** A non-empty target is refused (`pass --force to replace it`), and `--force` replaces the whole directory, so files the entry no longer publishes cannot survive into a hybrid corpus. Hand-authored YAML in `.sightmap/` is safe from an accidental `add`.
+| Flag | Verbs | Purpose |
+|------|-------|---------|
+| `--category` | find, list | Keep only entries in a matching category |
+| `--json` | find, list | Machine-readable results, install command included |
+| `--limit` | find, list | Cap the results (default 10; `0` shows all) |
+| `--refresh` | find, list | Re-fetch the index instead of the cached copy |
+| `--index` | find, list | Atlas `index.json` URL, for mirrors and tests |
+| `--target` | add | Directory to install into (default `.sightmap`) |
+| `--source` | add | Archive URL template with `{slug}` substituted, for mirrors and tests |
 
-**`--force` only replaces a corpus.** Because replacing deletes what was there, it is refused for any target that is not visibly a corpus directory:
+**A search that finds nothing exits 0.** It answers the question it was asked. An `add` with an unpublished slug exits 1 and points at `find` and the atlas.
 
-- **By location** — the working directory, anything above it, your home directory, or a filesystem root. `--target . --force` and `--target .. --force` are refusals, not a way to install into the project root.
-- **By contents** — every top-level entry must be a `.yaml`/`.yml` file or one of `views/`, `snapshots/`, `review/`. A `.git`, a `.env`, a `go.mod`, a `src/` means the target is a project directory, and `--force` stops:
+**Never merges.** A non-empty target is refused before anything is fetched, so the message is the same offline. There is no `--force`. Delete the directory yourself if you meant to replace it.
 
-```text
-sightmap add: refusing to replace the install target /Users/you/app: it holds ".env", ".git", "go.mod" and 1 more, which is not sightmap corpus content — replacing it deletes everything in it, so this looks like a project directory, not a corpus. Install into a corpus directory instead (for example /Users/you/app/.sightmap), or delete /Users/you/app yourself if you really did mean to replace it
-```
+**`find`/`list` read the index; `add` does not.** `add` fetches one `.tar.gz` from a URL template, so an index outage or a schema bump cannot stop an install, and the index can grow fields without a CLI release. `find` and `list` cache the index at `~/.sightmap/atlas/index.json` for 24 hours.
 
-The rule is an allowlist, so it refuses unfamiliar content rather than only the names someone thought to list. Install into `.sightmap/` (the default target) and `--force` behaves exactly as it always has.
+**Untrusted by construction.** Fetches are HTTPS-only (loopback excepted) with the policy re-applied to every redirect hop. An archive is capped on the wire *and* decompressed, per file, and by member count; every member must be a regular file or directory under `.sightmap/`, with no absolute path, traversal, symlink, or control character. The corpus is loaded before the rename that installs it, so an entry that does not load is reported as an atlas defect with nothing written. Index-supplied text is escaped before it reaches your terminal.
 
-**Rollback is real.** The previous contents are moved aside, not deleted, until the corpus that replaced them has been loaded from the target. A broken atlas entry restores what you had and says so; it does not leave you with neither.
-
-**Untrusted by construction.** The index and every entry string are untrusted: fetches are HTTPS-only (loopback excepted) with the policy re-applied to every redirect, slugs/commits/paths are validated fail-closed before they reach a URL or the filesystem, and responses are size-capped. The install is staged and swapped, so a failure leaves the target untouched. An entry that publishes no commit is fetched from a floating ref and warns.
-
-**Gotcha:** `add` proves the corpus *loads*; it does not vet its content. Run `sightmap validate` (the command tells you to) and read the YAML — an atlas entry's `memory:`/`description:` text ends up in your agent's context.
+**Gotcha:** `add` proves the corpus *loads*; it does not vet its content. Run `sightmap validate` (the command tells you to) and read the YAML. An atlas entry's `memory:`/`description:` text ends up in your agent's context.
 
 ---
 
