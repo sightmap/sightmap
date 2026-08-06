@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -31,9 +32,9 @@ const (
 )
 
 // Client fetches atlas content under a fixed policy: HTTPS only (plain HTTP
-// for loopback), that policy re-applied to every redirect hop, a bounded
-// redirect chain, a response size cap, and an overall timeout. The redirect
-// check is the load-bearing part — without it a mirror or a
+// for loopback), applied to the requested URL and re-applied to every redirect
+// hop, a bounded redirect chain, a response size cap, and an overall timeout.
+// The redirect check is the load-bearing part — without it a mirror or a
 // man-in-the-middle answering `302 Location: http://…` downgrades the fetch to
 // plaintext after the scheme was already approved.
 type Client struct {
@@ -59,7 +60,20 @@ func NewClient() *Client {
 // Fetch GETs rawURL and returns its body, refusing a response larger than
 // limit and folding a non-200 status into an error that names both the URL and
 // the status.
+//
+// The transport policy is applied to rawURL before the request is built, so a
+// refused URL is never dialled. [Install] already gates the index URL through
+// [ParseSource], but Fetch is exported and the atlas publisher CI calls it
+// directly: the policy has to hold on the first hop for the same reason
+// [NewClient] re-applies it to every redirect.
 func (c *Client) Fetch(ctx context.Context, rawURL string, limit int64) ([]byte, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("GET %s: %w", SafeText(rawURL), err)
+	}
+	if err := checkURL(u); err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("GET %s: %w", SafeText(rawURL), err)

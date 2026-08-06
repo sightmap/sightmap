@@ -65,12 +65,12 @@
 // # Transport policy
 //
 // [Client] fetches over HTTPS only, with a plain-HTTP exception for loopback
-// hosts so tests and local mirrors work. The policy is re-applied to every
-// redirect hop, so a mirror or a man-in-the-middle cannot downgrade a fetch to
-// plaintext with a 302. Responses are read through a size cap
-// ([MaxIndexBytes], [MaxFileBytes], [MaxEntryBytes]) and an entry may not list
-// more than [MaxEntryFiles] files, because the per-fetch [FetchTimeout] bounds
-// duration, not bytes.
+// hosts so tests and local mirrors work. The policy runs on the URL a caller
+// hands [Client.Fetch] and again on every redirect hop, so a mirror or a
+// man-in-the-middle cannot downgrade a fetch to plaintext with a 302.
+// Responses are read through a size cap ([MaxIndexBytes], [MaxFileBytes],
+// [MaxEntryBytes]) and an entry may not list more than [MaxEntryFiles] files,
+// because the per-fetch [FetchTimeout] bounds duration, not bytes.
 //
 // # Install
 //

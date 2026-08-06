@@ -3,11 +3,62 @@ package atlas
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
+
+// The policy has to hold on the first hop too. Fetch is exported — the atlas
+// publisher CI is a documented consumer — so "HTTPS only, loopback excepted"
+// being enforced solely on redirects means the promise is false for every
+// caller that does not go through Install.
+//
+// The client below dials the test server for *every* hostname, so a Fetch that
+// skipped the check would reach it and be counted: zero hits is evidence the
+// request was never issued, not evidence that some other host was unreachable.
+func TestClientFetch_refusesPlainHTTPWithoutIssuingARequest(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		fmt.Fprint(w, "attacker payload")
+	}))
+	defer srv.Close()
+
+	addr := strings.TrimPrefix(srv.URL, "http://")
+	client := &Client{http: &http.Client{
+		Timeout: FetchTimeout,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, network, addr)
+			},
+		},
+	}}
+
+	body, err := client.Fetch(context.Background(), "http://atlas.example.com/main/index.json", MaxIndexBytes)
+	if err == nil {
+		t.Fatalf("plain http on a non-loopback host was fetched, got body %q", body)
+	}
+	for _, want := range []string{"refusing non-HTTPS URL", "http://atlas.example.com/main/index.json", "localhost"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %v, want it to mention %q", err, want)
+		}
+	}
+	if n := hits.Load(); n != 0 {
+		t.Errorf("the refused URL was requested %d time(s); the policy must refuse before any request is issued", n)
+	}
+
+	// Prove the dialer really does reach the server, so the assertion above is
+	// about the policy and not about an unreachable host.
+	if _, err := client.Fetch(context.Background(), "http://localhost/main/index.json", MaxIndexBytes); err != nil {
+		t.Fatalf("the loopback exception was refused: %v", err)
+	}
+	if n := hits.Load(); n != 1 {
+		t.Fatalf("hits = %d after an allowed fetch, want 1 — the test's dialer is not reaching the server", n)
+	}
+}
 
 // The HTTPS gate is worthless if it only covers the URL the user typed: a
 // mirror (or anything on the path to one) can answer 302 with a plaintext
