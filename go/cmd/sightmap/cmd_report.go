@@ -12,7 +12,6 @@ import (
 	"os"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/render"
@@ -180,29 +179,18 @@ func runReport(args []string) error {
 	}
 
 	// ── Header ────────────────────────────────────────────────────────────────
-	wd, _ := os.Getwd()
-	site := lastPathComponent(wd)
-	fmt.Printf("sightmap report · %s · %s\n", site, time.Now().Format("2006-01-02"))
+	printTableBanner(os.Stdout, "report")
 
 	// ── Compute column widths ─────────────────────────────────────────────────
 	const t2WarnThreshold = 15 // ⚠ when worst T2 scope ≥ this
 
-	nameW := len("View")
-	routeW := len("Route")
-	for _, r := range results {
-		if w := len(r.name); w > nameW {
-			nameW = w
-		}
-		if w := len(routeDisplay(r.route, r.url)); w > routeW {
-			routeW = w
-		}
+	names := make([]string, len(results))
+	routes := make([]string, len(results))
+	for i, r := range results {
+		names[i] = r.name
+		routes[i] = routeDisplay(r.route, r.url)
 	}
-	if nameW > 30 {
-		nameW = 30
-	}
-	if routeW > 35 {
-		routeW = 35
-	}
+	nameW, routeW := viewColWidths(names, routes)
 
 	// ── Table header ─────────────────────────────────────────────────────────
 	sep := strings.Repeat("─", nameW+routeW+50)
