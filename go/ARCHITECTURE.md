@@ -119,7 +119,7 @@ read (it uses no bespoke DOM JS). This is why callers never need a
 | `sel-check` | authoring (offline) | `render`/`comps` + `sel` |
 | `coverage` / `multi-coverage` / `report` | authoring (offline) | `viewset` + `coverage` (+ `sightmap`) |
 | `capture-novelty` / `capture-prune` | authoring (offline) | `viewset` (+ `coverage`) |
-| `validate` / `lint` / `search` | authoring (offline) | `sightmap` |
+| `validate` / `lint` / `search` / `stats` | authoring (offline) | `sightmap` |
 | `serve-sightmap` | authoring | `sightmap` + http |
 | `skills` | — | `skills` |
 
@@ -136,7 +136,7 @@ The command surface splits cleanly along the two agent skills:
 - **Authoring** (`sightmap-authoring` skill — everything browser-use plus corpus
   work): `capture`, `inspect`, `suggest`, `discover`, `gap`, `sel-probe` /
   `sel-check`, `coverage` / `multi-coverage` / `report`, `validate` / `lint` /
-  `search`.
+  `search` / `stats`.
 
 `snapshot` (observe) and `capture` (persist) share `observe.Page` but sit on
 opposite sides of this line — matching the two-skill split exactly.
