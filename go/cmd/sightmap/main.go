@@ -2,6 +2,7 @@
 //
 // Usage:
 //
+//	sightmap add SLUG [flags]       install a published corpus from the community atlas
 //	sightmap browser <subcommand>   manage the Chrome session
 //	sightmap snapshot [flags]       observe: annotated component tree + coverage
 //	sightmap capture [flags]        persist a capture into the matched view's set

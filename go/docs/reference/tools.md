@@ -5,6 +5,38 @@ See also: [The outer loop](outer-loop.md) · [Lint rules](lint-rules.md)
 
 ---
 
+## `sightmap add SLUG`
+
+**Solves:** Starting from a corpus someone already published, instead of authoring one from scratch. Installs an entry from the community atlas (`github.com/sightmap/atlas`) into `--target` (default `.sightmap/`).
+
+**Key flags:**
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--force` | off | Install into a non-empty target, replacing its contents (a swap, never a merge) |
+| `--index` | `https://raw.githubusercontent.com/sightmap/atlas/main/index.json` | Atlas `index.json` URL — every other fetch URL is derived from it, so this redirects a whole install at a mirror |
+| `--target` | `.sightmap` | Directory to install into |
+
+```bash
+sightmap add acme-shop
+  wrote  .sightmap/config.yaml
+  wrote  .sightmap/components.yaml
+  wrote  .sightmap/views/plp.yaml
+
+Installed acme-shop (Acme Shop): 3 files → .sightmap. Next:
+  sightmap validate
+```
+
+An unknown slug prints the closest published slugs. Flags work before or after `SLUG`.
+
+**Never merges.** A non-empty target is refused (`pass --force to replace it`), and `--force` replaces the whole directory, so files the entry no longer publishes cannot survive into a hybrid corpus. Hand-authored YAML in `.sightmap/` is safe from an accidental `add`.
+
+**Untrusted by construction.** The index and every entry string are untrusted: fetches are HTTPS-only (loopback excepted) with the policy re-applied to every redirect, slugs/commits/paths are validated fail-closed before they reach a URL or the filesystem, and responses are size-capped. The install is staged and swapped, so a failure leaves the target untouched. An entry that publishes no commit is fetched from a floating ref and warns.
+
+**Gotcha:** `add` proves the corpus *loads*; it does not vet its content. Run `sightmap validate` (the command tells you to) and read the YAML — an atlas entry's `memory:`/`description:` text ends up in your agent's context.
+
+---
+
 ## `sightmap browser start`
 
 **Solves:** Launching a Chrome session with the sightmap HTTP server and overlay extension.

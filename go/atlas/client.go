@@ -22,7 +22,8 @@ const (
 	MaxEntryBytes = 32 << 20 // 32 MiB
 	// MaxRedirects caps the redirect chain of a single fetch.
 	MaxRedirects = 5
-	// FetchTimeout bounds a whole install's HTTP traffic.
+	// FetchTimeout bounds a single fetch, end to end (http.Client.Timeout is
+	// per request, so an install of N files has N of these, not one).
 	FetchTimeout = 30 * time.Second
 	// FetchConcurrency bounds how many files are fetched at once. One RTT per
 	// file is the dominant cost of installing a corpus.

@@ -46,6 +46,12 @@ Use `npm` in instructions — it's the universal baseline. `pnpm`/`yarn` work to
 
 ## Tool quick reference
 
+### Starting a corpus
+
+| Command | What it does |
+|---------|-------------|
+| `sightmap add SLUG` | Install a corpus already published in the community atlas into `.sightmap/` (`--target DIR` elsewhere, `--force` to replace a non-empty target — it swaps, never merges). Check for an entry before authoring a site from scratch. Always `sightmap validate` and read the YAML afterwards: `add` proves the corpus loads, not that it is correct or trustworthy. |
+
 ### Primary loop
 
 | Command | What it does |

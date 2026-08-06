@@ -69,8 +69,8 @@
 // redirect hop, so a mirror or a man-in-the-middle cannot downgrade a fetch to
 // plaintext with a 302. Responses are read through a size cap
 // ([MaxIndexBytes], [MaxFileBytes], [MaxEntryBytes]) and an entry may not list
-// more than [MaxEntryFiles] files, because a 30-second timeout bounds duration,
-// not bytes.
+// more than [MaxEntryFiles] files, because the per-fetch [FetchTimeout] bounds
+// duration, not bytes.
 //
 // # Install
 //
