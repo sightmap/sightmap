@@ -1,11 +1,11 @@
-title: "Guard: `add --index http://…` is refused by the scheme policy, before any fetch, and says what is allowed"
+title: "Guard: `atlas find --index http://…` is refused by the scheme policy, before any fetch, and says what is allowed"
 known_bug: false
 run:
-  args: [add, acme-shop, --index, 'http://atlas.example.com/main/index.json']
+  args: [atlas, find, acme, --index, 'http://atlas.example.com/index.json']
 expect:
   exit: nonzero
   output:
-    - must_match: 'refusing non-HTTPS URL http://atlas\.example\.com/main/index\.json'
+    - must_match: 'refusing non-HTTPS URL http://atlas\.example\.com/index\.json'
       why: >
         A pasted `--index` is the untrusted input of this command. The refusal
         must quote the URL it refused, so an agent editing a copied invocation

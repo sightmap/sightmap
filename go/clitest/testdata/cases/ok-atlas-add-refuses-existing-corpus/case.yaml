@@ -1,17 +1,16 @@
-title: "Guard: `add` into a project that already has a corpus refuses offline, names --force, and leaves the hand-authored YAML alone"
+title: "Guard: `atlas add` into a project that already has a corpus refuses offline, says to delete it, and leaves the hand-authored YAML alone"
 known_bug: false
 run:
-  args: [add, acme-shop]
+  args: [atlas, add, acme-shop]
   fixture: fixture
 expect:
   exit: nonzero
   output:
-    - must_match: 'install target already exists and is not empty: \.sightmap — pass --force to replace it'
+    - must_match: 'install target already exists and is not empty: \.sightmap — delete it and run this again'
       why: >
         An agent running `add` in a repo that already has a corpus needs both
         halves in one line: that the refusal is about the target's contents,
-        and the flag that overrides it. Without the flag it retries blind or
-        deletes the directory by hand.
+        and what to do about it. Without the second half it retries blind.
     - must_not_match: 'GET https?://'
       why: >
         The local precondition is checked before any network I/O, so the

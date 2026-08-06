@@ -1,0 +1,26 @@
+title: "Guard: bare `sightmap atlas add` names the missing SLUG, points at `find`, and does not reach for the network"
+known_bug: false
+run:
+  args: [atlas, add]
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'expected a SLUG argument'
+      why: >
+        `add` is the verb an agent reaches for with no arguments — it is the
+        command a gallery page told it to run. The refusal has to name the
+        argument that is missing, not just dump flags.
+    - must_match: 'Usage: sightmap atlas add SLUG \[--target DIR\] \[--source URL\]'
+      why: >
+        The usage line is where the agent learns the whole surface in one
+        read, so it must stay in sync with the flags the binary accepts.
+    - must_match: 'sightmap atlas find'
+      why: >
+        An agent that has a URL and no slug is the case this verb group exists
+        for. The missing-argument message is where it finds that out, because
+        it is the message it hits first.
+    - must_not_match: 'GET https?://'
+      why: >
+        Argument errors are decided before any network I/O. A fetch failure
+        against the default atlas would blame the atlas (or the user's
+        connectivity) for what is a missing argument.
