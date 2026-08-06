@@ -103,6 +103,18 @@ describe('filterEntries', () => {
     expect(filterEntries(entries, '', 'docs').map((e) => e.slug)).toEqual(['a', 'c'])
   })
 
+  it('searches the slug, which is what someone pastes back off a card', () => {
+    // `sightmap atlas find` searches the slug against this same index.json. A
+    // slug the CLI resolves and the grid does not is one query with two
+    // answers, so the slug has to be in the haystack here too.
+    const bySlug = [
+      entry({ slug: 'square-pos', name: 'Square', description: 'A card reader.' }),
+      entry({ slug: 'other-site', name: 'Other', description: 'Something else.' }),
+    ]
+    expect(filterEntries(bySlug, '', 'square-pos').map((e) => e.slug)).toEqual(['square-pos'])
+    expect(filterEntries(bySlug, '', 'SQUARE-POS').map((e) => e.slug)).toEqual(['square-pos'])
+  })
+
   it('ignores case and surrounding whitespace', () => {
     expect(filterEntries(entries, '', '  ALPHA ').map((e) => e.slug)).toEqual(['a'])
   })

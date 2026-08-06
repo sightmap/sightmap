@@ -64,12 +64,24 @@ export function figLabel(index: number): string {
 
 /**
  * Case-insensitive substring match across the fields a visitor would plausibly
- * type: name, domains, description, categories, author.
+ * type: slug, name, domains, description, categories, author.
+ *
+ * The slug is in here because the CLI's `sightmap atlas find` searches slug,
+ * name, domains, categories and description against this same index.json, and
+ * the slug is what someone pastes back after reading it off a card. Typing one
+ * query into the grid and into the CLI should return the same entries.
  */
 export function matchesQuery(entry: AtlasEntry, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
-  const haystack = [entry.name, entry.description, entry.author, ...entry.domains, ...entry.categories]
+  const haystack = [
+    entry.slug,
+    entry.name,
+    entry.description,
+    entry.author,
+    ...entry.domains,
+    ...entry.categories,
+  ]
     .join(' ')
     .toLowerCase()
   return haystack.includes(q)
