@@ -175,11 +175,12 @@ views:
       - The README body is rendered to HTML at build time by scripts/lib/atlas.ts, which escapes raw HTML and allowlists URL schemes because entries are community-authored
       - README headings are demoted one level so the page keeps a single h1
       - Machine twins for the same entry live at /atlas/<slug>.md and /atlas/index.json
+      - The corpus that `sightmap atlas add` pulls is served from /atlas/<slug>.tar.gz, written by scripts/build-atlas.ts
     components:
       - name: AtlasInstall
         selector: '[data-component="AtlasInstall"]'
         source: src/components/atlas/AtlasInstall.tsx
-        description: The `sightmap add <slug>` command with a copy button
+        description: The `sightmap atlas add <slug>` command with a copy button
         memory:
           - The button label toggles to "Copied" for 2s and only on a copy that actually succeeded
         children:

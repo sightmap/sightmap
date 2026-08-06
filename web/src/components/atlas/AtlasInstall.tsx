@@ -5,12 +5,12 @@ import { copyText } from '@/lib/clipboard'
  * The detail page's call to action: the one command that pulls this entry down
  * locally, with a copy button.
  *
- * `sightmap add` ships in sightmap/sightmap#168, which was still in review when
- * this page was built — the command is rendered anyway, on the handoff's
- * instruction, because it is the page's whole point. If that PR lands under a
- * different verb, this is the only place the string is written.
+ * The verb is namespaced because `sightmap search` already means the local
+ * corpus, so sightmap/sightmap#168 settled on `sightmap atlas list` / `find` /
+ * `add`. This is the only place the string is written; the sibling verbs are
+ * spelled out in the llms.txt atlas section (scripts/generate-feeds.ts).
  */
-export const installCommand = (slug: string): string => `sightmap add ${slug}`
+export const installCommand = (slug: string): string => `sightmap atlas add ${slug}`
 
 export default function AtlasInstall({ slug }: { slug: string }) {
   const command = installCommand(slug)
