@@ -158,21 +158,30 @@ func searchAtlas(ctx context.Context, query string, f *searchFlags, out io.Write
 	if *f.asJSON {
 		return writeAtlasJSON(out, query, *f.category, len(hits), shown, res)
 	}
-	writeAtlasText(out, query, len(hits), shown, res)
+	writeAtlasText(out, query, *f.category, len(hits), shown, res)
 	return nil
 }
 
 // writeAtlasText prints one block per hit: what it is, what it covers, and the
 // command that installs it. An empty result is a successful search, so it
 // prints where to look next and exits 0.
-func writeAtlasText(out io.Writer, query string, total int, hits []atlas.Hit, res *atlas.IndexResult) {
+//
+// Which "nothing found" message is right depends on what was asked. A category
+// that nothing is filed under is not an empty atlas, and saying so sends an
+// agent off to author a corpus that the atlas may already publish under a
+// category it spelled differently.
+func writeAtlasText(out io.Writer, query, category string, total int, hits []atlas.Hit, res *atlas.IndexResult) {
 	if len(hits) == 0 {
-		if query == "" {
+		switch {
+		case query != "":
+			fmt.Fprintf(out, "No atlas entry matches %q.\n", atlas.SafeText(query))
+			fmt.Fprintf(out, "Try the product name or a category, browse %s, or map the site yourself with sightmap init.\n", atlas.AtlasURL)
+		case category != "":
+			fmt.Fprintf(out, "No atlas entry is in category %q.\n", atlas.SafeText(category))
+			fmt.Fprintf(out, "Run sightmap atlas list to see every entry and the categories they use.\n")
+		default:
 			fmt.Fprintf(out, "The atlas index at %s publishes no entries.\n", atlas.SafeText(res.Source))
-			return
 		}
-		fmt.Fprintf(out, "No atlas entry matches %q.\n", atlas.SafeText(query))
-		fmt.Fprintf(out, "Try the product name or a category, browse %s, or map the site yourself with sightmap init.\n", atlas.AtlasURL)
 		return
 	}
 	for i, h := range hits {

@@ -170,6 +170,33 @@ func TestAtlasList_filtersByCategory(t *testing.T) {
 	}
 }
 
+// A category nothing is filed under is not an empty atlas. Telling an agent
+// the atlas publishes nothing sends it off to author a corpus the atlas may
+// already have under a category it spelled differently.
+func TestAtlasList_categoryWithNoEntriesDoesNotClaimTheAtlasIsEmpty(t *testing.T) {
+	f := newAtlasFixture(t)
+	var out bytes.Buffer
+	if err := runAtlasListOut(append([]string{"--category", "position tracking"}, f.indexFlag()...), &out); err != nil {
+		t.Fatalf("atlas list: %v", err)
+	}
+	got := out.String()
+	mustContain(t, got, `No atlas entry is in category "position tracking"`, "sightmap atlas list")
+	if strings.Contains(got, "publishes no entries") {
+		t.Errorf("a category miss was reported as an empty atlas:\n%s", got)
+	}
+}
+
+// An index that really is empty still says so.
+func TestAtlasList_saysWhenTheIndexIsEmpty(t *testing.T) {
+	f := newAtlasFixture(t)
+	f.index = `{"schema_version": 1, "entries": []}`
+	var out bytes.Buffer
+	if err := runAtlasListOut(f.indexFlag(), &out); err != nil {
+		t.Fatalf("atlas list: %v", err)
+	}
+	mustContain(t, out.String(), "publishes no entries")
+}
+
 func TestAtlasFind_limitsResultsAndSaysHowManyThereAre(t *testing.T) {
 	f := newAtlasFixture(t)
 	var out bytes.Buffer
