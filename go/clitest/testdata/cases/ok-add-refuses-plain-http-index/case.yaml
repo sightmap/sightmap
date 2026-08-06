@@ -1,0 +1,19 @@
+title: "Guard: `add --index http://…` is refused by the scheme policy, before any fetch, and says what is allowed"
+known_bug: false
+run:
+  args: [add, acme-shop, --index, 'http://atlas.example.com/main/index.json']
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'refusing non-HTTPS URL http://atlas\.example\.com/main/index\.json'
+      why: >
+        A pasted `--index` is the untrusted input of this command. The refusal
+        must quote the URL it refused, so an agent editing a copied invocation
+        can see which of several URLs the policy rejected.
+    - must_match: 'localhost'
+      why: >
+        Plain http is allowed for loopback so local mirrors and tests work.
+        Saying so is what stops an agent from concluding that its own test
+        server cannot be used and abandoning the flag.
+    - must_not_match: '(?i)(wrote|installed) '
+      why: nothing may be reported as written when the transport policy refuses the index

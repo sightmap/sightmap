@@ -1,0 +1,25 @@
+title: "Guard: `add` into a project that already has a corpus refuses offline, names --force, and leaves the hand-authored YAML alone"
+known_bug: false
+run:
+  args: [add, acme-shop]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'install target already exists and is not empty: \.sightmap — pass --force to replace it'
+      why: >
+        An agent running `add` in a repo that already has a corpus needs both
+        halves in one line: that the refusal is about the target's contents,
+        and the flag that overrides it. Without the flag it retries blind or
+        deletes the directory by hand.
+    - must_not_match: 'GET https?://'
+      why: >
+        The local precondition is checked before any network I/O, so the
+        refusal is the same with or without connectivity. A dial timeout or a
+        404 against the atlas would hide the actionable message behind an
+        unrelated one.
+    - must_not_match: '(?i)(wrote |installed )'
+      why: nothing may be reported as written when the install is refused
+  files:
+    - exists: .sightmap/components.yaml
+      why: a refused install must not touch a single byte of the existing corpus

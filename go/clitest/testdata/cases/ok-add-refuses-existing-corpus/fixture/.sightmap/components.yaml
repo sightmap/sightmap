@@ -1,0 +1,4 @@
+version: 1
+components:
+  - name: SiteHeader
+    selector: 'header[data-testid="site-header"]'
