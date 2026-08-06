@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-06T11:51:13Z",
+  "entries": [
+    {
+      "slug": "sightmap-org",
+      "name": "Sightmap",
+      "site_url": "https://sightmap.org/",
+      "domains": [
+        "sightmap.org"
+      ],
+      "description": "Marketing site and blog for the Sightmap spec — landing page sections, blog index, and post pages.",
+      "categories": [
+        "docs",
+        "devtools"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-06",
+      "updated": "2026-08-06",
+      "last_verified": "2026-08-06",
+      "cli_version": "0.17.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 4,
+        "components": 28,
+        "requests": 2,
+        "properties": 16,
+        "memory": 20
+      },
+      "per_view": [
+        {
+          "name": "BlogPost",
+          "route": "/blog/:slug",
+          "components": 5,
+          "requests": 0
+        },
+        {
+          "name": "BlogIndex",
+          "route": "/blog",
+          "components": 5,
+          "requests": 0
+        },
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 10,
+          "requests": 0
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 3,
+          "requests": 0
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-home.webp",
+        "screenshots/02-blog-index.webp"
+      ],
+      "files": [
+        ".sightmap/blog-post.yaml",
+        ".sightmap/blog.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "645f5c5f722248038c0c3aa185e2c1165b91e13f"
+    }
+  ]
+}
