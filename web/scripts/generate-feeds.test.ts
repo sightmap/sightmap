@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { buildRss, buildSitemap, type FeedPost } from './generate-feeds'
+import {
+  buildLlmsTxt,
+  buildRss,
+  buildSitemap,
+  type FeedAtlasEntry,
+  type FeedPost,
+} from './generate-feeds'
 
 const POSTS: FeedPost[] = [
   {
@@ -15,6 +21,21 @@ const POSTS: FeedPost[] = [
     excerpt: 'Second.',
     date: '2026-01-01',
     author: 'Chip Lay',
+  },
+]
+
+const ATLAS: FeedAtlasEntry[] = [
+  {
+    slug: 'sightmap-org',
+    name: 'Sightmap',
+    description: 'Marketing site and blog for the Sightmap spec.',
+    updated: '2026-08-06',
+  },
+  {
+    slug: 'example-shop',
+    name: 'Example & Co',
+    description: 'A storefront.',
+    updated: '2026-03-02',
   },
 ]
 
@@ -65,26 +86,83 @@ describe('buildRss', () => {
 })
 
 describe('buildSitemap', () => {
-  it('lists the homepage, the blog index, and every post', () => {
-    const xml = buildSitemap(POSTS, NOW)
+  it('lists the homepage, both indexes, every post, and every atlas entry', () => {
+    const xml = buildSitemap(POSTS, ATLAS, NOW)
     expect(xml).toContain('<loc>https://sightmap.org/</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/blog</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/blog/sightmaps</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(4)
+    expect(xml).toContain('<loc>https://sightmap.org/atlas</loc>')
+    expect(xml).toContain('<loc>https://sightmap.org/atlas/sightmap-org</loc>')
+    expect(xml).toContain('<loc>https://sightmap.org/atlas/example-shop</loc>')
+    expect(xml.match(/<url>/g)).toHaveLength(7)
   })
 
   it('uses the post date as lastmod for post URLs', () => {
-    expect(buildSitemap(POSTS, NOW)).toContain('<lastmod>2026-07-28</lastmod>')
+    expect(buildSitemap(POSTS, ATLAS, NOW)).toContain('<lastmod>2026-07-28</lastmod>')
   })
 
-  it('still lists the homepage and blog index when there are no published posts', () => {
-    // Same zero-posts edge case as above: /blog's lastmod falls back to
-    // `today` via `posts[0]?.date ?? today` and must not be "undefined".
-    const xml = buildSitemap([], NOW)
+  it('uses the newest entry as the atlas index lastmod', () => {
+    // loadAtlas() sorts newest-first, so [0] is the most recently updated
+    // entry — the index page changes whenever that one does.
+    expect(buildSitemap(POSTS, ATLAS, NOW)).toContain('<lastmod>2026-08-06</lastmod>')
+  })
+
+  it('still lists the homepage and both indexes when nothing is published', () => {
+    // Same zero-content edge case as above: /blog's and /atlas's lastmod both
+    // fall back to `today` and must not be "undefined".
+    const xml = buildSitemap([], [], NOW)
     expect(xml).toContain('<loc>https://sightmap.org/</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/blog</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(2)
+    expect(xml).toContain('<loc>https://sightmap.org/atlas</loc>')
+    expect(xml.match(/<url>/g)).toHaveLength(3)
     expect(xml).not.toContain('undefined')
     expect(xml).toContain('<lastmod>2026-07-28</lastmod>')
+  })
+})
+
+describe('buildLlmsTxt', () => {
+  it('opens with the site name and a one-line summary', () => {
+    const txt = buildLlmsTxt(POSTS, ATLAS)
+    expect(txt.startsWith('# Sightmap\n')).toBe(true)
+    expect(txt).toContain('> An open YAML spec and CLI')
+  })
+
+  it('links each atlas entry to its markdown twin, not its HTML page', () => {
+    const txt = buildLlmsTxt(POSTS, ATLAS)
+    expect(txt).toContain(
+      '- [Sightmap](https://sightmap.org/atlas/sightmap-org.md): Marketing site and blog for the Sightmap spec.'
+    )
+    expect(txt).toContain('- [Example & Co](https://sightmap.org/atlas/example-shop.md): A storefront.')
+    // The HTML page is linked from the Atlas heading's index pointer only.
+    expect(txt).not.toContain('](https://sightmap.org/atlas/sightmap-org)')
+  })
+
+  it('points at the machine index so an agent never has to scrape the gallery', () => {
+    expect(buildLlmsTxt(POSTS, ATLAS)).toContain('https://sightmap.org/atlas/index.json')
+  })
+
+  it('emits one line per post', () => {
+    const txt = buildLlmsTxt(POSTS, ATLAS)
+    expect(txt).toContain(
+      "- [Sightmaps: the runtime map of your app](https://sightmap.org/blog/sightmaps): It's a map, not a movie."
+    )
+  })
+
+  it('keeps every list item on one line', () => {
+    // A newline inside a community-authored description would split one entry
+    // into two malformed ones, so oneLine() collapses whitespace first.
+    const txt = buildLlmsTxt(POSTS, [
+      { slug: 'multi', name: 'Multi\nLine', description: 'First line.\n\nSecond line.', updated: '2026-01-01' },
+    ])
+    expect(txt).toContain('- [Multi Line](https://sightmap.org/atlas/multi.md): First line. Second line.')
+  })
+
+  it('says so rather than emitting an empty section when nothing is published', () => {
+    const txt = buildLlmsTxt([], [])
+    expect(txt).toContain('## Atlas')
+    expect(txt).toContain('## Blog')
+    expect(txt).toContain('- No entries published yet.')
+    expect(txt).toContain('- No posts published yet.')
+    expect(txt).not.toContain('undefined')
   })
 })
