@@ -156,3 +156,31 @@ selector: "#modal_12849"
 ```
 
 **Fix:** Add a `properties:` entry that extracts unique data from each instance. If the selector can be narrowed to unique attributes, update the selector instead. For child components, nest them under their parent component definition. For selector-unstable components (category D), mark as `stability: unstable` and document in `memory:`.
+
+## `message-level-unknown`
+
+**Triggers when:** a `messages:` entry declares a `level` outside the vocabulary the reference capture emits (`log`, `debug`, `info`, `warn`, `error`, `exception`).
+
+**Why it matters:** the entry can never match. Level comparison is case-insensitive equality, so a near-miss fails silently rather than erroring, and there is no output to tell you the pattern never fired.
+
+The realistic trap is `WARNING`. That is CDP's own spelling for the level, but the capture normalizes it to `warn`, so a corpus copied from CDP output matches nothing.
+
+```yaml
+# TRIGGERS — CDP spells it "warning", the capture normalizes to "warn"
+- name: SlowRequest
+  level: WARNING
+  message: 'took over \d+ms'
+
+# DOES NOT TRIGGER
+- name: SlowRequest
+  level: WARN
+  message: 'took over \d+ms'
+
+# DOES NOT TRIGGER — an uncaught exception arrives as its own level, not as error
+- name: UncaughtCheckoutError
+  level: EXCEPTION
+```
+
+This is advisory rather than a validation error because `level` is deliberately open: a consumer whose capture emits levels of its own is free to name them.
+
+**Fix:** use one of the six levels above, matching case-insensitively. If your consumer genuinely emits a different level, the warning is safe to ignore.

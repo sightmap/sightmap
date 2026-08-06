@@ -125,6 +125,9 @@ func Validate(c *Corpus) []ValidationError {
 	// Request property shape (SEP-0005); see validate_request.go.
 	errs = append(errs, checkRequestProperties(c)...)
 
+	// Console/exception patterns (SEP-0006); see validate_message.go.
+	errs = append(errs, checkMessages(c.Messages)...)
+
 	return errs
 }
 

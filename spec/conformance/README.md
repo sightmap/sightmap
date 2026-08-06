@@ -55,6 +55,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 016 | `stability-tooling-fields` | `stability:` (view + component) validates; reserved tooling fields `access:`/`snapshots:` are permitted |
 | 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, and views ([SEP-0004](../seps/0004-component-tags.md)) |
 | 018 | `request-properties` | `properties:` on a request validates via `field` (body and header paths) and `pattern`; declaring a reserved identity name warns with `request-property-shadows-reserved` ([SEP-0005](../seps/0005-request-properties.md)) |
+| 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](../seps/0006-message-entity.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 
@@ -72,6 +73,7 @@ The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byt
 ## Consumers
 
 - CI schema-validates every `sightmap/*.yaml` here against `sightmap.schema.json` (`npm run validate:conformance`).
-- **The `cases` arrays are not executed yet.** `scripts/validate-sightmap.mjs` reads `expected.json` only to look for `fmt.schema-invalid`/`fmt.parse-error`, which tell it to skip a deliberately-invalid input. Nothing runs the `command`/`args` or asserts the `diagnostics`. The reference implementation's own fixture runner (`go/match/conformance_test.go`) reads a different corpus, under [`go/conformance/fixtures/`](../../go/conformance/fixtures/).
-- So a `cases` entry is a **contract for ports and a record of intent**, not a passing assertion. Treat a green `validate:conformance` as "these files are schema-valid", nothing more, and keep the Go unit tests as the real coverage for any diagnostic asserted here.
+- **Most `cases` arrays are not executed yet.** `scripts/validate-sightmap.mjs` reads `expected.json` only to look for `fmt.schema-invalid`/`fmt.parse-error`, which tell it to skip a deliberately-invalid input. It does not run the `command`/`args` or assert the `diagnostics`. The reference implementation's own match runner (`go/match/conformance_test.go`) reads a different corpus, under [`go/conformance/fixtures/`](../../go/conformance/fixtures/).
+- **Exception:** the message fixtures (`*-messages.fixture`) *are* executed. `go/sightmap/spec_conformance_test.go` runs the reference validator (`sightmap.Validate`, the same path the `validate` command uses) over each and asserts its `validate` case's `diagnostics` exactly. Extending this executor to the `match`/`lint`/`explain` commands and the rest of the suite is tracked separately (one fixture, 017-tags, currently diverges from its own `expected.json` and must be reconciled first).
+- So for every *other* fixture a `cases` entry is still a **contract for ports and a record of intent**, not a passing assertion. Treat a green `validate:conformance` as "these files are schema-valid", nothing more, and keep the Go unit tests as the real coverage for any diagnostic asserted here.
 - Community ports in other languages are expected to run the same fixtures via a port-specific runner.
