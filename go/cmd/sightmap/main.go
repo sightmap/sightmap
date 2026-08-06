@@ -2,7 +2,7 @@
 //
 // Usage:
 //
-//	sightmap add SLUG [flags]       install a published corpus from the community atlas
+//	sightmap atlas <subcommand>     find and install corpora from the community atlas
 //	sightmap browser <subcommand>   manage the Chrome session
 //	sightmap snapshot [flags]       observe: annotated component tree + coverage
 //	sightmap capture [flags]        persist a capture into the matched view's set
@@ -35,8 +35,8 @@ func main() {
 
 	var err error
 	switch cmd {
-	case "add":
-		err = runAdd(args)
+	case "atlas":
+		err = runAtlas(args)
 	case "init":
 		err = runInit(args)
 	case "browser":
@@ -138,7 +138,9 @@ Commands:
   network  list [--type T] [--url SUBSTR] [--tab T] [--limit N]  captured network requests
   network  get INDEX [--response-file F] [--request-file F]  one request + body by index
 
-  add SLUG [--index URL] [--target DIR] [--force]           install a published corpus from the community atlas
+  atlas find QUERY [--category C] [--limit N] [--json]      search the community atlas by domain, name, or category
+  atlas list [--category C] [--limit N] [--json]            browse the community atlas
+  atlas add SLUG [--target DIR]                             install a published corpus into .sightmap/
   init     [--sightmap-dir DIR]                             scaffold a schema-correct .sightmap/ corpus
   skills install [--target DIR]                             install sightmap authoring skill to ~/.agents/skills/
   version                                                    print version and exit

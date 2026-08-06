@@ -1,17 +1,28 @@
-// Package atlas implements the client half of the community atlas wire
-// contract: the published index at github.com/sightmap/atlas from which a
-// visitor installs a ready-made `.sightmap/` corpus with one command.
+// Package atlas is the client half of the community atlas: the published
+// catalog at github.com/sightmap/atlas that an agent searches to find out
+// whether the site it is about to automate has already been mapped, and
+// installs from when it has.
 //
-// The package owns the index schema, the raw-URL layout, the fail-closed
-// validation rules, the fetch policy, and the [Install] operation. The CLI's
-// `sightmap add` adapter is one consumer; the sightmap/atlas repository's
-// publisher CI is the other, and it is an intended one. Both sides must agree
-// on what a valid entry is, so the rules live here in one importable place
-// rather than being re-implemented per side — a published entry that passes
-// atlas CI but that every shipped CLI refuses to install is the failure this
+// The package owns the index schema, the search ranking, the index cache, the
+// fetch policy, and the [Install] operation. The CLI's `sightmap atlas`
+// adapter is one consumer; the sightmap/atlas repository's publisher CI is the
+// other, and it is an intended one. Both sides must agree on what a valid
+// entry is, so the rules live here in one importable place — a published entry
+// that passes atlas CI but that every shipped CLI refuses is the failure this
 // package exists to prevent.
 //
-// # Wire contract
+// # Search and install are decoupled
+//
+// [LoadIndex] reads the catalog. [Install] fetches one archive from a URL
+// template and never reads the index. That split is deliberate: an install
+// keeps working through an index outage or a schema change, and the index can
+// grow fields without a CLI release.
+//
+//	idx, err := atlas.LoadIndex(ctx, atlas.IndexOptions{})
+//	hits := idx.Index.Search(atlas.Query{Text: "squareup.com"})
+//	res, err := atlas.Install(ctx, hits[0].Entry.Slug, atlas.Options{Target: ".sightmap"})
+//
+// # Index
 //
 // The atlas publishes a single JSON index:
 //
@@ -19,94 +30,71 @@
 //	  "schema_version": 1,
 //	  "entries": [
 //	    {
-//	      "slug":   "square-pos",                                  // required, identifies the entry
-//	      "name":   "Square POS",                                  // optional, display only
-//	      "commit": "0123456789abcdef0123456789abcdef01234567",    // optional, 40-char lowercase sha
-//	      "files":  [".sightmap/config.yaml", ".sightmap/views/checkout.yaml"]
+//	      "slug":          "square-pos",
+//	      "name":          "Square POS",
+//	      "description":   "Point-of-sale checkout, catalog, and order history.",
+//	      "domains":       ["squareup.com", "app.squareup.com"],
+//	      "categories":    ["payments", "commerce"],
+//	      "stats":         {"views": 12, "components": 48},
+//	      "last_verified": "2026-07-14"
 //	    }
 //	  ]
 //	}
 //
 // Unknown object fields are ignored on purpose so the atlas can grow metadata
-// (descriptions, stars, screenshots) without breaking already-shipped CLIs.
+// (stars, screenshots, authors) without breaking already-shipped CLIs.
 // [SchemaVersion] is the version this package understands; a higher
 // schema_version is refused before the rest of the document is decoded, so a
 // restructured future index produces "upgrade sightmap" rather than a raw JSON
 // error.
 //
-// Every string in the index is untrusted input. Slugs, commits, and file paths
-// are validated fail-closed ([ValidateSlug], [ValidateCommit],
-// [ValidateCorpusPath], [Entry.Validate]) before they are spliced into a URL or
-// a filesystem path, and any index-supplied string that reaches a terminal is
-// rendered through [SafeText].
+// [LoadIndex] caches the fetched bytes in ~/.sightmap/atlas/index.json for
+// [IndexTTL], alongside the browser cache at ~/.sightmap/browsers. The cache
+// is an optimization: a missing, corrupt, stale, or differently-sourced file
+// is a miss rather than an error, and a cache that cannot be written costs a
+// round trip rather than a search.
 //
-// # URL layout
+// # Search
 //
-// One rule, no per-host special cases:
+// [Index.Search] matches the query against slug, name, domains, categories,
+// and description, ranked so an exact domain hit comes first — the caller
+// usually has a URL, not a slug. Matching is case-insensitive substring
+// containment in either direction; domains are normalized first, so a pasted
+// URL, a bare hostname, and a www. hostname resolve to the same entry. An
+// empty query matches everything, which is what `sightmap atlas list` runs.
 //
-//	index:  <root>/<ref>/index.json
-//	files:  <root>/<ref>/entries/<slug>/<path>
-//
-// <root> is the raw-content root of the atlas repository, <ref> is a git ref,
-// and <path> is the entry's corpus-relative path (always under .sightmap/).
-// The ref of a file fetch is the entry's commit when it publishes one and the
-// ref parsed from the index URL otherwise — never a hardcoded branch, so
-// pointing --index at a non-main ref fetches that ref's content.
-//
-// The ref is parsed off the index URL: it is the trailing path segment before
-// the index file, or — when the path contains a "refs" segment — everything
-// from that segment on, so GitHub's own refs/heads/<branch> raw URLs describe
-// the same layout. That single rule covers raw.githubusercontent.com, a GitHub
-// Enterprise raw host, and a plain byte-for-byte copy of what either serves;
-// a mirror needs no bespoke shape, only the ref directory level it was copied
-// from. An index URL with no ref segment is rejected with an explicit error
-// rather than guessed at.
+// Every string in the index is untrusted input. An entry [Entry.Validate]
+// rejects never appears in results, and every index-supplied string that
+// reaches a terminal goes through [SafeText] — searching prints far more
+// atlas-authored text than installing ever did.
 //
 // # Transport policy
 //
 // [Client] fetches over HTTPS only, with a plain-HTTP exception for loopback
 // hosts so tests and local mirrors work. The policy runs on the URL a caller
 // hands [Client.Fetch] and again on every redirect hop, so a mirror or a
-// man-in-the-middle cannot downgrade a fetch to plaintext with a 302.
-// Responses are read through a size cap ([MaxIndexBytes], [MaxFileBytes],
-// [MaxEntryBytes]) and an entry may not list more than [MaxEntryFiles] files,
-// because the per-fetch [FetchTimeout] bounds duration, not bytes.
+// man-in-the-middle cannot downgrade a fetch to plaintext with a 302. Bodies
+// are read through a size cap ([MaxIndexBytes], [MaxArchiveBytes]), because
+// the per-fetch [FetchTimeout] bounds duration, not bytes.
 //
 // # Install
 //
-// [Install] checks local preconditions before touching the network, fetches
-// every file before writing any, stages the result in a temporary directory,
-// renames it onto the target, and loads the corpus that landed to prove the
-// atlas entry actually works. Whatever the target held is moved aside, not
-// deleted, until that load succeeds; a corpus that does not load undoes the
-// rename and puts the previous contents back. An install therefore either
-// lands whole or leaves the target exactly as it was.
+// [Install] refuses a non-empty target before it touches the network, fetches
+// one .tar.gz, extracts it into a temporary directory beside the target, loads
+// the staged corpus, and renames it into place. The rename is the atomicity:
+// until it runs the target does not exist, and it is one syscall. A corpus
+// that does not load is reported as a defect in the atlas entry, and nothing
+// is installed.
 //
-// # Replacing a target
+// An archive is untrusted too. What it may do is bounded on every axis:
+// [MaxArchiveBytes] on the wire and [MaxCorpusBytes] decompressed (a gzip bomb
+// is small on the wire and enormous on disk), [MaxCorpusFileBytes] per file,
+// [MaxArchiveEntries] members, regular files and directories only, and every
+// member path under .sightmap/ with no absolute path, no traversal, and no
+// control characters ([ValidateCorpusPath]), re-checked for containment after
+// it is joined onto the staging directory.
 //
-// [Options.Replace] is destructive: the target's previous contents do not
-// survive. So it is confined to directories that are visibly a corpus and
-// nothing else. Two rules, both fail-closed, both reported as
-// [ErrUnsafeReplace]:
-//
-//   - Location. The working directory, any directory containing it, the user's
-//     home directory, any directory containing that, and a filesystem root are
-//     refused whatever they hold. A mistyped target is the whole hazard here,
-//     and no inspection of the contents makes deleting one of those the
-//     caller's intent.
-//   - Contents. Every top-level entry of the target must be corpus content: a
-//     .yaml or .yml file, or one of the corpus's own subdirectories (views,
-//     snapshots, review). A .git directory, a .env, a go.mod, a src — anything
-//     else — means the target is a project directory that happens to hold
-//     YAML. macOS's .DS_Store is the single exception: it holds nothing of the
-//     user's, and refusing every corpus someone has opened in Finder would
-//     read as a bug.
-//
-// The contents rule is an allowlist rather than a list of alarming names on
-// purpose: a blocklist only refuses the destruction someone thought of in
-// advance, while the allowlist confines Replace to directories shaped like the
-// ones Install itself writes. It reads one level deep, which is what it takes
-// to establish that the target *is* a corpus directory; proving every byte
-// beneath it is corpus content would mean walking a snapshot set on every
-// install.
+// Reproducibility is not this package's job. A corpus is YAML the user checks
+// into their own repository; the commit it was installed from stops mattering
+// the moment they edit it.
 package atlas

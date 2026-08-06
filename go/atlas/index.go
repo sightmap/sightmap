@@ -3,24 +3,20 @@ package atlas
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 )
 
-// DefaultIndexURL is the published index of the community atlas. Every fetch
-// URL is derived from the index URL (see the layout rule in the package doc),
-// so overriding it is enough to redirect a whole install at a mirror or a test
-// server.
+// DefaultIndexURL is the published index of the community atlas. `find` and
+// `list` read it; an install does not, so an index outage or a schema bump
+// never blocks `sightmap atlas add`.
 const DefaultIndexURL = "https://raw.githubusercontent.com/sightmap/atlas/main/index.json"
+
+// AtlasURL is where a person browses the published corpora.
+const AtlasURL = "https://github.com/sightmap/atlas"
 
 // SchemaVersion is the index schema version this package understands. An index
 // declaring a higher version is refused before its entries are decoded.
 const SchemaVersion = 1
-
-// MaxEntryFiles caps how many files one entry may list. Corpora are a handful
-// of YAML files; anything larger is a malformed or hostile index, not a
-// corpus.
-const MaxEntryFiles = 256
 
 // Index is the subset of index.json that sightmap consumes. Unknown fields are
 // deliberately ignored so the atlas can grow metadata without breaking
@@ -30,12 +26,47 @@ type Index struct {
 	Entries       []Entry `json:"entries"`
 }
 
-// Entry is one published corpus.
+// Entry is one published corpus. Everything but the slug is display and search
+// metadata: an install needs only the slug.
 type Entry struct {
-	Slug   string   `json:"slug"`
-	Name   string   `json:"name,omitempty"`
-	Commit string   `json:"commit,omitempty"` // 40-char sha pinning the entry's content; empty = the index's own ref
-	Files  []string `json:"files"`            // corpus-relative paths, all under .sightmap/
+	Slug         string   `json:"slug"`
+	Name         string   `json:"name,omitempty"`
+	Description  string   `json:"description,omitempty"`
+	Domains      []string `json:"domains,omitempty"`
+	Categories   []string `json:"categories,omitempty"`
+	Stats        Stats    `json:"stats,omitempty"`
+	LastVerified string   `json:"last_verified,omitempty"`
+}
+
+// Stats is how much of a site an entry maps.
+type Stats struct {
+	Views      int `json:"views,omitempty"`
+	Components int `json:"components,omitempty"`
+}
+
+// Detail renders one terminal-safe line describing what an entry covers: its
+// domains, its categories, how much of the site it maps, and when someone last
+// checked it against the live site. It lives here rather than in the CLI
+// because the strings it composes are untrusted and the escaping belongs with
+// the type that owns them.
+func (e *Entry) Detail() string {
+	var parts []string
+	if d := safeList(e.Domains); d != "" {
+		parts = append(parts, d)
+	}
+	if c := safeList(e.Categories); c != "" {
+		parts = append(parts, c)
+	}
+	if e.Stats.Views > 0 || e.Stats.Components > 0 {
+		parts = append(parts, fmt.Sprintf("%d views, %d components", e.Stats.Views, e.Stats.Components))
+	}
+	if v := SafeText(e.LastVerified); v != "" {
+		parts = append(parts, "verified "+v)
+	}
+	if len(parts) == 0 {
+		return "(the atlas publishes no details for this entry)"
+	}
+	return strings.Join(parts, " · ")
 }
 
 // ParseIndex decodes an atlas index, gating on schema_version *before* the
@@ -58,56 +89,11 @@ func ParseIndex(data []byte) (*Index, error) {
 	return &idx, nil
 }
 
-// Entry returns the entry with the given slug, or nil when the atlas publishes
-// none. The first match wins; a well-formed index has no duplicate slugs (see
-// [Index.Validate]).
-func (ix *Index) Entry(slug string) *Entry {
-	for i := range ix.Entries {
-		if ix.Entries[i].Slug == slug {
-			return &ix.Entries[i]
-		}
-	}
-	return nil
-}
-
-// maxSuggestions caps the "did you mean" list on a slug miss.
-const maxSuggestions = 5
-
-// SuggestSlugs returns up to five published slugs resembling want, for the
-// "did you mean" line on a miss. Resemblance is substring containment in
-// either direction; ties — and everything else — break alphabetically, so the
-// list is deterministic. Slugs that would be refused at install time are never
-// suggested, which also keeps unvalidated index strings out of the message.
-func (ix *Index) SuggestSlugs(want string) []string {
-	w := strings.ToLower(want)
-	if w == "" {
-		return nil
-	}
-	seen := make(map[string]bool, len(ix.Entries))
-	var out []string
-	for _, e := range ix.Entries {
-		if ValidateSlug(e.Slug) != nil || seen[e.Slug] {
-			continue
-		}
-		s := strings.ToLower(e.Slug)
-		if !strings.Contains(s, w) && !strings.Contains(w, s) {
-			continue
-		}
-		seen[e.Slug] = true
-		out = append(out, e.Slug)
-	}
-	sort.Strings(out)
-	if len(out) > maxSuggestions {
-		out = out[:maxSuggestions]
-	}
-	return out
-}
-
 // Validate reports every problem in an index: a schema version this sightmap
 // cannot read, duplicate slugs, and anything [Entry.Validate] rejects. It is
 // the check the atlas publisher CI runs so a merged entry is one every shipped
-// CLI will install. [Install] does not call it — one broken entry must not
-// block installing a good one.
+// CLI can present. [Index.Search] does not call it wholesale — one broken entry
+// must not hide the rest — it drops the offending entry instead.
 func (ix *Index) Validate() []error {
 	var errs []error
 	if ix.SchemaVersion > SchemaVersion {
