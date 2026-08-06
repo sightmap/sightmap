@@ -1,5 +1,5 @@
 // atlas browses and installs corpora published in the community atlas
-// (github.com/sightmap/atlas): `find` searches the catalog by domain, name, or
+// (sightmap.org/atlas): `find` searches the catalog by domain, name, or
 // category, `list` browses it, and `add` installs one. The index schema, the
 // ranking, the cache, the fetch policy, and the install live in the atlas
 // package; these files are flags in, formatted output out.
@@ -55,10 +55,14 @@ Flags:
   --category C   keep only entries in a matching category
   --limit N      show at most N results (default 10; 0 shows all)
   --json         machine-readable results
-  --index URL    atlas index.json URL (for mirrors and tests)
+  --index URL    atlas index.json URL (for mirrors and private catalogs)
   --refresh      re-fetch the index instead of using the cached copy
   --target DIR   where add installs the corpus (default .sightmap)
   --source URL   archive URL template for add, with {slug} substituted
+
+Installing from a private corpus store:
+
+  sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
 `)
 }
 
@@ -76,7 +80,7 @@ func newSearchFlags(name string) *searchFlags {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	f := &searchFlags{
 		fs:       fs,
-		indexURL: fs.String("index", atlas.DefaultIndexURL, "Atlas index.json URL (for mirrors and tests)"),
+		indexURL: fs.String("index", atlas.DefaultIndexURL, "Atlas index.json URL (for mirrors and private catalogs)"),
 		category: fs.String("category", "", "Keep only entries in a matching category"),
 		limit:    fs.Int("limit", 10, "Show at most N results (0 shows all)"),
 		asJSON:   fs.Bool("json", false, "Print results as JSON"),
@@ -217,6 +221,7 @@ type atlasJSONHit struct {
 	Categories   []string `json:"categories,omitempty"`
 	Views        int      `json:"views"`
 	Components   int      `json:"components"`
+	Requests     int      `json:"requests"`
 	LastVerified string   `json:"last_verified,omitempty"`
 	MatchedOn    string   `json:"matched_on"`
 	Install      string   `json:"install"`
@@ -251,6 +256,7 @@ func writeAtlasJSON(out io.Writer, query, category string, total int, hits []atl
 			Categories:   safeStrings(e.Categories),
 			Views:        e.Stats.Views,
 			Components:   e.Stats.Components,
+			Requests:     e.Stats.Requests,
 			LastVerified: atlas.SafeText(e.LastVerified),
 			MatchedOn:    h.Rank.String(),
 			Install:      "sightmap atlas add " + atlas.SafeText(e.Slug),

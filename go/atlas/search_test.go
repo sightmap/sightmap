@@ -24,7 +24,7 @@ func searchIndex() *Index {
 				Description:  "Point-of-sale checkout and order history.",
 				Domains:      []string{"squareup.com", "app.squareup.com"},
 				Categories:   []string{"payments", "commerce"},
-				Stats:        Stats{Views: 12, Components: 48},
+				Stats:        Stats{Views: 12, Components: 48, Requests: 23},
 				LastVerified: "2026-07-14",
 			},
 			{
@@ -90,18 +90,45 @@ func TestSearch_ranksIdentityFieldsAheadOfProse(t *testing.T) {
 	}
 }
 
-// The substring-either-direction rule the old "did you mean" list used now
-// covers every short field: a longer query still finds a shorter slug.
-func TestSearch_substringMatchesInEitherDirection(t *testing.T) {
+// A slug matches in either direction: `pos` finds `square-pos`, and so does a
+// longer product string the caller pasted around it. This is the case the
+// reverse direction exists for and the one the narrowing must not break.
+func TestSearch_slugMatchesInEitherDirection(t *testing.T) {
 	for query, want := range map[string]string{
-		"pos":                "square-pos",
-		"square-pos-android": "square-pos",
-		"acme":               "acme-shop",
+		"pos":                 "square-pos",
+		"square-pos-terminal": "square-pos",
+		"square-pos-android":  "square-pos",
+		"acme":                "acme-shop",
 	} {
 		hits := searchIndex().Search(Query{Text: query})
 		if len(hits) == 0 || hits[0].Entry.Slug != want {
 			t.Errorf("Search(%q) = %v, want %s first", query, slugs(hits), want)
 		}
+	}
+}
+
+// The reverse direction stops at slugs and domains. Read into a category it
+// inverts the question: `pos` is a substring of `position tracking`, so every
+// point-of-sale corpus in the atlas would answer a query about tracking.
+func TestSearch_shortCategoryDoesNotMatchALongerQueryThatSpellsIt(t *testing.T) {
+	ix := &Index{SchemaVersion: 1, Entries: []Entry{
+		{Slug: "toast-terminal", Name: "Toast Terminal", Categories: []string{"pos"}},
+		{Slug: "lightspeed-retail", Name: "POS", Categories: []string{"retail"}},
+	}}
+	if hits := ix.Search(Query{Text: "position tracking"}); len(hits) != 0 {
+		t.Errorf("Search(position tracking) = %v, want no hits", slugs(hits))
+	}
+	if hits := ix.Search(Query{Category: "position tracking"}); len(hits) != 0 {
+		t.Errorf("Search(--category position tracking) = %v, want no hits", slugs(hits))
+	}
+	// Forward containment is untouched: `pos` still finds both, by name ahead
+	// of by category.
+	hits := ix.Search(Query{Text: "pos"})
+	if got := slugs(hits); len(got) != 2 || got[0] != "lightspeed-retail" || got[1] != "toast-terminal" {
+		t.Fatalf("Search(pos) = %v, want [lightspeed-retail toast-terminal]", got)
+	}
+	if hits[0].Rank != RankName || hits[1].Rank != RankCategory {
+		t.Errorf("ranks = %v/%v, want name then category", hits[0].Rank, hits[1].Rank)
 	}
 }
 
@@ -191,6 +218,33 @@ func TestSafeText_truncates(t *testing.T) {
 	got := SafeText(strings.Repeat("a", maxSafeTextRunes*3))
 	if len([]rune(got)) != maxSafeTextRunes+1 || !strings.HasSuffix(got, "…") {
 		t.Fatalf("SafeText(long) = %d runes, want %d plus an ellipsis", len([]rune(got)), maxSafeTextRunes)
+	}
+}
+
+// The gallery card and `find` read the same index.json, so they have to
+// summarize an entry the same way. Requests was the count `find` dropped.
+func TestEntryDetail_countsRequests(t *testing.T) {
+	e := Entry{Slug: "square-pos", Stats: Stats{Views: 12, Components: 48, Requests: 23}}
+	if got := e.Detail(); !strings.Contains(got, "12 views, 48 components, 23 requests") {
+		t.Fatalf("Detail() = %q, want all three counts", got)
+	}
+}
+
+// An index published before requests existed does not claim the corpus maps
+// none of them: the count is left off rather than printed as zero.
+func TestEntryDetail_omitsRequestsWhenTheIndexPredatesTheField(t *testing.T) {
+	idx, err := ParseIndex([]byte(`{"schema_version": 1, "entries": [
+	  {"slug": "square-pos", "stats": {"views": 12, "components": 48}}
+	]}`))
+	if err != nil {
+		t.Fatalf("ParseIndex: %v", err)
+	}
+	got := idx.Entries[0].Detail()
+	if !strings.Contains(got, "12 views, 48 components") {
+		t.Fatalf("Detail() = %q, want the counts it does publish", got)
+	}
+	if strings.Contains(got, "requests") {
+		t.Errorf("Detail() = %q, want no requests count from an index that has none", got)
 	}
 }
 

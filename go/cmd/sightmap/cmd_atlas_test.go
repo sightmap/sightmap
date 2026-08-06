@@ -29,7 +29,7 @@ const atlasIndexJSON = `{
       "description": "Point-of-sale checkout and order history.",
       "domains": ["squareup.com", "app.squareup.com"],
       "categories": ["payments", "commerce"],
-      "stats": {"views": 12, "components": 48},
+      "stats": {"views": 12, "components": 48, "requests": 23},
       "last_verified": "2026-07-14"
     },
     {
@@ -127,7 +127,7 @@ func TestAtlasFind_printsAnInstallCommandWithEachHit(t *testing.T) {
 		"Point-of-sale checkout and order history.",
 		"squareup.com, app.squareup.com",
 		"payments, commerce",
-		"12 views, 48 components",
+		"12 views, 48 components, 23 requests",
 		"verified 2026-07-14",
 		"sightmap atlas add square-pos",
 	)
@@ -186,11 +186,13 @@ func TestAtlasFind_jsonCarriesTheInstallCommand(t *testing.T) {
 		Query   string `json:"query"`
 		Total   int    `json:"total"`
 		Results []struct {
-			Slug      string   `json:"slug"`
-			Domains   []string `json:"domains"`
-			Views     int      `json:"views"`
-			MatchedOn string   `json:"matched_on"`
-			Install   string   `json:"install"`
+			Slug       string   `json:"slug"`
+			Domains    []string `json:"domains"`
+			Views      int      `json:"views"`
+			Components int      `json:"components"`
+			Requests   int      `json:"requests"`
+			MatchedOn  string   `json:"matched_on"`
+			Install    string   `json:"install"`
 		} `json:"results"`
 	}
 	if err := json.Unmarshal([]byte(out), &doc); err != nil {
@@ -200,8 +202,12 @@ func TestAtlasFind_jsonCarriesTheInstallCommand(t *testing.T) {
 		t.Fatalf("doc = %+v", doc)
 	}
 	r := doc.Results[0]
-	if r.Slug != "square-pos" || r.Install != "sightmap atlas add square-pos" || r.MatchedOn != "exact domain" || r.Views != 12 {
+	if r.Slug != "square-pos" || r.Install != "sightmap atlas add square-pos" || r.MatchedOn != "exact domain" {
 		t.Errorf("result = %+v", r)
+	}
+	// The same three counts the text output and the gallery card show.
+	if r.Views != 12 || r.Components != 48 || r.Requests != 23 {
+		t.Errorf("stats = %d views, %d components, %d requests; want 12/48/23", r.Views, r.Components, r.Requests)
 	}
 }
 

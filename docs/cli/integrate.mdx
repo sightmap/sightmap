@@ -14,7 +14,7 @@ description: "Find and install corpora from the community atlas, serve the compi
 
 ### `sightmap atlas`
 
-Three verbs over the community atlas ([github.com/sightmap/atlas](https://github.com/sightmap/atlas)), the catalog of corpora other people have published:
+Three verbs over the community atlas ([sightmap.org/atlas](https://sightmap.org/atlas)), the catalog of corpora other people have published:
 
 | Command | What it does |
 | --- | --- |
@@ -23,6 +23,8 @@ Three verbs over the community atlas ([github.com/sightmap/atlas](https://github
 | `sightmap atlas add SLUG` | Install one corpus into `.sightmap/` |
 
 They are grouped under `atlas` because a bare `sightmap add` would be ambiguous in a tool for authoring corpora, where adding a view or a component is the other thing it could mean.
+
+The index and the archives both come from `sightmap.org/atlas`, not from the atlas git repo. A takedown rebuilds the gallery, so an entry the atlas removes stops being findable and stops being installable in the same publish. `--index` and `--source` override the defaults, which is how mirrors and private corpora work.
 
 #### `sightmap atlas find`
 
@@ -35,7 +37,7 @@ sightmap atlas find squareup.com
 ```text
 square-pos  Square POS
   Point-of-sale checkout, catalog, and order history.
-  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components · verified 2026-07-14
+  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components, 23 requests · verified 2026-07-14
   sightmap atlas add square-pos
 
 1 match.
@@ -45,17 +47,17 @@ A query that matches nothing exits **0**. Asking whether the atlas has a site is
 
 ```text
 No atlas entry matches "stripe.com".
-Try the product name or a category, browse https://github.com/sightmap/atlas, or map the site yourself with sightmap init.
+Try the product name or a category, browse https://sightmap.org/atlas, or map the site yourself with sightmap init.
 ```
 
-Matching is case-insensitive substring containment in either direction, so `pos` finds `square-pos` and `square-pos-android` finds it too. Results are ordered by how they matched (exact domain, exact slug, domain, slug, name, category, description), with ties broken alphabetically.
+Matching is case-insensitive substring containment: a field that contains your query matches, so `pos` finds `square-pos`. Slugs and domains match the other way round too, so `square-pos-terminal` finds `square-pos` — those are the strings you paste a longer real-world form of. Names, categories, and descriptions match forwards only, because a three-letter category read in reverse makes `position tracking` a hit for every point-of-sale corpus in the atlas. Results are ordered by how they matched (exact domain, exact slug, domain, slug, name, category, description), with ties broken alphabetically.
 
 **Flags:**
 
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--category` | none | Keep only entries in a matching category |
-| `--index` | `https://raw.githubusercontent.com/sightmap/atlas/main/index.json` | Atlas `index.json` URL (for mirrors and tests) |
+| `--index` | `https://sightmap.org/atlas/index.json` | Atlas `index.json` URL (for mirrors and private catalogs) |
 | `--json` | off | Print results as JSON |
 | `--limit` | `10` | Show at most N results (`0` shows all) |
 | `--refresh` | off | Re-fetch the index instead of using the cached copy |
@@ -86,13 +88,14 @@ sightmap atlas find squareup.com --json
       ],
       "views": 12,
       "components": 48,
+      "requests": 23,
       "last_verified": "2026-07-14",
       "matched_on": "exact domain",
       "install": "sightmap atlas add square-pos"
     }
   ],
   "index": {
-    "source": "https://raw.githubusercontent.com/sightmap/atlas/main/index.json",
+    "source": "https://sightmap.org/atlas/index.json",
     "fetched_at": "2026-08-06T15:07:41Z",
     "cached": true
   }
@@ -117,12 +120,12 @@ sightmap atlas list --category commerce
 ```text
 acme-shop  Acme Shop
   Storefront, cart, and checkout for the Acme demo store.
-  shop.acme.test · commerce · 3 views, 11 components · verified 2026-05-20
+  shop.acme.test · commerce · 3 views, 11 components, 6 requests · verified 2026-05-20
   sightmap atlas add acme-shop
 
 square-pos  Square POS
   Point-of-sale checkout, catalog, and order history.
-  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components · verified 2026-07-14
+  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components, 23 requests · verified 2026-07-14
   sightmap atlas add square-pos
 
 2 matches.
@@ -136,7 +139,7 @@ Installs one published corpus into `--target` (default `.sightmap`). The archive
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--source` | `https://raw.githubusercontent.com/sightmap/atlas/main/entries/{slug}.tar.gz` | Archive URL template, with `{slug}` substituted (for mirrors and tests) |
+| `--source` | `https://sightmap.org/atlas/{slug}.tar.gz` | Archive URL template, with `{slug}` substituted (for mirrors and private corpora) |
 | `--target` | `.sightmap` | Directory to install the corpus into |
 
 ```bash
@@ -154,10 +157,18 @@ Installed square-pos: 3 files → .sightmap. Next:
 
 `add` fetches one archive from the URL template above and never reads the index. An index outage or a schema change cannot stop an install, and the atlas can add index fields without waiting for a CLI release.
 
+**Installing from a private corpus store.** `--source` is a whole URL template, so a team that publishes its own corpora serves them wherever it likes and points `add` at them:
+
+```bash
+sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
+```
+
+Everything below still applies to that host: HTTPS only, the caps, the path rules, and the load check before the rename. `--index` does the same for a private catalog, so `find` and `add` can both run against an internal atlas.
+
 A slug the atlas does not publish is a failed action, so it exits 1 and points at the two ways to find the right one:
 
 ```text
-sightmap atlas: no corpus published for this slug: "no-such-thing" — browse https://github.com/sightmap/atlas, or search for the site: sightmap atlas find <domain>
+sightmap atlas: no corpus published for this slug: "no-such-thing" — browse https://sightmap.org/atlas, or search for the site: sightmap atlas find <domain>
 ```
 
 **A non-empty target is refused,** and there is no `--force`. Deleting a directory that holds your work is your call. The refusal is decided before anything is fetched, so it reads the same offline:

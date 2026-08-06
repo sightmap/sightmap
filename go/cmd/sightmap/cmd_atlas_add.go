@@ -20,13 +20,15 @@ func runAtlasAdd(args []string) error {
 func runAtlasAddOut(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("atlas add", flag.ContinueOnError)
 	target := fs.String("target", ".sightmap", "Directory to install the corpus into")
-	source := fs.String("source", atlas.DefaultArchiveURL, "Archive URL template, with {slug} substituted (for mirrors and tests)")
+	source := fs.String("source", atlas.DefaultArchiveURL, "Archive URL template, with {slug} substituted (for mirrors and private corpora)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: sightmap atlas add SLUG [--target DIR] [--source URL]\n\n")
 		fmt.Fprintf(os.Stderr, "Installs a corpus published in the community atlas\n")
-		fmt.Fprintf(os.Stderr, "(github.com/sightmap/atlas) into TARGET (default ./.sightmap).\n\n")
+		fmt.Fprintf(os.Stderr, "(%s) into TARGET (default ./.sightmap).\n\n", atlas.AtlasURL)
 		fmt.Fprintf(os.Stderr, "Have a URL rather than a slug? Run: sightmap atlas find <domain>\n\n")
+		fmt.Fprintf(os.Stderr, "Install from a private corpus store instead:\n")
+		fmt.Fprintf(os.Stderr, "  sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		fs.PrintDefaults()
 	}

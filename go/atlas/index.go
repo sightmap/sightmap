@@ -9,10 +9,23 @@ import (
 // DefaultIndexURL is the published index of the community atlas. `find` and
 // `list` read it; an install does not, so an index outage or a schema bump
 // never blocks `sightmap atlas add`.
-const DefaultIndexURL = "https://raw.githubusercontent.com/sightmap/atlas/main/index.json"
+//
+// It is served from sightmap.org rather than read out of the atlas git repo,
+// for two reasons. Moderation is one: removed.yaml and the atlas POLICY.md
+// promise that a removed entry stops being reachable, and only the gallery
+// rebuild honors that. A CLI reading the repo directly would keep finding
+// entries the atlas has taken down. The other is that the gallery already
+// serves this document, so a second copy read from somewhere else is a second
+// answer to the same question.
+//
+// `--index` still overrides it, which is how a mirror or a private catalog
+// works.
+const DefaultIndexURL = "https://sightmap.org/atlas/index.json"
 
-// AtlasURL is where a person browses the published corpora.
-const AtlasURL = "https://github.com/sightmap/atlas"
+// AtlasURL is where a person browses the published corpora. `find` prints it
+// when nothing matches and `add` prints it on a 404, so it points at the
+// gallery a person can read rather than at a repository file tree.
+const AtlasURL = "https://sightmap.org/atlas"
 
 // SchemaVersion is the index schema version this package understands. An index
 // declaring a higher version is refused before its entries are decoded.
@@ -38,10 +51,28 @@ type Entry struct {
 	LastVerified string   `json:"last_verified,omitempty"`
 }
 
-// Stats is how much of a site an entry maps.
+// Stats is how much of a site an entry maps. The three counts are the ones
+// the index schema publishes and the ones the gallery card shows, so `find`
+// and the gallery summarize an entry the same way from the same document.
 type Stats struct {
 	Views      int `json:"views,omitempty"`
 	Components int `json:"components,omitempty"`
+	Requests   int `json:"requests,omitempty"`
+}
+
+// summary renders the counts for one display line, or "" when the entry
+// publishes none. Requests is dropped when it is zero: an index written before
+// the field existed says nothing about requests, and "0 requests" would report
+// that as a corpus that maps none.
+func (s Stats) summary() string {
+	if s.Views == 0 && s.Components == 0 && s.Requests == 0 {
+		return ""
+	}
+	out := fmt.Sprintf("%d views, %d components", s.Views, s.Components)
+	if s.Requests > 0 {
+		out += fmt.Sprintf(", %d requests", s.Requests)
+	}
+	return out
 }
 
 // Detail renders one terminal-safe line describing what an entry covers: its
@@ -57,8 +88,8 @@ func (e *Entry) Detail() string {
 	if c := safeList(e.Categories); c != "" {
 		parts = append(parts, c)
 	}
-	if e.Stats.Views > 0 || e.Stats.Components > 0 {
-		parts = append(parts, fmt.Sprintf("%d views, %d components", e.Stats.Views, e.Stats.Components))
+	if s := e.Stats.summary(); s != "" {
+		parts = append(parts, s)
 	}
 	if v := SafeText(e.LastVerified); v != "" {
 		parts = append(parts, "verified "+v)

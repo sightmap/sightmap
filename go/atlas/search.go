@@ -69,10 +69,15 @@ type Hit struct {
 // which is what [Entry.Validate] is for, not a reason the caller cannot find
 // the site they are looking at.
 //
-// Matching is substring containment in either direction, case-insensitive, so
-// `pos` finds `square-pos` and `square-pos-terminal` finds `square-pos`.
-// Domains are additionally compared exactly after normalization, so a pasted
-// URL, a bare hostname, and a `www.` hostname all resolve to the same entry.
+// Matching is case-insensitive substring containment. The field containing the
+// query always matches, so `pos` finds `square-pos`. Slugs and domains match in
+// the reverse direction too, so `square-pos-terminal` finds `square-pos`: those
+// are the fields a caller pastes a longer real-world string around. Names,
+// categories, and descriptions match forwards only — a category is three
+// letters wide, and reading `position tracking` as a hit for `pos` returns
+// every point-of-sale corpus in the atlas. Domains are additionally compared
+// exactly after normalization, so a pasted URL, a bare hostname, and a `www.`
+// hostname all resolve to the same entry.
 func (ix *Index) Search(q Query) []Hit {
 	text := strings.ToLower(strings.TrimSpace(q.Text))
 	domain := normalizeDomain(text)
@@ -83,7 +88,7 @@ func (ix *Index) Search(q Query) []Hit {
 		if ValidateSlug(e.Slug) != nil {
 			continue
 		}
-		if category != "" && !matchesAny(e.Categories, category) {
+		if category != "" && !containsAny(e.Categories, category) {
 			continue
 		}
 		rank := rankEntry(&e, text, domain)
@@ -122,10 +127,10 @@ func rankEntry(e *Entry, text, domain string) Rank {
 	if matchesText(e.Slug, text) {
 		return RankSlug
 	}
-	if matchesText(e.Name, text) {
+	if containsText(e.Name, text) {
 		return RankName
 	}
-	if matchesAny(e.Categories, text) {
+	if containsAny(e.Categories, text) {
 		return RankCategory
 	}
 	if strings.Contains(strings.ToLower(e.Description), text) {
@@ -134,9 +139,15 @@ func rankEntry(e *Entry, text, domain string) Rank {
 	return rankNone
 }
 
-// matchesText is containment in either direction, case-insensitive. It is the
-// rule the old "did you mean" suggestion list used, generalized from slugs to
-// every short field.
+// matchesText is containment in either direction, case-insensitive. The
+// reverse direction is the rule the old "did you mean" suggestion list used,
+// and it belongs to identifiers the caller pastes a longer form of: slugs and
+// hostnames. `square-pos-terminal` finding `square-pos` is what it buys.
+//
+// Only [rankEntry]'s slug and domain checks use it. Applied to a short field
+// the reverse direction inverts the question — it asks whether the field is a
+// substring of the query, and a three-letter category is a substring of a lot
+// of queries.
 func matchesText(field, want string) bool {
 	if field == "" || want == "" {
 		return false
@@ -145,9 +156,29 @@ func matchesText(field, want string) bool {
 	return strings.Contains(f, want) || strings.Contains(want, f)
 }
 
+// containsText is plain containment: the field contains the query. Names,
+// categories, and the `--category` filter use it. A caller typing `position
+// tracking` is not asking for every corpus filed under `pos`, and a display
+// name is prose the caller quotes from rather than an identifier they extend.
+func containsText(field, want string) bool {
+	if field == "" || want == "" {
+		return false
+	}
+	return strings.Contains(strings.ToLower(field), want)
+}
+
 func matchesAny(fields []string, want string) bool {
 	for _, f := range fields {
 		if matchesText(f, want) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAny(fields []string, want string) bool {
+	for _, f := range fields {
+		if containsText(f, want) {
 			return true
 		}
 	}

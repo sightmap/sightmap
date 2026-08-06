@@ -1,9 +1,43 @@
 package atlas
 
 import (
+	"net/url"
 	"strings"
 	"testing"
 )
+
+// removed.yaml and the atlas POLICY.md promise that a removed entry stops
+// being reachable, and only the sightmap.org build honors that. An index or an
+// archive read from anywhere else leaves a taken-down entry findable, or
+// installable, or both.
+func TestDefaults_indexAndArchiveComeFromTheGallery(t *testing.T) {
+	archive, err := ResolveArchiveURL("", "square-pos")
+	if err != nil {
+		t.Fatalf("ResolveArchiveURL: %v", err)
+	}
+	for name, raw := range map[string]string{
+		"DefaultIndexURL":   DefaultIndexURL,
+		"AtlasURL":          AtlasURL,
+		"DefaultArchiveURL": archive,
+	} {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatalf("%s = %q: %v", name, raw, err)
+		}
+		if u.Scheme != "https" || u.Host != "sightmap.org" {
+			t.Errorf("%s = %q, want https://sightmap.org", name, raw)
+		}
+	}
+	// --index and --source still override, which is how a mirror or a private
+	// corpus store works.
+	private, err := ResolveArchiveURL("https://internal.corp/{slug}.tar.gz", "toast-pos")
+	if err != nil {
+		t.Fatalf("ResolveArchiveURL(private): %v", err)
+	}
+	if private != "https://internal.corp/toast-pos.tar.gz" {
+		t.Errorf("private source = %q", private)
+	}
+}
 
 // The version gate has to run before the document's shape is assumed. `find`
 // and `list` are the only readers of the index now, so this is where a future
@@ -31,7 +65,7 @@ func TestParseIndex_acceptsTheCurrentSchemaAndIgnoresUnknownFields(t *testing.T)
 	    "name": "Square POS",
 	    "domains": ["squareup.com"],
 	    "categories": ["payments"],
-	    "stats": {"views": 12, "components": 48},
+	    "stats": {"views": 12, "components": 48, "requests": 23},
 	    "last_verified": "2026-07-14",
 	    "stars": 41
 	  }]
@@ -44,7 +78,7 @@ func TestParseIndex_acceptsTheCurrentSchemaAndIgnoresUnknownFields(t *testing.T)
 		t.Fatalf("entries = %d, want 1", len(idx.Entries))
 	}
 	e := idx.Entries[0]
-	if e.Slug != "square-pos" || e.Stats.Views != 12 || e.Stats.Components != 48 || e.LastVerified != "2026-07-14" {
+	if e.Slug != "square-pos" || e.Stats.Views != 12 || e.Stats.Components != 48 || e.Stats.Requests != 23 || e.LastVerified != "2026-07-14" {
 		t.Errorf("entry = %+v", e)
 	}
 	if len(e.Domains) != 1 || e.Domains[0] != "squareup.com" {

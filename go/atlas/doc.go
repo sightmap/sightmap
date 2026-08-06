@@ -1,7 +1,14 @@
 // Package atlas is the client half of the community atlas: the published
-// catalog at github.com/sightmap/atlas that an agent searches to find out
-// whether the site it is about to automate has already been mapped, and
-// installs from when it has.
+// catalog at sightmap.org/atlas that an agent searches to find out whether the
+// site it is about to automate has already been mapped, and installs from when
+// it has.
+//
+// Both the index and the archives come from sightmap.org, not from the atlas
+// git repo. The gallery rebuild is what enforces removed.yaml, so a CLI that
+// read the repo directly would keep serving entries the atlas has taken down,
+// and would install an archive nothing in the repo produces. [IndexOptions.URL]
+// (`--index`) and [Options.ArchiveURL] (`--source`) override both, which is how
+// a mirror or a private corpus store works.
 //
 // The package owns the index schema, the search ranking, the index cache, the
 // fetch policy, and the [Install] operation. The CLI's `sightmap atlas`
@@ -35,7 +42,7 @@
 //	      "description":   "Point-of-sale checkout, catalog, and order history.",
 //	      "domains":       ["squareup.com", "app.squareup.com"],
 //	      "categories":    ["payments", "commerce"],
-//	      "stats":         {"views": 12, "components": 48},
+//	      "stats":         {"views": 12, "components": 48, "requests": 23},
 //	      "last_verified": "2026-07-14"
 //	    }
 //	  ]
@@ -59,9 +66,13 @@
 // [Index.Search] matches the query against slug, name, domains, categories,
 // and description, ranked so an exact domain hit comes first — the caller
 // usually has a URL, not a slug. Matching is case-insensitive substring
-// containment in either direction; domains are normalized first, so a pasted
-// URL, a bare hostname, and a www. hostname resolve to the same entry. An
-// empty query matches everything, which is what `sightmap atlas list` runs.
+// containment. Slugs and domains also match when the query *contains* the
+// field, so `square-pos-terminal` finds `square-pos`; names, categories, and
+// descriptions do not, because a short category read that way turns `position
+// tracking` into a hit for every entry filed under `pos`. Domains are
+// normalized first, so a pasted URL, a bare hostname, and a www. hostname
+// resolve to the same entry. An empty query matches everything, which is what
+// `sightmap atlas list` runs.
 //
 // Every string in the index is untrusted input. Results carry an install
 // command, so an entry whose slug [ValidateSlug] rejects never appears in one;

@@ -23,7 +23,19 @@ import (
 // fetches exactly one URL, so it never reads the index: a search-index outage
 // or a schema bump cannot stop an install, and the index can grow fields
 // without a CLI release.
-const DefaultArchiveURL = "https://raw.githubusercontent.com/sightmap/atlas/main/entries/{slug}.tar.gz"
+//
+// The archive comes from sightmap.org, the same host as [DefaultIndexURL].
+// Moderation is why: a takedown that removes an entry from the index but
+// leaves its archive installable binds half the surface. The site build
+// produces the .tar.gz from the entry directory, so there is no archive to
+// fetch anywhere else — the atlas repo publishes entries/<slug>/ as a
+// directory of sources (README.md, .sightmap/, screenshots/), not a tarball.
+//
+// `--source` still overrides it, which is how a mirror or a private corpus
+// works:
+//
+//	sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
+const DefaultArchiveURL = "https://sightmap.org/atlas/{slug}.tar.gz"
 
 // Extraction limits. The download cap ([MaxArchiveBytes]) bounds the wire; a
 // gzip bomb is a few hundred kilobytes on the wire and gigabytes on disk, so

@@ -7,7 +7,7 @@ See also: [The outer loop](outer-loop.md) · [Lint rules](lint-rules.md)
 
 ## `sightmap atlas find QUERY` / `list` / `add SLUG`
 
-**Solves:** Finding out whether the site you are about to map has already been mapped, and starting from that corpus instead of authoring one from scratch. `find` searches the community atlas (`github.com/sightmap/atlas`), `list` browses it, `add` installs one entry into `--target` (default `.sightmap/`).
+**Solves:** Finding out whether the site you are about to map has already been mapped, and starting from that corpus instead of authoring one from scratch. `find` searches the community atlas (`sightmap.org/atlas`), `list` browses it, `add` installs one entry into `--target` (default `.sightmap/`).
 
 **Start with the domain.** An agent about to automate a site has a URL, not a slug. An exact domain match ranks first, and every hit prints the command that installs it:
 
@@ -15,11 +15,13 @@ See also: [The outer loop](outer-loop.md) · [Lint rules](lint-rules.md)
 sightmap atlas find squareup.com
 square-pos  Square POS
   Point-of-sale checkout, catalog, and order history.
-  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components · verified 2026-07-14
+  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components, 23 requests · verified 2026-07-14
   sightmap atlas add square-pos
 
 1 match.
 ```
+
+The counts are the ones the gallery card shows, read from the same `index.json`.
 
 Then install what it printed:
 
@@ -43,7 +45,17 @@ Installed square-pos: 3 files → .sightmap. Next:
 | `--refresh` | find, list | Re-fetch the index instead of the cached copy |
 | `--index` | find, list | Atlas `index.json` URL, for mirrors and tests |
 | `--target` | add | Directory to install into (default `.sightmap`) |
-| `--source` | add | Archive URL template with `{slug}` substituted, for mirrors and tests |
+| `--source` | add | Archive URL template with `{slug}` substituted, for mirrors and private corpora |
+
+**Both defaults point at `sightmap.org/atlas`,** the index and the archives. A takedown rebuilds the gallery, so an entry the atlas removes stops being findable *and* stops being installable. Reading either one out of the git repo would leave half of that unenforced.
+
+**Install from your own corpus store** by pointing `--source` at it. The template takes `{slug}` the same way:
+
+```bash
+sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
+```
+
+`--index` does the same for a private or mirrored catalog. Both stay under the HTTPS-only transport policy.
 
 **A search that finds nothing exits 0.** It answers the question it was asked. An `add` with an unpublished slug exits 1 and points at `find` and the atlas.
 
