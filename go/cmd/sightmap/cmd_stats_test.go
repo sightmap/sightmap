@@ -28,6 +28,147 @@ func writeStatsCorpus(t *testing.T, files map[string]string) string {
 	return dir
 }
 
+// sharedGlobalCorpus is a multi-file corpus whose global Navigation component is
+// $ref-reused by both views, so the loader emits three copies of it. It drives
+// the two end-to-end tests below: the rendered table and the deduped --json
+// numbers, both through the real loader rather than a hand-built Corpus.
+var sharedGlobalCorpus = map[string]string{
+	"components.yaml": `version: 1
+components:
+  - name: Navigation
+    selector: 'nav[data-component="Navigation"]'
+    memory:
+      - sticky on scroll
+  - name: Footer
+    selector: 'footer[data-component="Footer"]'
+requests:
+  - name: GetCurrentUser
+    route: /api/me
+    method: GET
+`,
+	"views/checkout.yaml": `version: 1
+views:
+  - name: Checkout
+    route: /checkout
+    components:
+      - $ref: Navigation
+      - name: CartSummary
+        selector: '[data-component="CartSummary"]'
+      - name: PaymentForm
+        selector: '[data-component="PaymentForm"]'
+        memory:
+          - Submit is disabled until required fields validate
+        children:
+          - name: submit
+            selector: 'button[type="submit"]'
+    requests:
+      - name: PlaceOrder
+        route: /api/orders
+        method: POST
+`,
+	"views/dashboard.yaml": `version: 1
+views:
+  - name: Dashboard
+    route: /dashboard
+    components:
+      - $ref: Navigation
+      - name: ActivityFeed
+        selector: '[data-component="ActivityFeed"]'
+        properties:
+          - name: count
+            extract: text
+`,
+}
+
+// TestStats_TableRendersPerViewRows drives the table end to end over a real
+// on-disk corpus: the totals dedupe the $ref-reused global (6 distinct names,
+// not 8), each per-view row still counts its own expanded copy, and the summary
+// line prints both numbers so the reader can see where they diverge.
+func TestStats_TableRendersPerViewRows(t *testing.T) {
+	dir := writeStatsCorpus(t, sharedGlobalCorpus)
+
+	var out bytes.Buffer
+	if err := runStatsOut([]string{"--sightmap-dir", dir}, &out); err != nil {
+		t.Fatalf("runStatsOut: %v", err)
+	}
+	got := out.String()
+
+	for _, want := range []string{
+		"Views       2",
+		// Navigation, Footer, CartSummary, PaymentForm, submit, ActivityFeed —
+		// Navigation once despite three expanded copies.
+		"Components  6",
+		"Requests    2", // 1 global + 1 view-scoped
+		"Properties  1",
+		"Memory      2", // Navigation's entry once + PaymentForm's
+		"Checkout   /checkout            4         1",
+		"Dashboard  /dashboard           2         0",
+		"2 views  ·  6 distinct components (per-view rows sum to 6)",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "Components  8") {
+		t.Errorf("totals counted every expanded copy instead of distinct names:\n%s", got)
+	}
+}
+
+// TestStatsJSON_DedupedTotals is the --json half of the same corpus: the
+// machine-readable numbers must agree with the table, and the payload must be
+// nothing but JSON — no banner for a consumer to strip.
+func TestStatsJSON_DedupedTotals(t *testing.T) {
+	dir := writeStatsCorpus(t, sharedGlobalCorpus)
+
+	var out bytes.Buffer
+	if err := runStatsOut([]string{"--sightmap-dir", dir, "--json"}, &out); err != nil {
+		t.Fatalf("runStatsOut: %v", err)
+	}
+	if !strings.HasPrefix(out.String(), "{") {
+		t.Errorf("--json output must start with the object, got:\n%s", out.String())
+	}
+	if strings.Contains(out.String(), "sightmap stats ·") {
+		t.Errorf("--json output carries the human banner:\n%s", out.String())
+	}
+
+	var got struct {
+		Views      int `json:"views"`
+		Components int `json:"components"`
+		Requests   int `json:"requests"`
+		Properties int `json:"properties"`
+		Memory     int `json:"memory"`
+		PerView    []struct {
+			Name       string `json:"name"`
+			Route      string `json:"route"`
+			Components int    `json:"components"`
+			Requests   int    `json:"requests"`
+		} `json:"per_view"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal %q: %v", out.String(), err)
+	}
+	if got.Views != 2 || got.Components != 6 || got.Requests != 2 || got.Properties != 1 || got.Memory != 2 {
+		t.Errorf("totals = views:%d components:%d requests:%d properties:%d memory:%d, want 2/6/2/1/2",
+			got.Views, got.Components, got.Requests, got.Properties, got.Memory)
+	}
+	want := []struct {
+		name, route string
+		comps, reqs int
+	}{
+		{"Checkout", "/checkout", 4, 1},
+		{"Dashboard", "/dashboard", 2, 0},
+	}
+	if len(got.PerView) != len(want) {
+		t.Fatalf("per_view = %+v, want %d rows", got.PerView, len(want))
+	}
+	for i, w := range want {
+		r := got.PerView[i]
+		if r.Name != w.name || r.Route != w.route || r.Components != w.comps || r.Requests != w.reqs {
+			t.Errorf("per_view[%d] = %+v, want %s %s %d/%d", i, r, w.name, w.route, w.comps, w.reqs)
+		}
+	}
+}
+
 // TestStatsJSON_PublishedFieldSet pins the --json contract consumed by CI in
 // other repos (the atlas index generator): the exact top-level field set and
 // the exact per-row field set, nothing added, nothing renamed, and per_view
