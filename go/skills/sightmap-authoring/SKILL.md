@@ -63,6 +63,7 @@ Use `npm` in instructions — it's the universal baseline. `pnpm`/`yarn` work to
 
 | Command | What it does |
 |---------|-------------|
+| `sightmap stats` | Offline corpus inventory: totals (views, components, requests, properties, memory) + a per-view table. `--json` for the stable machine-readable shape. Refuses a corpus `validate` rejects, since dropped definitions would under-report. |
 | `sightmap search PATTERN` | Offline YAML regex search with hierarchy breadcrumbs. `--field name\|selector\|description\|memory` to narrow. |
 | `sightmap discover` | Crawl page links → ✓ mapped / ○ surveyed / ? unseen. `--all` shows surveyed. |
 | `sightmap suggest --exclude-known` | Candidate selectors not yet in sightmap (`--exclude-known` always on). |

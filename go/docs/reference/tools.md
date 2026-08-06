@@ -364,6 +364,52 @@ No browser needed — runs statically against `.sightmap/` YAML. See [Lint rules
 
 ---
 
+## `sightmap stats`
+
+**Solves:** "What's actually in this corpus?" — corpus-wide totals plus a per-view component/request table, counted against the **loaded** model (`$ref`s expanded, hierarchies flattened).
+
+```
+sightmap stats
+
+sightmap stats · example.com · 2026-08-05
+──────────────────────────────────
+ Views       3
+ Components  8
+ Requests    3
+ Properties  3
+ Memory      2
+──────────────────────────────────
+ View  Route  Components  Requests
+──────────────────────────────────
+ home  /               4         0
+ pdp   /p/**           3         1
+ plp   /b/**           5         1
+──────────────────────────────────
+ 3 views  ·  8 distinct components (per-view rows sum to 12)
+```
+
+**What each total counts:**
+
+| Total | Counted over |
+|-------|--------------|
+| `Views` | view definitions |
+| `Components` | distinct component **names** corpus-wide — the corpus vocabulary |
+| `Requests` | global + view-scoped request definitions |
+| `Properties` | `properties:` entries over distinct component **definitions** |
+| `Memory` | `memory:` entries at file, view, component, and request level |
+
+**Per-view rows do not have to sum to `Components`, in either direction** — a global `$ref`-reused by three views fills three rows but one slot in the total, while a global no view references fills a slot and no row. The summary line prints both numbers so the gap is legible.
+
+The two rules differ on purpose: `Components` dedupes by name, but `Properties`/`Memory` sum over distinct definitions, because two views may legally define different components under the same local name (only *global* name collisions are rejected). A top-level `$ref` expands to a byte-identical copy and counts once; a `$ref` under a parent is scoped to that parent, so it is a separate extraction site and counts again.
+
+**`--json` is a published contract.** One JSON object on stdout, no banner: `views`, `components`, `requests`, `properties`, `memory`, `per_view[{name, route, components, requests}]`. Consumed by CI outside this repo (the atlas index generator), so the field names never change. The same counts are available in-process as `sightmap.Corpus.Stats()` — prefer that over shelling out.
+
+**Refuses a corpus it cannot count.** The loader drops an unresolved `$ref` or a component missing its `name`/`selector` and records an error, which would make the counts a silent under-report. `stats` therefore runs `validate`'s checks first and exits 1 on any error-severity finding (warnings are advisory). Under `--json` the failure is still one parseable object — `{"error": ..., "diagnostics": [...]}`, with `error` present only on failure and no counts.
+
+**When to use:** Orientation on an unfamiliar corpus, and as the CI numbers that tell you whether a corpus grew or shrank.
+
+---
+
 ## `sightmap suggest --exclude-known`
 
 **Solves:** Discovering DOM elements with stable selectors not yet in the sightmap.
