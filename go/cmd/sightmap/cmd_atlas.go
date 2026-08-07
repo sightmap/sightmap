@@ -170,7 +170,7 @@ func writeNoMatch(out io.Writer, query, category, source string) {
 // site.
 func detailLine(e atlas.Entry) string {
 	var parts []string
-	for _, group := range [][]string{e.Domains, e.Categories, e.Stats.Counts()} {
+	for _, group := range [][]string{e.Domains, e.Categories, atlas.StatCounts(e.Stats)} {
 		if len(group) > 0 {
 			parts = append(parts, strings.Join(group, ", "))
 		}

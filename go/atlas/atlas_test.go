@@ -4,12 +4,15 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // ── fixtures shared by every test in the package ──────────────────────────────
@@ -291,7 +294,7 @@ func searchIndex() *Index {
 			Description:  "Point-of-sale checkout and order history.",
 			Domains:      []string{"squareup.com", "app.squareup.com"},
 			Categories:   []string{"payments", "commerce"},
-			Stats:        Stats{Views: 12, Components: 48, Requests: 23},
+			Stats:        sightmap.Totals{Views: 12, Components: 48, Requests: 23},
 			LastVerified: "2026-07-14",
 		},
 		{
@@ -439,19 +442,69 @@ func TestSafeText(t *testing.T) {
 }
 
 // The gallery card and `find` read the same index.json, so they summarize an
-// entry the same way. A count the catalog omits is left out rather than printed
-// as zero, which would claim the corpus maps none.
-func TestStatsCounts(t *testing.T) {
+// entry the same way. A count the catalog leaves at zero is left out rather
+// than printed, which would claim the corpus maps none of that kind.
+//
+// Properties and Memory are deliberately absent from the output even though
+// [sightmap.Totals] carries them: a search result names how much of a site is
+// mapped, not how densely it is annotated.
+func TestStatCounts(t *testing.T) {
 	for _, tc := range []struct {
-		stats Stats
+		stats sightmap.Totals
 		want  []string
 	}{
-		{Stats{Views: 12, Components: 48, Requests: 23}, []string{"12 views", "48 components", "23 requests"}},
-		{Stats{Views: 12, Components: 48}, []string{"12 views", "48 components"}},
-		{Stats{}, nil},
+		{sightmap.Totals{Views: 12, Components: 48, Requests: 23}, []string{"12 views", "48 components", "23 requests"}},
+		{sightmap.Totals{Views: 12, Components: 48}, []string{"12 views", "48 components"}},
+		{sightmap.Totals{Views: 12, Properties: 9, Memory: 40}, []string{"12 views"}},
+		{sightmap.Totals{}, nil},
 	} {
-		if got := tc.stats.Counts(); !slices.Equal(got, tc.want) {
-			t.Errorf("Stats%+v.Counts() = %v, want %v", tc.stats, got, tc.want)
+		if got := StatCounts(tc.stats); !slices.Equal(got, tc.want) {
+			t.Errorf("StatCounts(%+v) = %v, want %v", tc.stats, got, tc.want)
 		}
+	}
+}
+
+// An entry's `stats` object is the same five numbers `sightmap stats --json`
+// emits, so decoding one into [sightmap.Totals] must pick up all five — not
+// just the three a search result prints.
+func TestEntryStatsDecodesEveryTotal(t *testing.T) {
+	const doc = `{"schema_version":1,"entries":[{"slug":"square-pos",
+		"stats":{"views":12,"components":48,"requests":23,"properties":9,"memory":40}}]}`
+	idx, err := ParseIndex([]byte(doc))
+	if err != nil {
+		t.Fatalf("ParseIndex: %v", err)
+	}
+	want := sightmap.Totals{Views: 12, Components: 48, Requests: 23, Properties: 9, Memory: 40}
+	if got := idx.Entries[0].Stats; got != want {
+		t.Errorf("Stats = %+v, want %+v", got, want)
+	}
+}
+
+// The catalog publishes per-view rows as a sibling of `stats`, not inside it.
+// Decoding into [sightmap.Stats] instead of [sightmap.Totals] would therefore
+// leave PerView permanently empty; this pins the shape so a future change to
+// either side has to confront that.
+func TestPerViewIsNotNestedUnderStats(t *testing.T) {
+	const doc = `{"schema_version":1,"entries":[{"slug":"square-pos",
+		"stats":{"views":1,"components":2,"requests":3},
+		"per_view":[{"name":"Home","route":"/","components":2,"requests":3}]}]}`
+	idx, err := ParseIndex([]byte(doc))
+	if err != nil {
+		t.Fatalf("ParseIndex: %v", err)
+	}
+	var nested struct {
+		Entries []struct {
+			Stats sightmap.Stats `json:"stats"`
+		} `json:"entries"`
+	}
+	if err := json.Unmarshal([]byte(doc), &nested); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(nested.Entries[0].Stats.PerView) != 0 {
+		t.Fatal("per_view decoded from inside stats; the catalog shape has changed " +
+			"and Entry.Stats could now be sightmap.Stats")
+	}
+	if idx.Entries[0].Stats.Views != 1 {
+		t.Errorf("Views = %d, want 1", idx.Entries[0].Stats.Views)
 	}
 }

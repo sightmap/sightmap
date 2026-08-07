@@ -26,6 +26,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // DefaultIndexURL is the published catalog. It is served from sightmap.org
@@ -54,31 +56,34 @@ type Index struct {
 // Entry is one published corpus. Only Slug reaches a URL or the filesystem; the
 // rest is display and search metadata, escaped by [ParseIndex].
 type Entry struct {
-	Slug         string   `json:"slug"`
-	Name         string   `json:"name,omitempty"`
-	Description  string   `json:"description,omitempty"`
-	Domains      []string `json:"domains,omitempty"`
-	Categories   []string `json:"categories,omitempty"`
-	Stats        Stats    `json:"stats"`
-	LastVerified string   `json:"last_verified,omitempty"`
+	Slug         string          `json:"slug"`
+	Name         string          `json:"name,omitempty"`
+	Description  string          `json:"description,omitempty"`
+	Domains      []string        `json:"domains,omitempty"`
+	Categories   []string        `json:"categories,omitempty"`
+	Stats        sightmap.Totals `json:"stats"`
+	LastVerified string          `json:"last_verified,omitempty"`
 }
 
-// Stats is how much of a site an entry maps.
-type Stats struct {
-	Views      int `json:"views,omitempty"`
-	Components int `json:"components,omitempty"`
-	Requests   int `json:"requests,omitempty"`
-}
-
-// Counts renders the non-zero counts as display phrases: "12 views",
-// "48 components". A count the catalog omits is left out rather than printed as
-// zero, which would claim the corpus maps none.
-func (s Stats) Counts() []string {
+// StatCounts renders an entry's non-zero counts as display phrases: "12 views",
+// "48 components". A count the catalog leaves at zero is left out rather than
+// printed, which would claim the corpus maps none of that kind.
+//
+// This is a function rather than a method because the counts are
+// [sightmap.Totals] — the same type `sightmap stats --json` emits and the atlas
+// index generator publishes, so there is one definition of what these numbers
+// mean. Formatting them for a terminal is this package's job, not the corpus
+// model's.
+func StatCounts(s sightmap.Totals) []string {
 	var out []string
 	for _, c := range []struct {
 		n     int
 		label string
-	}{{s.Views, "views"}, {s.Components, "components"}, {s.Requests, "requests"}} {
+	}{
+		{s.Views, "views"},
+		{s.Components, "components"},
+		{s.Requests, "requests"},
+	} {
 		if c.n > 0 {
 			out = append(out, fmt.Sprintf("%d %s", c.n, c.label))
 		}
