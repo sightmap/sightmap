@@ -21,6 +21,7 @@ Three verbs over the community atlas ([sightmap.org/atlas](https://sightmap.org/
 | `sightmap atlas find QUERY` | Search by domain, name, category, or description |
 | `sightmap atlas list` | Browse the whole catalog |
 | `sightmap atlas add SLUG` | Install one corpus into `.sightmap/` |
+| `sightmap atlas validate [FILE]` | Check a catalog before publishing it |
 
 They are grouped under `atlas` because a bare `sightmap add` would be ambiguous in a tool for authoring corpora, where adding a view or a component is the other thing it could mean.
 
@@ -43,11 +44,11 @@ square-pos  Square POS
 1 match.
 ```
 
-A query that matches nothing exits **0**. Asking whether the atlas has a site is a question, and "no" is an answer:
+A query that matches nothing exits **0**. Asking whether the atlas has a site is a question, and "no" is an answer. The message names every constraint that was applied, so a `--category` with nothing filed under it does not read as an empty atlas:
 
 ```text
 No atlas entry matches "stripe.com".
-Try the product name or a category, browse https://sightmap.org/atlas, or map the site yourself with sightmap init.
+Run sightmap atlas list to see everything published, browse https://sightmap.org/atlas, or map the site yourself with sightmap init.
 ```
 
 Matching is case-insensitive substring containment: a field that contains your query matches, so `pos` finds `square-pos`. Slugs and domains match the other way round too, so `square-pos-terminal` finds `square-pos` — those are the strings you paste a longer real-world form of. Names, categories, and descriptions match forwards only, because a three-letter category read in reverse makes `position tracking` a hit for every point-of-sale corpus in the atlas. Results are ordered by how they matched (exact domain, exact slug, domain, slug, name, category, description), with ties broken alphabetically.
@@ -86,9 +87,11 @@ sightmap atlas find squareup.com --json
         "payments",
         "commerce"
       ],
-      "views": 12,
-      "components": 48,
-      "requests": 23,
+      "stats": {
+        "views": 12,
+        "components": 48,
+        "requests": 23
+      },
       "last_verified": "2026-07-14",
       "matched_on": "exact domain",
       "install": "sightmap atlas add square-pos"
@@ -102,11 +105,11 @@ sightmap atlas find squareup.com --json
 }
 ```
 
-The index is cached at `~/.sightmap/atlas/index.json` for 24 hours, next to the browser cache at `~/.sightmap/browsers`. A cached read says so, and `--refresh` skips it:
+The catalog is cached at `~/.sightmap/atlas/index.json` for 24 hours, next to the browser cache at `~/.sightmap/browsers`. A cached read says so, and `--refresh` skips it:
 
 ```text
 2 matches.
-Index cached 2026-08-06 15:07 UTC. Pass --refresh to re-fetch.
+Catalog cached 2026-08-06 15:07 UTC. Pass --refresh to re-fetch.
 ```
 
 #### `sightmap atlas list`
@@ -130,6 +133,24 @@ square-pos  Square POS
 
 2 matches.
 ```
+
+#### `sightmap atlas validate`
+
+For whoever runs the atlas, not whoever reads it. Checks an `index.json` for the problems every shipped sightmap would hit, reporting all of them in one run so a publisher does not fix one entry per build:
+
+```bash
+sightmap atlas validate index.json
+```
+
+```text
+  entry 1: duplicate slug "square-pos"
+  entry 2: slug "../escape" contains a path separator
+  entry 3 (acme-shop): control character or invalid UTF-8 in Acme\x1b]0;pwned\x07
+```
+
+Exits **0** when the catalog is clean and **1** when it is not. Reads stdin for `-` or no argument.
+
+It runs against the bytes as published, which is the point: `find` escapes that text as it parses, so no reader ever sees the raw byte and only the publisher can fix it. A duplicate slug is the same shape of problem — the second entry silently shadows the first at install time, and only a whole-catalog check sees both.
 
 #### `sightmap atlas add`
 

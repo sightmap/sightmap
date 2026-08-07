@@ -49,21 +49,9 @@ func runBounds(args []string) error {
 	offscreenFlag := fs.Bool("include-offscreen", false, "Include components whose bounds fall entirely outside the viewport")
 	allFlag := fs.Bool("all", false, "Emit bounds for every matched component (ignores positional queries)")
 
-	// Allow flags and positional queries in any order (Go's flag package stops
-	// at the first positional, so `bounds Foo --addr X` would otherwise swallow
-	// --addr as a query). Parse flags, take a positional, repeat.
-	var queries []string
-	rest := args
-	for len(rest) > 0 {
-		if err := fs.Parse(rest); err != nil {
-			return err
-		}
-		rest = fs.Args()
-		if len(rest) == 0 {
-			break
-		}
-		queries = append(queries, rest[0])
-		rest = rest[1:]
+	queries, err := parseFlagsAroundArgs(fs, args)
+	if err != nil {
+		return err
 	}
 
 	if *selectorFlag == "" && !*allFlag && len(queries) == 0 {

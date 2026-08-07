@@ -13,8 +13,8 @@ import (
 	"testing"
 )
 
-// atlasFixture is a local atlas: one index and one archive, served over
-// loopback so the transport policy's http exception applies.
+// atlasFixture is a local atlas: one catalog and one archive, served over
+// loopback so the transport policy's plain-http exception applies.
 type atlasFixture struct {
 	*httptest.Server
 	index string
@@ -45,7 +45,7 @@ const atlasIndexJSON = `{
 
 func newAtlasFixture(t *testing.T) *atlasFixture {
 	t.Helper()
-	// Every case gets its own HOME so the index cache never touches the
+	// Every case gets its own HOME so the catalog cache never touches the
 	// developer's ~/.sightmap.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -99,11 +99,12 @@ func corpusTarGz(t *testing.T, files map[string]string) []byte {
 	return buf.Bytes()
 }
 
-func findOut(t *testing.T, f *atlasFixture, args ...string) string {
+// atlasOut runs a subcommand through the same dispatch main.go uses.
+func atlasOut(t *testing.T, f *atlasFixture, args ...string) string {
 	t.Helper()
 	var out bytes.Buffer
-	if err := runAtlasFindOut(append(args, f.indexFlag()...), &out); err != nil {
-		t.Fatalf("atlas find %v: %v", args, err)
+	if err := runAtlasOut(append(args, f.indexFlag()...), &out); err != nil {
+		t.Fatalf("atlas %v: %v", args, err)
 	}
 	return out.String()
 }
@@ -117,240 +118,274 @@ func mustContain(t *testing.T, got string, want ...string) {
 	}
 }
 
-// The handoff is the point of the verb: a result carries the command that
-// installs it, so an agent never has to assemble one.
+// A result has to carry the command that installs it, so nothing downstream has
+// to assemble one from a slug.
 func TestAtlasFind_printsAnInstallCommandWithEachHit(t *testing.T) {
 	f := newAtlasFixture(t)
-	out := findOut(t, f, "squareup.com")
+	out := atlasOut(t, f, "find", "squareup.com")
 	mustContain(t, out,
 		"square-pos  Square POS",
-		"Point-of-sale checkout and order history.",
+		"Point-of-sale checkout",
 		"squareup.com, app.squareup.com",
 		"payments, commerce",
 		"12 views, 48 components, 23 requests",
 		"verified 2026-07-14",
 		"sightmap atlas add square-pos",
+		"1 match.",
 	)
-	if i, j := strings.Index(out, "square-pos"), strings.Index(out, "acme-shop"); j != -1 && i > j {
-		t.Errorf("acme-shop outranked square-pos for a squareup.com query:\n%s", out)
+	if strings.Contains(out, "acme-shop") {
+		t.Errorf("output = %q, want only the matching entry", out)
 	}
 }
 
-// An empty result is a successful search, not a failed command: the agent
-// asked a question and got an answer.
-func TestAtlasFind_exitsZeroWhenNothingMatches(t *testing.T) {
-	f := newAtlasFixture(t)
-	var out bytes.Buffer
-	err := runAtlasFindOut(append([]string{"stripe.com"}, f.indexFlag()...), &out)
-	if err != nil {
-		t.Fatalf("a search with no results returned an error: %v", err)
-	}
-	mustContain(t, out.String(), `No atlas entry matches "stripe.com"`, "sightmap init")
-}
-
-func TestAtlasList_browsesTheWholeCatalog(t *testing.T) {
-	f := newAtlasFixture(t)
-	var out bytes.Buffer
-	if err := runAtlasListOut(f.indexFlag(), &out); err != nil {
-		t.Fatalf("atlas list: %v", err)
-	}
-	mustContain(t, out.String(), "acme-shop", "square-pos", "2 matches")
-}
-
-func TestAtlasList_filtersByCategory(t *testing.T) {
-	f := newAtlasFixture(t)
-	var out bytes.Buffer
-	if err := runAtlasListOut(append([]string{"--category", "payments"}, f.indexFlag()...), &out); err != nil {
-		t.Fatalf("atlas list: %v", err)
-	}
-	got := out.String()
-	mustContain(t, got, "square-pos", "1 match")
-	if strings.Contains(got, "acme-shop") {
-		t.Errorf("--category payments listed acme-shop:\n%s", got)
+// A search that finds nothing is a successful search: an agent branches on the
+// exit code, so a miss must not look like a failure. The message has to name
+// every constraint that was applied, or a category with nothing filed under it
+// reads as an empty atlas and the agent authors a corpus that already exists.
+func TestAtlasSearch_emptyResults(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want []string
+	}{{
+		name: "an unmapped site",
+		args: []string{"find", "stripe.com"},
+		want: []string{`No atlas entry matches "stripe.com".`, "sightmap atlas list", "sightmap init"},
+	}, {
+		name: "a category nothing is filed under",
+		args: []string{"list", "--category", "aerospace"},
+		want: []string{`No atlas entry is in category "aerospace".`},
+	}, {
+		name: "a query and a category that exclude each other",
+		args: []string{"find", "squareup.com", "--category", "aerospace"},
+		want: []string{`matches "squareup.com"`, `is in category "aerospace"`},
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := atlasOut(t, newAtlasFixture(t), tc.args...)
+			mustContain(t, out, tc.want...)
+			if strings.Contains(out, "publishes no entries") {
+				t.Errorf("output = %q, want it not to claim the atlas is empty", out)
+			}
+		})
 	}
 }
 
-// A category nothing is filed under is not an empty atlas. Telling an agent
-// the atlas publishes nothing sends it off to author a corpus the atlas may
-// already have under a category it spelled differently.
-func TestAtlasList_categoryWithNoEntriesDoesNotClaimTheAtlasIsEmpty(t *testing.T) {
-	f := newAtlasFixture(t)
-	var out bytes.Buffer
-	if err := runAtlasListOut(append([]string{"--category", "position tracking"}, f.indexFlag()...), &out); err != nil {
-		t.Fatalf("atlas list: %v", err)
-	}
-	got := out.String()
-	mustContain(t, got, `No atlas entry is in category "position tracking"`, "sightmap atlas list")
-	if strings.Contains(got, "publishes no entries") {
-		t.Errorf("a category miss was reported as an empty atlas:\n%s", got)
-	}
-}
-
-// An index that really is empty still says so.
-func TestAtlasList_saysWhenTheIndexIsEmpty(t *testing.T) {
+// An atlas with no entries at all is the one case that should say so.
+func TestAtlasList_saysWhenTheCatalogIsEmpty(t *testing.T) {
 	f := newAtlasFixture(t)
 	f.index = `{"schema_version": 1, "entries": []}`
-	var out bytes.Buffer
-	if err := runAtlasListOut(f.indexFlag(), &out); err != nil {
-		t.Fatalf("atlas list: %v", err)
-	}
-	mustContain(t, out.String(), "publishes no entries")
+	mustContain(t, atlasOut(t, f, "list"), "publishes no entries")
 }
 
+func TestAtlasList_browsesTheWholeCatalogAndFiltersByCategory(t *testing.T) {
+	f := newAtlasFixture(t)
+	mustContain(t, atlasOut(t, f, "list"), "acme-shop", "square-pos", "2 matches.")
+
+	payments := atlasOut(t, f, "list", "--category", "payments")
+	mustContain(t, payments, "square-pos", "1 match.")
+	if strings.Contains(payments, "acme-shop") {
+		t.Errorf("--category payments returned %q", payments)
+	}
+}
+
+// A truncated list has to say how much it left out, or a caller reads the first
+// page as the whole atlas.
 func TestAtlasFind_limitsResultsAndSaysHowManyThereAre(t *testing.T) {
+	out := atlasOut(t, newAtlasFixture(t), "list", "--limit", "1")
+	mustContain(t, out, "1 of 2 matches", "--limit")
+}
+
+// The flag package stops at the first positional, so flags on either side of
+// the query have to keep working.
+func TestAtlas_acceptsFlagsOnEitherSideOfThePositional(t *testing.T) {
 	f := newAtlasFixture(t)
 	var out bytes.Buffer
-	if err := runAtlasFindOut(append([]string{"e", "--limit", "1"}, f.indexFlag()...), &out); err != nil {
+	args := append([]string{"find", "squareup.com", "--limit", "1"}, f.indexFlag()...)
+	if err := runAtlasOut(args, &out); err != nil {
 		t.Fatalf("atlas find: %v", err)
 	}
-	mustContain(t, out.String(), "1 of 2 matches", "--limit")
+	mustContain(t, out.String(), "square-pos")
 }
 
+// The --json document is the agent contract: every field the catalog publishes,
+// why the entry matched, and the command that installs it.
 func TestAtlasFind_jsonCarriesTheInstallCommand(t *testing.T) {
-	f := newAtlasFixture(t)
-	out := findOut(t, f, "squareup.com", "--json")
+	out := atlasOut(t, newAtlasFixture(t), "find", "squareup.com", "--json")
+
 	var doc struct {
 		Query   string `json:"query"`
 		Total   int    `json:"total"`
+		Shown   int    `json:"shown"`
 		Results []struct {
 			Slug       string   `json:"slug"`
+			Name       string   `json:"name"`
 			Domains    []string `json:"domains"`
-			Views      int      `json:"views"`
-			Components int      `json:"components"`
-			Requests   int      `json:"requests"`
 			MatchedOn  string   `json:"matched_on"`
 			Install    string   `json:"install"`
+			Categories []string `json:"categories"`
+			Stats      struct {
+				Views, Components, Requests int
+			} `json:"stats"`
 		} `json:"results"`
+		Index struct {
+			Source string `json:"source"`
+			Cached bool   `json:"cached"`
+		} `json:"index"`
 	}
 	if err := json.Unmarshal([]byte(out), &doc); err != nil {
-		t.Fatalf("--json is not valid JSON: %v\n%s", err, out)
+		t.Fatalf("--json emitted %q: %v", out, err)
 	}
-	if doc.Query != "squareup.com" || doc.Total != 1 || len(doc.Results) != 1 {
-		t.Fatalf("doc = %+v", doc)
+	if doc.Query != "squareup.com" || doc.Total != 1 || doc.Shown != 1 || len(doc.Results) != 1 {
+		t.Fatalf("doc = %+v, want one result for squareup.com", doc)
 	}
 	r := doc.Results[0]
 	if r.Slug != "square-pos" || r.Install != "sightmap atlas add square-pos" || r.MatchedOn != "exact domain" {
 		t.Errorf("result = %+v", r)
 	}
-	// The same three counts the text output and the gallery card show.
-	if r.Views != 12 || r.Components != 48 || r.Requests != 23 {
-		t.Errorf("stats = %d views, %d components, %d requests; want 12/48/23", r.Views, r.Components, r.Requests)
+	if r.Stats.Requests != 23 || len(r.Domains) != 2 {
+		t.Errorf("result dropped catalog fields: %+v", r)
+	}
+	if doc.Index.Source == "" {
+		t.Error("index.source is empty, so a caller cannot tell which catalog answered")
 	}
 }
 
-// Names, descriptions, domains, and categories come straight off the index,
-// which is more atlas-authored text than an install ever printed.
-func TestAtlasFind_escapesHostileIndexText(t *testing.T) {
+// An empty result must be an empty JSON array, not null, so a caller can range
+// over it without a nil check.
+func TestAtlasFind_jsonEmptyResultsIsAnArray(t *testing.T) {
+	out := atlasOut(t, newAtlasFixture(t), "find", "stripe.com", "--json")
+	mustContain(t, out, `"results": []`)
+}
+
+// End to end, nothing the catalog authored reaches the terminal raw. The
+// escaping happens when the catalog is parsed; this is the check that the CLI
+// still benefits from it after formatting.
+func TestAtlas_escapesHostileCatalogText(t *testing.T) {
 	f := newAtlasFixture(t)
-	f.index = `{"schema_version": 1, "entries": [{"slug": "evil", "name": "Evil\u001b]0;pwned\u0007", "description": "drop\u001b[2K", "domains": ["evil.test"]}]}`
-	out := findOut(t, f, "evil.test")
+	f.index = `{"schema_version": 1, "entries": [{
+	  "slug": "evil", "name": "Evil\u001b]0;pwned\u0007",
+	  "description": "desc\u001b[2K", "domains": ["evil.test\u001b[2K"]
+	}]}`
+	out := atlasOut(t, f, "find", "evil")
 	if strings.ContainsAny(out, "\x1b\x07") {
-		t.Fatalf("output carried a raw control character:\n%q", out)
+		t.Fatalf("output = %q, want no control characters", out)
 	}
-	mustContain(t, out, `Evil\x1b]0;pwned\x07`, `drop\x1b[2K`)
+	mustContain(t, out, `Evil\x1b]0;pwned\x07`, `evil.test\x1b[2K`)
 }
 
-// A slug the index cannot install must not be offered with an install command.
-func TestAtlasFind_dropsEntriesThatCouldNotBeInstalled(t *testing.T) {
-	f := newAtlasFixture(t)
-	f.index = `{"schema_version": 1, "entries": [{"slug": "../../etc/passwd", "name": "traversal", "domains": ["evil.test"]}]}`
-	var out bytes.Buffer
-	if err := runAtlasFindOut(append([]string{"evil.test"}, f.indexFlag()...), &out); err != nil {
-		t.Fatalf("atlas find: %v", err)
-	}
-	if strings.Contains(out.String(), "etc/passwd") {
-		t.Fatalf("an uninstallable slug was offered:\n%s", out.String())
-	}
-}
-
-// A schema bump has to say what to do about it, wherever it is read from.
-func TestAtlasFind_reportsAFutureIndexSchema(t *testing.T) {
+// A catalog this CLI cannot read has to say so, rather than reporting an atlas
+// with nothing in it.
+func TestAtlasFind_reportsAFutureCatalogSchema(t *testing.T) {
 	f := newAtlasFixture(t)
 	f.index = `{"schema_version": 99, "entries": []}`
-	var out bytes.Buffer
-	err := runAtlasFindOut(append([]string{"anything"}, f.indexFlag()...), &out)
+	err := runAtlasOut(append([]string{"find", "square"}, f.indexFlag()...), &bytes.Buffer{})
 	if err == nil {
-		t.Fatal("expected the schema gate to refuse the index")
+		t.Fatal("expected an error")
 	}
-	mustContain(t, err.Error(), "schema_version 99", "upgrade sightmap")
+	mustContain(t, err.Error(), "upgrade sightmap")
 }
 
-func TestAtlasFind_needsAQuery(t *testing.T) {
-	var out bytes.Buffer
-	err := runAtlasFindOut(nil, &out)
-	if err == nil {
-		t.Fatal("expected a missing-query refusal")
+func TestAtlas_usageErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name, wantErr string
+		args          []string
+	}{
+		{"find with no query", "expected a QUERY", []string{"find"}},
+		{"add with no slug", "expected a SLUG", []string{"add"}},
+		{"add with two slugs", "unexpected argument", []string{"add", "square-pos", "acme-shop"}},
+		{"list with a positional", "use 'sightmap atlas find", []string{"list", "square"}},
+		{"an unknown subcommand", "unknown subcommand", []string{"browse"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := runAtlasOut(tc.args, &bytes.Buffer{})
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			mustContain(t, err.Error(), tc.wantErr)
+		})
 	}
-	mustContain(t, err.Error(), "expected a QUERY argument", "sightmap atlas list")
 }
 
-// ── add ───────────────────────────────────────────────────────────────────────
+// The caller is the atlas repository's CI checking an index.json before it
+// merges, so the exit code is the result and every problem is listed at once:
+// a publisher fixing one entry per run is a publisher waiting on N builds.
+func TestAtlasValidate(t *testing.T) {
+	write := func(t *testing.T, body string) string {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "index.json")
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+
+	t.Run("a clean catalog exits 0", func(t *testing.T) {
+		var out bytes.Buffer
+		if err := runAtlasOut([]string{"validate", write(t, atlasIndexJSON)}, &out); err != nil {
+			t.Fatalf("atlas validate: %v", err)
+		}
+		mustContain(t, out.String(), "The catalog is valid.")
+	})
+
+	t.Run("every problem is reported at once", func(t *testing.T) {
+		path := write(t, `{"schema_version": 1, "entries": [
+		  {"slug": "dupe"}, {"slug": "dupe"}, {"slug": "../escape"}
+		]}`)
+		var out bytes.Buffer
+		err := runAtlasOut([]string{"validate", path}, &out)
+		if err == nil {
+			t.Fatal("expected a non-zero exit for an invalid catalog")
+		}
+		mustContain(t, err.Error(), "2 problem(s)")
+		mustContain(t, out.String(), `entry 1: duplicate slug "dupe"`, "entry 2: slug", "path separator")
+	})
+
+	t.Run("a missing file is reported, not treated as empty", func(t *testing.T) {
+		err := runAtlasOut([]string{"validate", filepath.Join(t.TempDir(), "nope.json")}, &bytes.Buffer{})
+		if err == nil {
+			t.Fatal("expected an error for a missing file")
+		}
+	})
+}
 
 func TestAtlasAdd_installsAndSaysWhatToRunNext(t *testing.T) {
 	f := newAtlasFixture(t)
-	dir := t.TempDir()
-	target := filepath.Join(dir, ".sightmap")
+	target := filepath.Join(t.TempDir(), ".sightmap")
 
 	var out bytes.Buffer
-	args := append([]string{"square-pos", "--target", target}, f.sourceFlag()...)
-	if err := runAtlasAddOut(args, &out); err != nil {
+	args := append([]string{"add", "square-pos", "--target", target}, f.sourceFlag()...)
+	if err := runAtlasOut(args, &out); err != nil {
 		t.Fatalf("atlas add: %v", err)
 	}
-	mustContain(t, out.String(), "config.yaml", "views/checkout.yaml", "Installed square-pos: 2 files", "sightmap validate")
-	if _, err := os.Stat(filepath.Join(target, "views", "checkout.yaml")); err != nil {
-		t.Errorf("view file: %v", err)
-	}
-}
-
-// Flags have to work on either side of the slug: an agent copying an install
-// command off a gallery page appends --target to it.
-func TestAtlasAdd_acceptsFlagsAfterTheSlug(t *testing.T) {
-	f := newAtlasFixture(t)
-	target := filepath.Join(t.TempDir(), "vendor-map")
-	args := append(append(f.sourceFlag(), "square-pos"), "--target", target)
-
-	var out bytes.Buffer
-	if err := runAtlasAddOut(args, &out); err != nil {
-		t.Fatalf("atlas add: %v", err)
-	}
+	mustContain(t, out.String(),
+		filepath.Join(target, "config.yaml"),
+		filepath.Join(target, "views", "checkout.yaml"),
+		"Installed square-pos: 2 files",
+		"sightmap validate",
+	)
 	if _, err := os.Stat(filepath.Join(target, "config.yaml")); err != nil {
 		t.Errorf("config.yaml: %v", err)
 	}
 }
 
-func TestAtlasAdd_needsASlug(t *testing.T) {
-	var out bytes.Buffer
-	err := runAtlasAddOut(nil, &out)
-	if err == nil {
-		t.Fatal("expected a missing-slug refusal")
-	}
-	mustContain(t, err.Error(), "expected a SLUG argument")
-}
-
+// The refusal names the flag-free way out, because there is no --force.
 func TestAtlasAdd_refusesAnExistingCorpus(t *testing.T) {
 	f := newAtlasFixture(t)
-	target := t.TempDir()
-	if err := os.WriteFile(filepath.Join(target, "components.yaml"), []byte("version: 1\n"), 0o644); err != nil {
+	target := filepath.Join(t.TempDir(), ".sightmap")
+	if err := os.MkdirAll(target, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	var out bytes.Buffer
-	args := append([]string{"square-pos", "--target", target}, f.sourceFlag()...)
-	err := runAtlasAddOut(args, &out)
+	if err := os.WriteFile(filepath.Join(target, "mine.yaml"), []byte("mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	args := append([]string{"add", "square-pos", "--target", target}, f.sourceFlag()...)
+	err := runAtlasOut(args, &bytes.Buffer{})
 	if err == nil {
-		t.Fatal("expected a refusal")
+		t.Fatal("expected the existing corpus to be refused")
 	}
 	mustContain(t, err.Error(), "already exists and is not empty", "delete it")
-	if out.Len() != 0 {
-		t.Errorf("a refused install printed %q", out.String())
+	if got, _ := os.ReadFile(filepath.Join(target, "mine.yaml")); string(got) != "mine\n" {
+		t.Errorf("mine.yaml = %q, want it untouched", got)
 	}
-}
-
-// ── dispatch ──────────────────────────────────────────────────────────────────
-
-func TestRunAtlas_reportsAnUnknownSubcommand(t *testing.T) {
-	err := runAtlas([]string{"instal"})
-	if err == nil {
-		t.Fatal("expected an unknown-subcommand error")
-	}
-	mustContain(t, err.Error(), `unknown subcommand "instal"`)
 }

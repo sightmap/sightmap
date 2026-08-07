@@ -1,8 +1,7 @@
-// atlas browses and installs corpora published in the community atlas
-// (sightmap.org/atlas): `find` searches the catalog by domain, name, or
-// category, `list` browses it, and `add` installs one. The index schema, the
-// ranking, the cache, the fetch policy, and the install live in the atlas
-// package; these files are flags in, formatted output out.
+// atlas searches and installs corpora published at sightmap.org/atlas: `find`
+// searches the catalog, `list` browses it, and `add` installs one. The catalog
+// schema, the ranking, the cache, the fetch policy and the install live in the
+// atlas package; this file is flags in, formatted output out.
 package main
 
 import (
@@ -12,25 +11,33 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/sightmap/sightmap/go/atlas"
 )
 
-// runAtlas dispatches the atlas subcommands. It is registered in main.go.
+// maxDetailRunes bounds how much catalog-authored text one result line carries,
+// so a verbose or hostile entry cannot flood a terminal or an agent's context.
+const maxDetailRunes = 200
+
 func runAtlas(args []string) error {
+	return runAtlasOut(args, os.Stdout)
+}
+
+func runAtlasOut(args []string, out io.Writer) error {
 	if len(args) == 0 {
 		atlasUsage()
 		return nil
 	}
 	switch args[0] {
-	case "list":
-		return runAtlasList(args[1:])
-	case "find":
-		return runAtlasFind(args[1:])
+	case "find", "list":
+		return runAtlasSearch(args[0], args[1:], out)
 	case "add":
-		return runAtlasAdd(args[1:])
+		return runAtlasAdd(args[1:], out)
+	case "validate":
+		return runAtlasValidate(args[1:], out)
 	case "help", "--help", "-h":
 		atlasUsage()
 		return nil
@@ -41,147 +48,72 @@ func runAtlas(args []string) error {
 }
 
 func atlasUsage() {
-	fmt.Fprint(os.Stderr, `sightmap atlas — corpora published in the community atlas
+	fmt.Fprintf(os.Stderr, `sightmap atlas — corpora published at %s
 
-  list [--category C] [--limit N] [--json]           browse the catalog
-  find QUERY [--category C] [--limit N] [--json]     search by domain, name, category, or description
-  add SLUG [--target DIR]                            install a corpus into .sightmap/
+  list [flags]               browse the catalog
+  find QUERY [flags]         search by domain, name, category, or description
+  add SLUG [--target DIR]    install a corpus into .sightmap/
+  validate [FILE|-]          check a catalog before publishing it
 
-Have a URL, not a slug? Start there:
+Have a URL rather than a slug? Start there:
 
   sightmap atlas find squareup.com
 
-Flags:
-  --category C   keep only entries in a matching category
-  --limit N      show at most N results (default 10; 0 shows all)
-  --json         machine-readable results
-  --index URL    atlas index.json URL (for mirrors and private catalogs)
-  --refresh      re-fetch the index instead of using the cached copy
-  --target DIR   where add installs the corpus (default .sightmap)
-  --source URL   archive URL template for add, with {slug} substituted
-
-Installing from a private corpus store:
-
-  sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
-`)
+Run any subcommand with --help for its flags.
+`, atlas.AtlasURL)
 }
 
-// searchFlags are the flags find and list share.
-type searchFlags struct {
-	fs       *flag.FlagSet
-	indexURL *string
-	category *string
-	limit    *int
-	asJSON   *bool
-	refresh  *bool
-}
-
-func newSearchFlags(name string) *searchFlags {
-	fs := flag.NewFlagSet(name, flag.ContinueOnError)
-	f := &searchFlags{
-		fs:       fs,
-		indexURL: fs.String("index", atlas.DefaultIndexURL, "Atlas index.json URL (for mirrors and private catalogs)"),
-		category: fs.String("category", "", "Keep only entries in a matching category"),
-		limit:    fs.Int("limit", 10, "Show at most N results (0 shows all)"),
-		asJSON:   fs.Bool("json", false, "Print results as JSON"),
-		refresh:  fs.Bool("refresh", false, "Re-fetch the index instead of using the cached copy"),
-	}
-	return f
-}
-
-// runAtlasList browses the catalog. It is `find` with an empty query.
-func runAtlasList(args []string) error {
-	return runAtlasListOut(args, os.Stdout)
-}
-
-func runAtlasListOut(args []string, out io.Writer) error {
-	f := newSearchFlags("atlas list")
-	f.fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: sightmap atlas list [--category C] [--limit N] [--json] [--index URL] [--refresh]\n\nLists corpora published in the community atlas.\n\nFlags:\n")
-		f.fs.PrintDefaults()
-	}
-	if err := f.fs.Parse(args); err != nil {
-		return err
-	}
-	if f.fs.NArg() > 0 {
-		return fmt.Errorf("unexpected argument %q — use 'sightmap atlas find %s' to search", atlas.SafeText(f.fs.Arg(0)), atlas.SafeText(f.fs.Arg(0)))
-	}
-	return searchAtlas(context.Background(), "", f, out)
-}
-
-// runAtlasFind searches the catalog.
-func runAtlasFind(args []string) error {
-	return runAtlasFindOut(args, os.Stdout)
-}
-
-func runAtlasFindOut(args []string, out io.Writer) error {
-	f := newSearchFlags("atlas find")
-	f.fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: sightmap atlas find QUERY [--category C] [--limit N] [--json] [--index URL] [--refresh]\n\nSearches the community atlas by domain, name, category, or description.\nAn exact domain match ranks first, so a URL is a good query.\n\nFlags:\n")
-		f.fs.PrintDefaults()
-	}
-	if err := f.fs.Parse(args); err != nil {
-		return err
-	}
-	rest := f.fs.Args()
-	if len(rest) == 0 {
-		f.fs.Usage()
-		return fmt.Errorf("expected a QUERY argument — run 'sightmap atlas list' to browse everything")
-	}
-	// Re-parse what follows the query so flags work on either side of it: the
-	// flag package stops at the first positional argument.
-	var words []string
-	for len(rest) > 0 {
-		words = append(words, rest[0])
-		if err := f.fs.Parse(rest[1:]); err != nil {
-			return err
+// runAtlasSearch backs both find and list: list is find with an empty query.
+func runAtlasSearch(verb string, args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("atlas "+verb, flag.ContinueOnError)
+	indexURL := fs.String("index", atlas.DefaultIndexURL, "Catalog index.json URL, for mirrors and private catalogs")
+	category := fs.String("category", "", "Keep only entries in a matching category")
+	limit := fs.Int("limit", 10, "Show at most N results (0 shows all)")
+	asJSON := fs.Bool("json", false, "Print results as JSON")
+	refresh := fs.Bool("refresh", false, "Re-fetch the catalog instead of using the cached copy")
+	fs.Usage = func() {
+		if verb == "find" {
+			fmt.Fprint(os.Stderr, "Usage: sightmap atlas find QUERY [flags]\n\nSearches the community atlas by domain, name, category, or description.\nAn exact domain match ranks first, so a URL is a good query.\n\nFlags:\n")
+		} else {
+			fmt.Fprint(os.Stderr, "Usage: sightmap atlas list [flags]\n\nLists every corpus published in the community atlas.\n\nFlags:\n")
 		}
-		rest = f.fs.Args()
+		fs.PrintDefaults()
 	}
-	return searchAtlas(context.Background(), strings.Join(words, " "), f, out)
-}
 
-// searchAtlas is the one code path behind both verbs.
-func searchAtlas(ctx context.Context, query string, f *searchFlags, out io.Writer) error {
-	res, err := atlas.LoadIndex(ctx, atlas.IndexOptions{
-		URL:     *f.indexURL,
-		Refresh: *f.refresh,
-	})
+	words, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
 		return err
 	}
-	hits := res.Index.Search(atlas.Query{Text: query, Category: *f.category})
+	if verb == "find" && len(words) == 0 {
+		fs.Usage()
+		return fmt.Errorf("expected a QUERY argument — run 'sightmap atlas list' to browse everything")
+	}
+	if verb == "list" && len(words) > 0 {
+		return fmt.Errorf("unexpected argument %q — use 'sightmap atlas find %s' to search", atlas.SafeText(words[0]), atlas.SafeText(words[0]))
+	}
+	query := strings.Join(words, " ")
+
+	res, err := atlas.LoadIndex(context.Background(), atlas.IndexOptions{URL: *indexURL, Refresh: *refresh})
+	if err != nil {
+		return err
+	}
+	hits := res.Index.Search(atlas.Query{Text: query, Category: *category})
 	shown := hits
-	if *f.limit > 0 && len(shown) > *f.limit {
-		shown = shown[:*f.limit]
+	if *limit > 0 && len(shown) > *limit {
+		shown = shown[:*limit]
 	}
-	if *f.asJSON {
-		return writeAtlasJSON(out, query, *f.category, len(hits), shown, res)
+	if *asJSON {
+		return writeAtlasJSON(out, query, *category, len(hits), shown, res)
 	}
-	writeAtlasText(out, query, *f.category, len(hits), shown, res)
+	writeAtlasText(out, query, *category, len(hits), shown, res)
 	return nil
 }
 
 // writeAtlasText prints one block per hit: what it is, what it covers, and the
-// command that installs it. An empty result is a successful search, so it
-// prints where to look next and exits 0.
-//
-// Which "nothing found" message is right depends on what was asked. A category
-// that nothing is filed under is not an empty atlas, and saying so sends an
-// agent off to author a corpus that the atlas may already publish under a
-// category it spelled differently.
+// command that installs it.
 func writeAtlasText(out io.Writer, query, category string, total int, hits []atlas.Hit, res *atlas.IndexResult) {
 	if len(hits) == 0 {
-		switch {
-		case query != "":
-			fmt.Fprintf(out, "No atlas entry matches %q.\n", atlas.SafeText(query))
-			fmt.Fprintf(out, "Try the product name or a category, browse %s, or map the site yourself with sightmap init.\n", atlas.AtlasURL)
-		case category != "":
-			fmt.Fprintf(out, "No atlas entry is in category %q.\n", atlas.SafeText(category))
-			fmt.Fprintf(out, "Run sightmap atlas list to see every entry and the categories they use.\n")
-		default:
-			fmt.Fprintf(out, "The atlas index at %s publishes no entries.\n", atlas.SafeText(res.Source))
-		}
+		writeNoMatch(out, query, category, res.Source)
 		return
 	}
 	for i, h := range hits {
@@ -189,57 +121,86 @@ func writeAtlasText(out io.Writer, query, category string, total int, hits []atl
 			fmt.Fprintln(out)
 		}
 		e := h.Entry
-		fmt.Fprintf(out, "%s", atlas.SafeText(e.Slug))
-		if name := atlas.SafeText(e.Name); name != "" && name != atlas.SafeText(e.Slug) {
-			fmt.Fprintf(out, "  %s", name)
+		title := e.Slug
+		if e.Name != "" && e.Name != e.Slug {
+			title += "  " + e.Name
 		}
-		fmt.Fprintln(out)
-		if d := atlas.SafeText(e.Description); d != "" {
-			fmt.Fprintf(out, "  %s\n", d)
+		fmt.Fprintln(out, title)
+		if e.Description != "" {
+			fmt.Fprintf(out, "  %s\n", truncate(e.Description, maxDetailRunes))
 		}
-		fmt.Fprintf(out, "  %s\n", e.Detail())
-		fmt.Fprintf(out, "  sightmap atlas add %s\n", atlas.SafeText(e.Slug))
+		fmt.Fprintf(out, "  %s\n", detailLine(e))
+		fmt.Fprintf(out, "  sightmap atlas add %s\n", e.Slug)
 	}
 	fmt.Fprintln(out)
 	if total > len(hits) {
 		fmt.Fprintf(out, "%d of %d matches. Pass --limit to see more.\n", len(hits), total)
 	} else {
-		fmt.Fprintf(out, "%s.\n", plural(total, "match", "matches"))
+		fmt.Fprintf(out, "%d match%s.\n", total, pluralS(total))
 	}
 	if res.FromCache {
-		fmt.Fprintf(out, "Index cached %s. Pass --refresh to re-fetch.\n", res.FetchedAt.UTC().Format("2006-01-02 15:04 MST"))
+		fmt.Fprintf(out, "Catalog cached %s. Pass --refresh to re-fetch.\n", res.FetchedAt.UTC().Format("2006-01-02 15:04 MST"))
 	}
 }
 
-// atlasJSON is the --json document: one flat object per hit, install command
-// included, so an agent needs no second lookup to act on a result.
+// writeNoMatch names every constraint that was applied, so a caller can tell a
+// category with nothing filed under it from an empty catalog before deciding to
+// author a corpus of its own.
+func writeNoMatch(out io.Writer, query, category, source string) {
+	var applied []string
+	if query != "" {
+		applied = append(applied, fmt.Sprintf("matches %q", atlas.SafeText(query)))
+	}
+	if category != "" {
+		applied = append(applied, fmt.Sprintf("is in category %q", atlas.SafeText(category)))
+	}
+	if len(applied) == 0 {
+		fmt.Fprintf(out, "The atlas catalog at %s publishes no entries.\n", atlas.SafeText(source))
+		return
+	}
+	fmt.Fprintf(out, "No atlas entry %s.\n", strings.Join(applied, " and "))
+	fmt.Fprintf(out, "Run sightmap atlas list to see everything published, browse %s, or map the site yourself with sightmap init.\n", atlas.AtlasURL)
+}
+
+// detailLine summarizes what an entry covers: its domains, its categories, how
+// much of the site it maps, and when someone last checked it against the live
+// site.
+func detailLine(e atlas.Entry) string {
+	var parts []string
+	for _, group := range [][]string{e.Domains, e.Categories, e.Stats.Counts()} {
+		if len(group) > 0 {
+			parts = append(parts, strings.Join(group, ", "))
+		}
+	}
+	if e.LastVerified != "" {
+		parts = append(parts, "verified "+e.LastVerified)
+	}
+	if len(parts) == 0 {
+		return "(the atlas publishes no details for this entry)"
+	}
+	return truncate(strings.Join(parts, " · "), maxDetailRunes)
+}
+
+// atlasJSON is the --json document. Entries are embedded whole, so the fields
+// an agent reads are the fields the catalog publishes, plus why the entry
+// matched and the command that installs it.
 type atlasJSON struct {
-	Query    string          `json:"query"`
-	Category string          `json:"category,omitempty"`
-	Total    int             `json:"total"`
-	Shown    int             `json:"shown"`
-	Results  []atlasJSONHit  `json:"results"`
-	Index    atlasJSONSource `json:"index"`
+	Query    string     `json:"query"`
+	Category string     `json:"category,omitempty"`
+	Total    int        `json:"total"`
+	Shown    int        `json:"shown"`
+	Results  []atlasHit `json:"results"`
+	Index    struct {
+		Source    string `json:"source"`
+		FetchedAt string `json:"fetched_at"`
+		Cached    bool   `json:"cached"`
+	} `json:"index"`
 }
 
-type atlasJSONHit struct {
-	Slug         string   `json:"slug"`
-	Name         string   `json:"name,omitempty"`
-	Description  string   `json:"description,omitempty"`
-	Domains      []string `json:"domains,omitempty"`
-	Categories   []string `json:"categories,omitempty"`
-	Views        int      `json:"views"`
-	Components   int      `json:"components"`
-	Requests     int      `json:"requests"`
-	LastVerified string   `json:"last_verified,omitempty"`
-	MatchedOn    string   `json:"matched_on"`
-	Install      string   `json:"install"`
-}
-
-type atlasJSONSource struct {
-	Source    string `json:"source"`
-	FetchedAt string `json:"fetched_at"`
-	Cached    bool   `json:"cached"`
+type atlasHit struct {
+	atlas.Entry
+	MatchedOn string `json:"matched_on"`
+	Install   string `json:"install"`
 }
 
 func writeAtlasJSON(out io.Writer, query, category string, total int, hits []atlas.Hit, res *atlas.IndexResult) error {
@@ -248,27 +209,16 @@ func writeAtlasJSON(out io.Writer, query, category string, total int, hits []atl
 		Category: category,
 		Total:    total,
 		Shown:    len(hits),
-		Results:  make([]atlasJSONHit, 0, len(hits)),
-		Index: atlasJSONSource{
-			Source:    atlas.SafeText(res.Source),
-			FetchedAt: res.FetchedAt.UTC().Format(time.RFC3339),
-			Cached:    res.FromCache,
-		},
+		Results:  make([]atlasHit, 0, len(hits)),
 	}
+	doc.Index.Source = res.Source
+	doc.Index.FetchedAt = res.FetchedAt.UTC().Format(time.RFC3339)
+	doc.Index.Cached = res.FromCache
 	for _, h := range hits {
-		e := h.Entry
-		doc.Results = append(doc.Results, atlasJSONHit{
-			Slug:         atlas.SafeText(e.Slug),
-			Name:         atlas.SafeText(e.Name),
-			Description:  atlas.SafeText(e.Description),
-			Domains:      safeStrings(e.Domains),
-			Categories:   safeStrings(e.Categories),
-			Views:        e.Stats.Views,
-			Components:   e.Stats.Components,
-			Requests:     e.Stats.Requests,
-			LastVerified: atlas.SafeText(e.LastVerified),
-			MatchedOn:    h.Rank.String(),
-			Install:      "sightmap atlas add " + atlas.SafeText(e.Slug),
+		doc.Results = append(doc.Results, atlasHit{
+			Entry:     h.Entry,
+			MatchedOn: h.MatchedOn,
+			Install:   "sightmap atlas add " + h.Entry.Slug,
 		})
 	}
 	enc := json.NewEncoder(out)
@@ -276,20 +226,96 @@ func writeAtlasJSON(out io.Writer, query, category string, total int, hits []atl
 	return enc.Encode(doc)
 }
 
-func safeStrings(values []string) []string {
-	if len(values) == 0 {
+// runAtlasValidate checks a catalog before it is published. It reads a file
+// rather than a URL because the caller is the atlas repository's CI, checking
+// the index.json it is about to merge.
+func runAtlasValidate(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("atlas validate", flag.ContinueOnError)
+	fs.Usage = func() {
+		fmt.Fprint(os.Stderr, `Usage: sightmap atlas validate [FILE|-]
+
+Checks a catalog index.json for problems every shipped sightmap would hit:
+an unreadable schema version, a slug that could not be installed, a duplicate
+slug, and display text carrying control characters. Reads stdin for "-" or
+when FILE is omitted.
+
+Exits 0 when the catalog is clean, 1 when it is not.
+`)
+	}
+	files, err := parseFlagsAroundArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(files) > 1 {
+		return fmt.Errorf("unexpected argument %q after FILE", atlas.SafeText(files[1]))
+	}
+
+	data, err := readFileOrStdin(files)
+	if err != nil {
+		return err
+	}
+	problems := atlas.Validate(data)
+	if len(problems) == 0 {
+		fmt.Fprintln(out, "The catalog is valid.")
 		return nil
 	}
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		out = append(out, atlas.SafeText(v))
+	for _, p := range problems {
+		fmt.Fprintf(out, "  %s\n", p)
 	}
-	return out
+	return fmt.Errorf("%d problem(s) in the catalog", len(problems))
 }
 
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return fmt.Sprintf("%d %s", n, one)
+func readFileOrStdin(files []string) ([]byte, error) {
+	if len(files) == 0 || files[0] == "-" {
+		return io.ReadAll(os.Stdin)
 	}
-	return fmt.Sprintf("%d %s", n, many)
+	return os.ReadFile(files[0])
+}
+
+func runAtlasAdd(args []string, out io.Writer) error {
+	fs := flag.NewFlagSet("atlas add", flag.ContinueOnError)
+	target := fs.String("target", ".sightmap", "Directory to install the corpus into")
+	source := fs.String("source", atlas.DefaultArchiveURL, "Archive URL template with {slug} substituted, for mirrors and private corpora")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Usage: sightmap atlas add SLUG [flags]
+
+Installs a corpus published at %s into --target (default ./.sightmap).
+A non-empty target is refused; delete it yourself to install over it.
+
+Have a URL rather than a slug? Run: sightmap atlas find <domain>
+Install from a private corpus store:
+
+  sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
+
+Flags:
+`, atlas.AtlasURL)
+		fs.PrintDefaults()
+	}
+
+	words, err := parseFlagsAroundArgs(fs, args)
+	if err != nil {
+		return err
+	}
+	switch {
+	case len(words) == 0:
+		fs.Usage()
+		return fmt.Errorf("expected a SLUG argument")
+	case len(words) > 1:
+		return fmt.Errorf("unexpected argument %q after SLUG", atlas.SafeText(words[1]))
+	}
+
+	res, err := atlas.Install(context.Background(), words[0], atlas.Options{ArchiveURL: *source, Target: *target})
+	if err != nil {
+		return err
+	}
+	for _, rel := range res.Files {
+		fmt.Fprintf(out, "  wrote  %s\n", filepath.Join(res.Target, filepath.FromSlash(rel)))
+	}
+	noun := "files"
+	if len(res.Files) == 1 {
+		noun = "file"
+	}
+	fmt.Fprintf(out, "\nInstalled %s: %d %s → %s. Next:\n  sightmap validate\n",
+		res.Slug, len(res.Files), noun, res.Target)
+	return nil
 }

@@ -35,27 +35,17 @@ Installed square-pos: 3 files → .sightmap. Next:
   sightmap validate
 ```
 
-**Key flags:**
-
-| Flag | Verbs | Purpose |
-|------|-------|---------|
-| `--category` | find, list | Keep only entries in a matching category |
-| `--json` | find, list | Machine-readable results, install command included |
-| `--limit` | find, list | Cap the results (default 10; `0` shows all) |
-| `--refresh` | find, list | Re-fetch the index instead of the cached copy |
-| `--index` | find, list | Atlas `index.json` URL, for mirrors and tests |
-| `--target` | add | Directory to install into (default `.sightmap`) |
-| `--source` | add | Archive URL template with `{slug}` substituted, for mirrors and private corpora |
+Run any verb with `--help` for its flags. The ones that matter to an agent: `--json` on `find`/`list`, `--category` to narrow, `--target` on `add`, and `--source`/`--index` to point at a private store.
 
 **Both defaults point at `sightmap.org/atlas`,** the index and the archives. A takedown rebuilds the gallery, so an entry the atlas removes stops being findable *and* stops being installable. Reading either one out of the git repo would leave half of that unenforced.
 
-**Install from your own corpus store** by pointing `--source` at it. The template takes `{slug}` the same way:
+**Install from your own corpus store** by pointing `--source` at a URL template that takes `{slug}`; `--index` does the same for a private catalog. Both stay under the HTTPS-only transport policy.
 
 ```bash
 sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
 ```
 
-`--index` does the same for a private or mirrored catalog. Both stay under the HTTPS-only transport policy.
+**`sightmap atlas validate FILE`** is the publisher's check, not the reader's: duplicate slugs, uninstallable slugs, and control characters in display text, all reported in one run. `find` escapes that text as it parses, so this is the only place those problems surface.
 
 **A search that finds nothing exits 0.** It answers the question it was asked. An `add` with an unpublished slug exits 1 and points at `find` and the atlas.
 

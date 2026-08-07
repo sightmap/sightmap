@@ -148,3 +148,22 @@ func writeOut(path string, emit func(w io.Writer) error) error {
 	}
 	return nil
 }
+
+// parseFlagsAroundArgs parses fs, accepting flags before, after, and between
+// positional arguments, and returns the positionals in order. Go's flag package
+// stops at the first positional, so without this `atlas find shop --json` would
+// treat --json as part of the query.
+func parseFlagsAroundArgs(fs *flag.FlagSet, args []string) ([]string, error) {
+	var positional []string
+	for rest := args; ; {
+		if err := fs.Parse(rest); err != nil {
+			return nil, err
+		}
+		rest = fs.Args()
+		if len(rest) == 0 {
+			return positional, nil
+		}
+		positional = append(positional, rest[0])
+		rest = rest[1:]
+	}
+}

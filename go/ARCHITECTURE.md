@@ -47,7 +47,7 @@ Foundation (offline, no browser dependency):
 | `sightmap` | Loads `.sightmap/` YAML into a compiled, queryable **`Corpus`** (renamed from `Session`). Stays browser-free so every offline tool can use it. Also owns site config (`config.yaml`) and view-URL enumeration. |
 | `probe` | Embeds the canonical `cdp-probe.js` browser-side extractor. |
 | `render` | Formats a `comps` tree (+ matches) into the annotated snapshot and the raw `inspect` tree. Presentation only. |
-| `atlas` | The community atlas: the index schema and its cache, domain-ranked search, fail-closed entry validation, the fetch policy, and the corpus `Install` operation. Talks HTTPS, never a browser. Search reads the index; `Install` fetches one archive and does not, so an index outage cannot stop an install. Its exported surface is shared with the `sightmap/atlas` publisher CI so both sides enforce one definition of a valid entry. |
+| `atlas` | The community atlas: the catalog schema and its cache, domain-ranked search, the fetch policy, and the corpus `Install` operation. Talks HTTPS, never a browser. Search reads the catalog; `Install` fetches one archive and does not, so a catalog outage cannot stop an install. |
 | `coverage` **(planned)** | Pure T1/T2/T3 coverage math over a tree + matches: parent map, orphan slots, annotation gaps, T2/T3 cluster traces. |
 | `viewset` **(planned)** | On-disk capture sets: paths, discovery, stamps, the novelty gate, and the prune planner. Offline; built on `coverage`. |
 
