@@ -1,0 +1,30 @@
+title: "Guard: `atlas validate` lists every problem in one run, exits nonzero, and reaches no network"
+known_bug: false
+run:
+  args: [atlas, validate, index.json]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'entry 1: duplicate slug "dupe"'
+      why: >
+        Two entries with one slug means the second silently shadows the first
+        at install time. Only the publisher can see both, so only the publisher
+        can be told.
+    - must_match: 'entry 2: slug .* contains a path separator'
+      why: >
+        A slug is spliced into a fetch URL. One that could never be installed
+        has to fail at publish time rather than on every reader's machine.
+    - must_match: 'control character or invalid UTF-8'
+      why: >
+        `atlas find` escapes this text as it parses, so no reader ever sees the
+        raw byte and nobody downstream can report it. This command is the only
+        place the publisher hears about it.
+    - must_match: '3 problem\(s\)'
+      why: >
+        Every problem is reported in one run. A publisher who fixes one entry
+        per build waits on N builds to merge one pull request.
+    - must_not_match: 'GET https?://'
+      why: >
+        A catalog is validated from a file, so the check runs in CI before
+        anything is published and without network access.

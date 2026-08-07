@@ -5,6 +5,60 @@ See also: [The outer loop](outer-loop.md) · [Lint rules](lint-rules.md)
 
 ---
 
+## `sightmap atlas find QUERY` / `list` / `add SLUG`
+
+**Solves:** Finding out whether the site you are about to map has already been mapped, and starting from that corpus instead of authoring one from scratch. `find` searches the community atlas (`sightmap.org/atlas`), `list` browses it, `add` installs one entry into `--target` (default `.sightmap/`).
+
+**Start with the domain.** An agent about to automate a site has a URL, not a slug. An exact domain match ranks first, and every hit prints the command that installs it:
+
+```bash
+sightmap atlas find squareup.com
+square-pos  Square POS
+  Point-of-sale checkout, catalog, and order history.
+  squareup.com, app.squareup.com · payments, commerce · 12 views, 48 components, 23 requests · verified 2026-07-14
+  sightmap atlas add square-pos
+
+1 match.
+```
+
+The counts are the ones the gallery card shows, read from the same `index.json`.
+
+Then install what it printed:
+
+```bash
+sightmap atlas add square-pos
+  wrote  .sightmap/components.yaml
+  wrote  .sightmap/config.yaml
+  wrote  .sightmap/views/checkout.yaml
+
+Installed square-pos: 3 files → .sightmap. Next:
+  sightmap validate
+```
+
+Run any verb with `--help` for its flags. The ones that matter to an agent: `--json` on `find`/`list`, `--category` to narrow, `--target` on `add`, and `--source`/`--index` to point at a private store.
+
+**Both defaults point at `sightmap.org/atlas`,** the index and the archives. A takedown rebuilds the gallery, so an entry the atlas removes stops being findable *and* stops being installable. Reading either one out of the git repo would leave half of that unenforced.
+
+**Install from your own corpus store** by pointing `--source` at a URL template that takes `{slug}`; `--index` does the same for a private catalog. Both stay under the HTTPS-only transport policy.
+
+```bash
+sightmap atlas add toast-pos --source https://internal.corp/{slug}.tar.gz
+```
+
+**`sightmap atlas validate FILE`** is the publisher's check, not the reader's: duplicate slugs, uninstallable slugs, and control characters in display text, all reported in one run. `find` escapes that text as it parses, so this is the only place those problems surface.
+
+**A search that finds nothing exits 0.** It answers the question it was asked. An `add` with an unpublished slug exits 1 and points at `find` and the atlas.
+
+**Never merges.** A non-empty target is refused before anything is fetched, so the message is the same offline. There is no `--force`. Delete the directory yourself if you meant to replace it.
+
+**`find`/`list` read the index; `add` does not.** `add` fetches one `.tar.gz` from a URL template, so an index outage or a schema bump cannot stop an install, and the index can grow fields without a CLI release. `find` and `list` cache the index at `~/.sightmap/atlas/index.json` for 24 hours.
+
+**Untrusted by construction.** Fetches are HTTPS-only (loopback excepted) with the policy re-applied to every redirect hop. An archive is capped on the wire *and* decompressed, per file, and by member count; every member must be a regular file or directory under `.sightmap/`, with no absolute path, traversal, symlink, or control character. The corpus is loaded before the rename that installs it, so an entry that does not load is reported as an atlas defect with nothing written. Index-supplied text is escaped before it reaches your terminal.
+
+**Gotcha:** `add` proves the corpus *loads*; it does not vet its content. Run `sightmap validate` (the command tells you to) and read the YAML. An atlas entry's `memory:`/`description:` text ends up in your agent's context.
+
+---
+
 ## `sightmap browser start`
 
 **Solves:** Launching a Chrome session with the sightmap HTTP server and overlay extension.

@@ -32,12 +32,28 @@ import (
 // scoped to the parent), so it is its own definition and its properties and
 // memory count again — it is a distinct extraction site.
 type Stats struct {
-	Views      int         `json:"views"`      // number of views
-	Components int         `json:"components"` // distinct component names corpus-wide
-	Requests   int         `json:"requests"`   // global + view-scoped request definitions
-	Properties int         `json:"properties"` // properties over distinct component definitions
-	Memory     int         `json:"memory"`     // file-, view-, component-, and request-level entries
-	PerView    []ViewStats `json:"per_view"`   // one row per view, in corpus order
+	Totals
+	PerView []ViewStats `json:"per_view"` // one row per view, in corpus order
+}
+
+// Totals is the corpus-wide count summary without the per-view breakdown.
+//
+// It is split out from Stats because the two travel separately once published.
+// The atlas catalog carries these five numbers as an entry's `stats` object and
+// puts the per-view rows in a sibling field, so a catalog reader wants exactly
+// this shape — embedding Stats there would give it a PerView that no valid
+// catalog can ever populate. Embedding keeps `sightmap stats --json` emitting
+// all six keys at one level, unchanged.
+//
+// The JSON field names are a published contract (`sightmap stats --json`, the
+// atlas index generator, and the atlas package's catalog decoding all depend on
+// them) — never rename them.
+type Totals struct {
+	Views      int `json:"views"`      // number of views
+	Components int `json:"components"` // distinct component names corpus-wide
+	Requests   int `json:"requests"`   // global + view-scoped request definitions
+	Properties int `json:"properties"` // properties over distinct component definitions
+	Memory     int `json:"memory"`     // file-, view-, component-, and request-level entries
 }
 
 // ViewStats is one per-view row: the components and requests reachable in that
@@ -70,8 +86,10 @@ func (s Stats) IsEmpty() bool {
 // findings.
 func (c *Corpus) Stats() Stats {
 	s := Stats{
-		Views:   len(c.Views),
-		Memory:  len(c.Memory),
+		Totals: Totals{
+			Views:  len(c.Views),
+			Memory: len(c.Memory),
+		},
 		PerView: make([]ViewStats, 0, len(c.Views)),
 	}
 

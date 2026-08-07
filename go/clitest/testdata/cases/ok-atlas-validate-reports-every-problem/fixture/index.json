@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "entries": [
+    { "slug": "dupe", "name": "First" },
+    { "slug": "dupe", "name": "Impostor" },
+    { "slug": "../escape", "name": "Traversal" },
+    { "slug": "hostile-name", "name": "Evil\u001b]0;pwned\u0007" }
+  ]
+}
