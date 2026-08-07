@@ -79,3 +79,19 @@ views:
             selector: '[data-testid="map/ZoomOutButton"]'
           - name: MapSettings
             selector: '[data-testid="map/settingsButton"]'
+
+    requests:
+      - name: LocationContextPlaces
+        route: /api/v3/LocationContextPlacesQuery/*
+        method: POST
+        description: Resolves the searched destination to a place, which is how the normalized path is decided.
+
+      - name: PlaceListingPolygon
+        route: /api/v3/PlaceListingPolygonQuery/*
+        method: GET
+        description: The boundary drawn on the results map for the searched area.
+
+      - name: MapViewportInfo
+        route: /api/v3/MapViewportInfoQuery/*
+        method: GET
+        description: Viewport bounds for the results map. The listing page fetches this too, since both views carry a map.

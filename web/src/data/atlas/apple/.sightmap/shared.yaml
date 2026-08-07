@@ -102,7 +102,31 @@ components:
         selector: 'nav[aria-label="More Apple Store Links"]'
 
 requests:
-  - name: SearchPage
-    route: /us/search/*
+  - name: GlobalHeaderFlyouts
+    route: /api-www/global-elements/global-header/v1/flyouts
     method: GET
-    description: Search results, served as a document with the query in the path rather than a parameter.
+    description: Contents of the header's dropdown menus. The one call that fires on every route, marketing and store alike.
+    memory:
+      - Fetching this is the cheapest way to enumerate the site's top-level
+        navigation, because the flyout markup is not in the document until a
+        menu is opened.
+
+  - name: SearchSuggestionDefaults
+    route: /search-services/suggestions/defaultlinks/
+    method: GET
+    description: The links offered in the search overlay before anything is typed. Fires on every route whether or not search is opened.
+
+  - name: BagStatus
+    route: /**/shop/bag/status
+    method: GET
+    description: Cart contents for the header bag icon.
+    memory:
+      - The path depends on which of the two systems served the page. Marketing
+        pages request `/us/shop/bag/status` with the locale in front; store
+        pages request `/shop/bag/status` without it. Same purpose, two paths,
+        and a pattern anchored to either alone misses half the site.
+
+  - name: LocaleSwitcherContent
+    route: /ac/localeswitcher/*/*/content/localeswitcher.json
+    method: GET
+    description: The country and language list behind the footer's locale picker. Fetched by marketing pages only; store pages do not load it.

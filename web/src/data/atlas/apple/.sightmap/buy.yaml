@@ -92,3 +92,19 @@ views:
         memory:
           - A promotional strip above the buy flow. Its copy rotates, so it is
             not a fixed string.
+
+    requests:
+      - name: PurchaseOptions
+        route: /shop/api/purchase-options
+        method: GET
+        description: The configurable options and their prices for this model. Two calls fire, and this is where the buy flow's numbers come from.
+
+      - name: ExperienceMeta
+        route: /shop/experience-meta
+        method: GET
+        description: Metadata describing which buy-flow experience to render.
+
+      - name: SavedItems
+        route: /shop/favoritesx/fetch
+        method: GET
+        description: The visitor's saved items, fetched so the save control can show its current state.

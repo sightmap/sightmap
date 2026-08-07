@@ -93,7 +93,49 @@ components:
       - The dialog host. Present on browse routes before anything opens it.
 
 requests:
-  - name: SearchResultsPage
-    route: /s/*/homes
+  - name: PersistedGraphQlOperation
+    route: /api/v3/*/*
     method: GET
-    description: Search results, served as a document. Listing cards arrive in the HTML.
+    description: Every GraphQL call the site makes. The first path segment is the operation name and the second is a sha256 that pins the query version.
+    memory:
+      - The operation name is the most legible naming on the site. Where the DOM
+        gives Linaria hashes that mean nothing, the traffic gives
+        `StaysPdpReviewsQuery` and `PlaceListingPolygonQuery` — reading the
+        request path tells you what a page is doing faster than reading its
+        markup does.
+      - The trailing hash is a persisted-query id, not a resource id. It changes
+        when Airbnb changes the query, so match on the operation name and treat
+        the hash as a wildcard.
+      - Both methods are in use for the same style of call. Most are GET and a
+        few are POST, so a filter on method alone drops part of the family.
+
+  - name: HeaderData
+    route: /api/v3/Header/*
+    description: Contents of the global header. Fires on the home page, search, and listing pages, but not on SEO landing pages.
+
+  - name: ConsentFlags
+    route: /api/v3/GetConsentFlagsQuery/*
+    description: Which consent prompts apply to this visitor. The only GraphQL call that fires on every route, including the SEO landing pages that make almost none.
+
+  - name: ServerAnnouncements
+    route: /api/v3/NaviServerAnnouncementsQuery/*
+    description: Site-wide banner announcements shown under the header.
+
+  - name: SearchAutoSuggestions
+    route: /api/v3/AutoSuggestionsQuery/*
+    description: Destination suggestions for the search control, fetched before the control is opened.
+
+  - name: ClientConfigs
+    route: /api/v2/client_configs
+    method: POST
+    description: Feature flags and experiment assignment. Two calls per route on the app-driven views.
+
+  - name: UserMarkets
+    route: /api/v2/user_markets
+    method: GET
+    description: Currency and market defaults for the visitor.
+
+  - name: JitneyLogging
+    route: /tracking/jitney/logging/messages
+    method: POST
+    description: Airbnb's event logging pipeline and the noisiest thing on the site, at 19 calls on a listing page. Carries no content.

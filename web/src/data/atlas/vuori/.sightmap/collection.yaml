@@ -84,3 +84,9 @@ views:
         selector: '[data-testid="rich-text-editor"]'
         memory:
           - SEO copy below the grid, collapsed behind a "Read More" toggle.
+
+    requests:
+      - name: CollectionRouteData
+        route: /_next/data/*/en-US/collections/*.json
+        method: GET
+        description: This page's own props as JSON, keyed by the collection handle. Fetching it directly returns the grid without rendering the page.

@@ -33,3 +33,9 @@ views:
         children:
           - name: CardHoverBox
             selector: '[data-testid="productCardHoverBox"]'
+
+    requests:
+      - name: SearchRouteData
+        route: /_next/data/*/en-US/search.json
+        method: GET
+        description: The search page props as JSON. The query is passed as a parameter, so results are reachable without rendering anything.

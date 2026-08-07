@@ -98,7 +98,43 @@ components:
             way to find "Help" or "Company".
 
 requests:
-  - name: ProductWallSearch
-    route: /w
+  - name: MicroFrontendFragment
+    route: /fragments/*
     method: GET
-    description: The browse and search page itself, served as a document. Results arrive in the HTML rather than as a separate fetch.
+    description: One independently deployed page fragment. The path segment names it, and five load on every route regardless of what that route is for.
+    memory:
+      - The five constants are `privacy-consent`, `nike-ai-search`,
+        `error-modal`, `bellotti-playcard`, and `async-chat`. None is content —
+        they are the consent banner, the search overlay, an error dialog kept
+        ready, a promo card, and the chat launcher.
+      - A route may pull additional fragments beyond those five, which is the
+        cheapest way to see what a page is composed of without reading any DOM.
+
+  - name: FragmentStrings
+    route: /assets/i18n/*/en-US.json
+    method: GET
+    description: Localized strings for one fragment, fetched separately from the fragment itself. The path segment names the owning bundle.
+
+  - name: SharedConfig
+    route: /static/dotcom/shared-config/public/us/config.json
+    method: GET
+    description: Site-wide client configuration. One call on every route.
+
+  - name: CartState
+    route: /buy/carts/v2/US/NIKE/NIKECOM
+    description: Cart contents on api.nike.com. Read with GET and written back with PUT on every route, including routes that have nothing to add.
+
+  - name: SearchSuggestions
+    route: /search/suggestions/v1
+    method: GET
+    description: Typeahead terms for the search overlay on api.nike.com. Fetched once up front rather than as a query is typed.
+
+  - name: PrivacyCompliance
+    route: /privacy_compliance/**
+    method: GET
+    description: Consent framing and jurisdiction defaults on api.nike.com, keyed by location and language.
+
+  - name: PromoBanner
+    route: /content/published/v2/banner
+    method: GET
+    description: The promotional strip above the header, from content.services.nike.com.

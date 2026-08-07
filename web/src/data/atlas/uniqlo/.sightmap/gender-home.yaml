@@ -42,3 +42,9 @@ views:
         memory:
           - Shop-by-category links. The cheapest way to enumerate the category
             tree for the current gender without opening the navigation.
+
+    requests:
+      - name: ProductList
+        route: /us/api/commerce/v5/en/products
+        method: GET
+        description: Products for the merchandised rows on the landing page. Two calls fire, and neither goes through the search endpoint the listing views use.

@@ -82,3 +82,22 @@ views:
             properties:
               - name: caption
                 extract: text
+
+    requests:
+      - name: MarketingProductPrice
+        route: /*/shop/mcm/product-price
+        method: GET
+        description: The "From $999" price shown on this editorial page, pulled from the store rather than authored into the page.
+        memory:
+          - Two of these fire per load, differing only in the locale segment —
+            `/us/shop/` for consumer pricing and `/us-edu/shop/` for education
+            pricing. The page picks one to display, so the price on screen is a
+            choice made after both arrived.
+          - This is the only point where the marketing system talks to the store
+            system. Everything else on the page is editorial content with no way
+            to buy.
+
+      - name: VideoLocalization
+        route: /ac/ac-video/latest/json/localization/*.json
+        method: GET
+        description: Caption and control strings for the page's video players. Only routes with video fetch it.

@@ -37,3 +37,9 @@ views:
         memory:
           - Amazon's generic content-widget wrapper, used across several
             surfaces. Here it wraps each chart section.
+
+    requests:
+      - name: ComponentBuilder
+        route: /vap/ew/componentbuilder
+        method: POST
+        description: Builds the ranked lists on this page one block at a time. Six fire on a full scroll, and no other route uses this endpoint.

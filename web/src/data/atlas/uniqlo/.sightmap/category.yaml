@@ -40,3 +40,9 @@ views:
         children:
           - name: TileImage
             selector: '.fr-ec-product-tile__image'
+
+    requests:
+      - name: ProductSearch
+        route: /us/api/commerce/v5/en/products/search
+        method: POST
+        description: The grid contents as JSON, filtered by taxonomy rather than by a query. The same endpoint keyword search posts to.

@@ -142,7 +142,72 @@ components:
         was cached or freshly generated.
 
 requests:
-  - name: SearchPage
-    route: /search
+  - name: NextRouteData
+    route: /_next/data/*/en-US/**
     method: GET
-    description: Search results, served as a document. Results arrive in the HTML rather than as a separate fetch.
+    description: The props for one route as JSON. Next.js prefetches these for links in view, so a page issues one per visible link plus one for itself.
+    memory:
+      - This is the whole site as an API and the single most useful thing to
+        know about it. The path mirrors the page path, so
+        `/products/benton-twill-elastic-waist-short-8-ink` is served at
+        `/_next/data/<buildId>/en-US/products/benton-twill-elastic-waist-short-8-ink.json`.
+        A plain fetch of that URL with no browser and no JavaScript returns 165
+        KB of structured product data. Reading this beats scraping the DOM for
+        anything on this site.
+      - The build id is required and changes on every deploy. Read it from
+        `__NEXT_DATA__.buildId` in any page's HTML rather than caching it.
+      - Because prefetching is driven by what is on screen, the set of these
+        requests names every link the page offers. Scrolling a collection and
+        collecting them enumerates the products without parsing a single card.
+      - The broken skip link documented on `SkipNavigation` points at one of
+        these, which is how the endpoint surfaces even without watching traffic.
+
+  - name: ShopifyStorefront
+    route: /api/2026-04/graphql.json
+    method: POST
+    description: The Shopify Storefront GraphQL API on vuori-clothing.myshopify.com. The busiest endpoint on the site, at 7 calls on search and 18 on a product page.
+
+  - name: CartDrawerContent
+    route: /api/cms/cart-drawer-data
+    method: GET
+    description: CMS copy for the cart drawer. Fetched on every route whether or not the drawer is opened.
+
+  - name: AccountInfo
+    route: /api/account/info
+    method: GET
+    description: Account state for the header. Fires on every route, signed in or not.
+
+  - name: LoggedInCustomer
+    route: /apps/loggedincustomer
+    method: GET
+    description: A second, separate check on sign-in state, from a Shopify app proxy rather than the site's own API.
+
+  - name: ShippingRates
+    route: /api/shipping/rates
+    method: GET
+    description: Shipping options for the cart. Fetched on every route, including routes with an empty cart.
+
+  - name: ShippingConfig
+    route: /api/shipping-config
+    method: GET
+    description: Shipping thresholds behind the free-shipping messaging. One call per route.
+
+  - name: NostoPersonalization
+    route: /api/nosto/graphql
+    method: POST
+    description: Nosto recommendation and personalization queries, proxied through the site's own domain rather than called directly.
+
+  - name: Geolocation
+    route: /.netlify/functions/geolocation
+    method: GET
+    description: Coarse location from a Netlify edge function, used to pick currency and shipping defaults.
+
+  - name: ChatSettings
+    route: /p/**
+    method: GET
+    description: Kustomer chat widget configuration on vuori.api.kustomerapp.com. Four calls fire before the widget is opened.
+
+  - name: ElevarEvents
+    route: /elevar/base/hit
+    method: POST
+    description: Elevar server-side tagging, proxied through the site's own domain so it survives tracker blocking. Carries no content.

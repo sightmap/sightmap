@@ -73,3 +73,19 @@ views:
         memory:
           - The generic slot wrapper. There are more of these than there are
             results because banners, ad rows, and the info bar each occupy one.
+
+    requests:
+      - name: CartItems
+        route: /cart/add-to-cart/get-cart-items
+        method: GET
+        description: Cart contents for the add-to-cart panel. Fires only where an add-to-cart control exists, which is this view and the product page.
+
+      - name: AddToCartTemplate
+        route: /cart/add-to-cart/patc-template
+        method: GET
+        description: Markup for the panel that slides in after an item is added. Fetched up front, before anything is added.
+
+      - name: AddToCartConfig
+        route: /cart/add-to-cart/patc-config
+        method: GET
+        description: Configuration for the add-to-cart panel. Search fetches this alongside the template; the product page does not.

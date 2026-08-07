@@ -106,3 +106,19 @@ views:
                 selector: '.brwrvr__item-card__signals'
               - name: BrowseCardImageLink
                 selector: '.brwrvr__item-card__image-link'
+
+    requests:
+      - name: SearchImageExpand
+        route: /sch/ajax/multiple_images_expsvc
+        method: POST
+        description: Secondary photos for browse cards that carry more than one image. The same endpoint search uses, because both surfaces are served by the search stack.
+        response:
+          fields:
+            - name: items
+              type: array
+              description: One entry per listing, each with listingId and secondaryImages
+
+      - name: BelowResultsModules
+        route: /sch/ajax/post/bos_modules
+        method: POST
+        description: HTML fragment for a recommendation carousel below the item river. Conditional — repeat visits to the same URL do not reliably fire it.

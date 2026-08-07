@@ -60,3 +60,14 @@ views:
             properties:
               - name: price
                 extract: text
+
+    requests:
+      - name: ProductWall
+        route: /discover/product_wall/v1/marketplace/*/language/*/consumerChannelId/*
+        method: GET
+        description: The grid contents on api.nike.com, for refining and paging past the first screen, which is already in the document. The same endpoint keyword search uses; only the filter differs.
+
+      - name: RelatedLinks
+        route: /user_navigation/relatedlinks/v1
+        method: GET
+        description: The related-category links below the grid. Category browse fetches these and keyword search does not.

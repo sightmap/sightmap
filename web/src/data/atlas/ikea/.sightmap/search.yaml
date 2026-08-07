@@ -16,6 +16,11 @@ views:
         shared `name` is generated (`sort-P0-0`). Target the ids, not the name.
       - The grid renders about 22 cards and appends more on scroll, so counting
         cards measures the page size. The real total is in `.search-summary`.
+      - The only content route that fetches nothing of its own. Home, category
+        browse, and product pages each pull about twenty per-product HTML
+        fragments to fill their carousels; search has no carousels and issues
+        none, so everything here is either already in the document or appended
+        by the grid's own scroll handler.
     components:
       - name: SearchPage
         selector: '[data-testid="plp-search-page-container"]'

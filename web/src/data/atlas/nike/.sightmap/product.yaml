@@ -15,6 +15,14 @@ views:
       - The style code ending the URL (`IV5663-012`) is the colorway, not the
         product. A different colorway of the same shoe is a different URL with
         the same slug, which is why the slug alone is not addressable.
+      - Every identifier this page's API calls need is already in its URL, in
+        three forms. From `/t/pegasus-premium-mens-road-running-shoes-kWXqW9yR/IV5663-012`
+        the trailing token on the slug (`kWXqW9yR`) is the group key that keys
+        the availability call; the last segment (`IV5663-012`) is the style
+        colour that keys promotion visibility; and that segment with the
+        colorway suffix dropped (`IV5663`) is the style code that keys the
+        product record and the FAQ file. An agent holding the URL can address
+        all four without scraping anything.
       - Testid casing switches mid-page. `pdp-main` and `atb-button` are
         kebab-case while `ImageCarousel`, `ThumbnailListContainer`, and
         `Thumbnail-0` are PascalCase.
@@ -88,3 +96,34 @@ views:
         memory:
           - Also the main content of a discontinued product page, where it sits
             directly under the unavailable notice.
+
+    requests:
+      - name: ProductExperience
+        route: /products/experience/v1/*/US/en/styleCode/*
+        method: GET
+        description: The product record on api.nike.com — copy, media, and the colorway list. Keyed by style code.
+
+      - name: ProductAvailability
+        route: /discover/product_details_availability/v1/marketplace/*/language/*/consumerChannelId/*/groupKey/*
+        method: GET
+        description: Per-size stock on api.nike.com. The size grid renders before this resolves, so sizes can appear selectable and then go disabled.
+
+      - name: PromotionVisibility
+        route: /buy/promotion_visibility/v1/styleColor/*/**
+        method: GET
+        description: Whether a promotion applies to this colorway, on api.nike.com. Keyed by style colour rather than by style code.
+
+      - name: AvailableGtins
+        route: /deliver/available_gtins/v3
+        method: GET
+        description: The GTINs orderable for this product on api.nike.com, which is the stock keeping unit behind each size.
+
+      - name: ProductRecommendations
+        route: /discover/product_recs/v1
+        method: POST
+        description: The recommendation carousel below the fold on api.nike.com, paired with a recommendations-carousel fragment.
+
+      - name: ProductFaqs
+        route: /assets/experience/browse-config/faqs/*_en-US.json
+        method: GET
+        description: Static FAQ copy for this product, filed under the style code rather than fetched from an API.

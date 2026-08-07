@@ -105,22 +105,37 @@ components:
         Treat it as optional.
 
 requests:
-  - name: CircularOffers
-    route: /circular/circular-asis/offers/articles/*
-    method: GET
-    description: Buy-back and resale offers for one article, fetched on the product page from web-api.ikea.com.
-
   - name: NudgeOverlay
-    route: /nudge/api/*/orchestration/p/overlay
+    route: /nudge/api/*/orchestration/*/overlay
     method: GET
-    description: Decides which promotional overlay to show on a product page.
-
-  - name: RoteraModel
-    route: /*/rotera/data/model/*
-    method: GET
-    description: 3D model data for the product viewer, keyed by the same article number that ends the product URL.
+    description: Decides which promotional overlay to show. One call per route, on web-api.ikea.com.
+    memory:
+      - The segment before `overlay` looks like it names the surface you are on,
+        and it does not. A product page fired the `cat` variant on one article
+        and the `p` variant on another, so it reflects how IKEA classified that
+        page rather than the URL you requested. Do not read the current surface
+        out of this path.
 
   - name: ServerSideTagging
     route: /g/collect
     method: GET
     description: Server-side Google Tag Manager collection on sgtm.ikea.com. Fires on every route and carries no content.
+
+  - name: EpisodTrack
+    route: /global/api/episod/track/v2
+    method: POST
+    description: IKEA's own behavioral analytics collector, and by volume the bulk of the traffic on every route. Carries no content.
+    memory:
+      - Between 8 and 35 of these fire per route, more than every other request
+        on the page combined. A trace that is not filtering them will be almost
+        entirely this endpoint.
+
+  - name: CartPhrases
+    route: /us/en/shoppingcart/data/phrase/en-US.json
+    method: GET
+    description: Localized strings for the cart widget in the header. One call per route, independent of cart contents.
+
+  - name: ChatbotRules
+    route: /cschatbot/gcs/web-engine/engines/*/rules.json
+    method: GET
+    description: Targeting rules for the customer-service chat widget. Fires on the content routes and not on the home page.

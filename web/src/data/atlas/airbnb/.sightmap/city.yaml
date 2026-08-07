@@ -15,6 +15,11 @@ views:
         does not.
       - There is no map and no filter rail here. This is a marketing surface,
         and the route to filtered results is `/s/:location/homes`.
+      - The quietest route on the site by a wide margin. It issues one GraphQL
+        call, for consent flags, where search issues nine and a listing page
+        eleven — no header call, no client configs, no announcements. Everything
+        it shows is already in the document, which makes it the cheapest surface
+        to read and the one most likely to survive a slow connection.
     components:
       - name: CityHeader
         selector: '[data-testid="HEADER"]'

@@ -71,19 +71,32 @@ requests:
   - name: LocationToaster
     route: /portal-migration/hz/glow/get-rendered-toaster
     method: GET
-    description: Renders the delivery-location control in the header. Fires on every route.
+    description: Renders the delivery-location control in the header. Fires once on every route.
 
-  - name: CartItems
-    route: /cart/add-to-cart/get-cart-items
-    method: GET
-    description: Cart contents for the header count and the add-to-cart panel.
-
-  - name: LazyWidgetContent
-    route: /acp/*/getAjaxContentHTML
-    method: GET
-    description: Fetches HTML for a lazily-rendered page widget. The path segment names the widget.
+  - name: CrossBorderInterstitial
+    route: /cross_border_interstitial_sp/render
+    method: POST
+    description: Decides whether to interrupt with the ship-to-another-country interstitial. Fires once on every route.
 
   - name: RecommendedForYou
     route: /hz/rhf
     method: GET
     description: Personalized recommendation rail rendered into the page footer.
+    memory:
+      - Fires on the home page, product pages, and bestsellers, but not on
+        search, which ends at its pagination rather than a footer rail.
+
+  - name: AcpWidget
+    route: /acp/*/*/*
+    method: POST
+    description: The generic lazy-widget loader. Any page region that is not in the initial HTML arrives through this endpoint.
+    memory:
+      - The path is `/acp/<widget-name>/<instance-id>/<operation>`. The widget
+        name is the readable part and names the region, such as
+        `p13n-desktop-carousel` on the home page. The instance id repeats that
+        name with a uuid and a timestamp appended, so it is per-render and never
+        worth matching on.
+      - The final segment is the operation and it varies by widget —
+        `getCarouselItems`, `getAjaxContentHTML`, and `getTreatmentNoTrigger`
+        all appeared across four routes. Matching only one of them, which an
+        earlier pass of this corpus did, misses most of the family.

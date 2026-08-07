@@ -113,3 +113,24 @@ views:
         memory:
           - Related searches at the foot of the page, useful for enumerating
             nearby areas without running a search.
+
+    requests:
+      - name: PdpSections
+        route: /api/v3/StaysPdpSections/*
+        method: POST
+        description: The listing page's own sections, matching the data-section-id outline in the DOM. The single most useful call on this view.
+
+      - name: PdpReviews
+        route: /api/v3/StaysPdpReviewsQuery/*
+        method: GET
+        description: Reviews for this listing, fetched separately from the sections.
+
+      - name: PdpBookIt
+        route: /api/v3/StaysPdpBookItQuery/*
+        method: GET
+        description: Price breakdown and availability for the booking panel. This is where the numbers come from, so they depend on the search state rather than on the listing.
+
+      - name: HostRecommendedPois
+        route: /api/v3/HostRecommendedPoisQuery/*
+        method: GET
+        description: Nearby places the host recommends, shown on the listing map.

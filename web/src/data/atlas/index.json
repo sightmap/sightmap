@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-07T10:46:23Z",
+  "generated_at": "2026-08-07T12:07:34Z",
   "entries": [
     {
       "slug": "airbnb",
@@ -24,9 +24,9 @@
       "stats": {
         "views": 5,
         "components": 54,
-        "requests": 1,
+        "requests": 16,
         "properties": 20,
-        "memory": 43
+        "memory": 47
       },
       "per_view": [
         {
@@ -39,13 +39,13 @@
           "name": "Home",
           "route": "/",
           "components": 3,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "ListingDetail",
           "route": "/rooms/:listingId",
           "components": 19,
-          "requests": 0
+          "requests": 4
         },
         {
           "name": "NotFound",
@@ -57,7 +57,7 @@
           "name": "SearchResults",
           "route": "/s/:location/homes",
           "components": 14,
-          "requests": 0
+          "requests": 3
         }
       ],
       "screenshots": [
@@ -72,7 +72,7 @@
         ".sightmap/search.yaml",
         ".sightmap/shared.yaml"
       ],
-      "commit": "f2c3f93be52c7083c2f6ddea4edc2e7aaf605fb2"
+      "commit": "750b1107cdc6b678cf38b1145f02f9b198a08db8"
     },
     {
       "slug": "amazon",
@@ -96,22 +96,22 @@
       "stats": {
         "views": 5,
         "components": 47,
-        "requests": 4,
+        "requests": 12,
         "properties": 23,
-        "memory": 50
+        "memory": 54
       },
       "per_view": [
         {
           "name": "BestSellers",
           "route": "/gp/bestsellers",
           "components": 4,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "Home",
           "route": "/",
           "components": 4,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "NotFound",
@@ -123,13 +123,13 @@
           "name": "ProductDetail",
           "route": "/dp/:asin",
           "components": 15,
-          "requests": 0
+          "requests": 3
         },
         {
           "name": "SearchResults",
           "route": "/s",
           "components": 10,
-          "requests": 0
+          "requests": 3
         }
       ],
       "screenshots": [
@@ -145,7 +145,7 @@
         ".sightmap/search.yaml",
         ".sightmap/shared.yaml"
       ],
-      "commit": "9715ada4bc33e6b8059b1ff7b432bfcd99efe29e"
+      "commit": "a2e3e4179e0bf0c5b2f1e5747e5bf5178559914d"
     },
     {
       "slug": "apple",
@@ -169,16 +169,16 @@
       "stats": {
         "views": 5,
         "components": 54,
-        "requests": 1,
+        "requests": 10,
         "properties": 23,
-        "memory": 51
+        "memory": 55
       },
       "per_view": [
         {
           "name": "BuyFlow",
           "route": "/shop/buy-mac/:model",
           "components": 16,
-          "requests": 0
+          "requests": 3
         },
         {
           "name": "Home",
@@ -196,13 +196,13 @@
           "name": "ProductMarketing",
           "route": "/:productSlug",
           "components": 10,
-          "requests": 0
+          "requests": 2
         },
         {
           "name": "SearchResults",
           "route": "/us/search/:query",
           "components": 7,
-          "requests": 0
+          "requests": 1
         }
       ],
       "screenshots": [
@@ -218,7 +218,7 @@
         ".sightmap/search.yaml",
         ".sightmap/shared.yaml"
       ],
-      "commit": "4399333831a32b1fb9916774aad853da7d2bfcd3"
+      "commit": "deba0fd4a7043a3db8c61206904a89b25461f5c7"
     },
     {
       "slug": "ebay",
@@ -242,16 +242,16 @@
       "stats": {
         "views": 6,
         "components": 70,
-        "requests": 5,
+        "requests": 9,
         "properties": 25,
-        "memory": 62
+        "memory": 65
       },
       "per_view": [
         {
           "name": "CategoryBrowse",
           "route": "/b/:categoryName/:categoryId/:browseNode",
           "components": 17,
-          "requests": 0
+          "requests": 2
         },
         {
           "name": "Home",
@@ -281,7 +281,7 @@
           "name": "SearchResults",
           "route": "/sch/i.html",
           "components": 21,
-          "requests": 0
+          "requests": 2
         }
       ],
       "screenshots": [
@@ -298,7 +298,7 @@
         ".sightmap/search.yaml",
         ".sightmap/shared.yaml"
       ],
-      "commit": "730e8b9362bfc83066c2d856d60385759af99bbf"
+      "commit": "c15e962966814fbcae09ff6bf7ed46f98df79969"
     },
     {
       "slug": "ikea",
@@ -322,22 +322,22 @@
       "stats": {
         "views": 5,
         "components": 59,
-        "requests": 4,
+        "requests": 11,
         "properties": 16,
-        "memory": 57
+        "memory": 62
       },
       "per_view": [
         {
           "name": "CategoryBrowse",
           "route": "/us/en/cat/:categorySlug",
           "components": 10,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "Home",
           "route": "/us/en",
           "components": 13,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "NotFound",
@@ -349,7 +349,7 @@
           "name": "ProductDetail",
           "route": "/us/en/p/:productSlug",
           "components": 14,
-          "requests": 0
+          "requests": 4
         },
         {
           "name": "SearchResults",
@@ -371,7 +371,7 @@
         ".sightmap/search.yaml",
         ".sightmap/shared.yaml"
       ],
-      "commit": "3edb4eb184c01af4eea88c20439536b725533621"
+      "commit": "a55fd6b31db99fb617e4e02c8e799c523a1d56dc"
     },
     {
       "slug": "nike",
@@ -395,22 +395,22 @@
       "stats": {
         "views": 5,
         "components": 42,
-        "requests": 1,
+        "requests": 17,
         "properties": 17,
-        "memory": 52
+        "memory": 58
       },
       "per_view": [
         {
           "name": "CategoryWall",
           "route": "/w/:categorySlug",
           "components": 11,
-          "requests": 0
+          "requests": 2
         },
         {
           "name": "Home",
           "route": "/",
           "components": 4,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "NotFound",
@@ -422,13 +422,13 @@
           "name": "ProductDetail",
           "route": "/t/:productSlug/:styleCode",
           "components": 12,
-          "requests": 0
+          "requests": 6
         },
         {
           "name": "SearchResults",
           "route": "/w",
           "components": 12,
-          "requests": 0
+          "requests": 1
         }
       ],
       "screenshots": [
@@ -444,7 +444,7 @@
         ".sightmap/shared.yaml",
         ".sightmap/wall.yaml"
       ],
-      "commit": "e445a483361528050102cd3fb8b173c0ba6aa594"
+      "commit": "91c1fc87fa56221db7b494b718faf50a48f46c2c"
     },
     {
       "slug": "sightmap-org",
@@ -535,22 +535,22 @@
       "stats": {
         "views": 5,
         "components": 29,
-        "requests": 1,
+        "requests": 17,
         "properties": 11,
-        "memory": 42
+        "memory": 44
       },
       "per_view": [
         {
           "name": "CategoryListing",
           "route": "/us/en/:gender/:category",
           "components": 5,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "Home",
           "route": "/us/en/:gender",
           "components": 3,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "NotFound",
@@ -562,13 +562,13 @@
           "name": "ProductDetail",
           "route": "/us/en/products/:productId/:colorCode",
           "components": 4,
-          "requests": 0
+          "requests": 8
         },
         {
           "name": "SearchResults",
           "route": "/us/en/search",
           "components": 3,
-          "requests": 0
+          "requests": 2
         }
       ],
       "screenshots": [
@@ -584,7 +584,7 @@
         ".sightmap/search.yaml",
         ".sightmap/shared.yaml"
       ],
-      "commit": "8e93674c5052e65f7976eb6e1e15d3aaf1642c81"
+      "commit": "356acee1d22f8fa3168132538365df58ee1cfd9a"
     },
     {
       "slug": "vuori",
@@ -608,16 +608,16 @@
       "stats": {
         "views": 5,
         "components": 45,
-        "requests": 1,
+        "requests": 14,
         "properties": 18,
-        "memory": 59
+        "memory": 64
       },
       "per_view": [
         {
           "name": "Collection",
           "route": "/collections/:handle",
           "components": 10,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "Home",
@@ -635,13 +635,13 @@
           "name": "ProductDetail",
           "route": "/products/:handle",
           "components": 10,
-          "requests": 0
+          "requests": 1
         },
         {
           "name": "SearchResults",
           "route": "/search",
           "components": 4,
-          "requests": 0
+          "requests": 1
         }
       ],
       "screenshots": [
@@ -657,7 +657,7 @@
         ".sightmap/search.yaml",
         ".sightmap/shared.yaml"
       ],
-      "commit": "ff3a154ae46aacb9552810f0c1a742c304baaf5f"
+      "commit": "5f0fd97db0bac0be9457e825409a8654145479ff"
     }
   ]
 }

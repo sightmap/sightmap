@@ -46,3 +46,13 @@ views:
           - Matches the labelled links in the nav and footer as well as the
             campaign tiles, because the page body offers nothing more specific to
             anchor to.
+
+    requests:
+      - name: VideoManifest
+        route: /content/asset_video_manifest/v1/*
+        method: GET
+        description: Playback manifest for a hero video, on api.nike.com. Only the home page carries video, and the segments then stream from assets.nmp.nike.com.
+        memory:
+          - Once playback starts the segment requests arrive several per second
+            and never stop, so a capture left running on this route fills with
+            them and buries everything else.

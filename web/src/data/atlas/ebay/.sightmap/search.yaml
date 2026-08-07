@@ -154,3 +154,28 @@ views:
           - Search-page legal notes, including the pricing disclaimer. It sits in
             `.x-footer`, a search-only block above the site-wide `#glbfooter`,
             so it is easy to mistake for part of the global footer.
+
+    requests:
+      - name: SearchImageExpand
+        route: /sch/ajax/multiple_images_expsvc
+        method: POST
+        description: Secondary photos for result cards that carry more than one image, returned as a listingId-keyed array of CDN URLs. Fires as those cards scroll into view.
+        response:
+          fields:
+            - name: items
+              type: array
+              description: One entry per listing, each with listingId and secondaryImages
+
+      - name: BelowResultsModules
+        route: /sch/ajax/post/bos_modules
+        method: POST
+        description: HTML fragment for a recommendation carousel below the result river, such as the brand rail. Conditional, and returns markup rather than JSON.
+        memory:
+          - Do not treat this as a reliable signal. The same query on the same
+            profile fired it on one visit and not on the next, and when it does
+            not fire the carousel is simply absent — no placeholder, no empty
+            state.
+          - Two `srp-bos-items` containers are in the document either way, and
+            they stay the same size whether the fetch happens or not. Their
+            presence says nothing about whether the carousel loaded; look for
+            `srp-img-answer-guidance`, which arrives only with the response.

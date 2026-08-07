@@ -126,7 +126,27 @@ components:
     selector: '.fr-ec-footer'
 
 requests:
-  - name: SearchPage
-    route: /us/en/search
+  - name: CmsContent
+    route: /us/api/commerce/v5/en/cms
     method: GET
-    description: Search results, served as a document. The tiles arrive in the HTML.
+    description: Merchandised content blocks for the current route. Two or three fire per page, and they carry the promotional copy rather than the product data.
+
+  - name: ProductTaxonomies
+    route: /us/api/commerce/v5/en/products/taxonomies
+    method: GET
+    description: The category tree behind the navigation and the filter rail. Fetched on every content route.
+
+  - name: TrendingSearchWords
+    route: /us/api/typeahead-proxy/v1/en/trending-words
+    method: GET
+    description: Suggested search terms for the empty search box. Fires on every route including the product page.
+
+  - name: ChatbotConfig
+    route: /us/api/iq-chatbot/en/iq/admin/iqConfigResponse
+    method: GET
+    description: Configuration for the support chatbot. Fires on every route before the widget is opened.
+
+  - name: BotTelemetry
+    route: /akam/**
+    method: POST
+    description: Akamai bot-detection telemetry. Also posted to paths made of random-looking segments under a per-deploy prefix, which change and are not worth matching.

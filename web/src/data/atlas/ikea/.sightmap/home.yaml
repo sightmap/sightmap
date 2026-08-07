@@ -74,3 +74,9 @@ views:
 
       - name: PromoDisclaimer
         selector: '[data-testid="hri-fragment-disclaimer"]'
+
+    requests:
+      - name: ShoppableProductFragment
+        route: /us/en/products/*/*-shoppable-fragment.html
+        method: GET
+        description: One card of markup per product in the home page carousels, fetched individually. Roughly twenty fire on a full scroll.

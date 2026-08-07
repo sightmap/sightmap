@@ -87,3 +87,18 @@ views:
                 has cards.
           - name: CardImage
             selector: '.product-card__hero-image'
+
+    requests:
+      - name: ProductWall
+        route: /discover/product_wall/v1/marketplace/*/language/*/consumerChannelId/*
+        method: GET
+        description: The grid contents on api.nike.com, for everything past the first paint — refining, sorting, and paging further in.
+        memory:
+          - This is not how the first screen of results arrives. The document
+            already carries all 24 cards; a fetch of the URL with no JavaScript
+            running contains every one of them. The endpoint takes over only
+            once the query changes or the served page runs out.
+          - Category browse issues the identical call. The two views differ in
+            how they ask — search passes the query, category passes the taxonomy
+            filter — but the endpoint and the response shape are the same, so
+            anything written against one works on the other.

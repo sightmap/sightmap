@@ -68,3 +68,9 @@ views:
 
       - name: FilterSidebar
         selector: '[data-testid="plp-filter-side-bar"]'
+
+    requests:
+      - name: ShoppableProductFragment
+        route: /us/en/products/*/*-shoppable-fragment.html
+        method: GET
+        description: One card of markup per product in the carousels on this page, fetched individually. Not used by the grid itself, which arrives in the document.

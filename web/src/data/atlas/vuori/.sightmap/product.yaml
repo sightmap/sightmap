@@ -69,3 +69,13 @@ views:
         memory:
           - Algorithmic recommendations. Contents change between visits, so
             nothing inside is worth asserting against.
+
+    requests:
+      - name: ProductRouteData
+        route: /_next/data/*/en-US/products/*.json
+        method: GET
+        description: This page's own props as JSON, keyed by the same handle that ends the URL. Fetching it directly is a complete substitute for rendering the page.
+        memory:
+          - A product page also prefetches this endpoint for every other product
+            it links to, so a single visit yields the data for the whole
+            recommendation carousel alongside its own.

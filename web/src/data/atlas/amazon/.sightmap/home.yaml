@@ -34,3 +34,9 @@ views:
             memory:
               - A skeleton shown while the next batch of cards loads. Finding it
                 means the carousel is still filling.
+
+    requests:
+      - name: LazyStreamingContent
+        route: /dram/renderLazyLoadedStreaming
+        method: POST
+        description: Streams the below-the-fold home page rows. Two fire on a full scroll, and the rows they carry are absent from the initial HTML.

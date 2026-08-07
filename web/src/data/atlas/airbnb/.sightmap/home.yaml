@@ -30,3 +30,9 @@ views:
 
       - name: SearchIcon
         selector: '[data-testid="little-search-icon"]'
+
+    requests:
+      - name: PromotionsByPlacement
+        route: /api/v3/PromotionsByPlacementsQuery/*
+        method: GET
+        description: Merchandised promotions for the home page slots. No other route fetches these.

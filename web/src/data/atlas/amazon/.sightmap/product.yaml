@@ -113,3 +113,24 @@ views:
           - Mapped as one component because there are hundreds and their names
             are per-article. `slot_id` tells you which slot you are looking at;
             most of them are empty on any given page.
+
+    requests:
+      - name: CartItems
+        route: /cart/add-to-cart/get-cart-items
+        method: GET
+        description: Cart contents for the add-to-cart panel. Fires only where an add-to-cart control exists, which is this view and search.
+
+      - name: AddToCartTemplate
+        route: /cart/add-to-cart/patc-template
+        method: GET
+        description: Markup for the panel that slides in after an item is added. Fetched up front, before anything is added.
+
+      - name: ReviewsLazyStream
+        route: /portal/customer-reviews/ajax/lazy-widgets/stream
+        method: POST
+        description: Fills out the review section below the fold once it is scrolled toward.
+        memory:
+          - Eight reviews are already in the document, so the section is not
+            empty before this resolves — it is short. Counting what is on the
+            page is therefore not a count of the product's reviews; the total is
+            in the rating summary near the title.

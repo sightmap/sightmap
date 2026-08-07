@@ -48,3 +48,8 @@ views:
 
       - name: TabNavContainer
         selector: '.rf-serp-tabnav-container'
+
+    requests:
+      - name: StoreSearchService
+        route: /shop/shld/work/v2/q
+        description: The store's search backend. Called with both GET and POST on a single page load, so a method filter drops one of them.

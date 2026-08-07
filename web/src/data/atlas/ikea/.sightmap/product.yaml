@@ -96,3 +96,30 @@ views:
         children:
           - name: AddToCartButtons
             selector: '.pipf-add-to-cart-section__buttons'
+
+    requests:
+      - name: ShoppableProductFragment
+        route: /us/en/products/*/*-shoppable-fragment.html
+        method: GET
+        description: One card of markup per product in the recommendation carousels, fetched individually. A product page issues roughly twenty of them.
+        memory:
+          - The path buckets by the last three digits of the article number, so
+            article 40504193 is served from `/products/193/`. That bucket is
+            derivable from the article number and is not a separate id.
+          - These arrive as HTML rather than JSON, and they are the reason a
+            carousel is empty in a snapshot taken before the page settles.
+
+      - name: ProductRecommendationRail
+        route: /us/en/listing/fragments/product-rec/*/
+        method: GET
+        description: The wrapper markup for one recommendation rail. The path segment names the rail, such as recommended-for-you or recently-viewed.
+
+      - name: CircularOffers
+        route: /circular/circular-asis/offers/articles/*
+        method: GET
+        description: Buy-back and resale offers for one article, on web-api.ikea.com. Conditional — it fires only for articles IKEA will buy back, so many product pages never issue it.
+
+      - name: RoteraModel
+        route: /*/rotera/data/model/*
+        method: GET
+        description: 3D model data for the product viewer, keyed by the article number that ends the product URL. Conditional on the article having a 3D model.

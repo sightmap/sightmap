@@ -30,3 +30,19 @@ views:
         properties:
           - name: disclaimer
             extract: text
+
+    requests:
+      - name: ProductSearch
+        route: /us/api/commerce/v5/en/products/search
+        method: POST
+        description: The result set as JSON. Category listing posts to the same endpoint with a taxonomy filter instead of a query.
+        memory:
+          - The tiles are already in the document — a fetch of the search URL
+            with no JavaScript running returns 24 product links — so this is
+            not how the first screen arrives. It serves filtering, sorting, and
+            paging past what was served.
+
+      - name: RankedRecommendations
+        route: /us/api/commerce/v5/en/recommendations/ranked-products
+        method: GET
+        description: The recommended strip shown alongside results. The product page uses a different recommendations endpoint.
