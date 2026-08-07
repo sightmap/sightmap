@@ -213,6 +213,47 @@ They share a harness and almost nothing else. Track A is out of scope here, but
 it is cheap, low-risk, and would build real AXIS experience before Track B needs
 it — see the optional precursor in PLAN.md.
 
+**A third shape, for later.** Sean's description of AXIS's design centre — an
+*audit* of whether the agent has what it needs to do well — suggests the mature
+form of this phase is two-layered, like web performance tooling: a cheap,
+deterministic **audit** of each entry on every merge (does the corpus cover the
+site's main routes, are components propertied, is memory present, are selectors
+fresh — Lighthouse's lab data), with the run-based lift as the expensive,
+scheduled field measurement (the RUM). The audit layer overlaps `sightmap lint`
+and is not designed here; it is named so that if the lift proves too expensive to
+run often, the per-merge quality signal already has a shape waiting.
+
+### 2.6 Known threats to validity
+
+Named here so the spike measures them instead of discovering them later.
+
+**Judge-legibility bias.** Goal Achievement is an LLM judge reading the
+transcript. A `with-sightmap` transcript is clean annotated component trees; a
+`no-context` transcript may be raw fetched HTML. The judge can verify checks more
+easily in the legible transcript, and unverifiable claims score lower — so part
+of any measured lift could be transcript readability rather than task success.
+Two mitigations are mandatory: every scenario requires a written answer artifact
+(`answer.md`, captured via `artifacts`) so checks are groundable in a file rather
+than in prose scattered through the transcript; and P6.0 human-grades every job
+and reports judge–human agreement **per rung**. If agreement differs materially
+by rung, the instrument is biased and nothing is published until that is
+understood.
+
+**Composite dilution.** With Service dead (§2.4) and Environment intentionally
+flat, composite lift ≈ 0.4·ΔGoal + 0.2·ΔAgent. The §4.1 example — +26 Goal, +21
+Agent — publishes as roughly +15. The composite systematically understates the
+dimensions this measurement is about. The gallery therefore always shows
+per-dimension deltas (§5), and whether the headline badge is the composite lift
+or the Goal Achievement lift is an open decision (PLAN, open questions), made
+after the spike and **with Netlify** — publishing a re-weighted or re-labelled
+number under the AXIS name without their agreement is off the table.
+
+**Empty-dimension behaviour is unknown.** The AXIS docs do not say what a
+dimension with zero interactions scores. If empty Service defaults high, it
+dilutes uniformly (tolerable); if it swings on one or two stray calls, it injects
+noise into a fifth of the composite. P6.0 answers this empirically before any
+schema is built.
+
 ---
 
 ## 3. Scenario contract
@@ -256,6 +297,15 @@ These exist because we are grading our own product.
 5. **Answers that drift are asked as shapes, not values.** "Report the price
    shown" (judge checks a plausible currency amount was read off the page), not
    "report that the price is $129."
+6. **Checks are rung-neutral and grounded in an artifact.** Every scenario
+   instructs the agent to write its findings to `answer.md` and captures it via
+   `artifacts`, and every check is phrased so it is satisfiable in principle from
+   any rung's transcript. A check that assumes a browser exists ("the final URL
+   matches…") silently fails the `no-context` rung for the wrong reason; phrase
+   it as "identifies a specific listing page (its `/rooms/<id>` URL) as the
+   source of the answer" instead. Where prior knowledge could fake success
+   (install commands, well-known facts), add a check that the transcript shows
+   the answer was read from the site rather than recalled.
 
 **On rule 2 and `withSkillVariantsStrict`.** AXIS supports a per-variant `judge`
 override, and Netlify uses it deliberately: their `with-skill` runs are held to a
@@ -330,10 +380,10 @@ export default {
   name: "Airbnb: read the nightly price on a listing page",
   archetype: "extract",
   prompt:
-    "On airbnb.com, open any listing in Paris and report the nightly price shown on the listing page, plus the name of the page section it appears in.",
+    "On airbnb.com, open any listing in Paris and report the nightly price shown on the listing page, plus the name of the page section it appears in. Write your findings to answer.md, including the URL of the listing you used.",
   judge: [
-    { check: "Reaches a listing detail page — final URL matches /rooms/<id>" },
-    { check: "Reports a nightly price as a currency amount actually read off that page, not inferred from search results" },
+    { check: "answer.md identifies a specific listing detail page (its /rooms/<id> URL) as the source of the answer" },
+    { check: "Reports a nightly price as a currency amount actually read off that page (visible in the transcript), not inferred from search results" },
     { check: "Names the page region the price appears in" },
     { check: "Does NOT attempt to book, sign in, or submit any form" },
   ],
@@ -391,7 +441,8 @@ contributor.
   "region": "us-east",
   "archetypes": ["navigate", "extract", "traverse"],
   "scenarios": 3,
-  "runs_per_variant": 5,
+  "runs": { "no_context": 2, "with_skills": 5, "with_sightmap": 5 },
+  "failed": { "no_context": 1, "with_skills": 0, "with_sightmap": 0 },
   "rungs": {
     "no_context":    { "result": 48, "goal_achievement": 41, "environment": 70, "service": 62, "agent": 44, "spread": 9 },
     "with_skills":   { "result": 61, "goal_achievement": 58, "environment": 74, "service": 66, "agent": 55, "spread": 7 },
@@ -409,9 +460,14 @@ contributor.
 
 Field notes:
 
-- **Each rung** is the **median** across `runs_per_variant` repetitions per
-  scenario, then the mean across scenarios. Median first because a single CAPTCHA
-  or timeout should not define an entry.
+- **Each rung** is the **median** across its `runs` repetitions per scenario,
+  then the mean across scenarios. Median first because a single CAPTCHA or
+  timeout should not define an entry. `no_context` runs at lower n by design: it
+  is context for `lift_total`, not part of the headline instrument, and it is the
+  least controlled rung (an agent in a bare workspace may or may not bootstrap
+  its own tooling), so extra repetitions there buy noise, not precision.
+- **`failed`** tallies, per rung, jobs that timed out or died; they are excluded
+  from that rung's median.
 - **`lift`** is `with_sightmap − with_skills`, per dimension. **`lift_total`** is
   `with_sightmap − no_context`. `lift` is the headline everywhere.
 - **`spread`** is the interquartile range of the composite across repetitions. It
@@ -472,8 +528,17 @@ number everywhere it is shown.
 
 ## 5. Publication and display
 
-**Card (`/atlas`).** One badge: `AXIS +18`, coloured by confidence, not by score
-band. Unscored entries show nothing — no placeholder, no "not yet scored" chip.
+Two standing rules govern everything below. **Per-dimension deltas are always
+shown wherever a composite is** — §2.6's dilution means the composite alone
+under-reports the dimensions this measurement is about. And **nothing branded
+AXIS is published before Netlify has reviewed the methodology** (PLAN, post-spike
+sync): these scores stretch the tool past its design centre, and doing that in
+public under their name is a decision made with them, not about them.
+
+**Card (`/atlas`).** One badge showing the headline lift — whether that number is
+the composite lift or the Goal Achievement lift is decided post-spike with
+Netlify (see §2.6 and PLAN's open questions) — coloured by confidence, not by
+score band. Unscored entries show nothing — no placeholder, no "not yet scored" chip.
 Sorting by lift is allowed; it must place unscored entries last rather than at
 zero.
 
@@ -505,10 +570,16 @@ number across mixed agents is not a number.
 
 A measurement is published only if **all** hold:
 
-1. `runs_per_variant ≥ 3` (target 5).
-2. All three rungs completed on at least 3 scenarios; a job that timed out or died
-   is excluded from the median and counted in a `failed` tally, and if more than
-   a third of jobs failed the whole measurement is void.
+1. `with_skills` and `with_sightmap` each completed ≥3 runs per scenario
+   (target 5) on at least 3 scenarios. `no_context` needs only enough completions
+   to report `lift_total`; when it has none, `lift_total` is omitted and the
+   measurement stands.
+2. Failure is tallied **per rung**. A job that timed out or died is excluded from
+   its rung's median and counted in `failed`. If more than a third of
+   `with_skills` or `with_sightmap` jobs failed, the measurement is void.
+   Wholesale failure of `no_context` is not spoilage — an agent that cannot
+   complete the task at all without tooling *is the status quo*, and is recorded
+   as exactly that.
 3. The judge adapter differs from the agent under test.
 4. Dimension weights are AXIS defaults.
 5. `|lift.result| > max(with_skills.spread, with_sightmap.spread)` →

@@ -26,7 +26,8 @@ in the same PR that needs it, loudly.
 | Task | Repo | Depends on |
 |---|---|---|
 | P6.0 spike | atlas | P1 (`atlas add`), P3 (seed entries) |
-| P6.1 harness scaffold | atlas | P6.0 go |
+| Netlify sync | — | P6.0 |
+| P6.1 harness scaffold | atlas | P6.0 go + Netlify sync |
 | P6.2 scenarios + skill | atlas | P6.1 |
 | P6.3 record + index | atlas | P6.2 |
 | P6.4 scoring workflow | atlas | P6.3 |
@@ -69,9 +70,11 @@ site that turns us away gets recorded and skipped, never worked around.
 
 ### Shape
 
-Two scenarios per site (one `navigate`, one `extract`), three variants
-(SPEC §2.2), three repetitions. 36 jobs. Real numbers on cost and wall-clock come
-out of this; the estimate that motivated the schedule in P6.4 does not.
+Two scenarios per site (one `navigate` or `traverse`, one `extract`), three rungs
+(SPEC §2.2), with repetitions of 2 for `no-context` and 3 for the two headline
+rungs. 32 jobs, plus a judge pass over every transcript — assume scoring roughly
+doubles the raw run cost. Real numbers on cost and wall-clock come out of this;
+the estimate that motivated the schedule in P6.4 does not.
 
 ### What the spike has to answer
 
@@ -87,7 +90,14 @@ learned now than after five more phases.
 
 **Is SPEC §2.4 right about Service?** Confirm that browser interactions classify
 as Environment and the site is invisible to Service. If so, that is a real finding
-to take back to Sean, and it shapes what §5 puts on the page.
+to take back to Sean, and it shapes what §5 puts on the page. While there:
+**what does an empty dimension score?** Service should have near-zero
+interactions in most runs — record what AXIS does with that (SPEC §2.6).
+
+**Is the judge honest across rungs?** Human-grade all 32 jobs against the rubrics
+(they are short) and report judge–human agreement per rung. Divergence by rung is
+SPEC §2.6's legibility bias made real, and it blocks publication until
+understood.
 
 **Do the mechanics hold?**
 - Chrome installed once in `beforeAll`, symlinked per job across isolated `HOME`s.
@@ -102,9 +112,13 @@ entry and to a full-atlas sweep.
 
 ### Deliverable
 
-A written go/no-go with the raw `report.json` attached: the numbers, the mechanical
-findings, the pre-flight results, the cost extrapolation, and — if no-go — what
-would have to change. **A weak or noise-level lift is a legitimate outcome and
+A written go/no-go with the raw `report.json` attached: the AXIS numbers **next
+to harness-independent operational metrics computed from the same transcripts —
+task success rate, wall-clock, tokens, tool calls per run.** If AXIS lift is flat
+while success and tokens moved, that disagreement is a finding about AXIS's fit,
+not about sightmap, and it is the single most important distinction the spike can
+draw. Plus the mechanical findings, the pre-flight results, the judge-agreement
+table, the cost extrapolation, and — if no-go — what would have to change. **A weak or noise-level lift is a legitimate outcome and
 stops the phase.** So is "airbnb blocks us and ikea is flaky"; that would push the
 whole design toward `self-hosted` and `replay` before anything else gets built.
 
@@ -116,6 +130,28 @@ as a dev-tool experience, no browser and no live sites, structured exactly like
 `netlify/context-and-tools`. It exercises config, variants, judging, and reports
 against a target that cannot flake, and it produces a useful quality signal for
 the skills either way. Not required; a shortcut if P6.0 stalls on plumbing.
+
+---
+
+## After the spike: the Netlify sync — before any downstream task starts
+
+The spike report goes to Sean Roberts more or less as written: AXIS on ground
+nobody has taken it, with the §2.4 Service finding and the judge-agreement table
+as the interesting parts. Three things come out of that conversation:
+
+- **A methodology review** — are we using the tool in a way its maintainer will
+  stand behind?
+- **The badge decision** (composite lift vs. Goal Achievement lift), made
+  jointly, because publishing a re-labelled number under the AXIS name is their
+  call as much as ours.
+- **The upstream conversation.** A browser/computer-use interaction category is
+  the structural fix for §2.4, Sean has already said extending AXIS there "would
+  be amazing," and nobody has benchmarked agent experience for general browser
+  use. Being the instigating contributor is worth more to the partnership than
+  any gallery badge.
+
+P6.1 onward is contingent on this sync the way it is contingent on the spike
+itself.
 
 ---
 
@@ -184,6 +220,10 @@ the skills either way. Not required; a shortcut if P6.0 stalls on plumbing.
 
 ## P6.5 Gallery surface — sightmap/sightmap `web/`
 
+- **Decision-gated, not queued.** The public surface ships only after the
+  badge-semantics decision from the Netlify sync and after internal measurements
+  (P6.6) have run long enough to trust their stability. The internal eval carries
+  its own weight regardless; the public badge can wait as long as it needs to.
 - Card badge, detail scorecard (the three-rung ladder, per-dimension deltas,
   `lift_total` labelled as the whole-stack comparison), stale handling, sort
   behaviour, machine twins, and the `llms.txt` clause, all per SPEC §5.
@@ -216,18 +256,19 @@ the skills either way. Not required; a shortcut if P6.0 stalls on plumbing.
 - A blog post walking one entry end to end with its real report linked. Lead with
   the measurement, not the marketing: the credibility of every number on the site
   rests on the first one being reported honestly, negatives included.
-- Worth raising with Netlify before publishing: no one has benchmarked agent
-  experience for general browser use, the §2.4 finding is useful to them, and a
-  joint framing is better than a vendor claim about its own product.
+- The Netlify sync has long since happened by this point; launch content is
+  written jointly where they want that, and cites the methodology review rather
+  than asserting our own rigor.
 - README badge once AXIS ships its embeddable badge (on their roadmap, not ours).
 
 ---
 
 ## Risks
 
-**Cost.** 4 scenarios × 3 rungs × 5 repetitions is 60 agent runs per entry, each
-driving a browser — the third rung raised this by half over a two-variant design,
-and it is worth it. This is the dominant constraint and the reason for a schedule
+**Cost.** 4 scenarios × (2+5+5) repetitions is 48 agent runs per entry, each
+driving a browser, plus a judge pass over every transcript — the third rung
+raised this substantially over a two-variant design, and it is worth it. This is
+the dominant constraint and the reason for a schedule
 rather than per-merge scoring, hard limits, and a budget ceiling in P6.4. P6.0
 replaces this estimate with a measurement.
 
@@ -248,6 +289,11 @@ scenarios and reports, published negatives, the `with-skills` middle rung, and t
 §6.6 goal-achievement gate are all load-bearing. Dropping any one of them turns
 this from evidence into marketing.
 
+**The judge may flatter the map.** SPEC §2.6: legible sightmap transcripts are
+easier to verify than fetched HTML soup, which could manufacture lift out of
+readability. The spike's human-graded calibration exists to catch this; if
+judge–human agreement diverges by rung, publication stops there.
+
 **Live-site exposure.** Read-only tasks, serial execution, one region, POLICY.md
 in force. A site that signals it does not want automated traffic gets no `live`
 score and no workaround.
@@ -259,6 +305,19 @@ pinned, recorded in every result, and a bump re-baselines.
 **Scope creep into the spec.** This phase adds nothing to `spec/v1/` and no CLI
 verb. If an implementation task starts wanting one, that is a signal the design
 drifted, not a small extra PR.
+
+## Later options, named so they aren't re-litigated
+
+- **A standard-benchmark companion.** When the efficacy claim needs to convince a
+  skeptical audience, its strongest form is a WebArena-style standard benchmark —
+  self-hosted site replicas, deterministic, an instrument we didn't design — run
+  with and without maps of the benchmark sites, reporting the success-rate delta.
+  Heavy, not per-entry, and not a scorecard: a credibility moment, not a product
+  surface. Out of scope until there is something worth defending.
+- **The audit layer.** SPEC §2.5's two-layer shape: a cheap deterministic
+  per-merge audit of each entry (AXIS's actual design centre), with the run-based
+  lift as the scheduled field measurement. If lift proves too expensive to run
+  monthly across the atlas, this is the per-entry signal that fills the gap.
 
 ## Open questions for maintainers
 
@@ -276,3 +335,6 @@ drifted, not a small extra PR.
    Worth an explicit decision rather than drift.
 6. **Track A on its own merits?** Scoring the CLI and skills needs no browser and
    no live sites, and would be useful whether or not Track B proceeds.
+7. **Badge semantics.** Composite lift or Goal Achievement lift as the public
+   number — decided at the Netlify sync (SPEC §2.6), listed here so it is not
+   decided by default during P6.5.

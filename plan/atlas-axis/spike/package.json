@@ -1,0 +1,9 @@
+{
+  "name": "atlas-axis-spike",
+  "private": true,
+  "type": "module",
+  "description": "P6.0 feasibility spike: AXIS three-rung ladder on sightmap-org and airbnb. Throwaway; see README.md.",
+  "devDependencies": {
+    "@netlify/axis": "1.17.2"
+  }
+}
