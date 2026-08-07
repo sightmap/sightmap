@@ -91,6 +91,9 @@ func runAtlasSearch(verb string, args []string, out io.Writer) error {
 	if verb == "list" && len(words) > 0 {
 		return fmt.Errorf("unexpected argument %q — use 'sightmap atlas find %s' to search", atlas.SafeText(words[0]), atlas.SafeText(words[0]))
 	}
+	if *limit < 0 {
+		return fmt.Errorf("--limit must be 0 or greater (0 shows all)")
+	}
 	query := strings.Join(words, " ")
 
 	res, err := atlas.LoadIndex(context.Background(), atlas.IndexOptions{URL: *indexURL, Refresh: *refresh})

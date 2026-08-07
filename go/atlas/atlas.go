@@ -8,7 +8,7 @@
 //
 //	res, err := atlas.LoadIndex(ctx, atlas.IndexOptions{})
 //	hits := res.Index.Search(atlas.Query{Text: "squareup.com"})
-//	err = atlas.Install(ctx, hits[0].Entry.Slug, atlas.Options{Target: ".sightmap"})
+//	_, err = atlas.Install(ctx, hits[0].Entry.Slug, atlas.Options{Target: ".sightmap"})
 //
 // Everything the catalog publishes is untrusted. [ParseIndex] escapes control
 // characters out of every display field as it decodes, so index text is safe to
