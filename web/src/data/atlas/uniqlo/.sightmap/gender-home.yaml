@@ -1,0 +1,44 @@
+version: 1
+
+views:
+  - name: Home
+    route: /us/en/:gender
+    url: https://www.uniqlo.com/us/en/men
+    description: Landing page — media banners and a category grid, addressed by gender.
+    memory:
+      - The landing page has three addresses and which one you end up on depends
+        on state, not on what you requested. `/us/en/` redirects to whichever
+        gender was browsed last; `/us/en/men` keeps its own path; `/us/en/women`
+        normalizes to `/us/en/`, because women's is the default. The preference
+        is stored client-side, so two agents at the same URL land on different
+        pages.
+      - Mapped under `/us/en/:gender` rather than at the root because that is
+        where a warm profile actually lands. A corpus written only against
+        `/us/en` reports the landing as unmatched as soon as anyone browses
+        men's.
+      - All three addresses render `.home-template`, so the template class
+        identifies the page type while the gender has to be read from the title
+        or the content.
+      - There is no product grid here. The first surface that lists products is
+        `/us/en/search` or a category listing.
+    components:
+      - name: HomeTemplate
+        selector: '.home-template'
+
+      - name: MediaBanner
+        selector: '.media-banner'
+        properties:
+          - name: banner_text
+            extract: text
+        memory:
+          - Full-width campaign banners. Which ones render is merchandising, so
+            treat every one as optional.
+
+      - name: CategoryList
+        selector: '#homeCategoryList'
+        properties:
+          - name: categories
+            extract: text
+        memory:
+          - Shop-by-category links. The cheapest way to enumerate the category
+            tree for the current gender without opening the navigation.

@@ -1,0 +1,132 @@
+version: 1
+
+memory:
+  - The page type is announced by a class on the content root, which is the
+    cleanest page-type signal on any site in this atlas. `.fr-ec-template-plp` is
+    a category listing, `.fr-ec-template-pdp` is a product page. An agent can
+    branch on that instead of parsing the URL.
+  - The `data-testid` values are design-system primitives, not identifiers.
+    `ITOTypography` matched 574 elements on one page, `ITOImage` 363, and
+    `ITOLink` 128. They name the component the design system rendered, so they
+    tell you an element is *a* piece of text and never *which* one. Use the
+    `fr-ec-` classes for identity and treat `ITO*` as type information.
+  - Two class families, both stable. `fr-ec-` is the e-commerce layer and carries
+    meaning (`fr-ec-product-tile`, `fr-ec-footer`, `fr-ec-breadcrumb-group`);
+    `ito-` is spacing utility (`ito-margin-bottom-52`) and carries none.
+  - Every route is locale-prefixed (`/us/en/`), so a mapped route holds only for
+    that storefront.
+  - A product URL is `/us/en/products/:productId/:colorCode`. Loading one appends
+    `?colorDisplayCode=` and `?sizeDisplayCode=` for the default variant, so the
+    URL after load is longer than the one requested.
+
+components:
+  - name: PromoStrip
+    selector: '#stickyTopSection'
+    properties:
+      - name: promo_text
+        extract: text
+    memory:
+      - The sticky banner above the navigation. Its copy rotates with
+        merchandising.
+
+  - name: NavigationHeader
+    selector: '.navigation-header'
+    memory:
+      - WOMEN, MEN, KIDS, BABY. It matches three times per page because the
+        header renders desktop, mobile, and sticky variants of itself, so any
+        count of nav links is tripled.
+
+  - name: PageContent
+    selector: '#page-content'
+    memory:
+      - The per-route content region, present on every view. Its first child
+        carries the `fr-ec-template-*` class that names the page type.
+
+  - name: Breadcrumbs
+    selector: '[data-testid="ITOBreadcrumbGroup"]'
+    properties:
+      - name: trail
+        extract: text
+    memory:
+      - Sits at the foot of the page rather than the top, which is unusual and
+        easy to miss when looking for it above the content.
+
+  - name: PreloadedDialog
+    selector: '[data-testid="ITODialog"]'
+    memory:
+      - A full-viewport dialog host rendered empty on every route before anything
+        opens it. Its header, content, and footer sub-elements all exist with no
+        text, so "a dialog is present" is not a signal that one is showing.
+
+  - name: BackToFrontOverlay
+    selector: '.b2f-overlay'
+    memory:
+      - A second empty full-viewport overlay hosting an iframe (`#b2f-frame`).
+        Like the dialog, it ships closed on every route.
+
+  - name: Accordion
+    selector: '[data-testid="ITOAccordion"]'
+    properties:
+      - name: accordion_text
+        extract: text
+    memory:
+      - The design system's collapsible section, used for filter groups on
+        category pages and for detail sections on product pages. Like every
+        `ITO*` hook it names the primitive rather than the purpose, so telling a
+        filter accordion from a spec accordion means reading its heading.
+
+  - name: PromoModal
+    selector: '[data-testid="modal-form-container"]'
+    memory:
+      - An email-capture overlay ("ACTIVATE $5 OFF") injected on browse routes.
+        It is a marketing prompt with a close control rather than a wall, so the
+        page underneath stays readable, but it will intercept a click aimed at
+        the content behind it.
+    children:
+      - name: PromoModalForm
+        selector: '[data-testid="form-component"]'
+
+  - name: ContentAlignment
+    selector: '[data-testid="ITOContentAlignment"]'
+    memory:
+      - A design-system layout wrapper with no meaning of its own. It is mapped
+        only so its many empty children resolve; nothing inside it is worth
+        reading without a more specific selector.
+
+  - name: ECGrid
+    selector: '[data-testid="ECGrid"]'
+    memory:
+      - The e-commerce grid primitive, used for size and colour swatch layouts on
+        product pages.
+
+  - name: Drawer
+    selector: '[data-testid="ITODrawer"]'
+    memory:
+      - The design system's slide-out panel, used for the filter drawer on
+        category listings. It holds the apply button ("VIEW ITEMS (240)") whose
+        label carries the filtered result count, which is the only place that
+        number appears before the filter is applied.
+
+  - name: PopupFormDialog
+    selector: 'div[aria-label="POPUP Form"]'
+    memory:
+      - A third dialog host, separate from `PreloadedDialog` and
+        `BackToFrontOverlay`, carrying the promotional email form. Three
+        independent overlay hosts ship on a browse route, so counting dialogs
+        overstates what is actually open.
+
+  - name: AppShell
+    selector: '.template-base'
+    memory:
+      - The application shell wrapping every route inside `#root`. Mapped so that
+        chrome elements outside the header, content, and footer regions still
+        resolve to something rather than reading as orphans.
+
+  - name: GlobalFooter
+    selector: '.fr-ec-footer'
+
+requests:
+  - name: SearchPage
+    route: /us/en/search
+    method: GET
+    description: Search results, served as a document. The tiles arrive in the HTML.

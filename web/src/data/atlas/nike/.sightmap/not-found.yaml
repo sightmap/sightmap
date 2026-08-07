@@ -1,0 +1,34 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://www.nike.com/no-such-page-xyz-123
+    description: Catch-all page — an apology line above a product carousel.
+    memory:
+      - Renders the full global nav and footer, so the chrome is no evidence that
+        a real page loaded. The title (`Page not found. Nike.com`) is the
+        reliable signal.
+      - It is built by the same CMS renderer as the home page. Both mount
+        `#ciclp-app`, which is why that id cannot distinguish them and why this
+        page merchandises at all.
+      - The message avoids the number 404, so string-matching on it fails.
+      - Below the apology sits a carousel of real products with real prices,
+        which means an agent scraping "products on the page" gets a non-empty
+        answer from a page that found nothing.
+    components:
+      - name: NotFoundApp
+        selector: '#ciclp-app'
+
+      - name: NotFoundMessage
+        selector: '.headline-3'
+        properties:
+          - name: message
+            extract: text
+
+      - name: NotFoundCarousel
+        selector: '.nds-carousel'
+        memory:
+          - The same design-system carousel used for recommendations elsewhere.
+            Its presence here is why "found products" cannot stand in for "found
+            the page".

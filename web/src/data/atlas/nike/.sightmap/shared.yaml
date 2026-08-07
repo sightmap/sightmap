@@ -1,0 +1,104 @@
+version: 1
+
+memory:
+  - The site uses two different test-hook attributes and they are not
+    interchangeable. `data-testid` covers the global nav, the footer, and the
+    product page; `data-test` appears on the browse shell
+    (`[data-test="browseShell"]`). A selector written against one will not find
+    the other.
+  - Test-hook naming is inconsistent within a single page. The product page
+    carries kebab-case (`pdp-main`, `atb-button`, `favorite-button`) alongside
+    PascalCase (`ImageCarousel`, `ThumbnailListContainer`, `Thumbnail-0`). Match
+    the exact string; there is no convention to infer from.
+  - React `useId` values appear as ids in the form `#:r0:` and `#:r1:`. They
+    change between renders and are not valid CSS identifiers without escaping.
+    Never anchor to them.
+  - Class names come in two families. Prefixed names (`nds-`, `product-card__`,
+    `wall-header__`, `results__`) are the design system and are stable;
+    `nav-css-cssveg` and `css-`-style names are compiled output that changes
+    between deploys.
+  - Search and category browse are the same page. `/w?q=<terms>` and
+    `/w/<categorySlug>` both render `#Wall` with the same `.product-card` grid
+    and the same filter rail, so one set of selectors covers both.
+
+components:
+  - name: GlobalNav
+    selector: '#commerce-header-v2-wrapper'
+    memory:
+      - Rendered identically on every route including the 404, so its presence
+        proves nothing about the page beneath it.
+      - It contributes over 250 links to any node count, because the full
+        shopping menu is in the DOM whether or not a flyout is open.
+    children:
+      - name: TopBar
+        selector: '[data-testid="top-bar-container"]'
+        memory:
+          - Find a Store, Help, Join Us, Sign In. Reads "Sign In" when signed
+            out.
+      - name: ShoppingMenu
+        selector: '[data-testid="desktop-menu-container"]'
+        memory:
+          - Men, Women, Kids, Jordan and the rest. Every entry links to a `/w/`
+            category wall, so the whole top-level taxonomy is reachable without
+            opening a single flyout.
+
+  - name: NavScrim
+    selector: '[data-testid="scrim"]'
+    memory:
+      - A full-viewport overlay that is present on every route at all times and
+        only becomes visible when a nav flyout opens. Finding it says nothing
+        about whether a menu is showing.
+
+  - name: PromoBanner
+    selector: '[data-testid="banner-carousel"]'
+    memory:
+      - A rotating promotional strip at the top of the content area. Its text
+        changes on a timer, so an assertion against it is a race.
+
+  - name: ContentWrapper
+    selector: '#experience-wrapper'
+    memory:
+      - Holds the per-route content between the header and the footer on every
+        view. It is the boundary between the shared chrome and whatever the route
+        actually renders.
+
+  - name: ModalRoot
+    selector: '#modal-root'
+    memory:
+      - An empty portal target rendered on every route. Dialogs are teleported
+        here rather than into the component that opened them, so a modal's
+        position in the DOM says nothing about what triggered it.
+
+  - name: RouteAnnouncer
+    selector: '#__next-route-announcer__'
+    memory:
+      - The Next.js route announcer, an empty assertive live region present on
+        every route. It reads as an unlabeled alert to anything walking the
+        accessibility tree and carries no content of its own.
+
+  - name: EmbeddedMessaging
+    selector: '[id="embedded-messaging"]'
+    memory:
+      - A Salesforce chat widget mounted site-wide with its own polite live
+        region. It stays empty until support chat is opened.
+      - Written in the attribute form rather than as `#embedded-messaging`
+        because the `id-hash-selector` lint rule reads this stable vendor id as
+        auto-generated. The two selectors match the same single element, live
+        and offline. The ids on this site that really are generated are the
+        UUID module mounts, which nothing here selects on.
+
+  - name: GlobalFooter
+    selector: '#footer-wrapper'
+    children:
+      - name: FooterMenu
+        selector: '[data-testid="footer-menu"]'
+        memory:
+          - Columns are numbered by position (`footer-menu-column-0` through
+            `-3`), not by what they contain, so the numbering is not a stable
+            way to find "Help" or "Company".
+
+requests:
+  - name: ProductWallSearch
+    route: /w
+    method: GET
+    description: The browse and search page itself, served as a document. Results arrive in the HTML rather than as a separate fetch.

@@ -1,0 +1,126 @@
+version: 1
+
+memory:
+  - Class prefixes name the surface that owns the element, and learning the three
+    of them replaces most selector guessing. `hnf-` is the shared header, nav,
+    and footer frame; `plp-` is the product list page and appears on both search
+    and category; `pipf-` is the product information page. A `plp-` class on a
+    `/p/` URL means the page is rendering a recommendation strip, not the product.
+  - Every route is locale-prefixed (`/us/en/`). The prefix is part of the path
+    rather than a cookie or header, so a mapped route only holds for that
+    storefront and prices, availability, and the category tree all change with it.
+  - Both browse surfaces resolve their slug from an id and rewrite the URL, so a
+    requested path never proves what loaded. Read `.hnf-pageheader__h1` after the
+    page settles.
+  - The search page embeds a Cloudflare Turnstile widget as a hidden
+    `cf-turnstile-response` input. It stayed dormant across this mapping and
+    never presented a challenge, but its presence means search is the route most
+    likely to start gating automated traffic.
+  - Product grids load about 22 cards and extend on scroll, so a card count read
+    straight after navigation is a page-size artifact rather than a result count.
+    `.search-summary` carries the real total.
+
+components:
+  - name: GlobalHeader
+    selector: '.hnf-header'
+    memory:
+      - Identical on every route including the 404, so its presence says nothing
+        about whether a real page loaded.
+    children:
+      - name: UtilityBar
+        selector: '.hnf-utilitybar'
+      - name: MainNavBar
+        selector: '.hnf-navbar'
+      - name: SearchBox
+        selector: '.hnf-navbar__search'
+        memory:
+          - A plain GET form pointing at `/us/en/search/`, so search is reachable
+            by URL alone as `/us/en/search/?q=<terms>`.
+        children:
+          - name: SearchInput
+            selector: '#ikea-search-input'
+            properties:
+              - name: query
+                extract: attr=value
+
+  - name: Breadcrumbs
+    selector: '.hnf-breadcrumb'
+    properties:
+      - name: trail
+        extract: text
+    memory:
+      - Present on category and product pages, absent from home and search. It is
+        the cheapest way to learn where a product sits in the taxonomy without
+        walking the nav.
+
+  - name: GlobalFooter
+    selector: '.hnf-footer'
+    children:
+      - name: FooterLinkGroups
+        selector: '.hnf-footer__linkGroups'
+        memory:
+          - Collapsible accordions (`#hnf-accordion_0` through `_3`). The links
+            are in the DOM whether or not a group is expanded.
+      - name: FooterCopyright
+        selector: '.hnf-footer__copyright'
+
+  - name: CookieConsent
+    selector: '#onetrust-consent-sdk'
+    memory:
+      - OneTrust, present on every route until a choice is stored in the
+        profile. It renders as a dialog over the page, so a fresh profile meets
+        it before anything else and any click-based flow has to account for it.
+      - It does not block reading the page. The underlying content is in the DOM
+        and not `aria-hidden`, so a corpus walk works without dismissing it.
+      - Anything written against `#onetrust-` is a vendor selector rather than an
+        IKEA one, and it changes when the consent vendor does.
+
+  - name: PreloadedModalHosts
+    selector: '[class*="modal-wrapper"]'
+    properties:
+      - name: wrapper_class
+        extract: attr=class
+    memory:
+      - Five independent modal hosts render on every route before anything opens
+        them, each from a different frontend — `hnf-` (shared frame),
+        `wlo-modal-` (favorites), `rec-` (add to cart),
+        `ugc-rr-pip-fe-` (reviews), and `rr-leave-review-` (write a review).
+      - Every one sits in the DOM carrying a `--close` modifier, which is why
+        "is a modal present" and counting `[role=dialog]` both give the wrong
+        answer here. Test for the absence of `--close` instead, and read
+        `wrapper_class` to learn which frontend owns the open one.
+      - Each host also has a paired `__backdrop` element, so the raw match count
+        is roughly double the number of modals.
+
+  - name: MainContent
+    selector: '#content'
+    memory:
+      - The `main` landmark on every route. It carries no accessible name, so it
+        has to be matched by id, and it wraps a different subtree per route.
+
+  - name: FeedbackPrompt
+    selector: '.hnf-voc-cta'
+    memory:
+      - A voice-of-customer prompt that appears on some routes and not others.
+        Treat it as optional.
+
+requests:
+  - name: CircularOffers
+    route: /circular/circular-asis/offers/articles/*
+    method: GET
+    description: Buy-back and resale offers for one article, fetched on the product page from web-api.ikea.com.
+
+  - name: NudgeOverlay
+    route: /nudge/api/*/orchestration/p/overlay
+    method: GET
+    description: Decides which promotional overlay to show on a product page.
+
+  - name: RoteraModel
+    route: /*/rotera/data/model/*
+    method: GET
+    description: 3D model data for the product viewer, keyed by the same article number that ends the product URL.
+
+  - name: ServerSideTagging
+    route: /g/collect
+    method: GET
+    description: Server-side Google Tag Manager collection on sgtm.ikea.com. Fires on every route and carries no content.

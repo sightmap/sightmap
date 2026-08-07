@@ -1,0 +1,86 @@
+version: 1
+
+views:
+  - name: Collection
+    route: /collections/:handle
+    url: https://vuoriclothing.com/collections/shorts
+    description: Collection listing — headline, subcategory carousel, filter bar, and the product grid.
+    memory:
+      - Handles resolve loosely and silently. `/collections/mens-shorts` serves
+        `/collections/shorts` and rewrites the path, so the requested handle is
+        not evidence of what loaded. Read
+        `[data-testid="plp-headline-container"]` instead.
+      - An unknown handle does not redirect and does not 404 in any obvious way.
+        It renders the same not-found body as any unmatched path, with an empty
+        `document.title`.
+      - The product card is itself the `<a>`. There is no inner link to descend
+        into, so the href is read from the card element directly.
+      - The subcategory carousel gives each slide a `data-testid` equal to its
+        label ("Athletic Shorts", "Boardshorts"). Useful as data, useless as a
+        stable hook.
+    components:
+      - name: CollectionHeadline
+        selector: '[data-testid="plp-headline-container"]'
+        properties:
+          - name: headline
+            extract: text
+        memory:
+          - The authoritative answer to which collection loaded, given that the
+            URL is rewritten.
+
+      - name: SubcategoryCarousel
+        selector: 'div[aria-label="Content carousel"]'
+        children:
+          - name: SubcategoryCard
+            selector: '[data-testid="carouselCard"]'
+            properties:
+              - name: label
+                extract: text
+
+      - name: FilterBar
+        selector: '[data-testid="filter-bar"]'
+        properties:
+          - name: result_summary
+            extract: text
+        memory:
+          - Carries the result count as prose ("Showing 398 results"), so the
+            number has to be parsed out of the sentence.
+
+      - name: FiltersAccordion
+        selector: '[data-testid="FiltersAccordion"]'
+
+      - name: ProductRow
+        selector: '[data-testid="Plp-ConnectedProductRow"]'
+
+      - name: ProductCard
+        selector: '[data-testid="productCard"]'
+        properties:
+          - name: product_url
+            extract: attr=href
+          - name: card_text
+            extract: text
+        memory:
+          - The card element is the anchor, so `href` is read from it directly.
+            The URL carries `?queryId=` and `?collection=` for search
+            attribution; both are droppable.
+          - Card text runs together as badge, name, and price with no separators
+            ("New Arrival Benton Twill Elastic Waist Short 8\" Ink $98"), so it
+            needs splitting rather than reading as a name.
+        children:
+          - name: CardHoverBox
+            selector: '[data-testid="productCardHoverBox"]'
+            memory:
+              - Holds the swatch and quick-add affordances revealed on hover. It
+                is in the DOM whether or not the card is hovered.
+
+      - name: CollectionEditorial
+        selector: '[data-testid="CollectionEditorial2"]'
+        memory:
+          - An editorial tile placed inside the product grid. It has no price and
+            no href, so a walk that assumes every grid child is a product trips
+            on it.
+
+      - name: CollectionCopy
+        selector: '[data-testid="rich-text-editor"]'
+        memory:
+          - SEO copy below the grid, collapsed behind a "Read More" toggle.

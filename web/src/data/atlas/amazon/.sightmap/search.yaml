@@ -1,0 +1,75 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /s
+    url: https://www.amazon.com/s?k=cordless+drill
+    description: Keyword search — refinement rail, result grid, and pagination.
+    memory:
+      - Result cards are `[data-component-type="s-search-result"]`, 48 per page.
+        Do not use `[data-asin]` — it matches 88 elements on the same page,
+        because carousels, ad slots, and recommendation strips all carry an ASIN
+        too. The extra 40 look exactly like results until you follow them.
+      - Each card exposes its fields through `data-cy` attributes
+        (`title-recipe`, `price-recipe`, `reviews-block`, `delivery-recipe`),
+        one per card and no more, which makes them the cleanest read on the page.
+      - The `data-asin` on a result card is the same id that forms the product
+        URL at `/dp/:asin`, so results link to product pages with no lookup.
+      - The result count in the info bar is Amazon's estimate ("1-48 of over
+        20,000 results") and is not the number of cards rendered.
+    components:
+      - name: SearchRoot
+        selector: '#search'
+
+      - name: RefinementRail
+        selector: '#s-refinements'
+        memory:
+          - Filters are links that rewrite the query string, so filter state
+            survives a reload and can be composed by URL without clicking.
+
+      - name: ResultInfoBar
+        selector: '[data-component-type="s-result-info-bar"]'
+        properties:
+          - name: result_summary
+            extract: text
+
+      - name: SearchResultCard
+        selector: '[data-component-type="s-search-result"]'
+        properties:
+          - name: asin
+            extract: attr=data-asin
+          - name: position
+            extract: attr=data-index
+        children:
+          - name: CardTitle
+            selector: '[data-cy="title-recipe"]'
+            properties:
+              - name: title
+                extract: text
+          - name: CardPrice
+            selector: '[data-cy="price-recipe"]'
+            properties:
+              - name: price
+                extract: text
+          - name: CardReviews
+            selector: '[data-cy="reviews-block"]'
+            properties:
+              - name: reviews
+                extract: text
+          - name: CardDelivery
+            selector: '[data-cy="delivery-recipe"]'
+            properties:
+              - name: delivery
+                extract: text
+            memory:
+              - Delivery dates come from the header's IP-inferred location, so
+                this field differs by where the request originates.
+
+      - name: Pagination
+        selector: '.s-pagination-container'
+
+      - name: WidgetContainer
+        selector: '.s-widget-container'
+        memory:
+          - The generic slot wrapper. There are more of these than there are
+            results because banners, ad rows, and the info bar each occupy one.

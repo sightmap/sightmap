@@ -1,0 +1,38 @@
+version: 1
+
+views:
+  - name: ProductDetail
+    route: /us/en/products/:productId/:colorCode
+    url: https://www.uniqlo.com/us/en/products/E465185-000/00
+    description: Product page — gallery, options, a size comparison table, and related product carousels.
+    memory:
+      - Identified by `.fr-ec-template-pdp` on the content root.
+      - Colour is part of the path, not a parameter, so each colourway is its own
+        URL. Loading one appends `?colorDisplayCode=` and `?sizeDisplayCode=` for
+        the default variant, which means the URL after load differs from the one
+        requested even on success.
+      - The product id shape is `E465185-000`. The leading `E` and the trailing
+        block are constant across the catalogue; only the middle digits vary.
+      - A `.product-table` sits inside the related-products section rather than
+        describing the product on the page, so it is easy to mistake for a spec
+        table.
+    components:
+      - name: ProductTemplate
+        selector: '.fr-ec-template-pdp'
+
+      - name: RelatedProducts
+        selector: 'section[aria-label="Related Product List"]'
+        memory:
+          - Holds both the similar-products grid and the size comparison table.
+        children:
+          - name: ProductTable
+            selector: '.product-table'
+            properties:
+              - name: table_text
+                extract: text
+
+      - name: ProductLayout
+        selector: '.fr-ec-layout'
+        memory:
+          - The gallery and buy controls share this generic layout wrapper, which
+            is the only container above them that is not a spacing utility.

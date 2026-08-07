@@ -1,0 +1,99 @@
+version: 1
+
+memory:
+  - Four naming conventions coexist and each covers a different part of the site.
+    Kebab-case testids (`listing-card-title`, `little-search`) name interactive
+    components. UPPER_SNAKE testids (`LISTINGS_CAROUSEL`, `HEADER`, `BANNER`)
+    name sections on SEO landing pages. `data-section-id` (`TITLE_DEFAULT`,
+    `AMENITIES_DEFAULT`) names the structure of a listing page. Slash-namespaced
+    testids (`map/GoogleMap`, `map/ZoomInButton`) belong to the map subsystem.
+    An agent that only looks at `data-testid` never sees the listing page's
+    outline at all.
+  - Class names are Linaria output and carry no meaning. There are also 31
+    elements with `data-testid="linaria-injector"`, which are style injection
+    points rather than content. Nothing on this site should be selected by class.
+  - Every browse path normalizes. `/s/Paris--France/experiences` becomes
+    `/ile-de-france/things-to-do`, and an unmatched path becomes `/404`. Reading
+    `location.pathname` after load is how you learn where you actually are.
+  - Prices and availability depend on the dates and guest count in the search
+    state, so the same listing shows different numbers across searches. A price
+    read from a card is only meaningful together with the query that produced it.
+
+components:
+  - name: SkipLinks
+    selector: '#site-skip-links'
+    memory:
+      - The accessibility skip link, rendered outside the React root as a direct
+        child of `body`. Anything that walks down from `#react-application`
+        misses it.
+
+  - name: AppRoot
+    selector: '#react-application'
+    memory:
+      - The React mount point wrapping every route except the error page, which
+        is server-rendered without it. That difference is a cheap structural test
+        for whether the app booted at all.
+
+  - name: PageHeader
+    selector: '#react-application header'
+    memory:
+      - Scoped under the app root because a bare `header` selector is too broad
+        for a global.
+
+  - name: PageMain
+    selector: '#react-application main'
+
+  - name: PageFooter
+    selector: '#react-application footer'
+
+  - name: SearchHeader
+    selector: '[data-testid="little-search"]'
+    memory:
+      - The collapsed search control in the header on browse and listing pages.
+        The home page uses the expanded `structured-search-input-*` form instead,
+        so the two surfaces have different search markup.
+    children:
+      - name: SearchLocation
+        selector: '[data-testid="little-search-location"]'
+        properties:
+          - name: location
+            extract: text
+      - name: SearchDates
+        selector: '[data-testid="little-search-date"]'
+        properties:
+          - name: dates
+            extract: text
+      - name: SearchGuests
+        selector: '[data-testid="little-search-guests"]'
+        properties:
+          - name: guests
+            extract: text
+
+  - name: HeaderProfileMenu
+    selector: '[data-testid="cypress-headernav-profile"]'
+    memory:
+      - The account menu. Its testid still carries a `cypress-` prefix from an
+        older test framework, the only one on the site that does.
+
+  - name: TabListWrapper
+    selector: '[data-testid="tab-list-wrapper"]'
+    memory:
+      - Homes, Experiences, and Services. Switching tabs changes the search
+        vertical and the destination route.
+
+  - name: ContentScroller
+    selector: '[data-testid="content-scroller"]'
+    memory:
+      - A horizontal scroll container reused for card carousels and image
+        galleries, so finding one says nothing about what it holds.
+
+  - name: ModalContainer
+    selector: '[data-testid="modal-container"]'
+    memory:
+      - The dialog host. Present on browse routes before anything opens it.
+
+requests:
+  - name: SearchResultsPage
+    route: /s/*/homes
+    method: GET
+    description: Search results, served as a document. Listing cards arrive in the HTML.

@@ -1,0 +1,148 @@
+version: 1
+
+memory:
+  - Shopify behind a Next.js front end with MUI for components, so three naming
+    systems overlap. Vuori's own hooks are `data-testid`; MUI contributes
+    `.Mui*-root` classes that are stable but say nothing about purpose; and
+    `.mui-style-oim0n1` style hashes are compiled output that changes on deploy.
+  - Some `data-testid` values are content rather than identifiers. Carousel
+    slides use the product name and colorway
+    (`data-testid='Seaside Short 8" | Nautical'`), and category cards use the
+    category label (`data-testid="Athletic Shorts"`). They change whenever the
+    merchandising does, and the product ones contain a double quote for the inch
+    mark, so they cannot be written as a CSS attribute selector without escaping.
+    Treat every testid that reads like a sentence as data, not as a hook.
+  - React `useId` values appear as ids like `#:R16n55am:`. They change per render
+    and are not valid CSS identifiers unescaped.
+  - Collection handles resolve loosely. `/collections/mens-shorts` serves
+    `/collections/shorts` and rewrites the path, so the URL requested does not
+    describe what loaded.
+  - Product links carry `?queryId=` and `?collection=` for search attribution.
+    Both are droppable; `/products/:handle` alone serves the same page.
+
+components:
+  - name: PromoBanner
+    selector: '[data-testid="banner-message-container"]'
+    properties:
+      - name: message
+        extract: text
+    memory:
+      - Sits inside `StickyElement-container` above the header and rotates
+        promotional copy, so its text is not a fixed string.
+
+  - name: DesktopHeader
+    selector: '[data-testid="desktop-header"]'
+    memory:
+      - Present on every route including the 404, so it proves nothing about the
+        page beneath it.
+    children:
+      - name: MainMenu
+        selector: 'ul[aria-label="Main Menu"]'
+        memory:
+          - New, Women, Men, Accessories, Explore. Each opens a flyout and also
+            links to a `/collections/` handle, so following the link is the
+            reliable path.
+      - name: SearchBar
+        selector: '[data-testid="SearchBar"]'
+        memory:
+          - Search is reachable by URL as `/search?q=<terms>` with no need to
+            open this control.
+
+  - name: MobileDrawer
+    selector: '[data-testid="top-level-mobile-drawer"]'
+    memory:
+      - Rendered at full viewport size on desktop as well as mobile, closed. It
+        contributes its own copy of the whole navigation to the DOM, so menu
+        links match twice on every route.
+
+  - name: MainContent
+    selector: '#main-content'
+    memory:
+      - The per-route content region. It is the boundary between the shared
+        chrome and whatever the route renders.
+
+  - name: Breadcrumbs
+    selector: 'nav[aria-label="breadcrumb"]'
+    properties:
+      - name: trail
+        extract: text
+    memory:
+      - Present on collection and product pages, absent on home and the 404.
+
+  - name: SkipNavigation
+    selector: 'a[href*="#main-content"]'
+    properties:
+      - name: href
+        extract: attr=href
+    memory:
+      - The accessibility skip link, and it is broken. The href resolves to
+        `/products/meta-pant-oxblood.json#main-content` rather than to
+        `#main-content` on the current page, so activating it navigates to an
+        unrelated product's JSON endpoint instead of jumping to the content.
+        Observed on every route, including the 404.
+
+  - name: RouteAnnouncer
+    selector: '#__next-route-announcer__'
+    memory:
+      - The Next.js route announcer, an empty assertive live region on every
+        route. It reads as an unlabeled alert to anything walking the
+        accessibility tree.
+
+  - name: CookieConsent
+    selector: '#onetrust-consent-sdk'
+    memory:
+      - OneTrust, present on every route. It does not hide the page content, so a
+        corpus walk works without dismissing it.
+
+  - name: NewsletterOverlay
+    selector: '.klaviyo-form'
+    memory:
+      - A Klaviyo email-capture form injected on every route with its own live
+        regions. Its wrapper classes carry a per-build hash
+        (`kl-private-reset-css-Xuajs1`), so only the `.klaviyo-form` class is
+        durable.
+
+  - name: GlobalFooter
+    selector: '#__next footer'
+    memory:
+      - The footer element carries no id and no testid, only a generic
+        `.MuiBox-root`, so the tag name is the only handle on it. It is scoped
+        under `#__next` here because a bare `footer` selector trips the
+        `broad-tag-selector` lint rule.
+      - Most of its content (legal links, sitemap, privacy controls, the
+        newsletter form) sits outside the one testid it does have, which makes
+        `footerMenuLinks-wrapper` a subset rather than the footer.
+    children:
+      - name: FooterLinks
+        selector: '[data-testid="footerMenuLinks-wrapper"]'
+        memory:
+          - Support, Company, and Other columns. It is only part of the footer.
+      - name: FooterSafeText
+        selector: '[data-testid="safe-text"]'
+        memory:
+          - A wrapper for copy containing inline links, used for the newsletter
+            consent text. The links inside it are legal pages.
+
+  - name: FeedbackWidget
+    selector: '#kampyleButtonContainer'
+    memory:
+      - A Medallia feedback launcher injected on every route. It is a
+        third-party widget, so its markup changes with the vendor rather than
+        with the site.
+
+  - name: BuildStamp
+    selector: '#buildTime'
+    properties:
+      - name: rendered_at
+        extract: text
+    memory:
+      - The page prints its own render timestamp into the DOM. It changed on
+        every load observed rather than staying fixed per deploy, which makes it
+        a per-request server-render time and a direct read on whether a response
+        was cached or freshly generated.
+
+requests:
+  - name: SearchPage
+    route: /search
+    method: GET
+    description: Search results, served as a document. Results arrive in the HTML rather than as a separate fetch.

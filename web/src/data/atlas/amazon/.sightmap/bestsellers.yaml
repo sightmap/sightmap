@@ -1,0 +1,39 @@
+version: 1
+
+views:
+  - name: BestSellers
+    route: /gp/bestsellers
+    url: https://www.amazon.com/gp/bestsellers/
+    description: Best Sellers charts — department rail and a ranked grid, updated hourly.
+    memory:
+      - Ranked rather than searched, which makes it the one browse surface on the
+        site that returns a stable, enumerable list rather than a relevance guess.
+      - Every card wrapper is an `#CardInstance<random>` id regenerated on each
+        render. They read like stable hooks and are not. Use `#zg`, `#zg-header`,
+        and `#zg-left-col`, or the `.celwidget` wrapper.
+      - The `zg` prefix (from the older "Zeitgeist" name) is unique to this
+        surface and appears nowhere else on the site.
+    components:
+      - name: BestSellersRoot
+        selector: '#zg'
+
+      - name: BestSellersHeader
+        selector: '#zg-header'
+        properties:
+          - name: heading
+            extract: text
+
+      - name: DepartmentRail
+        selector: '#zg-left-col'
+        memory:
+          - The department tree for the charts. Its entries are links, so the
+            whole taxonomy can be walked without clicking.
+
+      - name: CardWidget
+        selector: '.celwidget'
+        properties:
+          - name: widget_text
+            extract: text
+        memory:
+          - Amazon's generic content-widget wrapper, used across several
+            surfaces. Here it wraps each chart section.

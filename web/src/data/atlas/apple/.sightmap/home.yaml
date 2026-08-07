@@ -1,0 +1,60 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.apple.com/
+    description: Editorial landing page — full-bleed promotional tiles and a media gallery.
+    memory:
+      - The landing page is promotion, not commerce. It is a stack of tiles for
+        whatever Apple is currently pushing, which on this capture was largely
+        Apple TV programming rather than hardware. There is no product grid and
+        no search field in the body.
+      - Tile headlines are frequently images rather than text. The `.tile-headline`
+        element wraps an `img`, so its `innerText` is empty and the readable
+        identity is the `aria-label` on the surrounding element or the
+        `.tile-subhead` below it.
+      - Which tiles appear and in what order is merchandising, so nothing here
+        should be matched by position.
+    components:
+      - name: MainContent
+        selector: '[role="main"]'
+
+      - name: PromoTile
+        selector: '.tile-wrapper'
+        properties:
+          - name: tile_text
+            extract: text
+        children:
+          - name: TileHeadline
+            selector: '.tile-headline'
+            memory:
+              - Often an image rather than text, so this element can match while
+                reading empty.
+          - name: TileSubhead
+            selector: '.tile-subhead'
+            properties:
+              - name: subhead
+                extract: text
+            memory:
+              - Real text, and the most reliable way to identify a tile.
+          - name: TileActions
+            selector: '.tile-ctas'
+            properties:
+              - name: actions
+                extract: text
+            memory:
+              - Where a tile links into the store, typically "Learn more" beside
+                a "Shop" link.
+
+      - name: MediaGallery
+        selector: '.media-gallery-headline-container'
+        properties:
+          - name: gallery_heading
+            extract: text
+
+      - name: GalleryDotNav
+        selector: '.media-gallery-dotnav'
+        memory:
+          - A tablist of numbered items ("Item 1", "Item 2") with no descriptive
+            labels, so the dots cannot tell you what they scroll to.

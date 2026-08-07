@@ -1,0 +1,81 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /s/:location/homes
+    url: https://www.airbnb.com/s/Paris--France/homes
+    description: Stay search — a grid of listing cards beside a live map.
+    memory:
+      - The location segment is a display string with a double hyphen as the
+        separator (`Paris--France`), not a slug and not an id. Other verticals
+        under `/s/` normalize away entirely; only `/homes` keeps this shape.
+      - Cards and map markers are separate DOM trees describing the same
+        listings. There were 28 cards and 20 `map/markers/BasePillMarker`
+        elements on one load, because the map only renders markers inside the
+        current viewport. Neither count is the number of results.
+      - The `listing-card-subtitle` hook matches roughly twice per card, since
+        a card carries several subtitle lines. `listing-card-title` and
+        `listing-card-name` match exactly once each.
+    components:
+      - name: PageHeading
+        selector: '[data-testid="stays-page-heading"]'
+        properties:
+          - name: heading
+            extract: text
+
+      - name: ListingCard
+        selector: '[data-testid="card-container"]'
+        properties:
+          - name: card_text
+            extract: text
+        children:
+          - name: CardTitle
+            selector: '[data-testid="listing-card-title"]'
+            properties:
+              - name: title
+                extract: text
+          - name: CardName
+            selector: '[data-testid="listing-card-name"]'
+            properties:
+              - name: name
+                extract: text
+          - name: CardSubtitle
+            selector: '[data-testid="listing-card-subtitle"]'
+            memory:
+              - Several per card, carrying bed count, dates, and rating on
+                separate lines.
+          - name: CardImage
+            selector: '[data-testid="listing-image"]'
+          - name: CardSaveButton
+            selector: '[data-testid="listing-card-save-button"]'
+          - name: CardPriceRow
+            selector: '[data-testid="price-availability-row"]'
+            properties:
+              - name: price
+                extract: text
+            memory:
+              - The price reflects the dates and guest count in the current
+                search, so it is only meaningful alongside that query.
+
+      - name: ResultsMap
+        selector: '[data-testid="universal-map-controlled"]'
+        memory:
+          - A Google Map. Its testids are slash-namespaced, the only place on the
+            site that convention appears.
+        children:
+          - name: MapCanvas
+            selector: '[data-testid="map/GoogleMap"]'
+          - name: MapMarker
+            selector: '[data-testid="map/markers/BasePillMarker"]'
+            properties:
+              - name: marker_label
+                extract: text
+            memory:
+              - Only markers within the current viewport are rendered, so panning
+                the map changes how many exist.
+          - name: MapZoomIn
+            selector: '[data-testid="map/ZoomInButton"]'
+          - name: MapZoomOut
+            selector: '[data-testid="map/ZoomOutButton"]'
+          - name: MapSettings
+            selector: '[data-testid="map/settingsButton"]'

@@ -1,0 +1,89 @@
+version: 1
+
+memory:
+  - Server-rendered on every route, so the listings and product facts are in the
+    first HTML response. The XHR traffic that follows fills lazy widgets,
+    recommendations, and the location toaster, none of which changes the content
+    you came for.
+  - Ids beginning `nav-` belong to the global chrome and are the most stable
+    hooks on the site. Ids of the form `#CardInstance<random>` are generated per
+    render and change on reload. Anything ending `_feature_div` is a product-page
+    slot, described in `product.yaml`.
+  - The site duplicates ids. Amazon renders several variants of the same block
+    and hides all but one, so `#add-to-cart-button` matches twice and
+    `#availability` three times on a normal product page. `querySelector` returns
+    document order, which is not guaranteed to be the visible one. Always filter
+    by visibility.
+  - The header reports a delivery location ("Delivering to Smyrna 30080")
+    inferred from the request's IP. Prices, availability, and delivery estimates
+    all follow from it, so two agents in different places see different pages at
+    the same URL.
+  - Search accepts `/s?k=<terms>` with nothing else. The rest of the query string
+    Amazon accumulates while browsing is tracking and refinement state.
+
+components:
+  - name: GlobalNav
+    selector: '#navbar'
+    memory:
+      - Present on home, search, product, and bestsellers. It is absent from the
+        404, which makes it the one reliable structural signal that a real page
+        loaded.
+    children:
+      - name: NavBelt
+        selector: '#nav-belt'
+      - name: SearchForm
+        selector: '#nav-search-bar-form'
+        children:
+          - name: SearchInput
+            selector: '#twotabsearchtextbox'
+            properties:
+              - name: query
+                extract: attr=value
+          - name: DepartmentSelect
+            selector: '#searchDropdownBox'
+            properties:
+              - name: department
+                extract: attr=value
+      - name: NavTools
+        selector: '#nav-tools'
+        memory:
+          - Account, orders, and cart. Reads "Hello, sign in" when signed out.
+      - name: ShopByDepartment
+        selector: '#nav-xshop'
+        memory:
+          - The department strip changes with season and merchandising, so its
+            entries are not a stable taxonomy.
+
+  - name: KeyboardShortcutMenu
+    selector: '#shortcut-menu'
+    memory:
+      - An accessibility affordance rendered on every route offering keyboard
+        shortcuts (search, cart, home, orders). It is off-screen until focused,
+        so it inflates interactive-node counts without being visible.
+
+  - name: PageRoot
+    selector: '#a-page'
+    memory:
+      - Wraps every route except the 404, which does not use the standard page
+        template at all.
+
+requests:
+  - name: LocationToaster
+    route: /portal-migration/hz/glow/get-rendered-toaster
+    method: GET
+    description: Renders the delivery-location control in the header. Fires on every route.
+
+  - name: CartItems
+    route: /cart/add-to-cart/get-cart-items
+    method: GET
+    description: Cart contents for the header count and the add-to-cart panel.
+
+  - name: LazyWidgetContent
+    route: /acp/*/getAjaxContentHTML
+    method: GET
+    description: Fetches HTML for a lazily-rendered page widget. The path segment names the widget.
+
+  - name: RecommendedForYou
+    route: /hz/rhf
+    method: GET
+    description: Personalized recommendation rail rendered into the page footer.

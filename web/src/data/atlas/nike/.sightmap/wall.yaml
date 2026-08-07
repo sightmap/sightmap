@@ -1,0 +1,89 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /w
+    url: https://www.nike.com/w?q=running%20shoes
+    description: Keyword search — the product wall with its filter rail and result grid.
+    memory:
+      - Search and category browse are one page. `/w?q=<terms>` searches;
+        `/w/<categorySlug>` browses a category. Both render `#Wall`, the same
+        `.product-card` grid, and the same `.ln-scroller` filter rail, so a
+        single set of selectors drives both and the only difference is the URL.
+      - The result count lives in `.wall-header__title` as part of a sentence
+        ("Search results for running shoes (429)"), so it has to be parsed out of
+        the heading rather than read from a dedicated element.
+      - The grid renders 24 cards and appends on scroll. A count taken on load
+        measures the first page, not the 429 in the heading.
+      - The `.loader-overlay` element sits inside `.product-grid` permanently and
+        covers the grid only while a filter is being applied. Its presence is not
+        a loading signal; its visibility is.
+    components:
+      - name: BrowseShell
+        selector: '[data-test="browseShell"]'
+        memory:
+          - One of the few `data-test` hooks on the site. Everything else nearby
+            uses `data-testid`.
+
+      - name: Wall
+        selector: '#Wall'
+
+      - name: WallHeader
+        selector: '.wall-header'
+        children:
+          - name: WallTitle
+            selector: '.wall-header__title'
+            properties:
+              - name: heading
+                extract: text
+
+      - name: FilterRail
+        selector: '.ln-scroller'
+        memory:
+          - Filters rewrite the URL, so filter state survives a reload and can be
+            composed without clicking.
+
+      - name: ProductGrid
+        selector: '.product-grid'
+        children:
+          - name: GridLoaderOverlay
+            selector: '.loader-overlay'
+
+      - name: ProductCard
+        selector: '.product-card'
+        properties:
+          - name: position
+            extract: attr=data-product-position
+          - name: is_premium
+            extract: attr=data-is-premium
+        memory:
+          - Also matches `[data-testid="product-card"]`; the two are the same
+            element and either works.
+          - The `data-product-position` attribute is the card's rank in the
+            current result set, which is the cheapest way to preserve result
+            order without tracking DOM index.
+        children:
+          - name: CardLink
+            selector: '.product-card__link-overlay'
+            properties:
+              - name: product_url
+                extract: attr=href
+            memory:
+              - An overlay anchor covering the whole card, so the destination is
+                readable without descending into the title.
+          - name: CardTitle
+            selector: '.product-card__title'
+            properties:
+              - name: title
+                extract: text
+          - name: CardPrice
+            selector: '.product-price'
+            properties:
+              - name: price
+                extract: text
+            memory:
+              - Discounted cards carry two of these, the current and the original
+                price, which is why the page has one more price element than it
+                has cards.
+          - name: CardImage
+            selector: '.product-card__hero-image'

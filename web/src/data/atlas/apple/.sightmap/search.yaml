@@ -1,0 +1,50 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /us/search/:query
+    url: https://www.apple.com/us/search/macbook
+    description: Site search — tabbed results across products, accessories, support, and stores.
+    memory:
+      - The query is a path segment, not a parameter. `/us/search/macbook` rather
+        than `?q=macbook`, which means a query with spaces has to be URL-encoded
+        into the path.
+      - Results are split across four tabs (Explore, Accessories, Support, Find a
+        Store) and only the selected tab's panel is populated. Reading the page
+        without switching tabs sees one quarter of what search found.
+      - The tab panel ids are React `useId` output (`#panel-_r_3_-0`), so they
+        change per render. Match the tab by its label instead.
+      - The result count sits inside the panel as prose ("300 results found"),
+        not in a dedicated element.
+    components:
+      - name: SearchRoot
+        selector: '.rf-serp-search'
+
+      - name: SearchForm
+        selector: '.rf-serp-form'
+        children:
+          - name: SearchBox
+            selector: '.rf-serp-searchbox'
+          - name: SearchAutocomplete
+            selector: '.rf-serp-autocomplete'
+
+      - name: ResultTabs
+        selector: '.rf-serp-tab'
+        properties:
+          - name: tabs
+            extract: text
+        memory:
+          - Explore, Accessories, Support, Find a Store. Switching tabs does not
+            change the URL, so the selected tab is not recoverable from the
+            address bar.
+
+      - name: ResultPanel
+        selector: '.rf-serp-explore-details'
+        properties:
+          - name: results_text
+            extract: text
+        memory:
+          - Holds the count and the result list for the active tab only.
+
+      - name: TabNavContainer
+        selector: '.rf-serp-tabnav-container'
