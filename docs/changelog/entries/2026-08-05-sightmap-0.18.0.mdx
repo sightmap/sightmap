@@ -1,0 +1,55 @@
+---
+label: "sightmap 0.18.0"
+date: "2026-08-05"
+tags: ["go", "cli"]
+---
+
+**Breaking:** rename the rule-side corpus types to the `Def` convention — `match.SightmapComponent` → `match.ComponentDef` and `match.SightmapMatch` → `match.ComponentMatch`. A `ComponentDef` describes what to match; a `ComponentMatch` is the result of matching one. No behaviour change; callers update to the new names.
+
+Add `sightmap init`: scaffold a schema-correct `.sightmap/` corpus (a commented `components.yaml` and `views/example.yaml` carrying `version: 1` and the top-level `views:` wrapper) so the first files an author sees are already valid instead of written from memory. Existing files are never overwritten, and the scaffolded corpus passes `sightmap validate` as-is.
+
+**Breaking:** split the matching engine out of `Corpus`. `Corpus` is now pure, serializable data; build a `Matcher` with `NewMatcher(corpus)` to match a live component tree. `Corpus.MatchTree` and `Corpus.Components` move to `Matcher.MatchTree` / `Matcher.Components` (the per-URL compiled-query cache now lives on the `Matcher`). Read-only corpus queries (`ComponentsForURL`, `ViewForURL`, `RequestsForURL`, `GlobalComponentNames`) stay on `Corpus`.
+
+Model `requests:` in the corpus and make it serializable to a stable wire form:
+
+- Global and view-scoped API request definitions (`RequestDef` / `Payload` / `Field`) are now parsed into the corpus — previously `requests:` was known to the schema but silently dropped.
+- New `Corpus.RequestsForURL(url, method)` returns every request whose route glob (and optional method) matches the observed request — "all matches apply", per the spec. Reuses the existing route matcher (`:param`, trailing-slash, `**`).
+- `Corpus`, `View`, and `RequestDef` now carry JSON tags, so a corpus serializes to a lean wire form (`memory` / `globals` / `views` / `requests`); authoring-only `View` fields (`url` / `access` / `snapshots` / `sourceFile` / `stability`) are excluded. The flattened list is emitted in a stable pre-order (lexical file order, then declaration-order depth-first), locked by a test, so the wire form is reproducible.
+
+First-run papercuts fixed:
+
+- Subcommand `--help`/`-h` now exits 0 and no longer prints `flag: help requested` — a help request is a success, not an error (#117).
+- `browser status` on a session file that exists but doesn't parse (e.g. hand-written or corrupted, so no valid `port`) now reports it as an unrecognized format with the expected shape, instead of a misleading "server and CDP were assigned the same port (0)" collision hint. The collision hint is also gated on a real server port (#118).
+- `validate` no longer warns about unknown fields in tooling files it owns (`survey.yaml`), as it already skips `config.yaml` (#119).
+
+Make `browser start` work — and fail legibly — on Linux and in root containers (the standard agent/CI environment):
+
+- `FindChrome` now checks the sightmap-managed Chrome for Testing install (`~/.sightmap/browsers/`) on Linux and Windows, not just macOS, so the documented `browser install` → `browser start` flow works. The "no Chrome found" errors now point at `browser install`.
+- `browser start` adds `--no-sandbox` automatically when running as root (Chrome refuses to start otherwise), and accepts `--chrome-flag` (repeatable) and `--chrome-binary` to override the launch.
+- On a startup timeout, `browser start` now reports the resolved binary, the full argument list, and the tail of Chrome's stderr — instead of a bare "timed out waiting for CDP" that hid the real cause.
+
+Three first-run papercuts:
+
+- `validate` now errors on an unsupported `version:` value (e.g. `version: 2`) — the spec requires `version: 1`. This is the companion to the missing-`version:` warning.
+- `browser install --help` prints usage and exits 0 instead of ignoring its arguments and starting the 184 MB Chrome-for-Testing download (the subcommand now parses its flags).
+- `search` names the near-miss when a pattern matches a **view** or **request** name (search covers component fields only), instead of a bare "no matches".
+
+Route matching: `**` is now a proper globstar. As a whole path segment it matches zero or more segments, so `/admin/**` matches `/admin` itself (as the spec always stated) as well as `/admin/users` and deeper, and `/a/**/b` matches `/a/b`. A `**` glued into a segment (e.g. `/foo**`) is treated as a regular single-segment `*` that does not cross a `/`. This fixes the previous behaviour where `/admin/**` failed to match `/admin` and `/messages**` failed to match `/messages`.
+
+Remove the authoring skill's instruction to run `sightmap browser register --addr localhost:PORT` — that subcommand does not exist, so agents following it dead-ended. Attaching to an externally-launched browser remains a possible future feature (tracked upstream); until it lands the skill no longer documents it.
+
+`report` and `capture` errors now teach the `views:` file structure instead of naming a field in isolation:
+
+- `report` distinguishes "no views defined at all" from "views exist but none has a `url:`", and both print a minimal `views:` example (with `route:` and `url:` and their roles) — previously it always said "no views with URLs found / Add a url: field", which contradicted `capture`'s route-only advice.
+- `capture`'s "no view matches" error shows the same `views:` example and names `route:` explicitly.
+
+The `sightmap-authoring` skill's Phase 1a now shows a complete view-file example (the top-level `views:` list with `version:`/`route:`/`url:`), instead of only telling authors to "create a view file with `route:`" — which invited putting view fields at the file root (silently making it a globals file).
+
+Teach the corpus schema at the point authors get it wrong, instead of failing silently or generically:
+
+- A **view field at the file root** (e.g. a top-level `route:`/`name:`) now warns that view fields belong under a top-level `views:` list, with a short example, instead of a bare "unknown field".
+- A **view-shaped file** that sets `url:` and `components:` but no `views:` now warns that it defines no views and its components are treated as global (previously it validated clean and silently became a globals file).
+- A **missing `version:`** now warns (the spec requires `version: 1` in every corpus file).
+- `validate` now warns when the **whole corpus has global components but no views** — it can never match a view, so capture, report, and per-view coverage are unavailable.
+
+All are advisory warnings (exit 0); correct corpora stay warning-free.
