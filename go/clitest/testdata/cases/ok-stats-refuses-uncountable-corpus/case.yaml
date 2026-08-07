@@ -1,0 +1,24 @@
+title: "Guard: stats refuses a corpus the loader silently pruned, instead of printing counts that are quietly too low"
+known_bug: false
+run:
+  args: [stats]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: '\$ref "SiteHeadr" does not resolve'
+      why: >
+        The loader is lenient — a typo'd $ref drops that component and records
+        an error-severity diagnostic. stats must surface the dropped definition
+        by name, because the author cannot tell an under-report from a small
+        corpus by looking at the numbers.
+    - must_match: 'sightmap validate'
+      why: >
+        The message must name the command that fixes the corpus. This is the
+        whole diagnosability moment: an agent reading a plausible table has no
+        reason to run validate, so stats has to say it.
+    - must_not_match: 'Components\s+\d'
+      why: >
+        Printing a totals table over a pruned corpus is the misleading output
+        this case pins — the numbers look authoritative and are wrong, and an
+        exit-zero table would be copied into a report as fact.

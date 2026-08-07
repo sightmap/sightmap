@@ -8,6 +8,7 @@
 //	sightmap sel-probe [flags] SEL  validate a CSS selector against the live page
 //	sightmap validate [flags]       check sightmap YAML for structural errors
 //	sightmap lint [flags]           check sightmap YAML for style issues
+//	sightmap stats [flags]          corpus totals: views, components, requests, properties, memory
 //	sightmap coverage [flags]       recompute T1/T2/T3 coverage from saved snap files
 //	sightmap multi-coverage [flags] cross-page coverage matrix and promotion candidates
 //	sightmap search [flags] PATTERN offline YAML content search with hierarchy context
@@ -69,6 +70,8 @@ func main() {
 		err = runServeSightmap(args)
 	case "report":
 		err = runReport(args)
+	case "stats":
+		err = runStats(args)
 	case "sel-check", "sel_check":
 		err = runSelCheck(args)
 	case "console":
@@ -109,6 +112,7 @@ Commands:
   browser tabs list/new/close/resize                   tab management
 
   report        [--sightmap-dir DIR]                              per-view coverage health table + T2 quality
+  stats          [--sightmap-dir DIR] [--json]                    corpus totals + per-view component/request counts
   snapshot       [--url URL] [--coverage] [--out FILE] [--sightmap-dir DIR]  observe: annotated component tree + coverage
   capture        [--url URL] [--all] [--force] [--sightmap-dir DIR]  persist a capture into the matched view's set
   inspect        [--url URL] [--out FILE] [--sightmap-dir DIR]  raw DOM tree for selector authoring

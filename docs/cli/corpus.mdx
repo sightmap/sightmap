@@ -1,13 +1,13 @@
 ---
 title: "Sightmap CLI: Corpus Health Tools Reference"
 sidebarTitle: "Corpus"
-description: "Use validate, lint, search, and discover to check corpus structure, review selector quality, find definitions, and classify linked routes."
+description: "Use validate, lint, stats, search, and discover to check corpus structure, review selector quality, count what the corpus holds, find definitions, and classify linked routes."
 ---
 
-`sightmap validate` checks whether the corpus loads and follows the CLI's structural rules. `sightmap lint` reports selector and naming problems. `sightmap search` searches component definitions offline. `sightmap discover` classifies same-host links from the current page against the corpus.
+`sightmap validate` checks whether the corpus loads and follows the CLI's structural rules. `sightmap lint` reports selector and naming problems. `sightmap stats` counts what the corpus holds. `sightmap search` searches component definitions offline. `sightmap discover` classifies same-host links from the current page against the corpus.
 
 <Note>
-`validate`, `lint`, and `search` are fully offline — no browser needed. `discover` reads links from a live page, so it needs a running session (see [Browser](/cli/browser)). For scoring how well the corpus covers a page, see [Coverage](/cli/coverage); for the normative YAML format, see [the spec](/spec/overview).
+`validate`, `lint`, `stats`, and `search` are fully offline — no browser needed. `discover` reads links from a live page, so it needs a running session (see [Browser](/cli/browser)). For scoring how well the corpus covers a page, see [Coverage](/cli/coverage); for the normative YAML format, see [the spec](/spec/overview).
 </Note>
 
 ---
@@ -87,6 +87,117 @@ warn [multi-instance-no-property]: PromoTile: [multi-instance-no-property] selec
 <Warning>
 Property extraction (`properties:` on components) is implemented by the CLI as a draft extension — it is not part of spec v1 and may change. The `multi-instance-no-property` rule reflects the CLI's behavior, not a spec requirement.
 </Warning>
+
+---
+
+### `sightmap stats`
+
+Counts what the corpus holds: corpus-wide totals for views, components, requests, properties, and memory entries, followed by a per-view component and request table. The counts describe the corpus *after loading* — `$ref`s expanded, component hierarchies flattened — so they match what every other command sees.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--json` | off | Emit machine-readable JSON instead of the table |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
+
+```bash
+sightmap stats
+```
+
+```text
+sightmap stats · example.com · 2026-08-05
+──────────────────────────────────
+ Views       3
+ Components  8
+ Requests    3
+ Properties  3
+ Memory      2
+──────────────────────────────────
+ View  Route  Components  Requests
+──────────────────────────────────
+ home  /               4         0
+ pdp   /p/**           3         1
+ plp   /b/**           5         1
+──────────────────────────────────
+ 3 views  ·  8 distinct components (per-view rows sum to 12)
+```
+
+**What each total counts:**
+
+| Total | Counts |
+| --- | --- |
+| `Views` | View definitions in the corpus |
+| `Components` | Distinct component **names** corpus-wide — the size of the corpus vocabulary |
+| `Requests` | Global plus view-scoped request definitions |
+| `Properties` | `properties:` entries summed over distinct component **definitions** |
+| `Memory` | `memory:` entries at file, view, component, and request level |
+
+**Per-view rows need not sum to the `Components` total, in either direction.** A global component that three views `$ref` appears in three rows but counts once in the total, which pushes the sum *above* it — the summary line prints both numbers so the gap is visible rather than surprising. A global component no view references counts in the total but appears in no row, which pushes the sum *below* it.
+
+`Components` deduplicates by name, but `Properties` and `Memory` sum over distinct definitions, because two views may legally define different components under the same local name (only *global* name collisions are rejected). Deduplicating those by name would silently drop the second view's properties and memory. A `$ref` expanded at a view's top level is a byte-identical copy of the global and counts once; a `$ref` expanded under a parent is scoped to that parent, so it is a separate extraction site and counts again.
+
+**`--json` is a published contract.** It prints one JSON object on stdout and nothing else — no banner to strip. The field names are consumed by CI outside this repo, so they are stable: `views`, `components`, `requests`, `properties`, `memory`, and `per_view`, whose rows carry `name`, `route`, `components`, and `requests`.
+
+```bash
+sightmap stats --json
+```
+
+```json
+{
+  "views": 3,
+  "components": 8,
+  "requests": 3,
+  "properties": 3,
+  "memory": 2,
+  "per_view": [
+    {
+      "name": "home",
+      "route": "/",
+      "components": 4,
+      "requests": 0
+    },
+    {
+      "name": "pdp",
+      "route": "/p/**",
+      "components": 3,
+      "requests": 1
+    },
+    {
+      "name": "plp",
+      "route": "/b/**",
+      "components": 5,
+      "requests": 1
+    }
+  ]
+}
+```
+
+A corpus that holds only `memory:` entries is legal, and `--json` reports it with zero counts and `"per_view": []`. In table mode a corpus with nothing at all in it is an error that prints the `views:` schema instead of an all-zero table.
+
+**`stats` refuses counts it cannot trust.** The loader is lenient: an unresolved `$ref`, or a component missing its `name` or `selector`, drops that definition and records an error. Counting such a corpus would under-report with a zero exit, so `stats` runs the same checks as `validate` first and refuses any error-severity finding. Warnings are advisory and do not block.
+
+```text
+error: SiteHeadr: $ref "SiteHeadr" does not resolve to any global component
+sightmap stats: 1 validation error(s) in .sightmap — counts would under-report the dropped definitions; run `sightmap validate` and fix them first
+```
+
+<Note>
+Under `--json` the refusal is still one JSON object on stdout, so a consumer that parses stdout unconditionally always has something to parse. The envelope carries `error` and `diagnostics` (each with `code`, `file`, `component`, `selector`, and `message`) and never carries counts. An `error` key is present only on failure. The exit code is `1` either way.
+</Note>
+
+```json
+{
+  "error": "1 validation error(s) in .sightmap — counts would under-report the dropped definitions; run `sightmap validate` and fix them first",
+  "diagnostics": [
+    {
+      "code": "ref-unresolved",
+      "component": "SiteHeadr",
+      "message": "$ref \"SiteHeadr\" does not resolve to any global component"
+    }
+  ]
+}
+```
 
 ---
 

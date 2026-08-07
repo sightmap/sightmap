@@ -1,0 +1,9 @@
+version: 1
+
+views:
+  - name: plp
+    route: /b/**
+    components:
+      - $ref: SiteHeadr
+      - name: ProductPod
+        selector: '[data-testid="product-pod"]'

@@ -1,0 +1,13 @@
+title: "Guard: stats against a cwd with no .sightmap/ fails like its siblings — a load-corpus error naming the directory, not a zero table"
+known_bug: false
+run:
+  args: [stats]
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'load corpus'
+      why: a missing corpus is a load error (same wording as validate/lint/report), not an empty result
+    - must_match: '\.sightmap'
+      why: the error names the directory that was not found so the author knows where to run sightmap init
+    - must_not_match: 'Views\s+0'
+      why: printing an all-zero table for a nonexistent corpus would read as success
