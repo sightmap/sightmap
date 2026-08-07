@@ -225,6 +225,52 @@ A named API endpoint.
 | `headers` | string[] | no | Notable header names to highlight in the network detail view. |
 | `memory` | string[] | no | Request-level memory entries. |
 | `tags` | string[] | no | Open-vocabulary classification labels for this request. See [Tags](#tags). |
+| `properties` | [RequestProperty](#request-properties)[] | no | Values to extract from live traffic. |
+
+### Request properties
+
+`properties:` declares named values to pull out of a live request/response pair, so a consumer can reason about what an endpoint's traffic actually said. An HTTP status of `200` does not distinguish an approved payment from a declined one when the outcome lives in the response body.
+
+```yaml
+- name: CheckoutPayment
+  route: /api/checkout/pay
+  method: POST
+  properties:
+    - name: outcome
+      field: rsp.body.status
+
+- name: CheckoutRetryPayment
+  route: /api/checkout/pay/retry
+  method: POST
+  properties:
+    - name: rate_limit_remaining
+      field: rsp.headers.X-RateLimit-Remaining
+      transform: number
+
+# `pattern` is for a body `field` cannot traverse — here the response is
+# form-encoded, so it has no JSON keys to walk.
+- name: LegacyCheckoutCallback
+  route: /api/checkout/callback
+  method: POST
+  properties:
+    - name: outcome
+      pattern: '(?:declined|approved|deferred)'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
+| `field` | string | one of `field`/`pattern` | A rooted path: `req` or `rsp`, then `.body.<path>` (object-key traversal into the parsed JSON body) or `.headers.<name>` (one header's value, name matched case-insensitively). Also accepts a reserved identity name (`status`, `method`, `duration`). |
+| `pattern` | string | one of `field`/`pattern` | Regex matched against the raw text of the response body, for content `field`'s object-key traversal cannot reach (a non-JSON body, or a value embedded in a larger string). Carries no root of its own. |
+| `transform` | string | no | Same vocabulary as [Component properties](#component-properties)' transform. |
+
+Exactly one of `field`/`pattern` is required. **Value omission is silent** — a property that doesn't resolve (a missing key, no pattern match) is simply absent; consumers MUST NOT treat omission as an error. Omission is the normal case, not an edge case: whether a body or header is even available to read depends on the capture layer's own payload and privacy settings.
+
+Extraction requires **live traffic**. A tool operating on static corpus definitions alone MUST treat `properties:` as declared-but-unavailable, not an error.
+
+`status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. A consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
+
+`properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](../seps/0005-request-properties.md).
 
 ### Payload
 
@@ -392,9 +438,18 @@ A conforming SDK:
 - MUST implement route matching as specified
 - MUST implement global vs view-scoped precedence as specified
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
+- MUST reject a `RequestProperty` declaring both `field` and `pattern`, or neither
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
+
+An SDK that also **evaluates live activity** (observed network requests, console records, DOM state) additionally:
+
+- MUST resolve `properties:` only from live traffic, and MUST NOT error when a `properties:`-declaring request is used in a static context — omit the value instead
+- MUST omit an unresolved property value silently, without a diagnostic
+- SHOULD apply `transform` as [Component properties](#component-properties) does: skipped on an empty or absent raw value, single transform only, not composable
+
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `field`/`pattern` path and applies no `transform`. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

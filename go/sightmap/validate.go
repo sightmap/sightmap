@@ -122,6 +122,9 @@ func Validate(c *Corpus) []ValidationError {
 	errs = append(errs, checkViewNameCollisions(c.Views)...)
 	errs = append(errs, checkRouteCollisions(c.Views)...)
 
+	// Request property shape (SEP-0005); see validate_request.go.
+	errs = append(errs, checkRequestProperties(c)...)
+
 	return errs
 }
 
