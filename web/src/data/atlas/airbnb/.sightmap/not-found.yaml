@@ -1,0 +1,20 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /404
+    url: https://www.airbnb.com/no-such-page-xyz-123
+    description: Error page, reached by redirect from any unmatched path.
+    memory:
+      - Path, title, and body text all state 404 independently, so any one of
+        the three detects this page.
+      - No testids and no `data-section-id` anywhere on this page. Class names
+        are the only hook here, unlike the rest of the site.
+    components:
+      - name: ErrorContent
+        selector: '.page-container'
+        properties:
+          - name: message
+            extract: text
+        memory:
+          - Two blocks match, not one.

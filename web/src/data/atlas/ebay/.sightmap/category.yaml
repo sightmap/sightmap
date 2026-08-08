@@ -1,0 +1,129 @@
+version: 1
+
+views:
+  - name: CategoryBrowse
+    route: /b/:categoryName/:categoryId/:browseNode
+    url: https://www.ebay.com/b/Action-Figures/261068/bn_1642089
+    description: Category browse — breadcrumbs and a category tree, then either refinements and a grid of item cards or a set of merchandised modules.
+    memory:
+      - This one route serves two page shapes and nothing in the URL says which.
+        A hub such as `/b/Toys-Hobbies/220/bn_1865497` carries merchandised
+        modules and no listings at all. A leaf such as
+        `/b/Action-Figures/261068/bn_1642089` carries the refinements, the
+        controls bar and the item river. Test for `#brw-refinement-root` before
+        looking for items; the exemplar URL above is a leaf.
+      - The name segment is decorative. `/b/Totally-Made-Up-Name/220/bn_1865497`
+        loads Toys & Hobbies and rewrites the path, so the URL you requested
+        never tells you what you got.
+      - A mismatched name and id pair resolves to an unrelated category rather
+        than erroring. `/b/Cordless-Drills/184644/bn_1853799` serves Porcelain
+        Nativity Items with a 200. Read `h1.textual-display` to find out where
+        you landed.
+    components:
+      - name: Breadcrumbs
+        selector: '.seo-breadcrumbs-container'
+        properties:
+          - name: trail
+            extract: text
+
+      - name: CategoryHeading
+        selector: 'h1.textual-display'
+        properties:
+          - name: category_name
+            extract: text
+        memory:
+          - The only trustworthy answer to which category loaded, given that
+            both the name segment and a mismatched id resolve silently.
+          - The bare `.textual-display` class is eBay's generic type wrapper and
+            matches over 700 nodes on this page. The `h1` qualifier is what
+            reduces it to the heading.
+
+      - name: CategoryNav
+        selector: '.brw-category-nav'
+        children:
+          - name: CategoryNavItem
+            selector: '.brwel__item'
+
+      - name: Refinements
+        selector: '#brw-refinement-root'
+
+      - name: BrowseControls
+        selector: '#brw-controls-root'
+        properties:
+          - name: controls_text
+            extract: text
+
+      - name: PromoCarousel
+        selector: '.brw-product-carousel'
+        properties:
+          - name: carousel_heading
+            extract: text
+        memory:
+          - Merchandised carousels above the item river. Their cards are
+            `.brw-product-card`, not the `.brwrvr__item-card` of the river
+            below.
+        children:
+          - name: PromoCard
+            selector: '.brw-product-card'
+
+      - name: RecommendationCarousel
+        selector: '.generic-host-carousel'
+        memory:
+          - Personalized and rotating, and absent from leaf categories. Treat
+            presence as optional.
+
+      - name: EventModules
+        selector: '.brw-uep'
+        memory:
+          - Editorial and event promos. Present on hub categories and absent
+            from leaves, which is the mirror of `.brw-river` being present.
+
+      - name: SeoLinkList
+        selector: '.seo-expandable-list'
+        memory:
+          - Related-category links rendered for search engines — a cheap way to
+            enumerate sibling categories without opening the nav.
+
+      - name: RelatedSearchesNav
+        selector: '#seo-related-search-container'
+        memory:
+          - Points at `/sch/i.html?_nkw=`, so this is the one place on a
+            category page that hands you keyword searches rather than more
+            categories.
+
+      - name: CategoryMain
+        selector: '#mainContent'
+        memory:
+          - The `main` landmark, matched by id because it carries no accessible
+            name. Search does not use this id — its equivalent region is
+            `[data-testid="mainContent"]`.
+
+      - name: ItemRiver
+        selector: '.brw-river'
+        children:
+          - name: BrowseItemCard
+            selector: '.brwrvr__item-card'
+            properties:
+              - name: card_text
+                extract: text
+            children:
+              - name: BrowseCardSignals
+                selector: '.brwrvr__item-card__signals'
+              - name: BrowseCardImageLink
+                selector: '.brwrvr__item-card__image-link'
+
+    requests:
+      - name: SearchImageExpand
+        route: /sch/ajax/multiple_images_expsvc
+        method: POST
+        description: Secondary photos for browse cards that carry more than one image. The same endpoint search uses, because both surfaces are served by the search stack.
+        response:
+          fields:
+            - name: items
+              type: array
+              description: One entry per listing, each with listingId and secondaryImages
+
+      - name: BelowResultsModules
+        route: /sch/ajax/post/bos_modules
+        method: POST
+        description: HTML fragment for a recommendation carousel below the item river. Conditional — repeat visits to the same URL do not reliably fire it.

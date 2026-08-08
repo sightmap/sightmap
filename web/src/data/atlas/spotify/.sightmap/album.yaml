@@ -1,0 +1,79 @@
+version: 1
+
+views:
+  - name: AlbumDetail
+    route: /album/:albumId
+    url: https://open.spotify.com/album/4ZUryKKDhiMXcD4fluAEhl
+    description: One album — header, action bar, and its track list.
+    memory:
+      - The document title is the currently playing track, not the page. Read
+        the album name from the entityTitle testid instead.
+      - The main landmark keeps the previously viewed album in its `aria-label`
+        after a client-side navigation. It is stale by design, so do not
+        identify the page from it.
+      - Three visible `h1` elements exist, one each from the library rail, the
+        album header, and the playback bar. Scope headings inside the album-page
+        container.
+      - A hidden language dialog ships in every page and contributes 74
+        `language-option-*` testids. Counting testids overcounts by that much.
+    components:
+      - name: AlbumPage
+        selector: '[data-testid="album-page"]'
+        description: The album container. Everything about the album lives inside it.
+        memory:
+          - Neither `cover-art-image` nor `entity-image` matches inside this
+            container, though both look like the artwork hook. The album's own
+            image is a plain `img` descendant here.
+        children:
+          - name: AlbumTitle
+            selector: '[data-testid="entityTitle"]'
+            properties:
+              - name: album_name
+                extract: text
+          - name: AlbumCreator
+            selector: '[data-testid="creator-link"]'
+            properties:
+              - name: artist_name
+                extract: text
+              - name: artist_href
+                extract: attr=href
+          - name: ReleaseDate
+            selector: '[data-testid="release-date"]'
+            properties:
+              - name: release_year
+                extract: text
+          - name: ActionBar
+            selector: '[data-testid="action-bar"]'
+            children:
+              - name: SaveButton
+                selector: '[data-testid="add-button"]'
+                description: Saves the album to the account's library.
+          - name: TrackList
+            selector: '[data-testid="track-list"]'
+            description: The track table container and its column headers.
+            children:
+              - name: ColumnHeader
+                selector: '[role="columnheader"]'
+          - name: TrackRow
+            selector: '[data-testid="tracklist-row"]'
+            description: One track. Repeats once per track on the album.
+            memory:
+              - Per-row play buttons render on hover, so eleven rows yield
+                eleven play buttons of which only about seven are visible at
+                rest. Count rows, not play buttons.
+            children:
+              - name: TrackLink
+                selector: '[data-testid="internal-track-link"]'
+                properties:
+                  - name: track_title
+                    extract: text
+                  - name: track_href
+                    extract: attr=href
+              - name: TrackMoreButton
+                selector: '[data-testid="more-button"]'
+          - name: RelatedShelf
+            selector: '[data-testid="component-shelf"]'
+            description: Recommendation rows below the track list.
+            memory:
+              - Two shelves render here and their contents are personalized, so
+                what they hold is account state rather than album structure.

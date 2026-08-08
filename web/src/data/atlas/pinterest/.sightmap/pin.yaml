@@ -1,0 +1,86 @@
+version: 1
+
+views:
+  - name: PinDetail
+    route: /pin/:pinId
+    url: https://www.pinterest.com/pin/567805465539223631/
+    description: One pin — its image, description, action bar, and the related-pin grid below.
+    memory:
+      - This page has no `h1` at all, so heading-based route detection never
+        succeeds here. Test for the pdp container instead.
+      - The pin's own data is rendered into the document; only the related grid
+        is fetched afterwards. Waiting for a network call before reading the pin
+        waits for something that never comes.
+      - The 22 elements carrying `data-test-id="pin"` are the related grid, not
+        the pin being viewed. The pin itself is inside the closeup container and
+        carries no such attribute.
+      - 44 images on this page carry `pin-missing-alt-text`, so alt text is not
+        a dependable description source here.
+    requests:
+      - name: RelatedModules
+        route: /resource/RelatedModulesResource/get/
+        method: GET
+        description: The related-pin grid, fetched once per page of results and paged through a bookmarks cursor in the data parameter.
+    components:
+      - name: PdpContainer
+        selector: '[data-test-id="pdp-container"]'
+        description: The pin detail page container.
+        children:
+          - name: CloseupLoaded
+            selector: '[data-test-id="closeup-data-loaded"]'
+            description: Marker element present once the pin's data has rendered.
+            memory:
+              - This is an explicit load-state marker and the reliable settle
+                test for the route. Poll for it rather than guessing a delay.
+          - name: BackButton
+            selector: '[data-test-id="back-button"]'
+            description: Returns to the previous surface. Rendered but not visible on a direct load.
+          - name: CloseupImage
+            selector: '[data-test-id="closeup-image"]'
+            description: The pin's own image.
+            memory:
+              - Image URLs are served from a CDN whose path carries the rendition
+                width, so a different size is a different path rather than a
+                query parameter.
+          - name: PinDescription
+            selector: '[data-test-id="description-content-container"]'
+            description: Pin title and description text.
+            properties:
+              - name: description_text
+                extract: text
+          - name: ActionBar
+            selector: '[data-test-id="closeupActionBar"]'
+            description: Save, share and more-actions controls for the pin.
+          - name: VisitButton
+            selector: '[data-test-id="visit-button"]'
+            description: Opens the pin's source site.
+            properties:
+              - name: source_href
+                extract: attr=href
+      - name: RelatedPins
+        selector: '[data-test-id="relatedPins"]'
+        description: The masonry grid of related pins below the closeup.
+        memory:
+          - The grid is assembled for the account, so it is structure here and
+            what it contains is account state.
+        children:
+          - name: MasonryContainer
+            selector: '[data-test-id="masonry-container"]'
+          - name: RelatedPin
+            selector: '[data-test-id="pin"]'
+            description: One card in the related grid.
+            memory:
+              - Cards are not uniform. Of 22 observed, 21 carried an image and
+                two were video instead, and only 17 carried a footer or a
+                more-actions button. Iterate the cards and test each part rather
+                than assuming a count matches the card count.
+            children:
+              - name: PinImage
+                selector: '[data-test-id="pinrep-image"]'
+                properties:
+                  - name: thumbnail_src
+                    extract: attr=src
+              - name: PinFooter
+                selector: '[data-test-id="pinrep-footer"]'
+              - name: MoreActionsButton
+                selector: '[data-test-id="more-actions-button"]'

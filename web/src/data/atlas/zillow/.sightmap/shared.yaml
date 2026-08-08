@@ -1,0 +1,19 @@
+version: 1
+
+components:
+  - name: TopNav
+    selector: '[data-testid="topnav"]'
+    description: Primary navigation — Buy, Rent, Sell, mortgage, agents, rentals.
+
+  - name: SearchBar
+    selector: '[data-testid="search-bar-container"]'
+    description: Location search that drives every listing surface.
+    memory:
+      - Three inputs exist on the page and one is visible, so scope the field to
+        this container rather than querying inputs globally.
+    children:
+      - name: SearchInput
+        selector: 'input'
+        properties:
+          - name: search_placeholder
+            extract: attr=placeholder

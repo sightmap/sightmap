@@ -1,0 +1,51 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.zillow.com/
+    description: The signed-in landing page — search bar over a carousel of recommended homes.
+    memory:
+      - There is no `main` element on this page. The `topnav` and the carousel
+        are the landmarks, and a query for `main` matches nothing.
+      - Recommendation cards carry indexed test ids, `home-rec-card-0` upward,
+        so no fixed test id addresses a card. The prefix is the stable hook.
+      - The prefix `home-rec-card-` matches sixteen elements, not eight, because
+        `home-rec-card-anchor-N` shares it. Exclude the anchors to count cards.
+      - The anchor is a sibling of the card it links to, not a child of it, so
+        scoping the anchor inside the card matches nothing.
+      - Card anchors point at `/homedetails/:addressSlug`, and the slug is a
+        street address. Treat that href as personal data about a third party,
+        not as an identifier to record.
+    components:
+      - name: HomeRecsCarousel
+        selector: '[data-testid="home-recs-carousel"]'
+        description: Row of recommended homes, chosen for the account.
+        memory:
+          - What this carousel contains is chosen for the account and describes
+            real homes and their owners. The carousel is structure; nothing
+            inside it is corpus material.
+        children:
+          - name: CardAnchor
+            selector: '[data-testid^="home-rec-card-anchor-"]'
+            description: Link to a recommended listing's detail page.
+            properties:
+              - name: listing_href
+                extract: attr=href
+          - name: RecCard
+            selector: '[data-testid^="home-rec-card-"]:not([data-testid*="anchor"])'
+            description: One recommended home.
+            children:
+              - name: CardPhoto
+                selector: '[data-testid="property-card-photo"]'
+              - name: CardSaveButton
+                selector: '[data-testid="property-card-save"]'
+                description: Saves the listing to the account.
+              - name: CardBadge
+                selector: '[data-testid="property-card-badge"]'
+                description: Status flag such as a listing type or price change.
+                memory:
+                  - Scoped to a card there is exactly one badge per card, but
+                    the bare selector matched eleven against eight cards because
+                    three more sit outside the carousel. Scope it, or the count
+                    overstates the recommendations.

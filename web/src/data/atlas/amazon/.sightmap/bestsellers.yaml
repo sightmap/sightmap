@@ -1,0 +1,39 @@
+version: 1
+
+views:
+  - name: BestSellers
+    route: /gp/bestsellers
+    url: https://www.amazon.com/gp/bestsellers/
+    description: Best Sellers charts — department rail and a ranked grid, updated hourly.
+    memory:
+      - Card wrappers carry `#CardInstance<random>` ids regenerated on every
+        render. They read like stable hooks and are not — anchor on `#zg`,
+        `#zg-header`, and `#zg-left-col` instead.
+    components:
+      - name: BestSellersRoot
+        selector: '#zg'
+
+      - name: BestSellersHeader
+        selector: '#zg-header'
+        properties:
+          - name: heading
+            extract: text
+
+      - name: DepartmentRail
+        selector: '#zg-left-col'
+
+      - name: ChartSection
+        selector: '[data-cel-widget^="p13n-zg-list-carousel-desktop"]'
+        properties:
+          - name: section_text
+            extract: text
+        memory:
+          - Do not reach for `.celwidget` to find the charts — it is a generic
+            wrapper that also matches the navbar, the banners, and the department
+            tree.
+
+    requests:
+      - name: ComponentBuilder
+        route: /vap/ew/componentbuilder
+        method: POST
+        description: Builds the ranked lists on this page one block at a time. Six fire on a full scroll, and no other route uses this endpoint.

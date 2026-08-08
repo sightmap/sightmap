@@ -1,0 +1,82 @@
+version: 1
+
+memory:
+  - Every route is server-rendered, so the listings and product facts are in the
+    first HTML response and nothing needs to wait on XHR.
+  - The site duplicates ids. Several variants of a block are rendered and all but
+    one hidden, so an id can match two or three times and `querySelector` may
+    return a hidden one. Filter by visibility.
+  - Ids beginning `nav-` are the global chrome and the most stable hooks here.
+  - The header infers a delivery location from the request IP, and prices,
+    availability, and delivery estimates all follow from it. Two agents in
+    different places see different content at the same URL.
+  - Search accepts `/s?k=<terms>` alone. The rest of the query string Amazon
+    accumulates while browsing is tracking and refinement state.
+
+components:
+  - name: GlobalNav
+    selector: '#navbar'
+    memory:
+      - Absent from the 404 and present on every other route, which makes its
+        absence the most reliable check that a real page loaded.
+    children:
+      - name: NavBelt
+        selector: '#nav-belt'
+      - name: SearchForm
+        selector: '#nav-search-bar-form'
+        children:
+          - name: SearchInput
+            selector: '#twotabsearchtextbox'
+            properties:
+              - name: query
+                extract: attr=value
+          - name: DepartmentSelect
+            selector: '#searchDropdownBox'
+            properties:
+              - name: department
+                extract: attr=value
+            memory:
+              - A real select carrying the full department list, painted fully
+                transparent behind a styled facade, so the site-wide rule to
+                filter by visibility discards it. Read its `value` directly.
+      - name: NavTools
+        selector: '#nav-tools'
+      - name: ShopByDepartment
+        selector: '#nav-xshop'
+        memory:
+          - The strip changes with season and merchandising, so its entries are
+            not a stable taxonomy.
+
+  - name: KeyboardShortcutMenu
+    selector: '#shortcut-menu'
+    memory:
+      - Off-screen until focused, so it adds about a dozen interactive nodes that
+        nobody can see.
+
+  - name: PageRoot
+    selector: '#a-page'
+
+requests:
+  - name: LocationToaster
+    route: /portal-migration/hz/glow/get-rendered-toaster
+    method: GET
+    description: Renders the delivery-location control in the header. Fires once on every route.
+
+  - name: CrossBorderInterstitial
+    route: /cross_border_interstitial_sp/render
+    method: POST
+    description: Decides whether to interrupt with the ship-to-another-country interstitial. Fires once on every route.
+
+  - name: RecommendedForYou
+    route: /hz/rhf
+    method: GET
+    description: Personalized recommendation rail rendered into the page footer.
+
+  - name: AcpWidget
+    route: /acp/*/*/*
+    method: POST
+    description: The generic lazy-widget loader. Any page region that is not in the initial HTML arrives through this endpoint.
+    memory:
+      - The path is `/acp/<widget-name>/<instance-id>/<operation>`. Only the
+        widget name is stable — the instance id is per-render and the operation
+        varies by widget, so match on the widget segment alone.

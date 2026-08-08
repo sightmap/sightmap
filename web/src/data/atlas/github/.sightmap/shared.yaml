@@ -1,0 +1,86 @@
+version: 1
+
+memory:
+  - Mapped signed-out. Signing in adds surfaces this corpus does not cover.
+  - Two frontends are in production and never share a page. Legacy routes carry
+    `js-` prefixed hooks, React routes carry `data-testid`. Establish which one
+    served a route before selecting on it.
+  - Ids like `#_R_2qbd_` and the hash on
+    `.Primer_Brand__Text-module__Text___XeGJJ` change between renders and
+    between deploys. Match the module prefix with `class*=`, never `class^=`,
+    which depends on that class being listed first.
+
+requests:
+  - name: Telemetry
+    route: /github/collect
+    method: POST
+    description: Analytics beacon fired on every route, signed out included. Sent to collector.github.com, not to github.com.
+
+  - name: BrowserStats
+    route: /_private/browser/stats
+    method: POST
+    description: Client performance beacon fired on every route. Sent to api.github.com, not to github.com.
+
+  - name: BudgetThresholdBanner
+    route: '/in-product-messaging/budget-threshold-banner?organization=*'
+    method: GET
+    description: In-product messaging banner requested on every repository-scoped route.
+    memory:
+      - Answers 401 signed out. The banner never renders and the 401 is not a
+        failure worth chasing.
+
+components:
+  - name: HeaderWrapper
+    selector: '.js-header-wrapper'
+    children:
+      - name: GlobalHeader
+        selector: 'nav[aria-label="Global"]'
+        memory:
+          - Signed in this matches nothing — the header becomes
+            `header[aria-label="Global navigation menu"]`. It is the only
+            selector in this corpus that a session changes.
+
+      - name: SkipLink
+        selector: 'a[href="#start-of-content"]'
+
+  - name: SkipToContent
+    selector: '#start-of-content'
+
+  - name: GlobalFooter
+    selector: 'footer[role="contentinfo"]'
+    memory:
+      - The 404 carries a marketing footer with no `nav[aria-label="Footer"]`
+        inside it. Only the contentinfo role is on every route.
+    children:
+      - name: FooterNav
+        selector: 'nav[aria-label="Footer"]'
+
+  - name: AjaxErrorFlash
+    selector: '#ajax-error-message'
+
+  - name: ScreenReaderNotice
+    selector: '[id^="js-global-screen-reader-notice"]'
+
+  - name: ScreenReaderAnnouncement
+    selector: '#screenReaderAnnouncementDiv'
+
+  - name: RepoPjaxContainer
+    selector: '#js-repo-pjax-container'
+    memory:
+      - Absent on `/:org` and on the 404, which makes it the cheapest test for
+        being on a repository-scoped route. The pjax in the name is vestigial.
+
+  - name: RepoHeader
+    selector: '#repository-container-header'
+    properties:
+      - name: header_text
+        extract: text
+    children:
+      - name: RepoNav
+        selector: 'nav[aria-label="Repository"]'
+        properties:
+          - name: tabs
+            extract: text
+        memory:
+          - Tab labels carry the open issue and pull request counts, so this one
+            element answers both without visiting either list.

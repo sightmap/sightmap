@@ -1,0 +1,58 @@
+version: 1
+
+components:
+  - name: GlobalNav
+    selector: '[data-testid="global-nav-bar"]'
+    description: Left rail — home, search, and the account menu entry point.
+    memory:
+      - The account menu lives here, not in the top bar, which is the opposite
+        of where the visual layout puts it. Scope it to the nav.
+    children:
+      - name: HomeButton
+        selector: '[data-testid="home-button"]'
+      - name: SearchForm
+        selector: 'form[role="search"]'
+        children:
+          - name: SearchInput
+            selector: '[data-testid="search-input"]'
+            properties:
+              - name: placeholder
+                extract: attr=aria-label
+      - name: UserWidget
+        selector: '[data-testid="user-widget-link"]'
+        description: Account menu entry point. Identity — never extract from it.
+
+  - name: LibraryGrid
+    selector: 'div[role="grid"][aria-label="Your Library"]'
+    description: The signed-in library. Structure only — its rows are account contents.
+    memory:
+      - This grid is a root-level sibling of the nav rail, not a descendant of
+        it, so scoping it under the nav matches nothing.
+      - Rows here are the account's saved items, not the product. Read the grid
+        to know the library exists; never record what is in it.
+
+  - name: TopBar
+    selector: '[data-testid="topbar"]'
+    description: Page-level bar above the content area.
+
+  - name: NowPlayingBar
+    selector: '[data-testid="now-playing-bar"]'
+    description: Playback chrome, present on every route.
+    memory:
+      - Its contents are the account's listening state, not the page. Document
+        that the bar exists; never extract a track, artist, or artwork from it.
+      - This bar owns every `[data-testid="cover-art-image"]` on the page. An
+        agent reaching for album artwork lands here and gets the playing track
+        instead, so scope artwork queries inside the page's own container.
+    children:
+      - name: PlayerControls
+        selector: '[data-testid="player-controls"]'
+        children:
+          - name: PlayPauseButton
+            selector: '[data-testid="control-button-playpause"]'
+          - name: SkipBackButton
+            selector: '[data-testid="control-button-skip-back"]'
+          - name: SkipForwardButton
+            selector: '[data-testid="control-button-skip-forward"]'
+      - name: PlaybackProgress
+        selector: '[data-testid="playback-progressbar"]'

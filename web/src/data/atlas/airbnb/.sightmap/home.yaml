@@ -1,0 +1,30 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.airbnb.com/
+    description: Landing page — the expanded search form above destination inspiration.
+    memory:
+      - No listing cards render here. The first surface that lists stays is
+        `/s/:location/homes` or a `/:citySlug/stays` landing page.
+    components:
+      - name: SearchForm
+        selector: '[data-testid="structured-search-input-field-query"]'
+        properties:
+          - name: query
+            extract: text
+        memory:
+          - Typing opens a suggestion panel rather than submitting.
+
+      - name: SearchSubmit
+        selector: '[data-testid="structured-search-input-search-button"]'
+
+      - name: SearchIcon
+        selector: '[data-testid="little-search-icon"]'
+
+    requests:
+      - name: PromotionsByPlacement
+        route: /api/v3/PromotionsByPlacementsQuery/*
+        method: GET
+        description: Merchandised promotions for the home page slots. No other route fetches these.

@@ -1,0 +1,106 @@
+version: 1
+
+memory:
+  - Two test-hook attributes are in play and they are not interchangeable.
+    Everything uses `data-testid` except the browse shell, which uses
+    `data-test`.
+  - Testid casing is not conventional — kebab-case and PascalCase sit side by
+    side on the same page. Match the exact string rather than inferring one.
+  - React `useId` values appear as ids like `#:r0:`. They change between renders
+    and are not valid CSS identifiers unescaped, so never anchor to them.
+  - Prefixed class names (`nds-`, `product-card__`, `wall-header__`) are the
+    design system and survive deploys. Names like `css-1j8f80w` are compiled
+    output and do not.
+  - Search and category browse are the same page. `/w?q=<terms>` and
+    `/w/<categorySlug>` both render `#Wall` with the same grid and filter rail,
+    so one set of selectors covers both.
+
+components:
+  - name: GlobalNav
+    selector: '#commerce-header-v2-wrapper'
+    memory:
+      - The full shopping menu is in the DOM whether or not a flyout is open, so
+        the nav dominates any page-wide link count.
+    children:
+      - name: TopBar
+        selector: '[data-testid="top-bar-container"]'
+      - name: ShoppingMenu
+        selector: '[data-testid="desktop-menu-container"]'
+        memory:
+          - Every entry links to a `/w/` category wall, so the whole top-level
+            taxonomy is enumerable from here without opening a flyout.
+
+  - name: NavScrim
+    selector: '[data-testid="scrim"]'
+    memory:
+      - Present on every route at all times and only visible when a flyout
+        opens, so check its visibility rather than its presence.
+
+  - name: ContentWrapper
+    selector: '#experience-wrapper'
+
+  - name: ModalRoot
+    selector: '#modal-root'
+    memory:
+      - Dialogs are teleported here rather than into the component that opened
+        them, so a modal's position in the DOM says nothing about what triggered
+        it.
+
+  - name: RouteAnnouncer
+    selector: '#__next-route-announcer__'
+    memory:
+      - An empty assertive live region on every route. It reads as an unlabeled
+        alert in the accessibility tree and never carries content.
+
+  - name: EmbeddedMessaging
+    selector: '[id="embedded-messaging"]'
+
+  - name: GlobalFooter
+    selector: '#footer-wrapper'
+    children:
+      - name: FooterMenu
+        selector: '[data-testid="footer-menu"]'
+        memory:
+          - Columns are numbered by position (`footer-menu-column-0` through
+            `-3`), not by content. Match the column's first line — Resources,
+            Help, Company, Promotions — to find one.
+
+requests:
+  - name: MicroFrontendFragment
+    route: /fragments/*
+    method: GET
+    description: One independently deployed page fragment. The path segment names it, and five load on every route regardless of what that route is for.
+    memory:
+      - Five fragments load on every route and none is content — privacy-consent,
+        nike-ai-search, error-modal, bellotti-playcard, async-chat. Anything
+        beyond those five names what the route is made of, without reading any
+        DOM.
+
+  - name: FragmentStrings
+    route: /assets/i18n/*/en-US.json
+    method: GET
+    description: Localized strings for one fragment, fetched separately from the fragment itself. The path segment names the owning bundle.
+
+  - name: SharedConfig
+    route: /static/dotcom/shared-config/public/us/config.json
+    method: GET
+    description: Site-wide client configuration. One call on every route.
+
+  - name: CartState
+    route: /buy/carts/v2/US/NIKE/NIKECOM
+    description: Cart contents on api.nike.com. Read with GET and written back with PUT on every route, including routes that have nothing to add.
+
+  - name: SearchSuggestions
+    route: /search/suggestions/v1
+    method: GET
+    description: Typeahead terms for the search overlay on api.nike.com. Fetched once up front rather than as a query is typed.
+
+  - name: PrivacyCompliance
+    route: /privacy_compliance/**
+    method: GET
+    description: Consent framing and jurisdiction defaults on api.nike.com, keyed by location and language.
+
+  - name: PromoBanner
+    route: /content/published/v2/banner
+    method: GET
+    description: The promotional strip above the header, from content.services.nike.com.

@@ -1,0 +1,46 @@
+version: 1
+
+views:
+  - name: CityLanding
+    route: /:citySlug/stays
+    url: https://www.airbnb.com/paris-france/stays
+    description: SEO landing page for a destination — carousels of listing cards and cross-links.
+    memory:
+      - Listing cards here are the same `listing-card-*` components search uses,
+        so card selectors carry over even though the page around them does not.
+      - No map and no filter rail. This is a marketing surface; filtered results
+        live at `/s/:location/homes`.
+      - Fully server-rendered. The content is in the initial document and the
+        page issues no GraphQL beyond consent flags, so there is nothing to wait
+        for after load.
+    components:
+      - name: CityHeader
+        selector: '[data-testid="HEADER"]'
+        properties:
+          - name: heading
+            extract: text
+
+      - name: CityBanner
+        selector: '[data-testid="BANNER"]'
+
+      - name: ListingsCarousel
+        selector: '[data-testid="LISTINGS_CAROUSEL"]'
+        memory:
+          - Several per page, one per theme, so this matches more than once.
+        children:
+          - name: CardTitle
+            selector: '[data-testid="listing-card-title"]'
+            properties:
+              - name: title
+                extract: text
+          - name: CardName
+            selector: '[data-testid="listing-card-name"]'
+            properties:
+              - name: name
+                extract: text
+
+      - name: CrossLinks
+        selector: '[data-testid="TABBED_CROSS_LINKS"]'
+        memory:
+          - The cheapest way to enumerate related city slugs and property types
+            without running a search.

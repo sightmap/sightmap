@@ -1,0 +1,92 @@
+version: 1
+
+views:
+  - name: CategoryBrowse
+    route: /us/en/cat/:categorySlug
+    url: https://www.ikea.com/us/en/cat/desk-chairs-20654/
+    description: Category page — page header, in-page category carousel, and the shared product grid.
+    memory:
+      - This one route serves two different pages, and nothing in the URL says
+        which. A hub such as `/cat/tables-chairs-fu002/` carries the
+        subcategory carousel and no products at all. A leaf such as
+        `/cat/desk-chairs-20654/` carries the grid and filters and no
+        subcategory carousel. Test for `#product-list` before looking for
+        products; the exemplar URL above is a leaf.
+      - The slug is decorative and the trailing id is authoritative.
+        `/cat/totally-made-up-fu002/` loads Tables & Chairs and rewrites the path
+        to `/cat/tables-chairs-fu002/`, so the URL you requested never tells you
+        what you got.
+      - An unknown id does not 404. `/cat/tables-chairs-zz999/` redirects to
+        `/cat/products-products/`, the root of the catalog, which means a typo in
+        an id silently widens the query to everything IKEA sells. Read
+        `.hnf-pageheader__h1` to find out where you actually landed.
+      - The grid is the same `plp-` component set used by search, but only down
+        to the card. `[data-testid="plp-product-card"]`, `#product-list`,
+        `[data-testid="plp-filter-side-bar"]` and `.plp-price-module` work on
+        both. Inside the card they diverge — search renders
+        `.plp-grid-product-card__*`, a category renders `.plp-mastercard__*`.
+        Reach for `.plp-price-module` rather than either.
+    components:
+      - name: PageHeader
+        selector: '.hnf-pageheader__wrapper'
+        children:
+          - name: CategoryTitle
+            selector: '.hnf-pageheader__h1'
+            properties:
+              - name: category_name
+                extract: text
+            memory:
+              - The only trustworthy answer to which category loaded, given that
+                both the slug and a bad id resolve silently.
+          - name: HeaderBreadcrumbs
+            selector: '.hnf-pageheader__breadcrumbs'
+          - name: SubcategoryNav
+            selector: '.hnf-pageheader__in-page-nav'
+            memory:
+              - A horizontal carousel of child categories. Present on hub pages
+                only — a leaf category has no children to show, so its absence
+                is the same signal as `#product-list` being present.
+
+      - name: SubcategoryItem
+        selector: '.hnf-carousel__wrapper a'
+        properties:
+          - name: tracking_label
+            extract: attr=data-tracking-label
+        memory:
+          - Each entry carries a `data-tracking-label` of the form
+            `products | <parentId> | <childId>`, which exposes the taxonomy ids
+            without following a single link.
+          - Mapped at the top level rather than under `SubcategoryNav`, since
+            nesting it three deep only lengthens the selector without narrowing
+            what it matches.
+
+      - name: CategoryContent
+        selector: '.plp-content-container'
+
+      - name: ProductGrid
+        selector: '#product-list'
+
+      - name: ProductCard
+        selector: '[data-testid="plp-product-card"]'
+        properties:
+          - name: card_text
+            extract: text
+        children:
+          - name: CardPrice
+            selector: '.plp-price-module'
+            properties:
+              - name: price_text
+                extract: text
+            memory:
+              - The one price element both card variants share. The
+                search-only `.plp-grid-product-card__price-wrapper` reads as
+                the obvious choice and returns nothing on a category page.
+
+      - name: FilterSidebar
+        selector: '[data-testid="plp-filter-side-bar"]'
+
+    requests:
+      - name: ShoppableProductFragment
+        route: /us/en/products/*/*-shoppable-fragment.html
+        method: GET
+        description: One card of markup per product in the carousels on this page, fetched individually. Not used by the grid itself, which arrives in the document.

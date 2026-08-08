@@ -1,0 +1,22 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://www.ebay.com/no-such-page-xyz-123
+    description: Catch-all error page served for any unmatched path.
+    memory:
+      - The full header, search form, and footer render here, so chrome being
+        present is not evidence that a real page loaded. Check for
+        `.error-page-v2` or the title `Error Page | eBay`.
+      - The heading reads "We looked everywhere." and no status code appears
+        anywhere, so matching on the string 404 will not recognize it.
+    components:
+      - name: ErrorPage
+        selector: '.error-page-v2'
+        children:
+          - name: ErrorTitle
+            selector: '.error-header-v2__title'
+            properties:
+              - name: message
+                extract: text

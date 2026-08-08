@@ -1,0 +1,201 @@
+version: 1
+
+memory:
+  - Three naming systems overlap. Vuori's own hooks are `data-testid`; MUI's
+    `.Mui*-root` classes are stable but say nothing about purpose; `.mui-style-*`
+    hashes are compiled output and change on deploy.
+  - A `data-testid` that reads like a sentence is content, not a hook. It tracks
+    merchandising, and the product ones embed a double quote for the inch mark
+    that cannot go into a CSS attribute selector unescaped. Read them as data.
+  - Ids like `#:R16n55am:` are React `useId` output. They change per render and
+    are not valid CSS identifiers unescaped, so anchor on a nearby label or
+    testid instead.
+  - Product links carry `?queryId=` and `?collection=` for search attribution.
+    Both are droppable; `/products/:handle` alone serves the same page.
+
+components:
+  - name: PromoBanner
+    selector: '[data-testid="banner-message-container"]'
+    properties:
+      - name: message
+        extract: text
+    memory:
+      - Copy rotates between loads, so the message is not a fixed string.
+      - Renders twice, one copy per breakpoint, and only one of the two is
+        visible. Filter by visibility before reading the text.
+
+  - name: DesktopHeader
+    selector: '[data-testid="desktop-header"]'
+    children:
+      - name: MainMenu
+        selector: 'ul[aria-label="Main Menu"]'
+        memory:
+          - Each item opens a flyout and is also a plain link to a
+            `/collections/` handle, so following the link beats driving the
+            flyout.
+      - name: SearchBar
+        selector: '[data-testid="SearchBar"]'
+        memory:
+          - Results are reachable at `/search?q=<terms>` without opening this
+            control.
+
+  - name: MobileDrawer
+    selector: '[data-testid="top-level-mobile-drawer"]'
+    memory:
+      - Rendered closed on desktop as well as mobile, carrying its own copy of
+        the whole navigation, so every menu link matches twice. Scope nav queries
+        to `DesktopHeader`.
+
+  - name: MainContent
+    selector: '#main-content'
+
+  - name: Breadcrumbs
+    selector: 'nav[aria-label="breadcrumb"]'
+    properties:
+      - name: trail
+        extract: text
+    memory:
+      - Present on collection and product pages, absent on home and the 404.
+
+  - name: SkipNavigation
+    selector: 'a[href*="#main-content"]'
+    properties:
+      - name: href
+        extract: attr=href
+    memory:
+      - Broken. The href resolves to
+        `/products/meta-pant-oxblood.json#main-content` rather than to
+        `#main-content` on the current page, so following it leaves for an
+        unrelated product's JSON endpoint instead of jumping to the content.
+
+  - name: RouteAnnouncer
+    selector: '#__next-route-announcer__'
+    memory:
+      - An empty assertive live region, so it surfaces as an unlabeled alert to
+        anything walking the accessibility tree.
+
+  - name: CookieConsent
+    selector: '#onetrust-consent-sdk'
+    memory:
+      - OneTrust, and it does not cover the page content, so a walk works without
+        dismissing it.
+
+  - name: NewsletterOverlay
+    selector: '.klaviyo-form'
+    memory:
+      - Opens as a modal over the first page load and covers the content beneath.
+        Dismiss it with `button.klaviyo-close-form`; the wrapper then stays in
+        the DOM at zero size.
+      - Wrapper classes carry a per-build hash (`kl-private-reset-css-Xuajs1`),
+        so `.klaviyo-form` is the only durable handle.
+
+  - name: NewsletterTeaser
+    selector: '[data-testid="animated-teaser"]'
+    memory:
+      - Klaviyo swaps the dismissed modal for this teaser, so closing the modal
+        does not clear the page. Its own close button is
+        `[data-testid="animated-teaser"] button`.
+
+  - name: GlobalFooter
+    selector: '#__next footer'
+    memory:
+      - No id and no testid on the footer element, only a generic `.MuiBox-root`,
+        so the tag name is the only handle on it.
+      - Most of the footer sits outside `footerMenuLinks-wrapper`, which makes
+        that testid a subset rather than the footer.
+    children:
+      - name: FooterLinks
+        selector: '[data-testid="footerMenuLinks-wrapper"]'
+      - name: FooterSafeText
+        selector: '[data-testid="safe-text"]'
+      - name: EmailSignup
+        selector: 'button[aria-label="Sign Up"]'
+        memory:
+          - The field beside it carries a React `useId` id, so this button's
+            label is the only stable handle on the form.
+
+  - name: ChatLauncher
+    selector: 'img[alt="Kustomer Chat Icon"]'
+    memory:
+      - Kustomer's launcher. Its wrapper divs carry only compiled `mui-style`
+        hashes, so the image `alt` is the only stable hook on it.
+
+  - name: FeedbackWidget
+    selector: '#kampyleButtonContainer'
+    memory:
+      - A third-party Medallia launcher. Kampyle in the id is the vendor's former
+        name, not site code.
+
+  - name: BuildStamp
+    selector: '#buildTime'
+    properties:
+      - name: rendered_at
+        extract: text
+    memory:
+      - Despite the id, this is a per-request server-render time rather than a
+        build stamp. It changes on every load, which makes it a direct read on
+        whether a response was cached or freshly generated.
+
+requests:
+  - name: NextRouteData
+    route: /_next/data/*/en-US/**
+    method: GET
+    description: The props for one route as JSON. Next.js prefetches these for links in view, so a page issues one per visible link plus one for itself.
+    memory:
+      - Every page's props are fetchable as JSON at
+        `/_next/data/<buildId>/en-US/<page path>.json`, with no browser and no
+        JavaScript. Prefer it to reading the DOM.
+      - The build id changes on every deploy. Read it from
+        `__NEXT_DATA__.buildId` in the page HTML rather than caching it.
+      - Next prefetches one per link on screen, so collecting these while
+        scrolling a collection enumerates its products without parsing a card.
+
+  - name: ShopifyStorefront
+    route: /api/2026-04/graphql.json
+    method: POST
+    description: The Shopify Storefront GraphQL API on vuori-clothing.myshopify.com. The busiest endpoint on the site, at 7 calls on search and 18 on a product page.
+
+  - name: CartDrawerContent
+    route: /api/cms/cart-drawer-data
+    method: GET
+    description: CMS copy for the cart drawer. Fetched on every route whether or not the drawer is opened.
+
+  - name: AccountInfo
+    route: /api/account/info
+    method: GET
+    description: Account state for the header. Fires on every route, signed in or not.
+
+  - name: LoggedInCustomer
+    route: /apps/loggedincustomer
+    method: GET
+    description: A second, separate check on sign-in state, from a Shopify app proxy rather than the site's own API.
+
+  - name: ShippingRates
+    route: /api/shipping/rates
+    method: GET
+    description: Shipping options for the cart. Fetched on every route, including routes with an empty cart.
+
+  - name: ShippingConfig
+    route: /api/shipping-config
+    method: GET
+    description: Shipping thresholds behind the free-shipping messaging. One call per route.
+
+  - name: NostoPersonalization
+    route: /api/nosto/graphql
+    method: POST
+    description: Nosto recommendation and personalization queries, proxied through the site's own domain rather than called directly.
+
+  - name: Geolocation
+    route: /.netlify/functions/geolocation
+    method: GET
+    description: Coarse location from a Netlify edge function, used to pick currency and shipping defaults.
+
+  - name: ChatSettings
+    route: /p/**
+    method: GET
+    description: Kustomer chat widget configuration on vuori.api.kustomerapp.com. Four calls fire before the widget is opened.
+
+  - name: ElevarEvents
+    route: /elevar/base/hit
+    method: POST
+    description: Elevar server-side tagging, proxied through the site's own domain so it survives tracker blocking. Carries no content.

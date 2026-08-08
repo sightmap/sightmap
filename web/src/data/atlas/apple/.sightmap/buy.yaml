@@ -1,0 +1,107 @@
+version: 1
+
+views:
+  - name: BuyFlow
+    route: /**/shop/buy-mac/:model
+    url: https://www.apple.com/shop/buy-mac/macbook-air
+    description: Configure-and-buy page — stepped option selection with a running price in a sticky bar.
+    memory:
+      - Options are ordered steps, not a flat set of fields, and later steps
+        depend on earlier ones. The configuration cannot be filled in arbitrary
+        order. How many steps there are varies by model.
+      - Two prices are on the page at once. StickyPrice is the running total and
+        StartingPrice is the model's base price; they diverge as soon as anything
+        is selected.
+      - Fulfillment text is derived from the location Apple infers from the
+        request's IP address, so delivery estimates change with where the request
+        originates rather than with anything on the page.
+    components:
+      - name: BuyExperience
+        selector: '.rf-bfe'
+
+      - name: StickyBar
+        selector: '.rf-bfe-stickybar'
+        memory:
+          - Rendered above the viewport until the page scrolls, so on load its
+            bounding box has a negative top and it reads as off-screen.
+        children:
+          - name: StickyPrice
+            selector: '.rf-bfe-header-price'
+            properties:
+              - name: running_price
+                extract: text
+          - name: FulfillmentOptions
+            selector: '.rf-bfe-stickybar-fulfillment'
+            properties:
+              - name: fulfillment
+                extract: text
+
+      - name: BuyHeader
+        selector: '.rf-bfe-header-wrapper'
+        children:
+          - name: StartingPrice
+            selector: '.rc-prices'
+            properties:
+              - name: starting_price
+                extract: text
+          - name: TradeInLink
+            selector: '.rf-bfe-header-learnmorelink'
+
+      - name: SelectionArea
+        selector: '.rf-bfe-selectionarea'
+        children:
+          - name: ConfigStep
+            selector: '.rf-bfe-step'
+            properties:
+              - name: step_text
+                extract: text
+          - name: DimensionChooser
+            selector: '.rc-dimension'
+          - name: ColorChooser
+            selector: '.colornav'
+            properties:
+              - name: colors
+                extract: text
+          - name: DecisionSupport
+            selector: '.rf-bfe-decision-support'
+
+      - name: CustomizableSpecs
+        selector: '.rs-mac-bfe-collapsible-config-section'
+        properties:
+          - name: specs_text
+            extract: text
+        memory:
+          - Models with nothing to configure omit this section entirely, so no
+            cards is a valid state rather than a failed render.
+          - The id `customizableSpecs` belongs to the step's heading, not to this
+            section, so scoping a card query under it finds nothing.
+        children:
+          - name: ConfigureCard
+            selector: '.re-configure-card'
+
+      - name: TradeInSection
+        selector: '.rf-bfe-tradeup-header'
+
+      - name: PromoRibbon
+        selector: '.ribbon'
+        properties:
+          - name: promo
+            extract: text
+        memory:
+          - Its copy rotates, so it cannot be matched as a fixed string.
+
+    requests:
+      - name: PurchaseOptions
+        route: /shop/api/purchase-options
+        method: GET
+        description: The configurable options and their prices for this model. Two calls fire, and this is where the buy flow's numbers come from.
+
+      - name: ExperienceMeta
+        route: /shop/experience-meta
+        method: GET
+        description: Metadata describing which buy-flow experience to render.
+
+      - name: SavedItems
+        route: /shop/favoritesx/fetch
+        method: GET
+        description: The visitor's saved items, fetched so the save control can show its current state.

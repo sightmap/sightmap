@@ -1,0 +1,52 @@
+version: 1
+
+requests:
+  - name: Telemetry
+    route: /resource/ApiSResource/create/
+    method: POST
+    description: Client telemetry beacon, fired repeatedly on every route.
+
+  - name: ContextTelemetry
+    route: /resource/ApiCResource/create/
+    method: POST
+    description: Second telemetry channel, fired alongside ApiSResource.
+
+  - name: NotificationBadge
+    route: /resource/NewsHubBadgeResource/get/
+    method: GET
+    description: Unread count for the notifications icon. Account state — the response is not corpus material.
+
+  - name: ExperimentActivation
+    route: /resource/ActivateExperimentResource/create/
+    method: POST
+    description: Registers which experiment buckets the session is in.
+
+  - name: PlacementLookup
+    route: /resource/UserExperienceResource/get/
+    method: GET
+    description: Asks which promotional placements to render for the current page.
+
+components:
+  - name: SiteHeader
+    selector: '[data-test-id="header"]'
+    description: Fixed top bar — search, navigation icons, and account controls.
+    memory:
+      - Every backend call goes through `/resource/:ResourceName/:verb/`, where
+        verb is get, create or update and the arguments ride in a `data=` query
+        parameter holding URL-encoded JSON. There is no REST path to read.
+    children:
+      - name: SearchBox
+        selector: '[data-test-id="search-box-input"]'
+        description: Query field for the search route.
+      - name: HeaderProfile
+        selector: '[data-test-id="header-profile"]'
+        description: Account avatar and menu. Identity — never extract from it.
+      - name: AccountOptionsButton
+        selector: '[data-test-id="header-accounts-options-button"]'
+
+  - name: NavIcon
+    selector: '[data-test-id="vertical-nav-icon"]'
+    description: One primary navigation icon.
+    memory:
+      - The navigation icons sit in their own `nav` element outside the header
+        container, so scoping them under the header matches nothing.

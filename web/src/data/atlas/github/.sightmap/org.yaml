@@ -1,0 +1,64 @@
+version: 1
+
+views:
+  - name: OrgProfile
+    route: /:org
+    url: https://github.com/sightmap
+    description: Organization profile — pinned items and the repository list.
+    memory:
+      - Nothing in the path separates `/:org` from `/:user`. The presence of
+        `nav[aria-label="Organization"]` is the test — a user profile has no
+        such nav.
+      - The repository links carry `itemprop="name codeRepository"`, which
+        looks like the obvious hook and is invisible to everything but a live
+        DOM query. Select on `data-hovercard-type` instead.
+      - Signed out, only public repositories are listed, so a count read here
+        is not the organization's repository count.
+    requests:
+      - name: TabCounts
+        route: '/users/:org/tab_counts?repo=*'
+        method: GET
+        description: The numbers on the Repositories, Projects, and People tabs. Served from the users path even for an organization.
+
+      - name: ParticipationSparkline
+        route: '/:owner/:repo/graphs/participation?type=sparkline*'
+        method: GET
+        description: One call per pinned repository, drawing that repository's commit sparkline.
+
+      - name: SetupBudgetBanner
+        route: '/in-product-messaging/tbb-setup-budget-banner?organization=*'
+        method: GET
+        description: Organization billing prompt. This route replaces the repository-scoped banner on the profile.
+
+    components:
+      - name: OrgHeader
+        selector: 'header.orghead'
+        properties:
+          - name: header_text
+            extract: text
+        children:
+          - name: OrgNav
+            selector: 'nav[aria-label="Organization"]'
+            properties:
+              - name: tabs
+                extract: text
+
+      - name: OrgSidebar
+        selector: 'div[data-view-component="true"].col-md-3'
+
+      - name: PinnedItems
+        selector: '.js-pinned-items-reorder-container'
+        memory:
+          - Matches twice — an outer container and an inner one nested inside
+            it — so a count of this selector is not a count of pinned items.
+
+      - name: RepoList
+        selector: '#org-repositories'
+        children:
+          - name: RepoLink
+            selector: 'a[data-hovercard-type="repository"]'
+            properties:
+              - name: repo_name
+                extract: text
+              - name: href
+                extract: attr=href

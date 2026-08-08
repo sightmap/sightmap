@@ -1,0 +1,51 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /:locale/search/:query
+    url: https://www.apple.com/us/search/macbook
+    description: Site search — tabbed results across products, accessories, support, and stores.
+    memory:
+      - The whole SERP is duplicated by a hidden no-JS fallback copy, so every
+        unscoped `rf-serp-` class and the main landmark match two nodes and the
+        second is empty. Scope queries to `.as-search-wrapper` to get the live
+        one.
+      - The query is a path segment, not a parameter, so a query with spaces has
+        to be URL-encoded into the path.
+      - Only the selected tab's panel is populated. Reading the page without
+        switching tabs sees one quarter of what search found.
+      - The result count is prose inside the panel, not a dedicated element, so
+        it has to be parsed out of the panel text.
+    components:
+      - name: SearchRoot
+        selector: '.as-search-wrapper .rf-serp-search'
+        children:
+          - name: SearchForm
+            selector: '.rf-serp-form'
+          - name: SearchBox
+            selector: '.rf-serp-searchbox'
+          - name: SearchAutocomplete
+            selector: '.rf-serp-autocomplete'
+
+          - name: ResultTabs
+            selector: '.rf-serp-tab'
+            properties:
+              - name: tabs
+                extract: text
+            memory:
+              - Switching tabs does not change the URL, so which tab is selected
+                is not recoverable from the address bar.
+
+          - name: ResultPanel
+            selector: '.rf-serp-explore-details'
+            properties:
+              - name: results_text
+                extract: text
+
+          - name: TabNavContainer
+            selector: '.rf-serp-tabnav-container'
+
+    requests:
+      - name: StoreSearchService
+        route: /shop/shld/work/v2/q
+        description: The store's search backend. Called with both GET and POST on a single page load, so a method filter drops one of them.

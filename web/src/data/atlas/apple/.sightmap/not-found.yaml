@@ -1,0 +1,29 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://www.apple.com/zzz/such/page-xyz-123
+    description: Catch-all page — an apology, a search box, and a link to the sitemap.
+    memory:
+      - Serves at the requested path rather than redirecting, and a single-segment
+        unknown path is shaped exactly like a product URL, so the address bar
+        cannot tell you this is an error. The structural tells are SitemapLink
+        and a canonical link pointing under /errors/.
+      - The heading carries no error code and is translated by locale prefix, so
+        matching on wording or on the string 404 fails.
+      - The full header and footer render, so a check for whether the page has
+        content passes here.
+    components:
+      - name: ErrorMain
+        selector: '#main'
+        children:
+          - name: ErrorHeadline
+            selector: '.section-headline'
+            properties:
+              - name: message
+                extract: text
+          - name: ErrorSearch
+            selector: '#search-wrapper'
+          - name: SitemapLink
+            selector: '.cta-sitemap'

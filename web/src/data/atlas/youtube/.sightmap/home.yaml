@@ -1,0 +1,37 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.youtube.com/
+    description: The signed-in home feed — filter chips over a grid of video cards.
+    memory:
+      - Every video on this route is chosen for the account, so the grid is
+        product structure and its contents are account state.
+      - All four `h1` elements here are empty, so no heading identifies this
+        route. Test for the browse renderer instead.
+    components:
+      - name: GuideEntry
+        selector: 'tp-yt-app-drawer#guide ytd-guide-entry-renderer'
+        description: One navigation row in the expanded drawer.
+        memory:
+          - Rows below the navigation group are the account's subscriptions.
+            Read the count to know the drawer is populated; never record the
+            channels themselves.
+      - name: BrowsePage
+        selector: 'ytd-browse'
+        description: The feed container for browse-style routes.
+        children:
+          - name: ChipCloud
+            selector: 'yt-chip-cloud-chip-renderer'
+            description: Topic filter chips above the grid.
+            memory:
+              - Exactly one chip carries the selected state, and it is the
+                active filter.
+          - name: FeedItem
+            selector: 'ytd-rich-item-renderer'
+            description: One grid cell holding a video card.
+            children:
+              - name: VideoCard
+                selector: 'yt-lockup-view-model'
+                description: Thumbnail, title, channel and metadata for one video.

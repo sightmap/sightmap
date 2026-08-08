@@ -1,0 +1,41 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /search
+    url: https://vuoriclothing.com/search?q=shorts
+    description: Search results — the same filter bar and product grid the collection pages use.
+    memory:
+      - The product row wrapper is the one component that differs from a
+        collection page. It is `SearchPage-ConnectedProductRow` here and
+        `Plp-ConnectedProductRow` there; the collection name matches nothing on
+        this view.
+    components:
+      - name: FilterBar
+        selector: '[data-testid="filter-bar"]'
+        properties:
+          - name: result_summary
+            extract: text
+
+      - name: FiltersAccordion
+        selector: '[data-testid="FiltersAccordion"]'
+
+      - name: ProductRow
+        selector: '[data-testid="SearchPage-ConnectedProductRow"]'
+
+      - name: ProductCard
+        selector: '[data-testid="productCard"]'
+        properties:
+          - name: product_url
+            extract: attr=href
+          - name: card_text
+            extract: text
+        children:
+          - name: CardHoverBox
+            selector: '[data-testid="productCardHoverBox"]'
+
+    requests:
+      - name: SearchRouteData
+        route: /_next/data/*/en-US/search.json
+        method: GET
+        description: The search page props as JSON. The query is passed as a parameter, so results are reachable without rendering anything.

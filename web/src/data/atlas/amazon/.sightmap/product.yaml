@@ -1,0 +1,111 @@
+version: 1
+
+views:
+  - name: ProductDetail
+    route: /dp/:asin
+    url: https://www.amazon.com/dp/B08L5NP6NG
+    description: Product page — title, image block, price, buy box, and the feature-slot body.
+    memory:
+      - Ids ending `_feature_div` are template slots; most render empty. Presence
+        is not content.
+      - The ASIN in the path is the whole address. `/dp/:asin` with no other
+        segments or query serves the same page.
+    components:
+      - name: ProductRoot
+        selector: '#dp-container'
+
+      - name: ImageColumn
+        selector: '#leftCol'
+        children:
+          - name: ImageBlock
+            selector: '#imageBlock'
+            memory:
+              - Thumbnails swap the main image in place without touching the URL.
+
+      - name: CenterColumn
+        selector: '#centerCol'
+        children:
+          - name: ProductTitle
+            selector: '#productTitle'
+            properties:
+              - name: title
+                extract: text
+          - name: BylineInfo
+            selector: '#bylineInfo'
+            properties:
+              - name: brand
+                extract: text
+            memory:
+              - Absent on articles with no brand association, so a miss here is
+                not a failure.
+          - name: ReviewSummary
+            selector: '#averageCustomerReviews'
+            properties:
+              - name: rating
+                extract: text
+          - name: CorePrice
+            selector: '#apex_desktop'
+            properties:
+              - name: price
+                extract: text
+            memory:
+              - The id that reads like the price slot, `#corePrice_feature_div`,
+                is not in the center column — it is the buy box's per-offer
+                price, once per accordion row.
+
+      - name: BuyBox
+        selector: '#buybox'
+        memory:
+          - Every duplicated id on the page is in here. Scope to the visible
+            descendant rather than matching the ids globally.
+        children:
+          - name: Availability
+            selector: '#availability'
+            properties:
+              - name: availability
+                extract: text
+          - name: AddToCartButton
+            selector: '#add-to-cart-button'
+          - name: BuyNowButton
+            selector: '#buy-now-button'
+
+      - name: RightColumn
+        selector: '#rightCol'
+
+      - name: SentinelDivs
+        selector: 'body > div:not(#a-page)'
+        properties:
+          - name: sentinel_id
+            extract: attr=id
+        memory:
+          - The body-level divs after the page root are one-pixel placeholders
+            holding nothing, and they inflate any count of body-level structure.
+          - One of them is `#add-to-cart-btn`, which reads like the buy-box
+            control and is an empty placeholder. The control is
+            `#add-to-cart-button`.
+
+      - name: FeatureSlot
+        selector: '[id$="_feature_div"]'
+        properties:
+          - name: slot_id
+            extract: attr=id
+
+    requests:
+      - name: CartItems
+        route: /cart/add-to-cart/get-cart-items
+        method: GET
+        description: Cart contents for the add-to-cart panel. Fires only where an add-to-cart control exists, which is this view and search.
+
+      - name: AddToCartTemplate
+        route: /cart/add-to-cart/patc-template
+        method: GET
+        description: Markup for the panel that slides in after an item is added. Fetched up front, before anything is added.
+
+      - name: ReviewsLazyStream
+        route: /portal/customer-reviews/ajax/lazy-widgets/stream
+        method: POST
+        description: Fills out the review section below the fold once it is scrolled toward.
+        memory:
+          - A few reviews ship in the initial HTML, so before this resolves the
+            section is short rather than empty. Counting what is on the page is
+            not the review total — that is in the rating summary near the title.

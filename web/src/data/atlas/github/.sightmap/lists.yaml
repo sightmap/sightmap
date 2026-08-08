@@ -1,0 +1,123 @@
+version: 1
+
+views:
+  - name: PullList
+    route: /:owner/:repo/pulls
+    url: https://github.com/sightmap/sightmap/pulls
+    description: Open pull requests for a repository, served by the legacy frontend.
+    memory:
+      - Pull request rows carry issue markup — `.js-issue-row` and ids of the
+        form `issue_<number>` — because both lists render from one legacy row
+        component.
+      - This route and `/issues` are served by different frontends and share no
+        selectors. Probe `.js-issue-row` here and
+        `[data-testid="issue-pr-title-link"]` there to tell which one you got.
+      - The list is server-rendered, so the rows are in the initial document.
+    requests:
+      - name: ReviewDecisions
+        route: /pull_request_review_decisions
+        method: POST
+        description: Review state for the rows on screen, posted as one batch after the document. The only fetch this view makes.
+
+    components:
+      - name: PullRow
+        selector: '.js-issue-row'
+        properties:
+          - name: row_text
+            extract: text
+        children:
+          - name: PullTitleLink
+            selector: 'a[id^="issue_"]'
+            properties:
+              - name: title
+                extract: text
+              - name: href
+                extract: attr=href
+
+      - name: ListContainer
+        selector: '.js-navigation-container'
+
+      - name: IssueNav
+        selector: 'nav[aria-label="Issue"]'
+        memory:
+          - The filter nav is labelled "Issue" here, not "Pull request".
+
+  - name: IssueList
+    route: /:owner/:repo/issues
+    url: https://github.com/sightmap/sightmap/issues
+    description: Repository issues, served by the React frontend.
+    memory:
+      - Every per-row testid appears exactly once per row, so any of them
+        counts the page — 25 rows by default.
+      - Filter facets are enumerable from the `*-anchor-button` testids rather
+        than from the filter bar's text.
+    requests:
+      - name: PersistedGraphQl
+        route: '/_graphql?body=*'
+        method: GET
+        description: Persisted GraphQL over GET, with the operation name and query hash in the body query parameter rather than in a POST payload.
+
+      - name: IssuesViewer
+        route: '/issues/viewer?queryId=*'
+        method: GET
+        description: Viewer state for the issue list. Fires signed out too, keyed by an opaque query id.
+
+    components:
+      - name: IssueSection
+        selector: 'section[aria-label="All issues"]'
+
+      - name: IssueFilters
+        selector: 'nav[aria-label="Issue filters"]'
+        properties:
+          - name: filters
+            extract: text
+
+      - name: IssueRowTitle
+        selector: '[data-testid="issue-pr-title-link"]'
+        properties:
+          - name: title
+            extract: text
+          - name: href
+            extract: attr=href
+
+      - name: IssueRowState
+        selector: '[data-testid="list-row-state-icon"]'
+        memory:
+          - Row state is an icon with no text, so open-or-closed cannot be read
+            from the row's text.
+
+      - name: IssueRowNumber
+        selector: '[data-testid="list-row-repo-name-and-number"]'
+        properties:
+          - name: repo_and_number
+            extract: text
+
+      - name: IssueRowCreatedAt
+        selector: '[data-testid="created-at"]'
+        properties:
+          - name: created
+            extract: text
+
+      - name: IssueRowComments
+        selector: '[data-testid="list-row-comments"]'
+
+      - name: Pagination
+        selector: 'nav[aria-label="Pagination"]'
+
+  - name: Releases
+    route: /:owner/:repo/releases
+    url: https://github.com/sightmap/sightmap/releases
+    description: Tagged releases, newest first.
+    memory:
+      - Each release renders its own `h1`, so this page has one per release
+        rather than one per page.
+    components:
+      - name: ReleaseTagLink
+        selector: 'a[href*="/releases/tag/"]'
+        properties:
+          - name: tag
+            extract: text
+        memory:
+          - Matches several times per release — tag name, source links and
+            anchor heading all point at the same URL — so counting these is not
+            counting releases.

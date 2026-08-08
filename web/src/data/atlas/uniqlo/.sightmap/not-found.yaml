@@ -1,0 +1,20 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /us/en/not-found
+    url: https://www.uniqlo.com/us/en/no-such-page-xyz-123
+    description: Error page, reached by redirect from any unmatched path.
+    memory:
+      - An unmatched path redirects to `/us/en/not-found`, so `location.pathname`
+        alone tells you the request failed and no DOM inspection is needed.
+      - Neither the title nor the body contains the string 404, so a text search
+        for it finds nothing.
+      - The full navigation, footer, and editorial headings all render here, so a
+        does-the-page-have-content check passes on the error page.
+    components:
+      - name: ErrorContent
+        selector: '#page-content'
+        properties:
+          - name: message
+            extract: text

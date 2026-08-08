@@ -1,0 +1,123 @@
+version: 1
+
+views:
+  - name: RepoHome
+    route: /:owner/:repo
+    url: https://github.com/sightmap/sightmap
+    description: Repository landing page — file listing, latest commit, and the rendered README.
+    memory:
+      - Rendered Markdown is `article.markdown-body` everywhere it appears —
+        the repository README, a blob page, and the organization profile.
+      - The file table, its commit column, the README and the sidebar each
+        arrive in a separate fetch after the document. An immediate read gets
+        the shell without any of them.
+    requests:
+      - name: LatestCommit
+        route: /:owner/:repo/latest-commit
+        method: GET
+        description: The commit strip above the file table, fetched after the document rather than rendered into it.
+
+      - name: TreeCommitInfo
+        route: /:owner/:repo/tree-commit-info
+        method: GET
+        description: Per-file commit message and date for every row of the file table.
+
+      - name: OverviewFiles
+        route: /:owner/:repo/overview-files/:ref
+        method: GET
+        description: The rendered README and the other overview documents for the default branch.
+
+      - name: Sidebar
+        route: /:owner/:repo/_sidebar
+        method: GET
+        description: About box, topics, languages, and the releases and packages counts.
+
+      - name: BranchAndTagCount
+        route: /:owner/:repo/branch-and-tag-count
+        method: GET
+        description: The two counts shown beside the branch picker.
+
+      - name: RecentlyTouchedBranches
+        route: /:owner/:repo/recently-touched-branches
+        method: GET
+        description: Feeds the recently pushed branch prompt. Returns an empty result signed out.
+
+    components:
+      - name: FileTreeNav
+        selector: 'nav[aria-label="Repository files"]'
+
+      - name: FileTable
+        selector: 'table[aria-labelledby="folders-and-files"]'
+        properties:
+          - name: entries
+            extract: text
+
+      - name: LatestCommit
+        selector: '[data-testid="latest-commit"]'
+        properties:
+          - name: commit_text
+            extract: text
+
+      - name: LatestCommitDetails
+        selector: '[data-testid="latest-commit-details"]'
+        memory:
+          - A sibling of `[data-testid="latest-commit"]`, not a child. Scoping
+            one inside the other matches nothing.
+
+      - name: ViewAllFilesRow
+        selector: '[data-testid="view-all-files-row"]'
+
+      - name: Readme
+        selector: 'article.markdown-body'
+        properties:
+          - name: readme_text
+            extract: text
+
+  - name: FileBlob
+    route: /:owner/:repo/blob/:ref/**
+    url: https://github.com/sightmap/sightmap/blob/main/README.md
+    description: A single file at a ref, rendered when the file is Markdown.
+    memory:
+      - The repository file tree is absent here and present on the repository
+        root, even though the sidebar looks the same. That absence is the
+        cheapest way to tell a blob from a repo root.
+      - Only Markdown renders into `article.markdown-body`. A source file
+        renders a code viewer instead, so this is the rendered-document hook
+        and not a file-content hook.
+      - The commit strip here is the file's last commit, not the repository's,
+        though the testid is identical.
+    requests:
+      - name: FileLatestCommit
+        route: /:owner/:repo/latest-commit/:ref/**
+        method: GET
+        description: The commit strip for this one file, keyed by path rather than by repository.
+
+      - name: DeferredMetadata
+        route: /:owner/:repo/deferred-metadata/:ref/**
+        method: GET
+        description: Blame, history, and symbol metadata for the open file, fetched after the document.
+
+    components:
+      - name: StickyHeader
+        selector: '#StickyHeader'
+        properties:
+          - name: path
+            extract: text
+        memory:
+          - In the document from the start even though it only appears on
+            scroll, so the file path can be read without scrolling.
+
+      - name: BlobActions
+        selector: '.react-blob-header-edit-and-raw-actions'
+        memory:
+          - The Raw link is the route to the file's bytes with none of this
+            page around it.
+
+      - name: RenderedFile
+        selector: 'article.markdown-body'
+        properties:
+          - name: file_text
+            extract: text
+
+      - name: FileLatestCommit
+        selector: '[data-testid="latest-commit"]'

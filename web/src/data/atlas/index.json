@@ -1,0 +1,911 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-08T20:01:23Z",
+  "entries": [
+    {
+      "slug": "airbnb",
+      "name": "Airbnb",
+      "site_url": "https://www.airbnb.com/",
+      "domains": [
+        "airbnb.com"
+      ],
+      "description": "Stay search with its live map, listing pages built from named sections, city landing pages, and a model 404.",
+      "categories": [
+        "travel"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-07",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 5,
+        "components": 53,
+        "requests": 16,
+        "properties": 20,
+        "memory": 33
+      },
+      "per_view": [
+        {
+          "name": "CityLanding",
+          "route": "/:citySlug/stays",
+          "components": 6,
+          "requests": 0
+        },
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 3,
+          "requests": 1
+        },
+        {
+          "name": "ListingDetail",
+          "route": "/rooms/:listingId",
+          "components": 19,
+          "requests": 4
+        },
+        {
+          "name": "NotFound",
+          "route": "/404",
+          "components": 1,
+          "requests": 0
+        },
+        {
+          "name": "SearchResults",
+          "route": "/s/:location/homes",
+          "components": 14,
+          "requests": 3
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-search-results.webp"
+      ],
+      "files": [
+        ".sightmap/city.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/listing.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/search.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "4f6cdc87344f051c66934ea5cc6fb8b3312f735a"
+    },
+    {
+      "slug": "amazon",
+      "name": "Amazon",
+      "site_url": "https://www.amazon.com/",
+      "domains": [
+        "amazon.com"
+      ],
+      "description": "US marketplace — search, product detail, best-seller charts, and a text-free 404, mapped signed-out.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-06",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-06",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 5,
+        "components": 47,
+        "requests": 12,
+        "properties": 23,
+        "memory": 34
+      },
+      "per_view": [
+        {
+          "name": "BestSellers",
+          "route": "/gp/bestsellers",
+          "components": 4,
+          "requests": 1
+        },
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 4,
+          "requests": 1
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 5,
+          "requests": 0
+        },
+        {
+          "name": "ProductDetail",
+          "route": "/dp/:asin",
+          "components": 15,
+          "requests": 3
+        },
+        {
+          "name": "SearchResults",
+          "route": "/s",
+          "components": 10,
+          "requests": 3
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-search-results.webp",
+        "screenshots/02-not-found.webp"
+      ],
+      "files": [
+        ".sightmap/bestsellers.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/product.yaml",
+        ".sightmap/search.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "39e64a534f8718945a96ebec76b2ec03ffc5e7af"
+    },
+    {
+      "slug": "apple",
+      "name": "Apple",
+      "site_url": "https://www.apple.com/",
+      "domains": [
+        "apple.com"
+      ],
+      "description": "Editorial product pages and the configure-and-buy store, two systems sharing one header, plus a 404 that changes language with the URL.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-07",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-07",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 5,
+        "components": 54,
+        "requests": 10,
+        "properties": 23,
+        "memory": 38
+      },
+      "per_view": [
+        {
+          "name": "BuyFlow",
+          "route": "/**/shop/buy-mac/:model",
+          "components": 16,
+          "requests": 3
+        },
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 7,
+          "requests": 0
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 4,
+          "requests": 0
+        },
+        {
+          "name": "ProductMarketing",
+          "route": "/:productSlug",
+          "components": 10,
+          "requests": 2
+        },
+        {
+          "name": "SearchResults",
+          "route": "/:locale/search/:query",
+          "components": 7,
+          "requests": 1
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-buy-flow.webp",
+        "screenshots/02-search-results.webp"
+      ],
+      "files": [
+        ".sightmap/buy.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/product-page.yaml",
+        ".sightmap/search.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "33c8da740bd094583ccfb708b68609eb48e3a0af"
+    },
+    {
+      "slug": "ebay",
+      "name": "eBay",
+      "site_url": "https://www.ebay.com/",
+      "domains": [
+        "ebay.com"
+      ],
+      "description": "Marketplace search, category browse, item detail, and the live-shopping hub, mapped as a signed-out shopper.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-06",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-06",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 6,
+        "components": 70,
+        "requests": 9,
+        "properties": 25,
+        "memory": 58
+      },
+      "per_view": [
+        {
+          "name": "CategoryBrowse",
+          "route": "/b/:categoryName/:categoryId/:browseNode",
+          "components": 17,
+          "requests": 2
+        },
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 6,
+          "requests": 0
+        },
+        {
+          "name": "ItemDetail",
+          "route": "/itm/:itemId",
+          "components": 12,
+          "requests": 0
+        },
+        {
+          "name": "LiveHub",
+          "route": "/ebaylive",
+          "components": 3,
+          "requests": 0
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 2,
+          "requests": 0
+        },
+        {
+          "name": "SearchResults",
+          "route": "/sch/i.html",
+          "components": 21,
+          "requests": 2
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-search-results.webp",
+        "screenshots/02-item-detail.webp"
+      ],
+      "files": [
+        ".sightmap/category.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/item.yaml",
+        ".sightmap/live.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/search.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "de495d2949becc39e84a8fcd5f0a83ad407a00da"
+    },
+    {
+      "slug": "github",
+      "name": "GitHub",
+      "site_url": "https://github.com/",
+      "domains": [
+        "github.com"
+      ],
+      "description": "Public repository hosting — org, repo, file, issue, pull request, and release views, mapped signed-out across two frontends.",
+      "categories": [
+        "devtools",
+        "saas"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-08",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.19.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 8,
+        "components": 46,
+        "requests": 23,
+        "properties": 22,
+        "memory": 36
+      },
+      "per_view": [
+        {
+          "name": "PullList",
+          "route": "/:owner/:repo/pulls",
+          "components": 4,
+          "requests": 1
+        },
+        {
+          "name": "IssueList",
+          "route": "/:owner/:repo/issues",
+          "components": 8,
+          "requests": 2
+        },
+        {
+          "name": "Releases",
+          "route": "/:owner/:repo/releases",
+          "components": 1,
+          "requests": 0
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 2,
+          "requests": 0
+        },
+        {
+          "name": "OrgProfile",
+          "route": "/:org",
+          "components": 6,
+          "requests": 3
+        },
+        {
+          "name": "PullDetail",
+          "route": "/:owner/:repo/pull/:number",
+          "components": 3,
+          "requests": 6
+        },
+        {
+          "name": "RepoHome",
+          "route": "/:owner/:repo",
+          "components": 6,
+          "requests": 6
+        },
+        {
+          "name": "FileBlob",
+          "route": "/:owner/:repo/blob/:ref/**",
+          "components": 4,
+          "requests": 2
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-repo-home.webp",
+        "screenshots/02-file-blob.webp",
+        "screenshots/03-issue-list.webp",
+        "screenshots/04-not-found.webp"
+      ],
+      "files": [
+        ".sightmap/config.yaml",
+        ".sightmap/lists.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/org.yaml",
+        ".sightmap/pull-detail.yaml",
+        ".sightmap/repo.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "32cbdb3183c258b703198943630f382567515a86"
+    },
+    {
+      "slug": "ikea",
+      "name": "IKEA",
+      "site_url": "https://www.ikea.com/us/en/",
+      "domains": [
+        "ikea.com"
+      ],
+      "description": "US storefront — search, category browse, product detail, and the CMS-driven landing page, mapped signed-out.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-06",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 5,
+        "components": 59,
+        "requests": 11,
+        "properties": 17,
+        "memory": 64
+      },
+      "per_view": [
+        {
+          "name": "CategoryBrowse",
+          "route": "/us/en/cat/:categorySlug",
+          "components": 10,
+          "requests": 1
+        },
+        {
+          "name": "Home",
+          "route": "/us/en",
+          "components": 13,
+          "requests": 1
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 2,
+          "requests": 0
+        },
+        {
+          "name": "ProductDetail",
+          "route": "/us/en/p/:productSlug",
+          "components": 14,
+          "requests": 4
+        },
+        {
+          "name": "SearchResults",
+          "route": "/us/en/search",
+          "components": 11,
+          "requests": 0
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-search-results.webp",
+        "screenshots/02-product-detail.webp"
+      ],
+      "files": [
+        ".sightmap/category.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/product.yaml",
+        ".sightmap/search.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "037365d2b91cdd707161ae77c61c68e70e3bb4de"
+    },
+    {
+      "slug": "instacart",
+      "name": "Instacart",
+      "site_url": "https://www.instacart.com/",
+      "domains": [
+        "instacart.com",
+        "www.instacart.com"
+      ],
+      "description": "Instacart's retailer storefront, mapped signed in — aisle rail, item cards, cart entry, and the skeletons that never resolve.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-08",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.19.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "personal-account",
+      "stats": {
+        "views": 1,
+        "components": 10,
+        "requests": 0,
+        "properties": 3,
+        "memory": 8
+      },
+      "per_view": [
+        {
+          "name": "Storefront",
+          "route": "/store/:retailerSlug/storefront",
+          "components": 4,
+          "requests": 0
+        }
+      ],
+      "screenshots": [],
+      "files": [
+        ".sightmap/config.yaml",
+        ".sightmap/shared.yaml",
+        ".sightmap/storefront.yaml"
+      ],
+      "commit": "21d4ae87003f24100d3395703d970851503542aa"
+    },
+    {
+      "slug": "nike",
+      "name": "Nike",
+      "site_url": "https://www.nike.com/",
+      "domains": [
+        "nike.com"
+      ],
+      "description": "US storefront — the shared product wall behind both search and category browse, product pages, and a merchandising 404.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-06",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 5,
+        "components": 42,
+        "requests": 17,
+        "properties": 16,
+        "memory": 40
+      },
+      "per_view": [
+        {
+          "name": "CategoryWall",
+          "route": "/w/:categorySlug",
+          "components": 11,
+          "requests": 2
+        },
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 4,
+          "requests": 1
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 3,
+          "requests": 0
+        },
+        {
+          "name": "ProductDetail",
+          "route": "/t/:productSlug/:styleCode",
+          "components": 13,
+          "requests": 6
+        },
+        {
+          "name": "SearchResults",
+          "route": "/w",
+          "components": 12,
+          "requests": 1
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-product-wall.webp",
+        "screenshots/02-product-detail.webp"
+      ],
+      "files": [
+        ".sightmap/category.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/product.yaml",
+        ".sightmap/shared.yaml",
+        ".sightmap/wall.yaml"
+      ],
+      "commit": "86d4aff271edde12fd4d844e0b160ac17ac9da20"
+    },
+    {
+      "slug": "pinterest",
+      "name": "Pinterest",
+      "site_url": "https://www.pinterest.com/",
+      "domains": [
+        "pinterest.com",
+        "www.pinterest.com"
+      ],
+      "description": "Pinterest's pin detail page, mapped signed in — closeup image, description, action bar, and the related-pin grid.",
+      "categories": [
+        "social"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-08",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.19.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "personal-account",
+      "stats": {
+        "views": 1,
+        "components": 18,
+        "requests": 6,
+        "properties": 3,
+        "memory": 10
+      },
+      "per_view": [
+        {
+          "name": "PinDetail",
+          "route": "/pin/:pinId",
+          "components": 13,
+          "requests": 1
+        }
+      ],
+      "screenshots": [],
+      "files": [
+        ".sightmap/config.yaml",
+        ".sightmap/pin.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "84409442e496621ce0aac1b2e51b16cbb48355bb"
+    },
+    {
+      "slug": "spotify",
+      "name": "Spotify",
+      "site_url": "https://open.spotify.com/",
+      "domains": [
+        "open.spotify.com"
+      ],
+      "description": "Spotify's web player album view, mapped signed in — album header, track list, and the playback chrome around them.",
+      "categories": [
+        "media"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-08",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.19.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "personal-account",
+      "stats": {
+        "views": 1,
+        "components": 25,
+        "requests": 0,
+        "properties": 7,
+        "memory": 12
+      },
+      "per_view": [
+        {
+          "name": "AlbumDetail",
+          "route": "/album/:albumId",
+          "components": 12,
+          "requests": 0
+        }
+      ],
+      "screenshots": [],
+      "files": [
+        ".sightmap/album.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "8ac783260b8eff713e77560778daaea465e56cf1"
+    },
+    {
+      "slug": "uniqlo",
+      "name": "UNIQLO",
+      "site_url": "https://www.uniqlo.com/us/en/",
+      "domains": [
+        "uniqlo.com"
+      ],
+      "description": "US storefront — category listings, product pages, search, and an error page with a real address.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-07",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 5,
+        "components": 30,
+        "requests": 17,
+        "properties": 11,
+        "memory": 29
+      },
+      "per_view": [
+        {
+          "name": "CategoryListing",
+          "route": "/us/en/:gender/:category",
+          "components": 6,
+          "requests": 1
+        },
+        {
+          "name": "Home",
+          "route": "/us/en/:gender",
+          "components": 3,
+          "requests": 1
+        },
+        {
+          "name": "NotFound",
+          "route": "/us/en/not-found",
+          "components": 1,
+          "requests": 0
+        },
+        {
+          "name": "ProductDetail",
+          "route": "/us/en/products/:productId/:colorCode",
+          "components": 3,
+          "requests": 8
+        },
+        {
+          "name": "SearchResults",
+          "route": "/us/en/search",
+          "components": 5,
+          "requests": 2
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-category-listing.webp",
+        "screenshots/02-product-detail.webp"
+      ],
+      "files": [
+        ".sightmap/category.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/gender-home.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/product.yaml",
+        ".sightmap/search.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "ef9f2193fa1c481a1cd435b95f5ac480743b8419"
+    },
+    {
+      "slug": "vuori",
+      "name": "Vuori",
+      "site_url": "https://vuoriclothing.com/",
+      "domains": [
+        "vuoriclothing.com"
+      ],
+      "description": "Shopify storefront on Next.js — collections, product pages, search, and a 404 with an empty document title.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-06",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-06",
+      "cli_version": "0.18.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "none",
+      "stats": {
+        "views": 5,
+        "components": 47,
+        "requests": 14,
+        "properties": 18,
+        "memory": 54
+      },
+      "per_view": [
+        {
+          "name": "Collection",
+          "route": "/collections/:handle",
+          "components": 10,
+          "requests": 1
+        },
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 7,
+          "requests": 0
+        },
+        {
+          "name": "NotFound",
+          "route": "/**",
+          "components": 1,
+          "requests": 0
+        },
+        {
+          "name": "ProductDetail",
+          "route": "/products/:handle",
+          "components": 10,
+          "requests": 1
+        },
+        {
+          "name": "SearchResults",
+          "route": "/search",
+          "components": 5,
+          "requests": 1
+        }
+      ],
+      "screenshots": [
+        "screenshots/01-collection.webp",
+        "screenshots/02-product-detail.webp"
+      ],
+      "files": [
+        ".sightmap/collection.yaml",
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/not-found.yaml",
+        ".sightmap/product.yaml",
+        ".sightmap/search.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "bcde844d9abf76cb7f8e03117abe765ded9a20fb"
+    },
+    {
+      "slug": "youtube",
+      "name": "YouTube",
+      "site_url": "https://www.youtube.com/",
+      "domains": [
+        "youtube.com",
+        "www.youtube.com"
+      ],
+      "description": "YouTube's home feed and watch page, mapped signed in — feed grid, player, title row, description, comments, and related column.",
+      "categories": [
+        "media"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-08",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.19.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "personal-account",
+      "stats": {
+        "views": 2,
+        "components": 24,
+        "requests": 0,
+        "properties": 3,
+        "memory": 16
+      },
+      "per_view": [
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 5,
+          "requests": 0
+        },
+        {
+          "name": "Watch",
+          "route": "/watch",
+          "components": 13,
+          "requests": 0
+        }
+      ],
+      "screenshots": [],
+      "files": [
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/shared.yaml",
+        ".sightmap/watch.yaml"
+      ],
+      "commit": "8110c7dc52282952b438022c3522fb049afb7605"
+    },
+    {
+      "slug": "zillow",
+      "name": "Zillow",
+      "site_url": "https://www.zillow.com/",
+      "domains": [
+        "zillow.com",
+        "www.zillow.com"
+      ],
+      "description": "Zillow's signed-in landing page — search bar, top navigation, and the carousel of recommended homes.",
+      "categories": [
+        "commerce"
+      ],
+      "author": "chiplay",
+      "created": "2026-08-08",
+      "updated": "2026-08-08",
+      "last_verified": "2026-08-08",
+      "cli_version": "0.19.0",
+      "spec_version": 1,
+      "method": "browser",
+      "auth": "personal-account",
+      "stats": {
+        "views": 1,
+        "components": 9,
+        "requests": 0,
+        "properties": 2,
+        "memory": 8
+      },
+      "per_view": [
+        {
+          "name": "Home",
+          "route": "/",
+          "components": 6,
+          "requests": 0
+        }
+      ],
+      "screenshots": [],
+      "files": [
+        ".sightmap/config.yaml",
+        ".sightmap/home.yaml",
+        ".sightmap/shared.yaml"
+      ],
+      "commit": "df600fb1c5b473c159c47686c097f7738b59d1d8"
+    }
+  ]
+}

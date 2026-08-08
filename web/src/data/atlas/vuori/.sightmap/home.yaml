@@ -1,0 +1,56 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://vuoriclothing.com/
+    description: Landing page — hero carousel, featured products, a tabbed category carousel, and a colour picker.
+    memory:
+      - Carousels label their slides `aria-label="Slide N of M"` rather than by
+        content, which is the reliable way to enumerate them.
+      - Carousel container ids embed the first slide's name plus a random suffix,
+        so they change when either the content or the build does. Select on
+        `aria-label` instead.
+      - No product grid and no search field in the page body. The first surface
+        that lists products is `/collections/:handle` or `/search?q=`.
+    components:
+      - name: HeroCarousel
+        selector: 'section[aria-label="Hero carousel"]'
+
+      - name: FeaturedProducts
+        selector: '[data-testid="HomePage-FeaturedProductsCarousel"]'
+        properties:
+          - name: section_text
+            extract: text
+        memory:
+          - Two separate visible sections carry this testid, so it does not
+            identify a single carousel.
+
+      - name: PopularCategoriesTabs
+        selector: '#main-content [role="tablist"]'
+        memory:
+          - Only the selected tab's carousel holds content, so reading the
+            section without switching tabs sees half of it.
+          - Switching tabs does not change the URL, so the selected tab is not
+            recoverable from the address bar.
+          - Scoped to `#main-content` because the OneTrust cookie panel is also a
+            `[role="tablist"]`, on every route.
+
+      - name: CategoryCarousel
+        selector: 'div[aria-label="Men carousel"], div[aria-label="Women carousel"]'
+
+      - name: ColourPicker
+        selector: 'div[aria-label="Content carousel"]'
+        properties:
+          - name: colours
+            extract: text
+        memory:
+          - The `aria-label="Content carousel"` is reused for the subcategory
+            strip on collection pages, so it names a component type rather than
+            this section.
+
+      - name: AboutHero
+        selector: '[data-testid="hero3-wrapper"]'
+        children:
+          - name: AboutHeroOverlay
+            selector: '[data-testid="hero-overlay-interactive"]'
