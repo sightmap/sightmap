@@ -1,0 +1,50 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://www.amazon.com/no-such-page-xyz-123
+    description: Catch-all error page — a hand-minified document with no text nodes and a search box for recovery.
+    memory:
+      - The page has no text — `document.body.innerText` is empty, because the
+        apology is the `alt` attribute of an image. Reading page copy finds
+        nothing and looks like a page that never loaded. Detect it by
+        `document.title === "Page Not Found"` and the absence of `#navbar`.
+      - The markup is hand-minified with single-letter ids — the form is `#a`,
+        the field is `#e`, the submit is `#f`. Prefer the `role` and `name`
+        attributes over them.
+      - The recovery form posts to `/s` using `field-keywords` rather than the
+        `k` parameter the header search uses. Both reach search.
+    components:
+      - name: ErrorImages
+        selector: img
+        properties:
+          - name: alt_text
+            extract: attr=alt
+        memory:
+          - The only carrier of meaning on the page — read `alt_text` to recover
+            the error message.
+
+      - name: RecoverySearchForm
+        selector: 'form[role="search"]'
+        memory:
+          - Matched on `role` because sightmap's offline matcher finds zero for
+            `form[action="/s"]` even though a live browser finds it, and
+            `snapshot`, `coverage`, and `capture` all use the offline matcher.
+        children:
+          - name: RecoverySearchInput
+            selector: 'input[name="field-keywords"]'
+            properties:
+              - name: query
+                extract: attr=value
+          - name: RecoverySearchSubmit
+            selector: 'input[type="submit"]'
+
+      - name: ErrorLinks
+        selector: a
+        properties:
+          - name: href
+            extract: attr=href
+        memory:
+          - The links have no text because their content is an image — match on
+            `href`.

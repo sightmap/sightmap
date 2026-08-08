@@ -1,0 +1,124 @@
+version: 1
+
+views:
+  - name: ListingDetail
+    route: /rooms/:listingId
+    url: https://www.airbnb.com/rooms/1731899995599689412
+    description: A single stay — hero, overview, amenities, reviews, location, and the booking panel.
+    memory:
+      - Section ids carry an experiment variant suffix — `OVERVIEW_DEFAULT_V2`
+        alongside `TITLE_DEFAULT` — so match on the prefix
+        (`[data-section-id^="OVERVIEW"]`) rather than the whole string.
+      - Which sections render depends on the property type, so treat every
+        section as optional.
+      - Sections below the fold render well after the route settles, so poll for
+        the section you want instead of reading the outline once after navigate.
+    components:
+      - name: PageShell
+        selector: '[data-testid="pageshell-container"]'
+
+      - name: TitleSection
+        selector: '[data-section-id="TITLE_DEFAULT"]'
+        properties:
+          - name: title
+            extract: text
+
+      - name: HeroSection
+        selector: '[data-section-id="HERO_DEFAULT"]'
+        memory:
+          - Opening the photo grid swaps to a gallery view without leaving the
+            route.
+
+      - name: OverviewSection
+        selector: '[data-section-id^="OVERVIEW"]'
+        properties:
+          - name: overview
+            extract: text
+
+      - name: HighlightsSection
+        selector: '[data-section-id="HIGHLIGHTS_DEFAULT"]'
+
+      - name: DescriptionSection
+        selector: '[data-section-id="DESCRIPTION_DEFAULT"]'
+        properties:
+          - name: description
+            extract: text
+
+      - name: AmenitiesSection
+        selector: '[data-section-id="AMENITIES_DEFAULT"]'
+        properties:
+          - name: amenities
+            extract: text
+
+      - name: LocationSection
+        selector: '[data-section-id="LOCATION_DEFAULT"]'
+        memory:
+          - Shows an approximate area, not an exact address, until a stay is
+            booked.
+
+      - name: ReviewsSection
+        selector: '[data-section-id="REVIEWS_DEFAULT"]'
+        children:
+          - name: ShowAllReviewsButton
+            selector: '[data-testid="pdp-show-all-reviews-button"]'
+            memory:
+              - Only a few reviews render inline; the rest open in a modal
+                behind this button.
+
+      - name: PoliciesSection
+        selector: '[data-section-id="POLICIES_DEFAULT"]'
+
+      - name: BookingPanel
+        selector: '[data-section-id="BOOK_IT_SIDEBAR"]'
+        children:
+          - name: BookItPanel
+            selector: '[data-testid="book-it-default"]'
+          - name: CheckInDate
+            selector: '[data-testid="change-dates-checkIn"]'
+            properties:
+              - name: check_in
+                extract: text
+          - name: CheckOutDate
+            selector: '[data-testid="change-dates-checkOut"]'
+            properties:
+              - name: check_out
+                extract: text
+          - name: ReserveButton
+            selector: '[data-testid="homes-pdp-cta-btn"]'
+            memory:
+              - Activating this starts a real booking flow on a live
+                marketplace. Mapped, not exercised.
+
+      - name: SaveButton
+        selector: '[data-testid="pdp-save-button-unsaved"]'
+        memory:
+          - The testid encodes state and flips to the saved variant once
+            toggled. Match the `pdp-save-button` prefix if a save may already
+            have happened.
+
+      - name: ReportListingButton
+        selector: '[data-testid="user-flag-report-button"]'
+
+      - name: SeoLinks
+        selector: '[data-section-id="SEO_LINKS_DEFAULT"]'
+
+    requests:
+      - name: PdpSections
+        route: /api/v3/StaysPdpSections/*
+        method: POST
+        description: The listing page's own sections, matching the data-section-id outline in the DOM. The single most useful call on this view.
+
+      - name: PdpReviews
+        route: /api/v3/StaysPdpReviewsQuery/*
+        method: GET
+        description: Reviews for this listing, fetched separately from the sections.
+
+      - name: PdpBookIt
+        route: /api/v3/StaysPdpBookItQuery/*
+        method: GET
+        description: Price breakdown and availability for the booking panel. This is where the numbers come from, so they depend on the search state rather than on the listing.
+
+      - name: HostRecommendedPois
+        route: /api/v3/HostRecommendedPoisQuery/*
+        method: GET
+        description: Nearby places the host recommends, shown on the listing map.

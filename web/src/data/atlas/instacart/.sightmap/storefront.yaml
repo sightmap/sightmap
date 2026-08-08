@@ -1,0 +1,36 @@
+version: 1
+
+views:
+  - name: Storefront
+    route: /store/:retailerSlug/storefront
+    url: https://www.instacart.com/store/staples/storefront
+    description: One retailer's storefront — aisle rail, category tiles, and rows of item cards.
+    memory:
+      - Rows below the first mount as skeletons and never resolve while the tab
+        is in the background. Forty-five placeholders stood against six real
+        items after scrolling, and the placeholder count rose rather than fell.
+        Bring the tab to the foreground before trusting any count from this
+        route.
+      - Injected scrolling does not trigger the lazy load. `window.scrollTo`
+        moved the viewport and mounted nothing; a real scroll event rendered the
+        next row. Drive this page with input events, not script.
+      - Item test ids embed the item id, as in `item_list_item_items_45295-<id>`,
+        so no fixed test id addresses a card. Match on the `item_list_item_`
+        prefix instead.
+      - Section headings are `h2` and the store name is also an `h2`, so a
+        heading query returns the store alongside the product rows.
+    components:
+      - name: ItemCard
+        selector: '[data-testid^="item_list_item_"]'
+        description: One purchasable item in a row.
+        children:
+          - name: ItemImage
+            selector: '[data-testid="item-card-image"]'
+          - name: ItemLink
+            selector: 'a[href*="/products/"]'
+            properties:
+              - name: product_href
+                extract: attr=href
+          - name: AddButton
+            selector: 'button[aria-label*="Add"]'
+            description: Adds the item to the account's cart.

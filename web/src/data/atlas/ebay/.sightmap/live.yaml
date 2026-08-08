@@ -1,0 +1,30 @@
+version: 1
+
+views:
+  - name: LiveHub
+    route: /ebaylive
+    url: https://www.ebay.com/ebaylive
+    description: eBay Live hub — a filterable feed of live and upcoming shopping streams.
+    memory:
+      - Pressing a category filter re-filters the feed in place without changing
+        the URL, so the selected category is invisible from the address bar.
+      - Streams live at `/ebaylive/events/:eventId/stream` and sellers at
+        `/ebaylive/sellers/:sellerId`. Both ids are opaque strings, not the
+        numeric ids used for listings and categories.
+    components:
+      - name: LiveFeed
+        selector: '.dp-filtered-feed-module'
+        children:
+          - name: LiveFeedItem
+            selector: '.dp-subgrid-item'
+            properties:
+              - name: item_text
+                extract: text
+
+      - name: LiveFilters
+        selector: 'form[aria-label="Primary filter"]'
+        memory:
+          - Buttons, not links. There is no href to follow, so this is the one
+            browse action on the site that requires a click.
+          - Anchor to the `form`, not the `.primary-filters` div inside it — the
+            div misses the element that carries the accessible name.

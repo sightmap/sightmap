@@ -1,0 +1,122 @@
+version: 1
+
+memory:
+  - Four selector vocabularies, one per surface. Kebab-case testids name
+    interactive components, UPPER_SNAKE testids name sections on SEO landing
+    pages, `data-section-id` names listing-page structure, and slash-namespaced
+    testids belong to the map. Querying only `data-testid` never reveals a
+    listing page's outline.
+  - Class names inside the React app are Linaria hashes that change per build.
+    Select by `data-testid` or `data-section-id` instead.
+  - Every browse path normalizes and an unmatched one becomes `/404`, so read
+    `location.pathname` after load rather than trusting the URL you asked for.
+  - Prices and availability come from the dates and guest count in the search
+    state rather than from the listing, so a price is only meaningful alongside
+    the query that produced it.
+
+components:
+  - name: SkipLinks
+    selector: '#site-skip-links'
+    memory:
+      - Rendered outside the React root as a direct child of `body`, so a walk
+        down from `#react-application` misses it.
+
+  - name: AppRoot
+    selector: '#react-application'
+    memory:
+      - Wraps every route except `/404`, which is server-rendered without it.
+        Its absence is the reliable test for the error page.
+
+  - name: PageHeader
+    selector: '#react-application header'
+    memory:
+      - No `header` element exists anywhere on a listing page, so this global
+        silently skips `/rooms/:listingId`. The header controls are still there
+        — reach them through SearchHeader and HeaderProfileMenu.
+
+  - name: PageMain
+    selector: '#react-application main'
+
+  - name: PageFooter
+    selector: '#react-application footer'
+
+  - name: SearchHeader
+    selector: '[data-testid="little-search"]'
+    memory:
+      - Only listing and search-results pages carry this. The home page uses the
+        expanded `structured-search-input-*` form, and city landing pages have
+        no search control at all.
+    children:
+      - name: SearchLocation
+        selector: '[data-testid="little-search-location"]'
+        properties:
+          - name: location
+            extract: text
+      - name: SearchDates
+        selector: '[data-testid="little-search-date"]'
+        properties:
+          - name: dates
+            extract: text
+      - name: SearchGuests
+        selector: '[data-testid="little-search-guests"]'
+        properties:
+          - name: guests
+            extract: text
+
+  - name: HeaderProfileMenu
+    selector: '[data-testid="cypress-headernav-profile"]'
+
+  - name: TabListWrapper
+    selector: '[data-testid="tab-list-wrapper"]'
+    memory:
+      - Switching between Homes, Experiences, and Services changes the search
+        vertical and the destination route, so set the tab before running a
+        query.
+
+  - name: ContentScroller
+    selector: '[data-testid="content-scroller"]'
+    memory:
+      - Reused for card carousels and image galleries alike, so finding one says
+        nothing about what it holds.
+
+requests:
+  - name: PersistedGraphQlOperation
+    route: /api/v3/*/*
+    method: GET
+    description: Every GraphQL call the site makes. The first path segment is the operation name and the second is a sha256 that pins the query version.
+    memory:
+      - The trailing hash is a persisted-query id that changes whenever Airbnb
+        changes the query, so match on the operation name and wildcard the hash.
+      - Most calls in this family are GET and a few are POST, so filtering on
+        method alone drops part of it.
+
+  - name: HeaderData
+    route: /api/v3/Header/*
+    description: Contents of the global header. Fires on the home page, search, and listing pages, but not on SEO landing pages.
+
+  - name: ConsentFlags
+    route: /api/v3/GetConsentFlagsQuery/*
+    description: Which consent prompts apply to this visitor. The only GraphQL call that fires on every route, including the SEO landing pages that make almost none.
+
+  - name: ServerAnnouncements
+    route: /api/v3/NaviServerAnnouncementsQuery/*
+    description: Site-wide banner announcements shown under the header.
+
+  - name: SearchAutoSuggestions
+    route: /api/v3/AutoSuggestionsQuery/*
+    description: Destination suggestions for the search control, fetched before the control is opened.
+
+  - name: ClientConfigs
+    route: /api/v2/client_configs
+    method: POST
+    description: Feature flags and experiment assignment. Two calls per route on the app-driven views.
+
+  - name: UserMarkets
+    route: /api/v2/user_markets
+    method: GET
+    description: Currency and market defaults for the visitor.
+
+  - name: JitneyLogging
+    route: /tracking/jitney/logging/messages
+    method: POST
+    description: Airbnb's event logging pipeline and the noisiest thing on the site, at 19 calls on a listing page. Carries no content.

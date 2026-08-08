@@ -1,0 +1,38 @@
+version: 1
+
+views:
+  - name: Home
+    route: /us/en/:gender
+    url: https://www.uniqlo.com/us/en/men
+    description: Landing page — media banners and a category grid, addressed by gender.
+    memory:
+      - Which landing page you get depends on client-side stored state, not on
+        the URL you requested. `/us/en/` serves whichever gender was browsed
+        last, `/us/en/women` normalizes to `/us/en/`, and only `/us/en/men`
+        keeps its own path. Read the gender off the page, never off the URL.
+      - No product grid here. The first surfaces that list products are
+        `/us/en/search` and the category listings.
+    components:
+      - name: HomeTemplate
+        selector: '.home-template'
+
+      - name: MediaBanner
+        selector: '.media-banner'
+        properties:
+          - name: banner_text
+            extract: text
+
+      - name: CategoryList
+        selector: '#homeCategoryList'
+        properties:
+          - name: categories
+            extract: text
+        memory:
+          - The cheapest way to enumerate the category tree for the current
+            gender without opening the navigation.
+
+    requests:
+      - name: ProductList
+        route: /us/api/commerce/v5/en/products
+        method: GET
+        description: Products for the merchandised rows on the landing page. Two calls fire, and neither goes through the search endpoint the listing views use.

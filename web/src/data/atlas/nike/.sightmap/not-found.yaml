@@ -1,0 +1,29 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://www.nike.com/no-such-page-xyz-123
+    description: Catch-all page — an apology line above a product carousel.
+    memory:
+      - The 404 renders the full global nav and footer, and its message never
+        uses the number 404. The title `Page not found. Nike.com` is the reliable
+        signal.
+      - A carousel of real products with real prices sits below the apology, so
+        scraping products returns a non-empty answer from a page that found
+        nothing.
+    components:
+      - name: NotFoundApp
+        selector: '#ciclp-app'
+
+      - name: NotFoundMessage
+        selector: '.headline-3'
+        properties:
+          - name: message
+            extract: text
+        memory:
+          - Matches twice — the apology is split across two headlines, so the
+            extracted text is only its first line.
+
+      - name: NotFoundCarousel
+        selector: '#ciclp-app .nds-carousel'

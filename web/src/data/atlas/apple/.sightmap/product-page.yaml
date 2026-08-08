@@ -1,0 +1,88 @@
+version: 1
+
+views:
+  - name: ProductMarketing
+    route: /:productSlug
+    url: https://www.apple.com/macbook-air/
+    description: Editorial product page — local nav, marquee, and scroll-driven media galleries.
+    memory:
+      - This route serves two different page builds. The one mapped here has
+        `#main`, `.section` and `.gallery-item`; pages like /mac/, /ipad/ and
+        /watch/ use a newer build with hashed class names and none of those
+        hooks. MainRegion is the only anchor common to both.
+      - Block classes name the layout pattern, not the topic, and repeat many
+        times per page. Identity comes from the headline text inside a block.
+      - Most of the page is video that autoplays on scroll, standing in
+        beforehand as paired start-frame and end-frame images. A snapshot taken
+        at the top reads placeholders, so scroll before capturing.
+    components:
+      - name: LocalNav
+        selector: '#ac-localnav'
+        properties:
+          - name: nav_items
+            extract: text
+        memory:
+          - The shortcut to Tech Specs and Compare, but only a minority of
+            product pages have one. When it is missing there is no sub-navigation
+            to fall back on.
+
+      - name: MainContent
+        selector: '[role="main"]'
+
+      - name: PromoRibbon
+        selector: '.ribbon'
+        properties:
+          - name: promo
+            extract: text
+
+      - name: Marquee
+        selector: '.marquee'
+        children:
+          - name: MarqueeEyebrow
+            selector: '.header-eyebrow'
+            properties:
+              - name: eyebrow
+                extract: text
+          - name: MarqueeHeadline
+            selector: '.header-headline'
+            properties:
+              - name: headline
+                extract: text
+          - name: MarqueePricing
+            selector: '.pricing-copy-container'
+            properties:
+              - name: pricing
+                extract: text
+            memory:
+              - Footnote markers land in this text as literal asterisks, so strip
+                them before parsing a price.
+
+      - name: ContentSection
+        selector: '.section'
+        properties:
+          - name: section_text
+            extract: text
+
+      - name: ScrollGallery
+        selector: '.scroll-container'
+        children:
+          - name: GalleryItem
+            selector: '.gallery-item'
+            properties:
+              - name: caption
+                extract: text
+
+    requests:
+      - name: MarketingProductPrice
+        route: /*/shop/mcm/product-price
+        method: GET
+        description: The "From $999" price shown on this editorial page, pulled from the store rather than authored into the page.
+        memory:
+          - Prices are not authored into the page, they arrive by XHR after load
+            and in more than one call (consumer under `/us/shop/`, education
+            under `/us-edu/shop/`). A DOM read before they land finds no price.
+
+      - name: VideoLocalization
+        route: /ac/ac-video/latest/json/localization/*.json
+        method: GET
+        description: Caption and control strings for the page's video players. Only routes with video fetch it.

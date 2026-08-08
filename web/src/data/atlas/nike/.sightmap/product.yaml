@@ -1,0 +1,120 @@
+version: 1
+
+views:
+  - name: ProductDetail
+    route: /t/:productSlug/:styleCode
+    url: https://www.nike.com/t/pegasus-premium-mens-road-running-shoes-kWXqW9yR/IV5663-012
+    description: Product page — image carousel, price, size grid, and the add-to-bag control.
+    memory:
+      - A discontinued product returns 200 and still renders `pdp-main` above a
+        recommendations carousel. Check for `#pdp_product_title` and a size grid
+        — both are absent when the product is gone.
+      - The trailing style code is the colorway, not the product. Each colorway
+        is its own URL under the same slug, so the slug alone is not addressable.
+      - Every id this page's API calls need is already in the URL. The token
+        after the last dash of the slug is the group key for availability, the
+        final segment is the style colour for promotion visibility, and that
+        segment minus its numeric suffix is the style code for the product record
+        and the FAQ file.
+    components:
+      - name: ProductMain
+        selector: '[data-testid="pdp-main"]'
+
+      - name: ProductTitle
+        selector: '#pdp_product_title'
+        properties:
+          - name: title
+            extract: text
+
+      - name: CurrentPrice
+        selector: '[data-testid="currentPrice-container"]'
+        properties:
+          - name: price
+            extract: text
+        memory:
+          - Matches more than once inside the product body and one match is
+            empty, so read the first non-empty one.
+
+      - name: SizeGrid
+        selector: '[data-testid="pdp-grid-selector-item"]'
+        properties:
+          - name: size_label
+            extract: text
+        memory:
+          - Sold-out sizes stay in the grid rather than being removed, and
+            nothing marks them until ProductAvailability resolves. Presence is
+            not availability.
+
+      - name: AddToBagButton
+        selector: '[data-testid="atb-button"]'
+
+      - name: FavoriteButton
+        selector: '[data-testid="pdp-main"] [data-testid="favorite-button"]'
+        memory:
+          - The bare testid also matches the Favorites link in the global nav,
+            which is why this one is scoped to the product body.
+
+      - name: PromoBanner
+        selector: '[data-testid="banner-carousel"]'
+        memory:
+          - Its text rotates on a timer, so any assertion against it is a race.
+
+      - name: ImageCarousel
+        selector: '[data-testid="ImageCarousel"]'
+        children:
+          - name: ThumbnailList
+            selector: '[data-testid="ThumbnailListContainer"]'
+          - name: Thumbnail
+            selector: '[data-testid^="Thumbnail-"]'
+            properties:
+              - name: thumb_id
+                extract: attr=data-testid
+            memory:
+              - The prefix match picks up both the button and its image
+                (`Thumbnail-0` and `Thumbnail-Img-0`), so the match count is
+                twice the thumbnail count.
+
+      - name: ProductDescription
+        selector: '[data-testid="product-description"]'
+        properties:
+          - name: description
+            extract: text
+
+      - name: ViewProductDetailsButton
+        selector: '[data-testid="view-product-details-button"]'
+        memory:
+          - Expands the specification block in place without navigating.
+
+      - name: RecommendationsCarousel
+        selector: '[data-testid="recommendations-carousel"]'
+
+    requests:
+      - name: ProductExperience
+        route: /products/experience/v1/*/US/en/styleCode/*
+        method: GET
+        description: The product record on api.nike.com — copy, media, and the colorway list. Keyed by style code.
+
+      - name: ProductAvailability
+        route: /discover/product_details_availability/v1/marketplace/*/language/*/consumerChannelId/*/groupKey/*
+        method: GET
+        description: Per-size stock on api.nike.com. The size grid renders before this resolves, so sizes can appear selectable and then go disabled.
+
+      - name: PromotionVisibility
+        route: /buy/promotion_visibility/v1/styleColor/*/**
+        method: GET
+        description: Whether a promotion applies to this colorway, on api.nike.com. Keyed by style colour rather than by style code.
+
+      - name: AvailableGtins
+        route: /deliver/available_gtins/v3
+        method: GET
+        description: The GTINs orderable for this product on api.nike.com, which is the stock keeping unit behind each size.
+
+      - name: ProductRecommendations
+        route: /discover/product_recs/v1
+        method: POST
+        description: The recommendation carousel below the fold on api.nike.com, paired with a recommendations-carousel fragment.
+
+      - name: ProductFaqs
+        route: /assets/experience/browse-config/faqs/*_en-US.json
+        method: GET
+        description: Static FAQ copy for this product, filed under the style code rather than fetched from an API.

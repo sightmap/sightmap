@@ -1,0 +1,25 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://github.com/sightmap/sightmap/no-such-page-xyz-123
+    description: 404 page, served with a real 404 status.
+    memory:
+      - Serves a real 404 status rather than a 200 with an error body, so the
+        status code can be trusted here.
+      - The page has no `h1` at all, so anything keying "did I land somewhere
+        real" on a heading reads this page as still loading. Test for the 404
+        illustration instead.
+      - Served by the marketing stack rather than the app — `main.font-mktg`
+        and a marketing footer, with none of the repository chrome the path
+        suggests.
+    components:
+      - name: NotFoundMain
+        selector: 'main.font-mktg'
+        properties:
+          - name: message
+            extract: text
+
+      - name: NotFoundArt
+        selector: 'img[alt*="404"]'

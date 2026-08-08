@@ -1,0 +1,26 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://vuoriclothing.com/no-such-page-xyz-123
+    description: Catch-all page — an apology heading with an empty document title.
+    memory:
+      - The document title is the empty string, so anything that identifies pages
+        by title gets nothing and code branching on "404" or "not found" never
+        fires.
+      - The only text signal is the h1, "The page you're looking for cannot be
+        found", and it never says 404.
+      - The full header, nav, search, and footer render, so the chrome is no
+        evidence a real page loaded.
+      - The body is one MUI box whose only class is a compiled style hash, so the
+        heading is the only stable anchor on this view.
+    components:
+      - name: NotFoundHeading
+        selector: '#main-content h1'
+        properties:
+          - name: message
+            extract: text
+        memory:
+          - Scoped to `#main-content` because the footer headings on this site
+            are also `h1` elements.

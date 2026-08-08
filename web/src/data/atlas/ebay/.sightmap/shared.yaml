@@ -1,0 +1,92 @@
+version: 1
+
+memory:
+  - Listings arrive in the server-rendered HTML. A snapshot taken right after
+    navigation already holds them; the XHR that follows is advertising,
+    tracking, and header personalization.
+  - The content fetches on search and category browse fire on scroll, so an
+    unscrolled snapshot misses them.
+  - Category browse is served by the search stack. Its content endpoints live
+    under `/sch/ajax/` even on a `/b/` URL.
+  - A cold profile is served a proof-of-work splash at `/splashui/challenge`
+    before the page it asked for. It clears itself, so the symptoms are a slow
+    first load and a `document.referrer` pointing at the splash.
+  - Prefixed class names (`gh-`, `srp-`, `brw-`, `x-refine__`) survive deploys.
+    Bare short ones like `.esJT` and `.Jd4g` are compiled output that changes —
+    never anchor to them.
+  - No card selector spans the site — `li.s-card` on search,
+    `.brwrvr__item-card` on category browse, `.dp-subgrid-item` on eBay Live.
+
+components:
+  - name: GlobalHeader
+    selector: '#gh'
+    memory:
+      - Sell, Watchlist, and My eBay are `.gh-flyout__target` — they open a
+        hover panel instead of navigating, so a click that expects a page load
+        gets a menu.
+    children:
+      - name: UtilityNav
+        selector: '.gh-nav'
+      - name: SearchForm
+        selector: '#gh-f'
+        memory:
+          - A plain GET form. Build `/sch/i.html?_nkw=<terms>` directly rather
+            than filling and submitting it.
+        children:
+          - name: SearchInput
+            selector: '#gh-ac'
+            properties:
+              - name: query
+                extract: attr=value
+          - name: CategorySelect
+            selector: '#gh-cat'
+            properties:
+              - name: category_id
+                extract: attr=value
+
+  - name: GlobalPromoBanner
+    selector: '#gh-gb'
+    memory:
+      - Sits beside `#gh` rather than inside it, so a walk that descends from
+        the header never reaches it.
+
+  - name: FloatingHelp
+    selector: '#infcontainer'
+    memory:
+      - Injected after the rest of the page settles. Poll for it rather than
+        reading an early snapshot as proof it is absent.
+
+  - name: GlobalFooter
+    selector: '#glbfooter'
+    memory:
+      - Anchor to `#glbfooter`, which is on every route. The
+        `#dp-global-footer` wrapper around it is not.
+    children:
+      - name: FooterLegal
+        selector: '.gf-legal'
+
+requests:
+  - name: SearchAutocomplete
+    route: /sch/ajax/autocomplete
+    method: GET
+    description: Typeahead suggestions for the global search box, fired as the query is typed.
+
+  - name: HeaderUserProfile
+    route: /gh/user_profile
+    method: GET
+    description: Personalizes the global header (signed-in name, cart count). Runs on every route and never affects page content.
+
+  - name: SplashChallengeAnswer
+    route: /splashui/challengesvc/answer
+    method: POST
+    description: Proof-of-work answer for the bot splash. Present only on the first page load of a cold profile.
+
+  - name: TrackingTicketRedeem
+    route: /nap/napkinapi/v1/ticketing/redeem
+    method: GET
+    description: Impression-tracking ticket redemption. Fires many times per page and carries no content.
+
+  - name: HeaderUserAcquisition
+    route: /gh/useracquisition
+    method: GET
+    description: Decides whether the sign-in prompt above the header is shown. Runs on every route alongside the profile call.

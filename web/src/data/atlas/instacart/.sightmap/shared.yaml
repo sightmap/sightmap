@@ -1,0 +1,43 @@
+version: 1
+
+components:
+  - name: StoreHeader
+    selector: 'header#commonHeader'
+    description: Fixed bar — store search, fulfilment toggle, delivery window, and cart.
+    memory:
+      - The header carries the account's delivery address and its current
+        fulfilment window. Both are account data; read the header to know the
+        controls exist, never to record where or when.
+      - Class names here are generated, as in `e-xdho1a`, and change between
+        builds. Select on the id or on test ids, never on a class.
+    children:
+      - name: StoreSearch
+        selector: 'input:not([data-testid="hidden-input-for-ios-virtual-keyboard"])'
+        description: Searches within the current store rather than the whole catalogue.
+        memory:
+          - A second input in this header is a hidden shim for the iOS virtual
+            keyboard, so an unfiltered input query returns two and one of them
+            is not the search box.
+      - name: CartButton
+        selector: '[data-testid="floating-cart-button"]'
+        description: Cart entry point and item count. The count and contents are account state.
+
+  - name: AisleNav
+    selector: 'nav[aria-labelledby="sm-departments"]'
+    description: Left rail listing the store's aisles.
+    children:
+      - name: AisleLink
+        selector: 'a[href*="/collections/"]'
+        properties:
+          - name: aisle_href
+            extract: attr=href
+          - name: aisle_name
+            extract: text
+
+  - name: LoadingLockup
+    selector: '[data-testid^="loading-lockup"]'
+    description: Skeleton placeholder standing in for a section that has not resolved.
+    memory:
+      - Presence of these is the settle signal for this site, inverted. A route
+        is only fully read when the count reaches zero, and on this storefront
+        it does not reach zero in a background tab.

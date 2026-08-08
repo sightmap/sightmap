@@ -1,0 +1,67 @@
+version: 1
+
+views:
+  - name: Watch
+    route: /watch
+    url: https://www.youtube.com/watch?v=jNQXAC9IVRw
+    description: A single video — player, title row, description, comments, and the related column.
+    memory:
+      - The video id is in the query string rather than the path, so the route
+        is one shape and `?v=` carries the identity.
+      - This page renders two or three copies of its title, like button,
+        description and comment section, hiding all but one. Counts of two or
+        three where one is expected are the layout, not an error.
+      - The first `like-button-view-model` in document order is the hidden copy,
+        so an unscoped `querySelector` returns the wrong element. Scope to
+        `#above-the-fold`, which holds exactly one of each.
+    components:
+      - name: WatchPage
+        selector: 'ytd-watch-flexy'
+        description: The watch page container.
+        children:
+          - name: Player
+            selector: '#movie_player'
+            children:
+              - name: VideoElement
+                selector: 'video'
+          - name: AboveTheFold
+            selector: '#above-the-fold'
+            description: Title row and actions. The copy of each control that is visible.
+            children:
+              - name: VideoTitle
+                selector: 'h1'
+                properties:
+                  - name: video_title
+                    extract: text
+              - name: LikeButton
+                selector: 'like-button-view-model'
+              - name: VideoDescription
+                selector: 'ytd-text-inline-expander'
+                description: Collapsed by default; expands in place.
+          - name: OwnerRow
+            selector: 'ytd-video-owner-renderer'
+            description: Channel attribution for the video.
+            children:
+              - name: ChannelLink
+                selector: 'a'
+                properties:
+                  - name: channel_href
+                    extract: attr=href
+          - name: SubscribeButton
+            selector: 'ytd-subscribe-button-renderer'
+            description: Subscription control. Its state is account data.
+          - name: SecondaryColumn
+            selector: '#secondary'
+            description: Related and recommended videos.
+            memory:
+              - Contents here are recommendations computed for the account, so
+                the column is structure and what it lists is account state.
+            children:
+              - name: RelatedItem
+                selector: 'yt-lockup-view-model'
+      - name: Comments
+        selector: 'ytd-comments'
+        description: Comment section below the fold.
+        memory:
+          - Zero comment threads exist until the page is scrolled to them. An
+            empty count means not yet loaded, not a video without comments.

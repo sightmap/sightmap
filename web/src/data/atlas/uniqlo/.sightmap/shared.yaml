@@ -1,0 +1,113 @@
+version: 1
+
+memory:
+  - Page type is a class on the first child of `#page-content`.
+    `fr-ec-template-plp` is a category listing, `fr-ec-template-pdp` a product
+    page, `home-template` the landing page. Branch on that instead of parsing
+    the URL.
+  - Values of `data-testid` beginning `ITO` name design-system primitives, not
+    instances; `ITOTypography` alone matches hundreds of nodes per page. Use the
+    `fr-ec-` classes for identity.
+  - Class prefix `fr-ec-` carries meaning. The `ito-` prefix is spacing utility
+    only, as in `ito-margin-bottom-52`, and never worth selecting on.
+  - Every route is locale-prefixed (`/us/en/`), so a mapped route holds only for
+    that storefront.
+  - Overlay hosts ship closed and empty, and how many exist varies by route.
+    Their presence never means a dialog is open — look for text inside one.
+
+components:
+  - name: PromoStrip
+    selector: '#stickyTopSection'
+    properties:
+      - name: promo_text
+        extract: text
+
+  - name: NavigationHeader
+    selector: '.navigation-header'
+    memory:
+      - Matches three times per page because the header renders desktop, mobile,
+        and sticky variants of itself, so any count of nav links is tripled.
+
+  - name: PageContent
+    selector: '#page-content'
+
+  - name: Breadcrumbs
+    selector: '[data-testid="ITOBreadcrumbGroup"]'
+    properties:
+      - name: trail
+        extract: text
+    memory:
+      - Rendered at the foot of the page, not above the content.
+
+  - name: PreloadedDialog
+    selector: '[data-testid="ITODialog"]'
+
+  - name: BackToFrontOverlay
+    selector: '.b2f-overlay'
+
+  - name: Accordion
+    selector: '[data-testid="ITOAccordion"]'
+    properties:
+      - name: accordion_text
+        extract: text
+    memory:
+      - Filter groups on listings and detail sections on product pages are the
+        same accordion. Read its heading to tell them apart.
+
+  - name: PromoModal
+    selector: '[data-testid="modal-form-container"]'
+    memory:
+      - An email-capture overlay that appears unpredictably on browse routes. It
+        intercepts clicks aimed at the content behind it, so dismiss it with its
+        own close control before interacting with the page.
+    children:
+      - name: PromoModalForm
+        selector: '[data-testid="form-component"]'
+
+  - name: ContentAlignment
+    selector: '[data-testid="ITOContentAlignment"]'
+
+  - name: ECGrid
+    selector: '[data-testid="ECGrid"]'
+
+  - name: Drawer
+    selector: '[data-testid="ITODrawer"]'
+    memory:
+      - The filter drawer's apply button is labelled VIEW ITEMS (240). That count
+        is the only place the filtered result total appears before the filter is
+        applied.
+
+  - name: PopupFormDialog
+    selector: 'div[aria-label="POPUP Form"]'
+
+  - name: AppShell
+    selector: '.template-base'
+
+  - name: GlobalFooter
+    selector: '.fr-ec-footer'
+
+requests:
+  - name: CmsContent
+    route: /us/api/commerce/v5/en/cms
+    method: GET
+    description: Merchandised content blocks for the current route. Two or three fire per page, and they carry the promotional copy rather than the product data.
+
+  - name: ProductTaxonomies
+    route: /us/api/commerce/v5/en/products/taxonomies
+    method: GET
+    description: The category tree behind the navigation and the filter rail. Fetched on every content route.
+
+  - name: TrendingSearchWords
+    route: /us/api/typeahead-proxy/v1/en/trending-words
+    method: GET
+    description: Suggested search terms for the empty search box. Fires on every route including the product page.
+
+  - name: ChatbotConfig
+    route: /us/api/iq-chatbot/en/iq/admin/iqConfigResponse
+    method: GET
+    description: Configuration for the support chatbot. Fires on every route before the widget is opened.
+
+  - name: BotTelemetry
+    route: /akam/**
+    method: POST
+    description: Akamai bot-detection telemetry. Also posted to paths made of random-looking segments under a per-deploy prefix, which change and are not worth matching.

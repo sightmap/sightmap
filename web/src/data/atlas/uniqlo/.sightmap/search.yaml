@@ -1,0 +1,53 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /us/en/search
+    url: https://www.uniqlo.com/us/en/search?q=shirt
+    description: Keyword search — a grid of product tiles with a store-stock selector.
+    memory:
+      - Reachable by URL alone as `/us/en/search?q=<terms>`.
+      - Class `fr-ec-product-tile` is never a result — it is the tile inside the
+        recommendation carousels. Results are `.product-tile` inside
+        `.fr-ec-product-collection`; selecting the wrong one returns
+        recommendations that look like results.
+      - Class `fr-ec-product-collection` matches twice here. The second is an
+        empty hidden wrapper, so take the one that actually contains tiles.
+      - One tile per colourway rather than per garment, so a result count
+        overstates the number of distinct products.
+    components:
+      - name: ProductGrid
+        selector: '.fr-ec-product-collection'
+        children:
+          - name: ProductTile
+            selector: '.product-tile'
+            properties:
+              - name: tile_text
+                extract: text
+            children:
+              - name: TileImage
+                selector: '.product-tile__carousel-wrapper'
+
+      - name: RecommendationCarousel
+        selector: '.fr-ec-carousel'
+        children:
+          - name: RecommendedTile
+            selector: '.fr-ec-product-tile'
+            properties:
+              - name: tile_text
+                extract: text
+
+    requests:
+      - name: ProductSearch
+        route: /us/api/commerce/v5/en/products/search
+        method: POST
+        description: The result set as JSON. Category listing posts to the same endpoint with a taxonomy filter instead of a query.
+        memory:
+          - The first screen of results is already in the server-rendered HTML,
+            so reading it needs no JavaScript. This endpoint serves filtering,
+            sorting, and paging beyond that first screen.
+
+      - name: RankedRecommendations
+        route: /us/api/commerce/v5/en/recommendations/ranked-products
+        method: GET
+        description: The recommended strip shown alongside results. The product page uses a different recommendations endpoint.

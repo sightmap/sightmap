@@ -1,0 +1,50 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.apple.com/
+    description: Editorial landing page — full-bleed promotional tiles and a media gallery.
+    memory:
+      - Promotion, not commerce. There is no product grid and no search field in
+        the body; the only way in is the header or a tile's link.
+      - Which tiles appear and in what order is merchandising, so nothing here
+        can be matched by position.
+    components:
+      - name: MainContent
+        selector: '[role="main"]'
+
+      - name: PromoTile
+        selector: '.tile-wrapper'
+        properties:
+          - name: tile_text
+            extract: text
+        children:
+          - name: TileHeadline
+            selector: '.tile-headline'
+            memory:
+              - Usually wraps an image, so it matches while reading empty. Take
+                the tile's identity from TileSubhead or the surrounding
+                `aria-label`.
+          - name: TileSubhead
+            selector: '.tile-subhead'
+            properties:
+              - name: subhead
+                extract: text
+          - name: TileActions
+            selector: '.tile-ctas'
+            properties:
+              - name: actions
+                extract: text
+
+      - name: MediaGallery
+        selector: '.media-gallery-headline-container'
+        properties:
+          - name: gallery_heading
+            extract: text
+
+      - name: GalleryDotNav
+        selector: '.media-gallery-dotnav'
+        memory:
+          - Its tabs are labelled "Item 1", "Item 2" and so on, so the dots
+            cannot tell you what they scroll to.

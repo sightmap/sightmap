@@ -1,0 +1,43 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.ebay.com/
+    description: Merchandised landing page — category flyout, live-shopping carousel, and rotating promotional modules.
+    memory:
+      - Everything between the category nav and the footer is merchandising
+        chosen per render. Nothing in it is worth asserting against.
+      - Promotional module ids of the form `s0-0-1-1-0-2-…-container` look like
+        stable hooks and are not — they encode a module's position in one
+        render.
+      - There is no product grid on the landing page. The first surface that
+        lists items is `/sch/i.html?_nkw=` or a `/b/` category.
+    components:
+      - name: MerchandisedBody
+        selector: '[data-testid="parent-layout"]'
+        memory:
+          - The modules inside are `section` elements with an accessible name
+            such as "Today's Deals". Matching that name is the only durable way
+            to find one, and any given name may be absent.
+
+      - name: CategoryFlyoutNav
+        selector: '#vl-flyout-nav'
+        memory:
+          - Entries open hover panels, but each also carries a plain href to its
+            `/b/` category page — follow the href rather than driving the hover.
+
+      - name: LiveEventsCarousel
+        selector: '#dp-live-events-carousel'
+        children:
+          - name: LiveCarouselHeader
+            selector: '.live-event-video-carousel__header'
+
+      - name: DealsCarousel
+        selector: '.dp-item-carousel-module__wrapper'
+        properties:
+          - name: heading
+            extract: text
+
+      - name: HomeFooterRegion
+        selector: '#dp-global-footer'

@@ -1,0 +1,83 @@
+version: 1
+
+views:
+  - name: Collection
+    route: /collections/:handle
+    url: https://vuoriclothing.com/collections/shorts
+    description: Collection listing — headline, subcategory carousel, filter bar, and the product grid.
+    memory:
+      - Handles resolve loosely and silently. `/collections/mens-shorts` serves
+        `/collections/shorts` and rewrites the path, so read `CollectionHeadline`
+        rather than the URL to learn what loaded.
+      - An unknown handle neither redirects nor 404s visibly. It renders the
+        NotFound body with an empty `document.title`.
+    components:
+      - name: CollectionHeadline
+        selector: '[data-testid="plp-headline-container"]'
+        properties:
+          - name: headline
+            extract: text
+
+      - name: SubcategoryCarousel
+        selector: 'div[aria-label="Content carousel"]'
+        children:
+          - name: SubcategoryCard
+            selector: '[data-testid="carouselCard"]'
+            properties:
+              - name: label
+                extract: text
+
+      - name: FilterBar
+        selector: '[data-testid="filter-bar"]'
+        properties:
+          - name: result_summary
+            extract: text
+        memory:
+          - The result count arrives as prose ("Showing 398 results"), so the
+            number has to be parsed out of the sentence.
+
+      - name: FiltersAccordion
+        selector: '[data-testid="FiltersAccordion"]'
+
+      - name: ProductRow
+        selector: '[data-testid="Plp-ConnectedProductRow"]'
+
+      - name: ProductCard
+        selector: '[data-testid="productCard"]'
+        properties:
+          - name: product_url
+            extract: attr=href
+          - name: card_text
+            extract: text
+        memory:
+          - The card element is itself the anchor, so read `href` from it
+            directly rather than looking for an inner link.
+          - Card text concatenates badge, name, and price with no separator, so
+            it cannot be read as a product name.
+        children:
+          - name: CardHoverBox
+            selector: '[data-testid="productCardHoverBox"]'
+            memory:
+              - In the DOM whether or not the card is hovered, so the swatch and
+                quick-add affordances read without hovering.
+
+      - name: CollectionEditorial
+        selector: '[data-testid="CollectionEditorial2"]'
+        memory:
+          - An editorial tile inside the product grid with no price and no href,
+            so a walk that assumes every grid child is a product trips on it.
+
+      - name: CollectionCopy
+        selector: '#main-content [data-testid="rich-text-editor"]'
+        memory:
+          - SEO copy below the grid, most of it collapsed behind a Read More
+            toggle.
+          - The `rich-text-editor` testid is a generic CMS wrapper reused inside
+            the account and member drawers, so the `#main-content` scope is what
+            makes this selector mean the collection copy.
+
+    requests:
+      - name: CollectionRouteData
+        route: /_next/data/*/en-US/collections/*.json
+        method: GET
+        description: This page's own props as JSON, keyed by the collection handle. Fetching it directly returns the grid without rendering the page.

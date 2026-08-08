@@ -1,0 +1,26 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://www.ikea.com/us/en/no-such-page-xyz-123/
+    description: Catch-all page served for any unmatched path.
+    memory:
+      - Nothing links here, so a link crawl never reaches it.
+      - It renders the complete header, nav, search box, and footer, which makes
+        "the frame is present" useless as proof that a real page loaded. The
+        title is `Page can't be found` and the body is `.hnf-content-container`
+        holding a single `.hnf-text`.
+      - The wording avoids the number 404 entirely, so an agent matching on that
+        string does not recognize the page.
+      - A mistyped `/cat/` id does not land here — it redirects to the root
+        catalog instead. This view only catches paths that match no route at all.
+    components:
+      - name: NotFoundContent
+        selector: '.hnf-content-container'
+        children:
+          - name: NotFoundMessage
+            selector: '.hnf-text'
+            properties:
+              - name: message
+                extract: text

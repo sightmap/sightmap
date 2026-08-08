@@ -1,0 +1,52 @@
+version: 1
+
+components:
+  - name: Masthead
+    selector: 'ytd-masthead#masthead'
+    description: Top bar — search, guide toggle, and account controls.
+    memory:
+      - Two masthead variants exist. The one seen through most of this mapping
+        carries a Back button and no `#avatar-btn` at all, on both routes and at
+        a 1768px viewport; a variant with `#avatar-btn` appeared once. Test for
+        the Back button rather than assuming account controls are present.
+      - No account control is declared here for that reason. A selector for the
+        avatar matches nothing in the state this entry was verified against.
+    children:
+      - name: SearchForm
+        selector: 'form[action="/results"]'
+        description: Submits a query to the results route.
+        memory:
+          - The query field is a `textarea[role="combobox"]`, not an input, so
+            the long-standing `input[name="search_query"]` matches nothing.
+        children:
+          - name: SearchField
+            selector: 'textarea[role="combobox"]'
+            properties:
+              - name: query_placeholder
+                extract: attr=aria-label
+
+  - name: GuideDrawer
+    selector: 'tp-yt-app-drawer#guide'
+    description: Expanded left navigation.
+    memory:
+      - Exactly one of the drawer and the mini guide is visible at a time, and
+        the hidden one still matches. Filter by visibility to know which is in
+        use.
+      - The drawer renders with no entry rows at all on a cold watch load. An
+        empty drawer means it has not been populated, not that navigation is
+        missing.
+
+  - name: MiniGuide
+    selector: 'ytd-app ytd-mini-guide-renderer'
+    description: Collapsed left navigation rail.
+
+  - name: PageManager
+    selector: 'ytd-page-manager#page-manager'
+    description: Holds whichever page renderer the current route uses.
+    memory:
+      - Ids are not unique on this site. `#content` matched 46 elements on the
+        home route and 12 on a watch route, so `getElementById` returns an
+        arbitrary one. Select by element name instead.
+      - The icon sprite defines invisible symbols with generic ids such as `add`
+        and `alarm`, so a query like `#add` resolves to an icon definition
+        rather than a control.

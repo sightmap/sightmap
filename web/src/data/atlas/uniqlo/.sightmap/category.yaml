@@ -1,0 +1,49 @@
+version: 1
+
+views:
+  - name: CategoryListing
+    route: /us/en/:gender/:category
+    url: https://www.uniqlo.com/us/en/men/tops
+    description: Category listing — sticky subcategory tabs above a product grid.
+    memory:
+      - The route shape `/us/en/:gender/:path` also serves editorial pages.
+        Confirm `.fr-ec-template-plp` on the content root before treating a page
+        as a listing.
+      - Subcategory tabs are links, so the whole subcategory tree can be walked
+        without clicking any of them.
+      - This view renders no recommendation carousel, so `.fr-ec-product-tile`
+        matches nothing here. Results are `.product-tile` inside
+        `.fr-ec-product-collection`, the same pair search uses.
+    components:
+      - name: CategoryTemplate
+        selector: '.fr-ec-template-plp'
+
+      - name: StickyTabs
+        selector: '.fr-ec-sticky-tabs'
+        properties:
+          - name: tabs
+            extract: text
+
+      - name: LineupLinks
+        selector: '#lineupLinkWrapper'
+        properties:
+          - name: lineup
+            extract: text
+
+      - name: ProductGrid
+        selector: '.fr-ec-product-collection'
+        children:
+          - name: ProductTile
+            selector: '.product-tile'
+            properties:
+              - name: tile_text
+                extract: text
+            children:
+              - name: TileImage
+                selector: '.product-tile__carousel-wrapper'
+
+    requests:
+      - name: ProductSearch
+        route: /us/api/commerce/v5/en/products/search
+        method: POST
+        description: The grid contents as JSON, filtered by taxonomy rather than by a query. The same endpoint keyword search posts to.

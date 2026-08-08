@@ -1,0 +1,102 @@
+version: 1
+
+memory:
+  - Marketing pages and store pages are separate systems sharing one header. A
+    URL like `/macbook-air/` is editorial with no way to buy; the purchase
+    surface is `/shop/buy-mac/macbook-air`.
+  - Every path takes an optional locale prefix and serves the same page
+    translated, so `/uk/macbook-air/` and `/macbook-air/` are one page. Identify
+    a page by structure, never by its copy.
+  - Paths under `/us/shop/goto/` are underscored permalinks that redirect to the
+    hyphenated canonical route, so most store URLs found by crawling are aliases
+    rather than destinations.
+  - Ids like `#_r_3_` and `#panel-_r_3_-0` are React `useId` output. They change
+    per render and are not valid CSS identifiers unescaped, so address those
+    elements by role and label.
+
+components:
+  - name: GlobalHeader
+    selector: '#globalheader'
+    memory:
+      - The full store menu is in the DOM on every route whether or not a flyout
+        is open, so header links dominate any link count.
+    children:
+      - name: GlobalNav
+        selector: '#globalnav'
+      - name: GlobalNavList
+        selector: '#globalnav-list'
+
+  - name: NavCurtain
+    selector: '#globalnav-curtain'
+    memory:
+      - Exists on every route and is visible only while a flyout is open. Check
+        its visibility, not its presence.
+
+  - name: PageRoot
+    selector: '#page'
+    memory:
+      - Present on search and store routes only, so its absence marks a marketing
+        or landing page.
+
+  - name: MainRegion
+    selector: '[role="main"]'
+    memory:
+      - The portable content landmark. An `#main` id is present on some pages and
+        missing from others, so match the role instead.
+
+  - name: AnnouncementPortal
+    selector: '#portal'
+    memory:
+      - Holds the page's live regions, whose own ids are per-render React output.
+        Read the portal's text rather than addressing a region.
+
+  - name: NavSearchResultCount
+    selector: '.globalnav-searchresults-count'
+    memory:
+      - Empty until the header search field is used.
+
+  - name: GlobalFooter
+    selector: '#ac-globalfooter, #global-footersection'
+    memory:
+      - Two footers with one purpose. Marketing and landing pages use
+        `#ac-globalfooter` and `ac-gf-` classes inside it; search and the store
+        use `#global-footersection` and `as-globalfooter-` classes.
+    children:
+      - name: FooterDisclosure
+        selector: '.ac-gf-sosumi, .as-globalfooter-sosumi'
+        properties:
+          - name: disclosure
+            extract: text
+      - name: FooterBreadcrumbs
+        selector: 'nav[aria-label="Breadcrumbs"]'
+        properties:
+          - name: trail
+            extract: text
+        memory:
+          - Breadcrumbs are in the footer on this site, not above the content.
+      - name: FooterDirectory
+        selector: 'nav[aria-label="Apple Directory"], nav[aria-label="More Apple Store Links"]'
+
+requests:
+  - name: GlobalHeaderFlyouts
+    route: /api-www/global-elements/global-header/v1/flyouts
+    method: GET
+    description: Contents of the header's dropdown menus. The one call that fires on every route, marketing and store alike.
+    memory:
+      - Flyout markup is not in the document until a menu opens, so fetching this
+        route is the cheapest way to enumerate the top-level navigation.
+
+  - name: SearchSuggestionDefaults
+    route: /search-services/suggestions/defaultlinks/
+    method: GET
+    description: The links offered in the search overlay before anything is typed. Fires on every route whether or not search is opened.
+
+  - name: BagStatus
+    route: /**/shop/bag/status
+    method: GET
+    description: Cart contents for the header bag icon.
+
+  - name: LocaleSwitcherContent
+    route: /ac/localeswitcher/*/*/content/localeswitcher.json
+    method: GET
+    description: The country and language list behind the footer's locale picker. Fetched by marketing pages only; store pages do not load it.

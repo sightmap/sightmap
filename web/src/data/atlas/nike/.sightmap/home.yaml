@@ -1,0 +1,47 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.nike.com/
+    description: Editorial landing page — full-bleed campaign cards and product carousels.
+    memory:
+      - Built by the same CMS renderer as the 404. Both mount `#ciclp-app`, so
+        that id identifies the renderer rather than the page.
+      - Durable handles here are the design-system classes and the `aria-label`
+        on each campaign link. Everything else is compiled output.
+      - There is no product grid and no search field in the page body. The first
+        surface that lists products is `/w`.
+    components:
+      - name: HomeApp
+        selector: '#ciclp-app'
+
+      - name: CampaignCard
+        selector: '.image-card'
+        properties:
+          - name: card_text
+            extract: text
+        memory:
+          - Which tiles render, and in what order, is merchandising — neither is
+            stable across loads.
+
+      - name: HomeCarousel
+        selector: '#ciclp-app .nds-carousel'
+
+      - name: CampaignLink
+        selector: '#ciclp-app a[aria-label]'
+        properties:
+          - name: label
+            extract: attr=aria-label
+        memory:
+          - Campaign links wrap an image and carry no text. `aria-label` is the
+            only readable identity and it changes with the campaign.
+
+    requests:
+      - name: VideoManifest
+        route: /content/asset_video_manifest/v1/*
+        method: GET
+        description: Playback manifest for a hero video, on api.nike.com. Only the home page carries video, and the segments then stream from assets.nmp.nike.com.
+        memory:
+          - Once playback starts the segment requests arrive several per second
+            and never stop, so a capture left running here fills with them.

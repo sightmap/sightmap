@@ -1,0 +1,60 @@
+version: 1
+
+views:
+  - name: PullDetail
+    route: /:owner/:repo/pull/:number
+    url: https://github.com/sightmap/sightmap/pull/168
+    description: One pull request — conversation, commits, checks, and the diff, behind a sub-nav.
+    memory:
+      - Conversation, Commits, Checks and Files changed are separate URLs, not
+        client-side tabs, so each one is a full navigation.
+      - The diffstat testids name the kind of change rather than the file and
+        contain a space — `addition diffstat`, `neutral diffstat`.
+      - A merged pull request serves the same route. Only the state badge in
+        the header separates open from merged.
+      - The sub-nav counts, the diffstat and the check rollups all arrive after
+        the document, so an immediate read finds the header without its
+        numbers.
+    requests:
+      - name: TabCounts
+        route: /:owner/:repo/pull/:number/page_data/tab_counts
+        method: GET
+        description: The commit, check, and changed-file counts on the sub-nav, fetched after the document.
+
+      - name: Diffstat
+        route: /:owner/:repo/pull/:number/page_data/diffstat
+        method: GET
+        description: Backs the addition and neutral diffstat testids in the header.
+
+      - name: PartialsLinks
+        route: '/:owner/:repo/pull/:number/partials/links?has_github_issues=*'
+        method: GET
+        description: Linked issues and projects for this pull request, rendered as a markup fragment.
+
+      - name: CommitBadges
+        route: /commits/badges
+        method: POST
+        description: Verification and signing badges for the commits listed on the conversation tab. Posted to the site root, not under the repository.
+
+      - name: ChecksStatusesRollups
+        route: /:owner/:repo/commits/checks-statuses-rollups
+        method: POST
+        description: Rolled-up check status per commit, driving the green or red mark beside each one.
+
+      - name: ReviewThreadDiffLines
+        route: /:owner/:repo/pull/:number/review_thread_syntax_highlighted_diff_lines
+        method: POST
+        description: Highlighted diff context for inline review threads, fetched even when the diff tab is not open.
+
+    components:
+      - name: PullNav
+        selector: 'nav[aria-label="Pull request navigation tabs"]'
+        properties:
+          - name: tabs
+            extract: text
+
+      - name: AdditionDiffstat
+        selector: '[data-testid="addition diffstat"]'
+
+      - name: NeutralDiffstat
+        selector: '[data-testid="neutral diffstat"]'
