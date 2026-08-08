@@ -6,6 +6,7 @@ import Seo from '@/components/Seo'
 import { formatDate } from '@/components/BlogCard'
 import { renderPostBody } from '@/components/blog/widgets'
 import { readPostHtml, loadPostHtml } from '@/lib/postHtml'
+import { useScrollToTopOnPush } from '@/lib/useScrollToTopOnPush'
 import { blogPosts } from '@/generated/blog-manifest'
 // Shared with scripts/prerender.tsx so a client-side navigation to a post and
 // a fresh/prerendered load of that same post produce an identical <title>.
@@ -53,6 +54,11 @@ export default function BlogPost() {
   }, [slug, html, meta])
 
   const body = useMemo(() => (html ? renderPostBody(html) : null), [html])
+
+  // A click from halfway down /blog would otherwise open the post halfway down.
+  // Safe to run before the body has loaded: the reset lands while the page is
+  // still header-only, and the article growing underneath does not move it.
+  useScrollToTopOnPush()
 
   if (!meta) return <Navigate to="/blog" replace />
   if (meta.draft && !isPreview) return <Navigate to="/blog" replace />

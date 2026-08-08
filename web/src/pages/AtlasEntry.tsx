@@ -6,6 +6,7 @@ import AtlasMark from '@/components/atlas/AtlasMark'
 import AtlasInstall from '@/components/atlas/AtlasInstall'
 import { formatDate } from '@/components/BlogCard'
 import { figLabel, primaryDomain } from '@/lib/atlas'
+import { useScrollToTopOnPush } from '@/lib/useScrollToTopOnPush'
 import { atlasEntries } from '@/generated/atlas-manifest'
 // Shared with scripts/prerender.tsx so a client-side navigation from /atlas
 // and a fresh load of the same entry produce an identical <title>.
@@ -29,6 +30,11 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 export default function AtlasEntryPage() {
   const { slug = '' } = useParams()
   const entry = atlasEntries.find((e) => e.slug === slug)
+
+  // A click from halfway down the gallery would otherwise land halfway down the
+  // entry. Called before the `!entry` guard below, since hooks cannot sit after
+  // a conditional return.
+  useScrollToTopOnPush()
 
   // Same shape as BlogPost's guard: an unknown slug has no page of its own
   // (the prerender only writes files for entries that exist), so anything else
