@@ -143,6 +143,13 @@ export const AtlasIndexSchema = z.object({
   entries: z.array(z.unknown()).default([]),
 })
 
+/**
+ * Catalog schema the site emits when there is no vendored index to copy.
+ * Matches atlas.SchemaVersion in go/atlas, which refuses a higher version
+ * outright — an empty catalog must still be one a shipped CLI can read.
+ */
+const EMPTY_SCHEMA_VERSION = 1
+
 export interface LoadedAtlas {
   /** Verbatim index.json text, for the `/atlas/index.json` machine twin. */
   indexJson: string
@@ -295,6 +302,24 @@ export function resolveCorpus(dataDir: string, slug: string): ResolvedCorpus {
 
 export async function loadAtlas(dataDir: string): Promise<LoadedAtlas> {
   const indexPath = path.join(dataDir, 'index.json')
+
+  // No vendored tree at all is a different condition from a broken one. The
+  // atlas arrives by a separate rolling PR, so between this code landing and
+  // that PR merging — and in any checkout that has not taken it — there is
+  // simply no atlas yet. Build an empty gallery and say so, rather than
+  // failing a site build over data this repo does not own.
+  if (!fs.existsSync(indexPath)) {
+    console.warn(`  ! no atlas data vendored at ${dataDir}; building an empty gallery`)
+    return {
+      indexJson: JSON.stringify({ schema_version: EMPTY_SCHEMA_VERSION, generated_at: '', entries: [] }),
+      generatedAt: '',
+      schemaVersion: EMPTY_SCHEMA_VERSION,
+      entries: [],
+      markdown: new Map(),
+      skipped: [],
+    }
+  }
+
   const indexJson = fs.readFileSync(indexPath, 'utf-8')
 
   const parsedIndex = AtlasIndexSchema.safeParse(JSON.parse(indexJson))
