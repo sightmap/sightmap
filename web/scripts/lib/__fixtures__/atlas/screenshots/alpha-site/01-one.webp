@@ -1,0 +1,2 @@
+Not a real image. scripts/lib/atlas.test.ts only checks that this path exists —
+resolveScreenshots() stats files, it never decodes them.

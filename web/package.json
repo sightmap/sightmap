@@ -6,9 +6,10 @@
   "packageManager": "pnpm@10.32.1",
   "type": "module",
   "scripts": {
-    "dev": "tsx scripts/build-blog.ts && vite",
+    "dev": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && vite",
     "build:blog": "tsx scripts/build-blog.ts",
-    "build": "tsx scripts/build-blog.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/generate-feeds.ts",
+    "build:atlas": "tsx scripts/build-atlas.ts",
+    "build": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/generate-feeds.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

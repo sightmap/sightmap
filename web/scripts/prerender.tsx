@@ -13,19 +13,24 @@ import { StaticRouter } from 'react-router'
 import App from '../src/App'
 import { setServerPostHtml, clearServerPostHtml } from '../src/lib/postHtml'
 import { loadPosts, renderPostHtml } from './lib/posts'
+import { loadAtlas } from './lib/atlas'
 import {
   SITE_URL,
   SITE_NAME,
   SITE_DESCRIPTION,
   BLOG_DESCRIPTION,
+  ATLAS_DESCRIPTION,
   HOME_TITLE,
   BLOG_INDEX_TITLE,
+  ATLAS_INDEX_TITLE,
   postTitle,
+  atlasTitle,
   esc,
 } from './lib/site'
 
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
+const ATLAS_DIR = path.resolve('src/data/atlas')
 
 // Netlify sets DEPLOY_PRIME_URL on deploy previews and branch deploys (and
 // URL, which already equals SITE_URL, on production). Locally and in
@@ -352,7 +357,106 @@ async function main() {
     }
   }
 
-  console.log(`\n  prerender complete: ${posts.length + 2} page(s)`)
+  // ---- Atlas ----
+  //
+  // scripts/build-atlas.ts has already written src/generated/atlas-manifest.ts
+  // (what the components read) and public/atlas/ (screenshots + machine
+  // twins). This reads the vendored data a second time rather than importing
+  // that manifest, for the same reason the blog reads content/blog here: the
+  // manifest is a generated artifact, and a prerender that depends on it would
+  // silently emit a stale page set if the two steps ever ran out of order.
+  const atlas = await loadAtlas(ATLAS_DIR)
+
+  write(
+    'atlas',
+    renderRoute(shell, '/atlas', {
+      url: `${SITE_URL}/atlas`,
+      ogUrl: `${DEPLOY_URL}/atlas`,
+      title: ATLAS_INDEX_TITLE,
+      description: ATLAS_DESCRIPTION,
+      image: `${SITE_URL}/og-image.png`,
+      ogImage: `${DEPLOY_URL}/og-image.png`,
+      imageAlt: DEFAULT_IMAGE_ALT,
+      imageDimensionsKnown: true,
+      type: 'website',
+    })
+  )
+
+  for (const entry of atlas.entries) {
+    const url = `${SITE_URL}/atlas/${entry.slug}`
+    const ogUrl = `${DEPLOY_URL}/atlas/${entry.slug}`
+
+    // Every entry shares the site-wide card. Per-entry OG images are
+    // deliberately not generated: og/render.mjs is a manual, Chrome-driven
+    // step that writes a committed PNG, while atlas entries arrive by
+    // automated bot PR — so a per-entry card would exist only for whichever
+    // entries someone happened to hand-process, and be silently absent for the
+    // rest. One card that is correct for every entry beats that.
+
+    // A sightmap *is* a dataset about a website, and the atlas exists to be
+    // consumed by machines — so the structured data describes it as one, with
+    // the two machine twins as its distributions.
+    const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Dataset',
+      name: `${entry.name} sightmap`,
+      description: entry.description,
+      url,
+      creator: { '@type': 'Person', name: entry.author },
+      dateCreated: entry.created,
+      dateModified: entry.updated,
+      isBasedOn: entry.site_url,
+      keywords: entry.categories,
+      distribution: [
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'text/markdown',
+          contentUrl: `${SITE_URL}/atlas/${entry.slug}.md`,
+        },
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'application/json',
+          contentUrl: `${SITE_URL}/atlas/index.json`,
+        },
+      ],
+      includedInDataCatalog: {
+        '@type': 'DataCatalog',
+        name: `${SITE_NAME} Atlas`,
+        url: `${SITE_URL}/atlas`,
+      },
+    }
+
+    const head = [
+      // The machine twin, advertised where a crawler already looks for
+      // alternate representations rather than only as a link in the sidebar.
+      `<link rel="alternate" type="text/markdown" href="${SITE_URL}/atlas/${entry.slug}.md">`,
+      `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`,
+    ].join('\n    ')
+
+    write(
+      `atlas/${entry.slug}`,
+      renderRoute(
+        shell,
+        `/atlas/${entry.slug}`,
+        {
+          url,
+          ogUrl,
+          title: atlasTitle(entry.name),
+          description: entry.description,
+          image: `${SITE_URL}/og-image.png`,
+          ogImage: `${DEPLOY_URL}/og-image.png`,
+          imageAlt: DEFAULT_IMAGE_ALT,
+          imageDimensionsKnown: true,
+          type: 'website',
+        },
+        head
+      )
+    )
+  }
+
+  console.log(
+    `\n  prerender complete: ${posts.length + atlas.entries.length + 3} page(s)`
+  )
 }
 
 // Only run when invoked directly, so the test can import renderMeta and
