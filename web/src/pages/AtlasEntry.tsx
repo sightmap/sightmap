@@ -1,4 +1,5 @@
-import { Link, Navigate, useParams } from 'react-router'
+import { useEffect } from 'react'
+import { Link, Navigate, useLocation, useNavigationType, useParams } from 'react-router'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import Seo from '@/components/Seo'
@@ -29,6 +30,25 @@ function MetaRow({ label, children }: { label: string; children: React.ReactNode
 export default function AtlasEntryPage() {
   const { slug = '' } = useParams()
   const entry = atlasEntries.find((e) => e.slug === slug)
+
+  // React Router leaves the window's scroll offset alone across a client-side
+  // navigation, so a click from halfway down the gallery lands halfway down the
+  // entry. Reset it — but only for PUSH, which is a link click. POP is the back
+  // button and the initial load, where the browser's own scroll restoration is
+  // the right answer, and a hash means the visitor asked for a specific heading
+  // (`#atlas-views-h`). Keyed on `slug` as well because entry-to-entry
+  // navigation reuses this component rather than remounting it.
+  //
+  // Runs before the `!entry` guard below: hooks cannot sit after a conditional
+  // return.
+  const navigationType = useNavigationType()
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (navigationType !== 'PUSH' || hash) return
+    // 'instant', not the default: `html { scroll-behavior: smooth }` would
+    // otherwise animate the whole page back up.
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [slug, navigationType, hash])
 
   // Same shape as BlogPost's guard: an unknown slug has no page of its own
   // (the prerender only writes files for entries that exist), so anything else

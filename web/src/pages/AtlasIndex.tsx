@@ -4,6 +4,7 @@ import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import Seo from '@/components/Seo'
 import AtlasCard from '@/components/atlas/AtlasCard'
+import AtlasSubmitCard from '@/components/atlas/AtlasSubmitCard'
 import { filterEntries } from '@/lib/atlas'
 import { atlasCategories, atlasEntries } from '@/generated/atlas-manifest'
 // Shared with scripts/prerender.tsx (this page's meta description/title) — see
@@ -132,6 +133,10 @@ export default function AtlasIndex() {
                 {shown.map((entry) => (
                   <AtlasCard key={entry.slug} entry={entry} />
                 ))}
+                {/* Last in the grid, filtered or not: someone who narrowed to a
+                    category and found a gap is exactly who should see it. It is
+                    not counted in the line below, which counts entries. */}
+                <AtlasSubmitCard />
               </div>
               {/* Unfiltered, "1 of 1 entry" is noise — just say how many there
                   are. The x-of-y form only earns its place once a filter is

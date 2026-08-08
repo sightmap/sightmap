@@ -1323,10 +1323,16 @@ footer {
   list-style-type: decimal;
 }
 
+/* Inline code only. The dark surface is right for a whole block, but at inline
+   size it reads as a heavy bar dropped mid-sentence — a paragraph with three
+   of them looks striped. So inline code borrows the accent chip that
+   `.atlas-table code` already uses further down, and blocks keep the dark
+   surface via `.prose pre code` below (and `.blog-code`, which supplies its
+   own). */
 .prose code {
   font-family: var(--mono);
-  background: var(--bg-code);
-  color: var(--code-text);
+  background: var(--accent-dim);
+  color: var(--accent);
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-size: 0.875em;
@@ -1341,8 +1347,14 @@ footer {
   margin-bottom: 1.5em;
 }
 
+/* Undoes the inline chip for code inside a block: the <pre> already supplies
+   the dark surface and the accent is unreadable on it. `color` is set here and
+   not left to inherit because this also catches `.blog-code`'s highlighted
+   <pre><code>, where the untokenized text has no colour of its own and would
+   otherwise pick up the chip's accent. */
 .prose pre code {
   background: none;
+  color: var(--code-text);
   padding: 0;
   border-radius: 0;
   font-size: 0.875em;
@@ -2390,6 +2402,62 @@ footer {
   color: var(--text-dim);
 }
 
+/* ---- ATLAS SUBMIT CARD ---- */
+/* The trailing "Submit a site" card (see AtlasSubmitCard.tsx). Everything here
+   is an override of `.atlas-card`, which it shares so the grid keeps one card
+   shape; dashed edges are the only structural difference, and they are what
+   separate an invitation from a mapped site at a glance. */
+.atlas-card--submit {
+  border-style: dashed;
+}
+
+.atlas-card--submit:hover {
+  border-color: var(--accent);
+}
+
+/* No screenshot to show, so the aspect-ratio box holds the graph-paper fill the
+   screenshot-less entry card already uses, with the plus centred in it. */
+.atlas-card--submit .atlas-card__shot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom-style: dashed;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.atlas-card__plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border: 1px dashed var(--accent);
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.atlas-card--submit:hover .atlas-card__plus {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* --mark-color is normally set per instance from the domain; this card has no
+   domain, so it takes the accent. */
+.atlas-card__submit-mark {
+  --mark-color: var(--accent);
+}
+
+.atlas-card--submit .atlas-card__foot {
+  border-top-style: dashed;
+  color: var(--accent);
+}
+
 .atlas-index__empty {
   font-family: var(--mono);
   font-size: 0.9rem;
@@ -2417,6 +2485,16 @@ footer {
 .atlas-entry {
   padding-top: 9rem;
   padding-bottom: 5rem;
+}
+
+/* The global `section { padding: 5rem 0 }` exists for the homepage's full-bleed
+   bands, where each <section> is its own screenful. An entry's sections
+   (figures, views, README body) are stacked blocks inside one column that
+   already space themselves with margins, so that padding only opens holes
+   between them. Higher specificity than the bare `section` rule, so it also
+   wins over the 3.5rem narrow-viewport override. */
+.atlas-entry section {
+  padding: 0;
 }
 
 .atlas-entry__header {
