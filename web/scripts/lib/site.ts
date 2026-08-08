@@ -20,6 +20,17 @@ export const SITE_DESCRIPTION =
 export const BLOG_DESCRIPTION =
   'Research and release notes from the people building the sightmap spec.'
 
+// The atlas gallery's tagline, distinct again from both of the above: the
+// atlas is community-contributed maps of other people's sites, not the spec
+// pitch and not the blog. Used for /atlas's meta description and the copy
+// under its heading, and imported by src/pages/AtlasIndex.tsx for the same
+// single-source reason BLOG_DESCRIPTION is.
+// Sits directly under the /atlas heading ("Sightmaps of real sites"), so it
+// must not restate it — and it has to stand alone as the page's meta
+// description and its llms.txt section summary.
+export const ATLAS_DESCRIPTION =
+  'Community-contributed maps of views, components, and requests, made by browsing the live site with no source access.'
+
 // Per-route <title> builders. scripts/prerender.tsx (the source of truth
 // crawlers and unfurlers read) and src/components/Seo.tsx (which fixes the
 // tab title on client-side navigation, since useEffect never runs during
@@ -28,7 +39,11 @@ export const BLOG_DESCRIPTION =
 // titles for the same route.
 export const HOME_TITLE = `${SITE_NAME} — runtime context for agents using your web app`
 export const BLOG_INDEX_TITLE = `Blog — ${SITE_NAME}`
+export const ATLAS_INDEX_TITLE = `Atlas — ${SITE_NAME}`
 export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`
+// An atlas entry's own title carries the mapped site's name, so the suffix
+// says which gallery it came from rather than repeating the site name twice.
+export const atlasTitle = (name: string): string => `${name} — ${SITE_NAME} Atlas`
 
 // Escape for use inside an HTML attribute value. Ampersand goes first so the
 // entities introduced by the later replacements are not themselves escaped.

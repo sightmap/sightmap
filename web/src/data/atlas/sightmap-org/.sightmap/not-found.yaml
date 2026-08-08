@@ -1,0 +1,27 @@
+version: 1
+
+views:
+  - name: NotFound
+    route: /**
+    url: https://sightmap.org/no-such-page
+    description: Catch-all 404 page served for any unmatched path.
+    memory:
+      - Matches every path, so it only wins where no more specific view does —
+        `/`, `/blog`, and `/blog/:slug` still resolve to their own views.
+      - The server returns the SPA shell for unmatched paths, so this renders
+        client-side rather than as a distinct error document. Do not expect a
+        404 status to tell you that you landed here; check for NotFound instead.
+      - Unlike every other route, both of its links stay on the site — the
+        fastest way back onto the mapped surface.
+    components:
+      - name: NotFoundMain
+        selector: '[data-component^="NotFound"]'
+        properties:
+          - name: heading
+            extract: text
+            transform: first_line
+        children:
+          - name: NotFoundHomeLink
+            selector: 'a[href="/"]'
+          - name: NotFoundBlogLink
+            selector: 'a[href="/blog"]'

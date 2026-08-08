@@ -1,0 +1,85 @@
+version: 1
+
+views:
+  - name: ItemDetail
+    route: /itm/:itemId
+    url: https://www.ebay.com/itm/264476753478
+    description: A single listing — gallery, title, price, quantity, buy actions, shipping, and returns.
+    memory:
+      - The one route on the site with a thorough `data-testid` vocabulary. Every
+        fact worth reading has its own `x-`prefixed testid, so this page needs no
+        class-name guessing at all.
+      - The numeric id in the path is the same `data-listingid` carried by the
+        search result card, so search results link to item pages without any
+        lookup step.
+      - Query parameters on `/itm/` URLs are all tracking. `/itm/:itemId` with
+        nothing appended serves the identical page.
+      - The example URL on this view points at one real listing, and listings
+        end. When it eventually stops resolving, re-probe against any current
+        `/itm/` id rather than treating the view as broken — nothing about the
+        structure is specific to that item.
+      - What a listing shows depends on how it sells. Auction listings carry a
+        bid count and a countdown where fixed-price listings carry
+        `x-bin-price`, and `x-volume-pricing` appears only when the seller set up
+        bulk tiers. Treat every block below as optional and branch on presence.
+    components:
+      - name: ItemMain
+        selector: '[data-testid="x-vi-evo-main-container"]'
+        children:
+          - name: ItemTitle
+            selector: '[data-testid="x-item-title"]'
+            properties:
+              - name: title
+                extract: text
+          - name: PriceSection
+            selector: '[data-testid="x-price-section"]'
+            properties:
+              - name: price
+                extract: text
+            memory:
+              - Holds whichever price applies to the listing type. On a
+                fixed-price listing it contains `x-bin-price`; on an auction it
+                holds the current bid instead.
+          - name: QuantityPanel
+            selector: '[data-testid="x-quantity"]'
+            properties:
+              - name: availability
+                extract: text
+          - name: BuyBoxActions
+            selector: '[data-testid="x-buybox-cta"]'
+            memory:
+              - Buy It Now, Add to cart, Make offer, and Add to Watchlist all
+                live here. Which of them render depends on the listing, so
+                resolve the specific action by its label rather than by position.
+          - name: VolumePricing
+            selector: '[data-testid="x-volume-pricing"]'
+          - name: WatcherSignals
+            selector: '[data-testid="x-wtb-signals"]'
+            properties:
+              - name: signal_text
+                extract: text
+          - name: ShippingSummary
+            selector: '[data-testid="d-shipping-minview"]'
+            properties:
+              - name: shipping_text
+                extract: text
+          - name: ReturnsSummary
+            selector: '[data-testid="x-returns-minview"]'
+            properties:
+              - name: returns_text
+                extract: text
+
+      - name: PhotoGallery
+        selector: '[data-testid="x-photos"]'
+        memory:
+          - Thumbnails swap the main image in place with no navigation, so the
+            URL never reflects which photo is showing.
+        children:
+          - name: GalleryMainView
+            selector: '[data-testid="x-photos-min-view"]'
+
+      - name: RecommendationSlot
+        selector: '[data-testid="x-pda-placements"]'
+        memory:
+          - Sponsored placements. The contents change per load, so nothing here
+            is stable enough to assert against.

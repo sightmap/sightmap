@@ -1,0 +1,42 @@
+version: 1
+
+views:
+  - name: BlogIndex
+    route: /blog
+    url: https://sightmap.org/blog
+    description: Reverse-chronological list of posts, one card each.
+    memory:
+      - Each card is itself the anchor — the whole card is clickable, so there is
+        no inner "read more" link to target.
+      - Card metadata runs title, date, and category together in `textContent`;
+        read the individual values through the card's properties instead.
+    components:
+      - name: BlogIndexMain
+        selector: '[data-component^="BlogIndex"]'
+
+      - name: BlogCard
+        selector: '[data-component^="BlogCard"]'
+        memory:
+          - Repeats once per post, so this selector matches N elements; property
+            extraction runs independently on each.
+        properties:
+          - name: href
+            extract: attr=href
+          - name: title
+            extract: text
+        children:
+          - name: BlogCardMeta
+            selector: .blog-card__meta
+            properties:
+              - name: meta
+                extract: text
+          - name: BlogCardTitle
+            selector: .blog-card__title
+            properties:
+              - name: title
+                extract: text
+          - name: BlogCardExcerpt
+            selector: .blog-card__excerpt
+            properties:
+              - name: excerpt
+                extract: text

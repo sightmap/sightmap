@@ -1,0 +1,84 @@
+version: 1
+
+views:
+  - name: ProductDetail
+    route: /us/en/products/:productId/:colorCode
+    url: https://www.uniqlo.com/us/en/products/E465185-000/00
+    description: Product page — gallery, options, a size comparison table, and related product carousels.
+    memory:
+      - Identified by `.fr-ec-template-pdp` on the content root.
+      - Colour is part of the path, not a parameter, so each colourway is its own
+        URL. Loading one appends `?colorDisplayCode=` and `?sizeDisplayCode=` for
+        the default variant, which means the URL after load differs from the one
+        requested even on success.
+      - The product id shape is `E465185-000`. The leading `E` and the trailing
+        block are constant across the catalogue; only the middle digits vary.
+      - A `.product-table` sits inside the related-products section rather than
+        describing the product on the page, so it is easy to mistake for a spec
+        table.
+    components:
+      - name: ProductTemplate
+        selector: '.fr-ec-template-pdp'
+
+      - name: RelatedProducts
+        selector: 'section[aria-label="Related Product List"]'
+        memory:
+          - Holds both the similar-products grid and the size comparison table.
+        children:
+          - name: ProductTable
+            selector: '.product-table'
+            properties:
+              - name: table_text
+                extract: text
+
+      - name: ProductLayout
+        selector: '.fr-ec-layout'
+        memory:
+          - The gallery and buy controls share this generic layout wrapper, which
+            is the only container above them that is not a spacing utility.
+
+    requests:
+      - name: ProductVariants
+        route: /us/api/commerce/v5/en/products/*/price-groups/*/l2s
+        method: GET
+        description: The buyable variants — size and colour combinations with their stock. Keyed by the two identifiers that make up this page's URL.
+        memory:
+          - Both path parameters come straight from the address bar. For
+            `/us/en/products/E465185-000/00` the product id is `E465185-000` and
+            the price group is `00`, so every call this page makes is
+            constructible from the URL without reading the DOM.
+
+      - name: ProductReviews
+        route: /us/api/commerce/v5/en/products/*/reviews
+        method: GET
+        description: Customer reviews for this product, fetched separately from the product record.
+
+      - name: SizeCharts
+        route: /us/api/commerce/v5/en/products/size-charts
+        method: GET
+        description: Measurement tables for the size guide. Fetched on load rather than when the guide is opened.
+
+      - name: StyleHintPhotos
+        route: /us/api/commerce/v5/en/products/*/sh-styles
+        method: GET
+        description: Customer StyleHint photos featuring this product.
+
+      - name: StyleBookLooks
+        route: /us/api/commerce/v5/en/products/*/sb-styles
+        method: GET
+        description: Styled outfit imagery for this product, a separate collection from the StyleHint photos.
+
+      - name: SimilarProducts
+        route: /us/api/commerce/v5/en/products/*/price-groups/*/similar-products
+        method: GET
+        description: The similar-items strip, keyed by product id and price group like the variants call.
+
+      - name: ProductRecommendations
+        route: /us/api/commerce/v5/en/recommendations/products
+        method: GET
+        description: The recommendation carousel. The listing views call ranked-products instead, so the two surfaces do not share an endpoint.
+
+      - name: CmsWordings
+        route: /us/api/commerce/v5/en/cms/wordings
+        method: GET
+        description: Localized label strings for the product page controls. Only this view fetches them.

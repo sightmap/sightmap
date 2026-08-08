@@ -75,6 +75,19 @@ Never change spec semantics without an SEP (`spec/seps/`).
 ### `web/`
 - `pnpm install && pnpm dev` from `web/`.
 - Deploys to Netlify from its subdirectory.
+- Routes are declared twice — in `src/App.tsx` and again in
+  `scripts/prerender.tsx`, which writes one static file per URL. A route added
+  to only the first renders in dev and ships as a client-only page.
+- Two content pipelines feed the app, both generating into gitignored
+  directories on every `pnpm dev` / `pnpm build`:
+  `scripts/build-blog.ts` (from `content/blog/`) and `scripts/build-atlas.ts`
+  (from `src/data/atlas/`, the vendored community atlas — see that directory's
+  `README.md`). Neither makes a network call, at build or at run time; the
+  atlas is vendored precisely so a bad community merge cannot break a deploy.
+- Atlas READMEs are community-authored, so `scripts/lib/atlas.ts` renders them
+  through its own hardened `marked` instance (raw HTML escaped, URL schemes
+  allowlisted). Don't route that content through `scripts/lib/posts.ts`, which
+  deliberately passes raw HTML for maintainer-written posts.
 
 ## Sightmap dogfooding
 

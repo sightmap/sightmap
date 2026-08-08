@@ -1,0 +1,81 @@
+version: 1
+
+views:
+  - name: ProductDetail
+    route: /products/:handle
+    url: https://vuoriclothing.com/products/benton-twill-elastic-waist-short-8-ink
+    description: Product page — media grid, title and price, colour and size options, spec accordions, and two recommendation carousels.
+    memory:
+      - The handle encodes the colourway (`...-short-8-ink`), so each colour is
+        its own URL rather than a variant parameter on a shared one.
+      - Spec sections are accordions with stable ids (`#description-accordion`,
+        `#fit-accordion`, `#fabricCare-accordion`, `#features-accordion`). Their
+        content is in the DOM whether or not the accordion is open, so nothing
+        needs clicking to read it.
+      - The recommendation carousels give each slide a `data-testid` of
+        `<Product Name> | <Colourway>`. Those strings contain a double quote for
+        the inch mark, which makes them invalid inside a CSS attribute selector
+        unless escaped. Read them as data from the slide; do not select on them.
+    components:
+      - name: ProductBody
+        selector: '[data-testid="pdp-template-body"]'
+
+      - name: MediaGrid
+        selector: '#media-grid-desktop'
+        memory:
+          - Desktop-only id. The mobile gallery is a separate element, so a
+            corpus written at one viewport misses the other.
+
+      - name: TitleAndPrice
+        selector: '[data-testid="pdptop-title-price"]'
+        properties:
+          - name: title_price
+            extract: text
+        memory:
+          - Name and price share one element with no separator, so they come out
+            as a single string.
+
+      - name: ProductOptions
+        selector: '[data-testid="product-options-section"]'
+        properties:
+          - name: options_text
+            extract: text
+        memory:
+          - Colour, size, Find My Size, and Size Chart. Sizes render as buttons
+            and sold-out sizes stay present, so presence is not availability.
+
+      - name: DescriptionAccordion
+        selector: '#description-accordion'
+        properties:
+          - name: description
+            extract: text
+
+      - name: FitAccordion
+        selector: '#fit-accordion'
+
+      - name: FabricCareAccordion
+        selector: '#fabricCare-accordion'
+
+      - name: FeaturesAccordion
+        selector: '#features-accordion'
+
+      - name: ShopTheLookCarousel
+        selector: '[data-testid="pdp-related-products-carousel"]'
+        memory:
+          - Styled-with suggestions, curated per product.
+
+      - name: YouMayAlsoLikeCarousel
+        selector: '[data-testid="Pdp-YouMayAlsoLikeCarousel"]'
+        memory:
+          - Algorithmic recommendations. Contents change between visits, so
+            nothing inside is worth asserting against.
+
+    requests:
+      - name: ProductRouteData
+        route: /_next/data/*/en-US/products/*.json
+        method: GET
+        description: This page's own props as JSON, keyed by the same handle that ends the URL. Fetching it directly is a complete substitute for rendering the page.
+        memory:
+          - A product page also prefetches this endpoint for every other product
+            it links to, so a single visit yields the data for the whole
+            recommendation carousel alongside its own.

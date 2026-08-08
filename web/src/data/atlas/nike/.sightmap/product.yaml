@@ -1,0 +1,129 @@
+version: 1
+
+views:
+  - name: ProductDetail
+    route: /t/:productSlug/:styleCode
+    url: https://www.nike.com/t/pegasus-premium-mens-road-running-shoes-kWXqW9yR/IV5663-012
+    description: Product page — image carousel, price, size grid, and the add-to-bag control.
+    memory:
+      - A discontinued product does not 404. The URL returns 200, renders
+        `pdp-main`, and shows the sentence "THE PRODUCT YOU ARE LOOKING FOR IS NO
+        LONGER AVAILABLE" above a recommendations carousel. Structural checks
+        cannot tell that page apart from a live product; look for
+        `#pdp_product_title` and a size grid, both of which are absent when the
+        product is gone.
+      - The style code ending the URL (`IV5663-012`) is the colorway, not the
+        product. A different colorway of the same shoe is a different URL with
+        the same slug, which is why the slug alone is not addressable.
+      - Every identifier this page's API calls need is already in its URL, in
+        three forms. From `/t/pegasus-premium-mens-road-running-shoes-kWXqW9yR/IV5663-012`
+        the trailing token on the slug (`kWXqW9yR`) is the group key that keys
+        the availability call; the last segment (`IV5663-012`) is the style
+        colour that keys promotion visibility; and that segment with the
+        colorway suffix dropped (`IV5663`) is the style code that keys the
+        product record and the FAQ file. An agent holding the URL can address
+        all four without scraping anything.
+      - Testid casing switches mid-page. `pdp-main` and `atb-button` are
+        kebab-case while `ImageCarousel`, `ThumbnailListContainer`, and
+        `Thumbnail-0` are PascalCase.
+    components:
+      - name: ProductMain
+        selector: '[data-testid="pdp-main"]'
+
+      - name: ProductTitle
+        selector: '#pdp_product_title'
+        properties:
+          - name: title
+            extract: text
+        memory:
+          - Absent when the product is discontinued, which makes it the most
+            reliable liveness check on this route.
+
+      - name: CurrentPrice
+        selector: '[data-testid="currentPrice-container"]'
+        properties:
+          - name: price
+            extract: text
+        memory:
+          - Matches more than once on a discounted product, since the page
+            renders the price in several places.
+
+      - name: SizeGrid
+        selector: '[data-testid="pdp-grid-selector-item"]'
+        properties:
+          - name: size_label
+            extract: text
+        memory:
+          - One element per size. Sold-out sizes stay in the grid rather than
+            being removed, so presence is not availability.
+
+      - name: AddToBagButton
+        selector: '[data-testid="atb-button"]'
+        memory:
+          - Labelled "Add to Bag". The abbreviation in the testid is the only
+            place the site calls it that.
+
+      - name: FavoriteButton
+        selector: '[data-testid="favorite-button"]'
+
+      - name: ImageCarousel
+        selector: '[data-testid="ImageCarousel"]'
+        children:
+          - name: ThumbnailList
+            selector: '[data-testid="ThumbnailListContainer"]'
+          - name: Thumbnail
+            selector: '[data-testid^="Thumbnail-"]'
+            properties:
+              - name: thumb_id
+                extract: attr=data-testid
+            memory:
+              - Numbered per position (`Thumbnail-0`, `Thumbnail-Img-0`), so the
+                prefix match picks up both the button and its image.
+
+      - name: ProductDescription
+        selector: '[data-testid="product-description"]'
+        properties:
+          - name: description
+            extract: text
+
+      - name: ViewProductDetailsButton
+        selector: '[data-testid="view-product-details-button"]'
+        memory:
+          - Expands the specification block in place without navigating.
+
+      - name: RecommendationsCarousel
+        selector: '[data-testid="recommendations-carousel"]'
+        memory:
+          - Also the main content of a discontinued product page, where it sits
+            directly under the unavailable notice.
+
+    requests:
+      - name: ProductExperience
+        route: /products/experience/v1/*/US/en/styleCode/*
+        method: GET
+        description: The product record on api.nike.com — copy, media, and the colorway list. Keyed by style code.
+
+      - name: ProductAvailability
+        route: /discover/product_details_availability/v1/marketplace/*/language/*/consumerChannelId/*/groupKey/*
+        method: GET
+        description: Per-size stock on api.nike.com. The size grid renders before this resolves, so sizes can appear selectable and then go disabled.
+
+      - name: PromotionVisibility
+        route: /buy/promotion_visibility/v1/styleColor/*/**
+        method: GET
+        description: Whether a promotion applies to this colorway, on api.nike.com. Keyed by style colour rather than by style code.
+
+      - name: AvailableGtins
+        route: /deliver/available_gtins/v3
+        method: GET
+        description: The GTINs orderable for this product on api.nike.com, which is the stock keeping unit behind each size.
+
+      - name: ProductRecommendations
+        route: /discover/product_recs/v1
+        method: POST
+        description: The recommendation carousel below the fold on api.nike.com, paired with a recommendations-carousel fragment.
+
+      - name: ProductFaqs
+        route: /assets/experience/browse-config/faqs/*_en-US.json
+        method: GET
+        description: Static FAQ copy for this product, filed under the style code rather than fetched from an API.

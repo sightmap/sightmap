@@ -1,0 +1,68 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://vuoriclothing.com/
+    description: Landing page — hero carousel, featured products, a tabbed category carousel, and a colour picker.
+    memory:
+      - Nearly everything here is a carousel, and every carousel labels its
+        slides `aria-label="Slide N of M"` rather than by content. That label is
+        the reliable way to enumerate slides; the `data-testid` on a slide is the
+        product or category name and changes with merchandising.
+      - Popular Categories is a `[role="tablist"]` with Men and Women tabs. Only
+        the selected tab's carousel holds content, so reading the section without
+        switching tabs sees half of it.
+      - Carousel container ids embed the first slide's name
+        (`#carousel-swiper-ShortSleeveShirts_goeqatfjqom`) plus a random suffix,
+        so they change when either the content or the build does.
+      - There is no product grid and no visible search field in the page body.
+        The first surface that lists products is `/collections/:handle` or
+        `/search?q=`.
+    components:
+      - name: HeroCarousel
+        selector: 'section[aria-label="Hero carousel"]'
+        memory:
+          - The top campaign rotator. Slide count and content change with the
+            campaign.
+
+      - name: FeaturedProducts
+        selector: '[data-testid="HomePage-FeaturedProductsCarousel"]'
+        properties:
+          - name: section_text
+            extract: text
+
+      - name: PopularCategoriesTabs
+        selector: '[role="tablist"]'
+        memory:
+          - Men and Women. Switching tabs swaps the carousel below without
+            changing the URL, so the selected tab is not recoverable from the
+            address bar.
+
+      - name: CategoryCarousel
+        selector: 'div[aria-label="Men carousel"], div[aria-label="Women carousel"]'
+        memory:
+          - One per tab, named for the tab rather than given a stable testid.
+
+      - name: ColourPicker
+        selector: 'div[aria-label="Content carousel"]'
+        properties:
+          - name: colours
+            extract: text
+        memory:
+          - A shop-by-colour strip. The same `aria-label="Content carousel"` is
+            reused on collection pages for the subcategory strip, so this label
+            identifies a component type rather than a particular section.
+
+      - name: AboutHero
+        selector: '[data-testid="hero3-wrapper"]'
+        children:
+          - name: AboutHeroOverlay
+            selector: '[data-testid="hero-overlay-interactive"]'
+
+      - name: EmailSignup
+        selector: 'button[aria-label="Sign Up"]'
+        memory:
+          - The newsletter field beside it is a `[role="textbox"]` whose id is
+            React `useId` output (`#:R16n55am:`), so the button's label is the
+            only stable handle on this form.

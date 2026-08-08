@@ -5,6 +5,7 @@ import atomOneDarkImport from 'react-syntax-highlighter/dist/esm/styles/hljs/ato
 import bashImport from 'react-syntax-highlighter/dist/esm/languages/hljs/bash'
 import yamlImport from 'react-syntax-highlighter/dist/esm/languages/hljs/yaml'
 import plaintextImport from 'react-syntax-highlighter/dist/esm/languages/hljs/plaintext'
+import { copyText } from '@/lib/clipboard'
 
 // Ported from the Subtext marketing site's <CodeBlock>. That site switches
 // the hljs theme with useTheme(); this site is light-only and the syntax
@@ -58,31 +59,6 @@ function resolveLanguage(language?: string): string {
   const lower = language.toLowerCase()
   if (LANGUAGES[lower]) return lower
   return LANG_ALIASES[lower] ?? 'plaintext'
-}
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text)
-      return true
-    }
-  } catch {
-    // fall through to the legacy path
-  }
-  try {
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.style.position = 'fixed'
-    textarea.style.top = '-9999px'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
-    const ok = document.execCommand('copy')
-    textarea.remove()
-    return ok
-  } catch {
-    return false
-  }
 }
 
 const iconProps = {

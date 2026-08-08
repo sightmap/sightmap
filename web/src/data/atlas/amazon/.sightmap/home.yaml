@@ -1,0 +1,42 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.amazon.com/
+    description: Landing page — a merchandised deck of shoppable cards above a stack of recommendation rails.
+    memory:
+      - The deck at the top is `#gwm-Deck`, a horizontally scrolling carousel of
+        `#wd-shoppable-N` cards. The numbering is positional, so `#wd-shoppable-3`
+        is whatever occupies the third slot in that render rather than a
+        particular promotion.
+      - Cards append as the carousel scrolls, with an
+        `li[aria-label="Loading more"]` placeholder marking the boundary. A count
+        taken on load measures the first batch.
+      - There is no product grid here and no way to search from the content. The
+        first surface that lists products is `/s?k=` or `/gp/bestsellers`, so an
+        agent looking for items should skip this page.
+    components:
+      - name: ShoppableDeck
+        selector: '#gwm-Deck'
+        children:
+          - name: DeckWindow
+            selector: '#gwm-window'
+          - name: ShoppableCard
+            selector: '[id^="wd-shoppable-"]'
+            properties:
+              - name: card_id
+                extract: attr=id
+              - name: card_text
+                extract: text
+          - name: DeckLoadingPlaceholder
+            selector: '.gwm-window-skeleton-headers'
+            memory:
+              - A skeleton shown while the next batch of cards loads. Finding it
+                means the carousel is still filling.
+
+    requests:
+      - name: LazyStreamingContent
+        route: /dram/renderLazyLoadedStreaming
+        method: POST
+        description: Streams the below-the-fold home page rows. Two fire on a full scroll, and the rows they carry are absent from the initial HTML.

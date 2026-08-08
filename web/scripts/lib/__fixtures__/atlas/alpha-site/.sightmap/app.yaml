@@ -1,0 +1,6 @@
+views:
+  - name: Home
+    route: /
+    components:
+      - name: Hero
+        selector: '[data-component="Hero"]'

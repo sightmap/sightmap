@@ -16,6 +16,7 @@ export default function Navigation() {
         <a href="/#spec">Spec</a>
         <a href="/#memory">Memory</a>
         <a href="/#start">Get started</a>
+        <a href="/atlas">Atlas</a>
         <a href="/blog">Blog</a>
         <a href="https://docs.sightmap.org">Docs</a>
         <a href="https://github.com/sightmap/sightmap" target="_blank" rel="noreferrer" className="nav-gh">

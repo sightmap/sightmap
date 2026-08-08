@@ -1,0 +1,103 @@
+version: 1
+
+views:
+  - name: ProductMarketing
+    route: /:productSlug
+    url: https://www.apple.com/macbook-air/
+    description: Editorial product page — local nav, marquee, and scroll-driven media galleries.
+    memory:
+      - This page cannot sell anything. It states a starting price and links to
+        the store, but there is no configurator and no add-to-cart control; those
+        live at `/shop/buy-mac/:model`. An agent looking for a purchase surface
+        here will search a very long page and find nothing.
+      - The local nav (`#ac-localnav`) is the product's own sub-navigation and is
+        the fastest way to reach Tech Specs or Compare. It appears only on
+        marketing pages, never in the store.
+      - Content is built from repeated generic blocks — `.section`, `.marquee`,
+        `.gallery-item`, `.media-block-container` — whose classes name the layout
+        pattern rather than the topic. Identity comes from the headline text
+        inside them.
+      - The page is roughly 28,000 pixels tall and much of it is video that
+        autoplays on scroll, with paired `-startframe-` and `-endframe-` image
+        ids standing in before playback. A snapshot taken at the top sees
+        placeholder frames rather than the final imagery.
+    components:
+      - name: LocalNav
+        selector: '#ac-localnav'
+        properties:
+          - name: nav_items
+            extract: text
+        memory:
+          - Overview, Tech Specs, Compare, and the buy link. Present on marketing
+            pages only.
+
+      - name: MainContent
+        selector: '#main'
+
+      - name: PromoRibbon
+        selector: '.ribbon'
+        properties:
+          - name: promo
+            extract: text
+
+      - name: Marquee
+        selector: '.marquee'
+        memory:
+          - The hero block. Its headline and the price sit in separate children,
+            so neither is readable from the marquee alone.
+        children:
+          - name: MarqueeEyebrow
+            selector: '.header-eyebrow'
+            properties:
+              - name: eyebrow
+                extract: text
+          - name: MarqueeHeadline
+            selector: '.header-headline'
+            properties:
+              - name: headline
+                extract: text
+          - name: MarqueePricing
+            selector: '.pricing-copy-container'
+            properties:
+              - name: pricing
+                extract: text
+            memory:
+              - The starting price and financing copy, carrying footnote markers
+                as literal asterisks in the text.
+
+      - name: ContentSection
+        selector: '.section'
+        properties:
+          - name: section_text
+            extract: text
+        memory:
+          - The generic page block, repeated many times. Which sections exist is
+            per-product editorial, so match on the headline rather than position.
+
+      - name: ScrollGallery
+        selector: '.scroll-container'
+        children:
+          - name: GalleryItem
+            selector: '.gallery-item'
+            properties:
+              - name: caption
+                extract: text
+
+    requests:
+      - name: MarketingProductPrice
+        route: /*/shop/mcm/product-price
+        method: GET
+        description: The "From $999" price shown on this editorial page, pulled from the store rather than authored into the page.
+        memory:
+          - Two of these fire per load, differing only in the locale segment —
+            `/us/shop/` for consumer pricing and `/us-edu/shop/` for education
+            pricing. The page picks one to display, so the price on screen is a
+            choice made after both arrived.
+          - This is the only point where the marketing system talks to the store
+            system. Everything else on the page is editorial content with no way
+            to buy.
+
+      - name: VideoLocalization
+        route: /ac/ac-video/latest/json/localization/*.json
+        method: GET
+        description: Caption and control strings for the page's video players. Only routes with video fetch it.

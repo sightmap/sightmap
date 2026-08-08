@@ -2134,3 +2134,564 @@ footer {
     border-radius: 12px 12px 0 0;
   }
 }
+
+/* ---- ATLAS ---- */
+/* Everything here is built from the tokens at the top of this file. The site
+   is light-only (see the note in src/components/blog/CodeBlock.tsx), so there
+   is no dark variant to mirror — swapping the :root palette would carry the
+   atlas with it. */
+
+/* Visually hidden, still read aloud. The search input's label is the only
+   place the site needs this so far. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The domain monogram that stands in for a favicon (see src/lib/atlas.ts for
+   why the real one is never fetched). --mark-color is set per instance. */
+.atlas-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--mark-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--mark-color) 35%, transparent);
+  color: var(--mark-color);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ---- ATLAS INDEX ---- */
+.atlas-index {
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+}
+
+.atlas-index__header {
+  margin-bottom: 2rem;
+}
+
+.atlas-index__header .section-desc {
+  margin-bottom: 1rem;
+}
+
+.atlas-index__machine {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.atlas-index__machine a {
+  color: var(--text-dim);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border-bright);
+}
+
+.atlas-index__machine a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+.atlas-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.atlas-filters__search input {
+  width: 260px;
+  max-width: 100%;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.atlas-filters__search input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.atlas-filters__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Shared by the filter row (as a <button>) and an entry's category tags (as a
+   <Link> back into that filter), so both carry the same affordance. */
+.atlas-chip {
+  display: inline-block;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.atlas-chip:hover {
+  border-color: var(--text-dim);
+  color: var(--text-bright);
+}
+
+.atlas-chip--on {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* auto-fill, not auto-fit: with one entry auto-fit would stretch a lone card
+   across the full 1180px container. This keeps cards at their natural width
+   however few there are, and the design has to survive both 1 and 100. */
+.atlas-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.25rem;
+}
+
+.atlas-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.atlas-card:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 2px 16px rgba(201, 69, 109, 0.08);
+}
+
+/* Fixed ratio so the row of cards lines up and nothing shifts when a lazy
+   image lands — the schema carries no image dimensions. */
+.atlas-card__shot {
+  aspect-ratio: 16 / 10;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.atlas-card__shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+
+.atlas-card__shot-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-align: center;
+  overflow-wrap: anywhere;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.atlas-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.1rem 1.25rem 1.25rem;
+  flex: 1;
+}
+
+.atlas-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.atlas-card__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  letter-spacing: -0.015em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.atlas-card__method {
+  margin-left: auto;
+  flex: none;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 100px;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.atlas-card__desc {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.atlas-card__stats {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.atlas-card__stats strong {
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.atlas-card__dot { color: var(--border-bright); }
+
+.atlas-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.atlas-index__empty {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.atlas-index__clear {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.atlas-index__count {
+  margin-top: 1.75rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* ---- ATLAS ENTRY ---- */
+.atlas-entry {
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+}
+
+.atlas-entry__header {
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.atlas-entry__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+
+.atlas-entry__eyebrow:hover { color: var(--text-bright); }
+.atlas-entry__eyebrow-out { font-size: 0.9em; }
+
+.atlas-entry__desc {
+  margin-top: 1.5rem;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: var(--text-dim);
+  max-width: 620px;
+}
+
+.atlas-entry__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.atlas-entry__h2 {
+  font-size: 1.15rem;
+  margin-bottom: 1rem;
+}
+
+/* Spec-sheet layout: body on the left, monospace metadata rail on the right.
+   Single column below 900px (see the media query at the end of this section). */
+.atlas-entry__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15rem;
+  gap: 3rem;
+  align-items: start;
+}
+
+/* minmax(0, …) above plus this keeps a wide figure or table from blowing the
+   grid track out and forcing a horizontal page scroll. */
+.atlas-entry__main { min-width: 0; }
+
+/* ---- ATLAS INSTALL ---- */
+.atlas-install {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 1.5rem;
+  max-width: 30rem;
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  background: var(--bg-code);
+  overflow: hidden;
+}
+
+.atlas-install__cmd {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--code-text);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.atlas-install__prompt { color: var(--code-accent); }
+
+.atlas-install__copy {
+  flex: none;
+  padding: 0 1rem;
+  border: 0;
+  border-left: 1px solid var(--code-border);
+  background: var(--code-header-bg);
+  color: var(--code-caption);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.atlas-install__copy:hover {
+  color: var(--code-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---- ATLAS FIGURES ---- */
+.atlas-figs {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.atlas-fig img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.atlas-fig figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-top: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.atlas-fig__label {
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+.atlas-fig__name { text-transform: lowercase; }
+
+/* ---- ATLAS TABLES ---- */
+/* Also wraps the tables inside a rendered entry README — see the note in
+   scripts/lib/atlas.ts about why that wrapping happens at render time. */
+.atlas-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-raised);
+}
+
+.atlas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.atlas-table th,
+.atlas-table td {
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.atlas-table thead th {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  font-weight: 500;
+  background: var(--bg-subtle);
+}
+
+.atlas-table tbody tr:last-child td { border-bottom: 0; }
+
+.atlas-table td { color: var(--text); }
+
+.atlas-table code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.atlas-table__num {
+  text-align: right;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.atlas-views { margin-bottom: 3rem; }
+
+/* An entry README's prose. `.prose` carries the typography; this only relaxes
+   the table cells, which are `nowrap` in the spec-sheet table above but hold
+   sentences here. */
+.atlas-body .atlas-table td { white-space: normal; }
+.atlas-body .atlas-table-wrap { margin: 1.5rem 0; }
+.atlas-body > *:first-child { margin-top: 0; }
+
+/* Every README heading is demoted one level so the page keeps a single <h1>
+   (see scripts/lib/atlas.ts). `.prose` sizes h3 *larger* than h2, which reads
+   fine for a blog post that starts at h2 but inverts the hierarchy once
+   everything shifts down — so the atlas body sizes its own. */
+.atlas-body h2 { font-size: 1.35rem; margin-top: 2.5rem; }
+.atlas-body h3 { font-size: 1.05rem; margin-top: 2rem; }
+.atlas-body h4 { font-size: 0.95rem; margin-top: 1.75rem; }
+
+/* ---- ATLAS METADATA RAIL ---- */
+.atlas-meta {
+  position: sticky;
+  top: 5rem; /* clears the 56px fixed nav */
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.atlas-meta__row + .atlas-meta__row {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.atlas-meta dt {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.atlas-meta dd { color: var(--text-bright); overflow-wrap: anywhere; }
+
+.atlas-meta__machine {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.atlas-meta__machine-label {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  margin-bottom: 0.1rem;
+}
+
+.atlas-meta__machine a {
+  color: var(--text-dim);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.atlas-meta__machine a:hover { color: var(--accent); }
+
+@media (max-width: 900px) {
+  .atlas-entry__layout {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+  /* Sticky is only worth it beside a long body; stacked it would pin the rail
+     over the content the visitor is scrolling to. */
+  .atlas-meta { position: static; }
+}
+
+@media (max-width: 560px) {
+  .atlas-index,
+  .atlas-entry {
+    padding-top: 7rem;
+  }
+  .atlas-cards { grid-template-columns: 1fr; }
+  .atlas-filters__search input { width: 100%; }
+  .atlas-filters__search { width: 100%; }
+}

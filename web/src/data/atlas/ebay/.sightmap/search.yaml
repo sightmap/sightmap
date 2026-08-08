@@ -1,0 +1,181 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /sch/i.html
+    url: https://www.ebay.com/sch/i.html?_nkw=cordless+drill
+    description: Keyword search results — the filter rail, the result river, and the sort and pagination controls.
+    memory:
+      - Reachable by URL with no session state — `/sch/i.html?_nkw=<terms>`. Every
+        other query parameter eBay adds while you browse is tracking or a filter,
+        and dropping all of them still returns the same result set.
+      - Scope result cards to `ul.srp-results > li.s-card`. The bare `.s-card`
+        class also matches sponsored and related-item cards outside the river,
+        so an unscoped query returns roughly ten more cards than there are
+        results, and `.s-card__title` overcounts for the same reason.
+      - Filters are links, not form controls. Applying one navigates to a new URL
+        rather than mutating the current page, so an agent can compose filters by
+        following hrefs and never needs to click.
+      - The result count in `.srp-controls__count` is eBay's estimate and is
+        rounded ("44,000+ results"). It is not the number of cards on the page,
+        which is capped by the page size.
+    components:
+      - name: ResultsRiver
+        selector: '[data-testid="mainContent"]'
+        memory:
+          - Present as a `data-testid` only on search. Category browse and item
+            pages use `#mainContent` for their equivalent region, so this hook
+            does not generalize.
+
+      - name: ResultCard
+        selector: 'ul.srp-results > li.s-card'
+        properties:
+          - name: listing_id
+            extract: attr=data-listingid
+        memory:
+          - Mapped as a sibling of `ResultsRiver` rather than a child of it. The
+            child-combinator selector already pins the card to the results list,
+            and nesting it one level deeper only makes every descendant selector
+            longer without making any of them more specific.
+          - The `data-listingid` attribute is the same numeric id that appears in
+            the card's `/itm/:id` href, so a result can be tied to its item page
+            without parsing the URL.
+          - Inner class names split into two families — `s-card__*` is eBay's own
+            and stable, `su-*` belongs to a shared design system and also appears
+            on unrelated surfaces.
+        children:
+          - name: ResultCardTitle
+            selector: '.s-card__title'
+            properties:
+              - name: title
+                extract: text
+          - name: ResultCardPrice
+            selector: '.s-card__price'
+            properties:
+              - name: price
+                extract: text
+            memory:
+              - Cards on promotion carry two of these — the current price and the
+                struck-through original — so reading the first match is what you
+                want and reading the last one silently gives you the pre-discount
+                figure.
+          - name: ResultCardLink
+            selector: 'a.s-card__link:not(.image-treatment)'
+            properties:
+              - name: item_url
+                extract: attr=href
+            memory:
+              - Every image in a card's thumbnail carousel is its own
+                `a.s-card__link`, so the bare class matches roughly 150 times on
+                a 60-result page. Excluding `.image-treatment` leaves exactly one
+                link per card, the one on the title.
+          - name: WatchButton
+            selector: '.s-card__watchheart'
+
+      - name: FilterRail
+        selector: '.srp-rail__left'
+        memory:
+          - Filter groups are numbered positionally (`#x-refine__group__0`,
+            `__1`, …) and the numbering shifts with the query — the price group
+            is not always group 4. Match on the group's heading text, never on
+            the index.
+        children:
+          - name: RefineBody
+            selector: '.x-refine__body'
+          - name: RefineGroupTitle
+            selector: '.x-refine__item__title'
+            properties:
+              - name: group_label
+                extract: text
+            memory:
+              - The heading of each filter group, and the only reliable way to
+                tell the groups apart — this is what to match on instead of the
+                positional `#x-refine__group__N` ids.
+              - Each one is a collapse toggle as well as a label, so the group
+                below it may be closed and its options absent from the DOM.
+          - name: CategoryRefine
+            selector: '#x-refine__group__0'
+          - name: PriceGraph
+            selector: '[data-testid="refine_nav_price_graph"]'
+            memory:
+              - The price range is set with two draggable knobs rather than a
+                pair of number inputs, so it cannot be filled like a form field.
+                Dragging is only needed for the histogram; the same filter is
+                reachable by URL with `_udlo` and `_udhi`.
+            children:
+              - name: PriceKnobMin
+                selector: '[data-testid="refine_nav_price_graph_knob_min"]'
+                properties:
+                  - name: min_price
+                    extract: text
+              - name: PriceKnobMax
+                selector: '[data-testid="refine_nav_price_graph_knob_max"]'
+                properties:
+                  - name: max_price
+                    extract: text
+
+      - name: FilterMenus
+        selector: '[data-testid="format_menu"], [data-testid="condition_menu"], [data-testid="location_menu"]'
+        properties:
+          - name: menu_label
+            extract: text
+        memory:
+          - Buying Format, Condition, and Item Location render as menus in the
+            controls bar rather than as groups in the left rail, so an agent
+            walking only `.srp-rail__left` misses all three.
+
+      - name: ResultControls
+        selector: '.srp-controls'
+        children:
+          - name: ResultCount
+            selector: '.srp-controls__count'
+            properties:
+              - name: count_label
+                extract: text
+          - name: SortControl
+            selector: '.srp-controls__sort'
+
+      - name: RelatedSearches
+        selector: '.srp-related-searches'
+
+      - name: Pagination
+        selector: '.pagination'
+
+      - name: SponsoredRegion
+        selector: '.s-answer-region'
+        memory:
+          - Sponsored slots, some of which render a Google Ads iframe. Contents
+            change per load and cross into a third-party document, so nothing
+            inside is worth reading.
+
+      - name: SearchFooterNotes
+        selector: '.s-footer-notes'
+        memory:
+          - Search-page legal notes, including the pricing disclaimer. It sits in
+            `.x-footer`, a search-only block above the site-wide `#glbfooter`,
+            so it is easy to mistake for part of the global footer.
+
+    requests:
+      - name: SearchImageExpand
+        route: /sch/ajax/multiple_images_expsvc
+        method: POST
+        description: Secondary photos for result cards that carry more than one image, returned as a listingId-keyed array of CDN URLs. Fires as those cards scroll into view.
+        response:
+          fields:
+            - name: items
+              type: array
+              description: One entry per listing, each with listingId and secondaryImages
+
+      - name: BelowResultsModules
+        route: /sch/ajax/post/bos_modules
+        method: POST
+        description: HTML fragment for a recommendation carousel below the result river, such as the brand rail. Conditional, and returns markup rather than JSON.
+        memory:
+          - Do not treat this as a reliable signal. The same query on the same
+            profile fired it on one visit and not on the next, and when it does
+            not fire the carousel is simply absent — no placeholder, no empty
+            state.
+          - Two `srp-bos-items` containers are in the document either way, and
+            they stay the same size whether the fetch happens or not. Their
+            presence says nothing about whether the carousel loaded; look for
+            `srp-img-answer-guidance`, which arrives only with the response.

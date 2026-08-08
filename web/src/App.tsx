@@ -2,6 +2,8 @@ import { Routes, Route } from 'react-router'
 import Home from '@/pages/Home'
 import BlogIndex from '@/pages/BlogIndex'
 import BlogPost from '@/pages/BlogPost'
+import AtlasIndex from '@/pages/AtlasIndex'
+import AtlasEntry from '@/pages/AtlasEntry'
 import NotFound from '@/pages/NotFound'
 import { ConsentProvider } from '@/components/consent/ConsentContext'
 import ConsentUI from '@/components/consent/ConsentUI'
@@ -15,6 +17,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/blog" element={<BlogIndex />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
+        {/* Every route here needs a matching entry in scripts/prerender.tsx —
+            one declared only in this file ships as a client-only page. */}
+        <Route path="/atlas" element={<AtlasIndex />} />
+        <Route path="/atlas/:slug" element={<AtlasEntry />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <ConsentUI />

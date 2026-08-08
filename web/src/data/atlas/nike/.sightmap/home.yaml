@@ -1,0 +1,58 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.nike.com/
+    description: Editorial landing page — full-bleed campaign cards and product carousels.
+    memory:
+      - Built by the same CMS renderer as the 404. Both mount `#ciclp-app`, so
+        that id identifies the renderer rather than the page.
+      - Almost every hook here is compiled output (`._2tSHtrc2`, `.WetubkUi`,
+        `.l01-Jx1P`), which changes between deploys. The durable handles are the
+        design-system classes (`.nds-carousel`, `.nds-text`, `.image-card`) and
+        the `aria-label` on each campaign link.
+      - Campaign links are anchors whose entire content is an image, so they have
+        no text. `aria-label` ("BEST IN CLASS", "GAME RECOGNIZE GAME", "Jordan
+        Logo") is the only readable identity, and the labels change with the
+        campaign.
+      - There is no product grid and no search field in the page body. The first
+        surface that lists products is `/w`, so an agent looking for items should
+        go straight there.
+    components:
+      - name: HomeApp
+        selector: '#ciclp-app'
+
+      - name: CampaignCard
+        selector: '.image-card'
+        properties:
+          - name: card_text
+            extract: text
+        memory:
+          - Full-bleed editorial tiles. Which ones render, and in what order, is
+            merchandising.
+
+      - name: HomeCarousel
+        selector: '.nds-carousel'
+        memory:
+          - The same design-system carousel used on the product page and the 404.
+
+      - name: CampaignLink
+        selector: 'a[aria-label]'
+        properties:
+          - name: label
+            extract: attr=aria-label
+        memory:
+          - Matches the labelled links in the nav and footer as well as the
+            campaign tiles, because the page body offers nothing more specific to
+            anchor to.
+
+    requests:
+      - name: VideoManifest
+        route: /content/asset_video_manifest/v1/*
+        method: GET
+        description: Playback manifest for a hero video, on api.nike.com. Only the home page carries video, and the segments then stream from assets.nmp.nike.com.
+        memory:
+          - Once playback starts the segment requests arrive several per second
+            and never stop, so a capture left running on this route fills with
+            them and buries everything else.

@@ -1,0 +1,48 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /us/en/search
+    url: https://www.uniqlo.com/us/en/search?q=shirt
+    description: Keyword search — a grid of product tiles with a store-stock selector.
+    memory:
+      - Reachable by URL alone as `/us/en/search?q=<terms>`.
+      - Tiles are `.fr-ec-product-tile`, 30 per page. There is no `data-testid`
+        that identifies a tile, because every testid on this site names a design
+        system primitive rather than a purpose.
+      - Each tile links to `/us/en/products/:productId/:colorCode`, so the same
+        garment appears once per colourway rather than once per product.
+      - The page carries a note that results are not guaranteed exact matches,
+        which is a hint that search is fuzzy and result relevance should not be
+        assumed.
+    components:
+      - name: ProductTile
+        selector: '.fr-ec-product-tile'
+        properties:
+          - name: tile_text
+            extract: text
+        children:
+          - name: TileImage
+            selector: '.fr-ec-product-tile__image'
+
+      - name: SearchDisclaimer
+        selector: '.fr-ec-gutter-container'
+        properties:
+          - name: disclaimer
+            extract: text
+
+    requests:
+      - name: ProductSearch
+        route: /us/api/commerce/v5/en/products/search
+        method: POST
+        description: The result set as JSON. Category listing posts to the same endpoint with a taxonomy filter instead of a query.
+        memory:
+          - The tiles are already in the document — a fetch of the search URL
+            with no JavaScript running returns 24 product links — so this is
+            not how the first screen arrives. It serves filtering, sorting, and
+            paging past what was served.
+
+      - name: RankedRecommendations
+        route: /us/api/commerce/v5/en/recommendations/ranked-products
+        method: GET
+        description: The recommended strip shown alongside results. The product page uses a different recommendations endpoint.
