@@ -20,6 +20,7 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 			{Name: "Search", Route: "/api/search", Method: "POST",
 				Request: &sightmap.Payload{Fields: []sightmap.Field{{Name: "q", Type: "string"}}}},
 		},
+		Messages: []sightmap.MessageDef{{Name: "CartVersionMismatch", Level: "ERROR", Message: "cart version mismatch"}},
 		Views: []sightmap.View{{
 			Name:       "Home",
 			Route:      "/",
@@ -40,7 +41,7 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 	}
 	js := string(blob)
 
-	for _, want := range []string{`"memory"`, `"globals"`, `"views"`, `"requests"`, `"route":"/api/search"`, `"method":"POST"`, `"fields"`} {
+	for _, want := range []string{`"memory"`, `"globals"`, `"views"`, `"requests"`, `"route":"/api/search"`, `"method":"POST"`, `"fields"`, `"messages"`, `"level":"ERROR"`} {
 		if !strings.Contains(js, want) {
 			t.Errorf("wire JSON missing %s:\n%s", want, js)
 		}
@@ -64,6 +65,10 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 	if len(back.Requests) != 1 || back.Requests[0].Method != "POST" ||
 		back.Requests[0].Request == nil || len(back.Requests[0].Request.Fields) != 1 {
 		t.Errorf("global request did not round-trip: %+v", back.Requests)
+	}
+	if len(back.Messages) != 1 || back.Messages[0].Name != "CartVersionMismatch" ||
+		back.Messages[0].Level != "ERROR" || back.Messages[0].Message != "cart version mismatch" {
+		t.Errorf("messages did not round-trip: %+v", back.Messages)
 	}
 	if back.Views[0].URL != "" || back.Views[0].Stability != "" || back.Views[0].SourceFile != "" {
 		t.Errorf("authoring fields should be empty after a wire round-trip: %+v", back.Views[0])
