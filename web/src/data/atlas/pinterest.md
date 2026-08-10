@@ -2,12 +2,12 @@
 name: Pinterest
 slug: pinterest
 site_url: https://www.pinterest.com/
-domains: [pinterest.com, www.pinterest.com]
-description: Pinterest's pin detail page, mapped signed in — closeup image, description, action bar, and the related-pin grid.
+domains: [pinterest.com]
+description: Pinterest mapped signed in — home feed, search, board, pin detail, profile and what a dead path renders instead of a 404.
 categories: [social]
 author: chiplay
 created: 2026-08-08
-updated: 2026-08-08
+updated: 2026-08-10
 last_verified: 2026-08-08
 cli_version: 0.19.0
 spec_version: 1
@@ -17,56 +17,41 @@ auth: personal-account
 
 # Pinterest
 
-One view: a pin detail page. 19 components and 6 requests, every selector
-counted against the live page.
+Six views — home, search, board, pin detail, profile, and the path that
+resolves to nothing. 59 components, 12 requests.
 
-## Why this is `auth: personal-account`
+## Why the map matters
 
-The related grid below a pin is assembled for the account, and the header
-carries the account's avatar and notification badge. Both are mapped as
-structure. No pin content, board, follow, or identity ships — the entry records
-that the containers exist and what shape they have.
+Pinterest fails quietly. A board that no longer exists redirects to the home
+feed, so an agent following a stale link reads someone else's recommendations
+as the board. A profile in a background tab renders its chrome and no content,
+which looks the same as an account with nothing in it. And the obvious selector
+for "the pin on screen" only ever matches the recommendation grid around it.
 
-Only the author can re-verify this entry. `last_verified` means the author
-re-checked with their own account; CI cannot, and neither can a reviewer.
+None of that raises an error. The map is what turns three silent wrong answers
+into three known ones.
 
-There are no screenshots, because a pin page is other people's photographs and
-the account's own recommendations end to end.
+## Try it
+
+```bash
+sightmap atlas add pinterest
+```
+
+Sign in first — every route here needs an account.
 
 ## What bites
 
-**There is no `h1` on this page.** Not an empty one — none at all. Heading-based
-route detection cannot work here. Test for `[data-test-id="pdp-container"]`.
+- **Server-rendered feeds fill in a background tab; fetched ones never do.**
+  Home and search populate. A profile body, a board grid and a pin's related
+  grid render their containers and stay empty.
+- **There is no 404.** A missing board redirects to `/?show_error=true`. A
+  missing user renders the same chrome-only page as a real profile.
+- **`data-test-id="pin"` is never the pin being viewed**, on any route. It is
+  always a card in a grid.
+- **Card type is a test id, not an attribute.** `pincard-oneTap-*` marks a
+  promoted card; the promoted share of a feed swings load to load.
+- **Every `/resource/` call carries `source_url`**, so the route that issued a
+  request is readable from its query string.
 
-**The 22 elements with `data-test-id="pin"` are not the pin you are looking
-at.** They are the related grid. The pin itself lives in the closeup container
-and carries no `pin` attribute, so the obvious selector returns 22 wrong answers
-and never the right one.
-
-**The pin's own data never crosses the network.** It is rendered into the
-document; only the related grid is fetched afterwards. Waiting on a request
-before reading the pin waits for something that will not arrive.
-
-**There is an explicit settle marker.** `[data-test-id="closeup-data-loaded"]`
-appears once the pin has rendered. Poll for it rather than guessing a delay.
-
-**Related cards are not uniform.** Of 22 observed, 21 carried an image, two were
-video, and only 17 had a footer or a more-actions button. Counts across the grid
-do not line up with the card count.
-
-**44 images carry `pin-missing-alt-text`**, so alt text is not a dependable
-description source on this page.
-
-**Every backend call is `/resource/:ResourceName/:verb/`** where the verb is
-`get`, `create` or `update`, and the arguments ride in a `data=` query parameter
-holding URL-encoded JSON. There is no REST path to read, and the related grid
-pages through a `bookmarks` cursor inside that JSON.
-
-## Coverage
-
-18 selectors counted on the route that declares them, all matching. One was
-mis-scoped on the first pass: the navigation icons sit in their own `nav`
-outside the header container, so scoping them under the header matched nothing.
-
-`sightmap sel-probe` cannot attach to the browser this was authored in, so
-matches were counted in-page instead.
+Three screenshots, captured signed in. Only the author can re-verify this
+entry — CI cannot, and neither can a reviewer.

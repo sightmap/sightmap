@@ -33,7 +33,8 @@ The US storefront (`/us/en/`), mapped as a signed-out shopper.
 `PreloadedDialog`, `BackToFrontOverlay`, `Accordion`, `PromoModal`,
 `ContentAlignment`, `ECGrid`, `Drawer`, `PopupFormDialog`, `AppShell`, and
 `GlobalFooter` are global. All five views report `0 orphaned` coverage, with
-every selector `sel-probe`d on 2026-08-07.
+every selector `sel-probe`d at authoring and re-verified against the live site
+on 2026-08-08.
 
 ## Reliable signals
 

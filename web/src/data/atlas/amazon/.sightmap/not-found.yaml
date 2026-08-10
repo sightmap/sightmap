@@ -27,10 +27,6 @@ views:
 
       - name: RecoverySearchForm
         selector: 'form[role="search"]'
-        memory:
-          - Matched on `role` because sightmap's offline matcher finds zero for
-            `form[action="/s"]` even though a live browser finds it, and
-            `snapshot`, `coverage`, and `capture` all use the offline matcher.
         children:
           - name: RecoverySearchInput
             selector: 'input[name="field-keywords"]'

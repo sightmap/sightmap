@@ -38,6 +38,11 @@ views:
         properties:
           - name: position
             extract: attr=data-product-position
+          - name: is_premium
+            extract: attr=data-is-premium
+        memory:
+          - Card position is its rank in the whole result set, not its index
+            among the 24 rendered.
         children:
           - name: CardLink
             selector: '.product-card__link-overlay'
@@ -54,6 +59,11 @@ views:
             properties:
               - name: price
                 extract: text
+            memory:
+              - Discounted cards carry two price elements, current and original,
+                so the price count runs ahead of the card count.
+          - name: CardImage
+            selector: '.product-card__hero-image'
 
     requests:
       - name: ProductWall

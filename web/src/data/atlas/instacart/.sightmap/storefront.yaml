@@ -6,31 +6,160 @@ views:
     url: https://www.instacart.com/store/staples/storefront
     description: One retailer's storefront — aisle rail, category tiles, and rows of item cards.
     memory:
-      - Rows below the first mount as skeletons and never resolve while the tab
-        is in the background. Forty-five placeholders stood against six real
-        items after scrolling, and the placeholder count rose rather than fell.
-        Bring the tab to the foreground before trusting any count from this
-        route.
+      - This is the one route that never finishes. Rows below the first mount as
+        skeletons and stay that way, and the placeholder count rises rather than
+        falls as more sections mount — 38 placeholders against 5 items ten
+        seconds in, 76 against 23 on a tab left open. Collection, product and
+        search pages all resolve; this one does not, so read items from a
+        collection or a search instead.
       - Injected scrolling does not trigger the lazy load. `window.scrollTo`
         moved the viewport and mounted nothing; a real scroll event rendered the
         next row. Drive this page with input events, not script.
-      - Item test ids embed the item id, as in `item_list_item_items_45295-<id>`,
-        so no fixed test id addresses a card. Match on the `item_list_item_`
-        prefix instead.
+      - Item cards here carry a test id that embeds the retailer and item ids,
+        as in `item_list_item_items_45295-<itemId>`, so no fixed test id
+        addresses a card. Match on the `item_list_item_` prefix. Collection and
+        search pages do not use this test id at all.
       - Section headings are `h2` and the store name is also an `h2`, so a
         heading query returns the store alongside the product rows.
     components:
-      - name: ItemCard
+      - name: StorefrontItem
         selector: '[data-testid^="item_list_item_"]'
-        description: One purchasable item in a row.
+        description: One purchasable item in a storefront row.
         children:
-          - name: ItemImage
+          - name: StorefrontItemImage
             selector: '[data-testid="item-card-image"]'
-          - name: ItemLink
+          - name: StorefrontItemLink
             selector: 'a[href*="/products/"]'
             properties:
               - name: product_href
                 extract: attr=href
-          - name: AddButton
+          - name: StorefrontAddButton
             selector: 'button[aria-label*="Add"]'
             description: Adds the item to the account's cart.
+
+  - name: Collection
+    route: /store/:retailerSlug/collections/:collectionSlug
+    url: https://www.instacart.com/store/staples/collections/1452-office-supplies-office
+    description: One aisle — the retailer's items in a category, in a plain grid.
+    memory:
+      - The `h1` is the collection name, and unlike the storefront this route
+        resolves fully — zero skeleton placeholders once loaded.
+      - Nothing on this route is addressable by test id. Cards are `li`
+        elements with no test id, inside a `ul` with only a generated class, and
+        the page carries 45 `li` of which 18 hold an item — so matching `li`
+        over-counts by more than double. The product link is the only handle.
+    components:
+      - name: CollectionTitle
+        selector: 'h1'
+        properties:
+          - name: collection_name
+            extract: text
+      - name: CollectionItemLink
+        selector: 'a[href*="/products/"]'
+        description: One card in the grid, addressed by its product link.
+        properties:
+          - name: product_href
+            extract: attr=href
+      - name: CollectionAddButton
+        selector: 'button[aria-label*="Add"]'
+        description: Adds an item to the account's cart. One per card.
+        properties:
+          - name: add_label
+            extract: attr=aria-label
+
+  - name: SearchResults
+    route: /store/:retailerSlug/s
+    url: https://www.instacart.com/store/staples/s?k=pencils
+    description: In-store search — a facet sidebar beside a grid of matching items.
+    memory:
+      - The query rides in `k`, not `q`, and the `h1` reads `Results for
+        "<query>"`, so the route states its own query in two places.
+      - Sponsored results are marked by `display-ad-item-track` rather than by
+        anything on the card, and the marker sits outside the card it belongs
+        to. Two appeared among 73 results.
+    requests:
+      - name: GraphQLSearchFacets
+        route: /graphql?operationName=SearchFacets
+        method: POST
+        description: The facet list for the current query. Fires only on this route, alongside FilterOneClickReset.
+    components:
+      - name: SearchTitle
+        selector: 'h1'
+        properties:
+          - name: results_heading
+            extract: text
+      - name: ResultItem
+        selector: 'a[href*="/products/"]'
+        description: One matching item.
+      - name: FacetRow
+        selector: '[data-testid="row-base"]'
+        description: One row in the sidebar.
+        memory:
+          - The same test id covers the sort list and the facet list. Of 28
+            rows, 25 were facets with a checkbox and 3 were sort options
+            without one, so a row count is not a facet count. Test for the
+            checkbox.
+        children:
+          - name: FacetCheckbox
+            selector: '[data-testid="checkbox-base-input"]'
+          - name: FacetCheckboxAsset
+            selector: '[data-testid="checkbox-custom-asset"]'
+      - name: SponsoredMarker
+        selector: '[data-testid="display-ad-item-track"]'
+        description: Marks a sponsored placement in the results.
+
+  - name: ProductDetail
+    route: /products/:productSlug
+    url: https://www.instacart.com/products/21454459-staples-assorted-colors-dual-dome-manual-pencil-sharpener-each?retailerSlug=staples
+    description: One item — image, details, and four rows of recommendations.
+    memory:
+      - Price has no test id and no stable class. Every price on the page is a
+        bare `span` with a generated class, so the only handle is the text
+        itself.
+      - The page's own add-to-cart is `[data-testid="submit-button"]`. Every
+        other Add button belongs to a recommendation card and is addressed by
+        an `aria-label` that starts with "Add".
+      - The title prefixes the retailer name to the product name, which reads as
+        a stutter when the brand and retailer match. Read the `h1` instead.
+      - Recommendation carousels here use the storefront's
+        `item_list_item_` test ids even though the grid routes do not.
+    requests:
+      - name: GraphQLProductRatings
+        route: /graphql?operationName=GetProductRatings
+        method: POST
+        description: Ratings for the item on screen. Fires only on this route, alongside ItemPricesQuery and RecipesByProductId.
+    components:
+      - name: ProductTitle
+        selector: 'h1'
+        properties:
+          - name: product_name
+            extract: text
+      - name: ProductImage
+        selector: '[data-testid="item_image_zoom"]'
+        description: The item's own image.
+      - name: AddToCartButton
+        selector: '[data-testid="submit-button"]'
+        description: Adds this item to the account's cart.
+        memory:
+          - Two elements carry this test id on a single product page, so the
+            selector never resolves to one button.
+      - name: RecommendationItem
+        selector: '[data-testid^="item_list_item_"]'
+        description: One card in a recommendation row.
+
+  - name: NotFound
+    route: /**
+    url: https://www.instacart.com/store/staples/no-such-route-xyz-123
+    description: The 404 page.
+    memory:
+      - The 404 carries no `data-testid` anywhere, no store header, no aisle
+        rail and no cart button. Absence of the header is the test that
+        identifies it.
+      - Its title is "Instacart - Page not found" and its `h1` is "You've landed
+        in the 404 errorverse".
+    components:
+      - name: NotFoundHeading
+        selector: 'h1'
+        properties:
+          - name: heading_text
+            extract: text

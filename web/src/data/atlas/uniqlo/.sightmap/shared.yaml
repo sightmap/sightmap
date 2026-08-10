@@ -73,9 +73,9 @@ components:
   - name: Drawer
     selector: '[data-testid="ITODrawer"]'
     memory:
-      - The filter drawer's apply button is labelled VIEW ITEMS (240). That count
-        is the only place the filtered result total appears before the filter is
-        applied.
+      - The filter drawer's apply button label carries the filtered result
+        total ("VIEW ITEMS (N)"). That count is the only place the total
+        appears before the filter is applied.
 
   - name: PopupFormDialog
     selector: 'div[aria-label="POPUP Form"]'

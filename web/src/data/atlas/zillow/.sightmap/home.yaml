@@ -10,8 +10,12 @@ views:
         are the landmarks, and a query for `main` matches nothing.
       - Recommendation cards carry indexed test ids, `home-rec-card-0` upward,
         so no fixed test id addresses a card. The prefix is the stable hook.
-      - The prefix `home-rec-card-` matches sixteen elements, not eight, because
-        `home-rec-card-anchor-N` shares it. Exclude the anchors to count cards.
+      - The prefix `home-rec-card-` matches twice as many elements as there are
+        cards, because `home-rec-card-anchor-N` shares it. Exclude the anchors
+        to count cards.
+      - The carousel is refilled per load and the card count moves with it —
+        eight on one visit, five on another — so it is account state rather than
+        a fixed shelf size.
       - The anchor is a sibling of the card it links to, not a child of it, so
         scoping the anchor inside the card matches nothing.
       - Card anchors point at `/homedetails/:addressSlug`, and the slug is a
@@ -46,6 +50,7 @@ views:
                 description: Status flag such as a listing type or price change.
                 memory:
                   - Scoped to a card there is exactly one badge per card, but
-                    the bare selector matched eleven against eight cards because
-                    three more sit outside the carousel. Scope it, or the count
-                    overstates the recommendations.
+                    the bare selector always overshoots because more sit outside
+                    the carousel — eleven against eight cards on one load, eight
+                    against five on another. Scope it, or the count overstates
+                    the recommendations.

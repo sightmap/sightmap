@@ -1,0 +1,87 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://www.pinterest.com/
+    description: The signed-in home feed — a board filter row above an infinite masonry of recommended pins.
+    memory:
+      - Scrolling adds pins with no feed request of any kind. Three page-fulls
+        took the grid from 25 cards to 34 while only telemetry and the
+        notification badge crossed the network, so waiting on a request to
+        detect more pins waits for nothing. Count cards instead.
+      - The `h1` reads "Home" and sits inside the feed container, not above it.
+    components:
+      - name: HomeFeed
+        selector: '[data-test-id="homefeed-feed"]'
+        description: The feed container. The heading and the whole grid are inside it.
+        children:
+          - name: HomeGrid
+            selector: '[data-test-id="masonry-container"]'
+          - name: HomePin
+            selector: '[data-test-id="pin"]'
+            description: One card in the home grid.
+      - name: BoardFilterRow
+        selector: '[role="tablist"]'
+        description: Row of the account's own boards, filtering the feed. The row is account state; the tabs are structure.
+        children:
+          - name: BoardFilterTab
+            selector: '[role="tab"]'
+            properties:
+              - name: filter_label
+                extract: text
+      - name: PromotedPin
+        selector: '[data-test-id="one-tap-desktop"]'
+        description: A promoted card.
+        memory:
+          - The share of the feed that is promoted swings from render to render —
+            3 of 25 cards on one load and 13 of 25 on the next. Count it, do not
+            assume it.
+
+  - name: SearchResults
+    route: /search/pins/
+    url: https://www.pinterest.com/search/pins/?q=brass%20cabinet%20hardware&rs=typed
+    description: Pin search — a refinement pill row and a related-searches carousel above the results grid.
+    memory:
+      - The query rides in the `q` parameter and the results are already in the
+        first document, so there is no search request to wait for.
+      - The `h1` is the literal string "Search Results Page" on every query. It
+        never carries the query, so read that from the search input's value.
+      - Promoted cards dominate here far more than on home — 14 of 18 cards on
+        one query. Filter on the `pincard-oneTap-` type before treating results
+        as organic.
+    components:
+      - name: SearchFeed
+        selector: '[data-test-id="search-feed"]'
+        description: The results container.
+        children:
+          - name: SearchGrid
+            selector: '[data-test-id="masonry-container"]'
+          - name: ResultPin
+            selector: '[data-test-id="pin"]'
+          - name: RelatedSearchCarousel
+            selector: '[data-test-id="carousel-container"]'
+            description: Horizontal strip of narrower query suggestions above the grid.
+      - name: RefinementBar
+        selector: '[data-test-id="scrollable-one-bar-root"]'
+        description: The row of refinement pills.
+        memory:
+          - This row is a sibling of the results container, not a descendant, so
+            scoping the pills inside `search-feed` matches nothing.
+        children:
+          - name: RefinementPill
+            selector: '[data-test-id="one-bar-pill"]'
+            description: One refinement control.
+            memory:
+              - The first pill is the filter drawer toggle and has no text — it
+                is identified by `aria-label="Show filters"`. Every other pill
+                carries its term as text.
+            properties:
+              - name: pill_label
+                extract: text
+      - name: SearchFilterButton
+        selector: '[data-test-id="search-filter"]'
+        description: Scope selector in the header, present only on the search route.
+      - name: SearchCancelButton
+        selector: '[data-test-id="search-cancel"]'
+        description: Clears the query. Present only on the search route.

@@ -6,16 +6,16 @@ views:
     url: https://www.ikea.com/us/en/search/?q=desk%20chair
     description: Keyword search — result summary, filter sidebar, and the product grid.
     memory:
-      - Reachable by URL alone as `/us/en/search/?q=<terms>`. The form is a plain
-        GET and adds nothing else that matters.
+      - The page embeds a Cloudflare Turnstile widget as a hidden
+        `cf-turnstile-response` input. It stayed dormant across this mapping and
+        never presented a challenge, but its presence means search is the route
+        most likely to start gating automated traffic.
       - Shares the whole `plp-` component vocabulary with category browse. Anything
         written against the grid here works unchanged on a `/cat/` page, which
         makes these two views one problem rather than two.
       - Sort is a set of radio inputs with stable ids (`#plp-RELEVANCE`,
         `#plp-PRICE_LOW_TO_HIGH`, `#plp-PRICE_HIGH_TO_LOW`, `#plp-NEWEST`) whose
         shared `name` is generated (`sort-P0-0`). Target the ids, not the name.
-      - The grid renders about 22 cards and appends more on scroll, so counting
-        cards measures the page size. The real total is in `.search-summary`.
       - The only content route that fetches nothing of its own. Home, category
         browse, and product pages each pull about twenty per-product HTML
         fragments to fill their carousels; search has no carousels and issues

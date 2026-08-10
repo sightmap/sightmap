@@ -1,5 +1,36 @@
 version: 1
 
+requests:
+  - name: GraphQL
+    route: /graphql
+    method: POST
+    description: The single endpoint behind every view. One collection page fired 62 calls across 57 distinct operations.
+
+  - name: GraphQLItems
+    route: /graphql?operationName=Items
+    method: POST
+    description: Item data for a grid or carousel. The operation name is in the query string, so a network log can be filtered by operation without reading any bodies.
+
+  - name: GraphQLVisitShop
+    route: /graphql?operationName=VisitShop
+    method: POST
+    description: Retailer shell for the current store. Fires on every route under /store.
+
+  - name: GraphQLCartData
+    route: /graphql?operationName=CartData
+    method: POST
+    description: The account's cart. One of seven cart operations that fire on every route — CartData, CartTotals, CartItemCount, CartFeatureFlags, CartSignaledEta, CartCoachmark and activeCartVariant.
+
+  - name: RetailerAvailability
+    route: /v3/retailers/:retailerId/availability
+    method: GET
+    description: Whether the retailer can deliver. One of the few calls not routed through GraphQL.
+
+  - name: ImageServer
+    route: /image-server/:width x :height/filters:fill(FFFFFF,true):format(webp)/:sourceUrl
+    method: GET
+    description: Image transform proxy. The requested dimensions and the output format are path segments, and the origin URL is appended whole, so a different size is a different path.
+
 components:
   - name: StoreHeader
     selector: 'header#commonHeader'
@@ -18,6 +49,9 @@ components:
           - A second input in this header is a hidden shim for the iOS virtual
             keyboard, so an unfiltered input query returns two and one of them
             is not the search box.
+          - On a search route it holds the current query, but only as the DOM
+            `value` property. There is no `value` attribute, so reading the
+            attribute returns empty on every route.
       - name: CartButton
         selector: '[data-testid="floating-cart-button"]'
         description: Cart entry point and item count. The count and contents are account state.
@@ -34,10 +68,52 @@ components:
           - name: aisle_name
             extract: text
 
+  - name: CartDrawer
+    selector: '[role="dialog"][aria-label="Cart"]'
+    description: The cart, opened from the header button.
+    memory:
+      - The cart is a drawer, not a route. Opening it leaves the URL unchanged,
+        so there is no cart page to navigate to and no URL that proves it is
+        open.
+      - The drawer is in the DOM on every route whether or not it is open, so
+        matching this selector proves nothing about its state. Open it by
+        clicking the header cart button.
+      - Eight `[role="dialog"]` elements sit in the DOM at once, most with no
+        aria-label or a blank one. Only the label picks the cart out.
+      - Its heading carries the delivery ZIP. Account data — read the drawer for
+        structure, never for location.
+    children:
+      - name: CartCloseButton
+        selector: '[data-testid="cart-close-button"]'
+      - name: CartSavings
+        selector: '[data-testid="cart-savings-details-root"]'
+      - name: CartIncentiveButton
+        selector: '[data-testid="cart-incentive-savings-button"]'
+
   - name: LoadingLockup
     selector: '[data-testid^="loading-lockup"]'
     description: Skeleton placeholder standing in for a section that has not resolved.
     memory:
       - Presence of these is the settle signal for this site, inverted. A route
-        is only fully read when the count reaches zero, and on this storefront
-        it does not reach zero in a background tab.
+        is fully read when the count reaches zero. Collection pages reach zero;
+        the storefront does not.
+
+  - name: ProductLink
+    selector: 'a[href*="/products/"]'
+    description: One item, wherever it appears in a grid or carousel.
+    memory:
+      - The anchor carries `role="button"`, so an accessibility-tree query for
+        links misses every item on the page. Match the href instead.
+      - Product URLs sit at the site root, `/products/:productSlug`, with the
+        store in a `retailerSlug` query parameter rather than in the path.
+    properties:
+      - name: product_href
+        extract: attr=href
+
+  - name: ItemImage
+    selector: '[data-testid="item-card-image"]'
+    description: The thumbnail on an item card.
+
+  - name: StockIcon
+    selector: '[data-testid="dynamic-stock-icon"]'
+    description: Availability marker on an item card. Present on only some cards.

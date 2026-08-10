@@ -12,10 +12,6 @@ views:
         `/cat/desk-chairs-20654/` carries the grid and filters and no
         subcategory carousel. Test for `#product-list` before looking for
         products; the exemplar URL above is a leaf.
-      - The slug is decorative and the trailing id is authoritative.
-        `/cat/totally-made-up-fu002/` loads Tables & Chairs and rewrites the path
-        to `/cat/tables-chairs-fu002/`, so the URL you requested never tells you
-        what you got.
       - An unknown id does not 404. `/cat/tables-chairs-zz999/` redirects to
         `/cat/products-products/`, the root of the catalog, which means a typo in
         an id silently widens the query to everything IKEA sells. Read

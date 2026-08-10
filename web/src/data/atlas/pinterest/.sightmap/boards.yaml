@@ -1,0 +1,119 @@
+version: 1
+
+views:
+  - name: BoardDetail
+    route: /:username/:boardSlug
+    url: https://www.pinterest.com/laybabylay/reprom-inspiration/
+    description: One board — header with its summary and tools, over the board's pin grid.
+    memory:
+      - A board slug that does not exist redirects to the home feed at
+        `/?show_error=true`. Nothing on the page says the board was missing, so
+        an agent following a stale link lands on home and reads it as success.
+        Check the path after navigating.
+      - This is the only route whose `h1` is the entity name. On home it is
+        "Home" and on search it is a fixed string.
+      - Two controls in the board tools carry their visible label as the test
+        id — `data-test-id="Organize"` and `data-test-id="More ideas"`, spaces
+        and capitals included.
+      - Loading a board by URL leaves the grid empty. The header renders, the
+        containers render, and no pin ever appears — still zero past thirty
+        seconds with three fetch markers pending. Clicking through to a board
+        from inside the app fills it. Navigate, do not deep-link.
+    requests:
+      - name: BoardMetadata
+        route: /resource/BoardResource/get/
+        method: GET
+        description: The board's own record. Its data parameter carries username and slug, not an id, so the request can be built from the URL.
+      - name: BoardFeed
+        route: /resource/BoardFeedResource/get/
+        method: GET
+        description: The board's pins, 25 per page, keyed by board_id rather than by slug.
+      - name: Typeahead
+        route: /resource/AdvancedTypeaheadResource/get/
+        method: GET
+        description: Search suggestions. Fires twice on page load with an empty term, before anything is typed.
+    components:
+      - name: BoardHeader
+        selector: '[data-test-id="board-header"]'
+        description: Everything above the grid — title, summary, counts and tools.
+        children:
+          - name: BoardTitle
+            selector: 'h1'
+            properties:
+              - name: board_name
+                extract: text
+          - name: BoardHeaderDetails
+            selector: '[data-test-id="board-header-details"]'
+          - name: BoardSummary
+            selector: '[data-test-id="board-summary-container"]'
+          - name: BoardCountInfo
+            selector: '[data-test-id="board-count-info"]'
+          - name: PinCount
+            selector: '[data-test-id="pin-count"]'
+            description: Number of pins on the board.
+            memory:
+              - The text is a count and its unit in one string, "257 Pins", so
+                it needs parsing rather than reading.
+            properties:
+              - name: pin_count_text
+                extract: text
+      - name: SecretBoardLabel
+        selector: '[data-test-id="secret-board-icon-label"]'
+        description: Marker for a board that is not public.
+      - name: BoardTools
+        selector: '[data-test-id="board-tools"]'
+        description: Organize and More ideas controls.
+        memory:
+          - This sits beside the header at the root of the page, not inside it,
+            so scoping it under `board-header` matches nothing.
+        children:
+          - name: OrganizeButton
+            selector: '[data-test-id="Organize"]'
+          - name: MoreIdeasButton
+            selector: '[data-test-id="More ideas"]'
+      - name: BoardFeed
+        selector: '[data-test-id="board-feed"]'
+        description: The board's pin grid.
+        children:
+          - name: BoardPinGrid
+            selector: '[data-test-id="base-board-pin-grid"]'
+          - name: BoardPin
+            selector: '[data-test-id="pin"]'
+
+  - name: Profile
+    route: /:username
+    url: https://www.pinterest.com/chiplay/
+    description: A user's profile — boards, pins and follower counts.
+    memory:
+      - This route renders nothing until the tab is visible. In a background tab
+        the chrome appears, `document.body.innerText` stays empty, and the two
+        `resource-pending-fetch-script` markers for `UserResource` and
+        `UserSettingsResource` never resolve — reproduced on repeat loads and on
+        a second tab, past thirteen seconds. Every other route renders hidden.
+        Foreground the tab before reading this one.
+      - Board cards here carry no test id at all. Address them by href shape,
+        `/:username/:boardSlug/`, and note that a card can point at another
+        account when the board is collaborative.
+      - The document title is `<username> - Profile | Pinterest` whether or not
+        the account exists.
+    components:
+      - name: ProfilePending
+        selector: '[data-test-id="resource-pending-fetch-script"]'
+        description: Inline marker naming a resource the page is still waiting on. Two of them on this route.
+
+  - name: NotFound
+    route: /**
+    url: https://www.pinterest.com/no-such-route-xyz-123/
+    description: What a path that resolves to nothing renders.
+    memory:
+      - A single-segment path is a username lookup, and a username that does not
+        exist renders the same chrome-only page as a real profile — same title
+        shape, same empty body, same test ids. There is no error text and no 404
+        page, so a missing account and an unrendered profile are
+        indistinguishable from the DOM.
+      - Deeper paths do not reach an error page either. A missing board
+        redirects to the home feed with `?show_error=true`.
+    components:
+      - name: NotFoundHeader
+        selector: '[data-test-id="header"]'
+        description: The global header, which is all that renders on this route.
