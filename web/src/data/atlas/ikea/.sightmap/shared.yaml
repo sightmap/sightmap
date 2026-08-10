@@ -1,21 +1,18 @@
 version: 1
 
 memory:
-  - Class prefixes name the surface that owns the element, and learning the three
-    of them replaces most selector guessing. `hnf-` is the shared header, nav,
-    and footer frame; `plp-` is the product list page and appears on both search
-    and category; `pipf-` is the product information page. A `plp-` class on a
-    `/p/` URL means the page is rendering a recommendation strip, not the product.
+  - Class prefixes name the surface that owns the element, and learning them
+    replaces most selector guessing. `hnf-` is the shared header, nav, and
+    footer frame; `plp-` is the product list page and appears on both search
+    and category; `pipf-` is the product information page; `crec-` is the
+    late-loading recommendation fragment. A `plp-` class on a `/p/` URL means
+    the page is rendering a recommendation strip, not the product.
   - Every route is locale-prefixed (`/us/en/`). The prefix is part of the path
     rather than a cookie or header, so a mapped route only holds for that
     storefront and prices, availability, and the category tree all change with it.
   - Both browse surfaces resolve their slug from an id and rewrite the URL, so a
     requested path never proves what loaded. Read `.hnf-pageheader__h1` after the
     page settles.
-  - The search page embeds a Cloudflare Turnstile widget as a hidden
-    `cf-turnstile-response` input. It stayed dormant across this mapping and
-    never presented a challenge, but its presence means search is the route most
-    likely to start gating automated traffic.
   - Product grids load about 22 cards and extend on scroll, so a card count read
     straight after navigation is a page-size artifact rather than a result count.
     `.search-summary` carries the real total.

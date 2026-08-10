@@ -8,6 +8,9 @@ memory:
     side on the same page. Match the exact string rather than inferring one.
   - React `useId` values appear as ids like `#:r0:`. They change between renders
     and are not valid CSS identifiers unescaped, so never anchor to them.
+  - Feature modules (privacy consent, chat, error modal) mount into divs whose
+    id is a bare UUID, different per session; the module's name appears only on
+    the paired `#<name>-module-script-<uuid>` tag. Never anchor to the UUID ids.
   - Prefixed class names (`nds-`, `product-card__`, `wall-header__`) are the
     design system and survive deploys. Names like `css-1j8f80w` are compiled
     output and do not.
@@ -88,6 +91,7 @@ requests:
 
   - name: CartState
     route: /buy/carts/v2/US/NIKE/NIKECOM
+    method: GET
     description: Cart contents on api.nike.com. Read with GET and written back with PUT on every route, including routes that have nothing to add.
 
   - name: SearchSuggestions

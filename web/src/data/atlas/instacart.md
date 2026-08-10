@@ -2,12 +2,12 @@
 name: Instacart
 slug: instacart
 site_url: https://www.instacart.com/
-domains: [instacart.com, www.instacart.com]
-description: Instacart's retailer storefront, mapped signed in — aisle rail, item cards, cart entry, and the skeletons that never resolve.
+domains: [instacart.com]
+description: Instacart mapped signed in — storefront, aisle, product, in-store search and the 404, plus the GraphQL operations behind them.
 categories: [commerce]
 author: chiplay
 created: 2026-08-08
-updated: 2026-08-08
+updated: 2026-08-10
 last_verified: 2026-08-08
 cli_version: 0.19.0
 spec_version: 1
@@ -17,57 +17,39 @@ auth: personal-account
 
 # Instacart
 
-One view: a retailer storefront. 10 components, every selector counted against
-the live page.
+Five views — a retailer storefront, an aisle, a product, in-store search, and
+the 404. 31 components, 8 requests.
 
-## Why this is `auth: personal-account`
+## Why the map matters
 
-The storefront only renders against a chosen retailer and a delivery address,
-which means a signed-in session. The header carries that address, the fulfilment
-window, and the cart count. All three are account data and none of them ship.
-The map records that the controls exist and what shape they have.
+The storefront never finishes loading. Skeleton placeholders keep mounting and
+real items don't, so an agent that reads it comes away with a handful of
+products and no signal that it is looking at a fraction of the shelf. The map
+says so, and says to read items from an aisle or a search instead.
 
-Only the author can re-verify this entry. `last_verified` means the author
-re-checked with their own account; CI cannot, and neither can a reviewer.
+Underneath, everything is one `/graphql` endpoint — but the operation name is in
+the query string, so a network log is filterable without parsing a single body.
 
-There are no screenshots. The header shows the account's street address in every
-frame, and the rule is to drop the frame rather than retouch it.
+## Try it
+
+```bash
+sightmap atlas add instacart
+```
+
+Sign in and pick a retailer first; nothing renders without a delivery address.
 
 ## What bites
 
-**The page never finishes loading in a background tab.** Rows below the first
-mount as skeleton placeholders and stay that way. After scrolling, 45
-placeholders stood against 6 real items, and the placeholder count *rose* as
-more sections mounted. Nothing about this is a timeout you can wait out — at
-thirty seconds it was worse than at eight.
+- **The storefront never resolves.** Placeholders outnumber items and the gap
+  widens the longer you wait. Aisle, product and search all resolve normally.
+- **Scripted scrolling mounts nothing.** `window.scrollTo` moves the viewport;
+  only a real scroll event loads the next row.
+- **Item cards are addressed three different ways** depending on route. The
+  product link is the only handle that works everywhere — and it carries
+  `role="button"`, so accessibility-tree queries for links miss every item.
+- **Price has no test id and no stable class**, anywhere.
+- **The cart is a drawer, not a route.** It sits in the DOM whether open or
+  not, one of eight `[role="dialog"]` elements.
 
-**Scripted scrolling does not trigger the lazy load.** `window.scrollTo` moved
-the viewport and mounted nothing. A real scroll event rendered the next row.
-Drive this page with input events, not with injected script — the distinction
-decides whether you see one product row or several.
-
-**There is an inverted settle signal.** `[data-testid^="loading-lockup"]` counts
-the unresolved sections. A route is fully read when that count is zero, and on
-this storefront in a background tab it never reaches zero.
-
-**No fixed test id addresses an item.** They embed the item id, as in
-`item_list_item_items_45295-16498490`. Match on the `item_list_item_` prefix.
-
-**The header holds two inputs and one is a decoy** — a hidden shim for the iOS
-virtual keyboard. An unfiltered `input` query inside the header returns two.
-
-**Class names are generated** (`e-xdho1a`, `e-v26ry7`) and change between
-builds. Select on ids, test ids, or `aria-labelledby`.
-
-**Section headings and the store name are both `h2`**, so a heading query
-returns the store alongside the product rows.
-
-## Coverage
-
-10 selectors counted on the route that declares them, all matching. No requests
-are recorded: the network capture for this tab returned a single third-party
-beacon across two page loads, so rather than guess at API routes the dimension
-is left empty and marked here as a known gap.
-
-`sightmap sel-probe` cannot attach to the browser this was authored in, so
-matches were counted in-page instead.
+Two screenshots, captured signed in with the delivery address replaced. Only the
+author can re-verify this entry — CI cannot, and neither can a reviewer.

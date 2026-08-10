@@ -87,7 +87,7 @@ views:
             selector: '[data-testid="homes-pdp-cta-btn"]'
             memory:
               - Activating this starts a real booking flow on a live
-                marketplace. Mapped, not exercised.
+                marketplace.
 
       - name: SaveButton
         selector: '[data-testid="pdp-save-button-unsaved"]'

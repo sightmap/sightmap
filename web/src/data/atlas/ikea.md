@@ -31,7 +31,8 @@ The US storefront (`/us/en/`), mapped as a signed-out shopper.
 
 `GlobalHeader`, `Breadcrumbs`, `GlobalFooter`, `MainContent`, `CookieConsent`,
 `PreloadedModalHosts`, and `FeedbackPrompt` are global. All five views report
-`0 orphaned` coverage, with every selector `sel-probe`d on 2026-08-06.
+`0 orphaned` coverage, with every selector `sel-probe`d at authoring and
+re-verified against the live site on 2026-08-08.
 
 Five views is the whole public shopping surface. Cart and checkout are excluded
 deliberately (see Known gaps), and the remaining top-level paths (`/rooms/`,
@@ -109,6 +110,6 @@ so other markets have their own prices, availability, and category ids.
 
 ## Screenshots
 
-Signed-out views of public catalog pages. The home page and fulfillment panel
-name a nearby store inferred from the capture machine's IP address; neither
-screenshot shows that surface.
+Signed-out views of public catalog pages. The utility bar and fulfillment panel
+name a nearby store and ZIP inferred from the capture machine's IP address — a
+geolocated store default, not anything a visitor entered.

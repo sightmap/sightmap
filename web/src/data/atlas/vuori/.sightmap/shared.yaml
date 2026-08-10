@@ -153,7 +153,7 @@ requests:
   - name: ShopifyStorefront
     route: /api/2026-04/graphql.json
     method: POST
-    description: The Shopify Storefront GraphQL API on vuori-clothing.myshopify.com. The busiest endpoint on the site, at 7 calls on search and 18 on a product page.
+    description: The Shopify Storefront GraphQL API on vuori-clothing.myshopify.com. The busiest endpoint on the site, called many times per page.
 
   - name: CartDrawerContent
     route: /api/cms/cart-drawer-data

@@ -10,6 +10,9 @@ views:
         product structure and its contents are account state.
       - All four `h1` elements here are empty, so no heading identifies this
         route. Test for the browse renderer instead.
+      - The browse renderer alone does not identify home. Channel and playlist
+        use the same element, and only its `page-subtype` attribute — `home`,
+        `channels` or `playlist` — tells the three apart.
     components:
       - name: GuideEntry
         selector: 'tp-yt-app-drawer#guide ytd-guide-entry-renderer'

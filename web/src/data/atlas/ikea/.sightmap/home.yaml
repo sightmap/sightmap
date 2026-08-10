@@ -15,7 +15,7 @@ views:
         It does not appear on search, category, or product pages.
       - Which modules render, and in what order, is merchandising. Treat every
         one of them as optional and find it by type rather than by position.
-      - Store-specific content ("See what's happening now at IKEA Atlanta, GA")
+      - Store-specific content ("See what's happening now at IKEA <city>")
         is geolocated from the visitor's IP, so this page differs by where the
         request comes from even within one locale.
     components:

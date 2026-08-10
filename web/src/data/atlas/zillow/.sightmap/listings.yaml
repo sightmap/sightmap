@@ -1,0 +1,235 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /homes/:filters/:location_rb
+    url: https://www.zillow.com/homes/for_sale/Atlanta,-GA_rb/
+    description: Search results — filter bar, sortable list of property cards, and the map beside them.
+    memory:
+      - Filters are path segments, not query parameters. `for_sale`, `fore_lt`,
+        `1_open` and the rest stack into the path and the location ends in
+        `_rb`, so a search is built by composing the URL rather than by setting
+        parameters.
+      - The list holds nine cards at a time however many results the heading
+        claims. It pages rather than scrolls, through `search-pagination`.
+      - Sponsored rows are separate elements — `search-list-first-ad` and
+        `search-list-second-ad` — rather than flags on a card, so filtering
+        cards does not remove them.
+    components:
+      - name: SearchHeading
+        selector: 'h1'
+        description: States the location and search type.
+        properties:
+          - name: results_heading
+            extract: text
+      - name: ResultsList
+        selector: '[data-testid="search-page-list-container"]'
+        description: The card list beside the map.
+        children:
+          - name: PropertyCard
+            selector: '[data-testid="property-card"]'
+            description: One listing in the results.
+            children:
+              - name: CardTitleLink
+                selector: '[data-testid="property-card-title-link"]'
+                description: Link to the listing's detail page.
+                memory:
+                  - The href is `/homedetails/:addressSlug/:zpid_zpid/`, and the
+                    slug is the street address of a real home. Treat it as
+                    personal data about a third party, not as an identifier to
+                    record.
+                properties:
+                  - name: listing_href
+                    extract: attr=href
+              - name: CardPrice
+                selector: '[data-testid="property-card-price"]'
+              - name: CardDetails
+                selector: '[data-testid="property-card-details"]'
+                description: Beds, baths and square footage.
+              - name: CardAddressLink
+                selector: '[data-testid="property-card-address-link"]'
+              - name: CardSaveButton
+                selector: '[data-testid="property-card-save"]'
+                description: Saves the listing to the account.
+              - name: CardActionsButton
+                selector: '[data-testid="property-card-actions-btn"]'
+              - name: CardPhoto
+                selector: '[data-testid="carousel-photo"]'
+                description: One photo in a card's carousel. Three per card.
+          - name: Pagination
+            selector: '[data-testid="search-pagination"]'
+          - name: SponsoredRow
+            selector: '[data-testid="search-list-first-ad"]'
+            description: A sponsored placement inserted into the list.
+      - name: FilterButton
+        selector: '[data-testid$="-filters-button"]'
+        description: One of the five filter dropdowns — listing type, price, beds, home type, and more.
+      - name: SortButton
+        selector: '[data-testid="sort-popover-dropdown-button"]'
+      - name: MapTile
+        selector: '[data-testid="map-placeholder-tile"]'
+        description: One tile of the map beside the list.
+
+  - name: ListingDetail
+    route: /homedetails/:addressSlug/:zpid
+    url: https://www.zillow.com/homedetails/3469-Rose-Arbor-Ct-Doraville-GA-30340/14571422_zpid/
+    description: One listing — media tabs, facts, Zestimate, price and tax history, agent attribution, and similar homes.
+    memory:
+      - Neither the price nor the address has a test id. `price` matches only
+        history-table cells and a filter button, and nothing matches address at
+        all, so the two facts an agent most wants are the two it cannot select
+        for. Read them from the `h1` and the document title.
+      - The test id `property-card` matches five *other* homes on this route —
+        the similar-homes rail at the bottom — not the listing being viewed. It
+        means a different thing here than it does on search results.
+      - The header facts render twice. `bed-bath-sqft-text__container` matches
+        six for three facts, once inline and once in the sticky bar, and the
+        `__description` values read beds, baths, sqft, beds, baths, sqft.
+      - Search-page filter buttons are present on this route too, left over from
+        the shared chrome, so testing for them does not distinguish a listing
+        from a results page.
+      - Photo wrappers carry a content hash in the test id, as in
+        `hero-photo-wrapper-<hash>`, so only the prefix is stable.
+    components:
+      - name: ListingTitle
+        selector: 'h1'
+        description: The listing address. Personal data about a third party — named here, never recorded.
+      - name: HeroCarousel
+        selector: '[data-testid="hero-carousel-wrapper"]'
+        description: The listing's photo carousel.
+        children:
+          - name: HeroPhoto
+            selector: '[data-testid^="hero-carousel-picture-"]'
+          - name: CarouselControls
+            selector: '[data-testid="carousel-controls-wrapper"]'
+      - name: MediaTabs
+        selector: '[data-testid="persistent-tabs-container"]'
+        description: Photos, map, floor plan, virtual tour and virtual staging tabs.
+        memory:
+          - Every tab in this container matches twice, because the container
+            itself renders twice on the page.
+        children:
+          - name: PhotosTab
+            selector: '[data-testid="persistent-tab-photos"]'
+          - name: MapTab
+            selector: '[data-testid="persistent-tab-map"]'
+          - name: FloorPlanTab
+            selector: '[data-testid="persistent-tab-floor_plan"]'
+      - name: HomeFacts
+        selector: '[data-testid="bed-bath-sqft-text__container"]'
+        description: One of beds, baths or square footage.
+        children:
+          - name: FactValue
+            selector: '[data-testid="bed-bath-sqft-text__value"]'
+          - name: FactLabel
+            selector: '[data-testid="bed-bath-sqft-text__description"]'
+      - name: FactsAndFeatures
+        selector: '[data-testid="category-group"]'
+        description: One collapsible group in the facts-and-features section.
+        children:
+          - name: FactCategory
+            selector: '[data-testid="fact-category"]'
+      - name: Zestimate
+        selector: '[data-testid="zest-overview-grid"]'
+        description: Zillow's own valuation block.
+        children:
+          - name: PrimaryZestimate
+            selector: '[data-testid="primary-zestimate"]'
+          - name: ZestimateRange
+            selector: '[data-testid="zestimate-range"]'
+          - name: RentZestimate
+            selector: '[data-testid="rent-zestimate"]'
+      - name: PriceHistoryAmount
+        selector: '[data-testid="data-price-row"]'
+        description: The price in one price-history entry.
+        memory:
+          - The name lies. This is a `span` holding a single price, not a row.
+            The real row is a `tr` with no test id, so the three leaves —
+            `data-price-row`, `price-money-cell` and `date-info` — cannot be
+            scoped to each other and have to be zipped by index.
+      - name: PriceHistoryCell
+        selector: '[data-testid="price-money-cell"]'
+        description: The price cell of one price-history entry.
+      - name: PriceHistoryDate
+        selector: '[data-testid="date-info"]'
+        description: The date cell of one price-history entry.
+      - name: TaxHistoryCell
+        selector: '[data-testid="tax-money-cell"]'
+        description: One amount in the tax history table.
+      - name: AgentAttribution
+        selector: '[data-testid="listing-attribution-overview"]'
+        description: Who listed the home.
+        memory:
+          - Everything inside is a named person's contact details — the
+            `attribution-LISTING_AGENT`, `attribution-BROKER` and
+            `attribution-CO_LISTING_AGENT` entries. Structure only; the values
+            are third-party personal data and must not be recorded.
+      - name: ContactAgentButton
+        selector: '[data-testid="contact-listing-agent-button"]'
+      - name: SimilarHome
+        selector: '[data-testid="property-card"]'
+        description: One home in the similar-homes rail at the bottom of the page.
+
+  - name: SavedHomes
+    route: /myzillow/favorites
+    url: https://www.zillow.com/myzillow/favorites
+    description: The account's saved homes — counts, filters, and a paged card list.
+    memory:
+      - Cards here use a third convention. Home recommendations are
+        `home-rec-card-N`, search results are `property-card`, and saved homes
+        are `PropertyListCard-wrapper`. No card selector works across all three.
+      - There is no `h1` on this route. The document title, "My Favorite Homes",
+        is what identifies it.
+      - A second nav, `productnav`, appears alongside the global `topnav`.
+    components:
+      - name: SavedCardList
+        selector: '[data-testid="list-cards-wrapper"]'
+        description: The card list.
+        children:
+          - name: SavedCard
+            selector: '[data-testid="PropertyListCard-wrapper"]'
+            description: One saved home. Its contents are account state.
+          - name: CompareControl
+            selector: '[data-testid="Compare-wrapper"]'
+      - name: SavedMenuBar
+        selector: '[data-testid="menu-bar"]'
+        description: Counts, status filter and sort controls above the list.
+        children:
+          - name: HomeCount
+            selector: '[data-testid="home-count"]'
+          - name: StatusCount
+            selector: '[data-testid="status-count"]'
+          - name: StatusFilter
+            selector: '[data-testid="home-status-filter-dropdown"]'
+          - name: SortDropdown
+            selector: '[data-testid="sort-by-home-facts-dropdown"]'
+          - name: SortDirection
+            selector: '[data-testid="sort-order-direction"]'
+      - name: ProductNav
+        selector: '[data-testid="productnav"]'
+        description: Secondary nav across the account surfaces.
+
+  - name: NotFound
+    route: /**
+    url: https://www.zillow.com/no-such-route-xyz-123/
+    description: The 404 page.
+    memory:
+      - The document title is the empty string, which no other route does. That
+        is the cheapest test for this page.
+      - Five test ids survive — `topnav`, `footer`, `reg-login` and two inline
+        scripts. There is no search bar, which every real route has.
+      - Its `h1` reads "Uh oh, something broke." rather than naming a 404; the
+        status appears only in the body text below it.
+    components:
+      - name: NotFoundHeading
+        selector: 'h1'
+        properties:
+          - name: heading_text
+            extract: text
+      - name: SignInLink
+        selector: '[data-testid="reg-login"]'
+        description: Sign-in entry point.
+        memory:
+          - It renders in a signed-in session, here and on search results, and
+            not on the landing page, listing detail or saved homes. A sign-in
+            control on screen does not mean the session expired.

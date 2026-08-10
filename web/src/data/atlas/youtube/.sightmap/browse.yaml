@@ -1,0 +1,137 @@
+version: 1
+
+views:
+  - name: SearchResults
+    route: /results
+    url: https://www.youtube.com/results?search_query=fender+telecaster
+    description: Search results — filter chips over sections of videos, channels and shelves.
+    memory:
+      - This is the one route whose page renderer is not `ytd-browse`. Home,
+        channel and playlist all use `ytd-browse`; search uses `ytd-search`.
+      - Results are split across two renderers. Legacy rows are
+        `ytd-video-renderer` and newer ones are `yt-lockup-view-model`, and both
+        appear on the same page, so counting either alone undercounts.
+      - The query is in `search_query`, and the search field's `value` holds it
+        after load, so the route states its own query in two places. Every `h1`
+        is empty, as on home.
+      - Nothing fetches the first page. Only guide, player, log_event and the
+        stats endpoints appear on a fresh load, because the results are in the
+        document already.
+    components:
+      - name: SearchPage
+        selector: 'ytd-search'
+        description: The search page container.
+        children:
+          - name: SearchHeader
+            selector: 'ytd-search-header-renderer'
+            description: Filter and sort controls above the results.
+          - name: SearchFilterChip
+            selector: 'yt-chip-cloud-chip-renderer'
+            description: One result-type filter chip.
+          - name: ResultsColumn
+            selector: 'ytd-two-column-search-results-renderer'
+            description: The results column beside the secondary rail.
+          - name: ResultSection
+            selector: 'ytd-item-section-renderer'
+            description: One block of results. More than one per page.
+          - name: LegacyResult
+            selector: 'ytd-video-renderer'
+            description: One video result in the older renderer.
+          - name: LockupResult
+            selector: 'yt-lockup-view-model'
+            description: One video result in the newer renderer.
+          - name: PromotedResult
+            selector: 'ytd-search-pyv-renderer'
+            description: A paid placement in the results.
+          - name: SecondaryRail
+            selector: 'ytd-secondary-search-container-renderer'
+            description: The rail beside the results.
+
+  - name: Channel
+    route: /@:handle
+    url: https://www.youtube.com/@fender
+    description: One channel — page header, tab strip, and whatever the selected tab renders.
+    memory:
+      - The route is `ytd-browse` with `page-subtype="channels"`. That attribute
+        is the only thing separating this page from home and playlist, which
+        share the same element.
+      - The subscribe control here is `yt-subscribe-button-view-model`, a
+        different element from the watch page's `ytd-subscribe-button-renderer`.
+        Neither selector works on the other route.
+      - The channel name is a non-empty `h1`, unlike home and search where every
+        heading is blank. It is not the first `h1` in document order.
+      - The header can autoplay a trailer through
+        `ytd-channel-video-player-renderer`, so a video element on this route is
+        not a watch page.
+    components:
+      - name: ChannelHeader
+        selector: 'ytd-tabbed-page-header'
+        description: Banner, avatar, name, and the tab strip.
+        children:
+          - name: PageHeader
+            selector: 'yt-page-header-view-model'
+          - name: SubscribeButton
+            selector: 'yt-subscribe-button-view-model'
+            description: Subscription control. Its state is account data.
+          - name: ChannelTabGroup
+            selector: 'yt-tab-group-shape'
+            children:
+              - name: ChannelTab
+                selector: 'yt-tab-shape'
+                description: One of Home, Videos, Shorts, Live, Playlists, Posts.
+                properties:
+                  - name: tab_label
+                    extract: text
+      - name: ChannelName
+        selector: 'ytd-channel-name'
+        description: The channel's display name.
+      - name: ChannelTrailer
+        selector: 'ytd-channel-video-player-renderer'
+        description: Autoplaying video in the channel header.
+      - name: ChannelLegalInfo
+        selector: 'ytd-channel-legal-info-renderer'
+
+  - name: Playlist
+    route: /playlist
+    url: https://www.youtube.com/playlist?list=PLoi2sDiBa0EbGzNEjzHQsNNlngtBxpDME
+    description: One playlist — header and sidebar beside the list of videos.
+    memory:
+      - The route is `ytd-browse` with `page-subtype="playlist"`, and the list
+        id is in the `list` query parameter rather than the path.
+      - The element `ytd-playlist-video-renderer` matches nothing here. Rows are
+        `yt-lockup-view-model`, the same element the home feed and search use,
+        so an old playlist selector silently returns an empty list.
+      - The playlist title renders in three separate `h1` elements.
+    components:
+      - name: PlaylistHeader
+        selector: 'ytd-playlist-header-renderer'
+        description: Title, owner and playlist actions.
+      - name: PlaylistSidebar
+        selector: 'ytd-playlist-sidebar-renderer'
+        description: Thumbnail, counts and description beside the list.
+        children:
+          - name: PlaylistPrimaryInfo
+            selector: 'ytd-playlist-sidebar-primary-info-renderer'
+          - name: PlaylistSecondaryInfo
+            selector: 'ytd-playlist-sidebar-secondary-info-renderer'
+          - name: PlaylistThumbnail
+            selector: 'ytd-playlist-thumbnail'
+      - name: PlaylistVideo
+        selector: 'yt-lockup-view-model'
+        description: One video row in the playlist.
+
+  - name: NotFound
+    route: /**
+    url: https://www.youtube.com/no-such-route-xyz-123
+    description: The 404 page.
+    memory:
+      - The application shell is absent. No `ytd-app`, no masthead, no guide, no
+        `ytd-` or `yt-` element of any kind, and eleven elements in the whole
+        document. Testing for `ytd-app` is the cheapest way to tell this page
+        from a route that has not finished rendering.
+      - The document title is exactly "404 Not Found" and the body has no text
+        and no heading, so nothing but the title names the error.
+    components:
+      - name: NotFoundBody
+        selector: 'body'
+        description: The whole page. It holds no application markup.

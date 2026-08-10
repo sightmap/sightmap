@@ -1,8 +1,9 @@
 version: 1
 
 memory:
-  - Every route is server-rendered, so the listings and product facts are in the
-    first HTML response and nothing needs to wait on XHR.
+  - Search, product, and best-seller routes are server-rendered — the listings
+    and product facts are in the first HTML response. Only the home page
+    streams its below-the-fold rows over XHR.
   - The site duplicates ids. Several variants of a block are rendered and all but
     one hidden, so an id can match two or three times and `querySelector` may
     return a hidden one. Filter by visibility.

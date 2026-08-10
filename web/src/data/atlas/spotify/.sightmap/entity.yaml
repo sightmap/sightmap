@@ -1,0 +1,200 @@
+version: 1
+
+views:
+  - name: AlbumDetail
+    route: /album/:albumId
+    url: https://open.spotify.com/album/4ZUryKKDhiMXcD4fluAEhl
+    description: One album — header, action bar, and its track list.
+    memory:
+      - The document title is the currently playing track, not the page. Over
+        one mapping session it read three different things while the route never
+        changed. Read the album name from the entityTitle testid instead.
+      - The main landmark keeps the previously viewed album in its `aria-label`
+        after a client-side navigation. It is stale by design, so do not
+        identify the page from it.
+      - Three visible `h1` elements exist, one each from the library rail, the
+        page header, and the playback bar. Scope headings inside the page's own
+        container.
+      - A hidden language dialog ships in every page and contributes 74
+        `language-option-*` testids. Counting testids overcounts by that much.
+    components:
+      - name: AlbumPage
+        selector: '[data-testid="album-page"]'
+        description: The album container. Everything about the album lives inside it.
+        memory:
+          - The album's own artwork is a plain `img` descendant; no artwork
+            testid matches inside this container.
+        children:
+          - name: AlbumTitle
+            selector: '[data-testid="entityTitle"]'
+            properties:
+              - name: album_name
+                extract: text
+          - name: AlbumCreator
+            selector: '[data-testid="creator-link"]'
+            properties:
+              - name: artist_name
+                extract: text
+              - name: artist_href
+                extract: attr=href
+          - name: ReleaseDate
+            selector: '[data-testid="release-date"]'
+            properties:
+              - name: release_year
+                extract: text
+          - name: ActionBar
+            selector: '[data-testid="action-bar"]'
+            children:
+              - name: SaveButton
+                selector: '[data-testid="add-button"]'
+                description: Saves the album to the account's library.
+          - name: TrackList
+            selector: '[data-testid="track-list"]'
+            children:
+              - name: ColumnHeader
+                selector: '[role="columnheader"]'
+          - name: TrackRow
+            selector: '[data-testid="tracklist-row"]'
+            description: One track. Repeats once per track on the album.
+            memory:
+              - Per-row play buttons render on hover, so at rest only some are
+                in the DOM. Count rows, not play buttons.
+            children:
+              - name: TrackLink
+                selector: '[data-testid="internal-track-link"]'
+                properties:
+                  - name: track_title
+                    extract: text
+                  - name: track_href
+                    extract: attr=href
+              - name: TrackMoreButton
+                selector: '[data-testid="more-button"]'
+          - name: RelatedShelf
+            selector: '[data-testid="component-shelf"]'
+            description: Recommendation rows below the track list.
+
+  - name: PlaylistDetail
+    route: /playlist/:playlistId
+    url: https://open.spotify.com/playlist/25nXZAP7HFOPdkG3XnRYme
+    description: One playlist — header, action bar, and its track table.
+    memory:
+      - A playlist shares `entityTitle` and `action-bar` with an album but sits
+        in `playlist-page` rather than `album-page`. Test the container to tell
+        the two apart; the header markup will not.
+      - The track table is virtualised. Rows outside the viewport are absent
+        rather than hidden, and `tracklist-row-placeholder` marks the ones still
+        to render, so a row count is what is on screen and not the playlist
+        length.
+    components:
+      - name: PlaylistPage
+        selector: '[data-testid="playlist-page"]'
+        children:
+          - name: PlaylistTitle
+            selector: '[data-testid="entityTitle"]'
+            properties:
+              - name: playlist_name
+                extract: text
+          - name: PlaylistActionBar
+            selector: '[data-testid="action-bar"]'
+          - name: PlaylistTrackRow
+            selector: '[data-testid="tracklist-row"]'
+            children:
+              - name: PlaylistTrackLink
+                selector: '[data-testid="internal-track-link"]'
+                properties:
+                  - name: track_title
+                    extract: text
+          - name: RowPlaceholder
+            selector: '[data-testid="tracklist-row-placeholder"]'
+            description: Stands in for a virtualised row that has not rendered.
+
+  - name: ArtistDetail
+    route: /artist/:artistId
+    url: https://open.spotify.com/artist/5hNiAUVPCTgcpy8vljCxzs
+    description: One artist — top tracks over shelves of releases and related acts.
+    memory:
+      - This page has no `entityTitle` at all, unlike album and playlist. The
+        artist name is an `h1` inside the page and nothing else addresses it.
+      - Top tracks use the same `tracklist-row` as an album, but there is no
+        `track-list` container around them here.
+    components:
+      - name: ArtistTopTrack
+        selector: '[data-testid="tracklist-row"]'
+        description: One row of the artist's top tracks.
+        children:
+          - name: ArtistTrackLink
+            selector: '[data-testid="internal-track-link"]'
+            properties:
+              - name: track_title
+                extract: text
+      - name: ArtistShelf
+        selector: '[data-testid="component-shelf"]'
+        description: A titled row of releases, related artists or playlists.
+        children:
+          - name: ShelfHeader
+            selector: '[data-testid="rich-title-row-shelf-header"]'
+            properties:
+              - name: shelf_title
+                extract: text
+          - name: ShelfSeeAll
+            selector: '[data-testid="see-all-link"]'
+            properties:
+              - name: see_all_href
+                extract: attr=href
+      - name: ArtistGrid
+        selector: '[data-testid="grid-container"]'
+        description: Grid layout used by the discography sections.
+
+  - name: TrackDetail
+    route: /track/:trackId
+    url: https://open.spotify.com/track/2EK8rXsXlVz4ZYFscfhxHG
+    description: One song — header, action bar, the artist card, and shelves of the artist's other work.
+    memory:
+      - Container shape is what identifies the route. Album is `album-page`,
+        playlist is `playlist-page`, track is `track-page`, and artist has none
+        of them. Test the container, not the header.
+      - Most of this page is the artist, not the song. Below the header the
+        shelves read "Popular Releases by", "Fans also like" and "About the
+        artist", so a shelf here describes the artist and not the track.
+      - Signed out, this route renders a different build entirely —
+        `track-view`, `entity-play-button`, `track-artist-link-card`, and no
+        `track-page` at all. Nothing in this view matches a lapsed session,
+        which is a way to detect one.
+      - The recommendation list under the header reuses `tracklist-row` from
+        album and artist, so a row count here is recommendations rather than
+        anything about the song.
+    components:
+      - name: TrackPage
+        selector: '[data-testid="track-page"]'
+        description: The track container. Its presence is the route test.
+      - name: TrackTitle
+        selector: '[data-testid="entityTitle"]'
+        description: The song name.
+        properties:
+          - name: track_name
+            extract: text
+      - name: TrackActionBar
+        selector: '[data-testid="action-bar"]'
+        description: Play, save, download and more-options controls.
+        children:
+          - name: LyricsButton
+            selector: '[data-testid="lyrics-button"]'
+            description: Opens the lyrics panel. Present on this route only.
+      - name: RecommendedTrack
+        selector: '[data-testid="tracklist-row"]'
+        description: One row of the recommendations under the header.
+        children:
+          - name: RecommendedTrackLink
+            selector: '[data-testid="internal-track-link"]'
+            properties:
+              - name: track_title
+                extract: text
+      - name: TrackShelf
+        selector: '[data-testid="component-shelf"]'
+        description: A titled row of the artist's other releases.
+        children:
+          - name: TrackShelfHeader
+            selector: '[data-testid="rich-title-row-shelf-header"]'
+            properties:
+              - name: shelf_title
+                extract: text

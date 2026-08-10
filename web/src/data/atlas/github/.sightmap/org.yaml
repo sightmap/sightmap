@@ -9,9 +9,8 @@ views:
       - Nothing in the path separates `/:org` from `/:user`. The presence of
         `nav[aria-label="Organization"]` is the test — a user profile has no
         such nav.
-      - The repository links carry `itemprop="name codeRepository"`, which
-        looks like the obvious hook and is invisible to everything but a live
-        DOM query. Select on `data-hovercard-type` instead.
+      - Select repository links on `data-hovercard-type`, not on the
+        `itemprop="name codeRepository"` attribute they also carry.
       - Signed out, only public repositories are listed, so a count read here
         is not the organization's repository count.
     requests:

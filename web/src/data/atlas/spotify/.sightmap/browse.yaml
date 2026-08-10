@@ -1,0 +1,96 @@
+version: 1
+
+views:
+  - name: Home
+    route: /
+    url: https://open.spotify.com/
+    description: The signed-in home — shortcut tiles over rows of recommended shelves.
+    memory:
+      - Every shelf here is assembled for the account. The rows are product
+        structure and what they contain is account state.
+      - Play buttons vastly outnumber anything else, at over a hundred on one
+        render, because every card carries one. Count cards or shelves, never
+        play buttons.
+    components:
+      - name: Shortcut
+        selector: '[data-testid="shortcut-image"]'
+        description: One tile in the grid of recently played shortcuts at the top.
+      - name: HomeShelf
+        selector: '[data-testid="component-shelf"]'
+        description: One titled row of recommendations.
+        children:
+          - name: HomeShelfHeader
+            selector: '[data-testid="rich-title-row-shelf-header"]'
+            properties:
+              - name: shelf_title
+                extract: text
+          - name: HomeShelfSeeAll
+            selector: '[data-testid="see-all-link"]'
+            properties:
+              - name: see_all_href
+                extract: attr=href
+          - name: HomeCard
+            selector: '[data-testid="card-image"]'
+      - name: Carousel
+        selector: '[data-testid="carousel-scroller"]'
+        description: Horizontal scroller holding a shelf's cards.
+        memory:
+          - The next and previous controls are siblings of this element, not
+            descendants, so scoping them inside the scroller matches nothing.
+      - name: CarouselNext
+        selector: '[data-testid="carousel-next-button"]'
+      - name: CarouselPrevious
+        selector: '[data-testid="carousel-previous-button"]'
+
+  - name: SearchResults
+    route: /search/:query
+    url: https://open.spotify.com/search/ellie%20holcomb
+    description: Search results — a flat list of rows across every result type.
+    memory:
+      - Results do not use `tracklist-row`. Every row, whatever its type, is
+        built from the generic set `media`, `preTitle`, `title`, `subtitle` and
+        `trailing`, so one selector set covers tracks, artists, albums and
+        playlists alike and none of them says which type a row is.
+      - The query rides in the path rather than a query string, and a space is
+        percent-encoded there.
+    components:
+      - name: ResultRow
+        selector: '[data-testid="title"]'
+        description: The title cell of one result row.
+        properties:
+          - name: result_title
+            extract: text
+      - name: ResultSubtitle
+        selector: '[data-testid="subtitle"]'
+        properties:
+          - name: result_subtitle
+            extract: text
+      - name: ResultMedia
+        selector: '[data-testid="media"]'
+        description: Artwork cell of one result row.
+      - name: ResultTrailing
+        selector: '[data-testid="trailing"]'
+        description: Trailing cell holding duration or the row's actions.
+      - name: ResultLink
+        selector: '[data-testid="mouse-only-link"]'
+        properties:
+          - name: result_href
+            extract: attr=href
+
+  - name: NotFound
+    route: /**
+    url: https://open.spotify.com/no-such-route-xyz-123
+    description: The 404 page.
+    memory:
+      - The 404 is not the web player. It carries no `data-testid` anywhere, no
+        `main` element, and none of the global chrome — no nav rail, no top bar,
+        no playback bar. Every global component in this corpus is absent here,
+        which is the test that identifies the route.
+      - Its single `h1` reads "Page not found", and that heading is the only
+        structure on the page worth addressing.
+    components:
+      - name: NotFoundHeading
+        selector: 'h1'
+        properties:
+          - name: heading_text
+            extract: text

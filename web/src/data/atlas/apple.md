@@ -24,9 +24,9 @@ apple.com, mapped as a signed-out visitor.
 | View | Route | What it holds |
 |---|---|---|
 | `Home` | `/` | Promotional tiles and a media gallery |
-| `SearchResults` | `/us/search/:query` | Tabbed results across four verticals |
+| `SearchResults` | `/:locale/search/:query` | Tabbed results across four verticals |
 | `ProductMarketing` | `/:productSlug` | Local nav, marquee, scroll galleries |
-| `BuyFlow` | `/shop/buy-mac/:model` | Stepped configuration with a running price |
+| `BuyFlow` | `/**/shop/buy-mac/:model` | Stepped configuration with a running price |
 | `NotFound` | `/**` | Apology, search box, sitemap link |
 
 `GlobalHeader`, `NavCurtain`, `PageRoot`, `MainRegion`, `AnnouncementPortal`,

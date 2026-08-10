@@ -119,4 +119,4 @@ requests:
   - name: JitneyLogging
     route: /tracking/jitney/logging/messages
     method: POST
-    description: Airbnb's event logging pipeline and the noisiest thing on the site, at 19 calls on a listing page. Carries no content.
+    description: Airbnb's event logging pipeline and the noisiest thing on the site, firing constantly on every route. Carries no content.

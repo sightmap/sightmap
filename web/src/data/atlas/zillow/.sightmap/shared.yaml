@@ -1,9 +1,33 @@
 version: 1
 
+requests:
+  - name: GraphQL
+    route: /graphql
+    method: POST
+    description: The main data endpoint. Operation names ride in the request body, so the URL alone does not say which view issued a call.
+
+  - name: ZgGraph
+    route: /zg-graph
+    method: POST
+    description: A second graph endpoint alongside /graphql, used by the same pages.
+
+  - name: UserNav
+    route: /ajax/nav/UserNavAsync.htm
+    method: GET
+    description: Fills the signed-in portion of the top nav. Account state — a route to recognise, not a payload to read.
+
+  - name: RenterStatus
+    route: /renter-hub-api/api/v1/users/listingConversation/getRenterStatus
+    method: GET
+    description: Rental-side account status, fetched on search and listing routes whether or not the search is for rentals.
+
 components:
   - name: TopNav
     selector: '[data-testid="topnav"]'
     description: Primary navigation — Buy, Rent, Sell, mortgage, agents, rentals.
+    memory:
+      - This is the one component present on every route including the 404, so
+        its presence proves nothing about which page loaded.
 
   - name: SearchBar
     selector: '[data-testid="search-bar-container"]'
@@ -11,9 +35,20 @@ components:
     memory:
       - Three inputs exist on the page and one is visible, so scope the field to
         this container rather than querying inputs globally.
+      - It exists on the landing page only. Search results, listing detail,
+        saved homes and the 404 have no search bar at all, so its absence does
+        not mean the page failed to load.
     children:
       - name: SearchInput
         selector: 'input'
         properties:
           - name: search_placeholder
             extract: attr=placeholder
+
+  - name: PageFooter
+    selector: '[data-testid="footer"]'
+    description: Site footer.
+    memory:
+      - More than one element carries this test id on most routes — two on
+        search results, three on a listing page — so it never resolves to one
+        footer.

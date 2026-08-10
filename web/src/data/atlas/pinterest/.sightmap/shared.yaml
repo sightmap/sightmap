@@ -1,6 +1,21 @@
 version: 1
 
+memory:
+  - Backend calls take the shape `/resource/:ResourceName/:verb/`, verb being
+    get, create or update, with arguments in a `data=` query parameter holding
+    URL-encoded JSON. Telemetry and traces under `/_/_/` are the exception.
+  - There is a REST path, one level down. `/resource/ApiResource/get/` proxies
+    the v3 API, and the real path and field list ride inside `data=` as
+    `options.url` and `options.data.fields`.
+  - Every `/resource/` call carries `source_url=<path>`, so the route that
+    issued a request is readable from its query string.
+
 requests:
+  - name: ApiProxy
+    route: /resource/ApiResource/get/
+    method: GET
+    description: Generic proxy for the v3 REST API. The real path and the exact field list ride inside the data parameter as options.url and options.data.fields, so the request URL alone says nothing about what was asked for.
+
   - name: Telemetry
     route: /resource/ApiSResource/create/
     method: POST
@@ -11,10 +26,15 @@ requests:
     method: POST
     description: Second telemetry channel, fired alongside ApiSResource.
 
+  - name: Trace
+    route: /_/_/trace/trace/
+    method: POST
+    description: Performance trace channel. One of the few calls that does not go through /resource/.
+
   - name: NotificationBadge
     route: /resource/NewsHubBadgeResource/get/
     method: GET
-    description: Unread count for the notifications icon. Account state — the response is not corpus material.
+    description: Unread count for the notifications icon, polled every few seconds. Account state — the response is not corpus material.
 
   - name: ExperimentActivation
     route: /resource/ActivateExperimentResource/create/
@@ -24,29 +44,84 @@ requests:
   - name: PlacementLookup
     route: /resource/UserExperienceResource/get/
     method: GET
-    description: Asks which promotional placements to render for the current page.
+    description: Asks which promotional placements to render. Its extra_context carries facts about the current page, such as the board id and pin count.
+
+  - name: MetaConversions
+    route: https://www.facebook.com/tr/
+    method: GET
+    description: Conversions beacon fired from a hidden fb.html iframe. Its query string carries the account's email, first name, last name and country, both hashed and partially masked — a route to recognise and never a payload to read.
 
 components:
   - name: SiteHeader
     selector: '[data-test-id="header"]'
-    description: Fixed top bar — search, navigation icons, and account controls.
-    memory:
-      - Every backend call goes through `/resource/:ResourceName/:verb/`, where
-        verb is get, create or update and the arguments ride in a `data=` query
-        parameter holding URL-encoded JSON. There is no REST path to read.
+    description: Fixed top bar — search, account avatar and the account menu.
     children:
       - name: SearchBox
         selector: '[data-test-id="search-box-input"]'
         description: Query field for the search route.
+        memory:
+          - Its placeholder changes with the route — "Search your Pins" on a
+            profile, plain "Search" on the home feed — so the placeholder is a
+            weak route signal and never a label to match on.
+        properties:
+          - name: query_placeholder
+            extract: attr=placeholder
       - name: HeaderProfile
         selector: '[data-test-id="header-profile"]'
-        description: Account avatar and menu. Identity — never extract from it.
+        description: Account avatar linking to the signed-in profile. Identity — never extract from it.
       - name: AccountOptionsButton
         selector: '[data-test-id="header-accounts-options-button"]'
+
+  - name: HomeTab
+    selector: '[data-test-id="home-tab"]'
+    description: Left-rail link to the home feed.
+    memory:
+      - The rail is a `nav` outside the header container and carries no test id
+        or aria-label of its own, so it can only be addressed through the
+        entries inside it. Scoping any of them under the header matches nothing.
+
+  - name: ExploreTab
+    selector: '[data-test-id="today-tab"]'
+
+  - name: BoardsTab
+    selector: '[data-test-id="boards-tab"]'
+
+  - name: CreateTab
+    selector: '[data-test-id="create-tab"]'
 
   - name: NavIcon
     selector: '[data-test-id="vertical-nav-icon"]'
     description: One primary navigation icon.
     memory:
-      - The navigation icons sit in their own `nav` element outside the header
-        container, so scoping them under the header matches nothing.
+      - The count is account state, not layout — five icons with no unread
+        notifications, seven once the bell and its badge appear. Address icons
+        by their own testid rather than by position.
+
+  - name: SettingsButton
+    selector: '[data-test-id="vertical-nav-settings-button"]'
+
+  - name: PinCard
+    selector: '[data-test-id="pin"]'
+    description: One pin card in any grid — home, search, board or related.
+    memory:
+      - Each card holds exactly one `pincard-<type>-with-link` or
+        `-without-link` testid naming its type. Five types appeared on a single
+        home render (image, product, storyPin, oneTap, and their link
+        variants), and `oneTap` marks a promoted card.
+      - Most images carry `data-test-id="pin-missing-alt-text"` — 46 of 50 on
+        one home render — so alt text is not a description source here.
+    children:
+      - name: PinImage
+        selector: '[data-test-id="pinrep-image"]'
+        properties:
+          - name: thumbnail_src
+            extract: attr=src
+      - name: PinFooter
+        selector: '[data-test-id="pinrep-footer"]'
+        description: Attribution strip below a card. Absent on some card types.
+      - name: MoreActionsButton
+        selector: '[data-test-id="more-actions-button"]'
+
+  - name: MasonryContainer
+    selector: '[data-test-id="masonry-container"]'
+    description: The virtualised grid that holds pin cards on every feed route.

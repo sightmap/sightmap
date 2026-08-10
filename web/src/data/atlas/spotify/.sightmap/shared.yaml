@@ -1,5 +1,26 @@
 version: 1
 
+requests:
+  - name: Pathfinder
+    route: https://api-partner.spotify.com/pathfinder/v2/query
+    method: POST
+    description: The data API behind every view. One URL serves album, artist, playlist, search and home; the operation is named in the request body, so the URL alone cannot tell you which view fetched it.
+
+  - name: CollectionContains
+    route: https://spclient.wg.spotify.com/collection/v2/contains
+    method: POST
+    description: Asks which of the items on screen are already in the account's library, which is what fills in the saved state of every save control.
+
+  - name: Telemetry
+    route: https://gue1-spclient.spotify.com/gabo-receiver-service/v3/events
+    method: POST
+    description: Client event stream, fired continuously on every route.
+
+  - name: AnalyticsCollect
+    route: https://www.google-analytics.com/g/collect
+    method: POST
+    description: Analytics beacon. Its query string carries account facts including a user id and premium status, so it is a route to recognise and never a payload to read.
+
 components:
   - name: GlobalNav
     selector: '[data-testid="global-nav-bar"]'
@@ -13,14 +34,14 @@ components:
       - name: SearchForm
         selector: 'form[role="search"]'
         children:
-          - name: SearchInput
-            selector: '[data-testid="search-input"]'
+          - name: SearchField
+            selector: 'textarea, input[data-testid="search-input"]'
             properties:
-              - name: placeholder
+              - name: query_placeholder
                 extract: attr=aria-label
       - name: UserWidget
         selector: '[data-testid="user-widget-link"]'
-        description: Account menu entry point. Identity — never extract from it.
+        description: Account menu entry point.
 
   - name: LibraryGrid
     selector: 'div[role="grid"][aria-label="Your Library"]'
@@ -28,8 +49,6 @@ components:
     memory:
       - This grid is a root-level sibling of the nav rail, not a descendant of
         it, so scoping it under the nav matches nothing.
-      - Rows here are the account's saved items, not the product. Read the grid
-        to know the library exists; never record what is in it.
 
   - name: TopBar
     selector: '[data-testid="topbar"]'
@@ -37,13 +56,13 @@ components:
 
   - name: NowPlayingBar
     selector: '[data-testid="now-playing-bar"]'
-    description: Playback chrome, present on every route.
+    description: Playback chrome, present on every route except the 404.
     memory:
-      - Its contents are the account's listening state, not the page. Document
-        that the bar exists; never extract a track, artist, or artwork from it.
       - This bar owns every `[data-testid="cover-art-image"]` on the page. An
-        agent reaching for album artwork lands here and gets the playing track
-        instead, so scope artwork queries inside the page's own container.
+        agent reaching for a page's artwork lands here and gets the playing
+        track instead, so scope artwork queries inside the page's own container.
+      - It also owns `[data-testid="track"]`, which is an icon in its cover-art
+        button and never a track anywhere on the site. The name is a trap.
     children:
       - name: PlayerControls
         selector: '[data-testid="player-controls"]'
