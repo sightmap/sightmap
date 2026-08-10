@@ -233,24 +233,31 @@
     "requestProperty": {
       "type": "object",
       "description": "A named value extracted from a live request/response pair. See SEP-0005.",
-      "required": ["name"],
+      "required": ["name", "source"],
       "additionalProperties": false,
-      "oneOf": [{ "required": ["field"] }, { "required": ["pattern"] }],
+      "anyOf": [{ "required": ["field"] }, { "required": ["pattern"] }],
+      "if": { "properties": { "source": { "enum": ["req.headers", "rsp.headers"] } } },
+      "then": { "required": ["field"] },
       "properties": {
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "Key a consumer refers to this value by. Declaring one of the reserved request identity names (status, method, duration) shadows that identity; the reference CLI warns."
         },
+        "source": {
+          "type": "string",
+          "enum": ["req.body", "rsp.body", "req.headers", "rsp.headers"],
+          "description": "Which root to read from. See SEP-0005 §Extraction root."
+        },
         "field": {
           "type": "string",
           "minLength": 1,
-          "description": "Rooted path: req|rsp, then .body.<path> for JSON object-key traversal or .headers.<name> for one header value (name matched case-insensitively). Also accepts a reserved identity name: status, method, duration. See SEP-0005 §Extraction root."
+          "description": "Value to select within source: an object-key path for a body source, a header name (case-insensitive) for a headers source. Required when source is a headers source. See SEP-0005 §Extraction root."
         },
         "pattern": {
           "type": "string",
           "minLength": 1,
-          "description": "Regex matched against the raw text of the response body, for content field's object-key traversal cannot reach (a non-JSON body, or a value embedded in a larger string). Carries no root of its own."
+          "description": "RE2 regex (no backreferences or lookaround) applied to what field resolved, or to the raw source text when field is absent. Capture group 1 is the value if present, else the full match."
         },
         "transform": {
           "type": "string",

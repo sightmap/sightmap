@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strings"
 )
 
 // requestPropertyNamePattern mirrors $defs.requestProperty.properties.name in
@@ -15,9 +16,10 @@ var requestPropertyNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 //
 // These constraints live in the JSON Schema too, but only ajv enforces them
 // there. The Go CLI never validates against sightmap.schema.json, so without
-// this a corpus declaring both field and pattern (or neither, or an invalid
-// name) passes `sightmap validate` and fails `npm run validate:conformance` —
-// two conformance checkers disagreeing about the same file.
+// this a corpus with a bad source, no extractor, a headers source missing its
+// field, an invalid pattern, or an invalid name passes `sightmap validate` and
+// fails `npm run validate:conformance` — two conformance checkers disagreeing
+// about the same file.
 //
 // Requests are read from Corpus.Requests and each View.Requests directly rather
 // than through a whole-corpus accessor: those dedupe by first-seen name, which
@@ -63,23 +65,55 @@ func validateRequestProperty(reqName string, prop RequestProperty) []ValidationE
 		})
 	}
 
-	switch {
-	case prop.Field != "" && prop.Pattern != "":
+	// source is required and closed. field+pattern compose (anyOf), so both
+	// together is legal; only declaring neither is an error.
+	validSource := slices.Contains(RequestPropertySources, prop.Source)
+	if !validSource {
 		errs = append(errs, ValidationError{
 			Component: reqName,
-			Code:      "request-property-both-extractors",
+			Code:      "request-property-source-invalid",
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("request %q property %q declares both field and pattern; exactly one is allowed",
-				reqName, prop.Name),
+			Message: fmt.Sprintf("request %q property %q has source %q; must be one of %s",
+				reqName, prop.Name, prop.Source, strings.Join(RequestPropertySources, ", ")),
 		})
-	case prop.Field == "" && prop.Pattern == "":
+	}
+
+	if prop.Field == "" && prop.Pattern == "" {
 		errs = append(errs, ValidationError{
 			Component: reqName,
 			Code:      "request-property-no-extractor",
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("request %q property %q declares neither field nor pattern; exactly one is required",
+			Message: fmt.Sprintf("request %q property %q declares neither field nor pattern; at least one is required",
 				reqName, prop.Name),
 		})
+	}
+
+	// A headers source has no structure below a header value, so a bare regex
+	// scan across the raw header block is the addressing foot-gun this shape
+	// removes: field must name the header.
+	if validSource && strings.HasSuffix(prop.Source, ".headers") && prop.Field == "" {
+		errs = append(errs, ValidationError{
+			Component: reqName,
+			Code:      "request-property-headers-require-field",
+			Severity:  SeverityError,
+			Message: fmt.Sprintf("request %q property %q reads from %q but omits field; a headers source must name a header in field",
+				reqName, prop.Name, prop.Source),
+		})
+	}
+
+	// pattern is an RE2 regex (SEP-0005). Compile it at validation time, as the
+	// message entity does for its own author-written regex, rather than storing a
+	// pattern nobody has proven is one.
+	if prop.Pattern != "" {
+		if _, err := regexp.Compile(prop.Pattern); err != nil {
+			errs = append(errs, ValidationError{
+				Component: reqName,
+				Code:      "request-property-pattern-invalid",
+				Severity:  SeverityError,
+				Message: fmt.Sprintf("request %q property %q: pattern regex parse error: %v",
+					reqName, prop.Name, err),
+			})
+		}
 	}
 
 	// A declared property shadows the reserved identity name, which is legal and

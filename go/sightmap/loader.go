@@ -94,6 +94,7 @@ type rawRequest struct {
 
 type rawRequestProperty struct {
 	Name      string `yaml:"name"`
+	Source    string `yaml:"source"`
 	Field     string `yaml:"field"`
 	Pattern   string `yaml:"pattern"`
 	Transform string `yaml:"transform"`
@@ -352,6 +353,7 @@ func toRequestProperties(rps []rawRequestProperty) []RequestProperty {
 	for _, rp := range rps {
 		out = append(out, RequestProperty{
 			Name:      rp.Name,
+			Source:    rp.Source,
 			Field:     rp.Field,
 			Pattern:   rp.Pattern,
 			Transform: rp.Transform,

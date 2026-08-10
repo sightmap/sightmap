@@ -213,9 +213,11 @@ requests:
           type: string
     properties:
       - name: outcome
-        field: rsp.body.status
+        source: rsp.body
+        field: status
         transform: slug
       - name: legacy
+        source: rsp.body
         pattern: 'declined'
 `)
 	if len(w) != 0 {
