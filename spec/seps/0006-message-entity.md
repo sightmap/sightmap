@@ -4,9 +4,9 @@ title: A console/exception message entity (`messages[]`)
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-08-10
 spec-version-target: 1
-related-issues: []
+related-issues: [158]
 related-discussions: []
 ---
 
@@ -145,4 +145,4 @@ Existing SDKs that encounter a `messages:` key MUST treat it as an unknown top-l
 
 ## References
 
-- Subtext (a sightmap consumer) models a JS exception as an ERROR-level console record rather than a distinct entity — the real-world precedent behind this proposal's "one entity, not two" call in Semantics.
+- Subtext (a sightmap consumer) folds uncaught exceptions into the same console-record stream under their own `exception` level (not `error`) — the real-world precedent behind this proposal's "one entity, not two" call in Semantics, and the reason a corpus that wants exceptions writes `level: EXCEPTION`.
