@@ -270,12 +270,10 @@ A named API endpoint.
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
 | `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. |
 | `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). For a `.headers` source, a header name matched case-insensitively; **required** whenever `source` is a headers source. |
-| `pattern` | string | see below | An RE2 regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
+| `pattern` | string | see below | An [RE2](#regular-expressions) regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
 | `transform` | string | no | Same vocabulary as [Component properties](#component-properties)' transform. |
 
-At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source `field` is required too (a bare regex across a raw header block is the addressing foot-gun this shape removes).
-
-`pattern` uses **RE2** syntax (Go's `regexp`; no backreferences or lookaround) — a linear-time, predictable dialect, so authoring-time validation and runtime matching agree across SDKs. The reference CLI rejects an invalid pattern (`request-property-pattern-invalid`).
+At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source `field` is required too (a bare regex across a raw header block is the addressing foot-gun this shape removes). `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`).
 
 **Value omission is silent** — a property that doesn't resolve (a missing key, an out-of-range index, no pattern match) is simply absent; consumers MUST NOT treat omission as an error. Omission is the normal case, not an edge case: whether a body or header is even available to read depends on the capture layer's own payload and privacy settings.
 
@@ -332,15 +330,11 @@ messages:
 |---|---|---|---|
 | `name` | string | yes | Stable identifier, addressable by name by other tooling. |
 | `level` | string | no | Exact, case-insensitive match against the observed record's level. Match-any if omitted. |
-| `message` | string | no | [RE2](#regular-expression-syntax) regex matched against the record's text. Match-any if omitted. |
+| `message` | string | no | [RE2](#regular-expressions) regex matched against the record's text. Match-any if omitted. |
 | `description` | string | no | What this pattern means, for a human reading the corpus. |
 | `source` | string | no | Relative path to the source most likely to emit this. |
 
-A record matches when every declared constraint holds. Declaring neither `level` nor `message` matches every record, which is legal but rarely useful.
-
-### Regular expression syntax
-
-The `message` regex uses **RE2** syntax — the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package for JavaScript. RE2 is pinned deliberately: it matches in guaranteed linear time (no catastrophic backtracking), and because these patterns are validated at authoring time by one SDK and matched against a live console/exception stream at runtime by another, a single predictable dialect is what keeps the two from disagreeing about the same pattern. The tradeoff is expressivity: RE2 has **no backreferences and no lookahead/lookbehind**. Character classes, alternation, quantifiers, anchors, and groups all work, which covers essentially every message pattern in practice. A conforming SDK MUST reject a `message` that is not a valid RE2 pattern (the reference CLI reports `message-regex-invalid`).
+A record matches when every declared constraint holds. Declaring neither `level` nor `message` matches every record, which is legal but rarely useful. `message` is an [RE2 regular expression](#regular-expressions).
 
 ### Message levels
 
@@ -362,6 +356,12 @@ The vocabulary is open: `level` is free text, not an enum, so a corpus may name 
 Two entries that can match the same record are reported as `message-conflict` (a warning) when the overlap is statically decidable: the same `level`, or one omitting it, with an identical or absent `message`. Deciding whether two different regexes can both match some record is not decidable in general.
 
 A consumer evaluating live records MUST surface an ambiguity when a record matches more than one entry, rather than silently resolving to a first match. See [SEP-0006](../seps/0006-message-entity.md).
+
+## Regular expressions
+
+Every author-written regular expression in a sightmap — a request property's `pattern` ([Request properties](#request-properties)) and a message's `message` ([Message](#message)) — uses **RE2** syntax: the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package for JavaScript. RE2 is pinned deliberately. It matches in guaranteed linear time (no catastrophic backtracking), and because a pattern is validated at authoring time by one SDK and evaluated against live activity by another, one predictable dialect keeps the two from disagreeing about the same expression. The tradeoff is expressivity: RE2 has **no backreferences and no lookahead/lookbehind**. Character classes, alternation, quantifiers, anchors, and capture groups all work — essentially every pattern in practice.
+
+A conforming SDK MUST reject a regular expression that is not valid RE2; the reference CLI reports `request-property-pattern-invalid` for a `pattern` and `message-regex-invalid` for a `message`.
 
 ## Memory
 
@@ -510,8 +510,8 @@ A conforming SDK:
 - MUST reject a `RequestProperty` with no `source`, or a `source` outside the four-value enum (`req.body`/`rsp.body`/`req.headers`/`rsp.headers`)
 - MUST reject a `RequestProperty` that declares neither `field` nor `pattern`
 - MUST reject a `RequestProperty` whose `source` is a headers source but omits `field`
-- MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression
-- MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expression syntax](#regular-expression-syntax))
+- MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
+- MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
