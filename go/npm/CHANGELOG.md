@@ -1,5 +1,40 @@
 # @sightmap/sightmap
 
+## 0.20.0
+
+### Minor Changes
+
+- 8828f5c: Add a top-level `messages:` entity ([SEP-0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md)): named console-output and exception patterns, matched by `level` and a `message` regex. This gives console activity what `requests:` gives network activity, a named entity the rest of the corpus can reference by name.
+
+  **An uncaught exception arrives as `level: exception`, not `level: error`.** The reference capture emits `log`, `debug`, `info`, `warn`, `error`, and `exception`, so `level: ERROR` matches `console.error` and does not match an exception. SEP-0006 still needs no `kind:` discriminator, because the origin is carried as a level value, but a corpus that wants exceptions has to name them.
+
+  New validation:
+
+  - `message-regex-invalid` (error) compiles `message` at validation time, matching how component selectors are already checked. The corpus no longer stores a pattern nobody has proven is a pattern. The dialect is pinned to **RE2** (Go `regexp` / the `re2` npm package for JS): a linear-time syntax with no backreferences or lookaround, so authoring-time validation and runtime matching agree across SDKs.
+  - `merge-collision-message` (warning) reports a duplicated name. This one is load-bearing for SEP-0007: `ref:` resolution counts distinct entity kinds, so two messages sharing a name collapse to one kind and the ambiguity check never fires.
+  - `message-conflict` (warning) reports two entries that can match the same record, where that overlap is statically decidable: same `level`, identical or absent `message`.
+  - `message-level-unknown` (lint) catches a level outside the emitted vocabulary. The realistic trap is `WARNING`, CDP's own spelling, which the capture normalizes to `warn`.
+  - `field-type-invalid` (error) now covers message fields, so `message: 404` and `level: 500` are rejected in Go as ajv already rejected them.
+
+  This resolves SEP-0006's open question on ambiguous-match diagnostics, which the SEP delegated to its implementation.
+
+  Matching is not implemented: the SDK parses and validates these declarations but does not evaluate them against console records, even though the capture layer already collects both console output and exceptions.
+
+- 01f0a37: Add `properties:` to request definitions ([SEP-0005](https://github.com/sightmap/sightmap/blob/main/spec/seps/0005-request-properties.md)): named values a consumer extracts from a live request/response pair, so a `200 OK` whose body says a payment was declined can be reasoned about.
+
+  - `source` names the root (a closed enum: `req.body`/`rsp.body`/`req.headers`/`rsp.headers`).
+  - `field` selects a value within `source`: an object-key dot-path for a body source, a header name for a headers source (required there).
+  - `pattern` is an **RE2** regex (Go `regexp` / the `re2` npm package for JS; no backreferences or lookaround) that refines what `field` resolved, or scans the raw source text when `field` is absent. `field` and `pattern` compose (`anyOf`) instead of being mutually exclusive.
+  - `transform` shares the component-property vocabulary (unchanged; cleanup tracked separately).
+
+  New validation, closing a gap where the Go SDK accepted corpora the JSON Schema rejected:
+
+  - `request-property-invalid-name`, `request-property-no-extractor`, `request-property-source-invalid`, `request-property-headers-require-field`, and `request-property-pattern-invalid` (errors) enforce in Go what only ajv enforced before.
+  - `request-property-shadows-reserved` (warning) fires when a property is named `status`, `method`, or `duration`, which shadows the request's HTTP identity and makes it unreachable from a signal filter.
+  - `field-type-invalid` (error) rejects an unquoted non-string scalar in a schema-string field. yaml.v3 decodes any scalar into a Go string by taking the raw lexeme, so `source: 200` used to load as `"200"` while ajv rejected it.
+
+  Extraction itself is not implemented: the SDK parses and validates these declarations but resolves no `source`/`field`/`pattern` and applies no transform. `spec/v1/schema.md` marks the evaluation requirements as such, and the `018-request-properties` conformance fixture is now executed by the Go test suite.
+
 ## 0.19.0
 
 ### Minor Changes
