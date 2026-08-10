@@ -4,7 +4,7 @@ title: Request property extraction via `properties[]`
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-07-31
-updated: 2026-08-06
+updated: 2026-08-10
 spec-version-target: 1
 related-issues: [157]
 related-discussions: []
@@ -77,7 +77,7 @@ A `Request` entry gains an optional `properties` array. Each entry is a `Request
 | `name` | string | yes | The key a consumer refers to this value by. Must be a valid identifier (`[a-z][a-z0-9_]*`), matching `componentProperty.name`'s pattern. |
 | `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. See [Extraction root](#extraction-root). |
 | `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key path (see [Extraction root](#extraction-root)). For a `.headers` source, a header name, matched case-insensitively; required whenever `source` is a headers source. |
-| `pattern` | string | see below | A regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
+| `pattern` | string | see below | An [RE2](#regular-expression-dialect) regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
 | `transform` | string | no | Same enum as `componentProperty.transform` (SEP-0003): `first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`. |
 
 At least one of `field`/`pattern` is required (`anyOf`, not `oneOf`) — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required; when it names a headers source, `field` is also required — a bare regex scan across a raw header block is the addressing foot-gun this shape removes (see [Alternatives considered](#alternatives-considered)).
@@ -94,6 +94,10 @@ At least one of `field`/`pattern` is required (`anyOf`, not `oneOf`) — the two
 `pattern` always has a well-defined target, because `source` supplies one: the value `field` resolved, or the raw source text when `field` is absent.
 
 `status`, `method`, and `duration` are reserved top-level names, addressing the request's own already-structured identity (HTTP status code, HTTP method, timing) rather than anything inside `req`/`rsp`. They sit outside `source` entirely. A consumer MAY reference these directly wherever a property name is expected without a `properties:` declaration. This SEP does not require a `Request` entry to declare them.
+
+#### Regular expression dialect
+
+`pattern` is a regular expression in **RE2** syntax — the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package for JavaScript. RE2 is pinned deliberately: it matches in guaranteed linear time (no catastrophic backtracking), and because a `pattern` is validated at authoring time by one SDK and evaluated against live traffic at runtime by another, a single predictable dialect keeps the two from disagreeing about the same expression. The tradeoff is expressivity — RE2 has **no backreferences and no lookahead/lookbehind** — an acceptable loss for a value-extraction regex, and the same dialect [SEP-0006](0006-message-entity.md) pins for its `message` field.
 
 #### Live-traffic requirement
 
@@ -119,6 +123,7 @@ Omission is silent, mirroring SEP-0003 exactly — no error, no warning; consume
 - MUST reject a `RequestProperty` whose `source` is `req.headers`/`rsp.headers` and which omits `field`.
 - MUST apply `pattern` to the value `field` resolved, not to the whole source, when both are present.
 - MUST use capture group 1 as the extracted value when `pattern` has one, else the entire match.
+- MUST reject a `pattern` that is not a valid RE2 regular expression. Diagnostic code: `request-property-pattern-invalid` (mirrors [SEP-0006](0006-message-entity.md)'s `message-regex-invalid`).
 - MUST extract `field`/`pattern` values only from live traffic; MUST NOT error when a `properties:`-declaring `Request` is used in an offline/static context — omit values instead.
 - MUST omit a value silently on non-match; MUST NOT surface omission as a diagnostic.
 - SHOULD apply `transform` identically to how SEP-0003 applies it for DOM properties (skip on empty/absent raw value; single transform only, not composable).
@@ -165,7 +170,7 @@ $defs.requestProperty:
     pattern:
       type: string
       minLength: 1
-      description: "Regex applied to what `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the value if present, else the full match."
+      description: "RE2 regex (no backreferences or lookaround) applied to what `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the value if present, else the full match."
     transform:
       type: string
       enum: [first_word, last_word, first_number, first_dollar, number, slug]
@@ -213,6 +218,7 @@ Existing SDKs that encounter a `properties:` entry under a `request:` MUST treat
 1. **This SEP does not resolve** `schema.md`'s existing open question on validating `response.fields[]`'s *shape* against real traffic (enforcement, not extraction) — that's a distinct problem (type-checking a declared shape vs. naming a value to pull out) and stays open for a future SEP.
 2. **Dotted JSON keys in `field`.** A dot-separated path can't address a JSON key that itself contains a dot — `field: flags.checkout.new_flow` against `{"flags": {"checkout.new_flow": true}}` splits into three segments and misses, silently, at the second one. One option: let `field` accept a segment array (`field: [flags, "checkout.new_flow"]`) as an escape hatch alongside the dot-string form, so an author who hits this can opt into explicit segments instead of escaping syntax. Fullstory's own equivalent (`NetworkBodySelection.path`, a `repeated string` of pre-split segments — no dot-string at all) took the array-only route for exactly this reason, and has a passing test asserting a literal `"meta.version"` key resolves correctly. A consumer lowering this SEP's `field` into that type would lose expressiveness the backend already supports if `field` stays string-only.
 3. **Does `pattern` subsume `transform:`?** A regex with a capture group generalizes every case SEP-0003's fixed `transform:` enum handles (`first_number` ⊂ `pattern: '(\d[\d,.]*)'`, etc.), which raises whether the enum could be retired in favor of `pattern` alone. That's a change to SEP-0003 (already Accepted and implemented), not this SEP, and belongs in its own proposal. Worth noting the case is already half-proven in the implementation: `sightmap`'s Go `ApplyTransform` (`go/sightmap/property.go`) implements an undocumented seventh transform, `match:REGEX`, with capture-group-1 semantics, mirrored in `go/observe/properties.go` and both extension extractors and covered by `go/sightmap/property_test.go` — but it's absent from both SEP-0003's prose and `sightmap.schema.json`'s `transform` enum, so the Go loader currently accepts syntax the schema would reject.
+4. **Addressing URL path/query components.** `source` covers request/response bodies and header blocks, but not the request URL's own path segments or query parameters — there is no way to extract, say, a `?variant=` query value or an `/orders/:id` path-segment value as a property. `route` matches the path structurally and `status`/`method`/`duration` cover identity, but neither surfaces a query/path *value*. Deferred from v1; tracked in [issue #187](https://github.com/sightmap/sightmap/issues/187), so the `source` enum can grow compatibly later.
 
 ## References
 
