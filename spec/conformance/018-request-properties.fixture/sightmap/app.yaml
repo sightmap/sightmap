@@ -8,24 +8,29 @@ requests:
     method: POST
     properties:
       - name: status
-        field: rsp.body.status
+        source: rsp.body
+        field: status
 
-  # A header, addressed by `field`. No shadowing, so no diagnostic.
+  # A header value refined by a regex: `field` names the header, `pattern`
+  # extracts the digits. No shadowing, so no diagnostic. Also a plain body value.
   - name: CheckoutRetryPayment
     route: /api/checkout/pay/retry
     method: POST
     properties:
       - name: rate_limit_remaining
-        field: rsp.headers.X-RateLimit-Remaining
-        transform: number
+        source: rsp.headers
+        field: X-RateLimit-Remaining
+        pattern: '(\d+)'
       - name: outcome
-        field: rsp.body.status
+        source: rsp.body
+        field: status
 
-  # `pattern` reaches a body `field` cannot traverse: this response is
-  # form-encoded, so it has no JSON keys to walk.
+  # No `field`: the response is form-encoded, so `pattern` scans the raw body
+  # text directly.
   - name: LegacyCheckoutCallback
     route: /api/checkout/callback
     method: POST
     properties:
-      - name: outcome
+      - name: legacy_outcome
+        source: rsp.body
         pattern: '(?:declined|approved|deferred)'

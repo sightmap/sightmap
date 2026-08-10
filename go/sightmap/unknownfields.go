@@ -33,7 +33,7 @@ var (
 	accessFields    = set("status", "reason")
 	snapshotFields  = set("name", "notes", "url")
 
-	requestPropertyFields = set("name", "field", "pattern", "transform")
+	requestPropertyFields = set("name", "source", "field", "pattern", "transform")
 )
 
 func set(keys ...string) map[string]bool {
@@ -247,7 +247,7 @@ func walkRequest(node *yaml.Node, file string, out *[]ValidationError) {
 	}
 	forEachItem(v["properties"], func(n *yaml.Node) {
 		pv := checkKeys(n, requestPropertyFields, file, out)
-		checkStringScalars(pv, []string{"name", "field", "pattern", "transform"}, file, out)
+		checkStringScalars(pv, []string{"name", "source", "field", "pattern", "transform"}, file, out)
 	})
 }
 

@@ -244,39 +244,50 @@ A named API endpoint.
   route: /api/checkout/pay
   method: POST
   properties:
+    # A JSON body value: `field` is an object-key path within `source`.
     - name: outcome
-      field: rsp.body.status
+      source: rsp.body
+      field: status
 
 - name: CheckoutRetryPayment
   route: /api/checkout/pay/retry
   method: POST
   properties:
+    # A header value refined by a regex: `field` names the header, `pattern`
+    # extracts a substring from what it resolves to.
     - name: rate_limit_remaining
-      field: rsp.headers.X-RateLimit-Remaining
-      transform: number
+      source: rsp.headers
+      field: X-RateLimit-Remaining
+      pattern: '(\d+)'
 
-# `pattern` is for a body `field` cannot traverse — here the response is
-# form-encoded, so it has no JSON keys to walk.
 - name: LegacyCheckoutCallback
   route: /api/checkout/callback
   method: POST
   properties:
-    - name: outcome
+    # No `field`: the response is form-encoded, so there's no JSON body to
+    # traverse — `pattern` scans the raw source text directly.
+    - name: legacy_outcome
+      source: rsp.body
       pattern: '(?:declined|approved|deferred)'
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
-| `field` | string | one of `field`/`pattern` | A rooted path: `req` or `rsp`, then `.body.<path>` (object-key traversal into the parsed JSON body) or `.headers.<name>` (one header's value, name matched case-insensitively). Also accepts a reserved identity name (`status`, `method`, `duration`). |
-| `pattern` | string | one of `field`/`pattern` | Regex matched against the raw text of the response body, for content `field`'s object-key traversal cannot reach (a non-JSON body, or a value embedded in a larger string). Carries no root of its own. |
+| `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. |
+| `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). For a `.headers` source, a header name matched case-insensitively; **required** whenever `source` is a headers source. |
+| `pattern` | string | see below | An RE2 regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
 | `transform` | string | no | Same vocabulary as [Component properties](#component-properties)' transform. |
 
-Exactly one of `field`/`pattern` is required. **Value omission is silent** — a property that doesn't resolve (a missing key, no pattern match) is simply absent; consumers MUST NOT treat omission as an error. Omission is the normal case, not an edge case: whether a body or header is even available to read depends on the capture layer's own payload and privacy settings.
+At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source `field` is required too (a bare regex across a raw header block is the addressing foot-gun this shape removes).
+
+`pattern` uses **RE2** syntax (Go's `regexp`; no backreferences or lookaround) — a linear-time, predictable dialect, so authoring-time validation and runtime matching agree across SDKs. The reference CLI rejects an invalid pattern (`request-property-pattern-invalid`).
+
+**Value omission is silent** — a property that doesn't resolve (a missing key, an out-of-range index, no pattern match) is simply absent; consumers MUST NOT treat omission as an error. Omission is the normal case, not an edge case: whether a body or header is even available to read depends on the capture layer's own payload and privacy settings.
 
 Extraction requires **live traffic**. A tool operating on static corpus definitions alone MUST treat `properties:` as declared-but-unavailable, not an error.
 
-`status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. A consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
+`status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. They sit outside `source` entirely — a consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
 
 `properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](https://github.com/sightmap/sightmap/blob/main/spec/seps/0005-request-properties.md).
 
@@ -446,7 +457,10 @@ A conforming SDK:
 - MUST implement route matching as specified
 - MUST implement global vs view-scoped precedence as specified
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
-- MUST reject a `RequestProperty` declaring both `field` and `pattern`, or neither
+- MUST reject a `RequestProperty` with no `source`, or a `source` outside the four-value enum (`req.body`/`rsp.body`/`req.headers`/`rsp.headers`)
+- MUST reject a `RequestProperty` that declares neither `field` nor `pattern`
+- MUST reject a `RequestProperty` whose `source` is a headers source but omits `field`
+- MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
@@ -455,9 +469,10 @@ An SDK that also **evaluates live activity** (observed network requests, console
 
 - MUST resolve `properties:` only from live traffic, and MUST NOT error when a `properties:`-declaring request is used in a static context — omit the value instead
 - MUST omit an unresolved property value silently, without a diagnostic
+- MUST apply `pattern` to the value `field` resolved (not the whole source) when both are present, taking capture group 1 as the value when the pattern has one, else the entire match
 - SHOULD apply `transform` as [Component properties](#component-properties) does: skipped on an empty or absent raw value, single transform only, not composable
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `field`/`pattern` path and applies no `transform`. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern` and applies no `transform`. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 
