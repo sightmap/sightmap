@@ -1,6 +1,9 @@
 package comps
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // SelectorPart is the structured CSS identity of a DOM element, or a
 // synthetic identity for native mobile elements. It carries no proto
@@ -56,6 +59,26 @@ type Element struct {
 	Id      string            `json:"id,omitempty"`
 	Classes []string          `json:"classes,omitempty"`
 	Attrs   map[string]string `json:"attrs,omitempty"`
+}
+
+// SelectorString formats the element as a simple CSS selector, tag[#id][.cls...].
+// Attributes are omitted (they appear only in richer trace/anchor displays). A
+// nil receiver yields "".
+func (e *Element) SelectorString() string {
+	if e == nil {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(e.Tag)
+	if e.Id != "" {
+		b.WriteByte('#')
+		b.WriteString(e.Id)
+	}
+	for _, c := range e.Classes {
+		b.WriteByte('.')
+		b.WriteString(c)
+	}
+	return b.String()
 }
 
 // Bounds holds the bounding box of a component in viewport coordinates.

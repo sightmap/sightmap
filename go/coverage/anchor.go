@@ -2,7 +2,6 @@ package coverage
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/sightmap/sightmap/go/comps"
 )
@@ -45,7 +44,7 @@ func DataAttrSelector(node *comps.ComponentNode) string {
 	if dc := a["data-component"]; dc != "" {
 		return fmt.Sprintf(`%s[data-component^="%s"]`, tag, dc)
 	}
-	return SelectorString(node.Element)
+	return node.Element.SelectorString()
 }
 
 // OrphanSlotKey is the cross-capture STRUCTURAL identity of an uncovered
@@ -92,24 +91,5 @@ func ArrowHint(node *comps.ComponentNode, parentMap ParentMap) string {
 	if dc := a["data-component"]; dc != "" {
 		return fmt.Sprintf(`[data-component^="%s"] %s`, dc, nodeTag)
 	}
-	return SelectorString(anc.Element) + " " + nodeTag
-}
-
-// SelectorString formats an observed Element as tag[#id][.cls1.cls2]. Attributes
-// are not included; they appear only in the trace/anchor displays above.
-func SelectorString(s *comps.Element) string {
-	if s == nil {
-		return ""
-	}
-	var b strings.Builder
-	b.WriteString(s.Tag)
-	if s.Id != "" {
-		b.WriteByte('#')
-		b.WriteString(s.Id)
-	}
-	for _, c := range s.Classes {
-		b.WriteByte('.')
-		b.WriteString(c)
-	}
-	return b.String()
+	return anc.Element.SelectorString() + " " + nodeTag
 }
