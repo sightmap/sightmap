@@ -47,7 +47,7 @@ func TestLint_BroadTagGlobal(t *testing.T) {
 func TestLint_BroadTagInView(t *testing.T) {
 	// Bare tag selector inside a view should NOT trigger broad-tag-selector,
 	// but WILL trigger multi-instance-no-property.
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
 			Name:  "Page",
 			Route: "/",
@@ -156,7 +156,7 @@ func TestLint_NoDuplicateWarnings(t *testing.T) {
 	global := sightmap.ComponentDef{Name: "Button", Selectors: []string{"button"}}
 	c := corpusFrom(
 		[]sightmap.ComponentDef{global},
-		[]sightmap.View{
+		[]sightmap.ViewDef{
 			{Name: "PageA", Route: "/a", Components: []sightmap.ComponentDef{global}},
 			{Name: "PageB", Route: "/b", Components: []sightmap.ComponentDef{global}},
 		},
@@ -180,7 +180,7 @@ func TestLint_Clean(t *testing.T) {
 		[]sightmap.ComponentDef{
 			{Name: "NavBar", Selectors: []string{"nav.navbar"}},
 		},
-		[]sightmap.View{
+		[]sightmap.ViewDef{
 			{
 				Name:       "Home",
 				Route:      "/",
@@ -231,7 +231,7 @@ func TestLint_MultiInstanceWithProperties_NoWarn(t *testing.T) {
 		{
 			Name:      "ProductCard",
 			Selectors: []string{`[data-component="product-card"]`},
-			Properties: []sightmap.Property{
+			Properties: []sightmap.ComponentPropertyDef{
 				{Name: "sku", Extract: "attr:data-sku"},
 			},
 		},
@@ -336,7 +336,7 @@ func TestLint_ChildRepeatsParent_Warns(t *testing.T) {
 	// selector with a space, so if the raw child YAML was ".dashboard .freelancer-card"
 	// and the parent matched ".dashboard", the stored Selectors entry is
 	// ".dashboard .dashboard .freelancer-card" — the doubled form we detect here.
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
 			Name:  "DashboardPage",
 			Route: "/dashboard",
@@ -357,7 +357,7 @@ func TestLint_ChildRepeatsParent_Warns(t *testing.T) {
 
 func TestLint_ChildRepeatsParent_MultiClass(t *testing.T) {
 	// Repeated class in a longer chain still fires.
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
 			Name:  "Page",
 			Route: "/",
@@ -378,7 +378,7 @@ func TestLint_ChildRepeatsParent_MultiClass(t *testing.T) {
 
 func TestLint_ChildRepeatsParent_NoWarnCorrect(t *testing.T) {
 	// A correctly-scoped child (no repeated class) must NOT trigger the rule.
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
 			Name:  "DashboardPage",
 			Route: "/dashboard",
@@ -419,7 +419,7 @@ func TestLint_ChildRepeatsParent_NoWarnGlobal(t *testing.T) {
 
 func TestLint_ChildComponent_NoWarn(t *testing.T) {
 	// Child components scoped to parent should not warn
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
 			Name:  "ProductPage",
 			Route: "/product",
@@ -427,7 +427,7 @@ func TestLint_ChildComponent_NoWarn(t *testing.T) {
 				{
 					Name:      "ProductGrid",
 					Selectors: []string{`[data-testid="product-grid"]`},
-					Properties: []sightmap.Property{
+					Properties: []sightmap.ComponentPropertyDef{
 						{Name: "ProductCard", Extract: ".product-card"},
 					},
 				},

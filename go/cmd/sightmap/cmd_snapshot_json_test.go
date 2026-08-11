@@ -44,7 +44,7 @@ func TestWriteAnnotatedJSON_MatchedNode(t *testing.T) {
 	propValues := map[string]map[string]string{
 		"1": {"label": "The Home Depot"},
 	}
-	view := &sightmap.View{Name: "HomePage", Route: "/"}
+	view := &sightmap.ViewDef{Name: "HomePage", Route: "/"}
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.json")

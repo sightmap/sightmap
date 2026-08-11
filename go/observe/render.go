@@ -159,7 +159,7 @@ func writeZeroMatchWarnings(
 	w io.Writer,
 	viewComponents []sightmap.ComponentDef,
 	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
-	view *sightmap.View,
+	view *sightmap.ViewDef,
 	globalNames map[string]bool,
 ) {
 	// Count matches per component name.
@@ -342,7 +342,7 @@ func WriteT2Trace(
 	t2clusters map[*comps.ComponentNode]int,
 	t2children map[*comps.ComponentNode][]*comps.ComponentNode,
 	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
-	view *sightmap.View,
+	view *sightmap.ViewDef,
 ) {
 	const minT2Count = 2 // ≥2 children required (single-child = simple wrapper)
 	const truncateAt = 8 // show first 8, then "… (N more)"

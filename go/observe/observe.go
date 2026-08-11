@@ -19,7 +19,7 @@ type Result struct {
 	Root        *comps.ComponentNode
 	URL         string
 	Matches     map[*comps.ComponentNode]*sightmap.ComponentMatch
-	View        *sightmap.View
+	View        *sightmap.ViewDef
 	Components  []sightmap.ComponentDef
 	GlobalNames map[string]bool
 	Props       map[string]map[string]string

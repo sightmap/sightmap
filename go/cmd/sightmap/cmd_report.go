@@ -96,7 +96,7 @@ func runReport(args []string) error {
 	}
 
 	// Filter to views that have URLs
-	var views []sightmap.View
+	var views []sightmap.ViewDef
 	for _, v := range corpus.Views {
 		if v.URL != "" {
 			views = append(views, v)

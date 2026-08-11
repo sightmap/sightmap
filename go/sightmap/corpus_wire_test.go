@@ -20,7 +20,7 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 				Request: &sightmap.Payload{Fields: []sightmap.Field{{Name: "q", Type: "string"}}}},
 		},
 		Messages: []sightmap.MessageDef{{Name: "CartVersionMismatch", Level: "ERROR", Message: "cart version mismatch"}},
-		Views: []sightmap.View{{
+		Views: []sightmap.ViewDef{{
 			Name:       "Home",
 			Route:      "/",
 			Components: []sightmap.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},

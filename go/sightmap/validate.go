@@ -134,8 +134,8 @@ func Validate(c *Corpus) []ValidationError {
 // should be unique across the corpus; when they collide, lookups by name and the
 // snapshot header become ambiguous. (Merging same-named views is a future SEP,
 // not v0 behaviour.)
-func checkViewNameCollisions(views []View) []ValidationError {
-	byName := map[string][]View{}
+func checkViewNameCollisions(views []ViewDef) []ValidationError {
+	byName := map[string][]ViewDef{}
 	var order []string
 	for _, v := range views {
 		if v.Name == "" {
@@ -166,8 +166,8 @@ func checkViewNameCollisions(views []View) []ValidationError {
 // checkRouteCollisions warns when two or more views share the same (normalized)
 // route. Only one view can win for a given URL — resolution falls back to
 // declaration order — so the later views' components silently stop applying.
-func checkRouteCollisions(views []View) []ValidationError {
-	byRoute := map[string][]View{}
+func checkRouteCollisions(views []ViewDef) []ValidationError {
+	byRoute := map[string][]ViewDef{}
 	var order []string
 	for _, v := range views {
 		if v.Route == "" {
@@ -201,7 +201,7 @@ func checkRouteCollisions(views []View) []ValidationError {
 
 // viewLocList formats a set of views as "file:route" entries for a collision
 // message.
-func viewLocList(vs []View) string {
+func viewLocList(vs []ViewDef) string {
 	parts := make([]string, 0, len(vs))
 	for _, v := range vs {
 		f := v.SourceFile

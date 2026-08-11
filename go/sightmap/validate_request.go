@@ -52,7 +52,7 @@ func checkRequestProperties(c *Corpus) []ValidationError {
 	return errs
 }
 
-func validateRequestProperty(reqName string, prop RequestProperty) []ValidationError {
+func validateRequestProperty(reqName string, prop RequestPropertyDef) []ValidationError {
 	var errs []ValidationError
 
 	if !requestPropertyNamePattern.MatchString(prop.Name) {

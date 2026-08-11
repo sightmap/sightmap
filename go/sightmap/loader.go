@@ -244,7 +244,7 @@ func loadDir(path string) (*Corpus, error) {
 	globalRequests := toRequestDefs(globalRequestRaws, ctx)
 
 	// Build views, expanding $refs and flattening each view's component list.
-	var views []View
+	var views []ViewDef
 	for _, vfp := range viewFiles {
 		vf := vfp.rf
 		// Extract source file basename (without extension)
@@ -271,7 +271,7 @@ func loadDir(path string) (*Corpus, error) {
 			if viewURL == "" {
 				viewURL = vf.URL
 			}
-			views = append(views, View{
+			views = append(views, ViewDef{
 				Name:       rv.Name,
 				Route:      rv.Route,
 				Memory:     rv.Memory,
@@ -298,14 +298,14 @@ func loadDir(path string) (*Corpus, error) {
 
 // ---- flattening helpers -----------------------------------------------------
 
-// rawPropsToMatch converts a slice of rawProperty to Property.
-func rawPropsToMatch(rps []rawProperty) []Property {
+// rawPropsToMatch converts a slice of rawProperty to ComponentPropertyDef.
+func rawPropsToMatch(rps []rawProperty) []ComponentPropertyDef {
 	if len(rps) == 0 {
 		return nil
 	}
-	ps := make([]Property, len(rps))
+	ps := make([]ComponentPropertyDef, len(rps))
 	for i, rp := range rps {
-		ps[i] = Property{Name: rp.Name, Extract: rp.Extract, Transform: rp.Transform}
+		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract, Transform: rp.Transform}
 	}
 	return ps
 }
@@ -357,13 +357,13 @@ func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
 // constraints (a valid name, exactly one of field/pattern) are reported by
 // checkRequestProperties at validation time rather than dropped here, so an
 // author sees every problem at once instead of losing entries silently.
-func toRequestProperties(rps []rawRequestProperty) []RequestProperty {
+func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 	if len(rps) == 0 {
 		return nil
 	}
-	out := make([]RequestProperty, 0, len(rps))
+	out := make([]RequestPropertyDef, 0, len(rps))
 	for _, rp := range rps {
-		out = append(out, RequestProperty{
+		out = append(out, RequestPropertyDef{
 			Name:      rp.Name,
 			Source:    rp.Source,
 			Field:     rp.Field,

@@ -22,7 +22,7 @@ func TestRequestsForURL(t *testing.T) {
 			{Name: "AnyFlights", Route: "/api/flights/**"}, // no method -> any method
 			{Name: "GetUser", Route: "/api/users/:id", Method: "GET"},
 		},
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Name: "Admin", Route: "/admin", Requests: []sightmap.RequestDef{
 				{Name: "AdminPing", Route: "/api/flights/search", Method: "GET"},
 			}},

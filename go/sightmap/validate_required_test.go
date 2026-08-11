@@ -91,7 +91,7 @@ views:
 }
 
 func TestRequired_ViewMissingName_Errors(t *testing.T) {
-	c := corpusFrom(nil, []sightmap.View{{Name: "", Route: "/x"}})
+	c := corpusFrom(nil, []sightmap.ViewDef{{Name: "", Route: "/x"}})
 	if !hasErrorCode(sightmap.Validate(c), "missing-name") {
 		t.Errorf("expected a missing-name error for a nameless view, got %v", sightmap.Validate(c))
 	}

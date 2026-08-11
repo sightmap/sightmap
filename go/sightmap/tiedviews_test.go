@@ -8,7 +8,7 @@ import (
 
 func TestTiedViews(t *testing.T) {
 	c := &sightmap.Corpus{
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Name: "AStar", Route: "/a/*"},    // score 4
 			{Name: "StarB", Route: "/*/b"},    // score 4 — ties with AStar for /a/b
 			{Name: "Specific", Route: "/a/b"}, // score 6 — wins /a/b outright
@@ -33,7 +33,7 @@ func TestTiedViews(t *testing.T) {
 
 func TestTiedViews_GenuineTie(t *testing.T) {
 	c := &sightmap.Corpus{
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Name: "AStar", Route: "/a/*"}, // score 4
 			{Name: "StarB", Route: "/*/b"}, // score 4 — both match /a/b at equal specificity
 		},
