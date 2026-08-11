@@ -16,6 +16,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -155,7 +156,7 @@ func boundsByComponent(
 	if err != nil {
 		return nil, fmt.Errorf("bounds: load corpus: %w", err)
 	}
-	matches := sightmap.NewMatcher(corpus).MatchTree(root, pageURL)
+	matches := match.NewMatcher(corpus).MatchTree(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("bounds: no sightmap components matched the current page (%s)", pageURL)
 	}

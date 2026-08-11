@@ -3,19 +3,18 @@ package sightmap_test
 import (
 	"testing"
 
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func TestLint_StabilitySuppression(t *testing.T) {
 	tests := []struct {
 		name     string
-		comp     match.ComponentDef
+		comp     sightmap.ComponentDef
 		wantRule string // empty if no warning expected
 	}{
 		{
 			name: "unstable suppresses multi-instance warning",
-			comp: match.ComponentDef{
+			comp: sightmap.ComponentDef{
 				Name:       "VolatileButton",
 				Selectors:  []string{"button.css-module-xyz"},
 				Stability:  "unstable",
@@ -25,7 +24,7 @@ func TestLint_StabilitySuppression(t *testing.T) {
 		},
 		{
 			name: "uncertain does not suppress multi-instance warning",
-			comp: match.ComponentDef{
+			comp: sightmap.ComponentDef{
 				Name:       "UncertainButton",
 				Selectors:  []string{"button.btn-primary"},
 				Stability:  "uncertain",
@@ -35,7 +34,7 @@ func TestLint_StabilitySuppression(t *testing.T) {
 		},
 		{
 			name: "no stability triggers warning",
-			comp: match.ComponentDef{
+			comp: sightmap.ComponentDef{
 				Name:       "GenericButton",
 				Selectors:  []string{"button.btn"},
 				Stability:  "",
@@ -47,7 +46,7 @@ func TestLint_StabilitySuppression(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := corpusFrom([]match.ComponentDef{tt.comp}, nil)
+			c := corpusFrom([]sightmap.ComponentDef{tt.comp}, nil)
 			warnings := sightmap.Lint(c)
 
 			foundRule := ""

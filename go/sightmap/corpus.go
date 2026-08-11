@@ -4,8 +4,6 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // Corpus is the parsed, $ref-expanded, hierarchy-flattened sightmap data. It is
@@ -23,7 +21,7 @@ type Corpus struct {
 
 	// GlobalComponents is the flat list of globally-defined components
 	// (from components.yaml), with children already flattened.
-	GlobalComponents []match.ComponentDef `json:"globals,omitempty"`
+	GlobalComponents []ComponentDef `json:"globals,omitempty"`
 
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
@@ -61,11 +59,11 @@ func (a Access) IsOpen() bool {
 
 // View is a per-URL-pattern view definition from the sightmap corpus.
 type View struct {
-	Name       string               `json:"name"`
-	Route      string               `json:"route,omitempty"`
-	Memory     []string             `json:"memory,omitempty"`
-	Components []match.ComponentDef `json:"components,omitempty"`
-	Requests   []RequestDef         `json:"requests,omitempty"` // view-scoped API request definitions
+	Name       string         `json:"name"`
+	Route      string         `json:"route,omitempty"`
+	Memory     []string       `json:"memory,omitempty"`
+	Components []ComponentDef `json:"components,omitempty"`
+	Requests   []RequestDef   `json:"requests,omitempty"` // view-scoped API request definitions
 
 	// Authoring/tooling fields — kept out of the serialized wire form.
 	Stability  string     `json:"-"` // "" (default/active), "stub", or "deferred"
@@ -117,7 +115,7 @@ func (v *View) SnapBasename() string {
 // ComponentsForURL returns the merged flat component list for a given URL:
 // view components first, then global components that don't collide on name.
 // Returns GlobalComponents only if no view matches.
-func (c *Corpus) ComponentsForURL(pageURL string) []match.ComponentDef {
+func (c *Corpus) ComponentsForURL(pageURL string) []ComponentDef {
 	v := c.ViewForURL(pageURL)
 	if v == nil {
 		return c.GlobalComponents
@@ -129,7 +127,7 @@ func (c *Corpus) ComponentsForURL(pageURL string) []match.ComponentDef {
 		viewNames[vc.Name] = true
 	}
 
-	result := make([]match.ComponentDef, 0, len(v.Components)+len(c.GlobalComponents))
+	result := make([]ComponentDef, 0, len(v.Components)+len(c.GlobalComponents))
 	result = append(result, v.Components...)
 	for _, gc := range c.GlobalComponents {
 		if !viewNames[gc.Name] {
@@ -145,10 +143,10 @@ func (c *Corpus) ComponentsForURL(pageURL string) []match.ComponentDef {
 // (global list first, then views in corpus order) wins. Route is not considered — this is
 // for a whole-corpus consumer (a linter, a coverage report, an upload payload builder), not
 // a per-page match; use ComponentsForURL for a single page's applicable list.
-func (c *Corpus) AllComponents() []match.ComponentDef {
+func (c *Corpus) AllComponents() []ComponentDef {
 	seen := make(map[string]bool)
-	var out []match.ComponentDef
-	add := func(comp match.ComponentDef) {
+	var out []ComponentDef
+	add := func(comp ComponentDef) {
 		if comp.Name == "" || seen[comp.Name] {
 			return
 		}

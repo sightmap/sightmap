@@ -33,7 +33,7 @@ func TestLoadDir_FileLevelMemoryAccumulatesInPathOrder(t *testing.T) {
 	}
 }
 
-// A component's tags: and source: flatten onto its match.ComponentDef, and neither
+// A component's tags: and source: flatten onto its ComponentDef, and neither
 // is inherited by children — matching Memory/Properties/Stability's existing convention
 // (only the selector prefix cascades to a child).
 func TestLoadDir_ComponentTagsAndSourceDoNotInheritToChildren(t *testing.T) {

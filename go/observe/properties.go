@@ -9,7 +9,7 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // ExtractProperties runs a single batched JS evaluation against the live DOM
@@ -19,8 +19,8 @@ import (
 func ExtractProperties(
 	ctx context.Context,
 	conn *browser.CDPConn,
-	matches map[*comps.ComponentNode]*match.ComponentMatch,
-	compByName map[string]match.ComponentDef,
+	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	compByName map[string]sightmap.ComponentDef,
 ) map[string]map[string]string {
 	type specProp struct {
 		Name      string `json:"name"`

@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -12,7 +11,7 @@ import (
 // multi-instance-no-property under static heuristics:
 // a bare generic button with a utility class and no properties.
 func broadComp(name string) *sightmap.Corpus {
-	return corpusFrom([]match.ComponentDef{
+	return corpusFrom([]sightmap.ComponentDef{
 		{Name: name, Selectors: []string{"button.btn-action"}},
 	}, nil)
 }
@@ -112,7 +111,7 @@ func TestLintSnapshot_EmptyCountsMap(t *testing.T) {
 // TestLintSnapshot_UnrelatedComponentsUnaffected verifies that a count entry
 // for one component does not affect warnings for a different component.
 func TestLintSnapshot_UnrelatedComponentsUnaffected(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "AddToCart", Selectors: []string{"button.btn-action"}},
 		{Name: "QuickBuy", Selectors: []string{"button.btn-quick"}},
 	}, nil)

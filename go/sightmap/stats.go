@@ -2,8 +2,6 @@ package sightmap
 
 import (
 	"strings"
-
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // Stats is a count summary of a loaded Corpus: corpus-wide totals plus a
@@ -99,7 +97,7 @@ func (c *Corpus) Stats() Stats {
 	// same-named local components each contribute while a $ref-expanded copy
 	// of a global does not double-count.
 	seen := make(map[string]bool)
-	countComponent := func(comp match.ComponentDef) {
+	countComponent := func(comp ComponentDef) {
 		if comp.Name == "" {
 			return
 		}
@@ -144,7 +142,7 @@ func (c *Corpus) Stats() Stats {
 // ComponentDefs are the same definition. It covers every field of the
 // definition, so an exact copy (what a top-level $ref expands to) collapses
 // while anything an author wrote differently does not.
-func componentIdentity(c match.ComponentDef) string {
+func componentIdentity(c ComponentDef) string {
 	var b strings.Builder
 	writeField := func(parts ...string) {
 		for _, p := range parts {

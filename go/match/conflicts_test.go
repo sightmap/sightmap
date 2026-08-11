@@ -1,6 +1,7 @@
 package match_test
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/match"
@@ -12,7 +13,7 @@ func TestFindConflicts_NodeClaimedByTwoNames(t *testing.T) {
 	root := node("root", "div", nil,
 		nodeAttr("dlg", "div", map[string]string{"role": "dialog", "data-testid": "login"}),
 	)
-	defs := []match.ComponentDef{
+	defs := []sightmap.ComponentDef{
 		{Name: "AppDialog", Selectors: []string{`[role="dialog"]`}},
 		{Name: "LoginDialog", Selectors: []string{`[data-testid="login"]`}},
 	}
@@ -36,7 +37,7 @@ func TestFindConflicts_SameNameManyNodes(t *testing.T) {
 		node("c2", "div", []string{"card"}),
 		node("c3", "div", []string{"card"}),
 	)
-	defs := []match.ComponentDef{{Name: "Card", Selectors: []string{".card"}}}
+	defs := []sightmap.ComponentDef{{Name: "Card", Selectors: []string{".card"}}}
 	if c := match.FindConflicts(root, defs); len(c) != 0 {
 		t.Errorf("same name matching many nodes must not conflict, got %+v", c)
 	}
@@ -49,7 +50,7 @@ func TestFindConflicts_DistinctNodes(t *testing.T) {
 		node("a", "div", []string{"a"}),
 		node("b", "div", []string{"b"}),
 	)
-	defs := []match.ComponentDef{
+	defs := []sightmap.ComponentDef{
 		{Name: "A", Selectors: []string{".a"}},
 		{Name: "B", Selectors: []string{".b"}},
 	}

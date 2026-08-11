@@ -1,10 +1,10 @@
 package match_test
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // TestHas_FormGroupScoping is the end-to-end (snapshot/coverage) path for the
@@ -20,7 +20,7 @@ func TestHas_FormGroupScoping(t *testing.T) {
 		formGroup("protection", nodeAttr("rb", "input", map[string]string{"type": "radio"})),
 	)
 
-	defs := []match.ComponentDef{{
+	defs := []sightmap.ComponentDef{{
 		Name:      "AssemblyOption",
 		Selectors: []string{`[data-testid="form-group"]:has(input[type="checkbox"])`},
 	}}
@@ -37,7 +37,7 @@ func TestHas_DirectChildScoping(t *testing.T) {
 		node("hasDirect", "div", []string{"box"}, node("b1", "button", nil)),
 		node("hasNested", "div", []string{"box"}, node("", "span", nil, node("b2", "button", nil))),
 	)
-	defs := []match.ComponentDef{{
+	defs := []sightmap.ComponentDef{{
 		Name:      "BoxWithButton",
 		Selectors: []string{"div.box:has(> button)"},
 	}}

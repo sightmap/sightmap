@@ -272,7 +272,7 @@ func offlineSelectorCount(ctx context.Context, conn *browser.CDPConn, selector s
 	if err != nil {
 		return 0, err
 	}
-	defs := []match.ComponentDef{{Name: "__probe__", Selectors: []string{selector}}}
+	defs := []sightmap.ComponentDef{{Name: "__probe__", Selectors: []string{selector}}}
 	return len(match.ApplySightmap(root, defs)), nil
 }
 
@@ -357,7 +357,7 @@ func loadCompAnnotations(dir string) []compAnnotation {
 	if err != nil {
 		return nil
 	}
-	components := sightmap.NewMatcher(corpus).Components("")
+	components := match.NewMatcher(corpus).Components("")
 
 	annotations := make([]compAnnotation, 0, len(components))
 	for _, comp := range components {

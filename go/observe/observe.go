@@ -18,9 +18,9 @@ import (
 type Result struct {
 	Root        *comps.ComponentNode
 	URL         string
-	Matches     map[*comps.ComponentNode]*match.ComponentMatch
+	Matches     map[*comps.ComponentNode]*sightmap.ComponentMatch
 	View        *sightmap.View
-	Components  []match.ComponentDef
+	Components  []sightmap.ComponentDef
 	GlobalNames map[string]bool
 	Props       map[string]map[string]string
 	Coverage    coverage.Result
@@ -37,7 +37,7 @@ type Result struct {
 	TiedViews []string
 	// ComponentConflicts holds DOM nodes claimed by more than one distinct
 	// component name (first-match-wins keeps only one; the rest are dropped).
-	ComponentConflicts []match.Conflict
+	ComponentConflicts []sightmap.Conflict
 }
 
 // Options controls how a page is observed.
@@ -75,7 +75,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	}
 	res.CorpusApplied = true
 
-	m := sightmap.NewMatcher(corpus)
+	m := match.NewMatcher(corpus)
 	res.Matches = m.MatchTree(root, url)
 	res.View = corpus.ViewForURL(url)
 	res.Components = m.Components(url)
@@ -89,7 +89,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	res.ComponentConflicts = match.FindConflicts(root, res.Components)
 
 	if opts.ExtractProps && len(res.Matches) > 0 && len(res.Components) > 0 {
-		compByName := make(map[string]match.ComponentDef, len(res.Components))
+		compByName := make(map[string]sightmap.ComponentDef, len(res.Components))
 		for _, c := range res.Components {
 			compByName[c.Name] = c
 		}

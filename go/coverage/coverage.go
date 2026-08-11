@@ -13,14 +13,14 @@
 package coverage
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"math"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // Matches maps a component node to the sightmap rule it matched.
-type Matches = map[*comps.ComponentNode]*match.ComponentMatch
+type Matches = map[*comps.ComponentNode]*sightmap.ComponentMatch
 
 // ParentMap maps each non-root node to its parent.
 type ParentMap = map[*comps.ComponentNode]*comps.ComponentNode

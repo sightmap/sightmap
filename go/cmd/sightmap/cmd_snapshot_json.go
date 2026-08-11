@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -35,7 +34,7 @@ type annotatedNode struct {
 // each ComponentNode pointer with its ComponentMatch and any extracted props.
 func buildAnnotatedNode(
 	node *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*match.ComponentMatch,
+	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
 	propValues map[string]map[string]string, // nodeID → {propName → value}; may be nil
 ) *annotatedNode {
 	an := &annotatedNode{
@@ -88,14 +87,14 @@ func writeAnnotatedJSON(
 	root *comps.ComponentNode,
 	path string,
 	view *sightmap.View,
-	matches map[*comps.ComponentNode]*match.ComponentMatch,
+	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
 	propValues map[string]map[string]string,
 ) error {
 	if root == nil {
 		return nil
 	}
 	if matches == nil {
-		matches = map[*comps.ComponentNode]*match.ComponentMatch{}
+		matches = map[*comps.ComponentNode]*sightmap.ComponentMatch{}
 	}
 
 	out := annotatedOutput{
