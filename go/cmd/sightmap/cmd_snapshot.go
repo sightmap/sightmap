@@ -114,7 +114,7 @@ func runSnapshot(args []string) error {
 		}
 	}
 	if *jsonOutFlag != "" {
-		if err := writeAnnotatedJSON(res.Root, *jsonOutFlag, res.View, res.Matches, res.Props); err != nil {
+		if err := writeAnnotatedJSON(res.Root, *jsonOutFlag, res.View, res.Matches); err != nil {
 			fmt.Fprintf(os.Stderr, "snapshot: json-out: %v\n", err)
 		}
 	}

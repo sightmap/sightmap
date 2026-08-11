@@ -66,7 +66,6 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 					Selectors:   opts.Selectors,
 					MaxDepth:    opts.MaxDepth,
 					Interactive: opts.Interactive,
-					PropValues:  r.Props,
 				})
 			}
 		}

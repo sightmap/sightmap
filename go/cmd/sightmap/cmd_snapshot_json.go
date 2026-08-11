@@ -34,7 +34,6 @@ type annotatedNode struct {
 func buildAnnotatedNode(
 	node *sightmap.ComponentNode,
 	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
-	propValues map[string]map[string]string, // nodeID → {propName → value}; may be nil
 ) *annotatedNode {
 	an := &annotatedNode{
 		ID:            node.Id,
@@ -53,16 +52,16 @@ func buildAnnotatedNode(
 	if m, ok := matches[node]; ok && m != nil {
 		an.Component = m.Name
 		an.Memory = m.Memory
-	}
-
-	if propValues != nil {
-		if props, ok := propValues[node.Id]; ok && len(props) > 0 {
-			an.Props = props
+		if len(m.Properties) > 0 {
+			an.Props = make(map[string]string, len(m.Properties))
+			for _, pv := range m.Properties {
+				an.Props[pv.Name] = pv.Value
+			}
 		}
 	}
 
 	for _, child := range node.Children {
-		an.Children = append(an.Children, buildAnnotatedNode(child, matches, propValues))
+		an.Children = append(an.Children, buildAnnotatedNode(child, matches))
 	}
 
 	return an
@@ -87,7 +86,6 @@ func writeAnnotatedJSON(
 	path string,
 	view *sightmap.ViewDef,
 	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
-	propValues map[string]map[string]string,
 ) error {
 	if root == nil {
 		return nil
@@ -97,7 +95,7 @@ func writeAnnotatedJSON(
 	}
 
 	out := annotatedOutput{
-		Tree: buildAnnotatedNode(root, matches, propValues),
+		Tree: buildAnnotatedNode(root, matches),
 	}
 	if view != nil {
 		out.View = view.Name

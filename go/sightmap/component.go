@@ -21,11 +21,24 @@ type ComponentPropertyDef struct {
 	Transform string `json:"transform"` // optional post-processing
 }
 
-// ComponentMatch records which component definition matched a node.
+// ComponentMatch records which component definition matched a node, and carries
+// any live-extracted property values for it (Properties, in the definition's
+// order; nil unless properties were extracted).
 type ComponentMatch struct {
-	Name   string
-	Memory []string
-	Tags   []string
+	Name       string
+	Memory     []string
+	Tags       []string
+	Properties []PropertyValue
+}
+
+// Property returns the extracted value named name, if present.
+func (m *ComponentMatch) Property(name string) (PropertyValue, bool) {
+	for _, p := range m.Properties {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return PropertyValue{}, false
 }
 
 // Conflict records a DOM node directly matched by more than one DISTINCT

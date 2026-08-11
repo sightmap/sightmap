@@ -11,16 +11,16 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-// ExtractProperties runs a single batched JS evaluation against the live DOM
-// to extract property values for all matched nodes that have property
-// definitions. Returns a map from nodeID to {propName → value}.
-// At most 200 nodes are evaluated to avoid JS timeout.
+// ExtractProperties runs a single batched JS evaluation against the live DOM to
+// extract property values for all matched nodes that have property definitions,
+// folding the results into each ComponentMatch's Properties (in definition
+// order). At most 200 nodes are evaluated to avoid JS timeout.
 func ExtractProperties(
 	ctx context.Context,
 	conn *browser.CDPConn,
 	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	compByName map[string]sightmap.ComponentDef,
-) map[string]map[string]string {
+) {
 	type specProp struct {
 		Name      string `json:"name"`
 		Extract   string `json:"extract"`
@@ -53,13 +53,13 @@ func ExtractProperties(
 		specs = append(specs, sp)
 	}
 	if len(specs) == 0 {
-		return nil
+		return
 	}
 
 	specsJSON, err := json.Marshal(specs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "observe: marshal property specs: %v\n", err)
-		return nil
+		return
 	}
 
 	const jsTemplate = `(function(specs) {
@@ -130,13 +130,32 @@ func ExtractProperties(
 	resultJSON, evalErr := browser.EvalJSON(ctx, conn, script)
 	if evalErr != nil {
 		fmt.Fprintf(os.Stderr, "observe: property extraction: %v\n", evalErr)
-		return nil
+		return
 	}
 
 	var propValues map[string]map[string]string
 	if err := json.Unmarshal(resultJSON, &propValues); err != nil {
 		fmt.Fprintf(os.Stderr, "observe: property extraction unmarshal: %v\n", err)
-		return nil
+		return
 	}
-	return propValues
+
+	// Fold the extracted values into each match, in the definition's property
+	// order, keeping only values that were actually extracted.
+	for node, m := range matches {
+		vals := propValues[node.Id]
+		if len(vals) == 0 {
+			continue
+		}
+		comp, ok := compByName[m.Name]
+		if !ok {
+			continue
+		}
+		var props []sightmap.PropertyValue
+		for _, p := range comp.Properties {
+			if v, ok := vals[p.Name]; ok {
+				props = append(props, sightmap.PropertyValue{Name: p.Name, Value: v})
+			}
+		}
+		m.Properties = props
+	}
 }

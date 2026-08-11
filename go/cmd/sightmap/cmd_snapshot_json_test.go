@@ -34,21 +34,19 @@ func TestWriteAnnotatedJSON_MatchedNode(t *testing.T) {
 	}
 
 	sm := &sightmap.ComponentMatch{
-		Name:   "SiteLogoLink",
-		Memory: []string{"main navigation logo"},
+		Name:       "SiteLogoLink",
+		Memory:     []string{"main navigation logo"},
+		Properties: []sightmap.PropertyValue{{Name: "label", Value: "The Home Depot"}},
 	}
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		node: sm,
-	}
-	propValues := map[string]map[string]string{
-		"1": {"label": "The Home Depot"},
 	}
 	view := &sightmap.ViewDef{Name: "HomePage", Route: "/"}
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.json")
 
-	if err := writeAnnotatedJSON(node, path, view, matches, propValues); err != nil {
+	if err := writeAnnotatedJSON(node, path, view, matches); err != nil {
 		t.Fatalf("writeAnnotatedJSON: %v", err)
 	}
 
@@ -106,7 +104,7 @@ func TestWriteAnnotatedJSON_UnmatchedNode(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.json")
 
-	if err := writeAnnotatedJSON(node, path, nil, matches, nil); err != nil {
+	if err := writeAnnotatedJSON(node, path, nil, matches); err != nil {
 		t.Fatalf("writeAnnotatedJSON: %v", err)
 	}
 
@@ -156,7 +154,7 @@ func TestWriteAnnotatedJSON_NilMatches(t *testing.T) {
 	path := filepath.Join(dir, "out.json")
 
 	// nil matches — should write clean tree JSON without any component fields
-	if err := writeAnnotatedJSON(node, path, nil, nil, nil); err != nil {
+	if err := writeAnnotatedJSON(node, path, nil, nil); err != nil {
 		t.Fatalf("writeAnnotatedJSON: %v", err)
 	}
 
