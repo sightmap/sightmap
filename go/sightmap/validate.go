@@ -127,6 +127,9 @@ func Validate(c *Corpus) []ValidationError {
 	// Console/exception patterns (SEP-0006); see validate_message.go.
 	errs = append(errs, checkMessages(c.Messages)...)
 
+	// Signal refs and filter keys (SEP-0007); see validate_signal.go.
+	errs = append(errs, checkSignals(c)...)
+
 	return errs
 }
 

@@ -56,6 +56,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, and views ([SEP-0004](../seps/0004-component-tags.md)) |
 | 018 | `request-properties` | `properties:` on a request validates via `field` (body and header paths) and `pattern`; declaring a reserved identity name warns with `request-property-shadows-reserved` ([SEP-0005](../seps/0005-request-properties.md)) |
 | 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](../seps/0006-message-entity.md)) |
+| 020 | `signals` | `signals:` resolves refs to a request, component, message, and view; filter keys resolve against declared properties, reserved request identities, and the built-in `value`; an unquoted integer filter value is accepted ([SEP-0007](../seps/0007-signals.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 
