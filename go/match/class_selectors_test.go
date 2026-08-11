@@ -95,7 +95,7 @@ func TestClassAttrSelectors(t *testing.T) {
 				Selectors: []string{tt.selector},
 			}
 
-			matches := match.ApplySightmap(node, []sightmap.ComponentDef{comp})
+			matches := match.NewMatcher(&sightmap.Corpus{GlobalComponents: []sightmap.ComponentDef{comp}}).Match(node, "")
 			got := len(matches) > 0
 
 			if got != tt.want {

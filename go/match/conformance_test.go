@@ -51,7 +51,7 @@ func TestConformance(t *testing.T) {
 			}
 
 			// run
-			result := match.ApplySightmap(&root, defs)
+			result := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(&root, "")
 
 			// collect got: name → sorted []id
 			got := make(map[string][]string)

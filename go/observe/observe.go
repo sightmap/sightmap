@@ -75,7 +75,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	res.CorpusApplied = true
 
 	m := match.NewMatcher(corpus)
-	res.Matches = m.MatchTree(root, url)
+	res.Matches = m.Match(root, url)
 	res.View = corpus.ViewForURL(url)
 	res.Components = m.Components(url)
 	res.GlobalNames = corpus.GlobalComponentNames()
@@ -85,7 +85,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	// flags >=2 views matching the URL at equal specificity; ComponentConflicts
 	// flags a single node claimed by multiple distinct component names.
 	res.TiedViews = corpus.TiedViews(url)
-	res.ComponentConflicts = match.FindConflicts(root, res.Components)
+	res.ComponentConflicts = m.Conflicts(root, url)
 
 	if opts.ExtractProps && len(res.Matches) > 0 && len(res.Components) > 0 {
 		compByName := make(map[string]sightmap.ComponentDef, len(res.Components))

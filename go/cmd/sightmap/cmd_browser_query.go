@@ -68,7 +68,7 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 		return nil, fmt.Errorf("resolve query: load corpus: %w", err)
 	}
 	m := match.NewMatcher(corpus)
-	matches := m.MatchTree(root, pageURL)
+	matches := m.Match(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf(
 			"resolve query: no sightmap components matched the page (need a corpus in %s)", sightmapDir)

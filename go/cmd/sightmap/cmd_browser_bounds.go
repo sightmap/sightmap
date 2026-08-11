@@ -155,7 +155,7 @@ func boundsByComponent(
 	if err != nil {
 		return nil, fmt.Errorf("bounds: load corpus: %w", err)
 	}
-	matches := match.NewMatcher(corpus).MatchTree(root, pageURL)
+	matches := match.NewMatcher(corpus).Match(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("bounds: no sightmap components matched the current page (%s)", pageURL)
 	}

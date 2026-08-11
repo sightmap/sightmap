@@ -431,7 +431,7 @@ func TestMatchTreeEndToEnd(t *testing.T) {
 		},
 	}
 
-	matches := match.NewMatcher(corpus).MatchTree(root, "https://example.com/search")
+	matches := match.NewMatcher(corpus).Match(root, "https://example.com/search")
 
 	// formNode → SearchForm
 	m := mustMatch(t, matches, formNode, "formNode")
@@ -491,7 +491,7 @@ func TestConcurrentSafety(t *testing.T) {
 			defer wg.Done()
 			// Use a few distinct URLs to exercise the multi-key cache path.
 			url := fmt.Sprintf("https://example.com/page/%d", i%5)
-			matches := match.NewMatcher(corpus).MatchTree(root, url)
+			matches := match.NewMatcher(corpus).Match(root, url)
 			if _, ok := matches[buttonNode]; !ok {
 				errs[i] = fmt.Errorf("goroutine %d: button not matched", i)
 			}

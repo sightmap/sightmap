@@ -242,7 +242,7 @@ func buildSightmapMatchMapForSuggest(
 	if err != nil {
 		return nil, fmt.Errorf("load corpus (fallback): %v", err)
 	}
-	matches := match.NewMatcher(corpus).MatchTree(root, pageURL)
+	matches := match.NewMatcher(corpus).Match(root, pageURL)
 	m := make(map[string]string)
 	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {
@@ -268,7 +268,7 @@ func buildSightmapMatchMap(treeFile string, smDir string, pageURL string) (map[s
 	if err != nil {
 		return nil, fmt.Errorf("load corpus: %v", err)
 	}
-	matches := match.NewMatcher(corpus).MatchTree(&root, pageURL)
+	matches := match.NewMatcher(corpus).Match(&root, pageURL)
 	m := make(map[string]string)
 	sightmap.Walk(&root, func(n *sightmap.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {
