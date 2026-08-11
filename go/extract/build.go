@@ -101,7 +101,7 @@ func walkDOMNode(
 	}
 
 	// Parse the CSS selector string; fall back to TagName on error.
-	sp := selectorPartFor(pc)
+	el := elementFor(pc)
 
 	// Merge A11Y data.
 	a11yNode := a11yByID[node.BackendNodeID]
@@ -113,7 +113,7 @@ func walkDOMNode(
 		Name:          name,
 		Value:         value,
 		Properties:    props,
-		Selector:      sp,
+		Element:       el,
 		Bounds:        pc.Bounds,
 		IsVisible:     pc.IsVisible,
 		IsInteractive: pc.IsInteractive,
@@ -126,33 +126,34 @@ func walkDOMNode(
 	return compNode, nil
 }
 
-// selectorPartFor parses ProbeComponent.Selector with sel.ParseSightmapSelector.
-// If parsing succeeds it returns the last (most-specific) part. On any error it
-// falls back to a SelectorPart with Tag = strings.ToLower(pc.TagName).
+// elementFor parses ProbeComponent.Selector with sel.ParseSightmapSelector and
+// projects the last (most-specific) compound into an observed Element. On any
+// error it falls back to an Element with Tag = strings.ToLower(pc.TagName).
 //
-// The returned SelectorPart has its Classes duplicated into Attrs["class"] to
-// support attribute selectors like [class*="partial"], [class^="prefix-"], etc.
-func selectorPartFor(pc *ProbeComponent) *comps.SelectorPart {
-	var sp *comps.SelectorPart
+// The returned Element has its Classes duplicated into Attrs["class"] to support
+// attribute selectors like [class*="partial"], [class^="prefix-"], etc.
+func elementFor(pc *ProbeComponent) *comps.Element {
+	var el *comps.Element
 	if pc.Selector != "" {
 		parsed, err := sel.ParseSightmapSelector(pc.Selector)
 		if err == nil && len(parsed.Parts) > 0 {
-			sp = parsed.Parts[len(parsed.Parts)-1]
+			p := parsed.Parts[len(parsed.Parts)-1]
+			el = &comps.Element{Tag: p.Tag, Id: p.Id, Classes: p.Classes, Attrs: p.Attrs}
 		}
 	}
-	if sp == nil {
-		sp = &comps.SelectorPart{Tag: strings.ToLower(pc.TagName)}
+	if el == nil {
+		el = &comps.Element{Tag: strings.ToLower(pc.TagName)}
 	}
 
 	// Duplicate classes into Attrs["class"] for attribute selector support.
-	if len(sp.Classes) > 0 {
-		if sp.Attrs == nil {
-			sp.Attrs = make(map[string]string)
+	if len(el.Classes) > 0 {
+		if el.Attrs == nil {
+			el.Attrs = make(map[string]string)
 		}
-		sp.Attrs["class"] = strings.Join(sp.Classes, " ")
+		el.Attrs["class"] = strings.Join(el.Classes, " ")
 	}
 
-	return sp
+	return el
 }
 
 // mergeA11Y derives role/name/value/ignored/properties from the A11Y tree.

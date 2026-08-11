@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "UIView"},
+  "element": {"tag": "UIView"},
   "children": [
     {
       "id": "btn1",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "UIButton", "attrs": {"label": "Add to Cart"}}
+      "element": {"tag": "UIButton", "attrs": {"label": "Add to Cart"}}
     },
     {
       "id": "btn2",
@@ -32,7 +32,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 2,
-      "selector": {"tag": "UIButton", "attrs": {"label": "Remove"}}
+      "element": {"tag": "UIButton", "attrs": {"label": "Remove"}}
     }
   ]
 }

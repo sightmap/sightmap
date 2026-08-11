@@ -15,11 +15,11 @@ func MatchesNode(node *comps.ComponentNode, rule *comps.SelectorPart) bool {
 	if rule == nil {
 		return true
 	}
-	nodeSel := node.Selector
-	if nodeSel == nil {
-		nodeSel = &comps.SelectorPart{}
+	el := node.Element
+	if el == nil {
+		el = &comps.Element{}
 	}
-	if !Matches(nodeSel, rule) {
+	if !Matches(el, rule) {
 		return false
 	}
 	// :has() — each entry is AND-ed; within an entry, alternatives are OR-ed.
@@ -71,25 +71,25 @@ func relMatches(anchor *comps.ComponentNode, parts []*comps.SelectorPart, combs 
 // Matches reports whether node satisfies rule. It checks tag, id, classes,
 // attribute operators, :not(), and :is()/:where(). It does NOT evaluate :has()
 // (which needs tree context — use MatchesNode for that). A nil rule matches
-// everything.
-func Matches(node, rule *comps.SelectorPart) bool {
+// everything. el is the observed element's identity (the subject).
+func Matches(el *comps.Element, rule *comps.SelectorPart) bool {
 	if rule == nil {
 		return true
 	}
 
 	// Tag match (case-insensitive for HTML; case-sensitive for synthetic mobile).
-	if rule.Tag != "" && !strings.EqualFold(node.Tag, rule.Tag) {
+	if rule.Tag != "" && !strings.EqualFold(el.Tag, rule.Tag) {
 		return false
 	}
 
 	// ID match.
-	if rule.Id != "" && node.Id != rule.Id {
+	if rule.Id != "" && el.Id != rule.Id {
 		return false
 	}
 
-	// Class match: every class in rule.Classes must appear in node.Classes.
+	// Class match: every class in rule.Classes must appear in el.Classes.
 	if len(rule.Classes) > 0 {
-		nodeClasses := sliceToSet(node.Classes)
+		nodeClasses := sliceToSet(el.Classes)
 		for _, cls := range rule.Classes {
 			if !nodeClasses[cls] {
 				return false
@@ -106,7 +106,7 @@ func Matches(node, rule *comps.SelectorPart) bool {
 			}
 		}
 
-		nodeVal, present := effectiveAttrValue(node, key)
+		nodeVal, present := effectiveAttrValue(el, key)
 		if !present {
 			// Attribute not present on node — only "[]" (presence-only) would
 			// logically not care, but absence means presence check fails too.
@@ -119,7 +119,7 @@ func Matches(node, rule *comps.SelectorPart) bool {
 	}
 
 	// :not() check.
-	if rule.Not != nil && Matches(node, rule.Not) {
+	if rule.Not != nil && Matches(el, rule.Not) {
 		return false
 	}
 
@@ -127,7 +127,7 @@ func Matches(node, rule *comps.SelectorPart) bool {
 	if len(rule.Is) > 0 {
 		anyMatch := false
 		for _, alt := range rule.Is {
-			if Matches(node, alt) {
+			if Matches(el, alt) {
 				anyMatch = true
 				break
 			}
@@ -140,24 +140,24 @@ func Matches(node, rule *comps.SelectorPart) bool {
 	return true
 }
 
-// effectiveAttrValue resolves an attribute value on a node's SelectorPart for
+// effectiveAttrValue resolves an attribute value on an observed Element for
 // matching. id and class live in dedicated fields (Id, Classes) — not always in
 // Attrs — so attribute selectors like [id^="issue_"] or [class*="card"] must see
 // them there to match offline the way the browser matches them live. Attrs is
 // consulted first (it wins when populated); id/class then fall back to their
 // dedicated fields. All other attributes come straight from Attrs.
-func effectiveAttrValue(node *comps.SelectorPart, key string) (string, bool) {
-	if v, ok := node.Attrs[key]; ok {
+func effectiveAttrValue(el *comps.Element, key string) (string, bool) {
+	if v, ok := el.Attrs[key]; ok {
 		return v, true
 	}
 	switch key {
 	case "id":
-		if node.Id != "" {
-			return node.Id, true
+		if el.Id != "" {
+			return el.Id, true
 		}
 	case "class":
-		if len(node.Classes) > 0 {
-			return strings.Join(node.Classes, " "), true
+		if len(el.Classes) > 0 {
+			return strings.Join(el.Classes, " "), true
 		}
 	}
 	return "", false

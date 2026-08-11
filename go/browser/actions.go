@@ -448,8 +448,8 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 	return data, nil
 }
 
-// selectorString builds a simple CSS selector string from a *comps.SelectorPart.
-func selectorString(s *comps.SelectorPart) string {
+// selectorString builds a simple CSS selector string from an observed Element.
+func selectorString(s *comps.Element) string {
 	if s == nil {
 		return ""
 	}
@@ -619,7 +619,7 @@ func Click(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) (int, 
 		// fall through to the bounds/selector paths below.
 	}
 	if node.Bounds == nil {
-		sel := selectorString(node.Selector)
+		sel := selectorString(node.Element)
 		if sel == "" {
 			return -1, -1, fmt.Errorf("click: node %q has no bounds and no selector", node.Id)
 		}
@@ -805,7 +805,7 @@ func KeyPress(ctx context.Context, conn *CDPConn, key string) error {
 // (e.g. a bare numeric probe ID) degrades silently to the bounds path rather
 // than surfacing as an EvalJSON JS exception.
 func ScrollIntoView(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) error {
-	if sel := selectorString(node.Selector); sel != "" {
+	if sel := selectorString(node.Element); sel != "" {
 		script := fmt.Sprintf(
 			`try{const el=document.querySelector(%q);if(el)el.scrollIntoView({block:"center",behavior:"instant"})}catch(_){}`,
 			sel,

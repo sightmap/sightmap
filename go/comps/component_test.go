@@ -107,7 +107,7 @@ func TestUnmarshalJSON_FullSnapshot(t *testing.T) {
 		"name": "Submit",
 		"value": "",
 		"properties": {"aria-label": "Submit form"},
-		"selector": {
+		"element": {
 			"tag": "button",
 			"classes": ["btn", "btn-primary"]
 		},
@@ -155,7 +155,7 @@ func TestUnmarshalJSON_FullSnapshot(t *testing.T) {
 func TestUnmarshalJSON_SelectorPart(t *testing.T) {
 	jsonData := `{
 		"role": "button",
-		"selector": {
+		"element": {
 			"tag": "button",
 			"classes": ["btn", "btn-primary"],
 			"attrs": {"data-testid": "submit-btn"}
@@ -167,17 +167,17 @@ func TestUnmarshalJSON_SelectorPart(t *testing.T) {
 		t.Fatalf("Unmarshal failed: %v", err)
 	}
 
-	if node.Selector == nil {
+	if node.Element == nil {
 		t.Fatal("Selector = nil, want non-nil")
 	}
-	if node.Selector.Tag != "button" {
-		t.Errorf("Selector.Tag = %q, want %q", node.Selector.Tag, "button")
+	if node.Element.Tag != "button" {
+		t.Errorf("Selector.Tag = %q, want %q", node.Element.Tag, "button")
 	}
-	if len(node.Selector.Classes) != 2 {
-		t.Errorf("len(Selector.Classes) = %d, want 2", len(node.Selector.Classes))
+	if len(node.Element.Classes) != 2 {
+		t.Errorf("len(Selector.Classes) = %d, want 2", len(node.Element.Classes))
 	}
-	if node.Selector.Attrs["data-testid"] != "submit-btn" {
-		t.Errorf("Selector.Attrs[data-testid] = %q, want %q", node.Selector.Attrs["data-testid"], "submit-btn")
+	if node.Element.Attrs["data-testid"] != "submit-btn" {
+		t.Errorf("Selector.Attrs[data-testid] = %q, want %q", node.Element.Attrs["data-testid"], "submit-btn")
 	}
 }
 

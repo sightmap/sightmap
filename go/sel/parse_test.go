@@ -402,9 +402,9 @@ func TestParse_MultipleAttributes(t *testing.T) {
 	}
 }
 
-// nodeWith builds a minimal SelectorPart for testing Matches.
-func nodeWith(tag, id string, classes []string, attrs map[string]string) *comps.SelectorPart {
-	return &comps.SelectorPart{
+// nodeWith builds a minimal observed Element for testing Matches.
+func nodeWith(tag, id string, classes []string, attrs map[string]string) *comps.Element {
+	return &comps.Element{
 		Tag:     tag,
 		Id:      id,
 		Classes: classes,

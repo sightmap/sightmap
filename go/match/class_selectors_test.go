@@ -83,7 +83,7 @@ func TestClassAttrSelectors(t *testing.T) {
 			node := &comps.ComponentNode{
 				Id:   "test-node",
 				Role: "button",
-				Selector: &comps.SelectorPart{
+				Element: &comps.Element{
 					Tag:     "button",
 					Classes: tt.classes,
 					Attrs:   map[string]string{"class": strings.Join(tt.classes, " ")},

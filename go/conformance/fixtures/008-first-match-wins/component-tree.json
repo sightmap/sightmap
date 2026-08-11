@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "div"},
+  "element": {"tag": "div"},
   "children": [
     {
       "id": "btn",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "button", "classes": ["primary", "submit"]}
+      "element": {"tag": "button", "classes": ["primary", "submit"]}
     }
   ]
 }

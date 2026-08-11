@@ -134,8 +134,8 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 	}
 
 	// Selector hint (opt-in) — appended after closing bracket for matched nodes.
-	if opts.Selectors && c.Original != nil && c.Original.Selector != nil {
-		if hint := selectorHint(c.Original.Selector); hint != "" {
+	if opts.Selectors && c.Original != nil && c.Original.Element != nil {
+		if hint := selectorHint(c.Original.Element); hint != "" {
 			fmt.Fprintf(&line, " <%s>", hint)
 		}
 	}
@@ -171,8 +171,8 @@ const (
 
 func decide(node *comps.ComponentNode, matched bool) disposition {
 	// Drop non-semantic embedded resources.
-	if node.Selector != nil {
-		switch strings.ToLower(node.Selector.Tag) {
+	if node.Element != nil {
+		switch strings.ToLower(node.Element.Tag) {
 		case "style", "script", "noscript":
 			return dropNode
 		}
@@ -398,7 +398,7 @@ func truncate(s string, maxRunes int) string {
 
 // selectorHint builds a compact selector string showing only tag, #id,
 // [data-testid], and [data-component] — no CSS classes.
-func selectorHint(sel *comps.SelectorPart) string {
+func selectorHint(sel *comps.Element) string {
 	if sel == nil {
 		return ""
 	}

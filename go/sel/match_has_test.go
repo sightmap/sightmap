@@ -8,9 +8,9 @@ import (
 	"github.com/sightmap/sightmap/go/sel"
 )
 
-// cn builds a ComponentNode with the given selector part and children.
-func cn(part *comps.SelectorPart, children ...*comps.ComponentNode) *comps.ComponentNode {
-	return &comps.ComponentNode{Selector: part, Children: children}
+// cn builds a ComponentNode with the given observed element identity and children.
+func cn(el *comps.Element, children ...*comps.ComponentNode) *comps.ComponentNode {
+	return &comps.ComponentNode{Element: el, Children: children}
 }
 
 // mustLastPart parses a selector and returns its final (target) part.

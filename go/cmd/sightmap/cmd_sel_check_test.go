@@ -28,7 +28,7 @@ const selCheckFixtureJSON = `{
       "id": "10",
       "role": "none",
       "name": "",
-      "selector": {
+      "element": {
         "tag": "div",
         "attrs": {"data-component": "product-details:ProductDetails:v9.32.1"}
       },
@@ -40,7 +40,7 @@ const selCheckFixtureJSON = `{
       "id": "20",
       "role": "button",
       "name": "Add to Cart",
-      "selector": {
+      "element": {
         "tag": "button",
         "attrs": {"data-testid": "add-to-cart"}
       },
@@ -52,7 +52,7 @@ const selCheckFixtureJSON = `{
       "id": "30",
       "role": "none",
       "name": "",
-      "selector": {
+      "element": {
         "tag": "div",
         "attrs": {"data-component": "product-details:ProductDetails:v9.32.1"}
       },
@@ -63,7 +63,7 @@ const selCheckFixtureJSON = `{
           "id": "31",
           "role": "generic",
           "name": "Product Title Here",
-          "selector": {
+          "element": {
             "tag": "h1",
             "attrs": {"data-component": "product-details:ProductTitle:v1"}
           },

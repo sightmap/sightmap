@@ -24,7 +24,7 @@ func gapsFixture() (root, banner, image *comps.ComponentNode, parentMap map[*com
 		Id:        "banner",
 		Role:      "generic",
 		IsVisible: true,
-		Selector:  &comps.SelectorPart{Tag: "div", Attrs: map[string]string{"data-testid": "hero"}},
+		Element:   &comps.Element{Tag: "div", Attrs: map[string]string{"data-testid": "hero"}},
 		Children:  []*comps.ComponentNode{image},
 	}
 	root = &comps.ComponentNode{

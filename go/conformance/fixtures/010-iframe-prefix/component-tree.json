@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "div"},
+  "element": {"tag": "div"},
   "children": [
     {
       "id": "1_nav",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "nav"},
+      "element": {"tag": "nav"},
       "children": [
         {
           "id": "1_5",
@@ -32,7 +32,7 @@
           "inViewport": true,
           "isIgnored": false,
           "nthChild": 1,
-          "selector": {"tag": "a", "classes": ["nav-link"]}
+          "element": {"tag": "a", "classes": ["nav-link"]}
         },
         {
           "id": "1_6",
@@ -44,7 +44,7 @@
           "inViewport": true,
           "isIgnored": false,
           "nthChild": 2,
-          "selector": {"tag": "a", "classes": ["nav-link"]}
+          "element": {"tag": "a", "classes": ["nav-link"]}
         }
       ]
     }

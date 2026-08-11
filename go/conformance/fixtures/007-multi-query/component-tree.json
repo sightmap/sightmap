@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "div"},
+  "element": {"tag": "div"},
   "children": [
     {
       "id": "nav",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "nav"},
+      "element": {"tag": "nav"},
       "children": [
         {
           "id": "a1",
@@ -32,7 +32,7 @@
           "inViewport": true,
           "isIgnored": false,
           "nthChild": 1,
-          "selector": {"tag": "a", "classes": ["nav-link"]}
+          "element": {"tag": "a", "classes": ["nav-link"]}
         }
       ]
     },
@@ -46,7 +46,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 2,
-      "selector": {"tag": "form", "classes": ["search"]},
+      "element": {"tag": "form", "classes": ["search"]},
       "children": [
         {
           "id": "inp1",
@@ -58,7 +58,7 @@
           "inViewport": true,
           "isIgnored": false,
           "nthChild": 1,
-          "selector": {"tag": "input", "attrs": {"type": "email"}}
+          "element": {"tag": "input", "attrs": {"type": "email"}}
         }
       ]
     }

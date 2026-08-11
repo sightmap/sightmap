@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "form", "classes": ["search"]},
+  "element": {"tag": "form", "classes": ["search"]},
   "children": [
     {
       "id": "inp1",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "input", "attrs": {"type": "email"}}
+      "element": {"tag": "input", "attrs": {"type": "email"}}
     },
     {
       "id": "div1",
@@ -32,7 +32,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 2,
-      "selector": {"tag": "div"},
+      "element": {"tag": "div"},
       "children": [
         {
           "id": "inp2",
@@ -44,7 +44,7 @@
           "inViewport": true,
           "isIgnored": false,
           "nthChild": 1,
-          "selector": {"tag": "input", "attrs": {"type": "email"}}
+          "element": {"tag": "input", "attrs": {"type": "email"}}
         }
       ]
     }

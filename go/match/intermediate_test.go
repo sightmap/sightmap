@@ -19,34 +19,34 @@ import (
 //	      a (link — BreadcrumbLink target)
 func buildBreadcrumbTree() *comps.ComponentNode {
 	return &comps.ComponentNode{
-		Id:       "page",
-		Selector: &comps.SelectorPart{Tag: "div"},
+		Id:      "page",
+		Element: &comps.Element{Tag: "div"},
 		Children: []*comps.ComponentNode{
 			{
 				Id:   "breadcrumb",
 				Role: "navigation",
-				Selector: &comps.SelectorPart{
+				Element: &comps.Element{
 					Tag:   "nav",
 					Attrs: map[string]string{"data-component": "breadcrumbs:Breadcrumbs:v14.0.1"},
 				},
 				Children: []*comps.ComponentNode{
 					{
-						Id:       "list",
-						Role:     "list",
-						Selector: &comps.SelectorPart{Tag: "ol"},
+						Id:      "list",
+						Role:    "list",
+						Element: &comps.Element{Tag: "ol"},
 						Children: []*comps.ComponentNode{
 							{
 								Id:        "listitem",
 								Role:      "listitem",
 								IsIgnored: false,
-								Selector:  &comps.SelectorPart{Tag: "li"},
+								Element:   &comps.Element{Tag: "li"},
 								Children: []*comps.ComponentNode{
 									{
 										Id:            "link",
 										Role:          "link",
 										IsInteractive: true,
 										IsVisible:     true,
-										Selector:      &comps.SelectorPart{Tag: "a"},
+										Element:       &comps.Element{Tag: "a"},
 									},
 								},
 							},

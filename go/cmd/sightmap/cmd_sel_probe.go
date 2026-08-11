@@ -377,9 +377,9 @@ func loadCompAnnotations(dir string) []compAnnotation {
 }
 
 // findCompAnnotation returns the name of the first component whose first
-// SelectorPart matches the parent node, or "" if none match.
+// pattern matches the parent node, or "" if none match.
 func findCompAnnotation(annotations []compAnnotation, p parentInfo) string {
-	node := &comps.SelectorPart{
+	node := &comps.Element{
 		Tag:     p.Tag,
 		Id:      p.Id,
 		Classes: p.Cls,

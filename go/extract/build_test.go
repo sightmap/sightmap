@@ -64,11 +64,11 @@ func TestMinimalTree(t *testing.T) {
 	if root.Name != "Submit" {
 		t.Errorf("Name = %q, want %q", root.Name, "Submit")
 	}
-	if root.Selector == nil {
+	if root.Element == nil {
 		t.Fatal("Selector is nil")
 	}
-	if root.Selector.Tag != "button" {
-		t.Errorf("Selector.Tag = %q, want %q", root.Selector.Tag, "button")
+	if root.Element.Tag != "button" {
+		t.Errorf("Selector.Tag = %q, want %q", root.Element.Tag, "button")
 	}
 }
 
@@ -250,14 +250,14 @@ func TestSelectorParse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildTree error: %v", err)
 	}
-	if root.Selector == nil {
+	if root.Element == nil {
 		t.Fatal("Selector is nil")
 	}
-	if root.Selector.Tag != "button" {
-		t.Errorf("Selector.Tag = %q, want %q", root.Selector.Tag, "button")
+	if root.Element.Tag != "button" {
+		t.Errorf("Selector.Tag = %q, want %q", root.Element.Tag, "button")
 	}
-	if len(root.Selector.Classes) != 1 || root.Selector.Classes[0] != "primary" {
-		t.Errorf("Selector.Classes = %v, want [primary]", root.Selector.Classes)
+	if len(root.Element.Classes) != 1 || root.Element.Classes[0] != "primary" {
+		t.Errorf("Selector.Classes = %v, want [primary]", root.Element.Classes)
 	}
 }
 
@@ -276,15 +276,15 @@ func TestSelectorFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildTree error: %v", err)
 	}
-	if root.Selector == nil {
+	if root.Element == nil {
 		t.Fatal("Selector is nil")
 	}
-	if root.Selector.Tag != "span" {
-		t.Errorf("Selector.Tag = %q, want %q", root.Selector.Tag, "span")
+	if root.Element.Tag != "span" {
+		t.Errorf("Selector.Tag = %q, want %q", root.Element.Tag, "span")
 	}
 	// No classes should be set from the invalid selector.
-	if len(root.Selector.Classes) != 0 {
-		t.Errorf("Selector.Classes = %v, want []", root.Selector.Classes)
+	if len(root.Element.Classes) != 0 {
+		t.Errorf("Selector.Classes = %v, want []", root.Element.Classes)
 	}
 }
 
@@ -303,23 +303,23 @@ func TestClassAttrDuplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildTree error: %v", err)
 	}
-	if root.Selector == nil {
+	if root.Element == nil {
 		t.Fatal("Selector is nil")
 	}
 
 	// Classes should be parsed
-	if len(root.Selector.Classes) != 2 {
-		t.Errorf("Selector.Classes len = %d, want 2", len(root.Selector.Classes))
+	if len(root.Element.Classes) != 2 {
+		t.Errorf("Selector.Classes len = %d, want 2", len(root.Element.Classes))
 	}
-	if root.Selector.Classes[0] != "btn" || root.Selector.Classes[1] != "btn-primary" {
-		t.Errorf("Selector.Classes = %v, want [btn, btn-primary]", root.Selector.Classes)
+	if root.Element.Classes[0] != "btn" || root.Element.Classes[1] != "btn-primary" {
+		t.Errorf("Selector.Classes = %v, want [btn, btn-primary]", root.Element.Classes)
 	}
 
 	// Classes should also be in Attrs["class"]
-	if root.Selector.Attrs == nil {
+	if root.Element.Attrs == nil {
 		t.Fatal("Selector.Attrs is nil")
 	}
-	classAttr, ok := root.Selector.Attrs["class"]
+	classAttr, ok := root.Element.Attrs["class"]
 	if !ok {
 		t.Fatal("Selector.Attrs[\"class\"] not found")
 	}

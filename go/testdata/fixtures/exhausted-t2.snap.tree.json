@@ -3,7 +3,7 @@
   "children": [
     {
       "role": "main",
-      "selector": {
+      "element": {
         "tag": "main",
         "classes": ["app-content"]
       },

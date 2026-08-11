@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "div"},
+  "element": {"tag": "div"},
   "children": [
     {
       "id": "inp1",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "input", "attrs": {"type": "email"}}
+      "element": {"tag": "input", "attrs": {"type": "email"}}
     },
     {
       "id": "inp2",
@@ -32,7 +32,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 2,
-      "selector": {"tag": "input", "attrs": {"type": "text"}}
+      "element": {"tag": "input", "attrs": {"type": "text"}}
     },
     {
       "id": "a1",
@@ -44,7 +44,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 3,
-      "selector": {"tag": "a", "attrs": {"href": "https://example.com"}}
+      "element": {"tag": "a", "attrs": {"href": "https://example.com"}}
     },
     {
       "id": "d1",
@@ -56,7 +56,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 4,
-      "selector": {"tag": "div", "attrs": {"aria-label": "Search products"}}
+      "element": {"tag": "div", "attrs": {"aria-label": "Search products"}}
     },
     {
       "id": "s1",
@@ -68,7 +68,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 5,
-      "selector": {"tag": "span", "attrs": {"class": "active btn"}}
+      "element": {"tag": "span", "attrs": {"class": "active btn"}}
     },
     {
       "id": "d2",
@@ -80,7 +80,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 6,
-      "selector": {"tag": "div", "attrs": {"lang": "en-US"}}
+      "element": {"tag": "div", "attrs": {"lang": "en-US"}}
     },
     {
       "id": "inp3",
@@ -92,7 +92,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 7,
-      "selector": {
+      "element": {
         "tag": "input",
         "attrs": {"disabled": ""},
         "attrOps": {"disabled": "[]"}
