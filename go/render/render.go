@@ -2,10 +2,11 @@ package render
 
 import (
 	"fmt"
-	"github.com/sightmap/sightmap/go/sightmap"
 	"io"
 	"sort"
 	"strings"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // Comp is a filtered, display-ready component node produced by Filter().
@@ -29,9 +30,6 @@ type FormatOpts struct {
 	// Interactive, if true, skips nodes (and collapses their indentation) when
 	// neither the node nor any of its Comp descendants is interactive.
 	Interactive bool
-	// PropValues maps node ID → (prop name → value) for property annotations.
-	// Populated by the snapshot CLI after DOM extraction; nil in library use.
-	PropValues map[string]map[string]string
 }
 
 // Filter builds a compact, filtered Comp tree from a raw ComponentNode tree.
@@ -107,7 +105,7 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 		line.WriteString(c.Role) // already set to match name by convert()
 
 		// Merged props: sightmap-extracted + AX value fallback.
-		props := mergedProps(c, opts)
+		props := mergedProps(c)
 
 		// Props sorted alphabetically, before text.
 		for _, k := range sortedKeys(props) {
@@ -143,7 +141,7 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 	// Compute parent props once for Rule B check below.
 	var parentProps map[string]string
 	if c.Match != nil {
-		parentProps = mergedProps(c, opts)
+		parentProps = mergedProps(c)
 	}
 
 	childIndent := indent + "  "
@@ -334,18 +332,21 @@ func markInteractive(c *Comp, set map[*Comp]bool) bool {
 }
 
 // mergedProps builds the combined property map for a matched Comp node.
-// Sightmap-extracted properties (opts.PropValues[c.Id]) take precedence.
+// Sightmap-extracted properties (c.Match.Properties) take precedence.
 // If no "value" key is present and the AX Comp.Value is non-empty, it is
 // added as "value" (reserved-but-overridable built-in).
 // Returns nil when there are no props and no AX value.
-func mergedProps(c *Comp, opts FormatOpts) map[string]string {
-	smap := opts.PropValues[c.Id]
-	if len(smap) == 0 && c.Value == "" {
+func mergedProps(c *Comp) map[string]string {
+	var match []sightmap.PropertyValue
+	if c.Match != nil {
+		match = c.Match.Properties
+	}
+	if len(match) == 0 && c.Value == "" {
 		return nil
 	}
-	props := make(map[string]string, len(smap)+1)
-	for k, v := range smap {
-		props[k] = v
+	props := make(map[string]string, len(match)+1)
+	for _, pv := range match {
+		props[pv.Name] = pv.Value
 	}
 	if _, hasValue := props["value"]; !hasValue && c.Value != "" {
 		props["value"] = c.Value

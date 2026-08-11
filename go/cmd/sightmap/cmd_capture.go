@@ -114,7 +114,7 @@ func runCapture(args []string) error {
 	}
 	if *jsonOutFlag {
 		jsonPath := strings.TrimSuffix(snapPath, ".snap") + ".snap.annotated.json"
-		if err := writeAnnotatedJSON(res.Root, jsonPath, res.View, res.Matches, res.Props); err != nil {
+		if err := writeAnnotatedJSON(res.Root, jsonPath, res.View, res.Matches); err != nil {
 			fmt.Fprintf(os.Stderr, "capture: json: %v\n", err)
 		}
 	}
@@ -205,7 +205,7 @@ func runCaptureAll(
 		}
 		if jsonOut {
 			jsonPath := strings.TrimSuffix(snapPath, ".snap") + ".snap.annotated.json"
-			writeAnnotatedJSON(res.Root, jsonPath, res.View, res.Matches, nil) // no propValues in --all mode
+			writeAnnotatedJSON(res.Root, jsonPath, res.View, res.Matches)
 		}
 
 		results = append(results, result{name: label, t1: cov.T1, t2: cov.T2, t3: cov.T3, total: cov.Total})

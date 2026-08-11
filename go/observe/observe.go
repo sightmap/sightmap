@@ -11,9 +11,9 @@ import (
 
 // Result is one observation of a live page: the extracted component tree, the
 // corpus matches applied to it, the view it resolved to, and the coverage score.
-// Props holds live-extracted property values (nodeID → propName → value) and is
-// nil unless Options.ExtractProps was set. Matches/View/Coverage are zero when no
-// corpus was supplied.
+// Matches/View/Coverage are zero when no corpus was supplied. When
+// Options.ExtractProps was set, each ComponentMatch in Matches carries its
+// live-extracted property values (ComponentMatch.Properties).
 type Result struct {
 	Root        *sightmap.ComponentNode
 	URL         string
@@ -21,8 +21,8 @@ type Result struct {
 	View        *sightmap.ViewDef
 	Components  []sightmap.ComponentDef
 	GlobalNames map[string]bool
-	Props       map[string]map[string]string
-	Coverage    coverage.Result
+
+	Coverage coverage.Result
 
 	// CorpusApplied is true when a corpus was supplied and matched against the
 	// tree, even if no view matched the URL or no component matched a node. It
@@ -92,7 +92,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 		for _, c := range res.Components {
 			compByName[c.Name] = c
 		}
-		res.Props = ExtractProperties(ctx, conn, res.Matches, compByName)
+		ExtractProperties(ctx, conn, res.Matches, compByName)
 	}
 	return res, nil
 }

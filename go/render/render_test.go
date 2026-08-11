@@ -355,15 +355,11 @@ func TestFormat_WithMatchAnnotation_Structural(t *testing.T) {
 func TestFormat_WithPropValues(t *testing.T) {
 	a := node("1", "link", "Garden Center", true, true, false)
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
-		a: {Name: "CategoryTile"},
+		a: {Name: "CategoryTile", Properties: []sightmap.PropertyValue{{Name: "category", Value: "Garden Center"}}},
 	}
 	comp := Filter(a, matches)
 	var buf bytes.Buffer
-	comp.Format(&buf, "", FormatOpts{
-		PropValues: map[string]map[string]string{
-			"1": {"category": "Garden Center"},
-		},
-	})
+	comp.Format(&buf, "", FormatOpts{})
 	got := buf.String()
 	// Rule A: name exactly matches category prop → name suppressed inside brackets.
 	want := "1 [CategoryTile category=\"Garden Center\"]\n"
@@ -375,15 +371,11 @@ func TestFormat_WithPropValues(t *testing.T) {
 func TestFormat_WithPropValues_SortedKeys(t *testing.T) {
 	a := node("1", "link", "Item", true, true, false)
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
-		a: {Name: "Tile"},
+		a: {Name: "Tile", Properties: []sightmap.PropertyValue{{Name: "zzz", Value: "last"}, {Name: "aaa", Value: "first"}, {Name: "mmm", Value: "mid"}}},
 	}
 	comp := Filter(a, matches)
 	var buf bytes.Buffer
-	comp.Format(&buf, "", FormatOpts{
-		PropValues: map[string]map[string]string{
-			"1": {"zzz": "last", "aaa": "first", "mmm": "mid"},
-		},
-	})
+	comp.Format(&buf, "", FormatOpts{})
 	got := buf.String()
 	// Keys sorted alphabetically; name "Item" ≠ any prop value → kept last.
 	want := "1 [Tile aaa=\"first\" mmm=\"mid\" zzz=\"last\" \"Item\"]\n"
@@ -627,15 +619,11 @@ func TestFormat_RuleA_NameSuppressed(t *testing.T) {
 	// Rule A: name exactly matches a prop value → name omitted
 	a := node("3", "link", "Explore", true, true, false)
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
-		a: {Name: "DesktopNavLink"},
+		a: {Name: "DesktopNavLink", Properties: []sightmap.PropertyValue{{Name: "label", Value: "Explore"}}},
 	}
 	comp := Filter(a, matches)
 	var buf bytes.Buffer
-	comp.Format(&buf, "", FormatOpts{
-		PropValues: map[string]map[string]string{
-			"3": {"label": "Explore"},
-		},
-	})
+	comp.Format(&buf, "", FormatOpts{})
 	want := "3 [DesktopNavLink label=\"Explore\"]\n"
 	if got := buf.String(); got != want {
 		t.Errorf("expected %q, got %q", want, got)
@@ -646,15 +634,11 @@ func TestFormat_RuleA_NameKept_CaseDiffers(t *testing.T) {
 	// Rule A is exact — case difference means name is kept last
 	a := node("5", "link", "FRI Aug 21 7:00pm", true, true, false)
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
-		a: {Name: "ShowDateRow"},
+		a: {Name: "ShowDateRow", Properties: []sightmap.PropertyValue{{Name: "date", Value: "Fri Aug 21 7:00pm"}}},
 	}
 	comp := Filter(a, matches)
 	var buf bytes.Buffer
-	comp.Format(&buf, "", FormatOpts{
-		PropValues: map[string]map[string]string{
-			"5": {"date": "Fri Aug 21 7:00pm"},
-		},
-	})
+	comp.Format(&buf, "", FormatOpts{})
 	// "FRI Aug..." ≠ "Fri Aug..." → name kept last
 	want := "5 [ShowDateRow date=\"Fri Aug 21 7:00pm\" \"FRI Aug 21 7:00pm\"]\n"
 	if got := buf.String(); got != want {
@@ -670,18 +654,14 @@ func TestFormat_RuleB_StaticTextSuppressed(t *testing.T) {
 	parent := node("1", "generic", "foo bar", true, false, false, st, btn)
 	// generic with name "foo bar" is kept (name != "")
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
-		parent: {Name: "NavItem"},
+		parent: {Name: "NavItem", Properties: []sightmap.PropertyValue{{Name: "label", Value: "Explore"}}},
 	}
 	comp := Filter(parent, matches)
 	if comp == nil {
 		t.Fatal("expected non-nil comp")
 	}
 	var buf bytes.Buffer
-	comp.Format(&buf, "", FormatOpts{
-		PropValues: map[string]map[string]string{
-			"1": {"label": "Explore"},
-		},
-	})
+	comp.Format(&buf, "", FormatOpts{})
 	got := buf.String()
 	// StaticText "Explore" == prop "Explore" → suppressed
 	if strings.Contains(got, "StaticText") {
@@ -699,15 +679,11 @@ func TestFormat_RuleB_StaticTextKept_NoMatch(t *testing.T) {
 	btn := node("3", "button", "OK", true, true, false)
 	parent := node("1", "generic", "foo bar", true, false, false, st, btn)
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
-		parent: {Name: "MyComp"},
+		parent: {Name: "MyComp", Properties: []sightmap.PropertyValue{{Name: "label", Value: "Explore"}}},
 	}
 	comp := Filter(parent, matches)
 	var buf bytes.Buffer
-	comp.Format(&buf, "", FormatOpts{
-		PropValues: map[string]map[string]string{
-			"1": {"label": "Explore"},
-		},
-	})
+	comp.Format(&buf, "", FormatOpts{})
 	got := buf.String()
 	// "other text" ≠ "Explore" → StaticText kept
 	if !strings.Contains(got, "StaticText") {
@@ -743,15 +719,11 @@ func TestFormat_ValueOverride_SightmapWins(t *testing.T) {
 		IsVisible: true, IsInteractive: true,
 	}
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
-		n: {Name: "CustomSelect"},
+		n: {Name: "CustomSelect", Properties: []sightmap.PropertyValue{{Name: "value", Value: "sightmap value"}}},
 	}
 	comp := Filter(n, matches)
 	var buf bytes.Buffer
-	comp.Format(&buf, "", FormatOpts{
-		PropValues: map[string]map[string]string{
-			"8": {"value": "sightmap value"},
-		},
-	})
+	comp.Format(&buf, "", FormatOpts{})
 	got := buf.String()
 	// Sightmap "value" wins; AX "AX value" is ignored; name "Dropdown" ≠ "sightmap value" → kept
 	want := "8 [CustomSelect value=\"sightmap value\" \"Dropdown\"]\n"

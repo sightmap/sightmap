@@ -92,7 +92,24 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	for _, c := range components {
 		compByName[c.Name] = c
 	}
-	props := observe.ExtractProperties(ctx, conn, relevant, compByName)
+	observe.ExtractProperties(ctx, conn, relevant, compByName)
 
-	return compquery.Resolve(root, matches, props, q)
+	return compquery.Resolve(root, matches, propsByNodeID(matches), q)
+}
+
+// propsByNodeID projects the extracted property values folded into each match
+// back into the node-id → (name → value) map the component-query engine consumes.
+func propsByNodeID(matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) map[string]map[string]string {
+	out := make(map[string]map[string]string)
+	for node, m := range matches {
+		if m == nil || len(m.Properties) == 0 {
+			continue
+		}
+		pm := make(map[string]string, len(m.Properties))
+		for _, pv := range m.Properties {
+			pm[pv.Name] = pv.Value
+		}
+		out[node.Id] = pm
+	}
+	return out
 }
