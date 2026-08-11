@@ -7,7 +7,6 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sel"
 )
 
@@ -277,14 +276,14 @@ func lintMessageLevels(msgs []MessageDef) []LintWarning {
 
 // lintComponent runs per-component lint rules.
 // global controls whether rules restricted to global scope are applied.
-func lintComponent(comp match.ComponentDef, global bool) []LintWarning {
+func lintComponent(comp ComponentDef, global bool) []LintWarning {
 	return lintComponentWithCounts(comp, global, nil)
 }
 
 // lintComponentWithCounts is the full implementation of per-component lint
 // rules. counts (component name → match count) optionally augments the
 // multi-instance-no-property warning; pass nil to use static heuristics only.
-func lintComponentWithCounts(comp match.ComponentDef, global bool, counts map[string]int) []LintWarning {
+func lintComponentWithCounts(comp ComponentDef, global bool, counts map[string]int) []LintWarning {
 	var warnings []LintWarning
 
 	name := comp.Name

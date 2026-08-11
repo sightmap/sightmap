@@ -9,7 +9,7 @@ import (
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
-	"github.com/sightmap/sightmap/go/sightmap"
+	"github.com/sightmap/sightmap/go/match"
 )
 
 func runGap(args []string) error {
@@ -54,7 +54,7 @@ func runGap(args []string) error {
 	if loadErr != nil {
 		return loadErr
 	}
-	m := sightmap.NewMatcher(corpus)
+	m := match.NewMatcher(corpus)
 	matches := m.MatchTree(root, pageURL)
 
 	// ── Build parent map ─────────────────────────────────────────────────────

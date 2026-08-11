@@ -7,7 +7,6 @@ import (
 
 	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -65,7 +64,7 @@ func TestFormat_Conflicts(t *testing.T) {
 		CorpusApplied: true,
 		View:          &sightmap.View{Name: "AStar", Route: "/a/*"},
 		TiedViews:     []string{"AStar", "StarB"},
-		ComponentConflicts: []match.Conflict{{
+		ComponentConflicts: []sightmap.Conflict{{
 			Node:  &comps.ComponentNode{Id: "7", Role: "button", Name: "Save"},
 			Names: []string{"AppDialog", "LoginDialog"},
 		}},

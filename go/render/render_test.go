@@ -2,11 +2,11 @@ package render
 
 import (
 	"bytes"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // node builds a ComponentNode for use in tests.
@@ -215,7 +215,7 @@ func TestFilter_MergeAdjacentStaticText_Mixed(t *testing.T) {
 
 func TestFilter_MatchProtectsFromTransparency(t *testing.T) {
 	div := node("1", "none", "", true, false, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		div: {Name: "ProductCard"},
 	}
 	comp := Filter(div, matches)
@@ -234,7 +234,7 @@ func TestFilter_MatchedLinkRoleReplaced(t *testing.T) {
 	// Mirrors the canonical extractor's DisplayRole(): match name always replaces AX role,
 	// even for interactive roles like "link". No ★ annotation.
 	a := node("1", "link", "Home", true, true, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		a: {Name: "NavLink"},
 	}
 	comp := Filter(a, matches)
@@ -251,7 +251,7 @@ func TestFilter_MatchedLinkRoleReplaced(t *testing.T) {
 
 func TestFilter_StructuralRoleReplacedByMatchName(t *testing.T) {
 	nav := node("1", "navigation", "", true, false, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		nav: {Name: "GlobalNav"},
 	}
 	comp := Filter(nav, matches)
@@ -291,7 +291,7 @@ func TestFilter_Value_Preserved(t *testing.T) {
 
 func TestFilter_EmptyMatches(t *testing.T) {
 	root := node("1", "button", "OK", true, true, false)
-	comp := Filter(root, map[*comps.ComponentNode]*match.ComponentMatch{})
+	comp := Filter(root, map[*comps.ComponentNode]*sightmap.ComponentMatch{})
 	if comp == nil {
 		t.Fatal("expected non-nil comp")
 	}
@@ -325,7 +325,7 @@ func TestFormat_NilComp(t *testing.T) {
 
 func TestFormat_WithMatchAnnotation_Interactive(t *testing.T) {
 	a := node("1", "link", "Home", true, true, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		a: {Name: "NavLink"},
 	}
 	comp := Filter(a, matches)
@@ -341,7 +341,7 @@ func TestFormat_WithMatchAnnotation_Interactive(t *testing.T) {
 
 func TestFormat_WithMatchAnnotation_Structural(t *testing.T) {
 	nav := node("1", "navigation", "", true, false, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		nav: {Name: "GlobalNav"},
 	}
 	comp := Filter(nav, matches)
@@ -356,7 +356,7 @@ func TestFormat_WithMatchAnnotation_Structural(t *testing.T) {
 
 func TestFormat_WithPropValues(t *testing.T) {
 	a := node("1", "link", "Garden Center", true, true, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		a: {Name: "CategoryTile"},
 	}
 	comp := Filter(a, matches)
@@ -376,7 +376,7 @@ func TestFormat_WithPropValues(t *testing.T) {
 
 func TestFormat_WithPropValues_SortedKeys(t *testing.T) {
 	a := node("1", "link", "Item", true, true, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		a: {Name: "Tile"},
 	}
 	comp := Filter(a, matches)
@@ -598,7 +598,7 @@ func TestFilter_MultipleChildren_ParentNameKept(t *testing.T) {
 func TestFormat_Bracket_NoPropsNoName(t *testing.T) {
 	// Matched structural node with no text and no props → bare [CompName]
 	nav := node("42", "navigation", "", true, false, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		nav: {Name: "SiteHeader"},
 	}
 	comp := Filter(nav, matches)
@@ -613,7 +613,7 @@ func TestFormat_Bracket_NoPropsNoName(t *testing.T) {
 func TestFormat_Bracket_NameKept_NoProps(t *testing.T) {
 	// Matched node, name present, no props → name shown last inside brackets
 	a := node("7", "link", "Shop Now", true, true, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		a: {Name: "BannerLink"},
 	}
 	comp := Filter(a, matches)
@@ -628,7 +628,7 @@ func TestFormat_Bracket_NameKept_NoProps(t *testing.T) {
 func TestFormat_RuleA_NameSuppressed(t *testing.T) {
 	// Rule A: name exactly matches a prop value → name omitted
 	a := node("3", "link", "Explore", true, true, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		a: {Name: "DesktopNavLink"},
 	}
 	comp := Filter(a, matches)
@@ -647,7 +647,7 @@ func TestFormat_RuleA_NameSuppressed(t *testing.T) {
 func TestFormat_RuleA_NameKept_CaseDiffers(t *testing.T) {
 	// Rule A is exact — case difference means name is kept last
 	a := node("5", "link", "FRI Aug 21 7:00pm", true, true, false)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		a: {Name: "ShowDateRow"},
 	}
 	comp := Filter(a, matches)
@@ -671,7 +671,7 @@ func TestFormat_RuleB_StaticTextSuppressed(t *testing.T) {
 	btn := node("3", "button", "Open menu", true, true, false)
 	parent := node("1", "generic", "foo bar", true, false, false, st, btn)
 	// generic with name "foo bar" is kept (name != "")
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "NavItem"},
 	}
 	comp := Filter(parent, matches)
@@ -700,7 +700,7 @@ func TestFormat_RuleB_StaticTextKept_NoMatch(t *testing.T) {
 	st := node("2", "StaticText", "other text", true, false, false)
 	btn := node("3", "button", "OK", true, true, false)
 	parent := node("1", "generic", "foo bar", true, false, false, st, btn)
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "MyComp"},
 	}
 	comp := Filter(parent, matches)
@@ -724,7 +724,7 @@ func TestFormat_ValueFallback_InBrackets(t *testing.T) {
 		Id: "7", Role: "textbox", Name: "Search", Value: "query text",
 		IsVisible: true, IsInteractive: true,
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		n: {Name: "SearchInput"},
 	}
 	comp := Filter(n, matches)
@@ -744,7 +744,7 @@ func TestFormat_ValueOverride_SightmapWins(t *testing.T) {
 		Id: "8", Role: "textbox", Name: "Dropdown", Value: "AX value",
 		IsVisible: true, IsInteractive: true,
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		n: {Name: "CustomSelect"},
 	}
 	comp := Filter(n, matches)
@@ -804,7 +804,7 @@ func TestFormat_Selectors_AfterBracket(t *testing.T) {
 			Attrs: map[string]string{"data-testid": "home-link"},
 		},
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		n: {Name: "HomeLink"},
 	}
 	comp := Filter(n, matches)

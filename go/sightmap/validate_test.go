@@ -3,17 +3,16 @@ package sightmap_test
 import (
 	"testing"
 
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // corpusFrom is a convenience constructor for test corpora.
-func corpusFrom(globals []match.ComponentDef, views []sightmap.View) *sightmap.Corpus {
+func corpusFrom(globals []sightmap.ComponentDef, views []sightmap.View) *sightmap.Corpus {
 	return &sightmap.Corpus{GlobalComponents: globals, Views: views}
 }
 
 func TestValidate_EmptyName(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "", Selectors: []string{"div"}},
 	}, nil)
 	errs := sightmap.Validate(c)
@@ -26,7 +25,7 @@ func TestValidate_EmptyName(t *testing.T) {
 }
 
 func TestValidate_NoSelector(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "NavBar", Selectors: nil},
 	}, nil)
 	errs := sightmap.Validate(c)
@@ -39,7 +38,7 @@ func TestValidate_NoSelector(t *testing.T) {
 }
 
 func TestValidate_BadSelector(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "NavBar", Selectors: []string{":hover"}},
 	}, nil)
 	errs := sightmap.Validate(c)
@@ -56,7 +55,7 @@ func TestValidate_BadSelector(t *testing.T) {
 
 func TestValidate_DuplicateNameGlobal(t *testing.T) {
 	// True duplicate: same name AND same selector — should error.
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "NavBar", Selectors: []string{"nav"}},
 		{Name: "NavBar", Selectors: []string{"nav"}},
 	}, nil)
@@ -75,7 +74,7 @@ func TestValidate_DuplicateNameInView(t *testing.T) {
 		{
 			Name:  "Home",
 			Route: "/",
-			Components: []match.ComponentDef{
+			Components: []sightmap.ComponentDef{
 				{Name: "Hero", Selectors: []string{".hero"}},
 				{Name: "Hero", Selectors: []string{".hero"}},
 			},
@@ -93,7 +92,7 @@ func TestValidate_DuplicateNameInView(t *testing.T) {
 func TestValidate_SameNameDifferentSelector_OK(t *testing.T) {
 	// Intentional reuse: same child name under different parent components
 	// (e.g. CarouselScrollButton under multiple carousels). Must NOT error.
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "ScrollBtn", Selectors: []string{"[data-testid='carousel-a'] button"}},
 		{Name: "ScrollBtn", Selectors: []string{"[data-testid='carousel-b'] button"}},
 		{Name: "ScrollBtn", Selectors: []string{"[data-testid='carousel-c'] button"}},
@@ -109,7 +108,7 @@ func TestValidate_MissingRoute(t *testing.T) {
 		{
 			Name:       "Home",
 			Route:      "",
-			Components: []match.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
+			Components: []sightmap.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
 		},
 	})
 	errs := sightmap.Validate(c)
@@ -123,14 +122,14 @@ func TestValidate_MissingRoute(t *testing.T) {
 
 func TestValidate_Clean(t *testing.T) {
 	c := corpusFrom(
-		[]match.ComponentDef{
+		[]sightmap.ComponentDef{
 			{Name: "NavBar", Selectors: []string{"nav"}},
 		},
 		[]sightmap.View{
 			{
 				Name:       "Home",
 				Route:      "/",
-				Components: []match.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
+				Components: []sightmap.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
 			},
 		},
 	)

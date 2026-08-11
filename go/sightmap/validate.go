@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sel"
 )
 
@@ -218,7 +217,7 @@ func viewLocList(vs []View) string {
 // seen maps component name → sorted-selector fingerprint so that the same
 // name is only flagged as a duplicate when the selector set is also identical.
 // Same name + different selectors = intentional child-component reuse = OK.
-func validateComponent(comp match.ComponentDef, seen map[string]string) []ValidationError {
+func validateComponent(comp ComponentDef, seen map[string]string) []ValidationError {
 	var errs []ValidationError
 
 	// empty-name: no further named checks are possible.

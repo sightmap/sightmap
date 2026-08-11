@@ -124,7 +124,7 @@ func runCoverage(args []string) error {
 // can't be loaded, parsed, or matched. Shared by coverage/report/multi-coverage so
 // every reader matches a capture the same route-aware way instead of
 // each re-implementing the load/parse/match boilerplate.
-func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.ComponentMatch, route string, ok bool) {
+func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch, route string, ok bool) {
 	treeFile := snapPath + ".tree.json"
 	data, err := os.ReadFile(treeFile)
 	if err != nil {
@@ -138,7 +138,7 @@ func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.Compone
 		return nil, nil, "", false
 	}
 	route = viewset.RouteOf(snapPath)
-	matches = sightmap.NewMatcher(corpus).MatchTree(root, route)
+	matches = match.NewMatcher(corpus).MatchTree(root, route)
 	return root, matches, route, true
 }
 

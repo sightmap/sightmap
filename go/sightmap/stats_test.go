@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // TestStats_DedupesSharedGlobals models the loader's output for a multi-file
@@ -14,14 +12,14 @@ import (
 // three times across the corpus. Totals must count it — and its memory entries
 // — exactly once, while each per-view row still counts its own expanded copy.
 func TestStats_DedupesSharedGlobals(t *testing.T) {
-	nav := match.ComponentDef{
+	nav := ComponentDef{
 		Name:      "Navigation",
 		Selectors: []string{`nav[data-component="Navigation"]`},
 		Memory:    []string{"sticky on scroll"},
 	}
 	corpus := &Corpus{
 		Memory: []string{"file-level note"},
-		GlobalComponents: []match.ComponentDef{
+		GlobalComponents: []ComponentDef{
 			nav,
 			{Name: "Footer", Selectors: []string{`footer[data-component="Footer"]`}},
 		},
@@ -33,7 +31,7 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 				Name:   "Checkout",
 				Route:  "/checkout",
 				Memory: []string{"guest checkout allowed"},
-				Components: []match.ComponentDef{
+				Components: []ComponentDef{
 					nav, // $ref-expanded copy of the global
 					{Name: "CartSummary", Selectors: []string{`[data-component="CartSummary"]`}},
 					{Name: "PaymentForm", Selectors: []string{`[data-component="PaymentForm"]`}},
@@ -47,10 +45,10 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 			{
 				Name:  "Dashboard",
 				Route: "/dashboard",
-				Components: []match.ComponentDef{
+				Components: []ComponentDef{
 					nav, // same global, reused by a second view
 					{Name: "ActivityFeed", Selectors: []string{`[data-component="ActivityFeed"]`},
-						Properties: []match.Property{{Name: "count", Extract: "text"}}},
+						Properties: []Property{{Name: "count", Extract: "text"}}},
 				},
 			},
 		},
@@ -102,21 +100,21 @@ func TestStats_SameNamedViewComponents(t *testing.T) {
 			{
 				Name:  "Products",
 				Route: "/products",
-				Components: []match.ComponentDef{{
+				Components: []ComponentDef{{
 					Name:       "Card",
 					Selectors:  []string{`[data-component="ProductCard"]`},
 					Memory:     []string{"price hides while the quote refreshes"},
-					Properties: []match.Property{{Name: "title", Extract: "text"}},
+					Properties: []Property{{Name: "title", Extract: "text"}},
 				}},
 			},
 			{
 				Name:  "Blog",
 				Route: "/blog",
-				Components: []match.ComponentDef{{
+				Components: []ComponentDef{{
 					Name:      "Card", // same local name, a different component
 					Selectors: []string{`[data-component="PostCard"]`},
 					Memory:    []string{"excerpt is truncated server-side"},
-					Properties: []match.Property{
+					Properties: []Property{
 						{Name: "headline", Extract: "text"},
 						{Name: "author", Extract: "attr=data-author"},
 					},
@@ -145,9 +143,9 @@ func TestStats_SameNamedViewComponents(t *testing.T) {
 // so the JSON contract serializes it as [].
 func TestStats_GlobalsOnlyCorpus(t *testing.T) {
 	corpus := &Corpus{
-		GlobalComponents: []match.ComponentDef{
+		GlobalComponents: []ComponentDef{
 			{Name: "Header", Selectors: []string{"#header"},
-				Properties: []match.Property{{Name: "brand", Extract: "text"}}},
+				Properties: []Property{{Name: "brand", Extract: "text"}}},
 		},
 		Requests: []RequestDef{
 			{Name: "Ping", Route: "/api/ping"},

@@ -8,8 +8,6 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // Loader is the source of sightmap corpus data.
@@ -300,14 +298,14 @@ func loadDir(path string) (*Corpus, error) {
 
 // ---- flattening helpers -----------------------------------------------------
 
-// rawPropsToMatch converts a slice of rawProperty to match.Property.
-func rawPropsToMatch(rps []rawProperty) []match.Property {
+// rawPropsToMatch converts a slice of rawProperty to Property.
+func rawPropsToMatch(rps []rawProperty) []Property {
 	if len(rps) == 0 {
 		return nil
 	}
-	ps := make([]match.Property, len(rps))
+	ps := make([]Property, len(rps))
 	for i, rp := range rps {
-		ps[i] = match.Property{Name: rp.Name, Extract: rp.Extract, Transform: rp.Transform}
+		ps[i] = Property{Name: rp.Name, Extract: rp.Extract, Transform: rp.Transform}
 	}
 	return ps
 }
@@ -488,8 +486,8 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 // stable: components in declaration order, each parent immediately before its
 // flattened children (pre-order). Combined with loadDir's lexical file walk this
 // gives the corpus a reproducible flattened/wire ordering.
-func flattenAll(rcs []rawComponent, ctx *flattenCtx) []match.ComponentDef {
-	var result []match.ComponentDef
+func flattenAll(rcs []rawComponent, ctx *flattenCtx) []ComponentDef {
+	var result []ComponentDef
 	for _, rc := range rcs {
 		result = append(result, flattenOne(rc, nil, ctx, nil, nil)...)
 	}
@@ -504,7 +502,7 @@ func flattenAll(rcs []rawComponent, ctx *flattenCtx) []match.ComponentDef {
 // extension can scope child selectors to their parent's DOM subtree.
 // refStack is the chain of $ref names currently being expanded; it guards
 // against circular references, which would otherwise recurse forever.
-func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string) []match.ComponentDef {
+func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string) []ComponentDef {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
 	if rc.Ref != "" {
 		for _, prev := range refStack {
@@ -572,7 +570,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		}
 	}
 
-	result := []match.ComponentDef{{
+	result := []ComponentDef{{
 		Name:        rc.Name,
 		Selectors:   mySels,
 		Source:      rc.Source,

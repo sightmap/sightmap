@@ -2,21 +2,21 @@ package render
 
 import (
 	"fmt"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"io"
 	"sort"
 	"strings"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // Comp is a filtered, display-ready component node produced by Filter().
 type Comp struct {
 	Id       string
-	Role     string                // display role: AX role (interactive) or match name (structural)
-	Name     string                // accessible name; may be collapsed from StaticText children
-	Value    string                // form field value
-	Match    *match.ComponentMatch // non-nil when matched by a sightmap definition
+	Role     string                   // display role: AX role (interactive) or match name (structural)
+	Name     string                   // accessible name; may be collapsed from StaticText children
+	Value    string                   // form field value
+	Match    *sightmap.ComponentMatch // non-nil when matched by a sightmap definition
 	Children []*Comp
 	Original *comps.ComponentNode // original raw node; .Role has the unmodified AX role
 }
@@ -50,7 +50,7 @@ type FormatOpts struct {
 // StaticText child is collapsed into the parent's Name.
 //
 // If matches is nil or empty, no sightmap annotations are applied.
-func Filter(root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.ComponentMatch) *Comp {
+func Filter(root *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) *Comp {
 	if root == nil {
 		return nil
 	}
@@ -216,7 +216,7 @@ func decide(node *comps.ComponentNode, matched bool) disposition {
 	return keepNode
 }
 
-func convert(node *comps.ComponentNode, matches map[*comps.ComponentNode]*match.ComponentMatch) []*Comp {
+func convert(node *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) []*Comp {
 	m := matches[node]
 	matched := m != nil
 
@@ -277,7 +277,7 @@ func convert(node *comps.ComponentNode, matches map[*comps.ComponentNode]*match.
 	}}
 }
 
-func convertChildren(node *comps.ComponentNode, matches map[*comps.ComponentNode]*match.ComponentMatch) []*Comp {
+func convertChildren(node *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) []*Comp {
 	var out []*Comp
 	for _, ch := range node.Children {
 		out = append(out, convert(ch, matches)...)

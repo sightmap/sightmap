@@ -16,7 +16,7 @@ import (
 // by the offline path (SlotsForCapture) and the live capture path (the capture
 // command) so both gate on the same notion of "new".
 func SlotsFromMatch(
-	matches map[*comps.ComponentNode]*match.ComponentMatch,
+	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
 	orphans []*comps.ComponentNode,
 	parentMap coverage.ParentMap,
 ) Slots {
@@ -45,7 +45,7 @@ func SlotsForCapture(snapPath string, corpus *sightmap.Corpus) (Slots, bool) {
 	if json.Unmarshal(data, &root) != nil {
 		return Slots{}, false
 	}
-	matches := sightmap.NewMatcher(corpus).MatchTree(&root, RouteOf(snapPath))
+	matches := match.NewMatcher(corpus).MatchTree(&root, RouteOf(snapPath))
 	cov := coverage.Score(&root, matches, coverage.Options{VisibleOnly: true})
 	return SlotsFromMatch(matches, cov.Orphans, cov.ParentMap), true
 }

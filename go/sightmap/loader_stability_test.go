@@ -4,15 +4,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/match"
 )
 
 func TestLoader_ComponentStability(t *testing.T) {
 	tests := []struct {
 		name     string
 		yaml     string
-		wantComp match.ComponentDef
+		wantComp ComponentDef
 	}{
 		{
 			name: "omitted defaults to empty",
@@ -21,7 +19,7 @@ components:
   - name: TestComponent
     selector: button
 `,
-			wantComp: match.ComponentDef{
+			wantComp: ComponentDef{
 				Name:       "TestComponent",
 				Selectors:  []string{"button"},
 				Stability:  "",
@@ -36,7 +34,7 @@ components:
     selector: '[data-testid="sheet"]'
     stability: uncertain
 `,
-			wantComp: match.ComponentDef{
+			wantComp: ComponentDef{
 				Name:       "UncertainComponent",
 				Selectors:  []string{`[data-testid="sheet"]`},
 				Stability:  "uncertain",
@@ -53,7 +51,7 @@ components:
     memory:
       - Selector uses volatile CSS module class names
 `,
-			wantComp: match.ComponentDef{
+			wantComp: ComponentDef{
 				Name:      "UnstableComponent",
 				Selectors: []string{".css-module-class"},
 				Stability: "unstable",
@@ -108,7 +106,7 @@ views:
 				Name:       "HomePage",
 				Route:      "/",
 				Stability:  "",
-				Components: []match.ComponentDef{},
+				Components: []ComponentDef{},
 			},
 		},
 		{
@@ -124,7 +122,7 @@ views:
 				Name:       "LegacyCMSPage",
 				Route:      "/legacy/**",
 				Stability:  "stub",
-				Components: []match.ComponentDef{},
+				Components: []ComponentDef{},
 			},
 		},
 		{
@@ -140,7 +138,7 @@ views:
 				Name:       "AdminPanel",
 				Route:      "/admin/**",
 				Stability:  "deferred",
-				Components: []match.ComponentDef{},
+				Components: []ComponentDef{},
 			},
 		},
 	}
@@ -200,7 +198,7 @@ components:
 	}
 
 	// Find each component by name
-	var parent, child *match.ComponentDef
+	var parent, child *ComponentDef
 	for i := range corpus.GlobalComponents {
 		if corpus.GlobalComponents[i].Name == "ParentComponent" {
 			parent = &corpus.GlobalComponents[i]

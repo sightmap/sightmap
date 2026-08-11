@@ -1,11 +1,11 @@
 package compquery
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 )
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -151,7 +151,7 @@ func TestPredicateMatch(t *testing.T) {
 //	└─ TileGroup
 //	    ├─ FulfillmentTileButton (t1) label=Pickup
 //	    └─ FulfillmentTileButton (t2) label=Delivery
-func buildFixture() (*comps.ComponentNode, map[*comps.ComponentNode]*match.ComponentMatch, map[string]map[string]string) {
+func buildFixture() (*comps.ComponentNode, map[*comps.ComponentNode]*sightmap.ComponentMatch, map[string]map[string]string) {
 	u1 := &comps.ComponentNode{Id: "u1"}
 	p1 := &comps.ComponentNode{Id: "p1"}
 	loginForm := &comps.ComponentNode{Id: "m2", Children: []*comps.ComponentNode{u1, p1}}
@@ -163,7 +163,7 @@ func buildFixture() (*comps.ComponentNode, map[*comps.ComponentNode]*match.Compo
 
 	root := &comps.ComponentNode{Id: "root", Children: []*comps.ComponentNode{mainPanel, tileGroup}}
 
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		mainPanel: {Name: "MainPanel"},
 		loginForm: {Name: "LoginForm"},
 		u1:        {Name: "UserNameInput"},

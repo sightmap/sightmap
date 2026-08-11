@@ -2,6 +2,7 @@ package match_test
 
 import (
 	"encoding/json"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"os"
 	"path/filepath"
 	"sort"
@@ -35,7 +36,7 @@ func TestConformance(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read sightmap: %v", err)
 			}
-			var defs []match.ComponentDef
+			var defs []sightmap.ComponentDef
 			if err := yaml.Unmarshal(smData, &defs); err != nil {
 				t.Fatalf("parse sightmap: %v", err)
 			}
