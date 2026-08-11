@@ -1,5 +1,10 @@
 package sightmap
 
+import (
+	"regexp"
+	"strings"
+)
+
 // MessageDef is a named console-output or runtime-exception pattern from the
 // sightmap corpus (SEP-0006). It gives console activity the same thing
 // RequestDef gives network activity: a named entity other parts of the corpus
@@ -53,4 +58,53 @@ const (
 // never emits), so this drives an advisory lint rather than validation.
 var KnownMessageLevels = []string{
 	LevelLog, LevelDebug, LevelInfo, LevelWarn, LevelError, LevelException,
+}
+
+// MessageMatch records which MessageDef classified an observed Message. It is
+// the message-side analogue of ComponentMatch: a projection of the matched
+// definition carrying the fields a consumer needs to link a classification back
+// to what produced it. Messages have no live-extracted properties, so — unlike
+// ComponentMatch — it carries no property values.
+type MessageMatch struct {
+	Name        string
+	Description string
+	Source      string
+}
+
+// MessagesForRecord returns every MessageDef that classifies the observed record
+// rec, as MessageMatch projections in corpus (declaration) order. A def matches
+// when both its declared constraints hold: Level compared case-insensitively for
+// equality, and Message as an RE2 regex (Go's regexp) against rec.Text. An
+// omitted constraint matches anything, so a def declaring neither matches every
+// record.
+//
+// All matches apply — there is no winner. Per SEP-0006 a record matching more
+// than one entry (len(result) > 1) is an ambiguity a consumer MUST surface
+// rather than silently resolving to a first match; this method never picks one
+// for you, mirroring how Matcher.Conflicts returns every colliding claim.
+//
+// A def whose Message fails to compile is skipped (it never matches) rather than
+// panicking: an in-memory Corpus may not have been validated, and matching stays
+// silent the way value omission does. Validation reports the malformed pattern
+// separately (message-regex-invalid).
+func (c *Corpus) MessagesForRecord(rec Message) []MessageMatch {
+	var out []MessageMatch
+	for i := range c.Messages {
+		m := &c.Messages[i]
+		if m.Level != "" && !strings.EqualFold(m.Level, rec.Level) {
+			continue
+		}
+		if m.Message != "" {
+			re, err := regexp.Compile(m.Message)
+			if err != nil || !re.MatchString(rec.Text) {
+				continue
+			}
+		}
+		out = append(out, MessageMatch{
+			Name:        m.Name,
+			Description: m.Description,
+			Source:      m.Source,
+		})
+	}
+	return out
 }
