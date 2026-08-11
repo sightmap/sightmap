@@ -448,21 +448,6 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 	return data, nil
 }
 
-// selectorString builds a simple CSS selector string from an observed Element.
-func selectorString(s *comps.Element) string {
-	if s == nil {
-		return ""
-	}
-	b := s.Tag
-	if s.Id != "" {
-		b += "#" + s.Id
-	}
-	for _, c := range s.Classes {
-		b += "." + c
-	}
-	return b
-}
-
 // ResolveBySightmapID resolves a probe id to a live element via its persisted
 // data-sightmap-id attribute (set on the DOM during the prior extraction) and
 // returns a ComponentNode carrying the element's CURRENT bounding box.
@@ -619,7 +604,7 @@ func Click(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) (int, 
 		// fall through to the bounds/selector paths below.
 	}
 	if node.Bounds == nil {
-		sel := selectorString(node.Element)
+		sel := node.Element.SelectorString()
 		if sel == "" {
 			return -1, -1, fmt.Errorf("click: node %q has no bounds and no selector", node.Id)
 		}
@@ -805,7 +790,7 @@ func KeyPress(ctx context.Context, conn *CDPConn, key string) error {
 // (e.g. a bare numeric probe ID) degrades silently to the bounds path rather
 // than surfacing as an EvalJSON JS exception.
 func ScrollIntoView(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) error {
-	if sel := selectorString(node.Element); sel != "" {
+	if sel := node.Element.SelectorString(); sel != "" {
 		script := fmt.Sprintf(
 			`try{const el=document.querySelector(%q);if(el)el.scrollIntoView({block:"center",behavior:"instant"})}catch(_){}`,
 			sel,
