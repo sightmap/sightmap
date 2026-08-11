@@ -8,7 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -406,22 +405,22 @@ func TestAllComponents(t *testing.T) {
 
 func TestMatchTreeEndToEnd(t *testing.T) {
 	// Tree: root → form#search → {input, button}
-	inputNode := &comps.ComponentNode{
+	inputNode := &sightmap.ComponentNode{
 		Id:      "input",
-		Element: &comps.Element{Tag: "input"},
+		Element: &sightmap.Element{Tag: "input"},
 	}
-	buttonNode := &comps.ComponentNode{
+	buttonNode := &sightmap.ComponentNode{
 		Id:      "button",
-		Element: &comps.Element{Tag: "button"},
+		Element: &sightmap.Element{Tag: "button"},
 	}
-	formNode := &comps.ComponentNode{
+	formNode := &sightmap.ComponentNode{
 		Id:       "form",
-		Element:  &comps.Element{Tag: "form", Id: "search-form"},
-		Children: []*comps.ComponentNode{inputNode, buttonNode},
+		Element:  &sightmap.Element{Tag: "form", Id: "search-form"},
+		Children: []*sightmap.ComponentNode{inputNode, buttonNode},
 	}
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:       "root",
-		Children: []*comps.ComponentNode{formNode},
+		Children: []*sightmap.ComponentNode{formNode},
 	}
 
 	corpus := &sightmap.Corpus{
@@ -467,13 +466,13 @@ func TestMatchTreeEndToEnd(t *testing.T) {
 // ---- 8. Concurrent safety (run with -race) ----------------------------------
 
 func TestConcurrentSafety(t *testing.T) {
-	buttonNode := &comps.ComponentNode{
+	buttonNode := &sightmap.ComponentNode{
 		Id:      "btn",
-		Element: &comps.Element{Tag: "button"},
+		Element: &sightmap.Element{Tag: "button"},
 	}
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:       "root",
-		Children: []*comps.ComponentNode{buttonNode},
+		Children: []*sightmap.ComponentNode{buttonNode},
 	}
 
 	corpus := &sightmap.Corpus{
@@ -573,8 +572,8 @@ func mustGet(t *testing.T, m map[string]sightmap.ComponentDef, name string) sigh
 
 func mustMatch(
 	t *testing.T,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
-	node *comps.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	node *sightmap.ComponentNode,
 	label string,
 ) *sightmap.ComponentMatch {
 	t.Helper()

@@ -1,16 +1,14 @@
-package sel_test
+package sightmap_test
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/sel"
 )
 
 // parseOK parses s and fails t if there's an error.
-func parseOK(t *testing.T, s string) sel.ParsedSelector {
+func parseOK(t *testing.T, s string) sightmap.ParsedSelector {
 	t.Helper()
-	ps, err := sel.ParseSightmapSelector(s)
+	ps, err := sightmap.ParseSightmapSelector(s)
 	if err != nil {
 		t.Fatalf("ParseSightmapSelector(%q) error: %v", s, err)
 	}
@@ -20,7 +18,7 @@ func parseOK(t *testing.T, s string) sel.ParsedSelector {
 // parseErr asserts that parsing s returns an error.
 func parseErr(t *testing.T, s string) {
 	t.Helper()
-	_, err := sel.ParseSightmapSelector(s)
+	_, err := sightmap.ParseSightmapSelector(s)
 	if err == nil {
 		t.Fatalf("ParseSightmapSelector(%q) expected error, got nil", s)
 	}
@@ -45,7 +43,7 @@ func TestParse_TagCaseNormalized(t *testing.T) {
 
 func TestParse_SyntheticMobileTag(t *testing.T) {
 	// Mobile tags like UIButton are preserved (lowercased by the parser,
-	// but matched case-insensitively by sel.Matches).
+	// but matched case-insensitively by sightmap.Matches).
 	ps := parseOK(t, "UIButton")
 	if ps.Parts[0].Tag != "uibutton" {
 		t.Errorf("tag: got %q, want %q", ps.Parts[0].Tag, "uibutton")
@@ -403,8 +401,8 @@ func TestParse_MultipleAttributes(t *testing.T) {
 }
 
 // nodeWith builds a minimal observed Element for testing Matches.
-func nodeWith(tag, id string, classes []string, attrs map[string]string) *comps.Element {
-	return &comps.Element{
+func nodeWith(tag, id string, classes []string, attrs map[string]string) *sightmap.Element {
+	return &sightmap.Element{
 		Tag:     tag,
 		Id:      id,
 		Classes: classes,

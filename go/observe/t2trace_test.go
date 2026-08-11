@@ -4,30 +4,29 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // TestWriteT2Trace_Basic verifies basic T2 enumeration functionality.
 func TestWriteT2Trace_Basic(t *testing.T) {
 	// Create a simple tree with T2 children
-	parent := &comps.ComponentNode{
+	parent := &sightmap.ComponentNode{
 		Id:   "parent",
 		Role: "complementary",
 	}
-	children := []*comps.ComponentNode{
+	children := []*sightmap.ComponentNode{
 		{Id: "c1", Role: "button", Name: "Create", IsInteractive: true},
 		{Id: "c2", Role: "button", Name: "Delete", IsInteractive: true},
 		{Id: "c3", Role: "link", Name: "Settings", IsInteractive: true},
 	}
 
-	t2clusters := map[*comps.ComponentNode]int{
+	t2clusters := map[*sightmap.ComponentNode]int{
 		parent: 3,
 	}
-	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
+	t2children := map[*sightmap.ComponentNode][]*sightmap.ComponentNode{
 		parent: children,
 	}
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "AppSidebar"},
 	}
 	view := &sightmap.ViewDef{
@@ -61,21 +60,21 @@ func TestWriteT2Trace_Basic(t *testing.T) {
 
 // TestWriteT2Trace_SingleChildSuppressed verifies single-child T2 is suppressed.
 func TestWriteT2Trace_SingleChildSuppressed(t *testing.T) {
-	parent := &comps.ComponentNode{
+	parent := &sightmap.ComponentNode{
 		Id:   "parent",
 		Role: "navigation",
 	}
-	child := &comps.ComponentNode{
+	child := &sightmap.ComponentNode{
 		Id: "c1", Role: "link", Name: "Privacy", IsInteractive: true,
 	}
 
-	t2clusters := map[*comps.ComponentNode]int{
+	t2clusters := map[*sightmap.ComponentNode]int{
 		parent: 1, // single child
 	}
-	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
+	t2children := map[*sightmap.ComponentNode][]*sightmap.ComponentNode{
 		parent: {child},
 	}
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "NavFooter"},
 	}
 	view := &sightmap.ViewDef{
@@ -96,23 +95,23 @@ func TestWriteT2Trace_SingleChildSuppressed(t *testing.T) {
 
 // TestWriteT2Trace_MemoryNoteSuppressed verifies memory note suppression.
 func TestWriteT2Trace_MemoryNoteSuppressed(t *testing.T) {
-	parent := &comps.ComponentNode{
+	parent := &sightmap.ComponentNode{
 		Id:   "parent",
 		Role: "main",
 	}
-	children := []*comps.ComponentNode{
+	children := []*sightmap.ComponentNode{
 		{Id: "c1", Role: "button", Name: "Action 1", IsInteractive: true},
 		{Id: "c2", Role: "button", Name: "Action 2", IsInteractive: true},
 		{Id: "c3", Role: "button", Name: "Action 3", IsInteractive: true},
 	}
 
-	t2clusters := map[*comps.ComponentNode]int{
+	t2clusters := map[*sightmap.ComponentNode]int{
 		parent: 3,
 	}
-	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
+	t2children := map[*sightmap.ComponentNode][]*sightmap.ComponentNode{
 		parent: children,
 	}
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "AppContent"},
 	}
 	view := &sightmap.ViewDef{
@@ -145,14 +144,14 @@ func TestWriteT2Trace_MemoryNoteSuppressed(t *testing.T) {
 
 // TestWriteT2Trace_Truncation verifies large lists are truncated.
 func TestWriteT2Trace_Truncation(t *testing.T) {
-	parent := &comps.ComponentNode{
+	parent := &sightmap.ComponentNode{
 		Id:   "parent",
 		Role: "region",
 	}
 	// Create 10 children
-	var children []*comps.ComponentNode
+	var children []*sightmap.ComponentNode
 	for i := 1; i <= 10; i++ {
-		children = append(children, &comps.ComponentNode{
+		children = append(children, &sightmap.ComponentNode{
 			Id:            string(rune('0' + i)),
 			Role:          "link",
 			Name:          "Product " + string(rune('0'+i)),
@@ -160,13 +159,13 @@ func TestWriteT2Trace_Truncation(t *testing.T) {
 		})
 	}
 
-	t2clusters := map[*comps.ComponentNode]int{
+	t2clusters := map[*sightmap.ComponentNode]int{
 		parent: 10,
 	}
-	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
+	t2children := map[*sightmap.ComponentNode][]*sightmap.ComponentNode{
 		parent: children,
 	}
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "ProductGrid"},
 	}
 	view := &sightmap.ViewDef{

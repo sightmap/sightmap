@@ -15,15 +15,13 @@ package coverage
 import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"math"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // Matches maps a component node to the sightmap rule it matched.
-type Matches = map[*comps.ComponentNode]*sightmap.ComponentMatch
+type Matches = map[*sightmap.ComponentNode]*sightmap.ComponentMatch
 
 // ParentMap maps each non-root node to its parent.
-type ParentMap = map[*comps.ComponentNode]*comps.ComponentNode
+type ParentMap = map[*sightmap.ComponentNode]*sightmap.ComponentNode
 
 // Options controls how coverage is scored.
 type Options struct {
@@ -40,27 +38,27 @@ type Result struct {
 	VisibleOnly       bool
 
 	// Orphans are the T3 nodes (interactive, no matched ancestor).
-	Orphans []*comps.ComponentNode
+	Orphans []*sightmap.ComponentNode
 	// Scopes maps a matched ancestor to its count of T2 children.
-	Scopes map[*comps.ComponentNode]int
+	Scopes map[*sightmap.ComponentNode]int
 	// ScopeChildren maps a matched ancestor to its T2 children.
-	ScopeChildren map[*comps.ComponentNode][]*comps.ComponentNode
+	ScopeChildren map[*sightmap.ComponentNode][]*sightmap.ComponentNode
 	// ParentMap is the node→parent map built during scoring.
 	ParentMap ParentMap
 }
 
 // Score classifies every interactive node in the tree into T1/T2/T3.
-func Score(root *comps.ComponentNode, matches Matches, opts Options) Result {
+func Score(root *sightmap.ComponentNode, matches Matches, opts Options) Result {
 	res := Result{
 		VisibleOnly:   opts.VisibleOnly,
-		Scopes:        make(map[*comps.ComponentNode]int),
-		ScopeChildren: make(map[*comps.ComponentNode][]*comps.ComponentNode),
+		Scopes:        make(map[*sightmap.ComponentNode]int),
+		ScopeChildren: make(map[*sightmap.ComponentNode][]*sightmap.ComponentNode),
 		ParentMap:     BuildParentMap(root),
 	}
 	if root == nil {
 		return res
 	}
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		if !n.IsInteractive {
 			return true
 		}
@@ -87,12 +85,12 @@ func Score(root *comps.ComponentNode, matches Matches, opts Options) Result {
 // the same visibility filter Score uses. It is the corpus-independent way to ask
 // "does this page have any actionable content?" — useful for detecting a blank or
 // still-loading page before a corpus is even involved.
-func CountInteractive(root *comps.ComponentNode, visibleOnly bool) int {
+func CountInteractive(root *sightmap.ComponentNode, visibleOnly bool) int {
 	if root == nil {
 		return 0
 	}
 	n := 0
-	comps.Walk(root, func(node *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(root, func(node *sightmap.ComponentNode, _ int) bool {
 		if !node.IsInteractive {
 			return true
 		}
@@ -106,12 +104,12 @@ func CountInteractive(root *comps.ComponentNode, visibleOnly bool) int {
 }
 
 // BuildParentMap returns a map from each non-root node to its parent.
-func BuildParentMap(root *comps.ComponentNode) ParentMap {
+func BuildParentMap(root *sightmap.ComponentNode) ParentMap {
 	pm := make(ParentMap)
 	if root == nil {
 		return pm
 	}
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		for _, child := range n.Children {
 			pm[child] = n
 		}
@@ -122,7 +120,7 @@ func BuildParentMap(root *comps.ComponentNode) ParentMap {
 
 // nearestMatchedAncestor returns the nearest ancestor of node that has a
 // sightmap match, or nil if none exists.
-func nearestMatchedAncestor(node *comps.ComponentNode, parentMap ParentMap, matches Matches) *comps.ComponentNode {
+func nearestMatchedAncestor(node *sightmap.ComponentNode, parentMap ParentMap, matches Matches) *sightmap.ComponentNode {
 	curr := parentMap[node]
 	for curr != nil {
 		if matches[curr] != nil {

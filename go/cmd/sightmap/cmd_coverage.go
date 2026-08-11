@@ -8,11 +8,9 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/observe"
-	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
 	"github.com/sightmap/sightmap/go/viewset"
 )
@@ -124,7 +122,7 @@ func runCoverage(args []string) error {
 // can't be loaded, parsed, or matched. Shared by coverage/report/multi-coverage so
 // every reader matches a capture the same route-aware way instead of
 // each re-implementing the load/parse/match boilerplate.
-func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch, route string, ok bool) {
+func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch, route string, ok bool) {
 	treeFile := snapPath + ".tree.json"
 	data, err := os.ReadFile(treeFile)
 	if err != nil {
@@ -132,7 +130,7 @@ func matchCapture(snapPath string, corpus *sightmap.Corpus) (root *comps.Compone
 			filepath.Base(snapPath), treeFile)
 		return nil, nil, "", false
 	}
-	root = &comps.ComponentNode{}
+	root = &sightmap.ComponentNode{}
 	if err := json.Unmarshal(data, root); err != nil {
 		fmt.Fprintf(os.Stderr, "%s: parse tree JSON: %v\n", filepath.Base(snapPath), err)
 		return nil, nil, "", false
@@ -241,15 +239,15 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 // (last) SelectorPart of selStr, ignoring all ancestor scoping. Used to
 // distinguish a broken scoped selector (leaf matches > 0) from a legitimately-
 // absent component (leaf matches == 0).
-func countLeafMatches(root *comps.ComponentNode, selStr string) int {
-	ps, err := sel.ParseSightmapSelector(selStr)
+func countLeafMatches(root *sightmap.ComponentNode, selStr string) int {
+	ps, err := sightmap.ParseSightmapSelector(selStr)
 	if err != nil || len(ps.Parts) == 0 {
 		return 0
 	}
 	leafPart := ps.Parts[len(ps.Parts)-1]
 	count := 0
-	comps.Walk(root, func(node *comps.ComponentNode, _ int) bool {
-		if sel.MatchesNode(node, leafPart) {
+	sightmap.Walk(root, func(node *sightmap.ComponentNode, _ int) bool {
+		if sightmap.MatchesNode(node, leafPart) {
 			count++
 		}
 		return true

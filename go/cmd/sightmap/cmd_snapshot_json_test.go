@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -25,7 +24,7 @@ func treeNode(t *testing.T, data []byte) map[string]any {
 }
 
 func TestWriteAnnotatedJSON_MatchedNode(t *testing.T) {
-	node := &comps.ComponentNode{
+	node := &sightmap.ComponentNode{
 		Id:            "1",
 		Role:          "link",
 		Name:          "The Home Depot",
@@ -38,7 +37,7 @@ func TestWriteAnnotatedJSON_MatchedNode(t *testing.T) {
 		Name:   "SiteLogoLink",
 		Memory: []string{"main navigation logo"},
 	}
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		node: sm,
 	}
 	propValues := map[string]map[string]string{
@@ -92,15 +91,15 @@ func TestWriteAnnotatedJSON_MatchedNode(t *testing.T) {
 }
 
 func TestWriteAnnotatedJSON_UnmatchedNode(t *testing.T) {
-	node := &comps.ComponentNode{
+	node := &sightmap.ComponentNode{
 		Id:   "2",
 		Role: "button",
 		Name: "Add to Cart",
 	}
 
 	// node is NOT in the matches map
-	other := &comps.ComponentNode{Id: "99"}
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	other := &sightmap.ComponentNode{Id: "99"}
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		other: {Name: "SomeOtherComponent"},
 	}
 
@@ -144,11 +143,11 @@ func TestWriteAnnotatedJSON_UnmatchedNode(t *testing.T) {
 }
 
 func TestWriteAnnotatedJSON_NilMatches(t *testing.T) {
-	node := &comps.ComponentNode{
+	node := &sightmap.ComponentNode{
 		Id:   "3",
 		Role: "heading",
 		Name: "Welcome",
-		Children: []*comps.ComponentNode{
+		Children: []*sightmap.ComponentNode{
 			{Id: "4", Role: "StaticText", Name: "Hello"},
 		},
 	}

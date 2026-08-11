@@ -9,7 +9,6 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/compquery"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -33,7 +32,7 @@ func looksLikeProbeID(arg string) bool {
 
 // resolveTarget resolves an interaction target that may be either a probe id or
 // a component query, returning a node with current bounds ready to act on.
-func resolveTarget(ctx context.Context, conn *browser.CDPConn, sightmapDir, arg string) (*comps.ComponentNode, error) {
+func resolveTarget(ctx context.Context, conn *browser.CDPConn, sightmapDir, arg string) (*sightmap.ComponentNode, error) {
 	if looksLikeProbeID(arg) {
 		return resolveNode(ctx, conn, arg)
 	}
@@ -45,7 +44,7 @@ func resolveTarget(ctx context.Context, conn *browser.CDPConn, sightmapDir, arg 
 // the query to a single node. Everything happens within one extraction, so the
 // returned node's bounds are fresh and no id crosses a call boundary — the
 // atomic resolve+act that fixes the dynamic-page race.
-func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapDir, queryStr string) (*comps.ComponentNode, error) {
+func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapDir, queryStr string) (*sightmap.ComponentNode, error) {
 	q, err := compquery.ParseQuery(queryStr)
 	if err != nil {
 		return nil, err
@@ -83,7 +82,7 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	for _, part := range q.Parts {
 		queryNames[part.Name] = true
 	}
-	relevant := make(map[*comps.ComponentNode]*sightmap.ComponentMatch)
+	relevant := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	for n, m := range matches {
 		if queryNames[m.Name] {
 			relevant[n] = m

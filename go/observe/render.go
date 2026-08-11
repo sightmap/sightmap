@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/render"
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -109,7 +108,7 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 
 // writeGuide prints the [Guide] section: component names and match counts,
 // sorted by count descending then name ascending.
-func writeGuide(w io.Writer, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) {
+func writeGuide(w io.Writer, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) {
 	counts := make(map[string]int)
 	for _, m := range matches {
 		if m != nil {
@@ -158,7 +157,7 @@ func writeGuide(w io.Writer, matches map[*comps.ComponentNode]*sightmap.Componen
 func writeZeroMatchWarnings(
 	w io.Writer,
 	viewComponents []sightmap.ComponentDef,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	view *sightmap.ViewDef,
 	globalNames map[string]bool,
 ) {
@@ -226,7 +225,7 @@ func writeConflicts(w io.Writer, r *Result) {
 
 // conflictNodeLabel formats a node for a conflict line: its probe id plus role
 // and accessible name when present.
-func conflictNodeLabel(n *comps.ComponentNode) string {
+func conflictNodeLabel(n *sightmap.ComponentNode) string {
 	if n == nil {
 		return "(node)"
 	}
@@ -260,8 +259,8 @@ func writeCoverage(w io.Writer, cov coverage.Result) {
 // and sorted by count descending.
 func WriteTrace(
 	w io.Writer,
-	t3nodes []*comps.ComponentNode,
-	parentMap map[*comps.ComponentNode]*comps.ComponentNode,
+	t3nodes []*sightmap.ComponentNode,
+	parentMap map[*sightmap.ComponentNode]*sightmap.ComponentNode,
 ) {
 	type clusterKey struct {
 		role   string
@@ -270,7 +269,7 @@ func WriteTrace(
 	}
 	type cluster struct {
 		count int
-		rep   *comps.ComponentNode
+		rep   *sightmap.ComponentNode
 	}
 
 	var order []clusterKey
@@ -339,9 +338,9 @@ func WriteTrace(
 //   - Large lists truncate at 8 items with "… (N more)"
 func WriteT2Trace(
 	w io.Writer,
-	t2clusters map[*comps.ComponentNode]int,
-	t2children map[*comps.ComponentNode][]*comps.ComponentNode,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	t2clusters map[*sightmap.ComponentNode]int,
+	t2children map[*sightmap.ComponentNode][]*sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	view *sightmap.ViewDef,
 ) {
 	const minT2Count = 2 // ≥2 children required (single-child = simple wrapper)
@@ -350,7 +349,7 @@ func WriteT2Trace(
 	type entry struct {
 		name      string
 		count     int
-		children  []*comps.ComponentNode
+		children  []*sightmap.ComponentNode
 		hasMemory bool
 	}
 	var entries []entry

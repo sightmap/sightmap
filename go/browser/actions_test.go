@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,8 +14,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 var wsUpgrader = websocket.Upgrader{
@@ -305,9 +304,9 @@ func TestClick_WithBounds(t *testing.T) {
 	})
 
 	// Center = (100+60/2, 200+40/2) = (130, 220)
-	node := &comps.ComponentNode{
+	node := &sightmap.ComponentNode{
 		Id:     "test",
-		Bounds: &comps.Bounds{X: 100, Y: 200, Width: 60, Height: 40},
+		Bounds: &sightmap.Bounds{X: 100, Y: 200, Width: 60, Height: 40},
 	}
 	if _, _, err := Click(context.Background(), conn, node); err != nil {
 		t.Fatal(err)
@@ -345,9 +344,9 @@ func TestClick_NoBounds(t *testing.T) {
 		return json.RawMessage(`{}`)
 	})
 
-	node := &comps.ComponentNode{
+	node := &sightmap.ComponentNode{
 		Id:      "test",
-		Element: &comps.Element{Tag: "button", Id: "submit"},
+		Element: &sightmap.Element{Tag: "button", Id: "submit"},
 	}
 	if _, _, err := Click(context.Background(), conn, node); err != nil {
 		t.Fatal(err)
@@ -407,7 +406,7 @@ func TestResolveBySightmapID(t *testing.T) {
 	if node.Bounds == nil {
 		t.Fatal("node Bounds is nil")
 	}
-	if got := *node.Bounds; got != (comps.Bounds{X: 10, Y: 20, Width: 30, Height: 40}) {
+	if got := *node.Bounds; got != (sightmap.Bounds{X: 10, Y: 20, Width: 30, Height: 40}) {
 		t.Errorf("bounds = %+v, want {10 20 30 40}", got)
 	}
 }
@@ -448,9 +447,9 @@ func TestFill(t *testing.T) {
 		return json.RawMessage(`{}`)
 	})
 
-	node := &comps.ComponentNode{
+	node := &sightmap.ComponentNode{
 		Id:     "field",
-		Bounds: &comps.Bounds{X: 0, Y: 0, Width: 100, Height: 30},
+		Bounds: &sightmap.Bounds{X: 0, Y: 0, Width: 100, Height: 30},
 	}
 	if err := Fill(context.Background(), conn, node, "hi"); err != nil {
 		t.Fatal(err)

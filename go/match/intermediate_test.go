@@ -7,7 +7,6 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 )
 
@@ -18,36 +17,36 @@ import (
 //	  ol (list — structural, no data attributes)
 //	    li (listitem — structural)
 //	      a (link — BreadcrumbLink target)
-func buildBreadcrumbTree() *comps.ComponentNode {
-	return &comps.ComponentNode{
+func buildBreadcrumbTree() *sightmap.ComponentNode {
+	return &sightmap.ComponentNode{
 		Id:      "page",
-		Element: &comps.Element{Tag: "div"},
-		Children: []*comps.ComponentNode{
+		Element: &sightmap.Element{Tag: "div"},
+		Children: []*sightmap.ComponentNode{
 			{
 				Id:   "breadcrumb",
 				Role: "navigation",
-				Element: &comps.Element{
+				Element: &sightmap.Element{
 					Tag:   "nav",
 					Attrs: map[string]string{"data-component": "breadcrumbs:Breadcrumbs:v14.0.1"},
 				},
-				Children: []*comps.ComponentNode{
+				Children: []*sightmap.ComponentNode{
 					{
 						Id:      "list",
 						Role:    "list",
-						Element: &comps.Element{Tag: "ol"},
-						Children: []*comps.ComponentNode{
+						Element: &sightmap.Element{Tag: "ol"},
+						Children: []*sightmap.ComponentNode{
 							{
 								Id:        "listitem",
 								Role:      "listitem",
 								IsIgnored: false,
-								Element:   &comps.Element{Tag: "li"},
-								Children: []*comps.ComponentNode{
+								Element:   &sightmap.Element{Tag: "li"},
+								Children: []*sightmap.ComponentNode{
 									{
 										Id:            "link",
 										Role:          "link",
 										IsInteractive: true,
 										IsVisible:     true,
-										Element:       &comps.Element{Tag: "a"},
+										Element:       &sightmap.Element{Tag: "a"},
 									},
 								},
 							},
@@ -73,8 +72,8 @@ func TestChildAnnotation_ThroughStructuralIntermediate(t *testing.T) {
 	result := match.ApplySightmap(root, defs)
 
 	// Find the specific nodes
-	var breadcrumbNode, linkNode *comps.ComponentNode
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	var breadcrumbNode, linkNode *sightmap.ComponentNode
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		switch n.Id {
 		case "breadcrumb":
 			breadcrumbNode = n
@@ -118,8 +117,8 @@ func TestChildAnnotation_BroadGlobalDoesNotSteal(t *testing.T) {
 
 	result := match.ApplySightmap(root, defs)
 
-	var linkNode *comps.ComponentNode
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	var linkNode *sightmap.ComponentNode
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		if n.Id == "link" {
 			linkNode = n
 		}

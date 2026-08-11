@@ -5,10 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"time"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // Navigate sends Page.navigate. Does NOT wait for load.
@@ -461,7 +460,7 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 //
 // Returns an error when no element carries the id (the node was removed or the
 // page was re-probed since), so callers can prompt for a fresh snapshot.
-func ResolveBySightmapID(ctx context.Context, conn *CDPConn, id string) (*comps.ComponentNode, error) {
+func ResolveBySightmapID(ctx context.Context, conn *CDPConn, id string) (*sightmap.ComponentNode, error) {
 	script := fmt.Sprintf(`(function(){
   var el=document.querySelector('[data-sightmap-id=%q]');
   if(!el) return null;
@@ -476,11 +475,11 @@ func ResolveBySightmapID(ctx context.Context, conn *CDPConn, id string) (*comps.
 		return nil, fmt.Errorf(
 			"component %q not found in live DOM (data-sightmap-id absent; re-run sightmap snapshot)", id)
 	}
-	var b comps.Bounds
+	var b sightmap.Bounds
 	if err := json.Unmarshal(raw, &b); err != nil {
 		return nil, fmt.Errorf("resolve %q: unmarshal bounds: %w", id, err)
 	}
-	return &comps.ComponentNode{Id: id, Bounds: &b}, nil
+	return &sightmap.ComponentNode{Id: id, Bounds: &b}, nil
 }
 
 // HoverAt moves the mouse to absolute page coordinates x, y without clicking.
@@ -508,7 +507,7 @@ func ClickAt(ctx context.Context, conn *CDPConn, x, y int) error {
 
 // Drag moves a component by (deltaX, deltaY) pixels via CDP mouse events.
 // Sequence: move to center → press → move to target → release.
-func Drag(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, deltaX, deltaY int) error {
+func Drag(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, deltaX, deltaY int) error {
 	if node.Bounds == nil {
 		return fmt.Errorf("drag: node %q has no bounds", node.Id)
 	}
@@ -586,7 +585,7 @@ func locateForClick(ctx context.Context, conn *CDPConn, id string) (clickTarget,
 // off-screen no-op). A node with no data-sightmap-id and no bounds falls back to
 // A node with no data-sightmap-id and no bounds falls back to
 // a selector-based JS click() and returns (-1, -1).
-func Click(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) (int, int, error) {
+func Click(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) (int, int, error) {
 	if node.Id != "" {
 		if t, err := locateForClick(ctx, conn, node.Id); err == nil && t.Found {
 			if !t.InViewport {
@@ -620,7 +619,7 @@ func Click(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) (int, 
 }
 
 // Hover moves the mouse to the center of node's bounding box.
-func Hover(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) error {
+func Hover(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) error {
 	if node.Bounds == nil {
 		return fmt.Errorf("Hover: node %q has no bounds", node.Id)
 	}
@@ -634,7 +633,7 @@ func Hover(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) error 
 
 // Fill clears the current value of a form field and types value into it.
 // Clicks the element first, then Ctrl+A to select all, then types each rune.
-func Fill(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, value string) error {
+func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("Fill: click to focus: %w", err)
 	}
@@ -704,7 +703,7 @@ func readInputValue(ctx context.Context, conn *CDPConn, id string) (string, bool
 // (reliable on React-controlled inputs where Ctrl+A may not select), then types
 // value using keystroke events. Use instead of Fill when a React input accumulates
 // text across multiple fill calls.
-func ClearAndFill(ctx context.Context, conn *CDPConn, node *comps.ComponentNode, value string) error {
+func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("ClearAndFill: click to focus: %w", err)
 	}
@@ -789,7 +788,7 @@ func KeyPress(ctx context.Context, conn *CDPConn, key string) error {
 // querySelector is wrapped in try-catch so a syntactically invalid selector
 // (e.g. a bare numeric probe ID) degrades silently to the bounds path rather
 // than surfacing as an EvalJSON JS exception.
-func ScrollIntoView(ctx context.Context, conn *CDPConn, node *comps.ComponentNode) error {
+func ScrollIntoView(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) error {
 	if sel := node.Element.SelectorString(); sel != "" {
 		script := fmt.Sprintf(
 			`try{const el=document.querySelector(%q);if(el)el.scrollIntoView({block:"center",behavior:"instant"})}catch(_){}`,

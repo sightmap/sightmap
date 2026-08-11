@@ -6,8 +6,6 @@ import (
 	"io"
 	"sort"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // InspectNode is a node in the unfiltered DOM-structural tree produced by Inspect().
@@ -15,16 +13,16 @@ import (
 // every node from the raw component tree and shows full selector details.
 type InspectNode struct {
 	Id            string
-	Tag           string         // element tag (from Element.Tag or Role fallback)
-	Element       *comps.Element // observed element identity from probe.js
-	Role          string         // AX role (informational)
-	Name          string         // AX accessible name (shown when non-empty)
+	Tag           string            // element tag (from Element.Tag or Role fallback)
+	Element       *sightmap.Element // observed element identity from probe.js
+	Role          string            // AX role (informational)
+	Name          string            // AX accessible name (shown when non-empty)
 	IsVisible     bool
 	IsIgnored     bool
 	IsInteractive bool
 	Match         *sightmap.ComponentMatch // non-nil when a sightmap definition matched
 	Children      []*InspectNode
-	Original      *comps.ComponentNode
+	Original      *sightmap.ComponentNode
 }
 
 // InspectOpts controls the output of FormatInspect.
@@ -45,14 +43,14 @@ type InspectOpts struct {
 // Inspect builds an unfiltered InspectNode tree from a raw ComponentNode tree.
 // Every node is preserved — hidden, ignored, and structural nodes all appear.
 // If matches is non-nil, matched nodes have their Match field populated.
-func Inspect(root *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) *InspectNode {
+func Inspect(root *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) *InspectNode {
 	if root == nil {
 		return nil
 	}
 	return buildInspectNode(root, matches)
 }
 
-func buildInspectNode(node *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) *InspectNode {
+func buildInspectNode(node *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) *InspectNode {
 	tag := ""
 	if node.Element != nil && node.Element.Tag != "" {
 		tag = node.Element.Tag
@@ -149,7 +147,7 @@ func (n *InspectNode) formatInspectNode(w io.Writer, indent string, depth int, o
 // Default (no flags): tag#id [data-*] [aria-*] [role] [type] [href] [name] [for] [action] [src] [placeholder]
 // --classes:          also prepends .class1.class2
 // --selectors:        shows ALL attributes (complete probe.js output)
-func inspectSelectorDisplay(sel *comps.Element, tag string, opts InspectOpts) string {
+func inspectSelectorDisplay(sel *sightmap.Element, tag string, opts InspectOpts) string {
 	if sel == nil {
 		return tag
 	}

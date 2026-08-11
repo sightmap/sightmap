@@ -5,41 +5,40 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 )
 
 // ---------- tree builders ----------------------------------------------------
 
-func node(id, tag string, classes []string, children ...*comps.ComponentNode) *comps.ComponentNode {
-	return &comps.ComponentNode{
+func node(id, tag string, classes []string, children ...*sightmap.ComponentNode) *sightmap.ComponentNode {
+	return &sightmap.ComponentNode{
 		Id:        id,
-		Element:   &comps.Element{Tag: tag, Classes: classes},
+		Element:   &sightmap.Element{Tag: tag, Classes: classes},
 		IsVisible: true,
 		Children:  children,
 	}
 }
 
-func nodeAttr(id, tag string, attrs map[string]string, children ...*comps.ComponentNode) *comps.ComponentNode {
-	return &comps.ComponentNode{
+func nodeAttr(id, tag string, attrs map[string]string, children ...*sightmap.ComponentNode) *sightmap.ComponentNode {
+	return &sightmap.ComponentNode{
 		Id:       id,
-		Element:  &comps.Element{Tag: tag, Attrs: attrs},
+		Element:  &sightmap.Element{Tag: tag, Attrs: attrs},
 		Children: children,
 	}
 }
 
-func nodeInvisible(id, tag string) *comps.ComponentNode {
-	return &comps.ComponentNode{
+func nodeInvisible(id, tag string) *sightmap.ComponentNode {
+	return &sightmap.ComponentNode{
 		Id:        id,
 		IsVisible: false,
-		Element:   &comps.Element{Tag: tag},
+		Element:   &sightmap.Element{Tag: tag},
 	}
 }
 
 // ---------- helpers ----------------------------------------------------------
 
 // applyDefs is a shorthand: build defs, apply, return matched node IDs by name.
-func applyDefs(t *testing.T, root *comps.ComponentNode, defs []sightmap.ComponentDef) map[string][]string {
+func applyDefs(t *testing.T, root *sightmap.ComponentNode, defs []sightmap.ComponentDef) map[string][]string {
 	t.Helper()
 	m := match.ApplySightmap(root, defs)
 	result := make(map[string][]string)
@@ -91,7 +90,7 @@ func assertNoMatch(t *testing.T, got map[string][]string, name string) {
 //       input[type=email] [id=inp1]
 //       button.submit     [id=btn3]   ← direct child of form
 
-func makeTree() *comps.ComponentNode {
+func makeTree() *sightmap.ComponentNode {
 	return node("root", "div", nil,
 		node("nav", "nav", []string{"main-nav"},
 			node("a1", "a", []string{"nav-link"}),
@@ -160,15 +159,15 @@ func TestDirectChild_DoesNotMatchGrandchild(t *testing.T) {
 
 func TestDirectChild_TwoHops(t *testing.T) {
 	// A > B > C chain.
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:      "r",
-		Element: &comps.Element{Tag: "ul"},
-		Children: []*comps.ComponentNode{
+		Element: &sightmap.Element{Tag: "ul"},
+		Children: []*sightmap.ComponentNode{
 			{
 				Id:      "li",
-				Element: &comps.Element{Tag: "li"},
-				Children: []*comps.ComponentNode{
-					{Id: "a", Element: &comps.Element{Tag: "a"}},
+				Element: &sightmap.Element{Tag: "li"},
+				Children: []*sightmap.ComponentNode{
+					{Id: "a", Element: &sightmap.Element{Tag: "a"}},
 				},
 			},
 		},
@@ -180,15 +179,15 @@ func TestDirectChild_TwoHops(t *testing.T) {
 
 func TestDirectChild_NotTwoLevelsDeep(t *testing.T) {
 	// ul > a should NOT match a inside li (two levels deep).
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:      "r",
-		Element: &comps.Element{Tag: "ul"},
-		Children: []*comps.ComponentNode{
+		Element: &sightmap.Element{Tag: "ul"},
+		Children: []*sightmap.ComponentNode{
 			{
 				Id:      "li",
-				Element: &comps.Element{Tag: "li"},
-				Children: []*comps.ComponentNode{
-					{Id: "a", Element: &comps.Element{Tag: "a"}},
+				Element: &sightmap.Element{Tag: "li"},
+				Children: []*sightmap.ComponentNode{
+					{Id: "a", Element: &sightmap.Element{Tag: "a"}},
 				},
 			},
 		},
@@ -239,11 +238,11 @@ func TestInvisibleNodesIncluded(t *testing.T) {
 
 func TestNilSelectorNode_DoesNotMatchSpecificRule(t *testing.T) {
 	// A node with nil Selector cannot satisfy a specific selector rule.
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:      "root",
 		Element: nil,
-		Children: []*comps.ComponentNode{
-			{Id: "child", Element: &comps.Element{Tag: "button"}},
+		Children: []*sightmap.ComponentNode{
+			{Id: "child", Element: &sightmap.Element{Tag: "button"}},
 		},
 	}
 	defs := []sightmap.ComponentDef{{Name: "Btn", Selectors: []string{"button"}}}
@@ -286,13 +285,13 @@ func TestFramePrefixedIDs_Traversed(t *testing.T) {
 
 func TestMobileSyntheticSelector(t *testing.T) {
 	// Native mobile component with synthetic selectors.
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:      "screen",
-		Element: &comps.Element{Tag: "UIView"},
-		Children: []*comps.ComponentNode{
+		Element: &sightmap.Element{Tag: "UIView"},
+		Children: []*sightmap.ComponentNode{
 			{
 				Id: "btn",
-				Element: &comps.Element{
+				Element: &sightmap.Element{
 					Tag:   "UIButton",
 					Attrs: map[string]string{"label": "Add to Cart"},
 				},

@@ -13,7 +13,6 @@ import (
 
 	"github.com/sightmap/sightmap/go/authoring"
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -245,7 +244,7 @@ func buildSightmapMatchMapForSuggest(
 	}
 	matches := match.NewMatcher(corpus).MatchTree(root, pageURL)
 	m := make(map[string]string)
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {
 			m[n.Id] = sm.Name
 		}
@@ -261,7 +260,7 @@ func buildSightmapMatchMap(treeFile string, smDir string, pageURL string) (map[s
 	if err != nil {
 		return nil, err
 	}
-	var root comps.ComponentNode
+	var root sightmap.ComponentNode
 	if err := json.Unmarshal(data, &root); err != nil {
 		return nil, fmt.Errorf("parse tree JSON: %v", err)
 	}
@@ -271,7 +270,7 @@ func buildSightmapMatchMap(treeFile string, smDir string, pageURL string) (map[s
 	}
 	matches := match.NewMatcher(corpus).MatchTree(&root, pageURL)
 	m := make(map[string]string)
-	comps.Walk(&root, func(n *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(&root, func(n *sightmap.ComponentNode, _ int) bool {
 		if sm := matches[n]; sm != nil && n.Id != "" {
 			m[n.Id] = sm.Name
 		}

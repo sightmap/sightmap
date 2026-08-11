@@ -2,8 +2,7 @@ package coverage
 
 import (
 	"fmt"
-
-	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // The anchor helpers locate the nearest stable (data-attr-bearing) ancestor of a
@@ -13,7 +12,7 @@ import (
 
 // NearestDataAttrAncestor walks up parentMap to the nearest ancestor whose
 // selector carries a data-testid or data-component attribute, or nil if none.
-func NearestDataAttrAncestor(node *comps.ComponentNode, parentMap ParentMap) *comps.ComponentNode {
+func NearestDataAttrAncestor(node *sightmap.ComponentNode, parentMap ParentMap) *sightmap.ComponentNode {
 	curr := parentMap[node]
 	for curr != nil {
 		if curr.Element != nil {
@@ -29,7 +28,7 @@ func NearestDataAttrAncestor(node *comps.ComponentNode, parentMap ParentMap) *co
 
 // DataAttrSelector formats an ancestor node for an "inside:" display line.
 // Prefers data-testid, then data-component, then falls back to tag#id.cls.
-func DataAttrSelector(node *comps.ComponentNode) string {
+func DataAttrSelector(node *sightmap.ComponentNode) string {
 	if node.Element == nil {
 		return node.Role
 	}
@@ -53,7 +52,7 @@ func DataAttrSelector(node *comps.ComponentNode) string {
 // its nearest data-attr ancestor — deliberately WITHOUT the node's instance text,
 // so different instances of the same widget (e.g. each product link in a
 // carousel) collapse to one slot and don't read as endless novelty.
-func OrphanSlotKey(node *comps.ComponentNode, parentMap ParentMap) string {
+func OrphanSlotKey(node *sightmap.ComponentNode, parentMap ParentMap) string {
 	role := node.Role
 	if role == "" {
 		role = "?"
@@ -68,7 +67,7 @@ func OrphanSlotKey(node *comps.ComponentNode, parentMap ParentMap) string {
 // ArrowHint builds the "→ selector" suggestion for a T3 node: the nearest
 // data-attr ancestor as the scope plus the node's own tag as the leaf. Returns
 // "" when there is no stable ancestor to anchor on.
-func ArrowHint(node *comps.ComponentNode, parentMap ParentMap) string {
+func ArrowHint(node *sightmap.ComponentNode, parentMap ParentMap) string {
 	nodeTag := ""
 	if node.Element != nil {
 		nodeTag = node.Element.Tag

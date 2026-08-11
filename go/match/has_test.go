@@ -3,15 +3,13 @@ package match_test
 import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // TestHas_FormGroupScoping is the end-to-end (snapshot/coverage) path for the
 // :has() relational pseudo-class: only the form-group that contains a checkbox
 // should match, mirroring the homedepot assembly-vs-protection rows.
 func TestHas_FormGroupScoping(t *testing.T) {
-	formGroup := func(id string, control *comps.ComponentNode) *comps.ComponentNode {
+	formGroup := func(id string, control *sightmap.ComponentNode) *sightmap.ComponentNode {
 		return nodeAttr(id, "div", map[string]string{"data-testid": "form-group"},
 			node("", "div", nil, control))
 	}

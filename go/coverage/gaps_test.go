@@ -3,8 +3,6 @@ package coverage
 import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // gapsFixture builds a small tree and returns root + parentMap so each test can
@@ -13,32 +11,32 @@ import (
 //	root (generic)
 //	└─ banner (generic, data-testid="hero")
 //	   └─ image  name="UP TO $800 OFF select appliances"   (the content node)
-func gapsFixture() (root, banner, image *comps.ComponentNode, parentMap map[*comps.ComponentNode]*comps.ComponentNode) {
-	image = &comps.ComponentNode{
+func gapsFixture() (root, banner, image *sightmap.ComponentNode, parentMap map[*sightmap.ComponentNode]*sightmap.ComponentNode) {
+	image = &sightmap.ComponentNode{
 		Id:        "img",
 		Role:      "image",
 		Name:      "UP TO $800 OFF select appliances",
 		IsVisible: true,
 	}
-	banner = &comps.ComponentNode{
+	banner = &sightmap.ComponentNode{
 		Id:        "banner",
 		Role:      "generic",
 		IsVisible: true,
-		Element:   &comps.Element{Tag: "div", Attrs: map[string]string{"data-testid": "hero"}},
-		Children:  []*comps.ComponentNode{image},
+		Element:   &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "hero"}},
+		Children:  []*sightmap.ComponentNode{image},
 	}
-	root = &comps.ComponentNode{
+	root = &sightmap.ComponentNode{
 		Id:        "root",
 		Role:      "generic",
 		IsVisible: true,
-		Children:  []*comps.ComponentNode{banner},
+		Children:  []*sightmap.ComponentNode{banner},
 	}
 	return root, banner, image, BuildParentMap(root)
 }
 
 func TestAnnotationGaps_FlaggedWhenNoContext(t *testing.T) {
 	root, _, image, pm := gapsFixture()
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{} // nothing matched
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{} // nothing matched
 
 	gaps := Gaps(root, matches, pm, true)
 	if len(gaps) != 1 {
@@ -59,7 +57,7 @@ func TestAnnotationGaps_FlaggedWhenNoContext(t *testing.T) {
 func TestAnnotationGaps_NotFlaggedWhenDirectlyMatched(t *testing.T) {
 	root, _, image, pm := gapsFixture()
 	// The content node itself is now captured by a component (T1).
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		image: {Name: "BannerImage"},
 	}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
@@ -70,7 +68,7 @@ func TestAnnotationGaps_NotFlaggedWhenDirectlyMatched(t *testing.T) {
 func TestAnnotationGaps_NotFlaggedWhenAncestorMatched(t *testing.T) {
 	root, banner, _, pm := gapsFixture()
 	// A matched ancestor gives the node component context → precision guard.
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		banner: {Name: "HeroBanner"},
 	}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
@@ -79,17 +77,17 @@ func TestAnnotationGaps_NotFlaggedWhenAncestorMatched(t *testing.T) {
 }
 
 func TestAnnotationGaps_ShortAndEmptyNamesIgnored(t *testing.T) {
-	short := &comps.ComponentNode{Id: "s", Role: "image", Name: "Sale", IsVisible: true}
-	empty := &comps.ComponentNode{Id: "e", Role: "image", Name: "   ", IsVisible: true}
-	symbols := &comps.ComponentNode{Id: "y", Role: "image", Name: "$$$ 100% !!!!!", IsVisible: true}
-	root := &comps.ComponentNode{
+	short := &sightmap.ComponentNode{Id: "s", Role: "image", Name: "Sale", IsVisible: true}
+	empty := &sightmap.ComponentNode{Id: "e", Role: "image", Name: "   ", IsVisible: true}
+	symbols := &sightmap.ComponentNode{Id: "y", Role: "image", Name: "$$$ 100% !!!!!", IsVisible: true}
+	root := &sightmap.ComponentNode{
 		Id:        "root",
 		Role:      "generic",
 		IsVisible: true,
-		Children:  []*comps.ComponentNode{short, empty, symbols},
+		Children:  []*sightmap.ComponentNode{short, empty, symbols},
 	}
 	pm := BuildParentMap(root)
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{}
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps for short/empty/symbol names, got %d: %+v", len(gaps), gaps)
 	}
@@ -97,41 +95,41 @@ func TestAnnotationGaps_ShortAndEmptyNamesIgnored(t *testing.T) {
 
 func TestAnnotationGaps_InteractiveSkipped(t *testing.T) {
 	// An interactive long-named orphan is scored by T1/T2/T3, not here.
-	link := &comps.ComponentNode{
+	link := &sightmap.ComponentNode{
 		Id:            "l",
 		Role:          "link",
 		Name:          "Shop all appliance deals today",
 		IsVisible:     true,
 		IsInteractive: true,
 	}
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:        "root",
 		Role:      "generic",
 		IsVisible: true,
-		Children:  []*comps.ComponentNode{link},
+		Children:  []*sightmap.ComponentNode{link},
 	}
 	pm := BuildParentMap(root)
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{}
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{}
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("want 0 gaps for interactive node, got %d: %+v", len(gaps), gaps)
 	}
 }
 
 func TestAnnotationGaps_VisibleOnly(t *testing.T) {
-	hidden := &comps.ComponentNode{
+	hidden := &sightmap.ComponentNode{
 		Id:        "h",
 		Role:      "image",
 		Name:      "Hidden promotional banner copy",
 		IsVisible: false,
 	}
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:        "root",
 		Role:      "generic",
 		IsVisible: true,
-		Children:  []*comps.ComponentNode{hidden},
+		Children:  []*sightmap.ComponentNode{hidden},
 	}
 	pm := BuildParentMap(root)
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{}
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{}
 
 	if gaps := Gaps(root, matches, pm, true); len(gaps) != 0 {
 		t.Fatalf("visibleOnly: want 0 gaps for hidden node, got %d", len(gaps))

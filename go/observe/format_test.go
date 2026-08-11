@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -20,7 +19,7 @@ func renderResult(r *Result) string {
 // renderer must say so, not silently omit the header.
 func TestFormat_NoViewMatched(t *testing.T) {
 	r := &Result{
-		Root:          &comps.ComponentNode{Id: "1", Role: "document", IsVisible: true},
+		Root:          &sightmap.ComponentNode{Id: "1", Role: "document", IsVisible: true},
 		URL:           "https://app.example.com/login",
 		CorpusApplied: true,
 		View:          nil,
@@ -39,7 +38,7 @@ func TestFormat_NoViewMatched(t *testing.T) {
 // [Coverage] line must still print (all orphans), not vanish.
 func TestFormat_CoverageWithZeroMatches(t *testing.T) {
 	r := &Result{
-		Root:          &comps.ComponentNode{Id: "1", Role: "document", IsVisible: true},
+		Root:          &sightmap.ComponentNode{Id: "1", Role: "document", IsVisible: true},
 		URL:           "https://app.example.com/x",
 		CorpusApplied: true,
 		View:          &sightmap.ViewDef{Name: "Stub", Route: "/x"},
@@ -59,13 +58,13 @@ func TestFormat_CoverageWithZeroMatches(t *testing.T) {
 // multiple components) surface in a [Conflicts] section.
 func TestFormat_Conflicts(t *testing.T) {
 	r := &Result{
-		Root:          &comps.ComponentNode{Id: "1", Role: "document", IsVisible: true},
+		Root:          &sightmap.ComponentNode{Id: "1", Role: "document", IsVisible: true},
 		URL:           "https://app.example.com/a/b",
 		CorpusApplied: true,
 		View:          &sightmap.ViewDef{Name: "AStar", Route: "/a/*"},
 		TiedViews:     []string{"AStar", "StarB"},
 		ComponentConflicts: []sightmap.Conflict{{
-			Node:  &comps.ComponentNode{Id: "7", Role: "button", Name: "Save"},
+			Node:  &sightmap.ComponentNode{Id: "7", Role: "button", Name: "Save"},
 			Names: []string{"AppDialog", "LoginDialog"},
 		}},
 	}
@@ -85,7 +84,7 @@ func TestFormat_Conflicts(t *testing.T) {
 // [Coverage] line should appear (the raw tree stands on its own).
 func TestFormat_NoCorpus(t *testing.T) {
 	r := &Result{
-		Root:          &comps.ComponentNode{Id: "1", Role: "document", IsVisible: true},
+		Root:          &sightmap.ComponentNode{Id: "1", Role: "document", IsVisible: true},
 		URL:           "https://app.example.com/x",
 		CorpusApplied: false,
 	}

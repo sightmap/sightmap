@@ -1,4 +1,4 @@
-package comps
+package sightmap
 
 // Predicate tests whether a node should be included in a filtered tree.
 // Returns (include bool, descend bool):

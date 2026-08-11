@@ -1,6 +1,6 @@
 package extract
 
-import "github.com/sightmap/sightmap/go/comps"
+import "github.com/sightmap/sightmap/go/sightmap"
 
 // ProbeResult is the top-level response from running probe.js in the page.
 type ProbeResult struct {
@@ -13,14 +13,14 @@ type ProbeResult struct {
 // ProbeComponent is the JSON output of probe.js for one element.
 // The Selector field is a CSS selector string.
 // probe.js will output a structured object; for now, parse
-// the string using sel.ParseSightmapSelector.
+// the string using sightmap.ParseSightmapSelector.
 type ProbeComponent struct {
 	Id            string            `json:"id"`
 	Role          string            `json:"role"`  // empty pre-merge
 	Text          string            `json:"text"`  // raw textContent
 	Value         string            `json:"value"` // empty pre-merge
 	Properties    map[string]string `json:"properties"`
-	Bounds        *comps.Bounds     `json:"bounds"`
+	Bounds        *sightmap.Bounds  `json:"bounds"`
 	Selector      string            `json:"selector"` // CSS selector string
 	OnTop         bool              `json:"onTop"`
 	IsVisible     bool              `json:"isVisible"`

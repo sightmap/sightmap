@@ -1,9 +1,7 @@
-package sel
+package sightmap
 
 import (
 	"strings"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // MatchesNode reports whether a tree node satisfies rule, including the
@@ -11,13 +9,13 @@ import (
 // applies the flat checks via Matches, then verifies every :has() entry against
 // node's descendants. Tree-walking callers (the rule matcher, sel-check, lint)
 // should use this instead of Matches so :has() is honored.
-func MatchesNode(node *comps.ComponentNode, rule *comps.SelectorPart) bool {
+func MatchesNode(node *ComponentNode, rule *SelectorPart) bool {
 	if rule == nil {
 		return true
 	}
 	el := node.Element
 	if el == nil {
-		el = &comps.Element{}
+		el = &Element{}
 	}
 	if !Matches(el, rule) {
 		return false
@@ -33,7 +31,7 @@ func MatchesNode(node *comps.ComponentNode, rule *comps.SelectorPart) bool {
 
 // hasMatches reports whether node's subtree satisfies the :has() selector h
 // (any of its comma-separated alternatives).
-func hasMatches(node *comps.ComponentNode, h *comps.HasSelector) bool {
+func hasMatches(node *ComponentNode, h *HasSelector) bool {
 	for _, alt := range h.Alternatives {
 		if relMatches(node, alt.Parts, alt.Combinators, 0) {
 			return true
@@ -46,10 +44,10 @@ func hasMatches(node *comps.ComponentNode, h *comps.HasSelector) bool {
 // within anchor's subtree. combs[idx] links anchor to parts[idx]: ">" means
 // parts[idx] must match a direct child of anchor; " " means any descendant.
 // MatchesNode is used for each candidate so nested :has() works.
-func relMatches(anchor *comps.ComponentNode, parts []*comps.SelectorPart, combs []string, idx int) bool {
+func relMatches(anchor *ComponentNode, parts []*SelectorPart, combs []string, idx int) bool {
 	direct := combs[idx] == ">"
-	var search func(n *comps.ComponentNode) bool
-	search = func(n *comps.ComponentNode) bool {
+	var search func(n *ComponentNode) bool
+	search = func(n *ComponentNode) bool {
 		for _, child := range n.Children {
 			if MatchesNode(child, parts[idx]) {
 				if idx+1 == len(parts) {
@@ -72,7 +70,7 @@ func relMatches(anchor *comps.ComponentNode, parts []*comps.SelectorPart, combs 
 // attribute operators, :not(), and :is()/:where(). It does NOT evaluate :has()
 // (which needs tree context — use MatchesNode for that). A nil rule matches
 // everything. el is the observed element's identity (the subject).
-func Matches(el *comps.Element, rule *comps.SelectorPart) bool {
+func Matches(el *Element, rule *SelectorPart) bool {
 	if rule == nil {
 		return true
 	}
@@ -146,7 +144,7 @@ func Matches(el *comps.Element, rule *comps.SelectorPart) bool {
 // them there to match offline the way the browser matches them live. Attrs is
 // consulted first (it wins when populated); id/class then fall back to their
 // dedicated fields. All other attributes come straight from Attrs.
-func effectiveAttrValue(el *comps.Element, key string) (string, bool) {
+func effectiveAttrValue(el *Element, key string) (string, bool) {
 	if v, ok := el.Attrs[key]; ok {
 		return v, true
 	}

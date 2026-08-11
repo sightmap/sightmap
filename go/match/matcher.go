@@ -1,8 +1,7 @@
 package match
 
 import (
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/sel"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // MatchQuery pairs a semantic name with a parsed, root-first selector chain.
@@ -11,7 +10,7 @@ import (
 //   - Subsequent entries are " " (descendant) or ">" (direct child)
 type MatchQuery struct {
 	Name        string
-	Parts       []*comps.SelectorPart
+	Parts       []*sightmap.SelectorPart
 	Combinators []string
 }
 
@@ -24,9 +23,9 @@ type MatchQuery struct {
 // special handling — component IDs are globally unique and require no frame
 // boundary logic here.
 func FindAllMatches(
-	root *comps.ComponentNode,
+	root *sightmap.ComponentNode,
 	queries []MatchQuery,
-	onMatch func(*comps.ComponentNode, *MatchQuery),
+	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 ) {
 	if root == nil || len(queries) == 0 {
 		return
@@ -49,10 +48,10 @@ type selectorState struct {
 //	direct     – states that must be checked at this node ONLY (direct-child
 //	             combinator consumed one level).
 func findAllMatchesNFA(
-	node *comps.ComponentNode,
+	node *sightmap.ComponentNode,
 	descendant, direct []selectorState,
 	queries []MatchQuery,
-	onMatch func(*comps.ComponentNode, *MatchQuery),
+	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 ) {
 	// Build de-duplicated set of states to evaluate at this node.
 	// Fresh starts ({q, 0}) are added for every query at every node — this is
@@ -103,7 +102,7 @@ func findAllMatchesNFA(
 		rule := state.q.Parts[state.idx]
 		// MatchesNode honors :has() (needs node's subtree); falls back to the
 		// flat checks for everything else.
-		if !sel.MatchesNode(node, rule) {
+		if !sightmap.MatchesNode(node, rule) {
 			continue
 		}
 

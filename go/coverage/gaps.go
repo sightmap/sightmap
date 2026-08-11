@@ -1,12 +1,11 @@
 package coverage
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // Annotation-completeness detector
@@ -67,12 +66,12 @@ func isContentName(s string) bool {
 // T1/T2/T3 tiers; this detector exists to catch NON-interactive content that
 // coverage cannot see. visibleOnly mirrors Score: hidden/ignored nodes are
 // skipped when set.
-func Gaps(root *comps.ComponentNode, matches Matches, parentMap ParentMap, visibleOnly bool) []ContentGap {
+func Gaps(root *sightmap.ComponentNode, matches Matches, parentMap ParentMap, visibleOnly bool) []ContentGap {
 	var gaps []ContentGap
 	if root == nil {
 		return gaps
 	}
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		if n.IsInteractive {
 			return true // scored by T1/T2/T3 already
 		}

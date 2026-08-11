@@ -1,22 +1,20 @@
-package sel_test
+package sightmap_test
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/sel"
 )
 
 // cn builds a ComponentNode with the given observed element identity and children.
-func cn(el *comps.Element, children ...*comps.ComponentNode) *comps.ComponentNode {
-	return &comps.ComponentNode{Element: el, Children: children}
+func cn(el *sightmap.Element, children ...*sightmap.ComponentNode) *sightmap.ComponentNode {
+	return &sightmap.ComponentNode{Element: el, Children: children}
 }
 
 // mustLastPart parses a selector and returns its final (target) part.
-func mustLastPart(t *testing.T, s string) *comps.SelectorPart {
+func mustLastPart(t *testing.T, s string) *sightmap.SelectorPart {
 	t.Helper()
-	ps, err := sel.ParseSightmapSelector(s)
+	ps, err := sightmap.ParseSightmapSelector(s)
 	if err != nil {
 		t.Fatalf("parse %q: %v", s, err)
 	}
@@ -102,7 +100,7 @@ func TestParse_Has_Errors(t *testing.T) {
 		{"div:zzz(x)", "unsupported pseudo-class"},
 	}
 	for _, tc := range cases {
-		_, err := sel.ParseSightmapSelector(tc.sel)
+		_, err := sightmap.ParseSightmapSelector(tc.sel)
 		if err == nil {
 			t.Errorf("%q: expected error, got nil", tc.sel)
 			continue
@@ -121,10 +119,10 @@ func TestMatchesNode_Has_Descendant(t *testing.T) {
 		cn(nodeWith("span", "", nil, nil),
 			cn(nodeWith("input", "", nil, nil))))
 
-	if !sel.MatchesNode(tree, mustLastPart(t, "div:has(input)")) {
+	if !sightmap.MatchesNode(tree, mustLastPart(t, "div:has(input)")) {
 		t.Error("div:has(input) should match a div with a nested input")
 	}
-	if sel.MatchesNode(tree, mustLastPart(t, "div:has(button)")) {
+	if sightmap.MatchesNode(tree, mustLastPart(t, "div:has(button)")) {
 		t.Error("div:has(button) should not match (no button)")
 	}
 }
@@ -134,14 +132,14 @@ func TestMatchesNode_Has_DirectChild(t *testing.T) {
 	deep := cn(nodeWith("div", "", nil, nil),
 		cn(nodeWith("span", "", nil, nil),
 			cn(nodeWith("input", "", nil, nil))))
-	if sel.MatchesNode(deep, mustLastPart(t, "div:has(> input)")) {
+	if sightmap.MatchesNode(deep, mustLastPart(t, "div:has(> input)")) {
 		t.Error("div:has(> input) should NOT match a grandchild input")
 	}
 
 	// div > input   (direct child)
 	shallow := cn(nodeWith("div", "", nil, nil),
 		cn(nodeWith("input", "", nil, nil)))
-	if !sel.MatchesNode(shallow, mustLastPart(t, "div:has(> input)")) {
+	if !sightmap.MatchesNode(shallow, mustLastPart(t, "div:has(> input)")) {
 		t.Error("div:has(> input) should match a direct-child input")
 	}
 }
@@ -151,10 +149,10 @@ func TestMatchesNode_Has_Chain(t *testing.T) {
 	tree := cn(nodeWith("div", "", nil, nil),
 		cn(nodeWith("", "", []string{"row"}, nil),
 			cn(nodeWith("", "", []string{"price"}, nil))))
-	if !sel.MatchesNode(tree, mustLastPart(t, "div:has(.row .price)")) {
+	if !sightmap.MatchesNode(tree, mustLastPart(t, "div:has(.row .price)")) {
 		t.Error("div:has(.row .price) should match")
 	}
-	if sel.MatchesNode(tree, mustLastPart(t, "div:has(.price .row)")) {
+	if sightmap.MatchesNode(tree, mustLastPart(t, "div:has(.price .row)")) {
 		t.Error("div:has(.price .row) should NOT match (wrong order)")
 	}
 }
@@ -163,13 +161,13 @@ func TestMatchesNode_Has_MultipleAreAnded(t *testing.T) {
 	both := cn(nodeWith("div", "", nil, nil),
 		cn(nodeWith("input", "", nil, nil)),
 		cn(nodeWith("", "", []string{"price"}, nil)))
-	if !sel.MatchesNode(both, mustLastPart(t, "div:has(input):has(.price)")) {
+	if !sightmap.MatchesNode(both, mustLastPart(t, "div:has(input):has(.price)")) {
 		t.Error("both :has present should match")
 	}
 
 	onlyInput := cn(nodeWith("div", "", nil, nil),
 		cn(nodeWith("input", "", nil, nil)))
-	if sel.MatchesNode(onlyInput, mustLastPart(t, "div:has(input):has(.price)")) {
+	if sightmap.MatchesNode(onlyInput, mustLastPart(t, "div:has(input):has(.price)")) {
 		t.Error("missing one :has should NOT match (AND semantics)")
 	}
 }
@@ -177,10 +175,10 @@ func TestMatchesNode_Has_MultipleAreAnded(t *testing.T) {
 func TestMatchesNode_Has_CommaAlternativesAreOred(t *testing.T) {
 	tree := cn(nodeWith("div", "", nil, nil),
 		cn(nodeWith("input", "", nil, nil)))
-	if !sel.MatchesNode(tree, mustLastPart(t, "div:has(button, input)")) {
+	if !sightmap.MatchesNode(tree, mustLastPart(t, "div:has(button, input)")) {
 		t.Error("div:has(button, input) should match when input present (OR)")
 	}
-	if sel.MatchesNode(tree, mustLastPart(t, "div:has(button, a)")) {
+	if sightmap.MatchesNode(tree, mustLastPart(t, "div:has(button, a)")) {
 		t.Error("div:has(button, a) should NOT match (neither present)")
 	}
 }
@@ -190,17 +188,17 @@ func TestMatchesNode_Has_Nested(t *testing.T) {
 	tree := cn(nodeWith("div", "", nil, nil),
 		cn(nodeWith("", "", []string{"row"}, nil),
 			cn(nodeWith("input", "", nil, nil))))
-	if !sel.MatchesNode(tree, mustLastPart(t, "div:has(.row:has(input))")) {
+	if !sightmap.MatchesNode(tree, mustLastPart(t, "div:has(.row:has(input))")) {
 		t.Error("nested :has should match")
 	}
-	if sel.MatchesNode(tree, mustLastPart(t, "div:has(.row:has(button))")) {
+	if sightmap.MatchesNode(tree, mustLastPart(t, "div:has(.row:has(button))")) {
 		t.Error("nested :has should NOT match when inner missing")
 	}
 }
 
 func TestMatchesNode_Has_RealFormGroup(t *testing.T) {
 	// The HD assembly case: only the form-group containing a checkbox should match.
-	fg := func(control *comps.ComponentNode) *comps.ComponentNode {
+	fg := func(control *sightmap.ComponentNode) *sightmap.ComponentNode {
 		return cn(nodeWith("div", "", nil, map[string]string{"data-testid": "form-group"}),
 			cn(nodeWith("div", "", nil, nil), control))
 	}
@@ -208,10 +206,10 @@ func TestMatchesNode_Has_RealFormGroup(t *testing.T) {
 	protection := fg(cn(nodeWith("input", "", nil, map[string]string{"type": "radio"})))
 
 	rule := mustLastPart(t, `[data-testid="form-group"]:has(input[type="checkbox"])`)
-	if !sel.MatchesNode(assembly, rule) {
+	if !sightmap.MatchesNode(assembly, rule) {
 		t.Error("assembly form-group (with checkbox) should match")
 	}
-	if sel.MatchesNode(protection, rule) {
+	if sightmap.MatchesNode(protection, rule) {
 		t.Error("protection form-group (radio only) should NOT match")
 	}
 }

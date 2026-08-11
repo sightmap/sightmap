@@ -1,13 +1,11 @@
 // Package sel provides CSS selector parsing and single-node matching for the
 // sightmap selector subset. See doc.go for the supported grammar.
-package sel
+package sightmap
 
 import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // ParsedSelector is the result of parsing a CSS selector string.
@@ -16,7 +14,7 @@ import (
 // that precedes Parts[i]: empty string for Parts[0], " " (descendant) or ">"
 // (direct child) for subsequent parts.
 type ParsedSelector struct {
-	Parts       []*comps.SelectorPart
+	Parts       []*SelectorPart
 	Combinators []string
 }
 
@@ -219,8 +217,8 @@ func (p *parser) parseString() (string, error) {
 // parseSimpleSelectors parses a compound selector (a sequence of simple
 // selectors with no combinators between them, e.g. div.foo#bar[attr]) and
 // merges them into a single SelectorPart.
-func (p *parser) parseSimpleSelectors() (*comps.SelectorPart, error) {
-	part := &comps.SelectorPart{}
+func (p *parser) parseSimpleSelectors() (*SelectorPart, error) {
+	part := &SelectorPart{}
 	sawAny := false
 
 	for p.i < len(p.s) {
@@ -293,7 +291,7 @@ done:
 
 // parseAttr parses an attribute selector of the form [key], [key=val],
 // [key^=val], etc., merging it into part.
-func (p *parser) parseAttr(part *comps.SelectorPart) error {
+func (p *parser) parseAttr(part *SelectorPart) error {
 	if p.i >= len(p.s) || p.s[p.i] != '[' {
 		return fmt.Errorf("expected '['")
 	}
@@ -388,7 +386,7 @@ func (p *parser) parseAttrOp() (string, error) {
 }
 
 // parsePseudo parses a pseudo-class selector. Only :not() is supported.
-func (p *parser) parsePseudo(part *comps.SelectorPart) error {
+func (p *parser) parsePseudo(part *SelectorPart) error {
 	if p.i >= len(p.s) || p.s[p.i] != ':' {
 		return fmt.Errorf("expected ':'")
 	}
@@ -409,13 +407,13 @@ func (p *parser) parsePseudo(part *comps.SelectorPart) error {
 			return fmt.Errorf("expected '(' after :has")
 		}
 		p.i++ // consume '('
-		h := &comps.HasSelector{}
+		h := &HasSelector{}
 		for {
 			parts, combs, relErr := p.parseRelativeSelector()
 			if relErr != nil {
 				return fmt.Errorf(":has() argument: %w", relErr)
 			}
-			h.Alternatives = append(h.Alternatives, comps.HasRelative{Parts: parts, Combinators: combs})
+			h.Alternatives = append(h.Alternatives, HasRelative{Parts: parts, Combinators: combs})
 			p.skipWhitespace()
 			if p.i >= len(p.s) {
 				return fmt.Errorf("expected ')' or ',' in :has()")
@@ -437,7 +435,7 @@ func (p *parser) parsePseudo(part *comps.SelectorPart) error {
 			return fmt.Errorf("expected '(' after :%s", name)
 		}
 		p.i++ // consume '('
-		var alts []*comps.SelectorPart
+		var alts []*SelectorPart
 		for {
 			p.skipWhitespace()
 			inner, err := p.parseSimpleSelectors()
@@ -496,7 +494,7 @@ func (p *parser) parsePseudo(part *comps.SelectorPart) error {
 // descendant) and returns the compound parts plus their combinators, where
 // Combinators[0] links the :has() anchor element to Parts[0]. Sibling
 // combinators (+, ~) are rejected — the matcher has no sibling support.
-func (p *parser) parseRelativeSelector() ([]*comps.SelectorPart, []string, error) {
+func (p *parser) parseRelativeSelector() ([]*SelectorPart, []string, error) {
 	p.skipWhitespace()
 
 	leading := " "
@@ -515,7 +513,7 @@ func (p *parser) parseRelativeSelector() ([]*comps.SelectorPart, []string, error
 	if err != nil {
 		return nil, nil, err
 	}
-	parts := []*comps.SelectorPart{first}
+	parts := []*SelectorPart{first}
 	combinators := []string{leading}
 
 	for {
@@ -562,7 +560,7 @@ func (p *parser) parseSelector() (ParsedSelector, error) {
 		return ParsedSelector{}, err
 	}
 
-	parts := []*comps.SelectorPart{first}
+	parts := []*SelectorPart{first}
 	combinators := []string{""}
 
 	for {

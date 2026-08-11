@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -100,14 +98,14 @@ func computeSnapshotCounts(corpus *sightmap.Corpus, treeFiles []string) (map[str
 	// Pre-parse selectors: component index → slice of last SelectorParts.
 	type parsedEntry struct {
 		name      string
-		lastParts []*comps.SelectorPart
+		lastParts []*sightmap.SelectorPart
 	}
 	all := corpus.AllComponents()
 	parsed := make([]parsedEntry, 0, len(all))
 	for _, comp := range all {
-		var lasts []*comps.SelectorPart
+		var lasts []*sightmap.SelectorPart
 		for _, selStr := range comp.Selectors {
-			ps, err := sel.ParseSightmapSelector(selStr)
+			ps, err := sightmap.ParseSightmapSelector(selStr)
 			if err != nil || len(ps.Parts) == 0 {
 				continue
 			}
@@ -129,7 +127,7 @@ func computeSnapshotCounts(corpus *sightmap.Corpus, treeFiles []string) (map[str
 			fmt.Fprintf(os.Stderr, "lint: %s: tree file not found, skipping\n", tf)
 			continue
 		}
-		var root comps.ComponentNode
+		var root sightmap.ComponentNode
 		if err := json.Unmarshal(data, &root); err != nil {
 			fmt.Fprintf(os.Stderr, "lint: %s: parse tree JSON: %v, skipping\n", tf, err)
 			continue
@@ -143,8 +141,8 @@ func computeSnapshotCounts(corpus *sightmap.Corpus, treeFiles []string) (map[str
 			maxForTree := 0
 			for _, lastPart := range pe.lastParts {
 				count := 0
-				comps.Walk(&root, func(node *comps.ComponentNode, _ int) bool {
-					if sel.MatchesNode(node, lastPart) {
+				sightmap.Walk(&root, func(node *sightmap.ComponentNode, _ int) bool {
+					if sightmap.MatchesNode(node, lastPart) {
 						count++
 					}
 					return true

@@ -3,8 +3,8 @@ package browser
 import (
 	"context"
 	"fmt"
+	"github.com/sightmap/sightmap/go/sightmap"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/extract"
 )
 
@@ -31,7 +31,7 @@ type Page interface {
 
 // ExtractComponents runs the full extraction pipeline on page:
 // RunProbe → GetA11YTree → GetDOMTree → extract.BuildTree.
-func ExtractComponents(ctx context.Context, page Page) (*comps.ComponentNode, error) {
+func ExtractComponents(ctx context.Context, page Page) (*sightmap.ComponentNode, error) {
 	probeResult, err := page.RunProbe(ctx, false, false)
 	if err != nil {
 		return nil, fmt.Errorf("browser: run probe: %w", err)

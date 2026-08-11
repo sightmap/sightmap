@@ -4,8 +4,6 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -151,19 +149,19 @@ func TestPredicateMatch(t *testing.T) {
 //	└─ TileGroup
 //	    ├─ FulfillmentTileButton (t1) label=Pickup
 //	    └─ FulfillmentTileButton (t2) label=Delivery
-func buildFixture() (*comps.ComponentNode, map[*comps.ComponentNode]*sightmap.ComponentMatch, map[string]map[string]string) {
-	u1 := &comps.ComponentNode{Id: "u1"}
-	p1 := &comps.ComponentNode{Id: "p1"}
-	loginForm := &comps.ComponentNode{Id: "m2", Children: []*comps.ComponentNode{u1, p1}}
-	mainPanel := &comps.ComponentNode{Id: "m1", Children: []*comps.ComponentNode{loginForm}}
+func buildFixture() (*sightmap.ComponentNode, map[*sightmap.ComponentNode]*sightmap.ComponentMatch, map[string]map[string]string) {
+	u1 := &sightmap.ComponentNode{Id: "u1"}
+	p1 := &sightmap.ComponentNode{Id: "p1"}
+	loginForm := &sightmap.ComponentNode{Id: "m2", Children: []*sightmap.ComponentNode{u1, p1}}
+	mainPanel := &sightmap.ComponentNode{Id: "m1", Children: []*sightmap.ComponentNode{loginForm}}
 
-	t1 := &comps.ComponentNode{Id: "t1"}
-	t2 := &comps.ComponentNode{Id: "t2"}
-	tileGroup := &comps.ComponentNode{Id: "g1", Children: []*comps.ComponentNode{t1, t2}}
+	t1 := &sightmap.ComponentNode{Id: "t1"}
+	t2 := &sightmap.ComponentNode{Id: "t2"}
+	tileGroup := &sightmap.ComponentNode{Id: "g1", Children: []*sightmap.ComponentNode{t1, t2}}
 
-	root := &comps.ComponentNode{Id: "root", Children: []*comps.ComponentNode{mainPanel, tileGroup}}
+	root := &sightmap.ComponentNode{Id: "root", Children: []*sightmap.ComponentNode{mainPanel, tileGroup}}
 
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		mainPanel: {Name: "MainPanel"},
 		loginForm: {Name: "LoginForm"},
 		u1:        {Name: "UserNameInput"},
@@ -178,7 +176,7 @@ func buildFixture() (*comps.ComponentNode, map[*comps.ComponentNode]*sightmap.Co
 	return root, matches, props
 }
 
-func mustResolve(t *testing.T, queryStr string) *comps.ComponentNode {
+func mustResolve(t *testing.T, queryStr string) *sightmap.ComponentNode {
 	t.Helper()
 	root, matches, props := buildFixture()
 	q, err := ParseQuery(queryStr)

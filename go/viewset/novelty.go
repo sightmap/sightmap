@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -16,8 +15,8 @@ import (
 // by the offline path (SlotsForCapture) and the live capture path (the capture
 // command) so both gate on the same notion of "new".
 func SlotsFromMatch(
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
-	orphans []*comps.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	orphans []*sightmap.ComponentNode,
 	parentMap coverage.ParentMap,
 ) Slots {
 	cs := Slots{Matched: map[string]bool{}, Orphans: map[string]int{}}
@@ -41,7 +40,7 @@ func SlotsForCapture(snapPath string, corpus *sightmap.Corpus) (Slots, bool) {
 	if err != nil {
 		return Slots{}, false
 	}
-	var root comps.ComponentNode
+	var root sightmap.ComponentNode
 	if json.Unmarshal(data, &root) != nil {
 		return Slots{}, false
 	}
