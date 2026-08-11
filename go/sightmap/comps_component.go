@@ -1,4 +1,4 @@
-package comps
+package sightmap
 
 import (
 	"encoding/json"
@@ -29,7 +29,7 @@ type SelectorPart struct {
 	// Has, if non-empty, contains one entry per :has() pseudo-class on this
 	// compound selector. The element matches only if its subtree satisfies
 	// EVERY entry (multiple :has() are AND-ed). Evaluating :has() requires tree
-	// context, so it is handled by sel.MatchesNode (not the flat sel.Matches).
+	// context, so it is handled by MatchesNode (not the flat Matches).
 	Has []*HasSelector `json:"has,omitempty"`
 }
 

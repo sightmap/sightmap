@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -185,7 +184,7 @@ func boundsByComponent(
 
 	var results []boundsResult
 	seenComp := map[string]bool{}
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		m := matches[n]
 		if m == nil || !nameMatches(m.Name) {
 			return true
@@ -265,7 +264,7 @@ func boundsBySelector(
 
 	results := make([]boundsResult, 0, len(rects))
 	for _, r := range rects {
-		b := &comps.Bounds{
+		b := &sightmap.Bounds{
 			X:      int(math.Round(r.X)),
 			Y:      int(math.Round(r.Y)),
 			Width:  int(math.Round(r.Width)),
@@ -344,7 +343,7 @@ func resolveScreenshotClip(
 
 // makeBoundsResult converts viewport-relative px bounds into viewport-% and
 // determines whether the box intersects the viewport at all.
-func makeBoundsResult(comp, label, id string, b *comps.Bounds, vw, vh int) boundsResult {
+func makeBoundsResult(comp, label, id string, b *sightmap.Bounds, vw, vh int) boundsResult {
 	return boundsResult{
 		Comp:       comp,
 		Label:      label,
@@ -359,7 +358,7 @@ func makeBoundsResult(comp, label, id string, b *comps.Bounds, vw, vh int) bound
 }
 
 // intersectsViewport reports whether the box overlaps the [0,vw]x[0,vh] region.
-func intersectsViewport(b *comps.Bounds, vw, vh int) bool {
+func intersectsViewport(b *sightmap.Bounds, vw, vh int) bool {
 	if b.Width <= 0 || b.Height <= 0 {
 		return false
 	}

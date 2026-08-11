@@ -14,9 +14,7 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
-	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -87,7 +85,7 @@ type parentInfo struct {
 // its first selector. Used for Go-side parent-chain annotation.
 type compAnnotation struct {
 	name string
-	part *comps.SelectorPart
+	part *sightmap.SelectorPart
 }
 
 func runSelProbe(args []string) error {
@@ -281,7 +279,7 @@ func offlineSelectorCount(ctx context.Context, conn *browser.CDPConn, selector s
 // best-known traps — attribute selectors on `id` and on `class` — and otherwise
 // gives a general nudge about the reduced offline node model.
 func offlineDivergenceHints(selector string) []string {
-	ps, err := sel.ParseSightmapSelector(selector)
+	ps, err := sightmap.ParseSightmapSelector(selector)
 	if err != nil {
 		return []string{"the offline selector parser could not parse this selector, so it matches nothing offline"}
 	}
@@ -364,7 +362,7 @@ func loadCompAnnotations(dir string) []compAnnotation {
 		if len(comp.Selectors) == 0 {
 			continue
 		}
-		ps, parseErr := sel.ParseSightmapSelector(comp.Selectors[0])
+		ps, parseErr := sightmap.ParseSightmapSelector(comp.Selectors[0])
 		if parseErr != nil || len(ps.Parts) == 0 {
 			continue
 		}
@@ -379,7 +377,7 @@ func loadCompAnnotations(dir string) []compAnnotation {
 // findCompAnnotation returns the name of the first component whose first
 // pattern matches the parent node, or "" if none match.
 func findCompAnnotation(annotations []compAnnotation, p parentInfo) string {
-	node := &comps.Element{
+	node := &sightmap.Element{
 		Tag:     p.Tag,
 		Id:      p.Id,
 		Classes: p.Cls,
@@ -393,7 +391,7 @@ func findCompAnnotation(annotations []compAnnotation, p parentInfo) string {
 	}
 
 	for _, ann := range annotations {
-		if sel.Matches(node, ann.part) {
+		if sightmap.Matches(node, ann.part) {
 			return ann.name
 		}
 	}

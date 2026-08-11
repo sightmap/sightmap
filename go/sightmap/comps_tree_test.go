@@ -1,9 +1,8 @@
-package comps_test
+package sightmap_test
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // buildTestTree constructs the shared test tree used across multiple tests:
@@ -16,64 +15,64 @@ import (
 //	    button (role=button,    isVisible=true,  isInteractive=true, inViewport=true, bounds={10,10,100,30})
 //	  p     (role=paragraph,   isVisible=false)
 //	    span  (role=StaticText, isVisible=false)
-func buildTestTree() *comps.ComponentNode {
-	a1 := &comps.ComponentNode{
+func buildTestTree() *sightmap.ComponentNode {
+	a1 := &sightmap.ComponentNode{
 		Id:            "a1",
 		Role:          "link",
 		IsVisible:     true,
 		IsInteractive: true,
 		InViewport:    true,
 	}
-	a2 := &comps.ComponentNode{
+	a2 := &sightmap.ComponentNode{
 		Id:            "a2",
 		Role:          "link",
 		IsVisible:     true,
 		IsInteractive: true,
 		InViewport:    false,
 	}
-	nav := &comps.ComponentNode{
+	nav := &sightmap.ComponentNode{
 		Id:            "nav",
 		Role:          "navigation",
 		IsVisible:     true,
 		IsInteractive: false,
-		Children:      []*comps.ComponentNode{a1, a2},
+		Children:      []*sightmap.ComponentNode{a1, a2},
 	}
-	button := &comps.ComponentNode{
+	button := &sightmap.ComponentNode{
 		Id:            "button",
 		Role:          "button",
 		IsVisible:     true,
 		IsInteractive: true,
 		InViewport:    true,
-		Bounds:        &comps.Bounds{X: 10, Y: 10, Width: 100, Height: 30},
+		Bounds:        &sightmap.Bounds{X: 10, Y: 10, Width: 100, Height: 30},
 	}
-	section := &comps.ComponentNode{
+	section := &sightmap.ComponentNode{
 		Id:        "section",
 		Role:      "generic",
 		IsVisible: true,
-		Children:  []*comps.ComponentNode{nav, button},
+		Children:  []*sightmap.ComponentNode{nav, button},
 	}
-	span := &comps.ComponentNode{
+	span := &sightmap.ComponentNode{
 		Id:        "span",
 		Role:      "StaticText",
 		IsVisible: false,
 	}
-	p := &comps.ComponentNode{
+	p := &sightmap.ComponentNode{
 		Id:        "p",
 		Role:      "paragraph",
 		IsVisible: false,
-		Children:  []*comps.ComponentNode{span},
+		Children:  []*sightmap.ComponentNode{span},
 	}
-	root := &comps.ComponentNode{
+	root := &sightmap.ComponentNode{
 		Id:        "root",
 		Role:      "document",
 		IsVisible: true,
-		Children:  []*comps.ComponentNode{section, p},
+		Children:  []*sightmap.ComponentNode{section, p},
 	}
 	return root
 }
 
 // assertNodeIds verifies that nodes have exactly the expected IDs in order.
-func assertNodeIds(t *testing.T, nodes []*comps.ComponentNode, wantIds []string) {
+func assertNodeIds(t *testing.T, nodes []*sightmap.ComponentNode, wantIds []string) {
 	t.Helper()
 	gotIds := make([]string, len(nodes))
 	for i, n := range nodes {
@@ -97,7 +96,7 @@ func TestWalk_AllNodes_DFSPreOrder(t *testing.T) {
 
 	var visitedIds []string
 	var visitedDepths []int
-	comps.Walk(root, func(node *comps.ComponentNode, depth int) bool {
+	sightmap.Walk(root, func(node *sightmap.ComponentNode, depth int) bool {
 		visitedIds = append(visitedIds, node.Id)
 		visitedDepths = append(visitedDepths, depth)
 		return true
@@ -124,7 +123,7 @@ func TestWalk_StopsDescending_WhenFnReturnsFalse(t *testing.T) {
 	root := buildTestTree()
 
 	var visitedIds []string
-	comps.Walk(root, func(node *comps.ComponentNode, depth int) bool {
+	sightmap.Walk(root, func(node *sightmap.ComponentNode, depth int) bool {
 		visitedIds = append(visitedIds, node.Id)
 		// Returning false for "section" skips its entire subtree.
 		return node.Id != "section"
@@ -147,13 +146,13 @@ func TestWalk_StopsDescending_WhenFnReturnsFalse(t *testing.T) {
 
 func TestCollect_IsInteractive(t *testing.T) {
 	root := buildTestTree()
-	got := comps.Collect(root, comps.IsInteractive())
+	got := sightmap.Collect(root, sightmap.IsInteractive())
 	assertNodeIds(t, got, []string{"a1", "a2", "button"})
 }
 
 func TestCollect_InViewport(t *testing.T) {
 	root := buildTestTree()
-	got := comps.Collect(root, comps.InViewport())
+	got := sightmap.Collect(root, sightmap.InViewport())
 	assertNodeIds(t, got, []string{"a1", "button"})
 }
 
@@ -161,13 +160,13 @@ func TestCollect_And_VisibleAndInteractive(t *testing.T) {
 	root := buildTestTree()
 	// All interactive nodes in the tree are also visible, so the result
 	// should be the same as IsInteractive() alone.
-	got := comps.Collect(root, comps.And(comps.IsVisible(), comps.IsInteractive()))
+	got := sightmap.Collect(root, sightmap.And(sightmap.IsVisible(), sightmap.IsInteractive()))
 	assertNodeIds(t, got, []string{"a1", "a2", "button"})
 }
 
 func TestCollect_Not_Visible(t *testing.T) {
 	root := buildTestTree()
-	got := comps.Collect(root, comps.Not(comps.IsVisible()))
+	got := sightmap.Collect(root, sightmap.Not(sightmap.IsVisible()))
 	assertNodeIds(t, got, []string{"p", "span"})
 }
 
@@ -175,7 +174,7 @@ func TestCollect_Not_Visible(t *testing.T) {
 
 func TestFilter_IsInteractive_StructuralConnectors(t *testing.T) {
 	root := buildTestTree()
-	filtered := comps.Filter(root, comps.IsInteractive())
+	filtered := sightmap.Filter(root, sightmap.IsInteractive())
 
 	if filtered == nil {
 		t.Fatal("Filter returned nil, want non-nil")
@@ -224,7 +223,7 @@ func TestFilter_IsInteractive_StructuralConnectors(t *testing.T) {
 
 func TestFilter_HasBounds_OnlyButtonMatches(t *testing.T) {
 	root := buildTestTree()
-	filtered := comps.Filter(root, comps.HasBounds())
+	filtered := sightmap.Filter(root, sightmap.HasBounds())
 
 	if filtered == nil {
 		t.Fatal("Filter returned nil, want non-nil")
@@ -260,10 +259,10 @@ func TestFilter_HasBounds_OnlyButtonMatches(t *testing.T) {
 func TestFilter_NothingMatches_ReturnsNil(t *testing.T) {
 	root := buildTestTree()
 	// IsIgnored is false on every node in the test tree.
-	neverMatch := func(node *comps.ComponentNode, _ int) (bool, bool) {
+	neverMatch := func(node *sightmap.ComponentNode, _ int) (bool, bool) {
 		return node.IsIgnored, true
 	}
-	filtered := comps.Filter(root, neverMatch)
+	filtered := sightmap.Filter(root, neverMatch)
 	if filtered != nil {
 		t.Errorf("Filter returned %q, want nil", filtered.Id)
 	}
@@ -274,6 +273,6 @@ func TestFilter_NothingMatches_ReturnsNil(t *testing.T) {
 func TestCollect_Or_InteractiveOrNotVisible(t *testing.T) {
 	root := buildTestTree()
 	// Interactive nodes (a1, a2, button) plus not-visible nodes (p, span).
-	got := comps.Collect(root, comps.Or(comps.IsInteractive(), comps.Not(comps.IsVisible())))
+	got := sightmap.Collect(root, sightmap.Or(sightmap.IsInteractive(), sightmap.Not(sightmap.IsVisible())))
 	assertNodeIds(t, got, []string{"a1", "a2", "button", "p", "span"})
 }

@@ -1,7 +1,5 @@
 package sightmap
 
-import "github.com/sightmap/sightmap/go/comps"
-
 // ComponentDef is a single flattened sightmap component definition.
 // Hierarchical YAML selectors should be pre-flattened by the caller into
 // compound descendant selectors before compiling into match queries.
@@ -35,6 +33,6 @@ type ComponentMatch struct {
 // actually claims the node; the rest are silently dropped. Names are in
 // first-seen (definition) order.
 type Conflict struct {
-	Node  *comps.ComponentNode
+	Node  *ComponentNode
 	Names []string
 }

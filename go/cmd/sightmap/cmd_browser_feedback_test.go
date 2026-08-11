@@ -2,21 +2,20 @@ package main
 
 import (
 	"errors"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 func TestActionLabel(t *testing.T) {
-	withBounds := &comps.ComponentNode{
+	withBounds := &sightmap.ComponentNode{
 		Id:     "42",
-		Bounds: &comps.Bounds{X: 100, Y: 40, Width: 80, Height: 20},
+		Bounds: &sightmap.Bounds{X: 100, Y: 40, Width: 80, Height: 20},
 	}
 	if got, want := actionLabel("CartNavButton", withBounds), "CartNavButton @ (140,50)"; got != want {
 		t.Errorf("actionLabel(bounds) = %q, want %q", got, want)
 	}
 
-	noBounds := &comps.ComponentNode{Id: "7"}
+	noBounds := &sightmap.ComponentNode{Id: "7"}
 	if got, want := actionLabel("7", noBounds), "7"; got != want {
 		t.Errorf("actionLabel(no bounds) = %q, want %q", got, want)
 	}

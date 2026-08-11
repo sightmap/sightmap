@@ -5,8 +5,6 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // TestInspect_PreservesAllNodes verifies that invisible and ignored children
@@ -48,7 +46,7 @@ func TestInspect_NoFilteringVsFilter(t *testing.T) {
 // TestInspect_MatchAnnotation verifies that match is propagated onto InspectNode.
 func TestInspect_MatchAnnotation(t *testing.T) {
 	btn := node("1", "button", "OK", true, true, false)
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		btn: {Name: "SubmitBtn"},
 	}
 
@@ -86,9 +84,9 @@ func TestFormatInspect_Basic(t *testing.T) {
 
 // TestFormatInspect_WithSelector verifies tag#id[data-testid] selector display.
 func TestFormatInspect_WithSelector(t *testing.T) {
-	n := &comps.ComponentNode{
+	n := &sightmap.ComponentNode{
 		Id: "7", Role: "button", Name: "Add", IsVisible: true, IsInteractive: true,
-		Element: &comps.Element{
+		Element: &sightmap.Element{
 			Tag:   "button",
 			Id:    "add-btn",
 			Attrs: map[string]string{"data-testid": "add-to-cart"},
@@ -135,9 +133,9 @@ func TestFormatInspect_Ignored(t *testing.T) {
 
 // TestFormatInspect_Classes verifies CSS classes are shown only when Classes is set.
 func TestFormatInspect_Classes(t *testing.T) {
-	n := &comps.ComponentNode{
+	n := &sightmap.ComponentNode{
 		Id: "1", Role: "div", IsVisible: true,
-		Element: &comps.Element{
+		Element: &sightmap.Element{
 			Tag:     "div",
 			Classes: []string{"btn", "btn-primary"},
 		},
@@ -162,9 +160,9 @@ func TestFormatInspect_Classes(t *testing.T) {
 // TestFormatInspect_Selectors_ShowsAll verifies --selectors shows attrs that
 // are normally hidden (e.g. tabindex).
 func TestFormatInspect_Selectors_ShowsAll(t *testing.T) {
-	n := &comps.ComponentNode{
+	n := &sightmap.ComponentNode{
 		Id: "1", Role: "input", IsVisible: true, IsInteractive: true,
-		Element: &comps.Element{
+		Element: &sightmap.Element{
 			Tag: "input",
 			Attrs: map[string]string{
 				"data-testid": "search",
@@ -192,7 +190,7 @@ func TestFormatInspect_Selectors_ShowsAll(t *testing.T) {
 // TestFormatInspect_MatchAnnotation verifies ★Name is shown for matched nodes.
 func TestFormatInspect_MatchAnnotation(t *testing.T) {
 	btn := node("3", "button", "Shop", true, true, false)
-	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
 		btn: {Name: "ShopButton"},
 	}
 	in := Inspect(btn, matches)

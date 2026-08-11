@@ -3,7 +3,6 @@ package match
 import (
 	"sync"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -53,7 +52,7 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 // selects the matching view (falling back to global components), compiles the
 // queries if not already cached, then runs the NFA matcher over root. Returns
 // nil when root is nil or no queries apply.
-func (m *Matcher) MatchTree(root *comps.ComponentNode, pageURL string) map[*comps.ComponentNode]*sightmap.ComponentMatch {
+func (m *Matcher) MatchTree(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode]*sightmap.ComponentMatch {
 	entry := m.entryFor(pageURL)
 	if root == nil || len(entry.queries) == 0 {
 		return nil
@@ -65,8 +64,8 @@ func (m *Matcher) MatchTree(root *comps.ComponentNode, pageURL string) map[*comp
 		byName[entry.components[i].Name] = &entry.components[i]
 	}
 
-	result := make(map[*comps.ComponentNode]*sightmap.ComponentMatch)
-	FindAllMatches(root, entry.queries, func(node *comps.ComponentNode, q *MatchQuery) {
+	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
+	FindAllMatches(root, entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		if _, already := result[node]; already {
 			return // first-match-wins
 		}

@@ -6,8 +6,6 @@ import (
 	"io"
 	"sort"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // Comp is a filtered, display-ready component node produced by Filter().
@@ -18,7 +16,7 @@ type Comp struct {
 	Value    string                   // form field value
 	Match    *sightmap.ComponentMatch // non-nil when matched by a sightmap definition
 	Children []*Comp
-	Original *comps.ComponentNode // original raw node; .Role has the unmodified AX role
+	Original *sightmap.ComponentNode // original raw node; .Role has the unmodified AX role
 }
 
 // FormatOpts controls the output of Format.
@@ -50,7 +48,7 @@ type FormatOpts struct {
 // StaticText child is collapsed into the parent's Name.
 //
 // If matches is nil or empty, no sightmap annotations are applied.
-func Filter(root *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) *Comp {
+func Filter(root *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) *Comp {
 	if root == nil {
 		return nil
 	}
@@ -169,7 +167,7 @@ const (
 	dropNode                    // remove node and entire subtree
 )
 
-func decide(node *comps.ComponentNode, matched bool) disposition {
+func decide(node *sightmap.ComponentNode, matched bool) disposition {
 	// Drop non-semantic embedded resources.
 	if node.Element != nil {
 		switch strings.ToLower(node.Element.Tag) {
@@ -216,7 +214,7 @@ func decide(node *comps.ComponentNode, matched bool) disposition {
 	return keepNode
 }
 
-func convert(node *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) []*Comp {
+func convert(node *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) []*Comp {
 	m := matches[node]
 	matched := m != nil
 
@@ -277,7 +275,7 @@ func convert(node *comps.ComponentNode, matches map[*comps.ComponentNode]*sightm
 	}}
 }
 
-func convertChildren(node *comps.ComponentNode, matches map[*comps.ComponentNode]*sightmap.ComponentMatch) []*Comp {
+func convertChildren(node *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) []*Comp {
 	var out []*Comp
 	for _, ch := range node.Children {
 		out = append(out, convert(ch, matches)...)
@@ -398,7 +396,7 @@ func truncate(s string, maxRunes int) string {
 
 // selectorHint builds a compact selector string showing only tag, #id,
 // [data-testid], and [data-component] — no CSS classes.
-func selectorHint(sel *comps.Element) string {
+func selectorHint(sel *sightmap.Element) string {
 	if sel == nil {
 		return ""
 	}

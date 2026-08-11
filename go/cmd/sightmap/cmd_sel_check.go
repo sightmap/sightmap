@@ -7,12 +7,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"io"
 	"os"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/sel"
 )
 
 // errSelCheckNoMatches is returned (exit code 1) when the selector matches
@@ -62,7 +60,7 @@ func runSelCheckOut(args []string, out io.Writer) error {
 	treeFile, displayName := selCheckResolvePaths(inputFile)
 
 	// Parse the user's selector.
-	ps, err := sel.ParseSightmapSelector(selectorStr)
+	ps, err := sightmap.ParseSightmapSelector(selectorStr)
 	if err != nil {
 		return err
 	}
@@ -80,16 +78,16 @@ func runSelCheckOut(args []string, out io.Writer) error {
 		return fmt.Errorf("cannot read tree file %s: %w", treeFile, err)
 	}
 
-	var root comps.ComponentNode
+	var root sightmap.ComponentNode
 	if err := json.Unmarshal(data, &root); err != nil {
 		return fmt.Errorf("parse tree JSON %s: %w", treeFile, err)
 	}
 
 	// Walk the full tree and collect every node whose selector matches.
-	var matches []*comps.ComponentNode
-	comps.Walk(&root, func(node *comps.ComponentNode, _ int) bool {
+	var matches []*sightmap.ComponentNode
+	sightmap.Walk(&root, func(node *sightmap.ComponentNode, _ int) bool {
 		// MatchesNode handles :has() (against node's subtree) and nil selectors.
-		if sel.MatchesNode(node, rulePart) {
+		if sightmap.MatchesNode(node, rulePart) {
 			matches = append(matches, node)
 		}
 		return true // always descend

@@ -6,8 +6,6 @@ import (
 	"slices"
 	"strings"
 	"unicode"
-
-	"github.com/sightmap/sightmap/go/sel"
 )
 
 // LintWarning describes a style or maintainability issue that doesn't prevent
@@ -157,7 +155,7 @@ func hasUniquenessAnchor(selStr string) bool {
 // - Generic data-component attributes without instance-specific values
 func isBroadSelector(selStr string) bool {
 	// Parse to check if it's a bare tag or generic pattern
-	if ps, err := sel.ParseSightmapSelector(selStr); err == nil && len(ps.Parts) > 0 {
+	if ps, err := ParseSightmapSelector(selStr); err == nil && len(ps.Parts) > 0 {
 		// Check the last part (most specific)
 		lastPart := ps.Parts[len(ps.Parts)-1]
 
@@ -346,7 +344,7 @@ func lintComponentWithCounts(comp ComponentDef, global bool, counts map[string]i
 	for _, selStr := range comp.Selectors {
 		// broad-tag-selector: bare tag name at global scope (e.g. "div", "button").
 		if global {
-			if ps, err := sel.ParseSightmapSelector(selStr); err == nil && len(ps.Parts) == 1 {
+			if ps, err := ParseSightmapSelector(selStr); err == nil && len(ps.Parts) == 1 {
 				p := ps.Parts[0]
 				if p.Tag != "" && p.Id == "" && len(p.Classes) == 0 && len(p.Attrs) == 0 && p.Not == nil {
 					warnings = append(warnings, LintWarning{
@@ -373,7 +371,7 @@ func lintComponentWithCounts(comp ComponentDef, global bool, counts map[string]i
 		// Use the parsed part count, NOT raw space counting, to avoid false
 		// positives from spaces inside quoted attribute values like
 		// [aria-label="Link to homepage"].
-		if ps, parseErr := sel.ParseSightmapSelector(selStr); parseErr == nil && len(ps.Parts) >= 4 {
+		if ps, parseErr := ParseSightmapSelector(selStr); parseErr == nil && len(ps.Parts) >= 4 {
 			warnings = append(warnings, LintWarning{
 				Component: name,
 				Selector:  selStr,
@@ -400,7 +398,7 @@ func lintComponentWithCounts(comp ComponentDef, global bool, counts map[string]i
 		// ".parent .parent .leaf"), which matches zero nodes. Only relevant for
 		// child components (non-empty ParentChain).
 		if len(comp.ParentChain) > 0 {
-			if ps, parseErr := sel.ParseSightmapSelector(selStr); parseErr == nil {
+			if ps, parseErr := ParseSightmapSelector(selStr); parseErr == nil {
 				if cls := firstRepeatedDescendantClass(ps); cls != "" {
 					warnings = append(warnings, LintWarning{
 						Component: name,
@@ -424,7 +422,7 @@ func lintComponentWithCounts(comp ComponentDef, global bool, counts map[string]i
 // ancestor part and the immediately following descendant part of ps. Returns ""
 // if no such repetition exists. This is the exact pattern produced by flattenOne
 // when a child component's raw selector already includes the parent class.
-func firstRepeatedDescendantClass(ps sel.ParsedSelector) string {
+func firstRepeatedDescendantClass(ps ParsedSelector) string {
 	for i := 0; i+1 < len(ps.Parts); i++ {
 		if ps.Combinators[i+1] != " " {
 			continue // only flag descendant combinators, not direct-child (>)

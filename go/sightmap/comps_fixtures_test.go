@@ -1,4 +1,4 @@
-package comps
+package sightmap
 
 import (
 	"encoding/json"

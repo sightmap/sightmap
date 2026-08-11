@@ -1,9 +1,8 @@
 package coverage
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 func TestResultStatus(t *testing.T) {
@@ -35,9 +34,9 @@ func TestResultStatus(t *testing.T) {
 }
 
 func TestCountInteractive(t *testing.T) {
-	tree := &comps.ComponentNode{
+	tree := &sightmap.ComponentNode{
 		Id: "root", Role: "document", IsVisible: true,
-		Children: []*comps.ComponentNode{
+		Children: []*sightmap.ComponentNode{
 			{Id: "btn", Role: "button", IsInteractive: true, IsVisible: true},
 			{Id: "hidden-btn", Role: "button", IsInteractive: true, IsVisible: false},
 			{Id: "ignored-btn", Role: "button", IsInteractive: true, IsVisible: true, IsIgnored: true},

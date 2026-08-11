@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -12,17 +11,17 @@ import (
 // It adds component name, memory notes, and extracted prop values from the
 // sightmap corpus, omitting those fields when the node is unmatched.
 type annotatedNode struct {
-	ID            string         `json:"id"`
-	Role          string         `json:"role"`
-	Name          string         `json:"name,omitempty"`
-	Value         string         `json:"value,omitempty"`
-	Element       *comps.Element `json:"element,omitempty"`
-	Bounds        *comps.Bounds  `json:"bounds,omitempty"`
-	IsVisible     bool           `json:"isVisible"`
-	IsInteractive bool           `json:"isInteractive"`
-	InViewport    bool           `json:"inViewport"`
-	IsIgnored     bool           `json:"isIgnored,omitempty"`
-	NthChild      int            `json:"nthChild,omitempty"`
+	ID            string            `json:"id"`
+	Role          string            `json:"role"`
+	Name          string            `json:"name,omitempty"`
+	Value         string            `json:"value,omitempty"`
+	Element       *sightmap.Element `json:"element,omitempty"`
+	Bounds        *sightmap.Bounds  `json:"bounds,omitempty"`
+	IsVisible     bool              `json:"isVisible"`
+	IsInteractive bool              `json:"isInteractive"`
+	InViewport    bool              `json:"inViewport"`
+	IsIgnored     bool              `json:"isIgnored,omitempty"`
+	NthChild      int               `json:"nthChild,omitempty"`
 	// sightmap-added fields — omitted when the node is unmatched or has no props
 	Component string            `json:"component,omitempty"`
 	Memory    []string          `json:"memory,omitempty"`
@@ -33,8 +32,8 @@ type annotatedNode struct {
 // buildAnnotatedNode recursively constructs an annotatedNode tree by joining
 // each ComponentNode pointer with its ComponentMatch and any extracted props.
 func buildAnnotatedNode(
-	node *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	node *sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	propValues map[string]map[string]string, // nodeID → {propName → value}; may be nil
 ) *annotatedNode {
 	an := &annotatedNode{
@@ -84,17 +83,17 @@ type annotatedOutput struct {
 // The top-level object also carries the matched view name and route.
 // Writes atomically via a .tmp file (same pattern as writeTreeJSON).
 func writeAnnotatedJSON(
-	root *comps.ComponentNode,
+	root *sightmap.ComponentNode,
 	path string,
 	view *sightmap.ViewDef,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	propValues map[string]map[string]string,
 ) error {
 	if root == nil {
 		return nil
 	}
 	if matches == nil {
-		matches = map[*comps.ComponentNode]*sightmap.ComponentMatch{}
+		matches = map[*sightmap.ComponentNode]*sightmap.ComponentMatch{}
 	}
 
 	out := annotatedOutput{

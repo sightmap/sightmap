@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -16,9 +15,9 @@ import (
 // nil unless Options.ExtractProps was set. Matches/View/Coverage are zero when no
 // corpus was supplied.
 type Result struct {
-	Root        *comps.ComponentNode
+	Root        *sightmap.ComponentNode
 	URL         string
-	Matches     map[*comps.ComponentNode]*sightmap.ComponentMatch
+	Matches     map[*sightmap.ComponentNode]*sightmap.ComponentMatch
 	View        *sightmap.ViewDef
 	Components  []sightmap.ComponentDef
 	GlobalNames map[string]bool

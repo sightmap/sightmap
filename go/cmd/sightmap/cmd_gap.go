@@ -4,10 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"sort"
 
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
 )
@@ -61,7 +61,7 @@ func runGap(args []string) error {
 	parentMap := coverage.BuildParentMap(root)
 
 	// ── Handle --scope flag ──────────────────────────────────────────────────
-	var scopeNode *comps.ComponentNode
+	var scopeNode *sightmap.ComponentNode
 	if *scopeFlag != "" {
 		// Find the named component in matches
 		for node, matchInfo := range matches {
@@ -102,10 +102,10 @@ func runGap(args []string) error {
 	}
 
 	// ── Collect nodes based on scope ─────────────────────────────────────
-	var gapNodes []*comps.ComponentNode
+	var gapNodes []*sightmap.ComponentNode
 
 	// Helper to check if a node is within the scope subtree
-	isInScope := func(n *comps.ComponentNode) bool {
+	isInScope := func(n *sightmap.ComponentNode) bool {
 		if scopeNode == nil {
 			return true // no scope filter
 		}
@@ -122,7 +122,7 @@ func runGap(args []string) error {
 	// scope component that are not matched).
 	// When --scope is absent, collect T3 nodes (interactive nodes with no matched
 	// ancestor anywhere).
-	comps.Walk(root, func(n *comps.ComponentNode, _ int) bool {
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
 		if !n.IsInteractive {
 			return true
 		}
@@ -167,7 +167,7 @@ func runGap(args []string) error {
 	// ── Group by nearest stable-anchor ancestor ────────────────────────────
 	type t3Group struct {
 		ancestorDesc string
-		nodes        []*comps.ComponentNode
+		nodes        []*sightmap.ComponentNode
 	}
 
 	type groupKey struct {
@@ -208,7 +208,7 @@ func runGap(args []string) error {
 		} else {
 			clusters[key] = &t3Group{
 				ancestorDesc: inside,
-				nodes:        []*comps.ComponentNode{n},
+				nodes:        []*sightmap.ComponentNode{n},
 			}
 			order = append(order, key)
 		}

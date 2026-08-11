@@ -3,8 +3,6 @@ package match
 import (
 	"fmt"
 
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/sel"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -18,7 +16,7 @@ func ParseQueries(defs []sightmap.ComponentDef) ([]MatchQuery, []error) {
 
 	for _, def := range defs {
 		for _, selStr := range def.Selectors {
-			ps, err := sel.ParseSightmapSelector(selStr)
+			ps, err := sightmap.ParseSightmapSelector(selStr)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("component %q selector %q: %w", def.Name, selStr, err))
 				continue
@@ -40,7 +38,7 @@ func ParseQueries(defs []sightmap.ComponentDef) ([]MatchQuery, []error) {
 // (and earliest selector within that definition) takes precedence.
 //
 // Returns nil if defs is empty or root is nil.
-func ApplySightmap(root *comps.ComponentNode, defs []sightmap.ComponentDef) map[*comps.ComponentNode]*sightmap.ComponentMatch {
+func ApplySightmap(root *sightmap.ComponentNode, defs []sightmap.ComponentDef) map[*sightmap.ComponentNode]*sightmap.ComponentMatch {
 	if root == nil || len(defs) == 0 {
 		return nil
 	}
@@ -57,9 +55,9 @@ func ApplySightmap(root *comps.ComponentNode, defs []sightmap.ComponentDef) map[
 		defByName[defs[i].Name] = &defs[i]
 	}
 
-	result := make(map[*comps.ComponentNode]*sightmap.ComponentMatch)
+	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 
-	FindAllMatches(root, queries, func(node *comps.ComponentNode, q *MatchQuery) {
+	FindAllMatches(root, queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		// First-match-wins: skip if already claimed.
 		if _, already := result[node]; already {
 			return
@@ -80,7 +78,7 @@ func ApplySightmap(root *comps.ComponentNode, defs []sightmap.ComponentDef) map[
 // normal and never reported; a single node claimed by several names is the
 // ambiguity, since ApplySightmap keeps only the first. It reuses the same
 // traversal as ApplySightmap, so it sees exactly the same matches.
-func FindConflicts(root *comps.ComponentNode, defs []sightmap.ComponentDef) []sightmap.Conflict {
+func FindConflicts(root *sightmap.ComponentNode, defs []sightmap.ComponentDef) []sightmap.Conflict {
 	if root == nil || len(defs) == 0 {
 		return nil
 	}
@@ -89,9 +87,9 @@ func FindConflicts(root *comps.ComponentNode, defs []sightmap.ComponentDef) []si
 		return nil
 	}
 
-	namesByNode := make(map[*comps.ComponentNode][]string)
-	var order []*comps.ComponentNode
-	FindAllMatches(root, queries, func(node *comps.ComponentNode, q *MatchQuery) {
+	namesByNode := make(map[*sightmap.ComponentNode][]string)
+	var order []*sightmap.ComponentNode
+	FindAllMatches(root, queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		names := namesByNode[node]
 		for _, n := range names {
 			if n == q.Name {

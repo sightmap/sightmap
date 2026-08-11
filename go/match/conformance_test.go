@@ -8,7 +8,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 	"gopkg.in/yaml.v3"
 )
@@ -26,7 +25,7 @@ func TestConformance(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read tree: %v", err)
 			}
-			var root comps.ComponentNode
+			var root sightmap.ComponentNode
 			if err := json.Unmarshal(treeData, &root); err != nil {
 				t.Fatalf("parse tree: %v", err)
 			}

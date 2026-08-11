@@ -3,10 +3,9 @@ package browser
 import (
 	"context"
 	"encoding/json"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // evalResult wraps a JS return value in the CDP Runtime.evaluate envelope the
@@ -23,8 +22,8 @@ func exprOf(params json.RawMessage) string {
 	return p.Expression
 }
 
-func nodeWithID(id string) *comps.ComponentNode {
-	return &comps.ComponentNode{Id: id, Bounds: &comps.Bounds{X: 0, Y: 0, Width: 20, Height: 10}}
+func nodeWithID(id string) *sightmap.ComponentNode {
+	return &sightmap.ComponentNode{Id: id, Bounds: &sightmap.Bounds{X: 0, Y: 0, Width: 20, Height: 10}}
 }
 
 func TestClick_OffScreenErrors(t *testing.T) {

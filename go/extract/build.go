@@ -2,10 +2,8 @@ package extract
 
 import (
 	"fmt"
+	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/sel"
 )
 
 // BuildTree runs the full post-probe pipeline:
@@ -16,13 +14,13 @@ import (
 //  4. Return the root ComponentNode
 //
 // The string selector from ProbeComponent is parsed into a SelectorPart using
-// sel.ParseSightmapSelector. On parse error, a SelectorPart with just Tag set
+// sightmap.ParseSightmapSelector. On parse error, a SelectorPart with just Tag set
 // (from TagName) is used as a fallback.
 func BuildTree(
 	probe *ProbeResult,
 	a11y []A11YNode,
 	domRoot *DOMNode,
-) (*comps.ComponentNode, error) {
+) (*sightmap.ComponentNode, error) {
 	// 1. Index probe results by ID.
 	probeByID := make(map[string]*ProbeComponent, len(probe.Results))
 	for i := range probe.Results {
@@ -63,7 +61,7 @@ func walkDOMNode(
 	node *DOMNode,
 	probeByID map[string]*ProbeComponent,
 	a11yByID map[int]*A11YNode,
-) (*comps.ComponentNode, []*comps.ComponentNode) {
+) (*sightmap.ComponentNode, []*sightmap.ComponentNode) {
 	// Treat shadow roots as ordinary children (appended after regular children
 	// to preserve document order of the light tree first).
 	allDOM := make([]*DOMNode, 0, len(node.Children)+len(node.ShadowRoots))
@@ -71,7 +69,7 @@ func walkDOMNode(
 	allDOM = append(allDOM, node.ShadowRoots...)
 
 	// Recursively collect component children.
-	var compChildren []*comps.ComponentNode
+	var compChildren []*sightmap.ComponentNode
 	for _, child := range allDOM {
 		childNode, grandchildren := walkDOMNode(child, probeByID, a11yByID)
 		if childNode != nil {
@@ -107,7 +105,7 @@ func walkDOMNode(
 	a11yNode := a11yByID[node.BackendNodeID]
 	role, name, value, ignored, props := mergeA11Y(pc, a11yNode)
 
-	compNode := &comps.ComponentNode{
+	compNode := &sightmap.ComponentNode{
 		Id:            pc.Id,
 		Role:          role,
 		Name:          name,
@@ -126,23 +124,23 @@ func walkDOMNode(
 	return compNode, nil
 }
 
-// elementFor parses ProbeComponent.Selector with sel.ParseSightmapSelector and
+// elementFor parses ProbeComponent.Selector with sightmap.ParseSightmapSelector and
 // projects the last (most-specific) compound into an observed Element. On any
 // error it falls back to an Element with Tag = strings.ToLower(pc.TagName).
 //
 // The returned Element has its Classes duplicated into Attrs["class"] to support
 // attribute selectors like [class*="partial"], [class^="prefix-"], etc.
-func elementFor(pc *ProbeComponent) *comps.Element {
-	var el *comps.Element
+func elementFor(pc *ProbeComponent) *sightmap.Element {
+	var el *sightmap.Element
 	if pc.Selector != "" {
-		parsed, err := sel.ParseSightmapSelector(pc.Selector)
+		parsed, err := sightmap.ParseSightmapSelector(pc.Selector)
 		if err == nil && len(parsed.Parts) > 0 {
 			p := parsed.Parts[len(parsed.Parts)-1]
-			el = &comps.Element{Tag: p.Tag, Id: p.Id, Classes: p.Classes, Attrs: p.Attrs}
+			el = &sightmap.Element{Tag: p.Tag, Id: p.Id, Classes: p.Classes, Attrs: p.Attrs}
 		}
 	}
 	if el == nil {
-		el = &comps.Element{Tag: strings.ToLower(pc.TagName)}
+		el = &sightmap.Element{Tag: strings.ToLower(pc.TagName)}
 	}
 
 	// Duplicate classes into Attrs["class"] for attribute selector support.

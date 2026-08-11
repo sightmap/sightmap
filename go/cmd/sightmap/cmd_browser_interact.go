@@ -15,7 +15,6 @@ import (
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/compquery"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -29,7 +28,7 @@ import (
 // root cause of the snapshot->click race. Resolving through the
 // already-present attribute keeps the id stable across re-renders that don't
 // remount the target.
-func resolveNode(ctx context.Context, conn *browser.CDPConn, id string) (*comps.ComponentNode, error) {
+func resolveNode(ctx context.Context, conn *browser.CDPConn, id string) (*sightmap.ComponentNode, error) {
 	return browser.ResolveBySightmapID(ctx, conn, id)
 }
 
@@ -37,7 +36,7 @@ func resolveNode(ctx context.Context, conn *browser.CDPConn, id string) (*comps.
 // the caller passed (a probe id or component query) plus the element's click
 // point when its bounds are known. Interaction commands echo one of these on
 // success so an agent driving the browser sees what happened.
-func actionLabel(arg string, node *comps.ComponentNode) string {
+func actionLabel(arg string, node *sightmap.ComponentNode) string {
 	if node != nil && node.Bounds != nil {
 		x := node.Bounds.X + node.Bounds.Width/2
 		y := node.Bounds.Y + node.Bounds.Height/2

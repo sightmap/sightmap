@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/sel"
 )
 
 // Severity classifies a validation finding. Errors fail validation (nonzero
@@ -243,7 +241,7 @@ func validateComponent(comp ComponentDef, seen map[string]string) []ValidationEr
 
 	// selector-parse
 	for _, selStr := range comp.Selectors {
-		if _, err := sel.ParseSightmapSelector(selStr); err != nil {
+		if _, err := ParseSightmapSelector(selStr); err != nil {
 			errs = append(errs, ValidationError{
 				Component: comp.Name,
 				Selector:  selStr,

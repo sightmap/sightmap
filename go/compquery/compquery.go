@@ -30,8 +30,6 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"sort"
 	"strings"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // Query is a parsed component query: a descendant chain of component matchers
@@ -106,15 +104,15 @@ func (q *Query) String() string {
 
 // Resolve finds the single component node matching q. matches maps tree nodes to
 // their sightmap identity; props maps node id -> extracted property values
-// (keyed by comps.ComponentNode.Id). It returns a descriptive error when nothing
+// (keyed by sightmap.ComponentNode.Id). It returns a descriptive error when nothing
 // matches, or when several components match and no occurrence index (#N)
 // disambiguates.
 func Resolve(
-	root *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	root *sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	props map[string]map[string]string,
 	q *Query,
-) (*comps.ComponentNode, error) {
+) (*sightmap.ComponentNode, error) {
 	cands := FindCandidates(root, matches, props, q)
 	if len(cands) == 0 {
 		return nil, fmt.Errorf("no component matches query %s", q)
@@ -135,20 +133,20 @@ func Resolve(
 // ancestors satisfy the preceding chain parts as an ordered subsequence
 // (descendant semantics). Results are in document (pre-order) order.
 func FindCandidates(
-	root *comps.ComponentNode,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	root *sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	props map[string]map[string]string,
 	q *Query,
-) []*comps.ComponentNode {
+) []*sightmap.ComponentNode {
 	if root == nil || q == nil || len(q.Parts) == 0 {
 		return nil
 	}
 	target := q.Parts[len(q.Parts)-1]
 	prefix := q.Parts[:len(q.Parts)-1]
 
-	var out []*comps.ComponentNode
-	var walk func(node *comps.ComponentNode, ancestors []*comps.ComponentNode)
-	walk = func(node *comps.ComponentNode, ancestors []*comps.ComponentNode) {
+	var out []*sightmap.ComponentNode
+	var walk func(node *sightmap.ComponentNode, ancestors []*sightmap.ComponentNode)
+	walk = func(node *sightmap.ComponentNode, ancestors []*sightmap.ComponentNode) {
 		if satisfies(node, target, matches, props) && subsequence(prefix, ancestors, matches, props) {
 			out = append(out, node)
 		}
@@ -156,7 +154,7 @@ func FindCandidates(
 		if matches[node] != nil {
 			// Only matched (named) nodes can satisfy chain parts, so only they
 			// extend the ancestor scope.
-			next = append(append([]*comps.ComponentNode(nil), ancestors...), node)
+			next = append(append([]*sightmap.ComponentNode(nil), ancestors...), node)
 		}
 		for _, ch := range node.Children {
 			walk(ch, next)
@@ -169,9 +167,9 @@ func FindCandidates(
 // satisfies reports whether node is matched as part.Name and all of part's
 // predicates hold against the node's extracted properties.
 func satisfies(
-	node *comps.ComponentNode,
+	node *sightmap.ComponentNode,
 	part Part,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	props map[string]map[string]string,
 ) bool {
 	m := matches[node]
@@ -194,8 +192,8 @@ func satisfies(
 // ancestors (each ancestor consumed at most once). An empty prefix is satisfied.
 func subsequence(
 	prefix []Part,
-	ancestors []*comps.ComponentNode,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	ancestors []*sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	props map[string]map[string]string,
 ) bool {
 	i := 0
@@ -212,8 +210,8 @@ func subsequence(
 
 func ambiguityError(
 	q *Query,
-	cands []*comps.ComponentNode,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	cands []*sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	props map[string]map[string]string,
 ) error {
 	var b strings.Builder

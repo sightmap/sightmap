@@ -12,7 +12,6 @@ import (
 	"os"
 
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -146,7 +145,7 @@ func runSnapshot(args []string) error {
 // ── Formatting helpers ────────────────────────────────────────────────────────
 
 // writeTreeJSON serialises root as JSON to path atomically.
-func writeTreeJSON(root *comps.ComponentNode, path string) error {
+func writeTreeJSON(root *sightmap.ComponentNode, path string) error {
 	data, err := json.Marshal(root)
 	if err != nil {
 		return err

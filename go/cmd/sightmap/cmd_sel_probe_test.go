@@ -1,9 +1,8 @@
 package main
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
-
-	"github.com/sightmap/sightmap/go/comps"
 )
 
 // makeAnnotation is a test helper that builds a compAnnotation matching a
@@ -11,7 +10,7 @@ import (
 func makeAnnotation(name, tag string, classes []string) compAnnotation {
 	return compAnnotation{
 		name: name,
-		part: &comps.SelectorPart{Tag: tag, Classes: classes},
+		part: &sightmap.SelectorPart{Tag: tag, Classes: classes},
 	}
 }
 
@@ -19,7 +18,7 @@ func makeAnnotation(name, tag string, classes []string) compAnnotation {
 func makeAnnotationDt(name, tag, dt string) compAnnotation {
 	return compAnnotation{
 		name: name,
-		part: &comps.SelectorPart{
+		part: &sightmap.SelectorPart{
 			Tag:   tag,
 			Attrs: map[string]string{"data-testid": dt},
 		},

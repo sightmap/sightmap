@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/sightmap/sightmap/go/browser"
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -19,7 +18,7 @@ import (
 func ExtractProperties(
 	ctx context.Context,
 	conn *browser.CDPConn,
-	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	compByName map[string]sightmap.ComponentDef,
 ) map[string]map[string]string {
 	type specProp struct {

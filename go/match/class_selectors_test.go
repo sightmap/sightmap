@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/comps"
 	"github.com/sightmap/sightmap/go/match"
 )
 
@@ -81,10 +80,10 @@ func TestClassAttrSelectors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			node := &comps.ComponentNode{
+			node := &sightmap.ComponentNode{
 				Id:   "test-node",
 				Role: "button",
-				Element: &comps.Element{
+				Element: &sightmap.Element{
 					Tag:     "button",
 					Classes: tt.classes,
 					Attrs:   map[string]string{"class": strings.Join(tt.classes, " ")},
