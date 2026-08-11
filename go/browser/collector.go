@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // DefaultMaxEntries is the per-stream ring-buffer cap (console and network are
@@ -17,29 +19,14 @@ import (
 // entries, which the query surface then reports as "N earlier entries dropped".
 const DefaultMaxEntries = 1000
 
-// ConsoleEntry is one captured console message (or uncaught exception, folded in
-// as level "exception"). Index is a monotonic per-collector id; it is the stable
-// handle for get-by-index.
-type ConsoleEntry struct {
-	Index int    `json:"index"`
-	Tab   string `json:"tab"`
-	Level string `json:"level"` // log, debug, info, warn, error, exception
-	Text  string `json:"text"`
-	Ts    int64  `json:"ts"` // unix milliseconds
-}
-
-// NetworkEntry is one captured request/response. Bodies are NOT buffered; they
-// are fetched lazily from the collector connection that saw the request (only
-// that connection can, via Network.getResponseBody / getRequestPostData).
-type NetworkEntry struct {
-	Index        int    `json:"index"`
-	Tab          string `json:"tab"`
-	Method       string `json:"method"`
-	URL          string `json:"url"`
-	Status       int    `json:"status"` // 0 until the response is received
-	StatusText   string `json:"statusText"`
-	ResourceType string `json:"resourceType"`
-	Ts           int64  `json:"ts"` // unix milliseconds
+// networkRecord is one buffered request/response: the tool-free sightmap.Request
+// the query surface returns, plus the CDP handle this tool keeps for lazy body
+// fetch. Bodies are NOT buffered; they are fetched from the collector connection
+// that saw the request (only that connection can, via Network.getResponseBody /
+// getRequestPostData). The handle fields are unexported so they never cross the
+// public surface or the wire.
+type networkRecord struct {
+	sightmap.Request
 
 	requestID string   // CDP requestId, for lazy body fetch
 	conn      *CDPConn // the collector connection that observed this request
@@ -55,8 +42,8 @@ type Collector struct {
 	maxEntries int
 
 	mu             sync.Mutex
-	console        []ConsoleEntry
-	network        []NetworkEntry
+	console        []sightmap.Message
+	network        []networkRecord
 	nextConsole    int
 	nextNetwork    int
 	consoleDropped int
@@ -211,7 +198,7 @@ func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, cons
 	}
 }
 
-func (c *Collector) addConsole(e ConsoleEntry) {
+func (c *Collector) addConsole(e sightmap.Message) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e.Index = c.nextConsole
@@ -223,7 +210,7 @@ func (c *Collector) addConsole(e ConsoleEntry) {
 	}
 }
 
-func (c *Collector) addNetwork(e NetworkEntry) {
+func (c *Collector) addNetwork(e networkRecord) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	e.Index = c.nextNetwork
@@ -261,10 +248,10 @@ type ConsoleFilter struct {
 
 // Console returns the buffered console entries matching f (oldest→newest) plus
 // the number of entries dropped from the front of the ring.
-func (c *Collector) Console(f ConsoleFilter) ([]ConsoleEntry, int) {
+func (c *Collector) Console(f ConsoleFilter) ([]sightmap.Message, int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	out := make([]ConsoleEntry, 0, len(c.console))
+	out := make([]sightmap.Message, 0, len(c.console))
 	for _, e := range c.console {
 		if f.Level != "" && e.Level != f.Level {
 			continue
@@ -288,12 +275,12 @@ type NetworkFilter struct {
 
 // Network returns the buffered network entries matching f (oldest→newest) plus
 // the number dropped from the front of the ring.
-func (c *Collector) Network(f NetworkFilter) ([]NetworkEntry, int) {
+func (c *Collector) Network(f NetworkFilter) ([]sightmap.Request, int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	rt := strings.ToLower(f.ResourceType)
 	sub := strings.ToLower(f.URLSubstr)
-	out := make([]NetworkEntry, 0, len(c.network))
+	out := make([]sightmap.Request, 0, len(c.network))
 	for _, e := range c.network {
 		if rt != "" && strings.ToLower(e.ResourceType) != rt {
 			continue
@@ -304,7 +291,7 @@ func (c *Collector) Network(f NetworkFilter) ([]NetworkEntry, int) {
 		if f.Tab != "" && e.Tab != f.Tab {
 			continue
 		}
-		out = append(out, e)
+		out = append(out, e.Request)
 	}
 	out = tailLimit(out, f.Limit)
 	return out, c.networkDropped
@@ -354,7 +341,7 @@ func tailLimit[T any](s []T, n int) []T {
 
 // ── CDP event parsing (pure; unit-tested) ──────────────────────────────────
 
-func parseConsoleAPI(raw json.RawMessage) (ConsoleEntry, bool) {
+func parseConsoleAPI(raw json.RawMessage) (sightmap.Message, bool) {
 	var ev struct {
 		Type      string  `json:"type"`
 		Timestamp float64 `json:"timestamp"`
@@ -365,20 +352,20 @@ func parseConsoleAPI(raw json.RawMessage) (ConsoleEntry, bool) {
 		} `json:"args"`
 	}
 	if err := json.Unmarshal(raw, &ev); err != nil {
-		return ConsoleEntry{}, false
+		return sightmap.Message{}, false
 	}
 	parts := make([]string, 0, len(ev.Args))
 	for _, a := range ev.Args {
 		parts = append(parts, renderArg(a.Value, a.Description))
 	}
-	return ConsoleEntry{
+	return sightmap.Message{
 		Level: consoleLevel(ev.Type),
 		Text:  strings.Join(parts, " "),
 		Ts:    int64(ev.Timestamp),
 	}, true
 }
 
-func parseException(raw json.RawMessage) (ConsoleEntry, bool) {
+func parseException(raw json.RawMessage) (sightmap.Message, bool) {
 	var ev struct {
 		Timestamp        float64 `json:"timestamp"`
 		ExceptionDetails struct {
@@ -389,16 +376,16 @@ func parseException(raw json.RawMessage) (ConsoleEntry, bool) {
 		} `json:"exceptionDetails"`
 	}
 	if err := json.Unmarshal(raw, &ev); err != nil {
-		return ConsoleEntry{}, false
+		return sightmap.Message{}, false
 	}
 	text := ev.ExceptionDetails.Exception.Description
 	if text == "" {
 		text = ev.ExceptionDetails.Text
 	}
-	return ConsoleEntry{Level: "exception", Text: text, Ts: int64(ev.Timestamp)}, true
+	return sightmap.Message{Level: "exception", Text: text, Ts: int64(ev.Timestamp)}, true
 }
 
-func parseRequest(raw json.RawMessage) (NetworkEntry, bool) {
+func parseRequest(raw json.RawMessage) (networkRecord, bool) {
 	var ev struct {
 		RequestID string `json:"requestId"`
 		Type      string `json:"type"`
@@ -408,14 +395,16 @@ func parseRequest(raw json.RawMessage) (NetworkEntry, bool) {
 		} `json:"request"`
 	}
 	if err := json.Unmarshal(raw, &ev); err != nil || ev.RequestID == "" {
-		return NetworkEntry{}, false
+		return networkRecord{}, false
 	}
-	return NetworkEntry{
-		Method:       ev.Request.Method,
-		URL:          ev.Request.URL,
-		ResourceType: ev.Type,
-		Ts:           time.Now().UnixMilli(),
-		requestID:    ev.RequestID,
+	return networkRecord{
+		Request: sightmap.Request{
+			Method:       ev.Request.Method,
+			URL:          ev.Request.URL,
+			ResourceType: ev.Type,
+			Ts:           time.Now().UnixMilli(),
+		},
+		requestID: ev.RequestID,
 	}, true
 }
 

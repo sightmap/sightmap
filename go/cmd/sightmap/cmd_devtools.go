@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // devtoolsGet fetches path (with query) from the daemon's HTTP server and
@@ -51,13 +52,13 @@ func devtoolsGet(sightmapDir, path string, query url.Values) ([]byte, error) {
 }
 
 type consoleResult struct {
-	Entries []browser.ConsoleEntry `json:"entries"`
-	Dropped int                    `json:"dropped"`
+	Entries []sightmap.Message `json:"entries"`
+	Dropped int                `json:"dropped"`
 }
 
 type networkResult struct {
-	Entries []browser.NetworkEntry `json:"entries"`
-	Dropped int                    `json:"dropped"`
+	Entries []sightmap.Request `json:"entries"`
+	Dropped int                `json:"dropped"`
 }
 
 // ── console ─────────────────────────────────────────────────────────────────
@@ -215,7 +216,7 @@ func runNetworkGet(args []string) error {
 	if err := json.Unmarshal(body, &res); err != nil {
 		return fmt.Errorf("parse response: %w", err)
 	}
-	var entry *browser.NetworkEntry
+	var entry *sightmap.Request
 	for i := range res.Entries {
 		if res.Entries[i].Index == idx {
 			entry = &res.Entries[i]
@@ -294,7 +295,7 @@ func printBodyPreview(b []byte) {
 	fmt.Printf("Response Body:\n%s\n", string(b))
 }
 
-func statusStr(e browser.NetworkEntry) string {
+func statusStr(e sightmap.Request) string {
 	if e.Status == 0 {
 		return "pending"
 	}
@@ -324,7 +325,7 @@ func singleIndexArg(args []string, cmd string) (int, error) {
 	return idx, nil
 }
 
-func spansMultipleTabs(entries []browser.ConsoleEntry) bool {
+func spansMultipleTabs(entries []sightmap.Message) bool {
 	seen := ""
 	for _, e := range entries {
 		if seen == "" {

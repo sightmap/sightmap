@@ -3,6 +3,8 @@ package browser
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func TestParseConsoleAPI(t *testing.T) {
@@ -57,7 +59,7 @@ func TestRingOverflowAndDropped(t *testing.T) {
 	c := NewCollector("localhost:0")
 	c.maxEntries = 3
 	for i := 0; i < 5; i++ {
-		c.addConsole(ConsoleEntry{Level: "log", Text: "m"})
+		c.addConsole(sightmap.Message{Level: "log", Text: "m"})
 	}
 	got, dropped := c.Console(ConsoleFilter{})
 	if len(got) != 3 {
@@ -74,9 +76,9 @@ func TestRingOverflowAndDropped(t *testing.T) {
 
 func TestConsoleFilterAndLimit(t *testing.T) {
 	c := NewCollector("localhost:0")
-	c.addConsole(ConsoleEntry{Level: "log", Text: "a", Tab: "T1"})
-	c.addConsole(ConsoleEntry{Level: "error", Text: "b", Tab: "T1"})
-	c.addConsole(ConsoleEntry{Level: "error", Text: "c", Tab: "T2"})
+	c.addConsole(sightmap.Message{Level: "log", Text: "a", Tab: "T1"})
+	c.addConsole(sightmap.Message{Level: "error", Text: "b", Tab: "T1"})
+	c.addConsole(sightmap.Message{Level: "error", Text: "c", Tab: "T2"})
 
 	errs, _ := c.Console(ConsoleFilter{Level: "error"})
 	if len(errs) != 2 {
@@ -94,8 +96,8 @@ func TestConsoleFilterAndLimit(t *testing.T) {
 
 func TestNetworkFilterAndResponseMatch(t *testing.T) {
 	c := NewCollector("localhost:0")
-	c.addNetwork(NetworkEntry{Method: "GET", URL: "https://x/style.css", ResourceType: "Stylesheet", requestID: "A"})
-	c.addNetwork(NetworkEntry{Method: "POST", URL: "https://x/api/cart", ResourceType: "XHR", requestID: "B"})
+	c.addNetwork(networkRecord{Request: sightmap.Request{Method: "GET", URL: "https://x/style.css", ResourceType: "Stylesheet"}, requestID: "A"})
+	c.addNetwork(networkRecord{Request: sightmap.Request{Method: "POST", URL: "https://x/api/cart", ResourceType: "XHR"}, requestID: "B"})
 	c.applyResponse("B", 500, "Server Error", "XHR")
 
 	xhr, _ := c.Network(NetworkFilter{ResourceType: "xhr"})
@@ -103,7 +105,7 @@ func TestNetworkFilterAndResponseMatch(t *testing.T) {
 		t.Fatalf("xhr filter/response = %+v", xhr)
 	}
 	byURL, _ := c.Network(NetworkFilter{URLSubstr: "CART"})
-	if len(byURL) != 1 || byURL[0].requestID != "B" {
+	if len(byURL) != 1 || byURL[0].URL != "https://x/api/cart" {
 		t.Errorf("url substring (case-insensitive) = %+v", byURL)
 	}
 }
