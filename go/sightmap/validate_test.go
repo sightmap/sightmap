@@ -7,7 +7,7 @@ import (
 )
 
 // corpusFrom is a convenience constructor for test corpora.
-func corpusFrom(globals []sightmap.ComponentDef, views []sightmap.View) *sightmap.Corpus {
+func corpusFrom(globals []sightmap.ComponentDef, views []sightmap.ViewDef) *sightmap.Corpus {
 	return &sightmap.Corpus{GlobalComponents: globals, Views: views}
 }
 
@@ -70,7 +70,7 @@ func TestValidate_DuplicateNameGlobal(t *testing.T) {
 
 func TestValidate_DuplicateNameInView(t *testing.T) {
 	// True duplicate within a view: same name AND same selector — should error.
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
 			Name:  "Home",
 			Route: "/",
@@ -104,7 +104,7 @@ func TestValidate_SameNameDifferentSelector_OK(t *testing.T) {
 }
 
 func TestValidate_MissingRoute(t *testing.T) {
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
 			Name:       "Home",
 			Route:      "",
@@ -125,7 +125,7 @@ func TestValidate_Clean(t *testing.T) {
 		[]sightmap.ComponentDef{
 			{Name: "NavBar", Selectors: []string{"nav"}},
 		},
-		[]sightmap.View{
+		[]sightmap.ViewDef{
 			{
 				Name:       "Home",
 				Route:      "/",

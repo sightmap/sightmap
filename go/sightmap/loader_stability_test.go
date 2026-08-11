@@ -92,7 +92,7 @@ func TestLoader_ViewStability(t *testing.T) {
 	tests := []struct {
 		name     string
 		yaml     string
-		wantView View
+		wantView ViewDef
 	}{
 		{
 			name: "omitted defaults to empty",
@@ -102,7 +102,7 @@ views:
     route: /
     components: []
 `,
-			wantView: View{
+			wantView: ViewDef{
 				Name:       "HomePage",
 				Route:      "/",
 				Stability:  "",
@@ -118,7 +118,7 @@ views:
     stability: stub
     components: []
 `,
-			wantView: View{
+			wantView: ViewDef{
 				Name:       "LegacyCMSPage",
 				Route:      "/legacy/**",
 				Stability:  "stub",
@@ -134,7 +134,7 @@ views:
     stability: deferred
     components: []
 `,
-			wantView: View{
+			wantView: ViewDef{
 				Name:       "AdminPanel",
 				Route:      "/admin/**",
 				Stability:  "deferred",

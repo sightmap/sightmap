@@ -20,20 +20,20 @@ import (
 // sibling View / component definition types are regularized onto the same
 // convention separately.
 type RequestDef struct {
-	Name        string            `json:"name"`
-	Route       string            `json:"route,omitempty"`  // glob pattern; express-style ":param" segments match one segment
-	Method      string            `json:"method,omitempty"` // optional HTTP method filter; "" matches any method
-	Description string            `json:"description,omitempty"`
-	Source      string            `json:"source,omitempty"`
-	Request     *Payload          `json:"request,omitempty"`  // expected request payload shape
-	Response    *Payload          `json:"response,omitempty"` // expected response payload shape
-	Headers     []string          `json:"headers,omitempty"`  // notable header names to highlight
-	Memory      []string          `json:"memory,omitempty"`   // request-level memory entries
-	Tags        []string          `json:"tags,omitempty"`     // open-vocabulary labels (SEP-0004)
-	Properties  []RequestProperty `json:"properties,omitempty"`
+	Name        string               `json:"name"`
+	Route       string               `json:"route,omitempty"`  // glob pattern; express-style ":param" segments match one segment
+	Method      string               `json:"method,omitempty"` // optional HTTP method filter; "" matches any method
+	Description string               `json:"description,omitempty"`
+	Source      string               `json:"source,omitempty"`
+	Request     *Payload             `json:"request,omitempty"`  // expected request payload shape
+	Response    *Payload             `json:"response,omitempty"` // expected response payload shape
+	Headers     []string             `json:"headers,omitempty"`  // notable header names to highlight
+	Memory      []string             `json:"memory,omitempty"`   // request-level memory entries
+	Tags        []string             `json:"tags,omitempty"`     // open-vocabulary labels (SEP-0004)
+	Properties  []RequestPropertyDef `json:"properties,omitempty"`
 }
 
-// RequestProperty declares a named value to extract from a live request/response
+// RequestPropertyDef declares a named value to extract from a live request/response
 // pair (SEP-0005). Source names which root to read (a request/response body or
 // header block); Field selects a value within it; Pattern optionally refines
 // what Field resolved (or scans the raw source text when Field is absent). At
@@ -43,7 +43,7 @@ type RequestDef struct {
 // lives, and a consumer observing real traffic resolves them. A tool working
 // from static corpus definitions alone treats every property as
 // declared-but-unavailable rather than an error.
-type RequestProperty struct {
+type RequestPropertyDef struct {
 	Name string `json:"name"`
 	// Source is the root to read from: one of RequestPropertySources
 	// ("req.body", "rsp.body", "req.headers", "rsp.headers").
@@ -63,7 +63,7 @@ type RequestProperty struct {
 	Transform string `json:"transform,omitempty"`
 }
 
-// RequestPropertySources is the closed set of roots a RequestProperty.Source
+// RequestPropertySources is the closed set of roots a RequestPropertyDef.Source
 // may name (SEP-0005 §Extraction root).
 var RequestPropertySources = []string{"req.body", "rsp.body", "req.headers", "rsp.headers"}
 

@@ -278,7 +278,7 @@ func TestRouteMatching(t *testing.T) {
 		GlobalComponents: []sightmap.ComponentDef{
 			{Name: "Global", Selectors: []string{"body"}},
 		},
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Name: "B", Route: "/b/**", Components: []sightmap.ComponentDef{
 				{Name: "BComp", Selectors: []string{".b"}},
 			}},
@@ -336,7 +336,7 @@ func TestComponentsForURL(t *testing.T) {
 
 	corpus := &sightmap.Corpus{
 		GlobalComponents: []sightmap.ComponentDef{globalA, globalB},
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Route: "/page", Components: []sightmap.ComponentDef{viewB, viewC}},
 		},
 	}
@@ -380,7 +380,7 @@ func TestAllComponents(t *testing.T) {
 
 	corpus := &sightmap.Corpus{
 		GlobalComponents: []sightmap.ComponentDef{globalA, globalB},
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Route: "/page", Components: []sightmap.ComponentDef{viewB, viewC}},
 		},
 	}

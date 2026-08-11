@@ -25,7 +25,7 @@ type Corpus struct {
 
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
-	Views []View `json:"views,omitempty"`
+	Views []ViewDef `json:"views,omitempty"`
 
 	// Requests is the flat list of globally-defined API request definitions
 	// (from a file-root `requests:` list). View-scoped requests live on each
@@ -57,8 +57,8 @@ func (a Access) IsOpen() bool {
 	return a.Status == "" || a.Status == "open"
 }
 
-// View is a per-URL-pattern view definition from the sightmap corpus.
-type View struct {
+// ViewDef is a per-URL-pattern view definition from the sightmap corpus.
+type ViewDef struct {
 	Name       string         `json:"name"`
 	Route      string         `json:"route,omitempty"`
 	Memory     []string       `json:"memory,omitempty"`
@@ -74,7 +74,7 @@ type View struct {
 }
 
 // ViewByName returns a pointer to the first View with the given name, or nil.
-func (c *Corpus) ViewByName(name string) *View {
+func (c *Corpus) ViewByName(name string) *ViewDef {
 	for i := range c.Views {
 		if c.Views[i].Name == name {
 			return &c.Views[i]
@@ -92,7 +92,7 @@ type Snapshot struct {
 
 // SnapBasename returns the output file basename for this view.
 // Uses SourceFile if available (preferred), otherwise lowercases and sanitises the Name.
-func (v *View) SnapBasename() string {
+func (v *ViewDef) SnapBasename() string {
 	if v.SourceFile != "" {
 		return v.SourceFile
 	}
@@ -168,7 +168,7 @@ func (c *Corpus) AllComponents() []ComponentDef {
 // path, or nil if no view matches. Specificity follows the spec's per-segment
 // scoring (literal > :param > * > **); when scores tie, the first-declared view
 // wins. The returned View is a copy.
-func (c *Corpus) ViewForURL(pageURL string) *View {
+func (c *Corpus) ViewForURL(pageURL string) *ViewDef {
 	u, err := url.Parse(pageURL)
 	if err != nil {
 		return nil

@@ -156,7 +156,7 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 	}
 
 	// Find view for memory note lookup (T2 trace) and leaf-probe component list.
-	var view *sightmap.View
+	var view *sightmap.ViewDef
 	if corpus != nil {
 		for i := range corpus.Views {
 			if corpus.Views[i].Route == route {

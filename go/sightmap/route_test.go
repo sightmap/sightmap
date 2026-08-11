@@ -84,7 +84,7 @@ func TestViewForURLMostSpecificWins(t *testing.T) {
 	// Declaration order deliberately puts the GENERIC route first so a
 	// first-match implementation would pick the wrong view.
 	c := &sightmap.Corpus{
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Name: "Generic", Route: "/users/*"},
 			{Name: "Specific", Route: "/users/me"},
 			{Name: "Param", Route: "/users/:id/edit"},
@@ -120,7 +120,7 @@ func TestViewForURLMostSpecificWins(t *testing.T) {
 // resolve to the first-declared view.
 func TestViewForURLTieBreakDeclarationOrder(t *testing.T) {
 	c := &sightmap.Corpus{
-		Views: []sightmap.View{
+		Views: []sightmap.ViewDef{
 			{Name: "First", Route: "/a/*"},
 			{Name: "Second", Route: "/*/b"},
 		},

@@ -26,7 +26,7 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 		Requests: []RequestDef{
 			{Name: "GetCurrentUser", Route: "/api/me", Method: "GET"},
 		},
-		Views: []View{
+		Views: []ViewDef{
 			{
 				Name:   "Checkout",
 				Route:  "/checkout",
@@ -48,7 +48,7 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 				Components: []ComponentDef{
 					nav, // same global, reused by a second view
 					{Name: "ActivityFeed", Selectors: []string{`[data-component="ActivityFeed"]`},
-						Properties: []Property{{Name: "count", Extract: "text"}}},
+						Properties: []ComponentPropertyDef{{Name: "count", Extract: "text"}}},
 				},
 			},
 		},
@@ -96,7 +96,7 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 // name-deduped component list drops the second view's entirely.
 func TestStats_SameNamedViewComponents(t *testing.T) {
 	corpus := &Corpus{
-		Views: []View{
+		Views: []ViewDef{
 			{
 				Name:  "Products",
 				Route: "/products",
@@ -104,7 +104,7 @@ func TestStats_SameNamedViewComponents(t *testing.T) {
 					Name:       "Card",
 					Selectors:  []string{`[data-component="ProductCard"]`},
 					Memory:     []string{"price hides while the quote refreshes"},
-					Properties: []Property{{Name: "title", Extract: "text"}},
+					Properties: []ComponentPropertyDef{{Name: "title", Extract: "text"}},
 				}},
 			},
 			{
@@ -114,7 +114,7 @@ func TestStats_SameNamedViewComponents(t *testing.T) {
 					Name:      "Card", // same local name, a different component
 					Selectors: []string{`[data-component="PostCard"]`},
 					Memory:    []string{"excerpt is truncated server-side"},
-					Properties: []Property{
+					Properties: []ComponentPropertyDef{
 						{Name: "headline", Extract: "text"},
 						{Name: "author", Extract: "attr=data-author"},
 					},
@@ -145,7 +145,7 @@ func TestStats_GlobalsOnlyCorpus(t *testing.T) {
 	corpus := &Corpus{
 		GlobalComponents: []ComponentDef{
 			{Name: "Header", Selectors: []string{"#header"},
-				Properties: []Property{{Name: "brand", Extract: "text"}}},
+				Properties: []ComponentPropertyDef{{Name: "brand", Extract: "text"}}},
 		},
 		Requests: []RequestDef{
 			{Name: "Ping", Route: "/api/ping"},

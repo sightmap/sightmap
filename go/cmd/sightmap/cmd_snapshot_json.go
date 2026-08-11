@@ -86,7 +86,7 @@ type annotatedOutput struct {
 func writeAnnotatedJSON(
 	root *comps.ComponentNode,
 	path string,
-	view *sightmap.View,
+	view *sightmap.ViewDef,
 	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
 	propValues map[string]map[string]string,
 ) error {

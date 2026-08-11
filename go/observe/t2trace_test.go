@@ -30,7 +30,7 @@ func TestWriteT2Trace_Basic(t *testing.T) {
 	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "AppSidebar"},
 	}
-	view := &sightmap.View{
+	view := &sightmap.ViewDef{
 		Name: "Home",
 		Components: []sightmap.ComponentDef{
 			{Name: "AppSidebar"},
@@ -78,7 +78,7 @@ func TestWriteT2Trace_SingleChildSuppressed(t *testing.T) {
 	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "NavFooter"},
 	}
-	view := &sightmap.View{
+	view := &sightmap.ViewDef{
 		Components: []sightmap.ComponentDef{
 			{Name: "NavFooter"},
 		},
@@ -115,7 +115,7 @@ func TestWriteT2Trace_MemoryNoteSuppressed(t *testing.T) {
 	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "AppContent"},
 	}
-	view := &sightmap.View{
+	view := &sightmap.ViewDef{
 		Components: []sightmap.ComponentDef{
 			{
 				Name:   "AppContent",
@@ -169,7 +169,7 @@ func TestWriteT2Trace_Truncation(t *testing.T) {
 	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "ProductGrid"},
 	}
-	view := &sightmap.View{
+	view := &sightmap.ViewDef{
 		Components: []sightmap.ComponentDef{
 			{Name: "ProductGrid"},
 		},

@@ -42,7 +42,7 @@ func TestFormat_CoverageWithZeroMatches(t *testing.T) {
 		Root:          &comps.ComponentNode{Id: "1", Role: "document", IsVisible: true},
 		URL:           "https://app.example.com/x",
 		CorpusApplied: true,
-		View:          &sightmap.View{Name: "Stub", Route: "/x"},
+		View:          &sightmap.ViewDef{Name: "Stub", Route: "/x"},
 		Matches:       nil, // zero components matched
 		Coverage:      coverage.Result{Total: 5, T3: 5},
 	}
@@ -62,7 +62,7 @@ func TestFormat_Conflicts(t *testing.T) {
 		Root:          &comps.ComponentNode{Id: "1", Role: "document", IsVisible: true},
 		URL:           "https://app.example.com/a/b",
 		CorpusApplied: true,
-		View:          &sightmap.View{Name: "AStar", Route: "/a/*"},
+		View:          &sightmap.ViewDef{Name: "AStar", Route: "/a/*"},
 		TiedViews:     []string{"AStar", "StarB"},
 		ComponentConflicts: []sightmap.Conflict{{
 			Node:  &comps.ComponentNode{Id: "7", Role: "button", Name: "Save"},

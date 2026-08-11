@@ -18,7 +18,7 @@ func findByCode(fs []sightmap.ValidationError, code string) (sightmap.Validation
 }
 
 func TestConflict_DuplicateViewName_Warns(t *testing.T) {
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{Name: "Dashboard", Route: "/a"},
 		{Name: "Dashboard", Route: "/b"},
 	})
@@ -32,7 +32,7 @@ func TestConflict_DuplicateViewName_Warns(t *testing.T) {
 }
 
 func TestConflict_DuplicateRoute_Warns(t *testing.T) {
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{Name: "First", Route: "/x"},
 		{Name: "Second", Route: "/x/"}, // normalizes to the same route
 	})
@@ -46,7 +46,7 @@ func TestConflict_DuplicateRoute_Warns(t *testing.T) {
 }
 
 func TestConflict_NoFalsePositive_DistinctViews(t *testing.T) {
-	c := corpusFrom(nil, []sightmap.View{
+	c := corpusFrom(nil, []sightmap.ViewDef{
 		{Name: "A", Route: "/a"},
 		{Name: "B", Route: "/b"},
 	})
