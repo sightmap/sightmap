@@ -40,7 +40,7 @@ func nodeInvisible(id, tag string) *sightmap.ComponentNode {
 // applyDefs is a shorthand: build defs, apply, return matched node IDs by name.
 func applyDefs(t *testing.T, root *sightmap.ComponentNode, defs []sightmap.ComponentDef) map[string][]string {
 	t.Helper()
-	m := match.ApplySightmap(root, defs)
+	m := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(root, "")
 	result := make(map[string][]string)
 	for node, sm := range m {
 		result[sm.Name] = append(result[sm.Name], node.Id)
@@ -321,7 +321,7 @@ func TestParseQueries_InvalidSelectorSkipped(t *testing.T) {
 
 func TestApplySightmap_NilRoot(t *testing.T) {
 	defs := []sightmap.ComponentDef{{Name: "X", Selectors: []string{"div"}}}
-	result := match.ApplySightmap(nil, defs)
+	result := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(nil, "")
 	if result != nil {
 		t.Errorf("expected nil for nil root, got %v", result)
 	}
@@ -329,7 +329,7 @@ func TestApplySightmap_NilRoot(t *testing.T) {
 
 func TestApplySightmap_EmptyDefs(t *testing.T) {
 	root := node("r", "div", nil)
-	result := match.ApplySightmap(root, nil)
+	result := match.NewMatcher(&sightmap.Corpus{GlobalComponents: nil}).Match(root, "")
 	if result != nil {
 		t.Errorf("expected nil for empty defs, got %v", result)
 	}

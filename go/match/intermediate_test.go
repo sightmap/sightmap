@@ -69,7 +69,7 @@ func TestChildAnnotation_ThroughStructuralIntermediate(t *testing.T) {
 		{Name: "BreadcrumbLink", Selectors: []string{`[data-component^="breadcrumbs:Breadcrumbs"] a`}},
 	}
 
-	result := match.ApplySightmap(root, defs)
+	result := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(root, "")
 
 	// Find the specific nodes
 	var breadcrumbNode, linkNode *sightmap.ComponentNode
@@ -115,7 +115,7 @@ func TestChildAnnotation_BroadGlobalDoesNotSteal(t *testing.T) {
 		{Name: "BreadcrumbLink", Selectors: []string{`[data-component^="breadcrumbs:Breadcrumbs"] a`}},
 	}
 
-	result := match.ApplySightmap(root, defs)
+	result := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(root, "")
 
 	var linkNode *sightmap.ComponentNode
 	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {

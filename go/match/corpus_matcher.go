@@ -48,11 +48,11 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	return e
 }
 
-// MatchTree applies the corpus to a pre-built component tree for pageURL: it
+// Match applies the corpus to a pre-built component tree for pageURL: it
 // selects the matching view (falling back to global components), compiles the
 // queries if not already cached, then runs the NFA matcher over root. Returns
 // nil when root is nil or no queries apply.
-func (m *Matcher) MatchTree(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode]*sightmap.ComponentMatch {
+func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode]*sightmap.ComponentMatch {
 	entry := m.entryFor(pageURL)
 	if root == nil || len(entry.queries) == 0 {
 		return nil
@@ -69,11 +69,12 @@ func (m *Matcher) MatchTree(root *sightmap.ComponentNode, pageURL string) map[*s
 		if _, already := result[node]; already {
 			return // first-match-wins
 		}
-		var memory []string
+		cm := &sightmap.ComponentMatch{Name: q.Name}
 		if def := byName[q.Name]; def != nil {
-			memory = def.Memory
+			cm.Memory = def.Memory
+			cm.Tags = def.Tags
 		}
-		result[node] = &sightmap.ComponentMatch{Name: q.Name, Memory: memory}
+		result[node] = cm
 	})
 	return result
 }
@@ -83,4 +84,39 @@ func (m *Matcher) MatchTree(root *sightmap.ComponentNode, pageURL string) map[*s
 // definitions without a tree to match against. Cached alongside the queries.
 func (m *Matcher) Components(pageURL string) []sightmap.ComponentDef {
 	return m.entryFor(pageURL).components
+}
+
+// Conflicts returns the nodes in root directly matched by more than one distinct
+// component name for pageURL. A single name matching many nodes (e.g. a list of
+// cards) is normal and never reported; a single node claimed by several names is
+// the ambiguity, since Match is first-match-wins and keeps only the first. It
+// reuses the same cached queries as Match, so it sees exactly the same matches.
+func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sightmap.Conflict {
+	entry := m.entryFor(pageURL)
+	if root == nil || len(entry.queries) == 0 {
+		return nil
+	}
+
+	namesByNode := make(map[*sightmap.ComponentNode][]string)
+	var order []*sightmap.ComponentNode
+	FindAllMatches(root, entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
+		names := namesByNode[node]
+		for _, n := range names {
+			if n == q.Name {
+				return // count distinct names only
+			}
+		}
+		if len(names) == 0 {
+			order = append(order, node)
+		}
+		namesByNode[node] = append(names, q.Name)
+	})
+
+	var out []sightmap.Conflict
+	for _, node := range order {
+		if names := namesByNode[node]; len(names) >= 2 {
+			out = append(out, sightmap.Conflict{Node: node, Names: names})
+		}
+	}
+	return out
 }

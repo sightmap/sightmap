@@ -62,7 +62,7 @@ func runInspect(args []string) error {
 	if corpus, cErr := lf.loadCorpus(); cErr != nil {
 		fmt.Fprintf(os.Stderr, "inspect: load corpus: %v (continuing without component names)\n", cErr)
 	} else if corpus != nil {
-		inspectMatches = match.NewMatcher(corpus).MatchTree(root, pageURL)
+		inspectMatches = match.NewMatcher(corpus).Match(root, pageURL)
 	}
 
 	// ── Render ────────────────────────────────────────────────────────────────

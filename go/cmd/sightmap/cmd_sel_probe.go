@@ -271,7 +271,7 @@ func offlineSelectorCount(ctx context.Context, conn *browser.CDPConn, selector s
 		return 0, err
 	}
 	defs := []sightmap.ComponentDef{{Name: "__probe__", Selectors: []string{selector}}}
-	return len(match.ApplySightmap(root, defs)), nil
+	return len(match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(root, "")), nil
 }
 
 // offlineDivergenceHints returns human-readable reasons a selector might match

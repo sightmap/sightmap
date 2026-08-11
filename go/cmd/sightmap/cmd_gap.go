@@ -55,7 +55,7 @@ func runGap(args []string) error {
 		return loadErr
 	}
 	m := match.NewMatcher(corpus)
-	matches := m.MatchTree(root, pageURL)
+	matches := m.Match(root, pageURL)
 
 	// ── Build parent map ─────────────────────────────────────────────────────
 	parentMap := coverage.BuildParentMap(root)
