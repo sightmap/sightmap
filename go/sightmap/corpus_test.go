@@ -2,13 +2,13 @@ package sightmap_test
 
 import (
 	"fmt"
+	"github.com/sightmap/sightmap/go/match"
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -275,17 +275,17 @@ views:
 
 func TestRouteMatching(t *testing.T) {
 	corpus := &sightmap.Corpus{
-		GlobalComponents: []match.ComponentDef{
+		GlobalComponents: []sightmap.ComponentDef{
 			{Name: "Global", Selectors: []string{"body"}},
 		},
 		Views: []sightmap.View{
-			{Name: "B", Route: "/b/**", Components: []match.ComponentDef{
+			{Name: "B", Route: "/b/**", Components: []sightmap.ComponentDef{
 				{Name: "BComp", Selectors: []string{".b"}},
 			}},
-			{Name: "Product", Route: "/product/*", Components: []match.ComponentDef{
+			{Name: "Product", Route: "/product/*", Components: []sightmap.ComponentDef{
 				{Name: "PComp", Selectors: []string{".p"}},
 			}},
-			{Name: "Home", Route: "/", Components: []match.ComponentDef{
+			{Name: "Home", Route: "/", Components: []sightmap.ComponentDef{
 				{Name: "HomeComp", Selectors: []string{".home"}},
 			}},
 		},
@@ -329,15 +329,15 @@ func TestRouteMatching(t *testing.T) {
 // ---- 5. ComponentsForURL merging --------------------------------------------
 
 func TestComponentsForURL(t *testing.T) {
-	globalA := match.ComponentDef{Name: "A", Selectors: []string{"#a"}}
-	globalB := match.ComponentDef{Name: "B", Selectors: []string{"#b-global"}}
-	viewB := match.ComponentDef{Name: "B", Selectors: []string{"#b-view"}}
-	viewC := match.ComponentDef{Name: "C", Selectors: []string{"#c"}}
+	globalA := sightmap.ComponentDef{Name: "A", Selectors: []string{"#a"}}
+	globalB := sightmap.ComponentDef{Name: "B", Selectors: []string{"#b-global"}}
+	viewB := sightmap.ComponentDef{Name: "B", Selectors: []string{"#b-view"}}
+	viewC := sightmap.ComponentDef{Name: "C", Selectors: []string{"#c"}}
 
 	corpus := &sightmap.Corpus{
-		GlobalComponents: []match.ComponentDef{globalA, globalB},
+		GlobalComponents: []sightmap.ComponentDef{globalA, globalB},
 		Views: []sightmap.View{
-			{Route: "/page", Components: []match.ComponentDef{viewB, viewC}},
+			{Route: "/page", Components: []sightmap.ComponentDef{viewB, viewC}},
 		},
 	}
 
@@ -373,15 +373,15 @@ func TestComponentsForURL(t *testing.T) {
 }
 
 func TestAllComponents(t *testing.T) {
-	globalA := match.ComponentDef{Name: "A", Selectors: []string{"#a"}}
-	globalB := match.ComponentDef{Name: "B", Selectors: []string{"#b-global"}}
-	viewB := match.ComponentDef{Name: "B", Selectors: []string{"#b-view"}} // $ref-expanded global, same name
-	viewC := match.ComponentDef{Name: "C", Selectors: []string{"#c"}}
+	globalA := sightmap.ComponentDef{Name: "A", Selectors: []string{"#a"}}
+	globalB := sightmap.ComponentDef{Name: "B", Selectors: []string{"#b-global"}}
+	viewB := sightmap.ComponentDef{Name: "B", Selectors: []string{"#b-view"}} // $ref-expanded global, same name
+	viewC := sightmap.ComponentDef{Name: "C", Selectors: []string{"#c"}}
 
 	corpus := &sightmap.Corpus{
-		GlobalComponents: []match.ComponentDef{globalA, globalB},
+		GlobalComponents: []sightmap.ComponentDef{globalA, globalB},
 		Views: []sightmap.View{
-			{Route: "/page", Components: []match.ComponentDef{viewB, viewC}},
+			{Route: "/page", Components: []sightmap.ComponentDef{viewB, viewC}},
 		},
 	}
 
@@ -425,14 +425,14 @@ func TestMatchTreeEndToEnd(t *testing.T) {
 	}
 
 	corpus := &sightmap.Corpus{
-		GlobalComponents: []match.ComponentDef{
+		GlobalComponents: []sightmap.ComponentDef{
 			{Name: "SearchForm", Selectors: []string{"form#search-form"}, Memory: []string{"search form hint"}},
 			{Name: "SearchInput", Selectors: []string{"form#search-form input"}},
 			{Name: "SearchSubmit", Selectors: []string{"form#search-form button"}, Memory: []string{"submit hint"}},
 		},
 	}
 
-	matches := sightmap.NewMatcher(corpus).MatchTree(root, "https://example.com/search")
+	matches := match.NewMatcher(corpus).MatchTree(root, "https://example.com/search")
 
 	// formNode → SearchForm
 	m := mustMatch(t, matches, formNode, "formNode")
@@ -477,7 +477,7 @@ func TestConcurrentSafety(t *testing.T) {
 	}
 
 	corpus := &sightmap.Corpus{
-		GlobalComponents: []match.ComponentDef{
+		GlobalComponents: []sightmap.ComponentDef{
 			{Name: "Button", Selectors: []string{"button"}},
 		},
 	}
@@ -492,7 +492,7 @@ func TestConcurrentSafety(t *testing.T) {
 			defer wg.Done()
 			// Use a few distinct URLs to exercise the multi-key cache path.
 			url := fmt.Sprintf("https://example.com/page/%d", i%5)
-			matches := sightmap.NewMatcher(corpus).MatchTree(root, url)
+			matches := match.NewMatcher(corpus).MatchTree(root, url)
 			if _, ok := matches[buttonNode]; !ok {
 				errs[i] = fmt.Errorf("goroutine %d: button not matched", i)
 			}
@@ -519,15 +519,15 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-func indexByName(cs []match.ComponentDef) map[string]match.ComponentDef {
-	m := make(map[string]match.ComponentDef, len(cs))
+func indexByName(cs []sightmap.ComponentDef) map[string]sightmap.ComponentDef {
+	m := make(map[string]sightmap.ComponentDef, len(cs))
 	for _, c := range cs {
 		m[c.Name] = c
 	}
 	return m
 }
 
-func compNames(cs []match.ComponentDef) []string {
+func compNames(cs []sightmap.ComponentDef) []string {
 	names := make([]string, len(cs))
 	for i, c := range cs {
 		names[i] = c.Name
@@ -547,7 +547,7 @@ func equalSels(a, b []string) bool {
 	return true
 }
 
-func hasComp(cs []match.ComponentDef, name string) bool {
+func hasComp(cs []sightmap.ComponentDef, name string) bool {
 	for _, c := range cs {
 		if c.Name == name {
 			return true
@@ -556,7 +556,7 @@ func hasComp(cs []match.ComponentDef, name string) bool {
 	return false
 }
 
-func mustGet(t *testing.T, m map[string]match.ComponentDef, name string) match.ComponentDef {
+func mustGet(t *testing.T, m map[string]sightmap.ComponentDef, name string) sightmap.ComponentDef {
 	t.Helper()
 	c, ok := m[name]
 	if !ok {
@@ -573,10 +573,10 @@ func mustGet(t *testing.T, m map[string]match.ComponentDef, name string) match.C
 
 func mustMatch(
 	t *testing.T,
-	matches map[*comps.ComponentNode]*match.ComponentMatch,
+	matches map[*comps.ComponentNode]*sightmap.ComponentMatch,
 	node *comps.ComponentNode,
 	label string,
-) *match.ComponentMatch {
+) *sightmap.ComponentMatch {
 	t.Helper()
 	m, ok := matches[node]
 	if !ok {

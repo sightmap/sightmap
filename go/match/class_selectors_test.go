@@ -1,6 +1,7 @@
 package match_test
 
 import (
+	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
 
@@ -90,12 +91,12 @@ func TestClassAttrSelectors(t *testing.T) {
 				},
 			}
 
-			comp := match.ComponentDef{
+			comp := sightmap.ComponentDef{
 				Name:      "TestButton",
 				Selectors: []string{tt.selector},
 			}
 
-			matches := match.ApplySightmap(node, []match.ComponentDef{comp})
+			matches := match.ApplySightmap(node, []sightmap.ComponentDef{comp})
 			got := len(matches) > 0
 
 			if got != tt.want {

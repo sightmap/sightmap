@@ -68,7 +68,7 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	if err != nil {
 		return nil, fmt.Errorf("resolve query: load corpus: %w", err)
 	}
-	m := sightmap.NewMatcher(corpus)
+	m := match.NewMatcher(corpus)
 	matches := m.MatchTree(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf(
@@ -83,13 +83,13 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	for _, part := range q.Parts {
 		queryNames[part.Name] = true
 	}
-	relevant := make(map[*comps.ComponentNode]*match.ComponentMatch)
+	relevant := make(map[*comps.ComponentNode]*sightmap.ComponentMatch)
 	for n, m := range matches {
 		if queryNames[m.Name] {
 			relevant[n] = m
 		}
 	}
-	compByName := make(map[string]match.ComponentDef, len(components))
+	compByName := make(map[string]sightmap.ComponentDef, len(components))
 	for _, c := range components {
 		compByName[c.Name] = c
 	}

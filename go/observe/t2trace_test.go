@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -28,12 +27,12 @@ func TestWriteT2Trace_Basic(t *testing.T) {
 	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
 		parent: children,
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "AppSidebar"},
 	}
 	view := &sightmap.View{
 		Name: "Home",
-		Components: []match.ComponentDef{
+		Components: []sightmap.ComponentDef{
 			{Name: "AppSidebar"},
 		},
 	}
@@ -76,11 +75,11 @@ func TestWriteT2Trace_SingleChildSuppressed(t *testing.T) {
 	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
 		parent: {child},
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "NavFooter"},
 	}
 	view := &sightmap.View{
-		Components: []match.ComponentDef{
+		Components: []sightmap.ComponentDef{
 			{Name: "NavFooter"},
 		},
 	}
@@ -113,11 +112,11 @@ func TestWriteT2Trace_MemoryNoteSuppressed(t *testing.T) {
 	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
 		parent: children,
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "AppContent"},
 	}
 	view := &sightmap.View{
-		Components: []match.ComponentDef{
+		Components: []sightmap.ComponentDef{
 			{
 				Name:   "AppContent",
 				Memory: []string{"Investigated. All children use volatile classes."},
@@ -167,11 +166,11 @@ func TestWriteT2Trace_Truncation(t *testing.T) {
 	t2children := map[*comps.ComponentNode][]*comps.ComponentNode{
 		parent: children,
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		parent: {Name: "ProductGrid"},
 	}
 	view := &sightmap.View{
-		Components: []match.ComponentDef{
+		Components: []sightmap.ComponentDef{
 			{Name: "ProductGrid"},
 		},
 	}

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/sightmap/sightmap/go/comps"
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -35,11 +34,11 @@ func TestWriteAnnotatedJSON_MatchedNode(t *testing.T) {
 		InViewport:    true,
 	}
 
-	sm := &match.ComponentMatch{
+	sm := &sightmap.ComponentMatch{
 		Name:   "SiteLogoLink",
 		Memory: []string{"main navigation logo"},
 	}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		node: sm,
 	}
 	propValues := map[string]map[string]string{
@@ -101,7 +100,7 @@ func TestWriteAnnotatedJSON_UnmatchedNode(t *testing.T) {
 
 	// node is NOT in the matches map
 	other := &comps.ComponentNode{Id: "99"}
-	matches := map[*comps.ComponentNode]*match.ComponentMatch{
+	matches := map[*comps.ComponentNode]*sightmap.ComponentMatch{
 		other: {Name: "SomeOtherComponent"},
 	}
 

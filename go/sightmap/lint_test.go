@@ -3,7 +3,6 @@ package sightmap_test
 import (
 	"testing"
 
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -19,7 +18,7 @@ func hasRule(ws []sightmap.LintWarning, rule string) bool {
 
 func TestLint_NameCase(t *testing.T) {
 	// ".nav-link" is a class selector — won't trigger broad-tag-selector.
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "navLink", Selectors: []string{".nav-link"}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -32,7 +31,7 @@ func TestLint_NameCase(t *testing.T) {
 }
 
 func TestLint_BroadTagGlobal(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "Button", Selectors: []string{"button"}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -52,7 +51,7 @@ func TestLint_BroadTagInView(t *testing.T) {
 		{
 			Name:  "Page",
 			Route: "/",
-			Components: []match.ComponentDef{
+			Components: []sightmap.ComponentDef{
 				{Name: "Button", Selectors: []string{"button"}},
 			},
 		},
@@ -70,7 +69,7 @@ func TestLint_BroadTagInView(t *testing.T) {
 }
 
 func TestLint_IdHash(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "Root", Selectors: []string{"div#root-12345"}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -83,7 +82,7 @@ func TestLint_IdHash(t *testing.T) {
 }
 
 func TestLint_DeepNesting(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "Input", Selectors: []string{"form div section input"}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -100,7 +99,7 @@ func TestLint_CommaInSelector(t *testing.T) {
 	// "a, button" contains a comma that should have been split by the loader.
 	// It also fails ParseSightmapSelector (comma stops the parse), so we
 	// expect both a "validation" warning and a "comma-in-selector" warning.
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "Link", Selectors: []string{"a, button"}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -112,7 +111,7 @@ func TestLint_CommaInSelector(t *testing.T) {
 func TestLint_ValidationErrors(t *testing.T) {
 	// A component with an empty name is a validation error; Lint should
 	// surface it as a warning with Rule="validation".
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "", Selectors: []string{"div"}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -127,7 +126,7 @@ func TestLint_ValidationErrors(t *testing.T) {
 func TestLint_DeepNestingFalsePositive(t *testing.T) {
 	// Selector with spaces INSIDE a quoted attribute value should NOT trigger
 	// deep-nesting — only 2 real selector parts (1 combinator).
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "LogoLink", Selectors: []string{`#nav-header a[aria-label="Link to homepage"]`}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -140,7 +139,7 @@ func TestLint_DeepNestingFalsePositive(t *testing.T) {
 
 func TestLint_CommaInIsNotFlagged(t *testing.T) {
 	// A comma inside :is() is valid and must NOT trigger comma-in-selector.
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "Content", Selectors: []string{`:is([data-testid="main"], [data-testid="top"]) [data-testid="foo"]`}},
 	}, nil)
 	warnings := sightmap.Lint(c)
@@ -154,12 +153,12 @@ func TestLint_CommaInIsNotFlagged(t *testing.T) {
 func TestLint_NoDuplicateWarnings(t *testing.T) {
 	// A global component referenced via $ref in two views should produce
 	// at most one warning per (rule, component, selector) triplet.
-	global := match.ComponentDef{Name: "Button", Selectors: []string{"button"}}
+	global := sightmap.ComponentDef{Name: "Button", Selectors: []string{"button"}}
 	c := corpusFrom(
-		[]match.ComponentDef{global},
+		[]sightmap.ComponentDef{global},
 		[]sightmap.View{
-			{Name: "PageA", Route: "/a", Components: []match.ComponentDef{global}},
-			{Name: "PageB", Route: "/b", Components: []match.ComponentDef{global}},
+			{Name: "PageA", Route: "/a", Components: []sightmap.ComponentDef{global}},
+			{Name: "PageB", Route: "/b", Components: []sightmap.ComponentDef{global}},
 		},
 	)
 	warnings := sightmap.Lint(c)
@@ -178,14 +177,14 @@ func TestLint_NoDuplicateWarnings(t *testing.T) {
 func TestLint_Clean(t *testing.T) {
 	// nav.navbar: has a class, so it is not a bare-tag selector.
 	c := corpusFrom(
-		[]match.ComponentDef{
+		[]sightmap.ComponentDef{
 			{Name: "NavBar", Selectors: []string{"nav.navbar"}},
 		},
 		[]sightmap.View{
 			{
 				Name:       "Home",
 				Route:      "/",
-				Components: []match.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
+				Components: []sightmap.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
 			},
 		},
 	)
@@ -198,7 +197,7 @@ func TestLint_Clean(t *testing.T) {
 // TestLint_MultiInstanceNoProperty tests that components with broad selectors
 // and no properties trigger the multi-instance-no-property warning.
 func TestLint_MultiInstanceNoProperty_Button(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "DeleteButton", Selectors: []string{"button.btn-danger"}},
 	}, nil)
 
@@ -216,7 +215,7 @@ func TestLint_MultiInstanceNoProperty_Button(t *testing.T) {
 }
 
 func TestLint_MultiInstanceNoProperty_Card(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "ProductCard", Selectors: []string{`[data-component="product-card"]`}},
 	}, nil)
 
@@ -228,11 +227,11 @@ func TestLint_MultiInstanceNoProperty_Card(t *testing.T) {
 }
 
 func TestLint_MultiInstanceWithProperties_NoWarn(t *testing.T) {
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{
 			Name:      "ProductCard",
 			Selectors: []string{`[data-component="product-card"]`},
-			Properties: []match.Property{
+			Properties: []sightmap.Property{
 				{Name: "sku", Extract: "attr:data-sku"},
 			},
 		},
@@ -249,7 +248,7 @@ func TestLint_MultiInstanceWithProperties_NoWarn(t *testing.T) {
 
 func TestLint_Singleton_NoWarn(t *testing.T) {
 	// Singletons like SiteHeader should not warn even without properties
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "SiteHeader", Selectors: []string{`header[role="banner"]`}},
 	}, nil)
 
@@ -264,7 +263,7 @@ func TestLint_Singleton_NoWarn(t *testing.T) {
 
 func TestLint_UniqueSelector_NoWarn(t *testing.T) {
 	// Selectors with data-testid are unique and should not warn
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "SubmitButton", Selectors: []string{`button[data-testid="submit-form"]`}},
 	}, nil)
 
@@ -290,7 +289,7 @@ func TestLint_ColonAnchoredDataComponent_NoWarn(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			c := corpusFrom([]match.ComponentDef{
+			c := corpusFrom([]sightmap.ComponentDef{
 				{Name: "TheComp", Selectors: []string{tc.sel}},
 			}, nil)
 			for _, w := range sightmap.Lint(c) {
@@ -302,7 +301,7 @@ func TestLint_ColonAnchoredDataComponent_NoWarn(t *testing.T) {
 	}
 
 	// ^= prefix is still broad and SHOULD warn
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "TheComp", Selectors: []string{`[data-component^="product-details:ProductDetails"]`}},
 	}, nil)
 	hasWarn := false
@@ -318,7 +317,7 @@ func TestLint_ColonAnchoredDataComponent_NoWarn(t *testing.T) {
 
 func TestLint_UniqueIdSelector_NoWarn(t *testing.T) {
 	// Selectors with #id are unique and should not warn
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{Name: "MainNav", Selectors: []string{"#main-navigation"}},
 	}, nil)
 
@@ -341,7 +340,7 @@ func TestLint_ChildRepeatsParent_Warns(t *testing.T) {
 		{
 			Name:  "DashboardPage",
 			Route: "/dashboard",
-			Components: []match.ComponentDef{
+			Components: []sightmap.ComponentDef{
 				{
 					Name:        "FreelancerCard",
 					Selectors:   []string{".dashboard .dashboard .freelancer-card"},
@@ -362,7 +361,7 @@ func TestLint_ChildRepeatsParent_MultiClass(t *testing.T) {
 		{
 			Name:  "Page",
 			Route: "/",
-			Components: []match.ComponentDef{
+			Components: []sightmap.ComponentDef{
 				{
 					Name:        "HelpLink",
 					Selectors:   []string{".help-card .help-card a"},
@@ -383,7 +382,7 @@ func TestLint_ChildRepeatsParent_NoWarnCorrect(t *testing.T) {
 		{
 			Name:  "DashboardPage",
 			Route: "/dashboard",
-			Components: []match.ComponentDef{
+			Components: []sightmap.ComponentDef{
 				{
 					Name:        "FreelancerCard",
 					Selectors:   []string{".freelancer-card"},
@@ -403,7 +402,7 @@ func TestLint_ChildRepeatsParent_NoWarnCorrect(t *testing.T) {
 func TestLint_ChildRepeatsParent_NoWarnGlobal(t *testing.T) {
 	// A top-level global component with a multi-class selector like ".x .x" must
 	// NOT trigger child-repeats-parent — the rule is gated on ParentChain.
-	c := corpusFrom([]match.ComponentDef{
+	c := corpusFrom([]sightmap.ComponentDef{
 		{
 			Name:        "WeirdGlobal",
 			Selectors:   []string{".nav .nav"},
@@ -424,11 +423,11 @@ func TestLint_ChildComponent_NoWarn(t *testing.T) {
 		{
 			Name:  "ProductPage",
 			Route: "/product",
-			Components: []match.ComponentDef{
+			Components: []sightmap.ComponentDef{
 				{
 					Name:      "ProductGrid",
 					Selectors: []string{`[data-testid="product-grid"]`},
-					Properties: []match.Property{
+					Properties: []sightmap.Property{
 						{Name: "ProductCard", Extract: ".product-card"},
 					},
 				},

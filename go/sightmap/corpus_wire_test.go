@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -15,7 +14,7 @@ import (
 func TestCorpusWireRoundTrip(t *testing.T) {
 	orig := &sightmap.Corpus{
 		Memory:           []string{"file note"},
-		GlobalComponents: []match.ComponentDef{{Name: "Nav", Selectors: []string{"nav"}}},
+		GlobalComponents: []sightmap.ComponentDef{{Name: "Nav", Selectors: []string{"nav"}}},
 		Requests: []sightmap.RequestDef{
 			{Name: "Search", Route: "/api/search", Method: "POST",
 				Request: &sightmap.Payload{Fields: []sightmap.Field{{Name: "q", Type: "string"}}}},
@@ -24,7 +23,7 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 		Views: []sightmap.View{{
 			Name:       "Home",
 			Route:      "/",
-			Components: []match.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
+			Components: []sightmap.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
 			Requests:   []sightmap.RequestDef{{Name: "Ping", Route: "/api/ping"}},
 			// Authoring fields that must NOT appear on the wire:
 			URL:        "https://x.test/",

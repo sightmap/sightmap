@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -44,7 +43,7 @@ type compiledSightmapJSON struct {
 	ViewComponents map[string][]compiledComponent `json:"viewComponents"`
 }
 
-func normaliseComponent(c match.ComponentDef) compiledComponent {
+func normaliseComponent(c sightmap.ComponentDef) compiledComponent {
 	chain := c.ParentChain
 	if chain == nil {
 		chain = []string{} // always emit [], never null

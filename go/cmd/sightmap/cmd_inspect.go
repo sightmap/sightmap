@@ -59,11 +59,11 @@ func runInspect(args []string) error {
 	}
 
 	// ── Load sightmap (optional enrichment; warn but don't fail on a bad corpus) ──
-	var inspectMatches map[*comps.ComponentNode]*match.ComponentMatch
+	var inspectMatches map[*comps.ComponentNode]*sightmap.ComponentMatch
 	if corpus, cErr := lf.loadCorpus(); cErr != nil {
 		fmt.Fprintf(os.Stderr, "inspect: load corpus: %v (continuing without component names)\n", cErr)
 	} else if corpus != nil {
-		inspectMatches = sightmap.NewMatcher(corpus).MatchTree(root, pageURL)
+		inspectMatches = match.NewMatcher(corpus).MatchTree(root, pageURL)
 	}
 
 	// ── Render ────────────────────────────────────────────────────────────────
