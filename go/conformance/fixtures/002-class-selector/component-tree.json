@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "div"},
+  "element": {"tag": "div"},
   "children": [
     {
       "id": "pc1",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "div", "classes": ["product-card"]},
+      "element": {"tag": "div", "classes": ["product-card"]},
       "children": [
         {
           "id": "pc2",
@@ -32,7 +32,7 @@
           "inViewport": true,
           "isIgnored": false,
           "nthChild": 1,
-          "selector": {"tag": "div"},
+          "element": {"tag": "div"},
           "children": [
             {
               "id": "pc3",
@@ -44,7 +44,7 @@
               "inViewport": true,
               "isIgnored": false,
               "nthChild": 1,
-              "selector": {"tag": "div", "classes": ["product-card", "featured"]}
+              "element": {"tag": "div", "classes": ["product-card", "featured"]}
             }
           ]
         }

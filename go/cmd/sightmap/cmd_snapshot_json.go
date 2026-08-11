@@ -13,17 +13,17 @@ import (
 // It adds component name, memory notes, and extracted prop values from the
 // sightmap corpus, omitting those fields when the node is unmatched.
 type annotatedNode struct {
-	ID            string              `json:"id"`
-	Role          string              `json:"role"`
-	Name          string              `json:"name,omitempty"`
-	Value         string              `json:"value,omitempty"`
-	Selector      *comps.SelectorPart `json:"selector,omitempty"`
-	Bounds        *comps.Bounds       `json:"bounds,omitempty"`
-	IsVisible     bool                `json:"isVisible"`
-	IsInteractive bool                `json:"isInteractive"`
-	InViewport    bool                `json:"inViewport"`
-	IsIgnored     bool                `json:"isIgnored,omitempty"`
-	NthChild      int                 `json:"nthChild,omitempty"`
+	ID            string         `json:"id"`
+	Role          string         `json:"role"`
+	Name          string         `json:"name,omitempty"`
+	Value         string         `json:"value,omitempty"`
+	Element       *comps.Element `json:"element,omitempty"`
+	Bounds        *comps.Bounds  `json:"bounds,omitempty"`
+	IsVisible     bool           `json:"isVisible"`
+	IsInteractive bool           `json:"isInteractive"`
+	InViewport    bool           `json:"inViewport"`
+	IsIgnored     bool           `json:"isIgnored,omitempty"`
+	NthChild      int            `json:"nthChild,omitempty"`
 	// sightmap-added fields — omitted when the node is unmatched or has no props
 	Component string            `json:"component,omitempty"`
 	Memory    []string          `json:"memory,omitempty"`
@@ -43,7 +43,7 @@ func buildAnnotatedNode(
 		Role:          node.Role,
 		Name:          node.Name,
 		Value:         node.Value,
-		Selector:      node.Selector,
+		Element:       node.Element,
 		Bounds:        node.Bounds,
 		IsVisible:     node.IsVisible,
 		IsInteractive: node.IsInteractive,

@@ -407,16 +407,16 @@ func TestAllComponents(t *testing.T) {
 func TestMatchTreeEndToEnd(t *testing.T) {
 	// Tree: root → form#search → {input, button}
 	inputNode := &comps.ComponentNode{
-		Id:       "input",
-		Selector: &comps.SelectorPart{Tag: "input"},
+		Id:      "input",
+		Element: &comps.Element{Tag: "input"},
 	}
 	buttonNode := &comps.ComponentNode{
-		Id:       "button",
-		Selector: &comps.SelectorPart{Tag: "button"},
+		Id:      "button",
+		Element: &comps.Element{Tag: "button"},
 	}
 	formNode := &comps.ComponentNode{
 		Id:       "form",
-		Selector: &comps.SelectorPart{Tag: "form", Id: "search-form"},
+		Element:  &comps.Element{Tag: "form", Id: "search-form"},
 		Children: []*comps.ComponentNode{inputNode, buttonNode},
 	}
 	root := &comps.ComponentNode{
@@ -468,8 +468,8 @@ func TestMatchTreeEndToEnd(t *testing.T) {
 
 func TestConcurrentSafety(t *testing.T) {
 	buttonNode := &comps.ComponentNode{
-		Id:       "btn",
-		Selector: &comps.SelectorPart{Tag: "button"},
+		Id:      "btn",
+		Element: &comps.Element{Tag: "button"},
 	}
 	root := &comps.ComponentNode{
 		Id:       "root",

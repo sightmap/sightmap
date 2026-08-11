@@ -46,6 +46,18 @@ type HasRelative struct {
 	Combinators []string        `json:"combinators"`
 }
 
+// Element is the observed identity of one DOM element (or a synthetic identity
+// for native mobile): the concrete tag/id/classes/attrs a live node presents. It
+// is the SUBJECT that a SelectorPart pattern is matched against. Unlike
+// SelectorPart it carries no matching operators or logical/relational pseudos
+// (AttrOps/Not/Is/Has) — an observed element has facts, not predicates.
+type Element struct {
+	Tag     string            `json:"tag,omitempty"`
+	Id      string            `json:"id,omitempty"`
+	Classes []string          `json:"classes,omitempty"`
+	Attrs   map[string]string `json:"attrs,omitempty"`
+}
+
 // Bounds holds the bounding box of a component in viewport coordinates.
 type Bounds struct {
 	X      int `json:"x"`
@@ -81,9 +93,11 @@ type ComponentNode struct {
 	// Properties holds additional A11Y properties (aria-* and others). (post-merge)
 	Properties map[string]string `json:"properties,omitempty"`
 
-	// Selector is the structured CSS identity of the underlying DOM element. (pre-merge)
-	// Nil for nodes that have no corresponding DOM element (e.g. virtual nodes).
-	Selector *SelectorPart `json:"selector,omitempty"`
+	// Element is the observed identity of the underlying DOM element — its
+	// tag/id/classes/attrs. (pre-merge) Nil for nodes that have no corresponding
+	// DOM element (e.g. virtual nodes). It is matched against SelectorPart
+	// patterns; see package sel.
+	Element *Element `json:"element,omitempty"`
 
 	// Bounds is the viewport bounding box. (pre-merge)
 	Bounds *Bounds `json:"bounds,omitempty"`

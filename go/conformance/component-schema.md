@@ -73,7 +73,7 @@ Viewport bounding box in pixels.
 | Name | string | `name` | post-merge | Computed accessible name (NOT raw `textContent`). |
 | Value | string | `value` | post-merge | Current value for form controls. |
 | Properties | map[string]string | `properties` | post-merge | Additional A11Y properties (`aria-*` etc.). |
-| Selector | \*SelectorPart | `selector` | pre-merge | Structured CSS identity. Nil for virtual nodes. |
+| Element | \*Element | `element` | pre-merge | Observed element identity (tag/id/classes/attrs). Nil for virtual nodes. Matched against `SelectorPart` patterns. |
 | Bounds | \*Bounds | `bounds` | pre-merge | Viewport bounding box. |
 | IsVisible | bool | `isVisible` | pre-merge | Effective visibility, computed in-browser via `Element.checkVisibility` — false when the element or any ancestor is hidden (`display:none`, `visibility:hidden`, `opacity:0`, `content-visibility`). |
 | IsInteractive | bool | `isInteractive` | pre-merge | Element is actionable per probe heuristics. |
@@ -82,7 +82,21 @@ Viewport bounding box in pixels.
 | NthChild | int | `nthChild` | pre-merge | 1-based position among parent's children. |
 | Children | []\*ComponentNode | `children` | pre-merge | Direct children in document order. |
 
-`omitempty` applies to: `Properties`, `Selector`, `Bounds`, `Children`.
+`omitempty` applies to: `Properties`, `Element`, `Bounds`, `Children`.
+
+### Element
+
+The observed identity of a node's underlying element — the concrete facts a live
+DOM (or native) element presents. It is the *subject* a `SelectorPart` pattern is
+matched against, and carries no matching operators or pseudo-classes
+(`AttrOps`/`Not`/`Is`/`Has`) — those live only on the pattern side.
+
+| Field | Type | JSON key |
+|---|---|---|
+| Tag | string | `tag` |
+| Id | string | `id` |
+| Classes | []string | `classes` |
+| Attrs | map[string]string | `attrs` |
 Boolean fields and `NthChild` are always present (zero value is meaningful).
 
 ### Phase notes
@@ -102,12 +116,11 @@ Boolean fields and `NthChild` are always present (zero value is meaningful).
   "name": "Add to cart",
   "value": "",
   "properties": { "aria-pressed": "false" },
-  "selector": {
+  "element": {
     "tag": "button",
     "id": "add-btn",
     "classes": ["primary", "action"],
-    "attrs": { "data-testid": "add-to-cart" },
-    "not": { "classes": ["disabled"] }
+    "attrs": { "data-testid": "add-to-cart" }
   },
   "bounds": { "x": 10, "y": 20, "width": 120, "height": 40 },
   "isVisible": true,

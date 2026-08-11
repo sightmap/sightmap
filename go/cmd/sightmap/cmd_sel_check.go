@@ -119,9 +119,9 @@ func runSelCheckOut(args []string, out io.Writer) error {
 			name = string([]rune(name)[:50])
 		}
 		fmt.Fprintf(out, "\n  node %s  %-8s%q\n", node.Id, node.Role, name)
-		if node.Selector != nil && len(node.Selector.Attrs) > 0 {
+		if node.Element != nil && len(node.Element.Attrs) > 0 {
 			for _, key := range interestingAttrs {
-				if val, ok := node.Selector.Attrs[key]; ok {
+				if val, ok := node.Element.Attrs[key]; ok {
 					fmt.Fprintf(out, "    %s: %s\n", key, val)
 				}
 			}

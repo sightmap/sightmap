@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": { "tag": "section" },
+  "element": { "tag": "section" },
   "children": [
     {
       "id": "btn1",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": { "tag": "button", "classes": ["primary"] }
+      "element": { "tag": "button", "classes": ["primary"] }
     },
     {
       "id": "btn2",
@@ -32,7 +32,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 2,
-      "selector": { "tag": "button", "classes": ["primary", "disabled"] }
+      "element": { "tag": "button", "classes": ["primary", "disabled"] }
     },
     {
       "id": "d1",
@@ -44,7 +44,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 3,
-      "selector": { "tag": "div" }
+      "element": { "tag": "div" }
     },
     {
       "id": "d2",
@@ -56,7 +56,7 @@
       "inViewport": false,
       "isIgnored": false,
       "nthChild": 4,
-      "selector": {
+      "element": {
         "tag": "div",
         "attrs": { "hidden": "" },
         "attrOps": { "hidden": "[]" }

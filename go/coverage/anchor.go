@@ -17,8 +17,8 @@ import (
 func NearestDataAttrAncestor(node *comps.ComponentNode, parentMap ParentMap) *comps.ComponentNode {
 	curr := parentMap[node]
 	for curr != nil {
-		if curr.Selector != nil {
-			a := curr.Selector.Attrs
+		if curr.Element != nil {
+			a := curr.Element.Attrs
 			if a["data-testid"] != "" || a["data-component"] != "" {
 				return curr
 			}
@@ -31,21 +31,21 @@ func NearestDataAttrAncestor(node *comps.ComponentNode, parentMap ParentMap) *co
 // DataAttrSelector formats an ancestor node for an "inside:" display line.
 // Prefers data-testid, then data-component, then falls back to tag#id.cls.
 func DataAttrSelector(node *comps.ComponentNode) string {
-	if node.Selector == nil {
+	if node.Element == nil {
 		return node.Role
 	}
-	tag := node.Selector.Tag
+	tag := node.Element.Tag
 	if tag == "" {
 		tag = node.Role
 	}
-	a := node.Selector.Attrs
+	a := node.Element.Attrs
 	if dt := a["data-testid"]; dt != "" {
 		return fmt.Sprintf(`%s[data-testid="%s"]`, tag, dt)
 	}
 	if dc := a["data-component"]; dc != "" {
 		return fmt.Sprintf(`%s[data-component^="%s"]`, tag, dc)
 	}
-	return SelectorString(node.Selector)
+	return SelectorString(node.Element)
 }
 
 // OrphanSlotKey is the cross-capture STRUCTURAL identity of an uncovered
@@ -71,8 +71,8 @@ func OrphanSlotKey(node *comps.ComponentNode, parentMap ParentMap) string {
 // "" when there is no stable ancestor to anchor on.
 func ArrowHint(node *comps.ComponentNode, parentMap ParentMap) string {
 	nodeTag := ""
-	if node.Selector != nil {
-		nodeTag = node.Selector.Tag
+	if node.Element != nil {
+		nodeTag = node.Element.Tag
 	}
 	if nodeTag == "" {
 		nodeTag = node.Role
@@ -82,22 +82,22 @@ func ArrowHint(node *comps.ComponentNode, parentMap ParentMap) string {
 	}
 
 	anc := NearestDataAttrAncestor(node, parentMap)
-	if anc == nil || anc.Selector == nil {
+	if anc == nil || anc.Element == nil {
 		return ""
 	}
-	a := anc.Selector.Attrs
+	a := anc.Element.Attrs
 	if dt := a["data-testid"]; dt != "" {
 		return fmt.Sprintf(`[data-testid="%s"] %s`, dt, nodeTag)
 	}
 	if dc := a["data-component"]; dc != "" {
 		return fmt.Sprintf(`[data-component^="%s"] %s`, dc, nodeTag)
 	}
-	return SelectorString(anc.Selector) + " " + nodeTag
+	return SelectorString(anc.Element) + " " + nodeTag
 }
 
-// SelectorString formats a SelectorPart as tag[#id][.cls1.cls2]. Attributes are
-// not included; they appear only in the trace/anchor displays above.
-func SelectorString(s *comps.SelectorPart) string {
+// SelectorString formats an observed Element as tag[#id][.cls1.cls2]. Attributes
+// are not included; they appear only in the trace/anchor displays above.
+func SelectorString(s *comps.Element) string {
 	if s == nil {
 		return ""
 	}

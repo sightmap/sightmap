@@ -15,10 +15,10 @@ import (
 // every node from the raw component tree and shows full selector details.
 type InspectNode struct {
 	Id            string
-	Tag           string              // element tag (from Selector.Tag or Role fallback)
-	Selector      *comps.SelectorPart // full selector from probe.js
-	Role          string              // AX role (informational)
-	Name          string              // AX accessible name (shown when non-empty)
+	Tag           string         // element tag (from Element.Tag or Role fallback)
+	Element       *comps.Element // observed element identity from probe.js
+	Role          string         // AX role (informational)
+	Name          string         // AX accessible name (shown when non-empty)
 	IsVisible     bool
 	IsIgnored     bool
 	IsInteractive bool
@@ -54,8 +54,8 @@ func Inspect(root *comps.ComponentNode, matches map[*comps.ComponentNode]*match.
 
 func buildInspectNode(node *comps.ComponentNode, matches map[*comps.ComponentNode]*match.ComponentMatch) *InspectNode {
 	tag := ""
-	if node.Selector != nil && node.Selector.Tag != "" {
-		tag = node.Selector.Tag
+	if node.Element != nil && node.Element.Tag != "" {
+		tag = node.Element.Tag
 	} else {
 		tag = node.Role
 	}
@@ -63,7 +63,7 @@ func buildInspectNode(node *comps.ComponentNode, matches map[*comps.ComponentNod
 	n := &InspectNode{
 		Id:            node.Id,
 		Tag:           tag,
-		Selector:      node.Selector,
+		Element:       node.Element,
 		Role:          node.Role,
 		Name:          node.Name,
 		IsVisible:     node.IsVisible,
@@ -115,7 +115,7 @@ func (n *InspectNode) formatInspectNode(w io.Writer, indent string, depth int, o
 	}
 
 	// Selector display: tag#id[.classes][attrs]
-	line.WriteString(inspectSelectorDisplay(n.Selector, n.Tag, opts))
+	line.WriteString(inspectSelectorDisplay(n.Element, n.Tag, opts))
 
 	// Accessible name (shown when non-empty; helps identify interactive elements)
 	if n.Name != "" {
@@ -149,7 +149,7 @@ func (n *InspectNode) formatInspectNode(w io.Writer, indent string, depth int, o
 // Default (no flags): tag#id [data-*] [aria-*] [role] [type] [href] [name] [for] [action] [src] [placeholder]
 // --classes:          also prepends .class1.class2
 // --selectors:        shows ALL attributes (complete probe.js output)
-func inspectSelectorDisplay(sel *comps.SelectorPart, tag string, opts InspectOpts) string {
+func inspectSelectorDisplay(sel *comps.Element, tag string, opts InspectOpts) string {
 	if sel == nil {
 		return tag
 	}

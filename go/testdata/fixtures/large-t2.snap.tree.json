@@ -3,7 +3,7 @@
   "children": [
     {
       "role": "region",
-      "selector": {
+      "element": {
         "tag": "div",
         "classes": ["product-grid"]
       },

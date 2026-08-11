@@ -346,8 +346,8 @@ func TestClick_NoBounds(t *testing.T) {
 	})
 
 	node := &comps.ComponentNode{
-		Id:       "test",
-		Selector: &comps.SelectorPart{Tag: "button", Id: "submit"},
+		Id:      "test",
+		Element: &comps.Element{Tag: "button", Id: "submit"},
 	}
 	if _, _, err := Click(context.Background(), conn, node); err != nil {
 		t.Fatal(err)

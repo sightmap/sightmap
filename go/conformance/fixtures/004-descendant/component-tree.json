@@ -8,7 +8,7 @@
   "inViewport": true,
   "isIgnored": false,
   "nthChild": 1,
-  "selector": {"tag": "div"},
+  "element": {"tag": "div"},
   "children": [
     {
       "id": "nav",
@@ -20,7 +20,7 @@
       "inViewport": true,
       "isIgnored": false,
       "nthChild": 1,
-      "selector": {"tag": "nav", "classes": ["main-nav"]},
+      "element": {"tag": "nav", "classes": ["main-nav"]},
       "children": [
         {
           "id": "ul",
@@ -32,7 +32,7 @@
           "inViewport": true,
           "isIgnored": false,
           "nthChild": 1,
-          "selector": {"tag": "ul"},
+          "element": {"tag": "ul"},
           "children": [
             {
               "id": "li1",
@@ -44,7 +44,7 @@
               "inViewport": true,
               "isIgnored": false,
               "nthChild": 1,
-              "selector": {"tag": "li"},
+              "element": {"tag": "li"},
               "children": [
                 {
                   "id": "a1",
@@ -56,7 +56,7 @@
                   "inViewport": true,
                   "isIgnored": false,
                   "nthChild": 1,
-                  "selector": {"tag": "a", "classes": ["nav-link"]}
+                  "element": {"tag": "a", "classes": ["nav-link"]}
                 }
               ]
             },
@@ -70,7 +70,7 @@
               "inViewport": true,
               "isIgnored": false,
               "nthChild": 2,
-              "selector": {"tag": "li"},
+              "element": {"tag": "li"},
               "children": [
                 {
                   "id": "a2",
@@ -82,7 +82,7 @@
                   "inViewport": true,
                   "isIgnored": false,
                   "nthChild": 1,
-                  "selector": {"tag": "a", "classes": ["nav-link"]}
+                  "element": {"tag": "a", "classes": ["nav-link"]}
                 }
               ]
             }

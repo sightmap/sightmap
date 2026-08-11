@@ -21,7 +21,7 @@ func node(id, role, name string, visible, interactive, ignored bool, children ..
 // nodeWithTag builds a ComponentNode with a Selector tag set.
 func nodeWithTag(id, role, name, tag string, visible, interactive, ignored bool, children ...*comps.ComponentNode) *comps.ComponentNode {
 	n := node(id, role, name, visible, interactive, ignored, children...)
-	n.Selector = &comps.SelectorPart{Tag: tag}
+	n.Element = &comps.Element{Tag: tag}
 	return n
 }
 
@@ -412,7 +412,7 @@ func TestFormat_Nested(t *testing.T) {
 func TestFormat_Selectors(t *testing.T) {
 	n := &comps.ComponentNode{
 		Id: "1", Role: "button", Name: "Add", IsVisible: true, IsInteractive: true,
-		Selector: &comps.SelectorPart{
+		Element: &comps.Element{
 			Tag:   "button",
 			Attrs: map[string]string{"data-testid": "add-btn"},
 		},
@@ -435,7 +435,7 @@ func TestFormat_Selectors(t *testing.T) {
 func TestFormat_Selectors_NoClasses(t *testing.T) {
 	n := &comps.ComponentNode{
 		Id: "1", Role: "button", Name: "Add", IsVisible: true, IsInteractive: true,
-		Selector: &comps.SelectorPart{
+		Element: &comps.Element{
 			Tag:     "button",
 			Classes: []string{"btn", "btn-primary"},
 			Id:      "submit-btn",
@@ -456,7 +456,7 @@ func TestFormat_Selectors_NoClasses(t *testing.T) {
 func TestFormat_Selectors_DataComponent(t *testing.T) {
 	n := &comps.ComponentNode{
 		Id: "1", Role: "generic", Name: "Canvas", IsVisible: true, IsInteractive: false,
-		Selector: &comps.SelectorPart{
+		Element: &comps.Element{
 			Tag:   "div",
 			Attrs: map[string]string{"data-component": "LayoutCanvas"},
 		},
@@ -799,7 +799,7 @@ func TestFormat_Selectors_AfterBracket(t *testing.T) {
 	// --selectors hint appears AFTER the closing bracket for matched nodes.
 	n := &comps.ComponentNode{
 		Id: "5", Role: "link", Name: "Home", IsVisible: true, IsInteractive: true,
-		Selector: &comps.SelectorPart{
+		Element: &comps.Element{
 			Tag:   "a",
 			Attrs: map[string]string{"data-testid": "home-link"},
 		},
@@ -832,7 +832,7 @@ func TestSelectorHint_Empty(t *testing.T) {
 }
 
 func TestSelectorHint_TagOnly(t *testing.T) {
-	sel := &comps.SelectorPart{Tag: "div"}
+	sel := &comps.Element{Tag: "div"}
 	got := selectorHint(sel)
 	if got != "div" {
 		t.Errorf("expected 'div', got %q", got)
@@ -840,7 +840,7 @@ func TestSelectorHint_TagOnly(t *testing.T) {
 }
 
 func TestSelectorHint_TagAndId(t *testing.T) {
-	sel := &comps.SelectorPart{Tag: "nav", Id: "main-nav"}
+	sel := &comps.Element{Tag: "nav", Id: "main-nav"}
 	got := selectorHint(sel)
 	if got != "nav#main-nav" {
 		t.Errorf("expected 'nav#main-nav', got %q", got)
@@ -848,7 +848,7 @@ func TestSelectorHint_TagAndId(t *testing.T) {
 }
 
 func TestSelectorHint_NoClasses(t *testing.T) {
-	sel := &comps.SelectorPart{
+	sel := &comps.Element{
 		Tag:     "button",
 		Classes: []string{"foo", "bar"},
 	}

@@ -88,7 +88,7 @@ func TestFormatInspect_Basic(t *testing.T) {
 func TestFormatInspect_WithSelector(t *testing.T) {
 	n := &comps.ComponentNode{
 		Id: "7", Role: "button", Name: "Add", IsVisible: true, IsInteractive: true,
-		Selector: &comps.SelectorPart{
+		Element: &comps.Element{
 			Tag:   "button",
 			Id:    "add-btn",
 			Attrs: map[string]string{"data-testid": "add-to-cart"},
@@ -137,7 +137,7 @@ func TestFormatInspect_Ignored(t *testing.T) {
 func TestFormatInspect_Classes(t *testing.T) {
 	n := &comps.ComponentNode{
 		Id: "1", Role: "div", IsVisible: true,
-		Selector: &comps.SelectorPart{
+		Element: &comps.Element{
 			Tag:     "div",
 			Classes: []string{"btn", "btn-primary"},
 		},
@@ -164,7 +164,7 @@ func TestFormatInspect_Classes(t *testing.T) {
 func TestFormatInspect_Selectors_ShowsAll(t *testing.T) {
 	n := &comps.ComponentNode{
 		Id: "1", Role: "input", IsVisible: true, IsInteractive: true,
-		Selector: &comps.SelectorPart{
+		Element: &comps.Element{
 			Tag: "input",
 			Attrs: map[string]string{
 				"data-testid": "search",

@@ -13,7 +13,7 @@ import (
 func node(id, tag string, classes []string, children ...*comps.ComponentNode) *comps.ComponentNode {
 	return &comps.ComponentNode{
 		Id:        id,
-		Selector:  &comps.SelectorPart{Tag: tag, Classes: classes},
+		Element:   &comps.Element{Tag: tag, Classes: classes},
 		IsVisible: true,
 		Children:  children,
 	}
@@ -22,7 +22,7 @@ func node(id, tag string, classes []string, children ...*comps.ComponentNode) *c
 func nodeAttr(id, tag string, attrs map[string]string, children ...*comps.ComponentNode) *comps.ComponentNode {
 	return &comps.ComponentNode{
 		Id:       id,
-		Selector: &comps.SelectorPart{Tag: tag, Attrs: attrs},
+		Element:  &comps.Element{Tag: tag, Attrs: attrs},
 		Children: children,
 	}
 }
@@ -31,7 +31,7 @@ func nodeInvisible(id, tag string) *comps.ComponentNode {
 	return &comps.ComponentNode{
 		Id:        id,
 		IsVisible: false,
-		Selector:  &comps.SelectorPart{Tag: tag},
+		Element:   &comps.Element{Tag: tag},
 	}
 }
 
@@ -160,14 +160,14 @@ func TestDirectChild_DoesNotMatchGrandchild(t *testing.T) {
 func TestDirectChild_TwoHops(t *testing.T) {
 	// A > B > C chain.
 	root := &comps.ComponentNode{
-		Id:       "r",
-		Selector: &comps.SelectorPart{Tag: "ul"},
+		Id:      "r",
+		Element: &comps.Element{Tag: "ul"},
 		Children: []*comps.ComponentNode{
 			{
-				Id:       "li",
-				Selector: &comps.SelectorPart{Tag: "li"},
+				Id:      "li",
+				Element: &comps.Element{Tag: "li"},
 				Children: []*comps.ComponentNode{
-					{Id: "a", Selector: &comps.SelectorPart{Tag: "a"}},
+					{Id: "a", Element: &comps.Element{Tag: "a"}},
 				},
 			},
 		},
@@ -180,14 +180,14 @@ func TestDirectChild_TwoHops(t *testing.T) {
 func TestDirectChild_NotTwoLevelsDeep(t *testing.T) {
 	// ul > a should NOT match a inside li (two levels deep).
 	root := &comps.ComponentNode{
-		Id:       "r",
-		Selector: &comps.SelectorPart{Tag: "ul"},
+		Id:      "r",
+		Element: &comps.Element{Tag: "ul"},
 		Children: []*comps.ComponentNode{
 			{
-				Id:       "li",
-				Selector: &comps.SelectorPart{Tag: "li"},
+				Id:      "li",
+				Element: &comps.Element{Tag: "li"},
 				Children: []*comps.ComponentNode{
-					{Id: "a", Selector: &comps.SelectorPart{Tag: "a"}},
+					{Id: "a", Element: &comps.Element{Tag: "a"}},
 				},
 			},
 		},
@@ -239,10 +239,10 @@ func TestInvisibleNodesIncluded(t *testing.T) {
 func TestNilSelectorNode_DoesNotMatchSpecificRule(t *testing.T) {
 	// A node with nil Selector cannot satisfy a specific selector rule.
 	root := &comps.ComponentNode{
-		Id:       "root",
-		Selector: nil,
+		Id:      "root",
+		Element: nil,
 		Children: []*comps.ComponentNode{
-			{Id: "child", Selector: &comps.SelectorPart{Tag: "button"}},
+			{Id: "child", Element: &comps.Element{Tag: "button"}},
 		},
 	}
 	defs := []match.ComponentDef{{Name: "Btn", Selectors: []string{"button"}}}
@@ -286,12 +286,12 @@ func TestFramePrefixedIDs_Traversed(t *testing.T) {
 func TestMobileSyntheticSelector(t *testing.T) {
 	// Native mobile component with synthetic selectors.
 	root := &comps.ComponentNode{
-		Id:       "screen",
-		Selector: &comps.SelectorPart{Tag: "UIView"},
+		Id:      "screen",
+		Element: &comps.Element{Tag: "UIView"},
 		Children: []*comps.ComponentNode{
 			{
 				Id: "btn",
-				Selector: &comps.SelectorPart{
+				Element: &comps.Element{
 					Tag:   "UIButton",
 					Attrs: map[string]string{"label": "Add to Cart"},
 				},
