@@ -109,28 +109,28 @@ func runBrowserStart(args []string) error {
 
 	// ── Start sightmap HTTP server in background ──────────────────────────────
 	siteName := filepath.Base(cwd())
-	compiled, err := compileCorpus(*sightmapDir, siteName)
+	compiled, err := loadServedSightmap(*sightmapDir, siteName)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "start: sightmap compile warning: %v\n", err)
+		fmt.Fprintf(os.Stderr, "start: sightmap load warning: %v\n", err)
 		// non-fatal: continue without corpus
 	}
 
 	var mu sync.RWMutex
 	current := compiled
 
-	recompile := func() {
-		c, compErr := compileCorpus(*sightmapDir, siteName)
-		if compErr != nil {
-			fmt.Fprintf(os.Stderr, "[serve-sightmap] compile error: %v\n", compErr)
+	reload := func() {
+		c, loadErr := loadServedSightmap(*sightmapDir, siteName)
+		if loadErr != nil {
+			fmt.Fprintf(os.Stderr, "[serve-sightmap] load error: %v\n", loadErr)
 			return
 		}
 		mu.Lock()
 		current = c
 		mu.Unlock()
-		fmt.Fprintf(os.Stderr, "[serve-sightmap] recompiled (v%s)\n", c.Version)
+		fmt.Fprintf(os.Stderr, "[serve-sightmap] reloaded (v%s)\n", c.Version)
 	}
 
-	go watchSightmapDir(*sightmapDir, recompile)
+	go watchSightmapDir(*sightmapDir, reload)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/sightmap/version", func(w http.ResponseWriter, r *http.Request) {

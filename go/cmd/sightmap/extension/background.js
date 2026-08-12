@@ -58,9 +58,10 @@ function pushOverlayVisible(visible) {
 
 /** Build a sightmap-loaded status object from a /sightmap response. */
 function statusFromSightmap(data) {
+  const corpus = data.corpus ?? {};
   const componentCount =
-    (data.globals?.length ?? 0) +
-    Object.values(data.viewComponents ?? {}).reduce((s, a) => s + a.length, 0);
+    (corpus.globals?.length ?? 0) +
+    (corpus.views ?? []).reduce((s, v) => s + (v.components?.length ?? 0), 0);
   return {
     type: "sightmap-loaded",
     version: data.version,

@@ -17,80 +17,32 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-type compiledComponent struct {
-	Name        string         `json:"name"`
-	Selector    string         `json:"selector"`    // selectors joined with ", "
-	ParentChain []string       `json:"parentChain"` // always array, never null
-	Properties  []compiledProp `json:"properties"`
+// servedSightmap is the thin transport envelope the extension fetches from
+// /sightmap: serve-only metadata (a site label and a cache-bust version stamp)
+// wrapped around the canonical Corpus wire. The Corpus body is byte-identical to
+// what a go-get/library consumer sees — serve no longer re-compiles the corpus
+// into a bespoke joined-selector shape. Cache-busting is unchanged: the extension
+// polls /sightmap/version and reloads when the stamp changes.
+type servedSightmap struct {
+	Site    string           `json:"site"`
+	Version string           `json:"version"`
+	Corpus  *sightmap.Corpus `json:"corpus"`
 }
 
-type compiledProp struct {
-	Name      string `json:"name"`
-	Extract   string `json:"extract"`
-	Transform string `json:"transform,omitempty"`
-}
-
-type compiledView struct {
-	Name  string `json:"name"`
-	Route string `json:"route"`
-}
-
-type compiledSightmapJSON struct {
-	Site           string                         `json:"site"`
-	Version        string                         `json:"version"`
-	Views          []compiledView                 `json:"views"`
-	Globals        []compiledComponent            `json:"globals"`
-	ViewComponents map[string][]compiledComponent `json:"viewComponents"`
-}
-
-func normaliseComponent(c sightmap.ComponentDef) compiledComponent {
-	chain := c.ParentChain
-	if chain == nil {
-		chain = []string{} // always emit [], never null
-	}
-	props := make([]compiledProp, 0, len(c.Properties))
-	for _, p := range c.Properties {
-		props = append(props, compiledProp{Name: p.Name, Extract: p.Extract, Transform: p.Transform})
-	}
-	return compiledComponent{
-		Name:        c.Name,
-		Selector:    strings.Join(c.Selectors, ", "),
-		ParentChain: chain,
-		Properties:  props,
-	}
-}
-
-func compileCorpus(sightmapDir, siteName string) (compiledSightmapJSON, error) {
+// loadServedSightmap loads the corpus and wraps it with serve metadata. The
+// version is a monotonic wall-clock stamp used only for cache-busting; the
+// selector-join / flattening the extension needs is done client-side now, so the
+// wire stays the canonical Corpus shape (selectors[] arrays, components nested
+// under each view).
+func loadServedSightmap(sightmapDir, siteName string) (servedSightmap, error) {
 	corp, err := sightmap.Load(sightmapDir)
 	if err != nil {
-		return compiledSightmapJSON{}, err
+		return servedSightmap{}, err
 	}
-
-	globals := make([]compiledComponent, 0, len(corp.GlobalComponents))
-	for _, c := range corp.GlobalComponents {
-		globals = append(globals, normaliseComponent(c))
-	}
-
-	viewList := make([]compiledView, 0, len(corp.Views))
-	viewComponents := make(map[string][]compiledComponent, len(corp.Views))
-	for _, v := range corp.Views {
-		if v.Route == "" {
-			continue
-		}
-		viewList = append(viewList, compiledView{Name: v.Name, Route: v.Route})
-		comps := make([]compiledComponent, 0, len(v.Components))
-		for _, c := range v.Components {
-			comps = append(comps, normaliseComponent(c))
-		}
-		viewComponents[v.Route] = comps
-	}
-
-	return compiledSightmapJSON{
-		Site:           siteName,
-		Version:        strconv.FormatInt(time.Now().UnixMilli(), 10),
-		Views:          viewList,
-		Globals:        globals,
-		ViewComponents: viewComponents,
+	return servedSightmap{
+		Site:    siteName,
+		Version: strconv.FormatInt(time.Now().UnixMilli(), 10),
+		Corpus:  corp,
 	}, nil
 }
 
@@ -104,29 +56,29 @@ func runServeSightmap(args []string) error {
 
 	siteName := filepath.Base(cwd())
 
-	// Initial compile.
-	compiled, err := compileCorpus(*sightmapDir, siteName)
+	// Initial load.
+	compiled, err := loadServedSightmap(*sightmapDir, siteName)
 	if err != nil {
-		return fmt.Errorf("serve-sightmap: initial compile: %w", err)
+		return fmt.Errorf("serve-sightmap: initial load: %w", err)
 	}
 
 	var mu sync.RWMutex
 	current := compiled
 
-	recompile := func() {
-		c, compErr := compileCorpus(*sightmapDir, siteName)
-		if compErr != nil {
-			fmt.Fprintf(os.Stderr, "[serve-sightmap] compile error: %v\n", compErr)
+	reload := func() {
+		c, loadErr := loadServedSightmap(*sightmapDir, siteName)
+		if loadErr != nil {
+			fmt.Fprintf(os.Stderr, "[serve-sightmap] load error: %v\n", loadErr)
 			return
 		}
 		mu.Lock()
 		current = c
 		mu.Unlock()
-		fmt.Fprintf(os.Stderr, "[serve-sightmap] recompiled (v%s)\n", c.Version)
+		fmt.Fprintf(os.Stderr, "[serve-sightmap] reloaded (v%s)\n", c.Version)
 	}
 
 	// File watcher.
-	go watchSightmapDir(*sightmapDir, recompile)
+	go watchSightmapDir(*sightmapDir, reload)
 
 	// HTTP handlers.
 	mux := http.NewServeMux()
