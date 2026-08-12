@@ -9,6 +9,7 @@
 //	sightmap sel-probe [flags] SEL  validate a CSS selector against the live page
 //	sightmap validate [flags]       check sightmap YAML for structural errors
 //	sightmap lint [flags]           check sightmap YAML for style issues
+//	sightmap export [dir]           emit the canonical Corpus wire (stdout, -o FILE, or --url)
 //	sightmap stats [flags]          corpus totals: views, components, requests, properties, memory
 //	sightmap coverage [flags]       recompute T1/T2/T3 coverage from saved snap files
 //	sightmap multi-coverage [flags] cross-page coverage matrix and promotion candidates
@@ -71,6 +72,10 @@ func main() {
 		err = runDiscover(args)
 	case "serve-sightmap", "serve_sightmap":
 		err = runServeSightmap(args)
+	case "export":
+		err = runExport(args)
+	case "push":
+		err = runPush(args)
 	case "report":
 		err = runReport(args)
 	case "stats":
@@ -132,6 +137,8 @@ Commands:
   search   [--field FIELD] PATTERN                           offline YAML content search
   discover [--all]                                           URL pattern discovery
   serve-sightmap [--port N] [--sightmap-dir DIR]             sightmap HTTP server for overlay extension
+  export   [dir] [-o FILE] [--url URL] [--sightmap-dir DIR]  emit the canonical Corpus wire (stdout, file, or POST)
+  push     URL [FILE]                                        POST a corpus JSON (file or stdin) to URL
 
   console  list [--level L] [--tab T] [--limit N]            captured console messages (needs a running session)
   console  get INDEX                                         one console message by index
