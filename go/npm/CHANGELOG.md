@@ -1,5 +1,25 @@
 # @sightmap/sightmap
 
+## 0.21.0
+
+### Minor Changes
+
+- 424a2c1: Restructure the Go library for downstream consumers. All corpus vocabulary,
+  observed runtime records, and match-result types now live in a single
+  self-contained `sightmap` package, with the matching engines consolidated behind
+  one `match.Matcher`. Types follow a consistent naming model — `…Def` for a spec,
+  bare structs for observed records, `…Match` for results — and extracted values
+  share a typed `PropertyValue`. This is a breaking change to the Go import surface
+  for library consumers (there were none before this release).
+- 424a2c1: Add runtime matching for console/exception messages. `Corpus.MessagesForRecord`
+  classifies an observed console record against `messages:` definitions
+  (case-insensitive level equality + an RE2 `message` regex, precompiled at load),
+  returning every match so an ambiguous record is surfaced rather than silently
+  resolved. The `sightmap console` and `sightmap network` devtools listings now
+  annotate each captured record with the corpus definitions that classify it —
+  messages via `MessagesForRecord`, requests via route+method identity — leading
+  each line with the match.
+
 ## 0.20.0
 
 ### Minor Changes
