@@ -173,16 +173,16 @@ messages:
 	if len(c.Messages) != 2 {
 		t.Fatalf("want 2 messages, got %d", len(c.Messages))
 	}
+	// Compare the exported fields individually rather than the whole struct:
+	// MessageDef also carries an unexported, precompiled-regexp cache that is not
+	// part of its value identity.
 	got := c.Messages[0]
-	want := sightmap.MessageDef{
-		Name:        "CartVersionMismatch",
-		Level:       "ERROR",
-		Message:     "cart version mismatch",
-		Description: "Cart mutated elsewhere",
-		Source:      "src/cart/sync.ts",
-	}
-	if got != want {
-		t.Errorf("messages[0] = %+v, want %+v", got, want)
+	if got.Name != "CartVersionMismatch" ||
+		got.Level != "ERROR" ||
+		got.Message != "cart version mismatch" ||
+		got.Description != "Cart mutated elsewhere" ||
+		got.Source != "src/cart/sync.ts" {
+		t.Errorf("messages[0] = %+v", got)
 	}
 	// The declared level is preserved verbatim; case-insensitivity applies when
 	// matching a record, not at load.
