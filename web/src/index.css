@@ -2134,3 +2134,45 @@ footer {
     border-radius: 12px 12px 0 0;
   }
 }
+
+/* ---- FAQ ---- */
+.faq {
+  padding: 5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.faq .container { max-width: 760px; }
+
+.faq-list {
+  margin-top: 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.faq-item {
+  border-bottom: 1px solid var(--border);
+}
+
+.faq-q {
+  cursor: pointer;
+  list-style: none;
+  padding: 1.1rem 0;
+  font-size: 1.02rem;
+  color: var(--text-bright);
+}
+
+.faq-q::-webkit-details-marker { display: none; }
+
+.faq-q::before {
+  content: '+';
+  font-family: var(--mono);
+  color: var(--accent);
+  margin-right: 0.75rem;
+}
+
+.faq-item[open] .faq-q::before { content: '−'; }
+
+.faq-a {
+  padding: 0 0 1.25rem 1.6rem;
+  color: var(--text);
+  line-height: 1.7;
+}

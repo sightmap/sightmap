@@ -3,6 +3,7 @@ import Hero from '@/components/Hero'
 import PitchSection from '@/components/PitchSection'
 import SpecSection from '@/components/SpecSection'
 import AgentSection from '@/components/AgentSection'
+import FaqSection from '@/components/FaqSection'
 import CTASection from '@/components/CTASection'
 import Footer from '@/components/Footer'
 import Seo from '@/components/Seo'
@@ -17,6 +18,7 @@ export default function Home() {
       <PitchSection />
       <SpecSection />
       <AgentSection />
+      <FaqSection />
       <CTASection />
       <Footer />
     </>
