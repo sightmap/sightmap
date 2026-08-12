@@ -8,6 +8,27 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.21.0" description="Released August 12, 2026" tags={["go"]}>
+
+Restructure the Go library for downstream consumers. All corpus vocabulary,
+observed runtime records, and match-result types now live in a single
+self-contained `sightmap` package, with the matching engines consolidated behind
+one `match.Matcher`. Types follow a consistent naming model — `…Def` for a spec,
+bare structs for observed records, `…Match` for results — and extracted values
+share a typed `PropertyValue`. This is a breaking change to the Go import surface
+for library consumers (there were none before this release).
+
+Add runtime matching for console/exception messages. `Corpus.MessagesForRecord`
+classifies an observed console record against `messages:` definitions
+(case-insensitive level equality + an RE2 `message` regex, precompiled at load),
+returning every match so an ambiguous record is surfaced rather than silently
+resolved. The `sightmap console` and `sightmap network` devtools listings now
+annotate each captured record with the corpus definitions that classify it —
+messages via `MessagesForRecord`, requests via route+method identity — leading
+each line with the match.
+
+</Update>
+
 <Update label="sightmap 0.20.0" description="Released August 10, 2026" tags={["cli"]}>
 
 Add a top-level `messages:` entity ([SEP-0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md)): named console-output and exception patterns, matched by `level` and a `message` regex. This gives console activity what `requests:` gives network activity, a named entity the rest of the corpus can reference by name.
