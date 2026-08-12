@@ -384,13 +384,15 @@ func toMessageDefs(rms []rawMessage) []MessageDef {
 	}
 	out := make([]MessageDef, 0, len(rms))
 	for _, rm := range rms {
-		out = append(out, MessageDef{
+		md := MessageDef{
 			Name:        rm.Name,
 			Level:       rm.Level,
 			Message:     rm.Message,
 			Description: rm.Description,
 			Source:      rm.Source,
-		})
+		}
+		md.precompile() // cache the compiled pattern once, at load time
+		out = append(out, md)
 	}
 	return out
 }

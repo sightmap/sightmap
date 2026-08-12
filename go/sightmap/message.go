@@ -34,6 +34,27 @@ type MessageDef struct {
 	Message     string `json:"message,omitempty"`
 	Description string `json:"description,omitempty"`
 	Source      string `json:"source,omitempty"`
+
+	// re is the compiled Message pattern, cached by the loader (precompile) so
+	// MessagesForRecord doesn't recompile per record. Nil when Message is empty,
+	// the pattern is invalid (validation reports that), or the def was built in
+	// memory without going through the loader; MessagesForRecord compiles on the
+	// fly in that last case. Unexported, so it never serializes.
+	re *regexp.Regexp
+}
+
+// precompile caches the compiled Message pattern on the def. The loader calls it
+// as each MessageDef is built, so a corpus loaded once and matched against many
+// records compiles each pattern once rather than once per record. A no-op for an
+// empty pattern; an invalid pattern leaves re nil (checkMessages reports it, and
+// MessagesForRecord then skips the def).
+func (m *MessageDef) precompile() {
+	if m.Message == "" {
+		return
+	}
+	if re, err := regexp.Compile(m.Message); err == nil {
+		m.re = re
+	}
 }
 
 // Console levels the reference capture emits. An observed record carries one of
@@ -95,8 +116,16 @@ func (c *Corpus) MessagesForRecord(rec Message) []MessageMatch {
 			continue
 		}
 		if m.Message != "" {
-			re, err := regexp.Compile(m.Message)
-			if err != nil || !re.MatchString(rec.Text) {
+			re := m.re
+			if re == nil {
+				// Not precompiled: an in-memory corpus that skipped the loader, or
+				// an invalid pattern. Compile on the fly; a bad pattern never matches.
+				var err error
+				if re, err = regexp.Compile(m.Message); err != nil {
+					continue
+				}
+			}
+			if !re.MatchString(rec.Text) {
 				continue
 			}
 		}
