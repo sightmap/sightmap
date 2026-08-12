@@ -153,7 +153,7 @@ func runBrowserStart(args []string) error {
 	// Devtools query surface. The collector is created after Chrome is ready
 	// (below); the handlers return 503 until then.
 	var collectorPtr atomic.Pointer[browser.Collector]
-	registerDevtoolsHandlers(mux, &collectorPtr)
+	registerDevtoolsHandlers(mux, &collectorPtr, *sightmapDir)
 
 	// Bind the sightmap server on the IPv4 loopback (not the ":port" wildcard) so
 	// it shares an address family with Chrome's CDP and with FindFreePort's probe.

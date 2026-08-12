@@ -51,14 +51,70 @@ func devtoolsGet(sightmapDir, path string, query url.Values) ([]byte, error) {
 	return body, nil
 }
 
+// consoleEntry / networkEntry are an observed record plus the names of the
+// corpus definitions that classify it. The daemon annotates entries in the
+// devtools handler (the collector stays corpus-blind); Matches is empty when no
+// corpus is loaded or nothing matched. Embedding promotes the record's own JSON
+// fields to the top level, so the wire shape is the record plus "matches".
+type consoleEntry struct {
+	sightmap.Message
+	Matches []string `json:"matches,omitempty"`
+}
+
+type networkEntry struct {
+	sightmap.Request
+	Matches []string `json:"matches,omitempty"`
+}
+
 type consoleResult struct {
-	Entries []sightmap.Message `json:"entries"`
-	Dropped int                `json:"dropped"`
+	Entries []consoleEntry `json:"entries"`
+	Dropped int            `json:"dropped"`
 }
 
 type networkResult struct {
-	Entries []sightmap.Request `json:"entries"`
-	Dropped int                `json:"dropped"`
+	Entries []networkEntry `json:"entries"`
+	Dropped int            `json:"dropped"`
+}
+
+// annotateConsole / annotateNetwork project each observed record together with
+// the names of the corpus defs that classify it. A nil corpus (none loaded, or a
+// load error) yields entries with no matches — devtools stays useful without a
+// corpus. Kept pure (corpus passed in, not loaded here) so they're unit-testable
+// without a daemon or disk.
+func annotateConsole(c *sightmap.Corpus, msgs []sightmap.Message) []consoleEntry {
+	out := make([]consoleEntry, len(msgs))
+	for i, m := range msgs {
+		e := consoleEntry{Message: m}
+		if c != nil {
+			for _, mm := range c.MessagesForRecord(m) {
+				e.Matches = append(e.Matches, mm.Name)
+			}
+		}
+		out[i] = e
+	}
+	return out
+}
+
+func annotateNetwork(c *sightmap.Corpus, reqs []sightmap.Request) []networkEntry {
+	out := make([]networkEntry, len(reqs))
+	for i, r := range reqs {
+		e := networkEntry{Request: r}
+		if c != nil {
+			for _, rd := range c.RequestsForURL(r.URL, r.Method) {
+				e.Matches = append(e.Matches, rd.Name)
+			}
+		}
+		out[i] = e
+	}
+	return out
+}
+
+// matchSuffix renders matched def names for a list line, or "" when none.
+func matchSuffix(matches []string) string {
+	if len(matches) == 0 {
+		return ""
+	}
+	return "  → " + strings.Join(matches, ", ")
 }
 
 // ── console ─────────────────────────────────────────────────────────────────
@@ -106,9 +162,9 @@ func runConsoleList(args []string) error {
 		multiTab := spansMultipleTabs(res.Entries)
 		for _, e := range res.Entries {
 			if multiTab {
-				fmt.Printf("[%d] %-9s [%s] %s\n", e.Index, e.Level, shortTab(e.Tab), e.Text)
+				fmt.Printf("[%d] %-9s [%s] %s%s\n", e.Index, e.Level, shortTab(e.Tab), e.Text, matchSuffix(e.Matches))
 			} else {
-				fmt.Printf("[%d] %-9s %s\n", e.Index, e.Level, e.Text)
+				fmt.Printf("[%d] %-9s %s%s\n", e.Index, e.Level, e.Text, matchSuffix(e.Matches))
 			}
 		}
 	}
@@ -137,6 +193,9 @@ func runConsoleGet(args []string) error {
 	for _, e := range res.Entries {
 		if e.Index == idx {
 			fmt.Printf("[%d] %s  (tab %s)\n%s\n", e.Index, e.Level, shortTab(e.Tab), e.Text)
+			if len(e.Matches) > 0 {
+				fmt.Printf("Matches: %s\n", strings.Join(e.Matches, ", "))
+			}
 			return nil
 		}
 	}
@@ -188,7 +247,7 @@ func runNetworkList(args []string) error {
 		fmt.Println("No network requests captured.")
 	} else {
 		for _, e := range res.Entries {
-			fmt.Printf("[%d] %s %s → %s (%s)\n", e.Index, e.Method, e.URL, statusStr(e), e.ResourceType)
+			fmt.Printf("[%d] %s %s → %s (%s)%s\n", e.Index, e.Method, e.URL, statusStr(e.Request), e.ResourceType, matchSuffix(e.Matches))
 		}
 	}
 	reportDropped(res.Dropped, "network")
@@ -216,7 +275,7 @@ func runNetworkGet(args []string) error {
 	if err := json.Unmarshal(body, &res); err != nil {
 		return fmt.Errorf("parse response: %w", err)
 	}
-	var entry *sightmap.Request
+	var entry *networkEntry
 	for i := range res.Entries {
 		if res.Entries[i].Index == idx {
 			entry = &res.Entries[i]
@@ -230,8 +289,11 @@ func runNetworkGet(args []string) error {
 	fmt.Printf("Method: %s\n", entry.Method)
 	fmt.Printf("URL: %s\n", entry.URL)
 	fmt.Printf("Resource Type: %s\n", entry.ResourceType)
-	fmt.Printf("Status: %s\n", statusStr(*entry))
+	fmt.Printf("Status: %s\n", statusStr(entry.Request))
 	fmt.Printf("Tab: %s\n", entry.Tab)
+	if len(entry.Matches) > 0 {
+		fmt.Printf("Matches: %s\n", strings.Join(entry.Matches, ", "))
+	}
 
 	if *reqFile != "" {
 		if err := saveBody(*sightmapDir, idx, "request", *reqFile); err != nil {
@@ -325,7 +387,7 @@ func singleIndexArg(args []string, cmd string) (int, error) {
 	return idx, nil
 }
 
-func spansMultipleTabs(entries []sightmap.Message) bool {
+func spansMultipleTabs(entries []consoleEntry) bool {
 	seen := ""
 	for _, e := range entries {
 		if seen == "" {
