@@ -182,9 +182,7 @@ function matchRoute(pattern, pathname) {
 const state = {
   /** @type {import("./types.js").FlatComponent[]} globals always-active */
   globals: [],
-  /** @type {Record<string, import("./types.js").FlatComponent[]>} route→comps */
-  viewComponents: {},
-  /** @type {{name:string, route:string}[]} */
+  /** @type {{name:string, route:string, components:import("./types.js").FlatComponent[]}[]} */
   views: [],
   version: null,
   enabled: true, // Alt+S toggle
@@ -192,6 +190,22 @@ const state = {
   tooltipEl: null,
   hoverTarget: null,
 };
+
+/**
+ * Normalize a corpus ComponentDef (wire shape: a selectors[] array, components
+ * nested under each view) into the flat component the resolver consumes: a
+ * single closest()-compatible selector string plus parentChain/properties.
+ * Keeping the selector join here means resolver.js stays agnostic to the wire
+ * shape.
+ */
+function normalizeComp(c) {
+  return {
+    name: c.name,
+    selector: (c.selectors ?? []).join(", "),
+    parentChain: c.parentChain ?? [],
+    properties: c.properties ?? [],
+  };
+}
 
 /** Return the active component list for the current URL. */
 function activeComponents() {
@@ -201,9 +215,7 @@ function activeComponents() {
   for (const c of state.globals) byName.set(c.name, c);
   for (const view of state.views) {
     if (!matchRoute(view.route, pathname)) continue;
-    for (const c of state.viewComponents[view.route] ?? []) {
-      byName.set(c.name, c);
-    }
+    for (const c of view.components) byName.set(c.name, c);
   }
   return [...byName.values()];
 }
@@ -228,13 +240,17 @@ async function fetchSightmap() {
   try {
     const resp = await bgFetch("fetch-sightmap");
     const data = resp.data;
-    state.globals = data.globals ?? [];
-    state.viewComponents = data.viewComponents ?? {};
-    state.views = data.views ?? [];
+    const corpus = data.corpus ?? {};
+    state.globals = (corpus.globals ?? []).map(normalizeComp);
+    state.views = (corpus.views ?? []).map((v) => ({
+      name: v.name,
+      route: v.route,
+      components: (v.components ?? []).map(normalizeComp),
+    }));
     state.version = data.version;
     const total =
       state.globals.length +
-      Object.values(state.viewComponents).reduce((s, a) => s + a.length, 0);
+      state.views.reduce((s, v) => s + v.components.length, 0);
     console.log(
       `[sightmap] loaded ${total} components from ${data.site} v${data.version}`,
     );
