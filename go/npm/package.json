@@ -1,6 +1,6 @@
 {
   "name": "@sightmap/sightmap",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "description": "sightmap authoring toolkit — live browser capture, annotated component snapshots, and coverage (native binary, no Go toolchain required)",
   "license": "MIT",
   "homepage": "https://sightmap.org",
