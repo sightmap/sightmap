@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -51,6 +52,30 @@ func TestAnnotateNetwork(t *testing.T) {
 	}
 	if len(got[1].Matches) != 0 {
 		t.Errorf("entry1 should have no matches, got %+v", got[1])
+	}
+}
+
+func TestMatchSlot(t *testing.T) {
+	cases := []struct {
+		name    string
+		matches []string
+		want    string // trimmed of the alignment padding
+	}{
+		{"unmatched", nil, "[--]"},
+		{"single", []string{"CartVersionMismatch"}, "[CartVersionMismatch]"},
+		{"multi (ambiguity up front)", []string{"CheckoutPayment", "AnyCheckout"}, "[CheckoutPayment, AnyCheckout]"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := strings.TrimRight(matchSlot(tc.matches), " ")
+			if got != tc.want {
+				t.Errorf("matchSlot(%v) = %q, want %q", tc.matches, got, tc.want)
+			}
+		})
+	}
+	// The unmatched token stays quiet (no def name could be mistaken for it).
+	if strings.Contains(matchSlot(nil), "match") {
+		t.Error("unmatched token should be an unobtrusive placeholder, not a word")
 	}
 }
 

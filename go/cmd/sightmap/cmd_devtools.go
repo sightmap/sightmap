@@ -109,12 +109,18 @@ func annotateNetwork(c *sightmap.Corpus, reqs []sightmap.Request) []networkEntry
 	return out
 }
 
-// matchSuffix renders matched def names for a list line, or "" when none.
-func matchSuffix(matches []string) string {
-	if len(matches) == 0 {
-		return ""
+// matchSlot renders the leading corpus-match token for a list line: the matched
+// def name(s) in brackets, or "[--]" when unmatched. It leads the line (before
+// the record's own payload) so an agent reads the classification first, mirroring
+// how snapshots foreground a component's [Name]. Multi-match renders every name
+// ("[A, B]") so the ambiguity is visible up front. Left-padded to a modest width
+// so short tokens align for human scanning; long ones overflow.
+func matchSlot(matches []string) string {
+	token := "[--]"
+	if len(matches) > 0 {
+		token = "[" + strings.Join(matches, ", ") + "]"
 	}
-	return "  → " + strings.Join(matches, ", ")
+	return fmt.Sprintf("%-22s", token)
 }
 
 // ── console ─────────────────────────────────────────────────────────────────
@@ -162,9 +168,9 @@ func runConsoleList(args []string) error {
 		multiTab := spansMultipleTabs(res.Entries)
 		for _, e := range res.Entries {
 			if multiTab {
-				fmt.Printf("[%d] %-9s [%s] %s%s\n", e.Index, e.Level, shortTab(e.Tab), e.Text, matchSuffix(e.Matches))
+				fmt.Printf("[%d] %s %-9s [%s] %s\n", e.Index, matchSlot(e.Matches), e.Level, shortTab(e.Tab), e.Text)
 			} else {
-				fmt.Printf("[%d] %-9s %s%s\n", e.Index, e.Level, e.Text, matchSuffix(e.Matches))
+				fmt.Printf("[%d] %s %-9s %s\n", e.Index, matchSlot(e.Matches), e.Level, e.Text)
 			}
 		}
 	}
@@ -247,7 +253,7 @@ func runNetworkList(args []string) error {
 		fmt.Println("No network requests captured.")
 	} else {
 		for _, e := range res.Entries {
-			fmt.Printf("[%d] %s %s → %s (%s)%s\n", e.Index, e.Method, e.URL, statusStr(e.Request), e.ResourceType, matchSuffix(e.Matches))
+			fmt.Printf("[%d] %s %s %s → %s (%s)\n", e.Index, matchSlot(e.Matches), e.Method, e.URL, statusStr(e.Request), e.ResourceType)
 		}
 	}
 	reportDropped(res.Dropped, "network")
