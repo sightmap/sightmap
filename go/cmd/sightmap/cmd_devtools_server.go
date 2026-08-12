@@ -14,19 +14,37 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // registerDevtoolsHandlers wires the /devtools/* endpoints onto mux. The
 // collector is supplied via ptr because it is created only after Chrome is
 // ready, whereas handlers must be registered before the server starts serving.
 // Until the collector exists the endpoints return 503.
-func registerDevtoolsHandlers(mux *http.ServeMux, ptr *atomic.Pointer[browser.Collector]) {
+//
+// sightmapDir is the corpus location. The console/network handlers annotate each
+// observed record with the corpus defs that classify it, loading the corpus
+// fresh per request so on-disk edits are reflected the same way the component
+// CLI's per-invocation sightmap.Load() is (corpora are tiny; the I/O is
+// negligible). A missing or malformed corpus degrades to no annotations rather
+// than failing the query.
+func registerDevtoolsHandlers(mux *http.ServeMux, ptr *atomic.Pointer[browser.Collector], sightmapDir string) {
 	load := func(w http.ResponseWriter) (*browser.Collector, bool) {
 		if c := ptr.Load(); c != nil {
 			return c, true
 		}
 		http.Error(w, "collector not ready", http.StatusServiceUnavailable)
 		return nil, false
+	}
+
+	// corpusNow loads the corpus fresh, returning nil on any error so the
+	// handler degrades to un-annotated entries.
+	corpusNow := func() *sightmap.Corpus {
+		c, err := sightmap.Load(sightmapDir)
+		if err != nil {
+			return nil
+		}
+		return c
 	}
 
 	mux.HandleFunc("/devtools/console", func(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +58,7 @@ func registerDevtoolsHandlers(mux *http.ServeMux, ptr *atomic.Pointer[browser.Co
 			Tab:   q.Get("tab"),
 			Limit: atoiDefault(q.Get("limit"), 0),
 		})
-		writeJSON(w, map[string]any{"entries": entries, "dropped": dropped})
+		writeJSON(w, map[string]any{"entries": annotateConsole(corpusNow(), entries), "dropped": dropped})
 	})
 
 	mux.HandleFunc("/devtools/network", func(w http.ResponseWriter, r *http.Request) {
@@ -55,7 +73,7 @@ func registerDevtoolsHandlers(mux *http.ServeMux, ptr *atomic.Pointer[browser.Co
 			Tab:          q.Get("tab"),
 			Limit:        atoiDefault(q.Get("limit"), 0),
 		})
-		writeJSON(w, map[string]any{"entries": entries, "dropped": dropped})
+		writeJSON(w, map[string]any{"entries": annotateNetwork(corpusNow(), entries), "dropped": dropped})
 	})
 
 	mux.HandleFunc("/devtools/network/body", func(w http.ResponseWriter, r *http.Request) {
