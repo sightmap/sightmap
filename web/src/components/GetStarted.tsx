@@ -1,4 +1,4 @@
-export default function CTASection() {
+export default function GetStarted() {
   return (
     <section id="start" className="get-started" data-component="GetStarted">
       <div className="container container--wide">

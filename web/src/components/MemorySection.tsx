@@ -1,4 +1,4 @@
-export default function AgentSection() {
+export default function MemorySection() {
   return (
     <section id="memory" data-component="MemorySection">
       <div className="container container--wide">
