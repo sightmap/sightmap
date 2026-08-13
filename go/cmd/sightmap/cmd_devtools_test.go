@@ -55,6 +55,56 @@ func TestAnnotateNetwork(t *testing.T) {
 	}
 }
 
+func TestAnnotateNetwork_ExtractsProperties(t *testing.T) {
+	corpus := &sightmap.Corpus{
+		Requests: []sightmap.RequestDef{{
+			Name: "CheckoutPayment", Route: "/api/checkout/pay", Method: "POST",
+			Properties: []sightmap.RequestPropertyDef{
+				{Name: "outcome", Source: "rsp.body", Field: "status"},
+			},
+		}},
+	}
+	reqs := []sightmap.Request{{
+		Index: 1, Method: "POST", URL: "https://x.test/api/checkout/pay", Status: 200,
+		RspBody: &sightmap.Body{Content: `{"status":"declined"}`, ContentType: "application/json"},
+	}}
+	got := annotateNetwork(corpus, reqs)
+
+	if !reflect.DeepEqual(got[0].Matches, []string{"CheckoutPayment"}) {
+		t.Errorf("matches = %+v", got[0].Matches)
+	}
+	if !reflect.DeepEqual(got[0].Props, []sightmap.PropertyValue{{Name: "outcome", Value: "declined"}}) {
+		t.Errorf("props = %+v (want outcome=declined extracted from the 200 body)", got[0].Props)
+	}
+	if slot := propsSlot(got[0].Props); slot != " {outcome=declined}" {
+		t.Errorf("propsSlot = %q", slot)
+	}
+}
+
+func TestAnnotateConsole_ExtractsStackProperties(t *testing.T) {
+	corpus := &sightmap.Corpus{
+		Messages: []sightmap.MessageDef{{
+			Name: "UncaughtCheckoutError", Level: "exception",
+			Properties: []sightmap.MessagePropertyDef{
+				{Name: "origin_file", Source: "stack", Field: "top.file"},
+			},
+		}},
+	}
+	line := 42
+	msgs := []sightmap.Message{{
+		Index: 1, Level: "exception", Text: "boom",
+		Stack: []sightmap.Frame{{Function: "syncCart", File: "src/cart/sync.ts", Line: &line}},
+	}}
+	got := annotateConsole(corpus, msgs)
+
+	if !reflect.DeepEqual(got[0].Matches, []string{"UncaughtCheckoutError"}) {
+		t.Errorf("matches = %+v", got[0].Matches)
+	}
+	if !reflect.DeepEqual(got[0].Props, []sightmap.PropertyValue{{Name: "origin_file", Value: "src/cart/sync.ts"}}) {
+		t.Errorf("props = %+v", got[0].Props)
+	}
+}
+
 func TestMatchSlot(t *testing.T) {
 	cases := []struct {
 		name    string

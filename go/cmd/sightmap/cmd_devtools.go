@@ -58,12 +58,14 @@ func devtoolsGet(sightmapDir, path string, query url.Values) ([]byte, error) {
 // fields to the top level, so the wire shape is the record plus "matches".
 type consoleEntry struct {
 	sightmap.Message
-	Matches []string `json:"matches,omitempty"`
+	Matches []string                 `json:"matches,omitempty"`
+	Props   []sightmap.PropertyValue `json:"props,omitempty"`
 }
 
 type networkEntry struct {
 	sightmap.Request
-	Matches []string `json:"matches,omitempty"`
+	Matches []string                 `json:"matches,omitempty"`
+	Props   []sightmap.PropertyValue `json:"props,omitempty"`
 }
 
 type consoleResult struct {
@@ -88,6 +90,7 @@ func annotateConsole(c *sightmap.Corpus, msgs []sightmap.Message) []consoleEntry
 		if c != nil {
 			for _, mm := range c.MessagesForRecord(m) {
 				e.Matches = append(e.Matches, mm.Name)
+				e.Props = append(e.Props, mm.Properties...)
 			}
 		}
 		out[i] = e
@@ -100,13 +103,44 @@ func annotateNetwork(c *sightmap.Corpus, reqs []sightmap.Request) []networkEntry
 	for i, r := range reqs {
 		e := networkEntry{Request: r}
 		if c != nil {
-			for _, rd := range c.RequestsForURL(r.URL, r.Method) {
-				e.Matches = append(e.Matches, rd.Name)
+			// RequestsForRecord does route+method identity AND resolves each
+			// matched def's properties[] against the record's live headers/body
+			// (populated by the collector). RequestsForURL gave names only.
+			for _, rm := range c.RequestsForRecord(r) {
+				e.Matches = append(e.Matches, rm.Name)
+				e.Props = append(e.Props, rm.Properties...)
 			}
 		}
 		out[i] = e
 	}
 	return out
+}
+
+// propsSlot renders extracted property values as a trailing `{name=value, …}`
+// token for a list line, or "" when none. It follows the record's own payload —
+// the classification (matchSlot) leads, the extracted content trails — mirroring
+// how a snapshot shows `[Component attr="value"]`.
+func propsSlot(props []sightmap.PropertyValue) string {
+	if len(props) == 0 {
+		return ""
+	}
+	parts := make([]string, len(props))
+	for i, p := range props {
+		parts[i] = fmt.Sprintf("%s=%s", p.Name, p.Value)
+	}
+	return " {" + strings.Join(parts, ", ") + "}"
+}
+
+// printProps writes an extracted-property block for a `get` detail view, one
+// `name = value` per line under a "Properties:" header. No-op when empty.
+func printProps(props []sightmap.PropertyValue) {
+	if len(props) == 0 {
+		return
+	}
+	fmt.Println("Properties:")
+	for _, p := range props {
+		fmt.Printf("  %s = %s\n", p.Name, p.Value)
+	}
 }
 
 // matchSlot renders the leading corpus-match token for a list line: the matched
@@ -168,9 +202,9 @@ func runConsoleList(args []string) error {
 		multiTab := spansMultipleTabs(res.Entries)
 		for _, e := range res.Entries {
 			if multiTab {
-				fmt.Printf("[%d] %s %-9s [%s] %s\n", e.Index, matchSlot(e.Matches), e.Level, shortTab(e.Tab), e.Text)
+				fmt.Printf("[%d] %s %-9s [%s] %s%s\n", e.Index, matchSlot(e.Matches), e.Level, shortTab(e.Tab), e.Text, propsSlot(e.Props))
 			} else {
-				fmt.Printf("[%d] %s %-9s %s\n", e.Index, matchSlot(e.Matches), e.Level, e.Text)
+				fmt.Printf("[%d] %s %-9s %s%s\n", e.Index, matchSlot(e.Matches), e.Level, e.Text, propsSlot(e.Props))
 			}
 		}
 	}
@@ -202,6 +236,7 @@ func runConsoleGet(args []string) error {
 			if len(e.Matches) > 0 {
 				fmt.Printf("Matches: %s\n", strings.Join(e.Matches, ", "))
 			}
+			printProps(e.Props)
 			return nil
 		}
 	}
@@ -253,7 +288,7 @@ func runNetworkList(args []string) error {
 		fmt.Println("No network requests captured.")
 	} else {
 		for _, e := range res.Entries {
-			fmt.Printf("[%d] %s %s %s → %s (%s)\n", e.Index, matchSlot(e.Matches), e.Method, e.URL, statusStr(e.Request), e.ResourceType)
+			fmt.Printf("[%d] %s %s %s → %s (%s)%s\n", e.Index, matchSlot(e.Matches), e.Method, e.URL, statusStr(e.Request), e.ResourceType, propsSlot(e.Props))
 		}
 	}
 	reportDropped(res.Dropped, "network")
@@ -300,6 +335,7 @@ func runNetworkGet(args []string) error {
 	if len(entry.Matches) > 0 {
 		fmt.Printf("Matches: %s\n", strings.Join(entry.Matches, ", "))
 	}
+	printProps(entry.Props)
 
 	if *reqFile != "" {
 		if err := saveBody(*sightmapDir, idx, "request", *reqFile); err != nil {
