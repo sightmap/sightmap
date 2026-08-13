@@ -18,9 +18,16 @@ type Message struct {
 	Ts    int64  `json:"ts"` // unix milliseconds
 }
 
-// Request is one observed network request/response. Bodies are not included —
-// they are large and, for a live capture, fetched lazily by the tool that
-// observed the request. Status is 0 until the response is seen.
+// Request is one observed network request/response. Status is 0 until the
+// response is seen.
+//
+// Everything a RequestDef's properties[] can address (the SEP-0005 sources
+// req.body / rsp.body / req.headers / rsp.headers, plus the reserved identity
+// name duration) is carried here, so the record is faithful to what the def can
+// extract. But every such field is optional: a lazy or streaming producer may
+// leave them nil/empty — bodies are large and are often fetched on demand — and
+// property extraction then degrades to "value absent" (silent omission, per the
+// SEP) rather than erroring. A producer holding a full capture populates them.
 type Request struct {
 	Index        int    `json:"index"`
 	Tab          string `json:"tab"`
@@ -30,4 +37,31 @@ type Request struct {
 	StatusText   string `json:"statusText"`
 	ResourceType string `json:"resourceType"`
 	Ts           int64  `json:"ts"` // unix milliseconds
+
+	// Optional, fetch-on-demand payload material — the targets of properties[]
+	// extraction. Omitted from the wire when unpopulated.
+	DurationMs int64    `json:"durationMs,omitempty"` // request→response latency; the reserved "duration" identity
+	ReqHeaders []Header `json:"reqHeaders,omitempty"` // request headers, ordered, duplicate-preserving
+	RspHeaders []Header `json:"rspHeaders,omitempty"` // response headers, ordered, duplicate-preserving
+	ReqBody    *Body    `json:"reqBody,omitempty"`    // request body (raw)
+	RspBody    *Body    `json:"rspBody,omitempty"`    // response body (raw)
+}
+
+// Header is one observed HTTP header. Headers are stored as an ordered,
+// duplicate-preserving list rather than a map so repeated headers (Set-Cookie,
+// and the like) survive; a properties[] lookup by name is case-insensitive.
+type Header struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+// Body is an observed request or response body. Content is the raw text; the
+// matcher parses it (a properties[] field dot-path implies JSON at match time) —
+// parsing is deliberately kept out of the record. Truncated and Size let a
+// matcher tell "absent" from "absent because the capture truncated it".
+type Body struct {
+	Content     string `json:"content,omitempty"`
+	Size        int    `json:"size,omitempty"`
+	ContentType string `json:"contentType,omitempty"`
+	Truncated   bool   `json:"truncated,omitempty"`
 }
