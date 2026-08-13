@@ -44,6 +44,7 @@ jobs:
   dispatch:
     name: start a curation agent run
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       # Only for .github/sightmap/curate-playbook.md — the playbook is
       # versioned here so a change to it rides in the same PR as the code it
@@ -79,7 +80,7 @@ jobs:
           jq -n --rawfile prompt .github/sightmap/curate-playbook.md \
             '{branch: "main", agent: "claude", prompt: $prompt}' > payload.json
 
-          code=$(curl -sS -o response.json -w '%{http_code}' \
+          code=$(curl -sS --max-time 30 -o response.json -w '%{http_code}' \
             -X POST "https://api.netlify.com/api/v1/agent_runners?site_id=$NETLIFY_SITE_ID" \
             -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
             -H 'Content-Type: application/json' \
@@ -96,5 +97,6 @@ jobs:
 
           id=$(jq -r '.id' response.json)
           state=$(jq -r '.state' response.json)
+          [ "$id" = "null" ] && { echo "::error::2xx with no run id"; cat response.json; exit 1; }
           echo "started agent run $id (state=$state)"
           echo "Curation agent run \`$id\` started for ${GITHUB_SHA:0:7} (state \`$state\`)." >> "$GITHUB_STEP_SUMMARY"
