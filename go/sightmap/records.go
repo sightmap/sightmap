@@ -26,12 +26,16 @@ type Message struct {
 
 // Frame is one call-stack frame of an exception Message, as the reference
 // capture derives it from CDP Runtime.exceptionThrown stackTrace.callFrames.
-// Line and Column are 0 when the capture didn't supply them.
+//
+// Line and Column are pointers so "not captured" (nil) is distinguishable from a
+// genuine zero: CDP callFrames.lineNumber is 0-based, so line 0 is a real
+// location, not a missing one. A property addressing an unset Line/Column omits
+// silently (per the SEP), while one addressing a captured 0 resolves to "0".
 type Frame struct {
 	Function string `json:"function,omitempty"`
 	File     string `json:"file,omitempty"`
-	Line     int    `json:"line,omitempty"`
-	Column   int    `json:"column,omitempty"`
+	Line     *int   `json:"line,omitempty"`
+	Column   *int   `json:"column,omitempty"`
 }
 
 // Request is one observed network request/response. Status is 0 until the

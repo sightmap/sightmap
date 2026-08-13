@@ -83,9 +83,15 @@ func resolveStackField(frames []Frame, field string) (string, bool) {
 	case "file":
 		return f.File, f.File != ""
 	case "line":
-		return strconv.Itoa(f.Line), true
+		if f.Line == nil {
+			return "", false
+		}
+		return strconv.Itoa(*f.Line), true
 	case "column":
-		return strconv.Itoa(f.Column), true
+		if f.Column == nil {
+			return "", false
+		}
+		return strconv.Itoa(*f.Column), true
 	default:
 		return "", false
 	}

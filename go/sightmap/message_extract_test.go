@@ -5,10 +5,12 @@ import (
 	"testing"
 )
 
+func intp(n int) *int { return &n }
+
 func excStack() []Frame {
 	return []Frame{
-		{Function: "syncCart", File: "src/cart/sync.ts", Line: 42, Column: 9},
-		{Function: "onClick", File: "src/checkout/pay.ts", Line: 118, Column: 4},
+		{Function: "syncCart", File: "src/cart/sync.ts", Line: intp(42), Column: intp(9)},
+		{Function: "onClick", File: "src/checkout/pay.ts", Line: intp(118), Column: intp(4)},
 	}
 }
 
@@ -76,6 +78,31 @@ func TestMessageExtract_SilentOmission(t *testing.T) {
 	rec := Message{Stack: []Frame{{File: "a.ts"}}}
 	if got := d.ExtractProperties(rec); got != nil {
 		t.Fatalf("want nil (all omitted), got %+v", got)
+	}
+}
+
+func TestMessageExtract_CapturedZeroLineIsValueNotAbsent(t *testing.T) {
+	// CDP line numbers are 0-based, so a captured line 0 is a real location and
+	// must resolve to "0" — not be treated as absent.
+	d := &MessageDef{Properties: []MessagePropertyDef{{Name: "ln", Source: "stack", Field: "top.line"}}}
+	rec := Message{Stack: []Frame{{File: "a.ts", Line: intp(0)}}}
+	got := d.ExtractProperties(rec)
+	want := []PropertyValue{{Name: "ln", Value: "0"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("captured line 0 should resolve to \"0\", got %+v", got)
+	}
+}
+
+func TestMessageExtract_UnsetLineOmits(t *testing.T) {
+	// A frame whose Line/Column the capture didn't supply (nil) omits, distinct
+	// from a captured 0.
+	d := &MessageDef{Properties: []MessagePropertyDef{
+		{Name: "ln", Source: "stack", Field: "top.line"},
+		{Name: "col", Source: "stack", Field: "top.column"},
+	}}
+	rec := Message{Stack: []Frame{{File: "a.ts"}}} // Line/Column nil
+	if got := d.ExtractProperties(rec); got != nil {
+		t.Fatalf("unset line/column should omit, got %+v", got)
 	}
 }
 
