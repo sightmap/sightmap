@@ -159,7 +159,7 @@ export default function AtlasEntryPage() {
               )}
             </div>
 
-            <aside className="atlas-meta" aria-label="Entry metadata">
+            <aside className="atlas-meta" aria-label="Entry metadata" data-component="AtlasMeta">
               <dl>
                 <MetaRow label="Capture method">{entry.method}</MetaRow>
                 <MetaRow label="Auth">{entry.auth}</MetaRow>
