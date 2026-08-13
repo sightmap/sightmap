@@ -557,7 +557,7 @@ A conforming SDK:
 - MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
 - MUST reject a `MessageProperty` with a `source` other than `stack`, or one that omits `field`, or whose `pattern` is not a valid RE2 regular expression
 - SHOULD surface `memory` entries to the agent when the parent definition is active
-- MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
+- MAY ignore fields it doesn't use (e.g. a consumer that never surfaces `description` at runtime)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
 
 An SDK that also **evaluates live activity** (observed network requests, console records, DOM state) additionally:
