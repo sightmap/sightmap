@@ -135,7 +135,7 @@ Existing SDKs that encounter a `messages:` key MUST treat it as an unknown top-l
 
 1. This SEP merges (status: Accepted).
 2. `sightmap/sightmap` implements `messages:` parsing and matching. Bumped to a minor release.
-3. Consumers (e.g. Subtext) pin `github.com/sightmap/sightmap/go >= <new version>` before authoring `messages:`.
+3. Consumers pin `github.com/sightmap/sightmap/go >= <new version>` before authoring `messages:`.
 
 ## Open questions
 
@@ -145,4 +145,4 @@ Existing SDKs that encounter a `messages:` key MUST treat it as an unknown top-l
 
 ## References
 
-- Subtext (a sightmap consumer) folds uncaught exceptions into the same console-record stream under their own `exception` level (not `error`) — the real-world precedent behind this proposal's "one entity, not two" call in Semantics, and the reason a corpus that wants exceptions writes `level: EXCEPTION`.
+- A sightmap consumer folds uncaught exceptions into the same console-record stream under an `exception` level (not `error`) — the real-world precedent behind this proposal's "one entity, not two" call in Semantics, and the reason a corpus that wants exceptions writes `level: EXCEPTION`.
