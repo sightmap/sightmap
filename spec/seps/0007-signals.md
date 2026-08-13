@@ -225,7 +225,7 @@ Existing SDKs that encounter a `signals:` key MUST treat it as an unknown top-le
 
 1. This SEP merges (status: Accepted) — depends on [SEP-0005](0005-request-properties.md) and [SEP-0006](0006-message-entity.md) also being accepted, since this proposal's `Request`/`Message` examples assume both exist.
 2. `sightmap/sightmap` implements `signals:` parsing and `ref:`/`filter:` resolution. Bumped to a minor release.
-3. Consumers (e.g. Subtext) pin `github.com/sightmap/sightmap/go >= <new version>` before authoring `signals:`.
+3. Consumers pin `github.com/sightmap/sightmap/go >= <new version>` before authoring `signals:`.
 
 ## Open questions
 
