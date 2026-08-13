@@ -211,7 +211,7 @@ Existing SDKs that encounter a `properties:` entry under a `request:` MUST treat
 
 1. This SEP merges (status: Accepted).
 2. `sightmap/sightmap` implements request-property extraction in its network-capture pipeline. Bumped to a minor release.
-3. Consumers (e.g. Subtext) pin `github.com/sightmap/sightmap/go >= <new version>` before adding `properties:` to a `requests:` entry.
+3. Consumers pin `github.com/sightmap/sightmap/go >= <new version>` before adding `properties:` to a `requests:` entry.
 
 ## Open questions
 
