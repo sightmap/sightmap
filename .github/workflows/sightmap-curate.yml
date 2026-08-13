@@ -24,9 +24,18 @@ on:
 permissions:
   contents: read
 
-# One curation run at a time. Not cancel-in-progress: an agent run lives on
-# Netlify, not in this job, so cancelling the job would abandon a run that
-# keeps burning credits rather than stopping it.
+# Serializes THIS JOB, and the job is a ~13 second POST. It does NOT serialize
+# curation runs: the run the job starts lives on Netlify, outside the job, for
+# 5-12 minutes and ~$3. Two web/src merges a minute apart start two concurrent
+# agent runs against the same main, both billed, with overlapping result diffs
+# for a human to reconcile. Real one-run-at-a-time needs somewhere to hold a
+# lock across dispatches, which is the Phase 2 extension's job, not CI's.
+#
+# cancel-in-progress stays false because cancelling the job would abandon the
+# run it started rather than stop it — the run keeps spending either way. The
+# cost of that choice: GitHub keeps at most one running plus one pending job
+# per group and cancels a superseded pending job, so on a merge train an
+# intermediate merge can end up with no curation run at all.
 concurrency:
   group: sightmap-curate
   cancel-in-progress: false
