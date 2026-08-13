@@ -3,6 +3,7 @@ package sightmap
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -42,8 +43,78 @@ func checkMessages(msgs []MessageDef) []ValidationError {
 		}
 	}
 
+	errs = append(errs, checkMessageProperties(msgs)...)
 	errs = append(errs, checkMessageNameCollisions(msgs)...)
 	errs = append(errs, checkMessageConflicts(msgs)...)
+	return errs
+}
+
+// checkMessageProperties validates the shape of every stack-addressing message
+// property (the SEP-0006 follow-on). Like checkRequestProperties, these
+// constraints also live in the JSON Schema, but the Go CLI never validates
+// against it, so without this a corpus with a bad property name, an unknown
+// source, or a stack source missing its field would pass `sightmap validate`
+// while `npm run validate:conformance` rejects it.
+func checkMessageProperties(msgs []MessageDef) []ValidationError {
+	var errs []ValidationError
+	for _, m := range msgs {
+		for _, p := range m.Properties {
+			errs = append(errs, validateMessageProperty(m.Name, p)...)
+		}
+	}
+	return errs
+}
+
+func validateMessageProperty(msgName string, p MessagePropertyDef) []ValidationError {
+	var errs []ValidationError
+
+	// name reuses the identifier rule shared with request/component properties.
+	if !requestPropertyNamePattern.MatchString(p.Name) {
+		errs = append(errs, ValidationError{
+			Component: msgName,
+			Code:      "message-property-invalid-name",
+			Severity:  SeverityError,
+			Message: fmt.Sprintf("message %q declares a property named %q; names must match %s",
+				msgName, p.Name, requestPropertyNamePattern),
+		})
+	}
+
+	validSource := slices.Contains(MessagePropertySources, p.Source)
+	if !validSource {
+		errs = append(errs, ValidationError{
+			Component: msgName,
+			Code:      "message-property-source-invalid",
+			Severity:  SeverityError,
+			Message: fmt.Sprintf("message %q property %q has source %q; must be one of %s",
+				msgName, p.Name, p.Source, strings.Join(MessagePropertySources, ", ")),
+		})
+	}
+
+	// A stack source addresses a specific frame+attribute, so field is required —
+	// there is no meaningful bare-regex scan over a structured call stack (the
+	// same reasoning that requires field for a headers source in SEP-0005).
+	if validSource && p.Field == "" {
+		errs = append(errs, ValidationError{
+			Component: msgName,
+			Code:      "message-property-no-field",
+			Severity:  SeverityError,
+			Message: fmt.Sprintf("message %q property %q reads from %q but omits field; name a frame and attribute, e.g. field: top.file",
+				msgName, p.Name, p.Source),
+		})
+	}
+
+	if p.Pattern != "" {
+		if _, err := regexp.Compile(p.Pattern); err != nil {
+			errs = append(errs, ValidationError{
+				Component: msgName,
+				Code:      "message-property-pattern-invalid",
+				Severity:  SeverityError,
+				Message: fmt.Sprintf("message %q property %q: pattern regex parse error: %v",
+					msgName, p.Name, err),
+			})
+		}
+	}
+
 	return errs
 }
 

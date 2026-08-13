@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": true,
+        "diagnostics": []
+      }
+    }
+  ]
+}

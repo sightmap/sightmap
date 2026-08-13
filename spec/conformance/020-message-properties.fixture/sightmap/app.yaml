@@ -1,0 +1,18 @@
+version: 1
+messages:
+  # An exception classified by origin, extracting the throwing frame's file and
+  # function plus a specific caller frame refined by a pattern.
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    message: 'Cannot read propert(y|ies) .* of (null|undefined)'
+    properties:
+      - name: origin_file
+        source: stack
+        field: top.file
+      - name: origin_fn
+        source: stack
+        field: top.function
+      - name: caller_base
+        source: stack
+        field: 1.file
+        pattern: '([^/]+)$'

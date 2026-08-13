@@ -333,8 +333,43 @@ messages:
 | `message` | string | no | [RE2](#regular-expressions) regex matched against the record's text. Match-any if omitted. |
 | `description` | string | no | What this pattern means, for a human reading the corpus. |
 | `source` | string | no | Relative path to the source most likely to emit this. |
+| `properties` | [MessageProperty](#message-properties)[] | no | Values to extract from an exception's stack. |
 
 A record matches when every declared constraint holds. Declaring neither `level` nor `message` matches every record, which is legal but rarely useful. `message` is an [RE2 regular expression](#regular-expressions).
+
+### Message properties
+
+`properties:` declares named values to pull out of an uncaught exception's **stack trace**, so a corpus can classify an exception by where it came from and extract the failing location — the message-side analogue of a request's [`properties:`](#request-properties). It reuses that mechanism's `source` / `field` / `pattern` / `transform` shape.
+
+```yaml
+messages:
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    message: 'Cannot read propert(y|ies) .* of (null|undefined)'
+    properties:
+      # The throwing frame's source file and function.
+      - name: origin_file
+        source: stack
+        field: top.file
+      - name: origin_fn
+        source: stack
+        field: top.function
+      # A specific frame by index, refined by a pattern to just the basename.
+      - name: caller_base
+        source: stack
+        field: 1.file
+        pattern: '([^/]+)$'
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
+| `source` | string | yes | Which root to read from. The only value in v1 is `stack` (the exception's call stack). |
+| `field` | string | yes | The frame and attribute to select, `<frame>.<attribute>`: `<frame>` is `top` (an alias for `0`) or a non-negative frame index (`0`, `1`, …), throwing frame first; `<attribute>` is one of `function`, `file`, `line`, or `column`. Required — a `stack` source has no meaningful bare-regex scan, the same reasoning that requires `field` for a request's headers source. |
+| `pattern` | string | no | An [RE2](#regular-expressions) regex applied to whatever `field` resolved. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
+| `transform` | string | no | Same vocabulary as [Component properties](#component-properties)' transform. |
+
+Extraction requires **live traffic** and **value omission is silent**, exactly as for [request properties](#request-properties): a property that doesn't resolve (a plain console record with no stack, a frame index out of range, an unknown attribute, no pattern match) is simply absent, never an error. See [SEP-0006](../seps/0006-message-entity.md).
 
 ### Message levels
 
@@ -359,7 +394,7 @@ A consumer evaluating live records MUST surface an ambiguity when a record match
 
 ## Regular expressions
 
-Every author-written regular expression in a sightmap — a request property's `pattern` ([Request properties](#request-properties)) and a message's `message` ([Message](#message)) — uses **RE2** syntax: the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package for JavaScript. RE2 is pinned deliberately. It matches in guaranteed linear time (no catastrophic backtracking), and because a pattern is validated at authoring time by one SDK and evaluated against live activity by another, one predictable dialect keeps the two from disagreeing about the same expression. The tradeoff is expressivity: RE2 has **no backreferences and no lookahead/lookbehind**. Character classes, alternation, quantifiers, anchors, and capture groups all work — essentially every pattern in practice.
+Every author-written regular expression in a sightmap — a request property's `pattern` ([Request properties](#request-properties)), a message's `message` ([Message](#message)), and a message property's `pattern` ([Message properties](#message-properties)) — uses **RE2** syntax: the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package for JavaScript. RE2 is pinned deliberately. It matches in guaranteed linear time (no catastrophic backtracking), and because a pattern is validated at authoring time by one SDK and evaluated against live activity by another, one predictable dialect keeps the two from disagreeing about the same expression. The tradeoff is expressivity: RE2 has **no backreferences and no lookahead/lookbehind**. Character classes, alternation, quantifiers, anchors, and capture groups all work — essentially every pattern in practice.
 
 A conforming SDK MUST reject a regular expression that is not valid RE2; the reference CLI reports `request-property-pattern-invalid` for a `pattern` and `message-regex-invalid` for a `message`.
 
@@ -512,6 +547,7 @@ A conforming SDK:
 - MUST reject a `RequestProperty` whose `source` is a headers source but omits `field`
 - MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
 - MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
+- MUST reject a `MessageProperty` with a `source` other than `stack`, or one that omits `field`, or whose `pattern` is not a valid RE2 regular expression
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. `description` is never surfaced at runtime by Subtext today)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
@@ -524,6 +560,7 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - SHOULD apply `transform` as [Component properties](#component-properties) does: skipped on an empty or absent raw value, single transform only, not composable
 - MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
+- MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
 
 **Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern`, applies no `transform`, and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 

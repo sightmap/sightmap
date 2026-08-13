@@ -296,6 +296,44 @@
         "source": {
           "type": "string",
           "description": "Relative path to the source most likely to emit this pattern."
+        },
+        "properties": {
+          "type": "array",
+          "description": "Ordered list of stack-addressing value extractions for an exception record. See SEP-0006.",
+          "items": { "$ref": "#/$defs/messageProperty" }
+        }
+      }
+    },
+    "messageProperty": {
+      "type": "object",
+      "description": "A named value extracted from an observed exception's stack. See SEP-0006.",
+      "required": ["name", "source", "field"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Key a consumer refers to this value by."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["stack"],
+          "description": "Which root to read from. Only the exception stack is addressable in v1."
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Frame and attribute to select: \"<frame>.<attribute>\" where <frame> is \"top\" (alias for 0) or a non-negative index and <attribute> is one of function/file/line/column. Required."
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "RE2 regex (no backreferences or lookaround) applied to what field resolved. Capture group 1 is the value if present, else the full match."
+        },
+        "transform": {
+          "type": "string",
+          "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
+          "description": "Optional post-processing applied to the extracted string. Same vocabulary as componentProperty.transform (SEP-0003)."
         }
       }
     },

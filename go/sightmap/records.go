@@ -16,6 +16,22 @@ type Message struct {
 	Level string `json:"level"`
 	Text  string `json:"text"`
 	Ts    int64  `json:"ts"` // unix milliseconds
+
+	// Stack is the call stack of an uncaught exception, throwing frame first
+	// (frame 0 == "top"). Empty for a plain console record. Optional and
+	// omitempty, like the Request payload fields: a producer that didn't capture
+	// frames leaves it nil and stack extraction degrades to "absent".
+	Stack []Frame `json:"stack,omitempty"`
+}
+
+// Frame is one call-stack frame of an exception Message, as the reference
+// capture derives it from CDP Runtime.exceptionThrown stackTrace.callFrames.
+// Line and Column are 0 when the capture didn't supply them.
+type Frame struct {
+	Function string `json:"function,omitempty"`
+	File     string `json:"file,omitempty"`
+	Line     int    `json:"line,omitempty"`
+	Column   int    `json:"column,omitempty"`
 }
 
 // Request is one observed network request/response. Status is 0 until the

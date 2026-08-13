@@ -34,7 +34,8 @@ var (
 	snapshotFields  = set("name", "notes", "url")
 
 	requestPropertyFields = set("name", "source", "field", "pattern", "transform")
-	messageFields         = set("name", "level", "message", "description", "source")
+	messageFields         = set("name", "level", "message", "description", "source", "properties")
+	messagePropertyFields = set("name", "source", "field", "pattern", "transform")
 )
 
 func set(keys ...string) map[string]bool {
@@ -260,6 +261,10 @@ func walkMessage(node *yaml.Node, file string, out *[]ValidationError) {
 	// write a pattern for an HTTP-status console error, and the JSON Schema
 	// rejects it.
 	checkStringScalars(v, []string{"name", "level", "message", "description", "source"}, file, out)
+	forEachItem(v["properties"], func(n *yaml.Node) {
+		pv := checkKeys(n, messagePropertyFields, file, out)
+		checkStringScalars(pv, []string{"name", "source", "field", "pattern", "transform"}, file, out)
+	})
 }
 
 func walkPayload(node *yaml.Node, file string, out *[]ValidationError) {

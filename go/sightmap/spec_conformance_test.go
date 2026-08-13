@@ -32,6 +32,10 @@ func TestSpecConformance_MessageFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-messages.fixture")
 }
 
+func TestSpecConformance_MessagePropertyFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-message-properties.fixture")
+}
+
 func runSpecValidateFixtures(t *testing.T, glob string) {
 	t.Helper()
 	const root = "../../spec/conformance"

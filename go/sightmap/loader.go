@@ -49,11 +49,20 @@ type rawFile struct {
 }
 
 type rawMessage struct {
-	Name        string `yaml:"name"`
-	Level       string `yaml:"level"`
-	Message     string `yaml:"message"`
-	Description string `yaml:"description"`
-	Source      string `yaml:"source"`
+	Name        string               `yaml:"name"`
+	Level       string               `yaml:"level"`
+	Message     string               `yaml:"message"`
+	Description string               `yaml:"description"`
+	Source      string               `yaml:"source"`
+	Properties  []rawMessageProperty `yaml:"properties"`
+}
+
+type rawMessageProperty struct {
+	Name      string `yaml:"name"`
+	Source    string `yaml:"source"`
+	Field     string `yaml:"field"`
+	Pattern   string `yaml:"pattern"`
+	Transform string `yaml:"transform"`
 }
 
 type rawSnapshot struct {
@@ -390,9 +399,31 @@ func toMessageDefs(rms []rawMessage) []MessageDef {
 			Message:     rm.Message,
 			Description: rm.Description,
 			Source:      rm.Source,
+			Properties:  toMessageProperties(rm.Properties),
 		}
 		md.precompile() // cache the compiled pattern once, at load time
 		out = append(out, md)
+	}
+	return out
+}
+
+// toMessageProperties converts raw stack-addressing property declarations
+// (SEP-0006 follow-on). Shape problems (a bad name, a wrong source, a missing
+// field) are reported by checkMessageProperties at validation time rather than
+// dropped here, so an author sees every problem at once.
+func toMessageProperties(rps []rawMessageProperty) []MessagePropertyDef {
+	if len(rps) == 0 {
+		return nil
+	}
+	out := make([]MessagePropertyDef, 0, len(rps))
+	for _, rp := range rps {
+		out = append(out, MessagePropertyDef{
+			Name:      rp.Name,
+			Source:    rp.Source,
+			Field:     rp.Field,
+			Pattern:   rp.Pattern,
+			Transform: rp.Transform,
+		})
 	}
 	return out
 }
