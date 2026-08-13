@@ -149,6 +149,7 @@ func (c *Collector) attachTab(tabID string) {
 	excCh := conn.Subscribe("Runtime.exceptionThrown")
 	reqCh := conn.Subscribe("Network.requestWillBeSent")
 	respCh := conn.Subscribe("Network.responseReceived")
+	finishedCh := conn.Subscribe("Network.loadingFinished")
 
 	// Enable the domains after subscribing so buffered replays aren't missed.
 	if err := conn.EnableDomain(ctx, "Runtime"); err != nil {
@@ -163,13 +164,13 @@ func (c *Collector) attachTab(tabID string) {
 	c.tabsMu.Unlock()
 
 	c.wg.Add(1)
-	go c.drain(ctx, tabID, conn, consoleCh, excCh, reqCh, respCh)
+	go c.drain(ctx, tabID, conn, consoleCh, excCh, reqCh, respCh, finishedCh)
 }
 
 // drain funnels one tab's CDP events into the shared buffers until ctx is
 // cancelled. It does minimal work per event so the cap-8 subscription channels
 // don't drop during bursts.
-func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, consoleCh, excCh, reqCh, respCh <-chan json.RawMessage) {
+func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, consoleCh, excCh, reqCh, respCh, finishedCh <-chan json.RawMessage) {
 	defer c.wg.Done()
 	for {
 		select {
@@ -194,6 +195,14 @@ func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, cons
 		case raw := <-respCh:
 			if info, ok := parseResponse(raw); ok {
 				c.applyResponse(info)
+			}
+		case raw := <-finishedCh:
+			// The response body is reliably fetchable only once loading finished.
+			// Fetch it OFF the drain loop (a getResponseBody round-trip would
+			// otherwise stall these cap-8 channels and drop events).
+			if reqID := parseLoadingFinished(raw); reqID != "" {
+				c.wg.Add(1)
+				go c.retainResponseBody(ctx, conn, reqID)
 			}
 		}
 	}
@@ -326,6 +335,81 @@ func (c *Collector) RequestBody(ctx context.Context, index int) ([]byte, bool, e
 	return body, true, err
 }
 
+// retainResponseBody fetches a finished response's body and stores it on the
+// buffered record, so property extraction runs against a complete record without
+// the query path making its own CDP round-trip. Only XHR/Fetch bodies are
+// retained — the API-call types a request property addresses — so page assets
+// (images, fonts, stylesheets) aren't pulled into memory. Best-effort: a body
+// that can't be fetched (evicted, no body, a redirect) is simply left absent,
+// matching the SEP's silent omission.
+func (c *Collector) retainResponseBody(ctx context.Context, conn *CDPConn, reqID string) {
+	defer c.wg.Done()
+
+	c.mu.Lock()
+	var rtype, ctype string
+	found := false
+	for i := range c.network {
+		if c.network[i].requestID == reqID {
+			rtype = c.network[i].ResourceType
+			ctype = contentTypeFromHeaders(c.network[i].RspHeaders)
+			found = true
+			break
+		}
+	}
+	c.mu.Unlock()
+	if !found || !wantsBody(rtype) {
+		return
+	}
+
+	body, err := getResponseBody(ctx, conn, reqID)
+	if err != nil || len(body) == 0 {
+		return
+	}
+
+	c.mu.Lock()
+	for i := range c.network {
+		if c.network[i].requestID == reqID {
+			c.network[i].RspBody = &sightmap.Body{
+				Content:     string(body),
+				Size:        len(body),
+				ContentType: ctype,
+			}
+			break
+		}
+	}
+	c.mu.Unlock()
+}
+
+// wantsBody reports whether a response body is worth retaining for a given CDP
+// resource type: the API-call types whose bodies a request property extracts.
+func wantsBody(resourceType string) bool {
+	switch strings.ToLower(resourceType) {
+	case "xhr", "fetch":
+		return true
+	}
+	return false
+}
+
+// contentTypeFromMap / contentTypeFromHeaders read the Content-Type header
+// (case-insensitive) from CDP's header map and from a captured Header slice.
+func contentTypeFromMap(m map[string]string) string {
+	for k, v := range m {
+		if strings.EqualFold(k, "content-type") {
+			return v
+		}
+	}
+	return ""
+}
+
+func contentTypeFromHeaders(hs []sightmap.Header) string {
+	for _, h := range hs {
+		if strings.EqualFold(h.Name, "content-type") {
+			return h.Value
+		}
+	}
+	return ""
+}
+
 func (c *Collector) lookupRequest(index int) (string, *CDPConn, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -433,15 +517,16 @@ func parseRequest(raw json.RawMessage) (networkRecord, bool) {
 		RequestID string `json:"requestId"`
 		Type      string `json:"type"`
 		Request   struct {
-			URL     string            `json:"url"`
-			Method  string            `json:"method"`
-			Headers map[string]string `json:"headers"`
+			URL      string            `json:"url"`
+			Method   string            `json:"method"`
+			Headers  map[string]string `json:"headers"`
+			PostData string            `json:"postData"`
 		} `json:"request"`
 	}
 	if err := json.Unmarshal(raw, &ev); err != nil || ev.RequestID == "" {
 		return networkRecord{}, false
 	}
-	return networkRecord{
+	rec := networkRecord{
 		Request: sightmap.Request{
 			Method:       ev.Request.Method,
 			URL:          ev.Request.URL,
@@ -450,7 +535,30 @@ func parseRequest(raw json.RawMessage) (networkRecord, bool) {
 			ReqHeaders:   headersFromMap(ev.Request.Headers),
 		},
 		requestID: ev.RequestID,
-	}, true
+	}
+	// The request body is delivered inline on requestWillBeSent (no round-trip),
+	// so retain it directly. The response body is not — it's fetched on
+	// loadingFinished (retainResponseBody).
+	if ev.Request.PostData != "" {
+		rec.ReqBody = &sightmap.Body{
+			Content:     ev.Request.PostData,
+			Size:        len(ev.Request.PostData),
+			ContentType: contentTypeFromMap(ev.Request.Headers),
+		}
+	}
+	return rec, true
+}
+
+// parseLoadingFinished extracts the requestId from a Network.loadingFinished
+// event, or "" if it doesn't parse.
+func parseLoadingFinished(raw json.RawMessage) string {
+	var ev struct {
+		RequestID string `json:"requestId"`
+	}
+	if json.Unmarshal(raw, &ev) != nil {
+		return ""
+	}
+	return ev.RequestID
 }
 
 // responseInfo is the parsed Network.responseReceived event, applied back onto
