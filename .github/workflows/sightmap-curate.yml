@@ -1,0 +1,91 @@
+name: sightmap curate
+
+# Starts a Netlify agent run that curates web/.sightmap after every merge to
+# main. The agent works in Netlify's sandbox and its edits come back as a
+# result diff for a human to review — nothing here writes to this repo.
+#
+# Netlify has no agent-runner hook endpoint (GET and POST
+# /sites/{id}/agent_runner_hooks both 404 as of 2026-08-12), so the run is
+# started directly with POST /agent_runners and a token. See
+# `Recipe: curate sightmap without an extension` in the sightmap-netlify
+# README for the whole story.
+
+on:
+  push:
+    branches: [main]
+    # web/src only, and deliberately narrower than the corpus's scope. The
+    # playbook stops at step 2 on a docs-only diff, but a run that stops early
+    # has still paid for its own startup — roughly 450-690 credits ($2.50-3.50)
+    # is the cost of a full run, and a wasted start is not free. This filter is
+    # the cost control. It also means edits to THIS file do not fire a run, so
+    # a change here is only exercised by the next real web/src merge.
+    paths: ['web/src/**']
+
+permissions:
+  contents: read
+
+# One curation run at a time. Not cancel-in-progress: an agent run lives on
+# Netlify, not in this job, so cancelling the job would abandon a run that
+# keeps burning credits rather than stopping it.
+concurrency:
+  group: sightmap-curate
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    name: start a curation agent run
+    runs-on: ubuntu-latest
+    steps:
+      # Only for .github/sightmap/curate-playbook.md — the playbook is
+      # versioned here so a change to it rides in the same PR as the code it
+      # has to understand.
+      - uses: actions/checkout@v4
+
+      - name: Start a curation agent run
+        env:
+          # Netlify PAT with access to the site. Never echoed; the only thing
+          # this job needs that a repo secret can hold.
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          # Not sensitive — a repo variable, so it is readable in the log.
+          NETLIFY_SITE_ID: ${{ vars.NETLIFY_SITE_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN secret is not set"
+            exit 1
+          fi
+          if [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::error::NETLIFY_SITE_ID variable is not set"
+            exit 1
+          fi
+
+          # Netlify's OpenAPI spec documents these as query parameters, but
+          # only `site_id` actually belongs there: app.netlify.com's own client
+          # sends the rest as a JSON body, and `file_keys` is silently dropped
+          # from the query. `prompt` in the body has no length limit, so the
+          # whole playbook goes inline and no file upload is needed.
+          # --rawfile, not --arg "$(cat ...)": it preserves the bytes exactly
+          # and does not push the playbook through an argv-length limit.
+          jq -n --rawfile prompt .github/sightmap/curate-playbook.md \
+            '{branch: "main", agent: "claude", prompt: $prompt}' > payload.json
+
+          code=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST "https://api.netlify.com/api/v1/agent_runners?site_id=$NETLIFY_SITE_ID" \
+            -H "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
+            -H 'Content-Type: application/json' \
+            --data @payload.json) || {
+            echo "::error::could not reach api.netlify.com"
+            exit 1
+          }
+
+          if [ "$code" -ge 300 ]; then
+            echo "::error::POST /agent_runners responded $code"
+            cat response.json
+            exit 1
+          fi
+
+          id=$(jq -r '.id' response.json)
+          state=$(jq -r '.state' response.json)
+          echo "started agent run $id (state=$state)"
+          echo "Curation agent run \`$id\` started for ${GITHUB_SHA:0:7} (state \`$state\`)." >> "$GITHUB_STEP_SUMMARY"
