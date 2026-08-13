@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -191,8 +192,8 @@ func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, cons
 				c.addNetwork(e)
 			}
 		case raw := <-respCh:
-			if reqID, st, stText, rtype, ok := parseResponse(raw); ok {
-				c.applyResponse(reqID, st, stText, rtype)
+			if info, ok := parseResponse(raw); ok {
+				c.applyResponse(info)
 			}
 		}
 	}
@@ -223,16 +224,21 @@ func (c *Collector) addNetwork(e networkRecord) {
 }
 
 // applyResponse matches a response back to its pending request (scanning from
-// the tail, where the request almost always is) and fills in status + type.
-func (c *Collector) applyResponse(reqID string, status int, statusText, rtype string) {
+// the tail, where the request almost always is) and fills in status, type,
+// response headers, and the observed request→response duration.
+func (c *Collector) applyResponse(info responseInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i := len(c.network) - 1; i >= 0; i-- {
-		if c.network[i].requestID == reqID {
-			c.network[i].Status = status
-			c.network[i].StatusText = statusText
-			if rtype != "" {
-				c.network[i].ResourceType = rtype
+		if c.network[i].requestID == info.reqID {
+			c.network[i].Status = info.status
+			c.network[i].StatusText = info.statusText
+			if info.rtype != "" {
+				c.network[i].ResourceType = info.rtype
+			}
+			c.network[i].RspHeaders = info.headers
+			if ts := c.network[i].Ts; ts > 0 {
+				c.network[i].DurationMs = time.Now().UnixMilli() - ts
 			}
 			return
 		}
@@ -365,6 +371,14 @@ func parseConsoleAPI(raw json.RawMessage) (sightmap.Message, bool) {
 	}, true
 }
 
+// cdpCallFrame is one CDP Runtime.CallFrame (0-based line/column).
+type cdpCallFrame struct {
+	FunctionName string `json:"functionName"`
+	URL          string `json:"url"`
+	LineNumber   int    `json:"lineNumber"`
+	ColumnNumber int    `json:"columnNumber"`
+}
+
 func parseException(raw json.RawMessage) (sightmap.Message, bool) {
 	var ev struct {
 		Timestamp        float64 `json:"timestamp"`
@@ -373,6 +387,9 @@ func parseException(raw json.RawMessage) (sightmap.Message, bool) {
 			Exception struct {
 				Description string `json:"description"`
 			} `json:"exception"`
+			StackTrace struct {
+				CallFrames []cdpCallFrame `json:"callFrames"`
+			} `json:"stackTrace"`
 		} `json:"exceptionDetails"`
 	}
 	if err := json.Unmarshal(raw, &ev); err != nil {
@@ -382,7 +399,33 @@ func parseException(raw json.RawMessage) (sightmap.Message, bool) {
 	if text == "" {
 		text = ev.ExceptionDetails.Text
 	}
-	return sightmap.Message{Level: "exception", Text: text, Ts: int64(ev.Timestamp)}, true
+	return sightmap.Message{
+		Level: "exception",
+		Text:  text,
+		Ts:    int64(ev.Timestamp),
+		Stack: framesFromCallFrames(ev.ExceptionDetails.StackTrace.CallFrames),
+	}, true
+}
+
+// framesFromCallFrames converts CDP stackTrace.callFrames into sightmap.Frame
+// records, throwing frame first. lineNumber/columnNumber are always present on a
+// CDP call frame and are 0-based, so they are captured as pointers (never nil
+// here); a downstream producer that lacks them leaves the pointer nil instead.
+func framesFromCallFrames(cfs []cdpCallFrame) []sightmap.Frame {
+	if len(cfs) == 0 {
+		return nil
+	}
+	out := make([]sightmap.Frame, 0, len(cfs))
+	for _, cf := range cfs {
+		line, col := cf.LineNumber, cf.ColumnNumber
+		out = append(out, sightmap.Frame{
+			Function: cf.FunctionName,
+			File:     cf.URL,
+			Line:     &line,
+			Column:   &col,
+		})
+	}
+	return out
 }
 
 func parseRequest(raw json.RawMessage) (networkRecord, bool) {
@@ -390,8 +433,9 @@ func parseRequest(raw json.RawMessage) (networkRecord, bool) {
 		RequestID string `json:"requestId"`
 		Type      string `json:"type"`
 		Request   struct {
-			URL    string `json:"url"`
-			Method string `json:"method"`
+			URL     string            `json:"url"`
+			Method  string            `json:"method"`
+			Headers map[string]string `json:"headers"`
 		} `json:"request"`
 	}
 	if err := json.Unmarshal(raw, &ev); err != nil || ev.RequestID == "" {
@@ -403,24 +447,59 @@ func parseRequest(raw json.RawMessage) (networkRecord, bool) {
 			URL:          ev.Request.URL,
 			ResourceType: ev.Type,
 			Ts:           time.Now().UnixMilli(),
+			ReqHeaders:   headersFromMap(ev.Request.Headers),
 		},
 		requestID: ev.RequestID,
 	}, true
 }
 
-func parseResponse(raw json.RawMessage) (reqID string, status int, statusText, rtype string, ok bool) {
+// responseInfo is the parsed Network.responseReceived event, applied back onto
+// the pending request record by applyResponse.
+type responseInfo struct {
+	reqID      string
+	status     int
+	statusText string
+	rtype      string
+	headers    []sightmap.Header
+}
+
+func parseResponse(raw json.RawMessage) (responseInfo, bool) {
 	var ev struct {
 		RequestID string `json:"requestId"`
 		Type      string `json:"type"`
 		Response  struct {
-			Status     int    `json:"status"`
-			StatusText string `json:"statusText"`
+			Status     int               `json:"status"`
+			StatusText string            `json:"statusText"`
+			Headers    map[string]string `json:"headers"`
 		} `json:"response"`
 	}
 	if err := json.Unmarshal(raw, &ev); err != nil || ev.RequestID == "" {
-		return "", 0, "", "", false
+		return responseInfo{}, false
 	}
-	return ev.RequestID, ev.Response.Status, ev.Response.StatusText, ev.Type, true
+	return responseInfo{
+		reqID:      ev.RequestID,
+		status:     ev.Response.Status,
+		statusText: ev.Response.StatusText,
+		rtype:      ev.Type,
+		headers:    headersFromMap(ev.Response.Headers),
+	}, true
+}
+
+// headersFromMap converts CDP's header object into an ordered Header slice,
+// sorted by name for determinism. CDP delivers headers as a JSON object, so
+// duplicates are already collapsed and order is not preserved — a producer with
+// the raw header text (e.g. a different capture layer) can populate duplicates,
+// which the []Header type supports.
+func headersFromMap(m map[string]string) []sightmap.Header {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]sightmap.Header, 0, len(m))
+	for k, v := range m {
+		out = append(out, sightmap.Header{Name: k, Value: v})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 // renderArg turns one console argument into display text: the JSON value when

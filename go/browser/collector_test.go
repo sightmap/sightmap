@@ -25,7 +25,7 @@ func TestParseConsoleAPI(t *testing.T) {
 }
 
 func TestParseException(t *testing.T) {
-	raw := json.RawMessage(`{"timestamp":1785015495306,"exceptionDetails":{"text":"Uncaught","exception":{"description":"TypeError: x is not a function"}}}`)
+	raw := json.RawMessage(`{"timestamp":1785015495306,"exceptionDetails":{"text":"Uncaught","exception":{"description":"TypeError: x is not a function"},"stackTrace":{"callFrames":[{"functionName":"syncCart","url":"https://x/cart.js","lineNumber":41,"columnNumber":8},{"functionName":"","url":"https://x/main.js","lineNumber":0,"columnNumber":0}]}}}`)
 	e, ok := parseException(raw)
 	if !ok {
 		t.Fatal("parseException returned ok=false")
@@ -36,10 +36,22 @@ func TestParseException(t *testing.T) {
 	if e.Text != "TypeError: x is not a function" {
 		t.Errorf("text = %q", e.Text)
 	}
+	// The stack is captured, throwing frame first, with 0-based line/column as
+	// non-nil pointers (a captured 0 is a real location).
+	if len(e.Stack) != 2 {
+		t.Fatalf("stack frames = %d, want 2", len(e.Stack))
+	}
+	top := e.Stack[0]
+	if top.Function != "syncCart" || top.File != "https://x/cart.js" || top.Line == nil || *top.Line != 41 {
+		t.Errorf("top frame = %+v", top)
+	}
+	if f2 := e.Stack[1]; f2.Line == nil || *f2.Line != 0 || f2.Column == nil || *f2.Column != 0 {
+		t.Errorf("second frame captured-zero line/column not preserved: %+v", f2)
+	}
 }
 
 func TestParseRequestResponse(t *testing.T) {
-	req := json.RawMessage(`{"requestId":"R1","type":"XHR","request":{"url":"https://x/api","method":"POST"}}`)
+	req := json.RawMessage(`{"requestId":"R1","type":"XHR","request":{"url":"https://x/api","method":"POST","headers":{"Authorization":"Bearer t"}}}`)
 	e, ok := parseRequest(req)
 	if !ok {
 		t.Fatal("parseRequest ok=false")
@@ -47,11 +59,18 @@ func TestParseRequestResponse(t *testing.T) {
 	if e.Method != "POST" || e.URL != "https://x/api" || e.ResourceType != "XHR" || e.requestID != "R1" {
 		t.Errorf("request parse = %+v", e)
 	}
+	if len(e.ReqHeaders) != 1 || e.ReqHeaders[0].Name != "Authorization" || e.ReqHeaders[0].Value != "Bearer t" {
+		t.Errorf("request headers = %+v", e.ReqHeaders)
+	}
 
-	resp := json.RawMessage(`{"requestId":"R1","type":"XHR","response":{"status":201,"statusText":"Created"}}`)
-	id, st, stText, rtype, ok := parseResponse(resp)
-	if !ok || id != "R1" || st != 201 || stText != "Created" || rtype != "XHR" {
-		t.Errorf("response parse = %s %d %s %s %v", id, st, stText, rtype, ok)
+	resp := json.RawMessage(`{"requestId":"R1","type":"XHR","response":{"status":201,"statusText":"Created","headers":{"Content-Type":"application/json","X-RateLimit-Remaining":"0"}}}`)
+	info, ok := parseResponse(resp)
+	if !ok || info.reqID != "R1" || info.status != 201 || info.statusText != "Created" || info.rtype != "XHR" {
+		t.Errorf("response parse = %+v %v", info, ok)
+	}
+	// Response headers are captured, sorted by name for determinism.
+	if len(info.headers) != 2 || info.headers[0].Name != "Content-Type" || info.headers[1].Value != "0" {
+		t.Errorf("response headers = %+v", info.headers)
 	}
 }
 
@@ -98,7 +117,7 @@ func TestNetworkFilterAndResponseMatch(t *testing.T) {
 	c := NewCollector("localhost:0")
 	c.addNetwork(networkRecord{Request: sightmap.Request{Method: "GET", URL: "https://x/style.css", ResourceType: "Stylesheet"}, requestID: "A"})
 	c.addNetwork(networkRecord{Request: sightmap.Request{Method: "POST", URL: "https://x/api/cart", ResourceType: "XHR"}, requestID: "B"})
-	c.applyResponse("B", 500, "Server Error", "XHR")
+	c.applyResponse(responseInfo{reqID: "B", status: 500, statusText: "Server Error", rtype: "XHR"})
 
 	xhr, _ := c.Network(NetworkFilter{ResourceType: "xhr"})
 	if len(xhr) != 1 || xhr[0].Status != 500 || xhr[0].StatusText != "Server Error" {
