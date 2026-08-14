@@ -184,6 +184,21 @@ func runStop(args []string) error {
 	info, infoErr := browser.ReadSessionInfo(sightmapDir)
 	hasSession := infoErr == nil && (info.Port > 0 || info.PID > 0 || info.Pgid > 0)
 
+	// Attached session: the browser is caller-owned, so never kill it. Signal the
+	// daemon (info.PID is the daemon's own pid in attach mode) to detach, and drop
+	// the session file. The daemon's own signal handler also tears down; both
+	// removing the file is harmless.
+	if hasSession && info.Attached {
+		if info.PID > 0 {
+			if proc, perr := os.FindProcess(info.PID); perr == nil {
+				_ = proc.Signal(syscall.SIGTERM)
+			}
+		}
+		_ = browser.RemoveSessionFile(sightmapDir)
+		fmt.Fprintln(os.Stderr, "detached (browser left running)")
+		return nil
+	}
+
 	profile := ""
 	if hasSession {
 		profile = info.Profile

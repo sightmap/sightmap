@@ -1,8 +1,10 @@
 package browser
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -118,5 +120,31 @@ func TestDecodeBody(t *testing.T) {
 	enc, err := decodeBody(json.RawMessage(`{"body":"aGk=","base64Encoded":true}`))
 	if err != nil || string(enc) != "hi" {
 		t.Errorf("base64 body = %q, %v", enc, err)
+	}
+}
+
+// TestCollectorStop_NoDeadlockWhileConnected guards the shutdown-order fix: a
+// drain goroutine only returns on its ctx being cancelled, so Stop must cancel
+// the per-tab contexts BEFORE wg.Wait(). Simulate a still-attached tab whose
+// drain is blocked (a healthy CDP connection, i.e. the browser is still alive —
+// the --attach case) and assert Stop returns promptly instead of deadlocking.
+func TestCollectorStop_NoDeadlockWhileConnected(t *testing.T) {
+	c := NewCollector("unused")
+	ctx, cancel := context.WithCancel(context.Background())
+	c.tabsMu.Lock()
+	c.tabs["t1"] = &tabColl{conn: nil, cancel: cancel}
+	c.tabsMu.Unlock()
+	c.wg.Add(1)
+	go func() {
+		defer c.wg.Done()
+		<-ctx.Done() // exits only when Stop cancels the tab's context
+	}()
+
+	done := make(chan struct{})
+	go func() { c.Stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Collector.Stop deadlocked with a healthy (uncancelled) drain")
 	}
 }

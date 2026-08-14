@@ -25,11 +25,16 @@ const DefaultCDPPort = 7892
 // ServerPort is the sightmap HTTP server port (default 7891). It is recorded
 // here so callers can display it and so the extension config can be validated.
 type SessionInfo struct {
-	Port       int    `json:"port"`
-	PID        int    `json:"pid"`                  // 0 if Chrome reused an existing process
+	Port       int    `json:"port"`                 // Chrome CDP (remote-debugging) port
+	PID        int    `json:"pid"`                  // 0 if Chrome reused an existing process; the DAEMON's own pid in attach mode
 	Pgid       int    `json:"pgid,omitempty"`       // process-group id (unix) for group-kill on stop
-	Profile    string `json:"profile"`              // user-data-dir used for this session
+	Profile    string `json:"profile"`              // user-data-dir used for this session (empty in attach mode)
 	ServerPort int    `json:"serverPort,omitempty"` // sightmap HTTP server port (0 = unknown/legacy)
+	// Attached is true when the daemon attached to a caller-launched Chrome via
+	// --attach rather than launching (and owning) its own. In that mode stop must
+	// NOT kill the browser — it only signals the daemon to detach. PID then holds
+	// the daemon's own pid, not Chrome's, and Profile is empty.
+	Attached bool `json:"attached,omitempty"`
 	// TargetID removed — use --tab flag on individual commands instead
 }
 
