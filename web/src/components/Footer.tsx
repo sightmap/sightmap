@@ -10,6 +10,7 @@ export default function Footer() {
             sightmap · open-source spec by <a href="https://subtext.fullstory.com" target="_blank" rel="noreferrer">Subtext</a>
           </div>
           <div className="footer-links">
+            <a href="/atlas">Atlas</a>
             <a href="/blog">Blog</a>
             <a href="https://docs.sightmap.org">Docs</a>
             <a href="https://docs.sightmap.org/start/quickstart">Quickstart</a>
