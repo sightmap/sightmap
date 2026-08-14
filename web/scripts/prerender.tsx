@@ -23,6 +23,8 @@ import {
   HOME_TITLE,
   BLOG_INDEX_TITLE,
   ATLAS_INDEX_TITLE,
+  NOT_FOUND_TITLE,
+  NOT_FOUND_DESCRIPTION,
   postTitle,
   atlasTitle,
   esc,
@@ -77,6 +79,12 @@ export interface PageMeta {
   // match it.
   imageDimensionsKnown: boolean
   type: 'website' | 'article'
+  // Adds `<meta name="robots" content="noindex">` and drops the canonical
+  // link. Only the 404 page sets this. The canonical has to go rather than
+  // just point elsewhere: the shell's is hardcoded to the homepage, and
+  // leaving it would tell a crawler that this page *is* the homepage — the
+  // exact duplicate-content claim the 404 status exists to retract.
+  noindex?: boolean
 }
 
 // Deletes a whole meta-tag line (including its leading newline/indentation)
@@ -149,6 +157,18 @@ export function renderMeta(shell: string, meta: PageMeta): string {
     html = stripTag(html, /\n[ \t]*<meta\s+property="og:image:type"[\s\S]*?>/)
     html = stripTag(html, /\n[ \t]*<meta\s+property="og:image:width"[\s\S]*?>/)
     html = stripTag(html, /\n[ \t]*<meta\s+property="og:image:height"[\s\S]*?>/)
+  }
+
+  if (meta.noindex) {
+    html = stripTag(html, /\n[ \t]*<link\s+rel="canonical"[\s\S]*?>/)
+    // Asserted rather than left as a silent `.replace()` no-op like the meta
+    // rewrites above. Those degrade to a stale-but-valid tag; this one
+    // degrades to a 404 page a crawler is free to index, which is the failure
+    // this whole change exists to prevent.
+    if (!html.includes('</head>')) {
+      throw new Error('renderMeta: no </head> in shell — cannot insert noindex')
+    }
+    html = html.replace('</head>', `  <meta name="robots" content="noindex">\n</head>`)
   }
 
   return html
@@ -454,8 +474,44 @@ async function main() {
     )
   }
 
+  // ---- 404 ----
+  //
+  // Written to dist/404.html, not dist/404/index.html: netlify.toml's
+  // catch-all names that exact path. Every real route above has a prerendered
+  // file and Netlify resolves static files ahead of a non-forced redirect, so
+  // the catch-all now only ever answers URLs that do not exist — which is what
+  // lets it return a real 404 instead of the homepage shell at status 200.
+  //
+  // Unstamped on purpose. This one file answers every unknown URL, so any
+  // fixed `data-prerender-route` value would mismatch the address bar; leaving
+  // it off makes src/main.tsx fall through to createRoot and render NotFound
+  // client-side for the actual URL, the same way drafts are handled above.
+  fs.writeFileSync(
+    path.join(DIST, '404.html'),
+    renderRoute(
+      shell,
+      '/404',
+      {
+        url: `${SITE_URL}/404`,
+        ogUrl: `${DEPLOY_URL}/404`,
+        title: NOT_FOUND_TITLE,
+        description: NOT_FOUND_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+        noindex: true,
+      },
+      '',
+      '',
+      false
+    )
+  )
+  console.log('  prerendered /404.html')
+
   console.log(
-    `\n  prerender complete: ${posts.length + atlas.entries.length + 3} page(s)`
+    `\n  prerender complete: ${posts.length + atlas.entries.length + 4} page(s)`
   )
 }
 
