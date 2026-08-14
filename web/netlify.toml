@@ -14,6 +14,23 @@
   to = "/404.html"
   status = 404
 
+# Vite writes a content hash into every filename under /assets/, so a changed
+# file is always a new URL and the old one is safe to keep forever. Without
+# this the Netlify default applies (`max-age=0, must-revalidate`), and every
+# page view revalidates the bundle: a 304 saves the bytes but still costs a
+# round trip per asset. This site is prerendered, so every internal link is a
+# full page load rather than a client-side route change — that round trip is
+# paid on each one.
+#
+# Scoped to /assets/ deliberately. Nothing else in dist/ is content-hashed:
+# /atlas/ alone is ~4.7MB of generated screenshots and archives written to
+# stable paths, and marking those immutable would pin a removed entry — a
+# takedown — in caches for a year.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # Inject the visitor's consent region into app HTML (replaces <!--CC_REGION-->).
 # The function guards on content-type, so non-HTML responses pass through;
 # assets are excluded outright to avoid pointless invocations.
