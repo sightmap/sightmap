@@ -66,4 +66,13 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
     },
   },
+  build: {
+    // Emit .map files next to the bundles so a Replay recording of
+    // sightmap.org resolves to the original TSX instead of a 460KB minified
+    // blob (scripts/upload-sourcemaps.ts pushes them to Replay after the
+    // build). `true` rather than 'hidden' — the site is MIT and its source is
+    // already public on GitHub, so suppressing the sourceMappingURL comment
+    // would hide nothing while costing plain DevTools the same mapping.
+    sourcemap: true,
+  },
 })
