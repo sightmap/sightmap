@@ -40,6 +40,12 @@ export const ATLAS_DESCRIPTION =
 export const HOME_TITLE = `${SITE_NAME} — runtime context for agents using your web app`
 export const BLOG_INDEX_TITLE = `Blog — ${SITE_NAME}`
 export const ATLAS_INDEX_TITLE = `Atlas — ${SITE_NAME}`
+// Read by both src/pages/NotFound.tsx and the dist/404.html prerender. The
+// prerendered head is what a crawler sees and the <Seo> tag is what a visitor
+// gets after hydration; sharing the strings keeps a single page from
+// advertising two different titles depending on who asked.
+export const NOT_FOUND_TITLE = `Page not found — ${SITE_NAME}`
+export const NOT_FOUND_DESCRIPTION = "This page doesn't exist."
 export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`
 // An atlas entry's own title carries the mapped site's name, so the suffix
 // says which gallery it came from rather than repeating the site name twice.

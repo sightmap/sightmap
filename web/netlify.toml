@@ -2,10 +2,17 @@
   command = "pnpm build"
   publish = "dist"
 
+# Unknown URLs. Every real route has a prerendered dist/<route>/index.html, and
+# Netlify serves an existing static file before applying a non-forced redirect,
+# so this rule only ever answers paths that do not exist. It used to return 200
+# with the homepage shell — and that shell's canonical points at the homepage,
+# so every broken inbound link became a 200-status duplicate of the homepage.
+# scripts/check-route-coverage.ts fails the build if a route is added without a
+# prerendered page, which is what keeps this safe.
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
+  to = "/404.html"
+  status = 404
 
 # Inject the visitor's consent region into app HTML (replaces <!--CC_REGION-->).
 # The function guards on content-type, so non-HTML responses pass through;

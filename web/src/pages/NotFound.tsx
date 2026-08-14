@@ -2,12 +2,12 @@ import { Link } from 'react-router'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import Seo from '@/components/Seo'
-import { SITE_NAME } from '../../scripts/lib/site'
+import { NOT_FOUND_TITLE, NOT_FOUND_DESCRIPTION } from '../../scripts/lib/site'
 
 export default function NotFound() {
   return (
     <>
-      <Seo title={`Page not found — ${SITE_NAME}`} description="This page doesn't exist." />
+      <Seo title={NOT_FOUND_TITLE} description={NOT_FOUND_DESCRIPTION} />
       <Navigation />
       <main className="not-found" data-component="NotFound">
         <div className="container">

@@ -61,6 +61,59 @@ describe('renderMeta', () => {
     expect(out).toContain('content="He said &quot;hi&quot;"')
   })
 
+  it('adds robots=noindex and drops the canonical when noindex is set', () => {
+    const out = renderMeta(SHELL, {
+      url: 'https://sightmap.org/404',
+      ogUrl: 'https://sightmap.org/404',
+      title: 'Page not found — Sightmap',
+      description: "This page doesn't exist.",
+      image: 'https://sightmap.org/og-image.png',
+      ogImage: 'https://sightmap.org/og-image.png',
+      imageAlt: 'x',
+      imageDimensionsKnown: true,
+      type: 'website',
+      noindex: true,
+    })
+    expect(out).toContain('<meta name="robots" content="noindex">')
+    // The canonical has to be gone entirely. Leaving the shell's homepage
+    // value would tell a crawler this page is the homepage — the duplicate
+    // claim the 404 status exists to retract.
+    expect(out).not.toContain('rel="canonical"')
+  })
+
+  it('keeps the canonical and adds no robots tag on a normal page', () => {
+    const out = renderMeta(SHELL, {
+      url: 'https://sightmap.org/blog',
+      ogUrl: 'https://sightmap.org/blog',
+      title: 'Blog — Sightmap',
+      description: 'x',
+      image: 'https://sightmap.org/og-image.png',
+      ogImage: 'https://sightmap.org/og-image.png',
+      imageAlt: 'x',
+      imageDimensionsKnown: true,
+      type: 'website',
+    })
+    expect(out).toContain('rel="canonical" href="https://sightmap.org/blog"')
+    expect(out).not.toContain('robots')
+  })
+
+  it('throws rather than silently skipping noindex if the shell has no </head>', () => {
+    expect(() =>
+      renderMeta('<html><body><div id="root"></div></body></html>', {
+        url: 'https://sightmap.org/404',
+        ogUrl: 'https://sightmap.org/404',
+        title: 'Page not found — Sightmap',
+        description: 'x',
+        image: 'https://sightmap.org/og-image.png',
+        ogImage: 'https://sightmap.org/og-image.png',
+        imageAlt: 'x',
+        imageDimensionsKnown: true,
+        type: 'website',
+        noindex: true,
+      })
+    ).toThrow(/noindex/)
+  })
+
   it('rewrites twitter:description independently of og:description', () => {
     const out = renderMeta(SHELL, {
       url: 'https://sightmap.org/blog',
