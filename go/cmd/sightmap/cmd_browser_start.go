@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -25,6 +26,7 @@ func runBrowserStart(args []string) error {
 	fset := flag.NewFlagSet("start", flag.ContinueOnError)
 	portFlag := fset.Int("port", 7891, "Sightmap HTTP server port (0 = auto-allocate)")
 	cdpPortFlag := fset.Int("cdp-port", browser.DefaultCDPPort, "Chrome remote debugging port (0 = auto-allocate)")
+	attachFlag := fset.String("attach", "", "Attach to an already-running Chrome's CDP endpoint (host:port) instead of launching one (degraded mode: no owned profile, capture is complete only from attach onward, browser is left running on stop)")
 	sightmapDir := fset.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	extensionsFlag := fset.String("extensions", "", "Comma-separated extension paths to load")
 	urlFlag := fset.String("url", "", "Navigate here after launch")
@@ -49,6 +51,13 @@ func runBrowserStart(args []string) error {
 		if !explicit["port"] && cfg.Browser.Port > 0 {
 			*portFlag = cfg.Browser.Port
 		}
+	}
+
+	// Attach mode: hand off to the degraded, browser-not-owned path. It shares the
+	// devtools server + collector with the owned-launch path below but skips the
+	// launch/profile/extension machinery entirely.
+	if *attachFlag != "" {
+		return runAttachedSession(*attachFlag, *sightmapDir, *portFlag, *urlFlag)
 	}
 
 	// Resolve profile early so the existing-Chrome check can match it.
@@ -109,73 +118,9 @@ func runBrowserStart(args []string) error {
 
 	// ── Start sightmap HTTP server in background ──────────────────────────────
 	siteName := filepath.Base(cwd())
-	compiled, err := loadServedSightmap(*sightmapDir, siteName)
+	srv, collectorPtr, err := startDevtoolsServer(*sightmapDir, siteName, resolvedServerPort)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "start: sightmap load warning: %v\n", err)
-		// non-fatal: continue without corpus
-	}
-
-	var mu sync.RWMutex
-	current := compiled
-
-	reload := func() {
-		c, loadErr := loadServedSightmap(*sightmapDir, siteName)
-		if loadErr != nil {
-			fmt.Fprintf(os.Stderr, "[serve-sightmap] load error: %v\n", loadErr)
-			return
-		}
-		mu.Lock()
-		current = c
-		mu.Unlock()
-		fmt.Fprintf(os.Stderr, "[serve-sightmap] reloaded (v%s)\n", c.Version)
-	}
-
-	go watchSightmapDir(*sightmapDir, reload)
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/sightmap/version", func(w http.ResponseWriter, r *http.Request) {
-		mu.RLock()
-		v := current.Version
-		mu.RUnlock()
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"version":%q}`, v)
-	})
-	mux.HandleFunc("/sightmap", func(w http.ResponseWriter, r *http.Request) {
-		mu.RLock()
-		c := current
-		mu.RUnlock()
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(c)
-	})
-
-	// Devtools query surface. The collector is created after Chrome is ready
-	// (below); the handlers return 503 until then.
-	var collectorPtr atomic.Pointer[browser.Collector]
-	registerDevtoolsHandlers(mux, &collectorPtr, *sightmapDir)
-
-	// Bind the sightmap server on the IPv4 loopback (not the ":port" wildcard) so
-	// it shares an address family with Chrome's CDP and with FindFreePort's probe.
-	// This keeps concurrent daemons from landing one daemon's server on another's
-	// CDP port, and keeps the server local-only.
-	srvAddr := fmt.Sprintf("127.0.0.1:%d", resolvedServerPort)
-	srv := &http.Server{Addr: srvAddr, Handler: mux}
-	srvReady := make(chan error, 1)
-	go func() {
-		ln, listenErr := net.Listen("tcp", srvAddr)
-		if listenErr != nil {
-			srvReady <- listenErr
-			return
-		}
-		srvReady <- nil
-		fmt.Fprintf(os.Stderr, "[serve-sightmap] listening on http://%s\n", srvAddr)
-		_ = srv.Serve(ln)
-	}()
-	if srvErr := <-srvReady; srvErr != nil {
-		// This shouldn't happen since we pre-allocated via FindFreePort,
-		// but handle the unlikely race gracefully.
-		return fmt.Errorf("start: sightmap server could not bind port %d: %w", resolvedServerPort, srvErr)
+		return fmt.Errorf("start: %w", err)
 	}
 
 	// ── Launch Chrome ─────────────────────────────────────────────────────────
@@ -337,5 +282,208 @@ func runBrowserStart(args []string) error {
 	// Remove session file.
 	os.Remove(browser.SessionFilePath(*sightmapDir))
 
+	return nil
+}
+
+// startDevtoolsServer builds and starts the sightmap HTTP server for a browser
+// session on serverPort: it serves the live corpus (/sightmap, /sightmap/version,
+// hot-reloaded from sightmapDir) and the devtools query surface (network/console).
+// It returns the running server plus the collector pointer the devtools handlers
+// read from — the caller Stores the live collector into it once the CDP session
+// is ready. Both the owned-launch and --attach paths share this.
+func startDevtoolsServer(sightmapDir, siteName string, serverPort int) (*http.Server, *atomic.Pointer[browser.Collector], error) {
+	compiled, err := loadServedSightmap(sightmapDir, siteName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "start: sightmap load warning: %v\n", err)
+		// non-fatal: continue without corpus
+	}
+
+	var mu sync.RWMutex
+	current := compiled
+
+	reload := func() {
+		c, loadErr := loadServedSightmap(sightmapDir, siteName)
+		if loadErr != nil {
+			fmt.Fprintf(os.Stderr, "[serve-sightmap] load error: %v\n", loadErr)
+			return
+		}
+		mu.Lock()
+		current = c
+		mu.Unlock()
+		fmt.Fprintf(os.Stderr, "[serve-sightmap] reloaded (v%s)\n", c.Version)
+	}
+
+	go watchSightmapDir(sightmapDir, reload)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sightmap/version", func(w http.ResponseWriter, r *http.Request) {
+		mu.RLock()
+		v := current.Version
+		mu.RUnlock()
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"version":%q}`, v)
+	})
+	mux.HandleFunc("/sightmap", func(w http.ResponseWriter, r *http.Request) {
+		mu.RLock()
+		c := current
+		mu.RUnlock()
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(c)
+	})
+
+	// Devtools query surface. The collector is created after the CDP session is
+	// ready; the handlers return 503 until then.
+	collectorPtr := &atomic.Pointer[browser.Collector]{}
+	registerDevtoolsHandlers(mux, collectorPtr, sightmapDir)
+
+	// Bind the sightmap server on the IPv4 loopback (not the ":port" wildcard) so
+	// it shares an address family with Chrome's CDP and with FindFreePort's probe.
+	// This keeps concurrent daemons from landing one daemon's server on another's
+	// CDP port, and keeps the server local-only.
+	srvAddr := fmt.Sprintf("127.0.0.1:%d", serverPort)
+	srv := &http.Server{Addr: srvAddr, Handler: mux}
+	srvReady := make(chan error, 1)
+	go func() {
+		ln, listenErr := net.Listen("tcp", srvAddr)
+		if listenErr != nil {
+			srvReady <- listenErr
+			return
+		}
+		srvReady <- nil
+		fmt.Fprintf(os.Stderr, "[serve-sightmap] listening on http://%s\n", srvAddr)
+		_ = srv.Serve(ln)
+	}()
+	if srvErr := <-srvReady; srvErr != nil {
+		return nil, nil, fmt.Errorf("sightmap server could not bind port %d: %w", serverPort, srvErr)
+	}
+	return srv, collectorPtr, nil
+}
+
+// runAttachedSession runs the daemon against a caller-launched Chrome reached at
+// attachAddr (host:port CDP endpoint) instead of launching its own. It is a
+// deliberately degraded mode (see the --attach flag help): no owned profile or
+// extension guarantees, capture is complete only from attach onward, and the
+// browser is left running when the daemon stops. The collector and devtools
+// server are identical to the owned-launch path — the collector only ever needed
+// a CDP address.
+func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlFlag string) error {
+	// Normalize the endpoint. A bare ":port" or "port" is treated as localhost.
+	host, port, err := net.SplitHostPort(attachAddr)
+	if err != nil {
+		// Allow a bare port number.
+		if p, perr := strconv.Atoi(strings.TrimSpace(attachAddr)); perr == nil && p > 0 {
+			host, port = "", strconv.Itoa(p)
+		} else {
+			return fmt.Errorf("start --attach: invalid CDP endpoint %q (want host:port)", attachAddr)
+		}
+	}
+	if host == "" {
+		host = "localhost"
+	}
+	cdpPort, err := strconv.Atoi(port)
+	if err != nil || cdpPort <= 0 || cdpPort > 65535 {
+		return fmt.Errorf("start --attach: invalid CDP port in %q", attachAddr)
+	}
+	cdpAddr := net.JoinHostPort(host, port)
+
+	// Verify the endpoint is actually reachable before we advertise a session.
+	if !cdpVersionAlive(context.Background(), cdpAddr) {
+		return fmt.Errorf("start --attach: no Chrome CDP endpoint answering at %s\n"+
+			"  Launch Chrome with --remote-debugging-port=%d first, then retry.", cdpAddr, cdpPort)
+	}
+
+	resolvedServerPort, err := browser.FindFreePort(serverPortFlag)
+	if err != nil {
+		return fmt.Errorf("start --attach: sightmap server: %w", err)
+	}
+
+	siteName := filepath.Base(cwd())
+	srv, collectorPtr, err := startDevtoolsServer(sightmapDir, siteName, resolvedServerPort)
+	if err != nil {
+		return fmt.Errorf("start --attach: %w", err)
+	}
+
+	collector := browser.NewCollector(cdpAddr)
+	collector.Start()
+	collectorPtr.Store(collector)
+	defer collector.Stop()
+
+	// Record the session. PID is the DAEMON's pid (there is no owned Chrome), and
+	// Attached tells stop to detach rather than kill. Profile is empty.
+	_ = browser.WriteSessionInfo(sightmapDir, browser.SessionInfo{
+		Port: cdpPort, PID: os.Getpid(), ServerPort: resolvedServerPort, Attached: true,
+	})
+
+	// Install signal handling and liveness polling up front, so the daemon is
+	// always interruptible even while the best-effort setup below is still running.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	gone := make(chan struct{})
+	stopPoll := make(chan struct{})
+	go func() {
+		t := time.NewTicker(2 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-stopPoll:
+				return
+			case <-t.C:
+				if !cdpVersionAlive(context.Background(), cdpAddr) {
+					close(gone)
+					return
+				}
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	// Best-effort extension port injection, off the main path: on a browser without
+	// the sightmap extension (common in attach mode) the service-worker lookup
+	// retries for several seconds, which must not delay readiness or block stop.
+	go func() {
+		injCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if injErr := browser.InjectExtensionServerPort(injCtx, cdpAddr, resolvedServerPort); injErr != nil {
+			fmt.Fprintf(os.Stderr, "start --attach: note: could not inject extension port: %v\n", injErr)
+		}
+	}()
+
+	var tabID string
+	if urlFlag != "" {
+		// Open our own tab rather than disturbing the caller's existing tabs.
+		id, conn, tabErr := browser.CreateTab(ctx, cdpAddr, urlFlag)
+		if tabErr != nil {
+			fmt.Fprintf(os.Stderr, "start --attach: warning: could not open tab for %s: %v\n", urlFlag, tabErr)
+		} else {
+			tabID = id
+			loadCtx, loadCancel := context.WithTimeout(ctx, 15*time.Second)
+			_ = browser.WaitForLoad(loadCtx, conn)
+			loadCancel()
+			conn.Close()
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "● attached  cdp=%s  server=%d  tab=%s\n", cdpAddr, resolvedServerPort, tabID)
+	fmt.Fprintf(os.Stderr, "  Addr: --addr %s\n", cdpAddr)
+	fmt.Fprintf(os.Stderr, "  Degraded mode: browser is caller-owned; console/network capture is live from now on.\n")
+	fmt.Fprintf(os.Stderr, "  Press Ctrl-C (or 'browser stop') to detach — the browser is left running.\n")
+
+	// Block until a signal, or until the attached browser goes away.
+	select {
+	case <-sigCh:
+		fmt.Fprintln(os.Stderr, "\ndetaching (browser left running)...")
+	case <-gone:
+		fmt.Fprintln(os.Stderr, "\nattached browser went away — detaching")
+	}
+	close(stopPoll)
+
+	// Stop HTTP server and drop the session file. The browser is NOT touched.
+	shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	srv.Shutdown(shutCtx)
+	os.Remove(browser.SessionFilePath(sightmapDir))
 	return nil
 }

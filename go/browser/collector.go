@@ -50,8 +50,9 @@ type Collector struct {
 	consoleDropped int
 	networkDropped int
 
-	tabsMu sync.Mutex
-	tabs   map[string]*tabColl
+	tabsMu   sync.Mutex
+	tabs     map[string]*tabColl
+	stopping bool // set under tabsMu in Stop; blocks new tab attachments during teardown
 
 	stop chan struct{}
 	wg   sync.WaitGroup
@@ -81,13 +82,28 @@ func (c *Collector) Start() {
 }
 
 // Stop halts capture and closes every per-tab connection.
+//
+// Order matters: each drain goroutine only returns on its ctx being cancelled,
+// so the per-tab contexts MUST be cancelled BEFORE wg.Wait(). Cancelling after
+// the wait would deadlock whenever the CDP connections are still healthy at Stop
+// time (i.e. the browser is still running — the norm when a caller stops the
+// collector without tearing down the browser, as in --attach mode). The owned
+// path happened to avoid this only because it kills Chrome first, breaking the
+// connections out from under the drains.
 func (c *Collector) Stop() {
 	close(c.stop)
+	c.tabsMu.Lock()
+	c.stopping = true // stop syncTabs from attaching a fresh (uncancelled) drain
+	for _, tc := range c.tabs {
+		tc.cancel()
+	}
+	c.tabsMu.Unlock()
 	c.wg.Wait()
 	c.tabsMu.Lock()
 	for id, tc := range c.tabs {
-		tc.cancel()
-		tc.conn.Close()
+		if tc.conn != nil {
+			tc.conn.Close()
+		}
 		delete(c.tabs, id)
 	}
 	c.tabsMu.Unlock()
@@ -160,10 +176,18 @@ func (c *Collector) attachTab(tabID string) {
 	}
 
 	c.tabsMu.Lock()
+	if c.stopping {
+		// Teardown is in progress; don't start a drain that Stop's wg.Wait would
+		// then block on. Cancel and drop this connection instead.
+		c.tabsMu.Unlock()
+		cancel()
+		conn.Close()
+		return
+	}
 	c.tabs[tabID] = &tabColl{conn: conn, cancel: cancel}
+	c.wg.Add(1)
 	c.tabsMu.Unlock()
 
-	c.wg.Add(1)
 	go c.drain(ctx, tabID, conn, consoleCh, excCh, reqCh, respCh, finishedCh)
 }
 
