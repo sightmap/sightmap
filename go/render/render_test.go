@@ -2,9 +2,10 @@ package render
 
 import (
 	"bytes"
-	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // node builds a ComponentNode for use in tests.
@@ -40,15 +41,37 @@ func TestFilter_Drop_Invisible(t *testing.T) {
 	}
 }
 
-// Invisible subtrees are dropped regardless of interactivity, so the rendered
-// tree stays in lockstep with coverage (which skips the same nodes). probe.js
-// reports effective visibility, so an interactive control hidden by an ancestor
-// (e.g. a closed opacity:0 menu's item) arrives here as invisible and must not
-// appear.
+// An invisible node with no visible descendants renders nothing: it is made
+// transparent (the node itself is dropped) and has nothing to promote. probe.js
+// reports effective visibility, so an interactive control hidden by display:none
+// (e.g. a closed menu's item) arrives here invisible with invisible children and
+// must not appear — keeping the tree in lockstep with coverage, which skips the
+// same nodes. (Contrast TestFilter_InvisibleAncestor_KeepsVisibleDescendant,
+// where an invisible ancestor DOES have visible descendants.)
 func TestFilter_Drop_InvisibleInteractive(t *testing.T) {
 	root := node("1", "button", "Hidden", false /* visible */, true /* interactive */, false)
 	if comp := Filter(root, nil); comp != nil {
-		t.Errorf("expected nil for invisible interactive node, got role=%q", comp.Role)
+		t.Errorf("expected nil for invisible interactive leaf, got role=%q", comp.Role)
+	}
+}
+
+// TestFilter_InvisibleAncestor_KeepsVisibleDescendant guards the fix for an
+// invisible ancestor that nonetheless has VISIBLE descendants — the zero-height
+// <html> document root (probe.js reports it height 0 / ignored), or a
+// visibility:hidden wrapper whose child overrides it with visibility:visible.
+// The ancestor is made transparent (dropped as a node), but its visible child
+// must survive; the whole subtree must NOT vanish (the bug this fixes: an
+// invisible root dropped the entire rendered tree while coverage still counted
+// the visible descendants).
+func TestFilter_InvisibleAncestor_KeepsVisibleDescendant(t *testing.T) {
+	child := node("2", "button", "Add", true /* visible */, true /* interactive */, false)
+	root := node("1", "none", "", false /* visible */, false, false, child)
+	comp := Filter(root, nil)
+	if comp == nil {
+		t.Fatal("expected the visible descendant to survive an invisible ancestor, got nil")
+	}
+	if comp.Role != "button" || comp.Name != "Add" {
+		t.Errorf("expected surviving role=button name=Add, got role=%q name=%q", comp.Role, comp.Name)
 	}
 }
 
