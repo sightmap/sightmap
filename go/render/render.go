@@ -174,12 +174,19 @@ func decide(node *sightmap.ComponentNode, matched bool) disposition {
 		}
 	}
 
-	// Drop invisible subtrees entirely. IsVisible is effective visibility
-	// (probe.js consults the browser's style engine, so ancestor-hidden nodes
-	// like a closed opacity:0 menu's items are already false), so this keeps the
-	// rendered tree in lockstep with coverage, which skips the same nodes.
+	// An invisible node doesn't render itself, but must NOT drop its subtree:
+	// visibility is overridable (a `visibility:hidden` ancestor can hold
+	// `visibility:visible` descendants) and a zero-size wrapper — notably the
+	// document <html> root, which probe.js reports as height 0 / ignored — has
+	// fully visible content beneath it. `display:none` is the case the old
+	// dropNode was really guarding, and probe.js already propagates that to
+	// descendants as effective invisibility, so they arrive here invisible too.
+	// Making the node transparent (recurse, drop only the node itself) handles
+	// both: a genuinely hidden subtree renders nothing (every node transparent),
+	// while visible descendants of an invisible ancestor survive — which keeps the
+	// tree in lockstep with coverage, which counts those same visible nodes.
 	if !node.IsVisible {
-		return dropNode
+		return makeTransparent
 	}
 
 	// Transparent: structural "none" role wrapper without sightmap identity.
