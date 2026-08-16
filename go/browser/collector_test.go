@@ -1,11 +1,48 @@
 package browser
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/sightmap"
 )
+
+// A retained body must be served without a live CDP fetch. These records carry a
+// zero-value conn, so a live getResponseBody/getRequestPostData would fail — a
+// pass proves the eagerly-retained copy was used (the #226 reliability fix).
+func TestResponseBody_PrefersRetained(t *testing.T) {
+	c := &Collector{network: []networkRecord{{
+		Request: sightmap.Request{Index: 1, RspBody: &sightmap.Body{Content: "retained-rsp"}},
+	}}}
+	body, found, err := c.ResponseBody(context.Background(), 1)
+	if err != nil || !found {
+		t.Fatalf("ResponseBody: found=%v err=%v", found, err)
+	}
+	if string(body) != "retained-rsp" {
+		t.Errorf("ResponseBody = %q, want retained-rsp", body)
+	}
+}
+
+func TestRequestBody_PrefersRetained(t *testing.T) {
+	c := &Collector{network: []networkRecord{{
+		Request: sightmap.Request{Index: 2, ReqBody: &sightmap.Body{Content: "retained-req"}},
+	}}}
+	body, found, err := c.RequestBody(context.Background(), 2)
+	if err != nil || !found {
+		t.Fatalf("RequestBody: found=%v err=%v", found, err)
+	}
+	if string(body) != "retained-req" {
+		t.Errorf("RequestBody = %q, want retained-req", body)
+	}
+}
+
+func TestResponseBody_NotFound(t *testing.T) {
+	c := &Collector{}
+	if _, found, err := c.ResponseBody(context.Background(), 99); found || err != nil {
+		t.Errorf("ResponseBody(absent) = found=%v err=%v, want found=false, nil", found, err)
+	}
+}
 
 func TestParseConsoleAPI(t *testing.T) {
 	raw := json.RawMessage(`{"type":"warning","timestamp":1785015495306,"args":[{"type":"string","value":"hello"},{"type":"number","value":42}]}`)
