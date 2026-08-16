@@ -49,7 +49,7 @@ func ScanCandidates(ctx context.Context, conn *browser.CDPConn, max int) ([]Cand
     '[role="tabpanel"]',
   ];
   for (const sel of selectors) {
-    const els = document.querySelectorAll(sel);
+    const els = __smDeepQueryAll(document, sel);
     for (const el of els) {
       let candidate = '';
       const dt = el.getAttribute('data-testid');
@@ -76,7 +76,7 @@ func ScanCandidates(ctx context.Context, conn *browser.CDPConn, max int) ([]Cand
   return Object.values(results).sort((a,b) => b.count - a.count).slice(0, max);
 })(%d)`, max)
 
-	raw, err := browser.EvalJSON(ctx, conn, script)
+	raw, err := browser.EvalJSON(ctx, conn, browser.DeepQueryJS+"\n"+script)
 	if err != nil {
 		return nil, fmt.Errorf("scan candidates: eval: %v", err)
 	}
@@ -94,7 +94,7 @@ func ScanLinks(ctx context.Context, conn *browser.CDPConn) ([]string, error) {
   const host = location.host;
   const seen = new Set();
   const links = [];
-  for (const a of document.querySelectorAll('a[href]')) {
+  for (const a of __smDeepQueryAll(document, 'a[href]')) {
     try {
       const u = new URL(a.href);
       if (u.host === host && !seen.has(u.pathname)) {
@@ -106,7 +106,7 @@ func ScanLinks(ctx context.Context, conn *browser.CDPConn) ([]string, error) {
   return links;
 })()`
 
-	raw, err := browser.EvalJSON(ctx, conn, linkScript)
+	raw, err := browser.EvalJSON(ctx, conn, browser.DeepQueryJS+"\n"+linkScript)
 	if err != nil {
 		return nil, fmt.Errorf("scan links: eval: %v", err)
 	}

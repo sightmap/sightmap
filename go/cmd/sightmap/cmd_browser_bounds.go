@@ -235,8 +235,9 @@ func boundsBySelector(
 ) ([]boundsResult, error) {
 	// Return the rects directly (not stringified) so EvalJSON gives us the
 	// object value rather than a JSON-encoded string.
-	script := fmt.Sprintf(`(function(){
-  var els = document.querySelectorAll(%s);
+	script := browser.DeepQueryJS + fmt.Sprintf(`
+(function(){
+  var els = __smDeepQueryAll(document, %s);
   var out = [];
   for (var i = 0; i < els.length; i++) {
     var r = els[i].getBoundingClientRect();

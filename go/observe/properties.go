@@ -78,9 +78,9 @@ func ExtractProperties(
     if (extract === 'inner_html') return el.innerHTML;
     if (extract.startsWith('attr=')) return el.getAttribute(extract.slice(5));
     if (extract.startsWith('exists:')) {
-      return el.querySelector(extract.slice(7)) ? 'true' : null;
+      return __smDeepQuery(el, extract.slice(7)) ? 'true' : null;
     }
-    const sub = el.querySelector(extract);
+    const sub = __smDeepQuery(el, extract);
     return sub ? (sub.innerText != null ? sub.innerText : sub.textContent) : null;
   }
   function applyTransform(val, transform) {
@@ -108,8 +108,8 @@ func ExtractProperties(
     // Anchor to the exact matched element via its sightmap ID attribute (set by
     // probe.js as data-sightmap-id). This ensures child components like
     // BreadcrumbLink get their own text, not the first match on the page.
-    const el = (id ? document.querySelector('[data-sightmap-id="' + id + '"]') : null)
-               || document.querySelector(selector);
+    const el = (id ? __smDeepQuery(document, '[data-sightmap-id="' + id + '"]') : null)
+               || __smDeepQuery(document, selector);
     if (!el) continue;
     const vals = {};
     for (const {name, extract, transform} of props) {
@@ -125,7 +125,7 @@ func ExtractProperties(
   return results;
 })(SPECS_JSON)`
 
-	script := strings.Replace(jsTemplate, "SPECS_JSON", string(specsJSON), 1)
+	script := browser.DeepQueryJS + "\n" + strings.Replace(jsTemplate, "SPECS_JSON", string(specsJSON), 1)
 
 	resultJSON, evalErr := browser.EvalJSON(ctx, conn, script)
 	if evalErr != nil {
