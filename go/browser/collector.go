@@ -316,9 +316,12 @@ func (c *Collector) Network(f NetworkFilter) ([]sightmap.Request, int) {
 // index, from the collector connection that observed it. Returns (body, found,
 // err); found is false when no such entry is buffered.
 func (c *Collector) ResponseBody(ctx context.Context, index int) ([]byte, bool, error) {
-	reqID, conn, ok := c.lookupRequest(index)
-	if !ok {
+	retained, reqID, conn, found := c.bodyLookup(index, func(r networkRecord) *sightmap.Body { return r.RspBody })
+	if !found {
 		return nil, false, nil
+	}
+	if retained != nil {
+		return retained, true, nil
 	}
 	body, err := getResponseBody(ctx, conn, reqID)
 	return body, true, err
@@ -327,12 +330,36 @@ func (c *Collector) ResponseBody(ctx context.Context, index int) ([]byte, bool, 
 // RequestBody fetches the request post-data for the network entry with the given
 // index. Returns (body, found, err).
 func (c *Collector) RequestBody(ctx context.Context, index int) ([]byte, bool, error) {
-	reqID, conn, ok := c.lookupRequest(index)
-	if !ok {
+	retained, reqID, conn, found := c.bodyLookup(index, func(r networkRecord) *sightmap.Body { return r.ReqBody })
+	if !found {
 		return nil, false, nil
+	}
+	if retained != nil {
+		return retained, true, nil
 	}
 	body, err := getRequestPostData(ctx, conn, reqID)
 	return body, true, err
+}
+
+// bodyLookup finds the buffered record for index and returns EITHER the body
+// already retained on it (pick selects ReqBody/RspBody) or the reqID+conn to
+// fetch it live. Preferring the retained copy is what makes `network get`
+// reliable: the eager loadingFinished capture keeps the body in memory, so a
+// query after Chrome has evicted it from its own network cache still succeeds
+// (a live getResponseBody would fail). Falls back to a live fetch only when
+// nothing was retained (e.g. a non-XHR/Fetch type, which wantsBody skips).
+func (c *Collector) bodyLookup(index int, pick func(networkRecord) *sightmap.Body) (retained []byte, reqID string, conn *CDPConn, found bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i := range c.network {
+		if c.network[i].Index == index {
+			if b := pick(c.network[i]); b != nil {
+				return []byte(b.Content), "", nil, true
+			}
+			return nil, c.network[i].requestID, c.network[i].conn, true
+		}
+	}
+	return nil, "", nil, false
 }
 
 // retainResponseBody fetches a finished response's body and stores it on the

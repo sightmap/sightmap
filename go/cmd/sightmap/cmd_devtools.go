@@ -143,6 +143,24 @@ func printProps(props []sightmap.PropertyValue) {
 	}
 }
 
+// printHeaders renders a captured header block (request or response) for
+// `network get`. Headers ride on the record from the collector (no extra
+// round-trip); long values are truncated so a token/cookie doesn't flood the
+// output while a marker header stays readable.
+func printHeaders(label string, hs []sightmap.Header) {
+	if len(hs) == 0 {
+		return
+	}
+	fmt.Printf("%s:\n", label)
+	for _, h := range hs {
+		v := h.Value
+		if len(v) > 512 {
+			v = v[:512] + "…(truncated)"
+		}
+		fmt.Printf("  %s: %s\n", h.Name, v)
+	}
+}
+
 // matchSlot renders the leading corpus-match token for a list line: the matched
 // def name(s) in brackets, or "[--]" when unmatched. It leads the line (before
 // the record's own payload) so an agent reads the classification first, mirroring
@@ -336,6 +354,8 @@ func runNetworkGet(args []string) error {
 		fmt.Printf("Matches: %s\n", strings.Join(entry.Matches, ", "))
 	}
 	printProps(entry.Props)
+	printHeaders("Request Headers", entry.ReqHeaders)
+	printHeaders("Response Headers", entry.RspHeaders)
 
 	if *reqFile != "" {
 		if err := saveBody(*sightmapDir, idx, "request", *reqFile); err != nil {
