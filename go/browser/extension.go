@@ -50,12 +50,11 @@ func InjectExtensionServerPort(ctx context.Context, addr string, serverPort int)
 // extension's service worker, retrying for up to 5 seconds while it starts.
 // Returns "" if no sightmap extension service worker is found.
 //
-// It must not just take the first extension service worker it sees: a real
-// browser (the --attach case) commonly has several extensions installed, so the
-// candidate is confirmed by evaluating its manifest `name` and matching
-// sightmapExtensionMarker. (An owned launch has an isolated profile with only
-// the sightmap extension, so this only ever mattered once attach let us point at
-// a user's everyday browser.)
+// Taking the first extension service worker found is not enough: a browser the
+// caller owns (the --attach case) commonly has several extensions installed, so
+// each candidate is confirmed by evaluating its manifest `name` against
+// sightmapExtensionMarker. An owned launch has an isolated profile holding only
+// the sightmap extension, where the first candidate always matches.
 func findExtensionSWWS(ctx context.Context, addr string) (string, error) {
 	type target struct {
 		Type  string `json:"type"`
