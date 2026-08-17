@@ -366,8 +366,8 @@ func startDevtoolsServer(sightmapDir, siteName string, serverPort int) (*http.Se
 // deliberately degraded mode (see the --attach flag help): no owned profile or
 // extension guarantees, capture is complete only from attach onward, and the
 // browser is left running when the daemon stops. The collector and devtools
-// server are identical to the owned-launch path — the collector only ever needed
-// a CDP address.
+// server are identical to the owned-launch path, since the collector needs
+// nothing but a CDP address.
 func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlFlag string) error {
 	// Normalize the endpoint. A bare ":port" or "port" is treated as localhost.
 	host, port, err := net.SplitHostPort(attachAddr)
@@ -422,16 +422,23 @@ func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlF
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	gone := make(chan struct{})
-	stopPoll := make(chan struct{})
+	pollCtx, pollCancel := context.WithCancel(context.Background())
+	defer pollCancel()
 	go func() {
 		t := time.NewTicker(2 * time.Second)
 		defer t.Stop()
 		for {
 			select {
-			case <-stopPoll:
+			case <-pollCtx.Done():
 				return
 			case <-t.C:
-				if !cdpVersionAlive(context.Background(), cdpAddr) {
+				// The probe sets no client timeout of its own, so pollCtx is what
+				// bounds it: a browser that accepts the socket and never answers
+				// would otherwise wedge this loop and never report the browser gone.
+				if !cdpVersionAlive(pollCtx, cdpAddr) {
+					if pollCtx.Err() != nil {
+						return // shutting down, not a dead browser
+					}
 					close(gone)
 					return
 				}
@@ -478,7 +485,6 @@ func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlF
 	case <-gone:
 		fmt.Fprintln(os.Stderr, "\nattached browser went away — detaching")
 	}
-	close(stopPoll)
 
 	// Stop HTTP server and drop the session file. The browser is NOT touched.
 	shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

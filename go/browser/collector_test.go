@@ -3,8 +3,13 @@ package browser
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -178,14 +183,15 @@ func TestDecodeBody(t *testing.T) {
 	}
 }
 
-// TestCollectorStop_NoDeadlockWhileConnected guards the shutdown-order fix: a
-// drain goroutine only returns on its ctx being cancelled, so Stop must cancel
-// the per-tab contexts BEFORE wg.Wait(). Simulate a still-attached tab whose
-// drain is blocked (a healthy CDP connection, i.e. the browser is still alive —
-// the --attach case) and assert Stop returns promptly instead of deadlocking.
+// TestCollectorStop_NoDeadlockWhileConnected pins Stop's shutdown ordering: a
+// drain returns only once its context is cancelled, so Stop must cancel every
+// tab context, via the shared parent c.ctx, before wg.Wait. Simulates a
+// still-attached tab whose drain is blocked on a healthy CDP connection, the
+// case where the browser outlives the collector, and asserts Stop returns
+// promptly rather than deadlocking.
 func TestCollectorStop_NoDeadlockWhileConnected(t *testing.T) {
 	c := NewCollector("unused")
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.ctx)
 	c.tabsMu.Lock()
 	c.tabs["t1"] = &tabColl{conn: nil, cancel: cancel}
 	c.tabsMu.Unlock()
@@ -201,5 +207,148 @@ func TestCollectorStop_NoDeadlockWhileConnected(t *testing.T) {
 	case <-done:
 	case <-time.After(2 * time.Second):
 		t.Fatal("Collector.Stop deadlocked with a healthy (uncancelled) drain")
+	}
+}
+
+// newFakeBrowser starts a fake Chrome CDP endpoint exposing a single page target
+// and returns its host:port. The websocket answers every command with an empty
+// result, which is all attachTab's Runtime.enable and Network.enable require.
+// onList, when non-nil, runs at the head of each /json/list request, letting a
+// test stall the tab poll.
+func newFakeBrowser(t *testing.T, onList func(r *http.Request)) string {
+	t.Helper()
+
+	mux := http.NewServeMux()
+	srv := httptest.NewUnstartedServer(mux)
+
+	mux.HandleFunc("/json/list", func(w http.ResponseWriter, r *http.Request) {
+		if onList != nil {
+			onList(r)
+		}
+		targets := []map[string]string{{
+			"id":                   "tab-1",
+			"type":                 "page",
+			"url":                  "http://fake.test/",
+			"webSocketDebuggerUrl": "ws://" + r.Host + "/ws",
+		}}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(targets); err != nil {
+			t.Logf("newFakeBrowser: encode targets: %v", err)
+		}
+	})
+
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		wsConn, err := wsUpgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Logf("newFakeBrowser: ws upgrade: %v", err)
+			return
+		}
+		var wsMu sync.Mutex
+		go func() {
+			for {
+				_, raw, readErr := wsConn.ReadMessage()
+				if readErr != nil {
+					return
+				}
+				var req struct {
+					ID int64 `json:"id"`
+				}
+				if json.Unmarshal(raw, &req) != nil {
+					continue
+				}
+				reply, _ := json.Marshal(map[string]any{"id": req.ID, "result": map[string]any{}})
+				wsMu.Lock()
+				err := wsConn.WriteMessage(websocket.TextMessage, reply)
+				wsMu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}()
+	})
+
+	srv.Start()
+	t.Cleanup(srv.Close)
+	return srv.Listener.Addr().String()
+}
+
+// waitForTabs blocks until the collector has exactly n tabs registered.
+func waitForTabs(t *testing.T, c *Collector, n int, why string) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		c.tabsMu.Lock()
+		got := len(c.tabs)
+		c.tabsMu.Unlock()
+		if got == n {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s: %d tabs registered, want %d", why, got, n)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// TestCollectorStop_LiveTabNoDeadlock drives the real attach path against a fake
+// browser and stops the collector while the CDP connection is still healthy, the
+// case where the caller owns the browser and it outlives the collector. Stop must
+// return promptly and leave no tab registered.
+func TestCollectorStop_LiveTabNoDeadlock(t *testing.T) {
+	c := NewCollector(newFakeBrowser(t, nil))
+	c.Start()
+	t.Cleanup(c.Stop) // idempotent; covers the early-Fatal paths below
+	waitForTabs(t, c, 1, "collector never attached the fake tab")
+
+	done := make(chan struct{})
+	go func() { c.Stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Collector.Stop deadlocked with a live, healthy tab connection")
+	}
+
+	c.tabsMu.Lock()
+	remaining := len(c.tabs)
+	c.tabsMu.Unlock()
+	if remaining != 0 {
+		t.Errorf("after Stop: %d tabs still registered, want 0", remaining)
+	}
+}
+
+// TestCollectorStop_DuringStalledPoll covers the other route to a hung Stop: a
+// browser that accepts the connection and then never answers the tab poll.
+// ListTabs sets no client timeout, so attachLoop escapes the poll only because it
+// runs on the collector context that Stop cancels.
+func TestCollectorStop_DuringStalledPoll(t *testing.T) {
+	polled := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	addr := newFakeBrowser(t, func(r *http.Request) {
+		once.Do(func() { close(polled) })
+		select {
+		case <-r.Context().Done(): // the collector gave up on the request
+		case <-release:
+		}
+	})
+	// Runs before the server's own cleanup, so a stalled handler cannot wedge it.
+	t.Cleanup(func() { close(release) })
+
+	c := NewCollector(addr)
+	c.Start()
+	t.Cleanup(c.Stop)
+
+	select {
+	case <-polled:
+	case <-time.After(3 * time.Second):
+		t.Fatal("collector never polled the fake browser")
+	}
+
+	done := make(chan struct{})
+	go func() { c.Stop(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Collector.Stop deadlocked while the tab poll was stalled")
 	}
 }
