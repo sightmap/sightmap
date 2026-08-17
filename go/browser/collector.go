@@ -238,20 +238,31 @@ func (c *Collector) addNetwork(e networkRecord) {
 func (c *Collector) applyResponse(info responseInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	i := c.networkIndexByReqID(info.reqID)
+	if i < 0 {
+		return
+	}
+	c.network[i].Status = info.status
+	c.network[i].StatusText = info.statusText
+	if info.rtype != "" {
+		c.network[i].ResourceType = info.rtype
+	}
+	c.network[i].RspHeaders = info.headers
+	if ts := c.network[i].Ts; ts > 0 {
+		c.network[i].DurationMs = time.Now().UnixMilli() - ts
+	}
+}
+
+// networkIndexByReqID returns the index of the network record with the given
+// CDP requestId, or -1 if none is buffered. Scans from the tail, where a match
+// almost always is. Caller must hold c.mu.
+func (c *Collector) networkIndexByReqID(reqID string) int {
 	for i := len(c.network) - 1; i >= 0; i-- {
-		if c.network[i].requestID == info.reqID {
-			c.network[i].Status = info.status
-			c.network[i].StatusText = info.statusText
-			if info.rtype != "" {
-				c.network[i].ResourceType = info.rtype
-			}
-			c.network[i].RspHeaders = info.headers
-			if ts := c.network[i].Ts; ts > 0 {
-				c.network[i].DurationMs = time.Now().UnixMilli() - ts
-			}
-			return
+		if c.network[i].requestID == reqID {
+			return i
 		}
 	}
+	return -1
 }
 
 // ConsoleFilter narrows a Console query.
@@ -373,18 +384,14 @@ func (c *Collector) retainResponseBody(ctx context.Context, conn *CDPConn, reqID
 	defer c.wg.Done()
 
 	c.mu.Lock()
+	i := c.networkIndexByReqID(reqID)
 	var rtype, ctype string
-	found := false
-	for i := range c.network {
-		if c.network[i].requestID == reqID {
-			rtype = c.network[i].ResourceType
-			ctype = contentTypeFromHeaders(c.network[i].RspHeaders)
-			found = true
-			break
-		}
+	if i >= 0 {
+		rtype = c.network[i].ResourceType
+		ctype = contentTypeFromHeaders(c.network[i].RspHeaders)
 	}
 	c.mu.Unlock()
-	if !found || !wantsBody(rtype) {
+	if i < 0 || !wantsBody(rtype) {
 		return
 	}
 
@@ -394,14 +401,11 @@ func (c *Collector) retainResponseBody(ctx context.Context, conn *CDPConn, reqID
 	}
 
 	c.mu.Lock()
-	for i := range c.network {
-		if c.network[i].requestID == reqID {
-			c.network[i].RspBody = &sightmap.Body{
-				Content:     string(body),
-				Size:        len(body),
-				ContentType: ctype,
-			}
-			break
+	if i := c.networkIndexByReqID(reqID); i >= 0 {
+		c.network[i].RspBody = &sightmap.Body{
+			Content:     string(body),
+			Size:        len(body),
+			ContentType: ctype,
 		}
 	}
 	c.mu.Unlock()
