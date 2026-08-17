@@ -1,5 +1,7 @@
 package browser
 
+import _ "embed"
+
 // DeepQueryJS defines shadow-piercing querySelector helpers, prepended to any
 // browser-eval that must locate a node the way the offline matcher does: across
 // shadow boundaries.
@@ -14,6 +16,11 @@ package browser
 // with the corpus. These helpers close that gap. See schema.md "Selector model
 // & shadow DOM".
 //
+// The traversal order matches probe.js's procNode exactly — a node's light-DOM
+// children, fully (each recursively, including its own shadow content), before
+// that node's own shadow-DOM children — so "first match" agrees with the
+// corpus instead of surfacing shadow-DOM matches out of order.
+//
 //	__smDeepQueryAll(root, sel) — every element matching sel within root's tree
 //	  AND every shadow tree nested beneath it. root may be the document, a
 //	  shadow root, or an element; for an element the matches are its descendants
@@ -23,25 +30,6 @@ package browser
 //
 // Prepend with: browser.DeepQueryJS + "\n" + script. The helpers are function
 // declarations, so the script's trailing expression stays the completion value.
-const DeepQueryJS = `
-function __smDeepQueryAll(root, sel) {
-  var out = [];
-  function walk(r) {
-    try {
-      var m = r.querySelectorAll(sel);
-      for (var i = 0; i < m.length; i++) out.push(m[i]);
-    } catch (e) { return; }
-    if (r.shadowRoot) walk(r.shadowRoot);
-    var all = r.querySelectorAll('*');
-    for (var j = 0; j < all.length; j++) {
-      if (all[j].shadowRoot) walk(all[j].shadowRoot);
-    }
-  }
-  walk(root);
-  return out;
-}
-function __smDeepQuery(root, sel) {
-  var a = __smDeepQueryAll(root, sel);
-  return a.length ? a[0] : null;
-}
-`
+//
+//go:embed deepquery.js
+var DeepQueryJS string
