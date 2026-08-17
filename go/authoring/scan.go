@@ -15,7 +15,12 @@ import (
 )
 
 //go:embed scan.js
-var scanJS string
+var scanJSSource string
+
+// scanJS is scanJSSource with its __smDeepQueryAll dependency (deepquery.js)
+// composed in once here, so every call site below just does scanJS+<call> --
+// there's no "did I remember to prepend DeepQueryJS" to get wrong.
+var scanJS = browser.DeepQueryJS + "\n" + scanJSSource
 
 // Candidate is one selector candidate found by ScanCandidates: a stable
 // data-attribute selector, how many elements it matched, and enough context
@@ -34,7 +39,7 @@ type Candidate struct {
 // candidate records the nearest [data-sightmap-id] ancestor so callers can group
 // candidates under the component that already covers their region.
 func ScanCandidates(ctx context.Context, conn *browser.CDPConn, max int) ([]Candidate, error) {
-	script := browser.DeepQueryJS + scanJS + fmt.Sprintf("\n__smScanCandidates(%d)", max)
+	script := scanJS + fmt.Sprintf("\n__smScanCandidates(%d)", max)
 
 	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
@@ -50,7 +55,7 @@ func ScanCandidates(ctx context.Context, conn *browser.CDPConn, max int) ([]Cand
 // ScanLinks returns the distinct same-host link pathnames on the live page, in
 // document order. Callers normalize these into route patterns with NormalizePath.
 func ScanLinks(ctx context.Context, conn *browser.CDPConn) ([]string, error) {
-	script := browser.DeepQueryJS + scanJS + "\n__smScanLinks()"
+	script := scanJS + "\n__smScanLinks()"
 
 	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {

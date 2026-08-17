@@ -20,7 +20,13 @@ import (
 )
 
 //go:embed cmd_sel_probe.js
-var selProbeJS string
+var selProbeJSSource string
+
+// selProbeJS is selProbeJSSource with its __smDeepQueryAll dependency
+// (deepquery.js) composed in once here, so every call site below just does
+// selProbeJS+<call> -- there's no "did I remember to prepend DeepQueryJS" to
+// get wrong.
+var selProbeJS = browser.DeepQueryJS + "\n" + selProbeJSSource
 
 // elementResult is the Go-side representation of one querySelectorAll hit.
 type elementResult struct {
@@ -207,8 +213,7 @@ func printOfflineCheck(ctx context.Context, conn *browser.CDPConn, selector stri
 // selector in the live page.
 func liveSelectorCount(ctx context.Context, conn *browser.CDPConn, selector string) (int, error) {
 	selJSON, _ := json.Marshal(selector)
-	raw, err := browser.EvalJSON(ctx, conn,
-		browser.DeepQueryJS+selProbeJS+fmt.Sprintf("\n__smLiveSelectorCount(%s)", selJSON))
+	raw, err := browser.EvalJSON(ctx, conn, selProbeJS+fmt.Sprintf("\n__smLiveSelectorCount(%s)", selJSON))
 	if err != nil {
 		return 0, err
 	}
@@ -282,7 +287,7 @@ func queryElements(
 		return nil, fmt.Errorf("marshal selector: %w", err)
 	}
 
-	script := browser.DeepQueryJS + selProbeJS + fmt.Sprintf("\n__smQueryElements(%s, %d, %v)", selectorJSON, maxN, full)
+	script := selProbeJS + fmt.Sprintf("\n__smQueryElements(%s, %d, %v)", selectorJSON, maxN, full)
 
 	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
@@ -478,7 +483,7 @@ func runSelProbeAll(args []string, sightmapDir, addr, tabID string, max int, ful
 		}
 		time.Sleep(time.Duration(w * float64(time.Second)))
 
-		script := browser.DeepQueryJS + selProbeJS + fmt.Sprintf("\n__smSelProbeAllCount(%s, %d)", selectorJSON, max)
+		script := selProbeJS + fmt.Sprintf("\n__smSelProbeAllCount(%s, %d)", selectorJSON, max)
 
 		raw, evalErr := browser.EvalJSON(ctx, conn, script)
 		if evalErr != nil {

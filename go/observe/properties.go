@@ -12,7 +12,13 @@ import (
 )
 
 //go:embed properties.js
-var propertiesJS string
+var propertiesJSSource string
+
+// propertiesJS is propertiesJSSource with its __smDeepQuery dependency
+// (deepquery.js) composed in once here, so the call site below just does
+// propertiesJS+<call> -- there's no "did I remember to prepend DeepQueryJS"
+// to get wrong.
+var propertiesJS = browser.DeepQueryJS + "\n" + propertiesJSSource
 
 // ExtractProperties runs a single batched JS evaluation against the live DOM to
 // extract property values for all matched nodes that have property definitions,
@@ -65,7 +71,7 @@ func ExtractProperties(
 		return
 	}
 
-	script := browser.DeepQueryJS + propertiesJS + fmt.Sprintf("\n__smExtractProperties(%s)", string(specsJSON))
+	script := propertiesJS + fmt.Sprintf("\n__smExtractProperties(%s)", string(specsJSON))
 
 	resultJSON, evalErr := browser.EvalJSON(ctx, conn, script)
 	if evalErr != nil {
