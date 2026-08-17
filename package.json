@@ -9,6 +9,11 @@
   "scripts": {
     "changeset": "npx --yes @changesets/cli@^2.27.0",
     "version-packages": "npx --yes @changesets/cli@^2.27.0 version && node scripts/sync-manifest-versions.mjs && node scripts/changelog-entry.mjs && node docs/scripts/build-changelog.mjs",
-    "sync-docs": "node docs/scripts/sync-spec.mjs"
+    "sync-docs": "node docs/scripts/sync-spec.mjs",
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "29.7.0",
+    "jest-environment-jsdom": "29.7.0"
   }
 }
