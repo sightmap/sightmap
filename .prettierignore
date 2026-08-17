@@ -1,0 +1,8 @@
+node_modules/
+go/npm/
+
+# Not yet brought under prettier -- pre-existing JS with its own history and
+# conventions. Reformatting either is a deliberate follow-up, not a side
+# effect of `npm run fmt` picking up every go/**/*.js file.
+go/probe/probe.js
+go/cmd/sightmap/extension/

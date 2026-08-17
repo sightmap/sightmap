@@ -5,7 +5,12 @@ function __smBoundsBySelector(sel) {
   const el = __smDeepQuery(document, sel);
   if (!el) return null;
   const r = el.getBoundingClientRect();
-  return {x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height)};
+  return {
+    x: Math.round(r.left),
+    y: Math.round(r.top),
+    width: Math.round(r.width),
+    height: Math.round(r.height),
+  };
 }
 
 // __smLocateForClick scrolls the element to the center of the viewport and
@@ -14,17 +19,24 @@ function __smBoundsBySelector(sel) {
 // through).
 function __smLocateForClick(sel) {
   const el = __smDeepQuery(document, sel);
-  if (!el) return {found: false};
-  el.scrollIntoView({block: 'center', inline: 'center', behavior: 'instant'});
+  if (!el) return { found: false };
+  el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
   const r = el.getBoundingClientRect();
-  const cx = Math.floor(r.left + r.width / 2), cy = Math.floor(r.top + r.height / 2);
-  const inViewport = r.width > 0 && r.height > 0 && cx >= 0 && cy >= 0 && cx < window.innerWidth && cy < window.innerHeight;
+  const cx = Math.floor(r.left + r.width / 2),
+    cy = Math.floor(r.top + r.height / 2);
+  const inViewport =
+    r.width > 0 &&
+    r.height > 0 &&
+    cx >= 0 &&
+    cy >= 0 &&
+    cx < window.innerWidth &&
+    cy < window.innerHeight;
   let hit = false;
   if (inViewport) {
     const at = document.elementFromPoint(cx, cy);
     hit = !!at && (at === el || el.contains(at) || at.contains(el));
   }
-  return {found: true, inViewport, hit, cx, cy};
+  return { found: true, inViewport, hit, cx, cy };
 }
 
 function __smClickBySelector(sel) {
@@ -43,7 +55,7 @@ function __smReadValueBySelector(sel) {
 function __smScrollIntoViewBySelector(sel) {
   try {
     const el = __smDeepQuery(document, sel);
-    if (el) el.scrollIntoView({block: 'center', behavior: 'instant'});
+    if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
   } catch (_) {}
 }
 
@@ -56,7 +68,7 @@ function __smLocationProtocol() {
 }
 
 function __smScrollPosition() {
-  return {x: window.scrollX, y: window.scrollY};
+  return { x: window.scrollX, y: window.scrollY };
 }
 
 function __smScrollToY(y) {
@@ -72,9 +84,10 @@ function __smScrollBy(deltaX, deltaY) {
 function __smClearActiveElement() {
   const el = document.activeElement;
   if (!el) return;
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value') ||
-                 Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
-  if (setter && setter.set) setter.set.call(el, '');
-  el.dispatchEvent(new Event('input', {bubbles: true}));
-  el.dispatchEvent(new Event('change', {bubbles: true}));
+  const setter =
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value") ||
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value");
+  if (setter && setter.set) setter.set.call(el, "");
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
 }
