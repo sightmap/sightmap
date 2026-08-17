@@ -232,9 +232,8 @@ func (c *Collector) addNetwork(e networkRecord) {
 	}
 }
 
-// applyResponse matches a response back to its pending request (scanning from
-// the tail, where the request almost always is) and fills in status, type,
-// response headers, and the observed request→response duration.
+// applyResponse matches a response back to its pending request and fills in
+// status, type, response headers, and the observed request→response duration.
 func (c *Collector) applyResponse(info responseInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
