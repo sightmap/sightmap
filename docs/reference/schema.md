@@ -128,6 +128,7 @@ See [SEP-0002](https://github.com/sightmap/sightmap/blob/main/spec/seps/0002-com
 - A list of strings is tried in order; the first selector that matches wins.
 - Selectors in `children` are evaluated **within** their parent's matched subtree, not globally. This scoping is how Sightmap avoids naming collisions between, say, two different card components that both contain a `button.primary`.
 - Selectors are not required to be unique at their level. If a selector matches multiple elements, all matches are named.
+- **Shadow DOM.** Selectors are matched against the captured component tree, which is a *flattened* representation: each shadow root's content is inlined as ordinary children of its host. Selectors therefore match **across shadow boundaries** — shadow-DOM content is addressed exactly like light-DOM content, and there is no piercing syntax (standard CSS has none: `>>>`/`/deep/` were removed, and `::part()`/`::slotted()` reach only explicitly-exposed nodes). `children` scoping and combinators operate over the flattened tree, where a shadow host → shadow child is an ordinary parent→child edge. This is a deliberate divergence from a live `document.querySelector`, which does **not** cross shadow roots: a tool re-implementing matching or property extraction against the live DOM MUST traverse shadow roots (walk each element's `shadowRoot`) to agree with the corpus. The same rule governs the `exists:`/sub-selector extract modes below — they resolve within the matched element's flattened subtree, including its shadow DOM.
 
 
 ### Component properties
@@ -149,8 +150,8 @@ A component may declare `properties: Property[]` — named values extracted from
 | `text_only` | `textContent` after removing `img`, `svg`, and `[alt]` descendants — use when icon alt-text bleeds into the label |
 | `inner_html` | `element.innerHTML` |
 | `attr=NAME` | `element.getAttribute(NAME)` |
-| `exists:SEL` | `"true"` if `element.querySelector(SEL)` matches; the property is **omitted** when it does not (boolean state flag) |
-| *any other string* | Treated as a CSS sub-selector: `element.querySelector(VALUE)?.textContent.trim()`; omitted when it matches nothing |
+| `exists:SEL` | `"true"` if `SEL` matches an element within the matched element's subtree — **including its shadow DOM** (see [Selector semantics](#selector-semantics)) — else **omitted** (boolean state flag) |
+| *any other string* | Treated as a CSS sub-selector resolved within the matched element's subtree, **including its shadow DOM**: the first match's `innerText` (falling back to `textContent`), trimmed; omitted when nothing matches |
 
 **Transforms.** When `transform` is set it is applied to the trimmed extracted string; if the value is empty or absent, the transform is skipped and the property omitted. Exactly one transform may be given (not composable in v1).
 
