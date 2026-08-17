@@ -21,7 +21,13 @@ import (
 )
 
 //go:embed cmd_browser_bounds.js
-var boundsJS string
+var boundsJSSource string
+
+// boundsJS is boundsJSSource with its __smDeepQueryAll dependency
+// (deepquery.js) composed in once here, so the call site below just does
+// boundsJS+<call> -- there's no "did I remember to prepend DeepQueryJS" to
+// get wrong.
+var boundsJS = browser.DeepQueryJS + "\n" + boundsJSSource
 
 // boundsResult is one emitted bounding box, in both viewport-% and raw px.
 type boundsResult struct {
@@ -237,7 +243,7 @@ func boundsBySelector(
 	selector string,
 	vw, vh int,
 ) ([]boundsResult, error) {
-	script := browser.DeepQueryJS + boundsJS + fmt.Sprintf("\n__smBoundsBySelector(%s)", jsString(selector))
+	script := boundsJS + fmt.Sprintf("\n__smBoundsBySelector(%s)", jsString(selector))
 
 	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {

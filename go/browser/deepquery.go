@@ -28,8 +28,11 @@ import _ "embed"
 //	  nested shadow root.
 //	__smDeepQuery(root, sel) — the first such element, or null.
 //
-// Prepend with: browser.DeepQueryJS + "\n" + script. The helpers are function
-// declarations, so the script's trailing expression stays the completion value.
+// Compose it once into any other embedded .js source that calls
+// __smDeepQuery/__smDeepQueryAll (see e.g. actions.go's actionsJS), rather
+// than prepending it again at each eval call site. The helpers are function
+// declarations, so the script's trailing expression stays the completion
+// value.
 //
 //go:embed deepquery.js
 var DeepQueryJS string
