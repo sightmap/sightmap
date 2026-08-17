@@ -72,9 +72,9 @@ func TestFill_DidNotStickErrors(t *testing.T) {
 	conn := newFakeCDP(t, func(method string, params json.RawMessage) json.RawMessage {
 		if method == "Runtime.evaluate" {
 			switch {
-			case strings.Contains(exprOf(params), "elementFromPoint"):
+			case strings.Contains(exprOf(params), "\n__smLocateForClick("):
 				return evalResult(`{"found":true,"inViewport":true,"hit":true,"cx":10,"cy":5}`)
-			case strings.Contains(exprOf(params), "el.value"):
+			case strings.Contains(exprOf(params), "\n__smReadValueBySelector("):
 				return evalResult(`""`) // field still empty → didn't stick
 			}
 		}
@@ -90,9 +90,9 @@ func TestFill_StuckSucceeds(t *testing.T) {
 	conn := newFakeCDP(t, func(method string, params json.RawMessage) json.RawMessage {
 		if method == "Runtime.evaluate" {
 			switch {
-			case strings.Contains(exprOf(params), "elementFromPoint"):
+			case strings.Contains(exprOf(params), "\n__smLocateForClick("):
 				return evalResult(`{"found":true,"inViewport":true,"hit":true,"cx":10,"cy":5}`)
-			case strings.Contains(exprOf(params), "el.value"):
+			case strings.Contains(exprOf(params), "\n__smReadValueBySelector("):
 				return evalResult(`"hello"`)
 			}
 		}

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -18,48 +19,8 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-// queryScript is the inline JS injected via EvalJSON.
-// Placeholders: %s = JSON-encoded selector, %d = max, %v = full (bool).
-const queryScript = `(function(sel, max, full) {
-  try {
-    const els = [...__smDeepQueryAll(document, sel)].slice(0, max);
-    const interestingAttrs = new Set([
-      'id','class','role','href','type','name','placeholder','aria-label',
-      'aria-expanded','aria-haspopup','aria-controls','aria-selected',
-      'data-testid','data-component','tabindex'
-    ]);
-    return els.map(el => {
-      const attrs = {};
-      for (const a of el.attributes) {
-        if (interestingAttrs.has(a.name) || a.name.startsWith('aria-') || a.name.startsWith('data-')) {
-          if (a.value !== '') attrs[a.name] = a.value;
-        }
-      }
-      const parents = [];
-      let p = el.parentElement;
-      for (let i = 0; i < 5 && p && p.tagName !== 'HTML'; i++, p = p.parentElement) {
-        parents.push({
-          tag: p.tagName.toLowerCase(),
-          id:  p.id || '',
-          cls: [...p.classList].slice(0, 4),
-          dt:  p.getAttribute('data-testid') || '',
-          dc:  p.getAttribute('data-component') || '',
-        });
-      }
-      return {
-        tag:     el.tagName.toLowerCase(),
-        id:      el.id || '',
-        cls:     [...el.classList],
-        role:    el.getAttribute('role') || '',
-        text:    full ? el.textContent.trim() : el.textContent.trim().slice(0, 80),
-        attrs:   attrs,
-        parents: parents,
-      };
-    });
-  } catch(e) {
-    return {error: e.message};
-  }
-})(%s, %d, %v)`
+//go:embed cmd_sel_probe.js
+var selProbeJS string
 
 // elementResult is the Go-side representation of one querySelectorAll hit.
 type elementResult struct {
@@ -246,8 +207,8 @@ func printOfflineCheck(ctx context.Context, conn *browser.CDPConn, selector stri
 // selector in the live page.
 func liveSelectorCount(ctx context.Context, conn *browser.CDPConn, selector string) (int, error) {
 	selJSON, _ := json.Marshal(selector)
-	raw, err := browser.EvalJSON(ctx, conn, browser.DeepQueryJS+fmt.Sprintf(
-		"\n"+`(function(s){try{return __smDeepQueryAll(document,s).length}catch(e){return -1}})(%s)`, string(selJSON)))
+	raw, err := browser.EvalJSON(ctx, conn,
+		browser.DeepQueryJS+selProbeJS+fmt.Sprintf("\n__smLiveSelectorCount(%s)", selJSON))
 	if err != nil {
 		return 0, err
 	}
@@ -321,7 +282,7 @@ func queryElements(
 		return nil, fmt.Errorf("marshal selector: %w", err)
 	}
 
-	script := browser.DeepQueryJS + "\n" + fmt.Sprintf(queryScript, string(selectorJSON), maxN, full)
+	script := browser.DeepQueryJS + selProbeJS + fmt.Sprintf("\n__smQueryElements(%s, %d, %v)", selectorJSON, maxN, full)
 
 	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
@@ -517,12 +478,7 @@ func runSelProbeAll(args []string, sightmapDir, addr, tabID string, max int, ful
 		}
 		time.Sleep(time.Duration(w * float64(time.Second)))
 
-		script := browser.DeepQueryJS + fmt.Sprintf("\n"+`(function(sel,max){
-            try {
-                var els = Array.from(__smDeepQueryAll(document,sel)).slice(0,max);
-                return els.length;
-            } catch(e) { return -1; }
-        })(%s, %d)`, string(selectorJSON), max)
+		script := browser.DeepQueryJS + selProbeJS + fmt.Sprintf("\n__smSelProbeAllCount(%s, %d)", selectorJSON, max)
 
 		raw, evalErr := browser.EvalJSON(ctx, conn, script)
 		if evalErr != nil {

@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -18,6 +19,9 @@ import (
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
+
+//go:embed cmd_browser_bounds.js
+var boundsJS string
 
 // boundsResult is one emitted bounding box, in both viewport-% and raw px.
 type boundsResult struct {
@@ -233,20 +237,7 @@ func boundsBySelector(
 	selector string,
 	vw, vh int,
 ) ([]boundsResult, error) {
-	// Return the rects directly (not stringified) so EvalJSON gives us the
-	// object value rather than a JSON-encoded string.
-	script := browser.DeepQueryJS + fmt.Sprintf(`
-(function(){
-  var els = __smDeepQueryAll(document, %s);
-  var out = [];
-  for (var i = 0; i < els.length; i++) {
-    var r = els[i].getBoundingClientRect();
-    var label = (els[i].getAttribute('aria-label') || els[i].textContent || '').trim().replace(/\s+/g,' ');
-    if (label.length > 80) label = label.slice(0, 80);
-    out.push({x: r.left, y: r.top, width: r.width, height: r.height, label: label});
-  }
-  return out;
-})()`, jsString(selector))
+	script := browser.DeepQueryJS + boundsJS + fmt.Sprintf("\n__smBoundsBySelector(%s)", jsString(selector))
 
 	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
@@ -368,8 +359,7 @@ func intersectsViewport(b *sightmap.Bounds, vw, vh int) bool {
 
 // viewportSize reads window.innerWidth/innerHeight from the live page.
 func viewportSize(ctx context.Context, conn *browser.CDPConn) (int, int, error) {
-	raw, err := browser.EvalJSON(ctx, conn,
-		`({w: window.innerWidth, h: window.innerHeight})`)
+	raw, err := browser.EvalJSON(ctx, conn, boundsJS+"\n__smViewportSize()")
 	if err != nil {
 		return 0, 0, fmt.Errorf("bounds: read viewport: %w", err)
 	}

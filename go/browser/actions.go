@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,9 @@ import (
 
 	"github.com/sightmap/sightmap/go/sightmap"
 )
+
+//go:embed actions.js
+var actionsJS string
 
 // Navigate sends Page.navigate. Does NOT wait for load.
 func Navigate(ctx context.Context, conn *CDPConn, url string) error {
@@ -373,7 +377,7 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 	// path for that combination that doesn't hang on cross-origin iframes).
 	fastPath := format == "jpeg" && opts.OptimizeForSpeed
 	if !fastPath {
-		if urlRaw, err := EvalJSON(ctx, conn, `JSON.stringify(location.protocol)`); err == nil {
+		if urlRaw, err := EvalJSON(ctx, conn, actionsJS+"\n__smLocationProtocol()"); err == nil {
 			var proto string
 			if json.Unmarshal(urlRaw, &proto) == nil && (proto == "http:" || proto == "https:") {
 				params["captureBeyondViewport"] = false
@@ -388,7 +392,7 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 	// above for HTTP(S) pages.
 	if opts.Clip != nil {
 		sx, sy := 0.0, 0.0
-		if raw, err := EvalJSON(ctx, conn, `({x: window.scrollX, y: window.scrollY})`); err == nil {
+		if raw, err := EvalJSON(ctx, conn, actionsJS+"\n__smScrollPosition()"); err == nil {
 			var s struct {
 				X float64 `json:"x"`
 				Y float64 `json:"y"`
@@ -462,13 +466,8 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 // Returns an error when no element carries the id (the node was removed or the
 // page was re-probed since), so callers can prompt for a fresh snapshot.
 func ResolveBySightmapID(ctx context.Context, conn *CDPConn, id string) (*sightmap.ComponentNode, error) {
-	script := DeepQueryJS + fmt.Sprintf(`
-(function(){
-  var el=__smDeepQuery(document,'[data-sightmap-id=%q]');
-  if(!el) return null;
-  var r=el.getBoundingClientRect();
-  return {x:Math.round(r.left),y:Math.round(r.top),width:Math.round(r.width),height:Math.round(r.height)};
-})()`, id)
+	selJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", id))
+	script := DeepQueryJS + actionsJS + fmt.Sprintf("\n__smBoundsBySelector(%s)", selJSON)
 	raw, err := EvalJSON(ctx, conn, script)
 	if err != nil {
 		return nil, fmt.Errorf("resolve %q: %w", id, err)
@@ -558,18 +557,8 @@ type clickTarget struct {
 // center is actually the top-most element there (so a target hidden behind an
 // overlay is reported as not-hit rather than clicked through).
 func locateForClick(ctx context.Context, conn *CDPConn, id string) (clickTarget, error) {
-	script := DeepQueryJS + fmt.Sprintf(`
-(function(){
-  var el=__smDeepQuery(document,'[data-sightmap-id=%q]');
-  if(!el) return {found:false};
-  el.scrollIntoView({block:"center",inline:"center",behavior:"instant"});
-  var r=el.getBoundingClientRect();
-  var cx=Math.floor(r.left+r.width/2), cy=Math.floor(r.top+r.height/2);
-  var iv = r.width>0 && r.height>0 && cx>=0 && cy>=0 && cx<window.innerWidth && cy<window.innerHeight;
-  var hit=false;
-  if(iv){ var at=document.elementFromPoint(cx,cy); hit=!!at && (at===el||el.contains(at)||at.contains(el)); }
-  return {found:true,inViewport:iv,hit:hit,cx:cx,cy:cy};
-})()`, id)
+	selJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", id))
+	script := DeepQueryJS + actionsJS + fmt.Sprintf("\n__smLocateForClick(%s)", selJSON)
 	raw, err := EvalJSON(ctx, conn, script)
 	if err != nil {
 		return clickTarget{}, err
@@ -610,7 +599,8 @@ func Click(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) (in
 		if sel == "" {
 			return -1, -1, fmt.Errorf("click: node %q has no bounds and no selector", node.Id)
 		}
-		_, err := EvalJSON(ctx, conn, DeepQueryJS+fmt.Sprintf("\n__smDeepQuery(document,%q)?.click()", sel))
+		selJSON, _ := json.Marshal(sel)
+		_, err := EvalJSON(ctx, conn, DeepQueryJS+actionsJS+fmt.Sprintf("\n__smClickBySelector(%s)", selJSON))
 		return -1, -1, err
 	}
 	x := node.Bounds.X + node.Bounds.Width/2
@@ -690,8 +680,8 @@ func readInputValue(ctx context.Context, conn *CDPConn, id string) (string, bool
 	if id == "" {
 		return "", false
 	}
-	raw, err := EvalJSON(ctx, conn, DeepQueryJS+fmt.Sprintf(
-		"\n"+`(function(){var el=__smDeepQuery(document,'[data-sightmap-id=%q]');if(!el||el.value==null)return null;return String(el.value)})()`, id))
+	selJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", id))
+	raw, err := EvalJSON(ctx, conn, DeepQueryJS+actionsJS+fmt.Sprintf("\n__smReadValueBySelector(%s)", selJSON))
 	if err != nil || len(raw) == 0 || string(raw) == "null" {
 		return "", false
 	}
@@ -711,17 +701,8 @@ func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNo
 		return fmt.Errorf("ClearAndFill: click to focus: %w", err)
 	}
 	// Clear the field via JS native setter — works on React-controlled inputs.
-	clearJS := `(function(){
-		var el = document.activeElement;
-		if (!el) return;
-		var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value') ||
-		             Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value');
-		if (setter && setter.set) { setter.set.call(el,''); }
-		el.dispatchEvent(new Event('input',{bubbles:true}));
-		el.dispatchEvent(new Event('change',{bubbles:true}));
-	})()`
 	if _, err := conn.call(ctx, "Runtime.evaluate", map[string]interface{}{
-		"expression": clearJS,
+		"expression": actionsJS + "\n__smClearActiveElement()",
 	}); err != nil {
 		return fmt.Errorf("ClearAndFill: clear: %w", err)
 	}
@@ -793,10 +774,8 @@ func KeyPress(ctx context.Context, conn *CDPConn, key string) error {
 // than surfacing as an EvalJSON JS exception.
 func ScrollIntoView(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) error {
 	if sel := node.Element.SelectorString(); sel != "" {
-		script := DeepQueryJS + fmt.Sprintf(
-			"\n"+`try{const el=__smDeepQuery(document,%q);if(el)el.scrollIntoView({block:"center",behavior:"instant"})}catch(_){}`,
-			sel,
-		)
+		selJSON, _ := json.Marshal(sel)
+		script := DeepQueryJS + actionsJS + fmt.Sprintf("\n__smScrollIntoViewBySelector(%s)", selJSON)
 		if _, err := EvalJSON(ctx, conn, script); err == nil {
 			return nil
 		}
@@ -805,8 +784,7 @@ func ScrollIntoView(ctx context.Context, conn *CDPConn, node *sightmap.Component
 	// Y position using its bounds.
 	if node.Bounds != nil {
 		y := int(node.Bounds.Y)
-		_, err := EvalJSON(ctx, conn,
-			fmt.Sprintf("window.scrollTo(0,Math.max(0,%d-Math.floor(window.innerHeight/2)))", y))
+		_, err := EvalJSON(ctx, conn, actionsJS+fmt.Sprintf("\n__smScrollToY(%d)", y))
 		return err
 	}
 	return fmt.Errorf("ScrollIntoView: node %q has no selector and no bounds", node.Id)
@@ -819,7 +797,7 @@ func ScrollIntoView(ctx context.Context, conn *CDPConn, node *sightmap.Component
 // "connection closed" errors. Runtime.evaluate is handled at the browser level
 // and is not affected by renderer lifecycle events.
 func ScrollBy(ctx context.Context, conn *CDPConn, deltaX, deltaY int) error {
-	_, err := EvalJSON(ctx, conn, fmt.Sprintf("window.scrollBy(%d,%d)", deltaX, deltaY))
+	_, err := EvalJSON(ctx, conn, actionsJS+fmt.Sprintf("\n__smScrollBy(%d,%d)", deltaX, deltaY))
 	return err
 }
 
@@ -848,7 +826,8 @@ func WaitForSelector(ctx context.Context, conn *CDPConn, selector string) error 
 			return ctx.Err()
 		default:
 		}
-		result, err := EvalJSON(ctx, conn, DeepQueryJS+fmt.Sprintf("\n!!__smDeepQuery(document,%q)", selector))
+		selJSON, _ := json.Marshal(selector)
+		result, err := EvalJSON(ctx, conn, DeepQueryJS+actionsJS+fmt.Sprintf("\n__smSelectorExists(%s)", selJSON))
 		if err == nil {
 			var found bool
 			if json.Unmarshal(result, &found) == nil && found {
