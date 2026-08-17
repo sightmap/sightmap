@@ -49,12 +49,24 @@ type Collector struct {
 	consoleDropped int
 	networkDropped int
 
-	tabsMu   sync.Mutex
-	tabs     map[string]*tabColl
-	stopping bool // set under tabsMu in Stop; blocks new tab attachments during teardown
+	tabsMu sync.Mutex
+	tabs   map[string]*tabColl
 
-	stop chan struct{}
-	wg   sync.WaitGroup
+	// ctx spans the collector's entire capture lifetime and is cancelled by Stop.
+	// Every per-tab context derives from it, so a single cancel stops every drain
+	// and interrupts any in-flight tab poll or dial.
+	//
+	// Holding a context in a struct is a deliberate deviation from the usual
+	// "pass it as the first argument" rule. The scope here is this object's
+	// lifetime rather than one request, and fixing both fields at construction
+	// keeps that lifetime immutable: Start and Stop then need no locking, no nil
+	// check, and no guard against a second Start replacing the first cancel func
+	// and stranding wg.Wait forever. Long-lived clients hold the same pair for
+	// the same reason (e.g. grpc.ClientConn).
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	wg sync.WaitGroup
 }
 
 type tabColl struct {
@@ -65,11 +77,13 @@ type tabColl struct {
 // NewCollector creates a collector for the Chrome session at addr (host:port).
 // Call Start to begin capturing and Stop to tear down.
 func NewCollector(addr string) *Collector {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Collector{
 		addr:       addr,
 		maxEntries: DefaultMaxEntries,
 		tabs:       make(map[string]*tabColl),
-		stop:       make(chan struct{}),
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 }
 
@@ -80,23 +94,25 @@ func (c *Collector) Start() {
 	go c.attachLoop()
 }
 
-// Stop halts capture and closes every per-tab connection.
+// Stop halts capture and closes every per-tab connection. It is safe to call
+// more than once.
 //
-// Order matters: each drain goroutine only returns on its ctx being cancelled,
-// so the per-tab contexts MUST be cancelled BEFORE wg.Wait(). Cancelling after
-// the wait would deadlock whenever the CDP connections are still healthy at Stop
-// time (i.e. the browser is still running — the norm when a caller stops the
-// collector without tearing down the browser, as in --attach mode). The owned
-// path happened to avoid this only because it kills Chrome first, breaking the
-// connections out from under the drains.
+// Order matters: a drain goroutine returns only once its context is cancelled,
+// so cancellation MUST precede wg.Wait(). Waiting first deadlocks whenever the
+// CDP connections are still healthy at Stop time, which is the normal case
+// whenever the caller owns the browser and it outlives the collector, as under
+// --attach. One cancel covers every tab, since all tab contexts descend from
+// c.ctx.
+//
+// A tab attaching concurrently with Stop is safe on three counts: its context
+// descends from c.ctx, so it is born cancelled and its drain returns on its
+// first select; its conn is registered in c.tabs before that drain is counted,
+// so the sweep below still closes it; and its wg.Add cannot race wg.Wait,
+// because attachTab runs only on the attachLoop goroutine, which holds a count
+// of its own until it returns, keeping the counter above zero for as long as a
+// further Add is possible.
 func (c *Collector) Stop() {
-	close(c.stop)
-	c.tabsMu.Lock()
-	c.stopping = true // stop syncTabs from attaching a fresh (uncancelled) drain
-	for _, tc := range c.tabs {
-		tc.cancel()
-	}
-	c.tabsMu.Unlock()
+	c.cancel()
 	c.wg.Wait()
 	c.tabsMu.Lock()
 	for id, tc := range c.tabs {
@@ -118,7 +134,7 @@ func (c *Collector) attachLoop() {
 	defer t.Stop()
 	for {
 		select {
-		case <-c.stop:
+		case <-c.ctx.Done():
 			return
 		case <-t.C:
 			c.syncTabs()
@@ -127,7 +143,10 @@ func (c *Collector) attachLoop() {
 }
 
 func (c *Collector) syncTabs() {
-	tabs, err := ListTabs(context.Background(), c.addr)
+	// Neither this poll nor the ConnectTab below sets a client timeout, so the
+	// collector context is the only thing bounding them: a browser that accepts
+	// the socket and then never answers would otherwise block Stop indefinitely.
+	tabs, err := ListTabs(c.ctx, c.addr)
 	if err != nil {
 		return
 	}
@@ -154,11 +173,11 @@ func (c *Collector) syncTabs() {
 }
 
 func (c *Collector) attachTab(tabID string) {
-	conn, err := ConnectTab(context.Background(), c.addr, tabID)
+	conn, err := ConnectTab(c.ctx, c.addr, tabID)
 	if err != nil {
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(c.ctx)
 
 	consoleCh := conn.Subscribe("Runtime.consoleAPICalled")
 	excCh := conn.Subscribe("Runtime.exceptionThrown")
@@ -174,14 +193,6 @@ func (c *Collector) attachTab(tabID string) {
 	}
 
 	c.tabsMu.Lock()
-	if c.stopping {
-		// Teardown is in progress; don't start a drain that Stop's wg.Wait would
-		// then block on. Cancel and drop this connection instead.
-		c.tabsMu.Unlock()
-		cancel()
-		conn.Close()
-		return
-	}
 	c.tabs[tabID] = &tabColl{conn: conn, cancel: cancel}
 	c.wg.Add(1)
 	c.tabsMu.Unlock()
