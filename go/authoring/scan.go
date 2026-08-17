@@ -7,11 +7,15 @@ package authoring
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 
 	"github.com/sightmap/sightmap/go/browser"
 )
+
+//go:embed scan.js
+var scanJS string
 
 // Candidate is one selector candidate found by ScanCandidates: a stable
 // data-attribute selector, how many elements it matched, and enough context
@@ -30,53 +34,9 @@ type Candidate struct {
 // candidate records the nearest [data-sightmap-id] ancestor so callers can group
 // candidates under the component that already covers their region.
 func ScanCandidates(ctx context.Context, conn *browser.CDPConn, max int) ([]Candidate, error) {
-	script := fmt.Sprintf(`(function(max) {
-  const results = {};
-  const selectors = [
-    '[data-testid]',
-    '[data-component]',
-    '[aria-label][role]',
-    '[role="navigation"]',
-    '[role="search"]',
-    '[role="banner"]',
-    '[role="main"]',
-    '[role="complementary"]',
-    '[role="contentinfo"]',
-    '[role="dialog"]',
-    '[role="alertdialog"]',
-    '[role="tablist"]',
-    '[role="tab"]',
-    '[role="tabpanel"]',
-  ];
-  for (const sel of selectors) {
-    const els = __smDeepQueryAll(document, sel);
-    for (const el of els) {
-      let candidate = '';
-      const dt = el.getAttribute('data-testid');
-      const dc = el.getAttribute('data-component');
-      const role = el.getAttribute('role') || el.tagName.toLowerCase();
-      const tag = el.tagName.toLowerCase();
-      const text = el.textContent.trim().replace(/\s+/g, ' ').slice(0, 60);
-      if (dt) {
-        candidate = '[data-testid="' + dt + '"]';
-      } else if (dc) {
-        const base = dc.replace(/:v\d+\.\d+\.\d+.*$/, '');
-        candidate = '[data-component^="' + base + '"]';
-      } else {
-        continue;
-      }
-      if (!results[candidate]) {
-        const ancestorEl = el.closest('[data-sightmap-id]');
-        const ancestorId = ancestorEl ? ancestorEl.getAttribute('data-sightmap-id') : '';
-        results[candidate] = {sel: candidate, count: 0, role: role, tag: tag, sample: text, ancestorId: ancestorId};
-      }
-      results[candidate].count++;
-    }
-  }
-  return Object.values(results).sort((a,b) => b.count - a.count).slice(0, max);
-})(%d)`, max)
+	script := browser.DeepQueryJS + scanJS + fmt.Sprintf("\n__smScanCandidates(%d)", max)
 
-	raw, err := browser.EvalJSON(ctx, conn, browser.DeepQueryJS+"\n"+script)
+	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
 		return nil, fmt.Errorf("scan candidates: eval: %v", err)
 	}
@@ -90,23 +50,9 @@ func ScanCandidates(ctx context.Context, conn *browser.CDPConn, max int) ([]Cand
 // ScanLinks returns the distinct same-host link pathnames on the live page, in
 // document order. Callers normalize these into route patterns with NormalizePath.
 func ScanLinks(ctx context.Context, conn *browser.CDPConn) ([]string, error) {
-	const linkScript = `(function() {
-  const host = location.host;
-  const seen = new Set();
-  const links = [];
-  for (const a of __smDeepQueryAll(document, 'a[href]')) {
-    try {
-      const u = new URL(a.href);
-      if (u.host === host && !seen.has(u.pathname)) {
-        seen.add(u.pathname);
-        links.push(u.pathname);
-      }
-    } catch(e) {}
-  }
-  return links;
-})()`
+	script := browser.DeepQueryJS + scanJS + "\n__smScanLinks()"
 
-	raw, err := browser.EvalJSON(ctx, conn, browser.DeepQueryJS+"\n"+linkScript)
+	raw, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
 		return nil, fmt.Errorf("scan links: eval: %v", err)
 	}

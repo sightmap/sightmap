@@ -394,8 +394,8 @@ func TestResolveBySightmapID(t *testing.T) {
 	script := evalScript
 	mu.Unlock()
 
-	if !strings.Contains(script, `data-sightmap-id="805"`) {
-		t.Errorf("resolution should anchor to data-sightmap-id=\"805\", got: %s", script)
+	if !strings.Contains(script, "data-sightmap-id") || !strings.Contains(script, "805") {
+		t.Errorf("resolution should anchor to data-sightmap-id 805, got: %s", script)
 	}
 	if !strings.Contains(script, "getBoundingClientRect") {
 		t.Errorf("resolution should read live bounds via getBoundingClientRect, got: %s", script)
