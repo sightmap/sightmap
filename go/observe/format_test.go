@@ -80,6 +80,44 @@ func TestFormat_Conflicts(t *testing.T) {
 	}
 }
 
+// TestFormat_ChromeOnlyAdvisory: a clean pass (T3==0) whose only matches are
+// GLOBAL components must warn that the view isn't really modeled (a11e.9).
+func TestFormat_ChromeOnlyAdvisory(t *testing.T) {
+	n := &sightmap.ComponentNode{Id: "1", Role: "banner", IsVisible: true, IsInteractive: true}
+	r := &Result{
+		Root:          &sightmap.ComponentNode{Id: "root", Children: []*sightmap.ComponentNode{n}},
+		URL:           "https://app.example.com/x",
+		CorpusApplied: true,
+		View:          &sightmap.ViewDef{Name: "Stub", Route: "/x"},
+		Matches:       map[*sightmap.ComponentNode]*sightmap.ComponentMatch{n: {Name: "GlobalHeader"}},
+		GlobalNames:   map[string]bool{"GlobalHeader": true},
+		Coverage:      coverage.Result{Total: 3, T1: 1, T2: 2, T3: 0},
+	}
+	out := renderResult(r)
+	if !strings.Contains(out, "contributed 0 components") {
+		t.Errorf("expected chrome-only advisory, got:\n%s", out)
+	}
+}
+
+// TestFormat_NoChromeOnlyAdvisoryWhenViewModels: a view-scoped match suppresses
+// the advisory — a legitimate pass must stay quiet.
+func TestFormat_NoChromeOnlyAdvisoryWhenViewModels(t *testing.T) {
+	n := &sightmap.ComponentNode{Id: "1", Role: "button", IsVisible: true, IsInteractive: true}
+	r := &Result{
+		Root:          &sightmap.ComponentNode{Id: "root", Children: []*sightmap.ComponentNode{n}},
+		URL:           "https://app.example.com/x",
+		CorpusApplied: true,
+		View:          &sightmap.ViewDef{Name: "Stub", Route: "/x"},
+		Matches:       map[*sightmap.ComponentNode]*sightmap.ComponentMatch{n: {Name: "SaveButton"}},
+		GlobalNames:   map[string]bool{"GlobalHeader": true},
+		Coverage:      coverage.Result{Total: 1, T1: 1, T3: 0},
+	}
+	out := renderResult(r)
+	if strings.Contains(out, "contributed 0 components") || strings.Contains(out, "no view modeled") {
+		t.Errorf("advisory should NOT fire when a view-scoped component matched, got:\n%s", out)
+	}
+}
+
 // TestFormat_NoCorpus: no corpus at all — neither the no-view notice nor a
 // [Coverage] line should appear (the raw tree stands on its own).
 func TestFormat_NoCorpus(t *testing.T) {

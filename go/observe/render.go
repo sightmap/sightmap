@@ -88,6 +88,7 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 		fmt.Fprintln(w)
 		cov := r.Coverage
 		writeCoverage(w, cov)
+		writeChromeOnlyAdvisory(w, r)
 
 		// ── Unlabeled clusters (--trace) ─────────────────────────────────────
 		// Coverage-only mode always shows the cluster traces — they are the point
@@ -250,6 +251,31 @@ func writeCoverage(w io.Writer, cov coverage.Result) {
 		cov.Total, cov.T1, coverage.Pct(cov.T1, cov.Total), cov.T2, coverage.Pct(cov.T2, cov.Total), cov.T3, cov.Mark())
 	if cov.Empty() {
 		fmt.Fprintf(w, "⚠ no interactive nodes — the page may be blank or still loading (no coverage signal)\n")
+	}
+}
+
+// writeChromeOnlyAdvisory warns when a clean coverage pass (no orphans) was
+// achieved purely by GLOBAL (chrome) components — the current view, or the
+// absence of one, contributed zero directly-matched components. "0 orphaned ✓"
+// then means the global backstop blankets the page, NOT that the view is
+// modeled, so a brand-new unmodeled page reads as done. Gated on a clean pass
+// with interactive content: real orphans (✗) and blank pages already tell their
+// own story. (a11e.9 — surfaced dogfooding SFDC, where a global div.viewport
+// backstop drove an unmodeled list page to "0 orphaned ✓".)
+func writeChromeOnlyAdvisory(w io.Writer, r *Result) {
+	cov := r.Coverage
+	if cov.Empty() || cov.T3 != 0 {
+		return
+	}
+	for _, m := range r.Matches {
+		if m != nil && !r.GlobalNames[m.Name] {
+			return // the view modeled at least one component — a legitimate pass
+		}
+	}
+	if r.View != nil {
+		fmt.Fprintf(w, "⚠ view [%s] contributed 0 components — this page is covered only by global (chrome) components. \"0 orphaned\" reflects the global backstop, not a modeled view.\n", r.View.Name)
+	} else {
+		fmt.Fprintf(w, "⚠ no view modeled this page — coverage came entirely from global (chrome) components. \"0 orphaned\" reflects the global backstop, not a modeled view.\n")
 	}
 }
 
