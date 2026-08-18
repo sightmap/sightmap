@@ -4,12 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/sightmap/sightmap/go/sightmap"
 	"sort"
+	"strings"
 
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/coverage"
 	"github.com/sightmap/sightmap/go/match"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func runGap(args []string) error {
@@ -250,9 +251,36 @@ func runGap(args []string) error {
 		fmt.Printf("  %d\u00d7 %s %s\n", len(g.nodes), key.role, nameDisp)
 		fmt.Printf("       inside: %s\n", g.ancestorDesc)
 
-		// Build arrow hint from the representative node.
-		if hint := coverage.ArrowHint(rep, parentMap); hint != "" {
-			fmt.Printf("       \u2192 %s\n", hint)
+		// Ranked selector candidates for the representative node. The strict
+		// data-attr hint (ArrowHint) leads when present; SelectorCandidates fills in
+		// the custom-element / design-system-class / id / attr hooks that make gap
+		// useful on hook-poor DOMs (where ArrowHint returns "").
+		strictHint := coverage.ArrowHint(rep, parentMap)
+		var hints []string
+		seenHint := map[string]bool{}
+		addHint := func(h string) {
+			if h == "" || seenHint[h] {
+				return
+			}
+			seenHint[h] = true
+			hints = append(hints, h)
+		}
+		addHint(strictHint)
+		for _, c := range coverage.SelectorCandidates(rep.Element) {
+			addHint(c)
+		}
+		if len(hints) > 3 {
+			hints = hints[:3]
+		}
+		if len(hints) > 0 {
+			fmt.Printf("       \u2192 %s\n", strings.Join(hints, "  \u00b7  "))
+		}
+		// When there was no strict data-attr hint (a hook-poor DOM), also surface a
+		// container hook so the leaf candidate can be scoped for uniqueness.
+		if strictHint == "" {
+			if _, anc := coverage.NearestHookAncestor(rep, parentMap); anc != "" {
+				fmt.Printf("       container: %s\n", anc)
+			}
 		}
 		fmt.Println()
 	}
