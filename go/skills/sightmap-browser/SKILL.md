@@ -119,24 +119,48 @@ so nothing goes stale. Prefer queries on dynamic pages.
   addressable (see the `sightmap-authoring` skill).
 - `--sightmap-dir` (default `.sightmap`) controls which corpus resolves a query.
 
-## Debugging: console & network
+## Console & network — the runtime view of the corpus
 
 The `browser start` daemon owns the session and runs a **collector** that buffers
 console messages and network requests from every tab for the life of the session
 (bounded ring buffers, ~1000 of each). Read them with thin query commands — no
-re-attaching to Chrome, and history the transient page commands never saw:
+re-attaching to Chrome, and with history the transient page commands never saw.
+
+These are not just raw debug streams. Each captured record is matched against the
+corpus's `requests:` and `messages:` entries (see the `sightmap-authoring`
+skill), so every line **leads with a `[MatchedName]` slot** — or `[--]` when
+nothing in the corpus classified it — the way a snapshot foregrounds a node's
+`[Component]`. Matched records also **trail their extracted `{name=value}`
+properties**.
 
 | Command | What it does |
 |---------|-------------|
-| `sightmap console list [--level error] [--tab ID] [--limit N]` | Captured console messages (uncaught exceptions fold in as `level=exception`). |
-| `sightmap console get <index>` | One console message by index. |
-| `sightmap network list [--type XHR] [--url /api] [--tab ID] [--limit N]` | Captured requests: `method url → status (type)`. |
-| `sightmap network get <index> [--response-file F]` | One request + its response body (fetched on demand; save with `--response-file`). |
+| `sightmap console list [--level error] [--tab ID] [--limit N]` | Console messages, each led by its `messages:` match (uncaught exceptions fold in as `level=exception`). |
+| `sightmap console get <index>` | One console message + any extracted stack `properties:`. |
+| `sightmap network list [--type XHR] [--url /api] [--tab ID] [--limit N]` | Requests: `[Match] method url → status (type) {prop=value}`. |
+| `sightmap network get <index> [--response-file F]` | One request + its `requests:` match, a `Properties:` block, and response body (save with `--response-file`). |
+
+Reading the slot:
+```
+[AuraAction]         POST /aura → 200 (XHR) {first_action_state=SUCCESS}   # matched a requests: entry + extracted a body value
+[AuraAction]         POST /aura → 200 (XHR) {first_action_state=ERROR}     # 200 OK, but the body says it failed — the payoff of request properties:
+[--]                 GET  /favicon.ico → 200 (Image)                       # unmatched: no corpus entry, unstructured
+[DeprecatedChartApi] warn  ...stackhbar.js has been deprecated             # matched a messages: entry
+```
+The `[--]` slot is deliberately quiet — it marks a record unclassified without
+drowning the matched ones.
 
 - These need a running `browser start` session — that's where the collector
-  lives. Entries from before the session started aren't available.
-- Reproduce the issue (navigate/click), then read `console list --level error`
-  and `network list` to see what failed; `network get <index>` pulls the body.
+  lives. Records from **before** the session started aren't captured, so in an
+  attached/degraded session (or right after `start`) **reproduce the traffic**:
+  refresh the page or re-trigger the action, then read. (A SPA may never reach
+  `wait-for --load`; prefer `wait-for --url`/`--selector`, or just re-read after
+  a short pause.)
+- `--url` is a substring match, not a path anchor (`--url /aura` also catches
+  `.../auraFW/...`) — narrow it when a route is noisy.
+- To find failures: reproduce, then scan the `[...]` slots in `console list`
+  (`--level error`) and `network list`; `network get <index>` pulls the body +
+  properties.
 
 ## Gotchas
 
