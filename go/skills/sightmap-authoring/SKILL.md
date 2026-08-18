@@ -89,7 +89,7 @@ other dependency.
 | `sightmap snapshot --coverage --url URL` | Observe: navigate + coverage + cluster hints, no tree. **Primary edit-loop tool.** |
 | `sightmap snapshot --url URL` | Observe: full annotated tree + coverage to stdout (add `--out FILE` / `--tree-out FILE` to save). |
 | `sightmap capture --url URL` | Persist a novelty-gated capture into the matched view's set. |
-| `sightmap sel-probe 'selector'` | Verify a selector: match count + parent chain. Run before writing any YAML. |
+| `sightmap sel-probe -- 'selector'` | Verify a selector: match count + parent chain. Run before writing any YAML. The selector goes **after** `--` (any flags before it): `sel-probe [flags] -- 'sel'`. |
 | `sightmap validate` | Spec-validate `.sightmap/` YAML (errors fail; **warnings** — corpus conflicts + unknown/typo'd fields like `memroy:` — print but pass). No prepare step needed. |
 | `sightmap lint --warn-only` | Style checks (`--warn-only`; exits 0 always). |
 | `sightmap coverage --trace FILE.snap` | Offline T1/T2/T3 re-check on saved snap (requires `.snap.tree.json` companion). |
@@ -103,7 +103,7 @@ other dependency.
 | `sightmap search PATTERN` | Offline YAML regex search with hierarchy breadcrumbs. `--field name\|selector\|description\|memory` to narrow. |
 | `sightmap discover` | Crawl page links → ✓ mapped / ○ surveyed / ? unseen. `--all` shows surveyed. |
 | `sightmap suggest --exclude-known` | Candidate selectors not yet in sightmap (`--exclude-known` always on). |
-| `sightmap gap --visible` | Orphaned interactive nodes with selector hints (`--visible` always on). |
+| `sightmap gap` | Orphaned interactive nodes with selector hints. Add `--include-hidden` to also list hidden/off-screen nodes. |
 
 ### Session management
 
@@ -129,8 +129,8 @@ component still needs a disambiguating property.
 ## Hard rules
 
 **NEVER write YAML without first verifying selectors.**
-Run `sightmap sel-probe 'selector'` on every new selector before committing it to
-YAML. sel-probe queries the live DOM **and** cross-checks the offline matcher
+Run `sightmap sel-probe -- 'selector'` on every new selector before committing it
+to YAML (the selector goes after `--`, any flags before it). sel-probe queries the live DOM **and** cross-checks the offline matcher
 that `snapshot`/`coverage`/`capture` actually use — it prints both counts and a
 `⚠ offline/live divergence` warning when they disagree. Trust the **offline**
 count: that is what the corpus will see. Wrong match count = corrupt coverage.
@@ -303,6 +303,109 @@ this to your advantage — a well-named property makes the annotation clean.
 
 ---
 
+## Requests and messages
+
+Components and views describe the DOM. Two more top-level entities describe a
+page's *runtime activity*: the network it makes (`requests:`) and the
+console/exceptions it emits (`messages:`). Both are matched against **live
+traffic**, not the DOM tree — you author them from what you observe with the
+`sightmap-browser` skill's `network` and `console` tools, where each captured
+record leads with a `[MatchedName]` slot (or `[--]` when nothing matched). They
+live in their own top-level lists and can share any `.sightmap/*.yaml` file.
+
+### `requests:` — name an endpoint
+
+Name endpoints that *mean something* (an API action, an auth call, a data fetch)
+by route glob + method, so their traffic is classified instead of anonymous.
+Don't map static assets (JS/CSS/images/fonts).
+
+```yaml
+version: 1
+requests:
+  - name: AuraAction
+    route: /aura                 # glob matched against the request URL path
+    method: POST
+    description: Lightning Aura batched server actions.
+```
+
+In `sightmap network list`, traffic to it now reads `[AuraAction]`; unmapped
+traffic reads `[--]`.
+
+### Request `properties:` — extract a value from live traffic
+
+The HTTP status often lies: an endpoint returns `200 OK` while the real outcome
+lives inside the body. A request `properties:` entry pulls a named value out of
+the live request/response so a consumer can reason about it (the SEP-0005 "200 OK
+but the body says declined" case). Each property is resolved
+**source → field → pattern → transform**:
+
+- **`source:`** — which half to read: `rsp.body`, `req.body`, `rsp.headers`, or
+  `req.headers`.
+- **`field:`** — where inside it. For a body, a dot-path into the parsed JSON; a
+  numeric segment indexes an array (`actions.0.state`). For headers, the header
+  name (case-insensitive).
+- **`pattern:`** *(optional)* — an RE2 regex refining what `field` resolved (or
+  scanning the raw source when `field` is omitted). Capture group 1 is the value
+  when present, else the whole match.
+- **`transform:`** *(optional)* — same vocabulary as component properties.
+
+```yaml
+requests:
+  - name: AuraAction
+    route: /aura
+    method: POST
+    properties:
+      # Aura returns HTTP 200 even when an action fails; the real per-action
+      # outcome (SUCCESS | ERROR | INCOMPLETE) is inside the JSON body.
+      - name: first_action_state
+        source: rsp.body
+        field: actions.0.state
+```
+
+Live, matched requests carry the extracted value:
+`[AuraAction] POST /aura → 200 (XHR) {first_action_state=SUCCESS}` — and, on the
+one call that actually failed behind the same 200, `{first_action_state=ERROR}`.
+
+Extraction is **silently omitted** (never an error) when the source isn't
+present, the field doesn't resolve, or the pattern doesn't match — whether a body
+or header is even captured depends on the runtime layer. `status`, `method`, and
+`duration` are already-structured request identity and need no `properties:`
+declaration.
+
+### `messages:` — name a console/exception pattern
+
+A `messages:` entry classifies console output and runtime exceptions by `level`
+and/or a `message` regex. An exception folds in as an ERROR/`exception`-level
+record — there is no separate entity.
+
+```yaml
+version: 1
+messages:
+  - name: DeprecatedChartApi
+    level: WARN                    # exact, case-insensitive; omit to match any level
+    message: has been deprecated   # RE2 regex over the message text; omit to match any
+    description: Legacy chart JS deprecation warning.
+```
+
+In `sightmap console list`, a matched record reads `[DeprecatedChartApi]`;
+unmatched reads `[--]`. Declare at least one of `level`/`message` (an entry
+matching everything isn't useful).
+
+An exception's **stack frames** are addressable with message `properties:`
+(`source: stack` is the only source in v1):
+
+```yaml
+messages:
+  - name: CartSyncCrash
+    message: cart version mismatch
+    properties:
+      - name: origin_fn
+        source: stack
+        field: top.function       # <frame>.<attr>; frame = top|<index>, attr = function|file|line|column
+```
+
+---
+
 ## Seeding from the codebase
 
 When the app's source is available, use it to bootstrap components before you
@@ -375,6 +478,16 @@ views:
 ```
 
 Run `sightmap validate` before snapping.
+
+**Keep routes specific.** A `route:` glob should identify *this* view, not every
+page. A catch-all like `/lightning/**` or `/**` that matches every URL is a smell:
+as you map more pages they all collapse onto the one view, and — worse —
+`sightmap discover` marks those distinct URLs `✓ [ThatView]` (mapped) purely
+because the catch-all matched, hiding that they are actually uncovered. When a
+new page looks structurally different (its Guide is mostly *different*
+components), give it its own view with a narrower route and demote or drop the
+catch-all. Matching every page is the problem, not the goal — don't keep an
+over-general route just because it "matches."
 
 ### Step 1b — Snap and read coverage
 
@@ -464,6 +577,28 @@ sightmap browser navigate https://...
 sightmap snapshot --out PAGE.snap --tree-out PAGE.snap.tree.json
 ```
 
+### Step 1e — Runtime activity (requests & messages)
+
+DOM coverage isn't the whole page. Once components are done, classify what the
+page *does* at runtime — the network it makes and the console/exceptions it emits
+— with the `requests:` and `messages:` entities (see **Requests and messages**
+above; observe them with the `sightmap-browser` skill's `network`/`console`
+tools). Traffic from before the session started isn't captured, so **reproduce it
+first**: refresh the page (or re-trigger the action), then read the streams —
+matched records lead with a `[Name]` slot, unmapped ones with `[--]`:
+
+```bash
+sightmap network list --type XHR    # name meaningful endpoints; skip static assets
+sightmap console list               # name recurring console/exception patterns
+```
+
+- Add a `requests:` entry for endpoints that *mean something* (an API action, an
+  auth call, a data fetch). Add request `properties:` where a value inside the
+  body/headers is the real signal — the "200 OK but the body says failed" case.
+- Add a `messages:` entry for recurring console/exception patterns worth naming.
+- Requests/messages are often global; promote cross-page ones like components
+  (Phase 2). Skip it only when the page makes no meaningful traffic.
+
 ---
 
 ## Phase 2: Cross-page promotion
@@ -491,6 +626,7 @@ sightmap lint --warn-only   # deep-nesting warnings are expected; watch for new 
 - [ ] Every page at 0 orphaned ✓
 - [ ] Quality self-review passed for all pages
 - [ ] `sightmap multi-coverage` shows no unaddressed global candidates
+- [ ] Runtime activity classified — meaningful `network`/`console` records lead with a `[Name]`, not `[--]` (or are deliberately left unmapped)
 
 ---
 
