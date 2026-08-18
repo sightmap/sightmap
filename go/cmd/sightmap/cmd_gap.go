@@ -161,6 +161,13 @@ func runGap(args []string) error {
 			fmt.Printf("✓ No T2 gaps in [%s]\n", *scopeFlag)
 		} else {
 			fmt.Println("✓ no orphaned interactive nodes")
+			// Chrome-only guard: no hard orphans, but if every covered node is
+			// scoped only by GLOBAL (chrome) components the page isn't modeled by a
+			// view — "no orphaned" just reflects a broad global backstop. Mirror the
+			// snapshot/coverage advisory so gap doesn't show a false green (a11e.9).
+			if len(matches) > 0 && coverage.ViewScopedMatchCount(matches, corpus.GlobalComponentNames()) == 0 {
+				fmt.Println("⚠ but every covered node is scoped only by global (chrome) components — this page isn't modeled by a view. Model the view's own content before treating this as complete.")
+			}
 		}
 		return nil
 	}

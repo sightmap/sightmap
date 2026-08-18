@@ -267,10 +267,8 @@ func writeChromeOnlyAdvisory(w io.Writer, r *Result) {
 	if cov.Empty() || cov.T3 != 0 {
 		return
 	}
-	for _, m := range r.Matches {
-		if m != nil && !r.GlobalNames[m.Name] {
-			return // the view modeled at least one component — a legitimate pass
-		}
+	if coverage.ViewScopedMatchCount(r.Matches, r.GlobalNames) > 0 {
+		return // the view modeled at least one component — a legitimate pass
 	}
 	if r.View != nil {
 		fmt.Fprintf(w, "⚠ view [%s] contributed 0 components — this page is covered only by global (chrome) components. \"0 orphaned\" reflects the global backstop, not a modeled view.\n", r.View.Name)
