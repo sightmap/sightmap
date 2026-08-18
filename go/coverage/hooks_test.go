@@ -124,6 +124,32 @@ func TestSelectorCandidates_RankingDataAttrOverClass(t *testing.T) {
 	}
 }
 
+func TestViewScopedMatchCount(t *testing.T) {
+	globals := map[string]bool{"GlobalHeader": true, "AppShell": true}
+	n1 := &sightmap.ComponentNode{Id: "1"}
+	n2 := &sightmap.ComponentNode{Id: "2"}
+	n3 := &sightmap.ComponentNode{Id: "3"}
+
+	// All matches are global → 0 view-scoped (the chrome-only case).
+	chromeOnly := Matches{
+		n1: {Name: "GlobalHeader"},
+		n2: {Name: "AppShell"},
+	}
+	if got := ViewScopedMatchCount(chromeOnly, globals); got != 0 {
+		t.Errorf("chrome-only: got %d, want 0", got)
+	}
+
+	// One view-scoped match → count 1.
+	mixed := Matches{
+		n1: {Name: "GlobalHeader"},
+		n2: {Name: "ListSearchBox"},
+		n3: {Name: "AppShell"},
+	}
+	if got := ViewScopedMatchCount(mixed, globals); got != 1 {
+		t.Errorf("mixed: got %d, want 1", got)
+	}
+}
+
 func TestNearestHookAncestor(t *testing.T) {
 	leaf := &sightmap.ComponentNode{Id: "leaf", Role: "button", Element: &sightmap.Element{Tag: "button"}}
 	mid := &sightmap.ComponentNode{Id: "mid", Element: &sightmap.Element{Tag: "div"}, Children: []*sightmap.ComponentNode{leaf}}
