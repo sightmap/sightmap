@@ -247,7 +247,18 @@ brackets when not suppressed by Rule A (exact match with a property value).
 
 ## Property extraction principles
 
-Every child component that is a link or button **must** have at least one property.
+Two property rules are **mandatory**:
+
+1. Every child component that is a link or button **must** have at least one
+   property.
+2. Every component whose selector matches **more than one instance** — a
+   repeated container or control (cards, list rows, nav tabs, feed items) —
+   **must** carry a property that *varies per instance* (a title, label, key, or
+   state), even a pure container with no link/button of its own. Without one,
+   every instance collapses to an indistinguishable node and no component query
+   can resolve a single one. `sel-probe` already prints the match count: a count
+   > 1 with no per-instance property is the tell. Extract the discriminator from
+   wherever it lives — a header title, an `aria-label`, a stable `data-*`.
 
 ```yaml
 - name: FooterLink
@@ -255,6 +266,14 @@ Every child component that is a link or button **must** have at least one proper
   properties:
     - name: label
       extract: text
+
+# Repeated container: one selector, many instances → needs a per-instance
+# discriminator so `Card[title^="Today"]` can resolve exactly one.
+- name: Card
+  selector: 'article.card'
+  properties:
+    - name: title
+      extract: '.card__title'
 ```
 
 **Choosing an extract mode:**
