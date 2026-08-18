@@ -13,8 +13,9 @@
 package coverage
 
 import (
-	"github.com/sightmap/sightmap/go/sightmap"
 	"math"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // Matches maps a component node to the sightmap rule it matched.
@@ -129,6 +130,21 @@ func nearestMatchedAncestor(node *sightmap.ComponentNode, parentMap ParentMap, m
 		curr = parentMap[curr]
 	}
 	return nil
+}
+
+// ViewScopedMatchCount returns the number of matched (T1) nodes whose component
+// is NOT a global (chrome) component. Zero while nodes are still covered means
+// the page is carried only by global backstops — a clean coverage pass that
+// reflects chrome, not a modeled view. Shared by the snapshot/coverage advisory
+// and `gap` so the two surfaces agree instead of one showing a false green.
+func ViewScopedMatchCount(matches Matches, globalNames map[string]bool) int {
+	n := 0
+	for _, m := range matches {
+		if m != nil && !globalNames[m.Name] {
+			n++
+		}
+	}
+	return n
 }
 
 // Pct returns a/b as a percentage rounded to the nearest integer (0 when b==0).
