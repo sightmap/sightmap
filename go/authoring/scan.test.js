@@ -65,6 +65,38 @@ describe("__smScanCandidates", () => {
     const [candidate] = __smScanCandidates(10);
     expect(candidate.ancestorId).toBe("42");
   });
+
+  test("emits a custom-element tag candidate (no data-attr needed)", () => {
+    document.body.innerHTML = `<one-appnav></one-appnav><one-appnav></one-appnav>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates).toEqual([
+      expect.objectContaining({ sel: "one-appnav", count: 2 }),
+    ]);
+  });
+
+  test("emits a design-system class candidate for a control", () => {
+    document.body.innerHTML = `<button class="refreshButton"></button>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates.map((c) => c.sel)).toContain("button.refreshButton");
+  });
+
+  test("drops a hashed class, emitting no candidate", () => {
+    document.body.innerHTML = `<button class="lwc-1a2b3c4d"></button>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates).toEqual([]);
+  });
+
+  test("falls back to an aria-label hook for a landmark", () => {
+    document.body.innerHTML = `<div role="navigation" aria-label="Main"></div>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates.map((c) => c.sel)).toContain('div[aria-label="Main"]');
+  });
+
+  test("ignores pure layout wrappers (not candidate-worthy)", () => {
+    document.body.innerHTML = `<div class="slds-grid"><div class="slds-col"></div></div>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates).toEqual([]);
+  });
 });
 
 describe("__smScanLinks", () => {
