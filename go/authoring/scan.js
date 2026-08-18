@@ -1,57 +1,115 @@
 // Live-DOM discovery scans used while building a corpus. Depends on
 // __smDeepQueryAll from browser/deepquery.js being prepended.
 
+// __smLooksHashed mirrors coverage.looksHashed (Go): a token is machine-generated
+// / per-instance (aura ids, hashed classnames, uuids, emotion/styled suffixes)
+// rather than a stable authored hook. Keep the two in sync.
+function __smLooksHashed(tok) {
+  if (!tok) return true;
+  if (/[:;$]/.test(tok)) return true; // aura ids "1:1;a", scoped "$x"
+  if (/[0-9]{4,}/.test(tok)) return true; // counters/timestamps
+  if (/[0-9a-fA-F]{8,}/.test(tok)) return true; // hashes/uuids
+  for (const seg of tok.split(/[-_]/)) {
+    // word-<hash>: >=6 chars mixing letters with several digits
+    if (
+      seg.length >= 6 &&
+      /[a-zA-Z]/.test(seg) &&
+      (seg.match(/[0-9]/g) || []).length >= 2
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const __smUtilityClasses = new Set([
+  "active",
+  "open",
+  "closed",
+  "hidden",
+  "show",
+  "hide",
+  "selected",
+  "disabled",
+  "visible",
+  "container",
+  "row",
+  "col",
+  "wrapper",
+  "content",
+  "clearfix",
+  "sr-only",
+]);
+
+// __smCandidateWorthy limits the scan to elements likely to be a nameable
+// component — controls, landmarks, custom elements, or data-attr-bearing nodes —
+// so pure layout wrappers don't flood the output.
+function __smCandidateWorthy(el) {
+  const tag = el.tagName.toLowerCase();
+  if (el.hasAttribute("data-testid") || el.hasAttribute("data-component"))
+    return true;
+  if (tag.includes("-")) return true; // custom element
+  if (el.hasAttribute("role")) return true;
+  if (el.hasAttribute("aria-label")) return true;
+  return ["a", "button", "input", "select", "textarea"].includes(tag);
+}
+
+// __smBestHook returns the single strongest stable selector for el, or "".
+// Priority mirrors coverage.SelectorCandidates (Go): data-* hooks lead but are
+// one input, not an override — a custom-element tag, stable id, form name, or
+// design-system class is surfaced when no data-attr exists.
+function __smBestHook(el) {
+  const tag = el.tagName.toLowerCase();
+  const dt = el.getAttribute("data-testid");
+  if (dt && !__smLooksHashed(dt)) return '[data-testid="' + dt + '"]';
+  const dc = el.getAttribute("data-component");
+  if (dc)
+    return '[data-component^="' + dc.replace(/:v\d+\.\d+\.\d+.*$/, "") + '"]';
+  if (tag.includes("-")) return tag; // custom element — stable and semantic
+  const id = el.id;
+  if (id && !__smLooksHashed(id) && !/\d+$/.test(id)) return "#" + id;
+  const name = el.getAttribute("name");
+  if (name && !__smLooksHashed(name)) return tag + '[name="' + name + '"]';
+  let utility = "";
+  for (const cls of el.classList) {
+    if (!cls || __smLooksHashed(cls)) continue;
+    if (__smUtilityClasses.has(cls)) {
+      if (!utility) utility = tag + "." + cls;
+      continue;
+    }
+    return tag + "." + cls; // first specific class wins
+  }
+  if (utility) return utility;
+  const al = el.getAttribute("aria-label");
+  if (al && !__smLooksHashed(al) && al.length <= 40)
+    return tag + '[aria-label="' + al + '"]';
+  return "";
+}
+
 function __smScanCandidates(max) {
   const results = {};
-  const selectors = [
-    "[data-testid]",
-    "[data-component]",
-    "[aria-label][role]",
-    '[role="navigation"]',
-    '[role="search"]',
-    '[role="banner"]',
-    '[role="main"]',
-    '[role="complementary"]',
-    '[role="contentinfo"]',
-    '[role="dialog"]',
-    '[role="alertdialog"]',
-    '[role="tablist"]',
-    '[role="tab"]',
-    '[role="tabpanel"]',
-  ];
-  for (const sel of selectors) {
-    const els = __smDeepQueryAll(document, sel);
-    for (const el of els) {
-      let candidate = "";
-      const dt = el.getAttribute("data-testid");
-      const dc = el.getAttribute("data-component");
-      const role = el.getAttribute("role") || el.tagName.toLowerCase();
-      const tag = el.tagName.toLowerCase();
-      const text = el.textContent.trim().replace(/\s+/g, " ").slice(0, 60);
-      if (dt) {
-        candidate = '[data-testid="' + dt + '"]';
-      } else if (dc) {
-        const base = dc.replace(/:v\d+\.\d+\.\d+.*$/, "");
-        candidate = '[data-component^="' + base + '"]';
-      } else {
-        continue;
-      }
-      if (!results[candidate]) {
-        const ancestorEl = el.closest("[data-sightmap-id]");
-        const ancestorId = ancestorEl
-          ? ancestorEl.getAttribute("data-sightmap-id")
-          : "";
-        results[candidate] = {
-          sel: candidate,
-          count: 0,
-          role,
-          tag,
-          sample: text,
-          ancestorId,
-        };
-      }
-      results[candidate].count++;
+  for (const el of __smDeepQueryAll(document, "*")) {
+    if (!__smCandidateWorthy(el)) continue;
+    const candidate = __smBestHook(el);
+    if (!candidate) continue;
+    const role = el.getAttribute("role") || el.tagName.toLowerCase();
+    const tag = el.tagName.toLowerCase();
+    const text = el.textContent.trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!results[candidate]) {
+      const ancestorEl = el.closest("[data-sightmap-id]");
+      const ancestorId = ancestorEl
+        ? ancestorEl.getAttribute("data-sightmap-id")
+        : "";
+      results[candidate] = {
+        sel: candidate,
+        count: 0,
+        role,
+        tag,
+        sample: text,
+        ancestorId,
+      };
     }
+    results[candidate].count++;
   }
   return Object.values(results)
     .sort((a, b) => b.count - a.count)
