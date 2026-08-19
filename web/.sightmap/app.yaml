@@ -5,6 +5,7 @@ memory:
   - All homepage sections live in src/components/ and compose into src/pages/Home.tsx
   - Posts are markdown in content/blog/; scripts/build-blog.ts generates the manifest and per-post HTML modules
   - Pages are statically prerendered by scripts/prerender.tsx; the client hydrates rather than mounting fresh
+  - "The offline matcher has no pseudo-class support: a selector like `.foo:first-child` probes 1 live and 0 offline, so keep selectors to attributes, classes and descendant combinators"
 
 views:
   - name: HomePage
@@ -102,6 +103,11 @@ views:
         selector: '[data-component="BlogCard"]'
         source: src/components/BlogCard.tsx
         description: One post summary — topic, date, title, excerpt
+        properties:
+          - name: title
+            extract: '.blog-card__title'
+          - name: topic
+            extract: '.blog-card__meta span'
         children:
           - name: blog-card-title
             selector: '.blog-card__title'
@@ -117,6 +123,8 @@ views:
       - Interactive figures are authored as <div data-widget="..."> in the markdown and swapped by src/components/blog/widgets.tsx
       - "Draft posts render a fixed banner (top: 56px, below the nav) and redirect to /blog without ?preview=true"
       - The prerender skips drafts entirely, so a draft post has no page in dist/
+      - "Code blocks carry `[data-component=\"CodeBlock\"]` but a post renders many of them, so the hook is deliberately left unmapped — reach one through PostBody instead"
+      - CodeBlock's expanded view is portalled to document.body, so it lands outside the post's subtree and a second `.blog-code` appears while it is open
     components:
       - name: SightmapSnapshot
         selector: '.smap-widget'
@@ -133,6 +141,18 @@ views:
         selector: '.smap-svs'
         source: src/components/blog/SkillVsSightmap.tsx
         description: Static SVG contrasting skill-dump context with contextual disclosure
+      - name: PostHeader
+        selector: '.blog-post__header'
+        source: src/pages/BlogPost.tsx
+        description: Identifies the post being read — topic, date, title and byline
+      - name: PostBody
+        selector: '.prose'
+        source: src/pages/BlogPost.tsx
+        description: The post's rendered markdown body, including its code blocks and embedded figures
+      - name: BackToBlog
+        selector: '.blog-post__back'
+        source: src/pages/BlogPost.tsx
+        description: Returns to the post index from a post
 
   - name: AtlasIndex
     route: /atlas
@@ -147,6 +167,7 @@ views:
     components:
       - name: AtlasFilters
         selector: '[data-component="AtlasFilters"]'
+        source: src/pages/AtlasIndex.tsx
         description: Search input plus the category chip row; the active chip carries aria-pressed
         children:
           - name: atlas-filters-search
@@ -157,14 +178,30 @@ views:
         selector: '[data-component="AtlasCard"]'
         source: src/components/atlas/AtlasCard.tsx
         description: One entry summary — screenshot, mark, name, method pill, stats, author, updated
+        properties:
+          - name: site
+            extract: '.atlas-card__name'
+          - name: method
+            extract: '.atlas-card__method'
         memory:
           - The whole card is the link to /atlas/<slug>; there is no inner call to action
           - An entry with no screenshots renders a typographic fallback panel in place of the image
+          - "`method` extracts as the rendered text, which CSS uppercases: the property reads BROWSER where the manifest data says browser"
         children:
           - name: atlas-card-name
             selector: '.atlas-card__name'
           - name: atlas-card-stats
             selector: '.atlas-card__stats'
+
+      - name: AtlasSubmitCard
+        selector: '[data-component="AtlasSubmitCard"]'
+        source: src/components/atlas/AtlasSubmitCard.tsx
+        description: Trailing invitation in the card grid — links out to the guide for contributing a new entry
+
+      - name: AtlasMachineHint
+        selector: '.atlas-index__machine'
+        source: src/pages/AtlasIndex.tsx
+        description: Points agents at the machine-readable index for the whole gallery
 
   - name: AtlasEntry
     route: /atlas/:slug
@@ -176,11 +213,16 @@ views:
       - README headings are demoted one level so the page keeps a single h1
       - Machine twins for the same entry live at /atlas/<slug>.md and /atlas/index.json
       - The corpus that `sightmap atlas add` pulls is served from /atlas/<slug>.tar.gz, written by scripts/build-atlas.ts
+      - "The rendered README reuses the page's own `.atlas-table` and `.atlas-table-wrap` classes, so neither is unique on an entry page — scope table selectors under `.atlas-views`"
+      - AtlasEntry reuses the blog's `.blog-post__back` class for its back link, so that selector resolves on both /blog/:slug and /atlas/:slug
     components:
       - name: AtlasInstall
         selector: '[data-component="AtlasInstall"]'
         source: src/components/atlas/AtlasInstall.tsx
         description: The `sightmap atlas add <slug>` command with a copy button
+        properties:
+          - name: command
+            extract: '.atlas-install__cmd'
         memory:
           - The button label toggles to "Copied" for 2s and only on a copy that actually succeeded
         children:
@@ -188,6 +230,55 @@ views:
             selector: '.atlas-install__cmd'
           - name: atlas-install-copy
             selector: '.atlas-install__copy'
+
+      - name: AtlasMeta
+        selector: '[data-component="AtlasMeta"]'
+        source: src/pages/AtlasEntry.tsx
+        description: Provenance rail for the entry — how and when it was captured, by whom, against which CLI and spec version
+        properties:
+          - name: lastVerified
+            extract: 'time'
+          - name: commit
+            extract: 'code'
+        memory:
+          - A row is omitted entirely rather than left blank when its value is absent, so the rail's row count varies by entry
+        children:
+          - name: AtlasMetaMachine
+            selector: '.atlas-meta__machine'
+            description: Links to the machine-readable twins of this entry
+
+      - name: EntryEyebrow
+        selector: '.atlas-entry__eyebrow'
+        source: src/pages/AtlasEntry.tsx
+        description: Links out to the mapped site itself, marked nofollow because entries are community-submitted
+
+      - name: EntryCategories
+        selector: '.atlas-entry__cats'
+        source: src/pages/AtlasEntry.tsx
+        description: Category chips that link back into the gallery's filter, so a category finds neighbouring entries
+
+      - name: EntryScreenshots
+        selector: '.atlas-figs'
+        source: src/pages/AtlasEntry.tsx
+        description: Captured screenshots for the entry, captioned from the vendored filenames
+
+      - name: EntryViews
+        selector: '.atlas-views'
+        source: src/pages/AtlasEntry.tsx
+        description: Per-view breakdown of what the entry's corpus covers — route, component and request counts
+        children:
+          - name: EntryViewsTable
+            selector: '.atlas-table'
+
+      - name: EntryBody
+        selector: '.atlas-body'
+        source: src/pages/AtlasEntry.tsx
+        description: The entry's README prose, rendered from community-authored markdown at build time
+
+      - name: BackToAtlas
+        selector: '.blog-post__back'
+        source: src/pages/AtlasEntry.tsx
+        description: Returns to the gallery from an entry
 
   - name: NotFound
     route: '*'
@@ -201,7 +292,7 @@ components:
   - name: Navigation
     selector: '[data-component="Navigation"]'
     source: src/components/Navigation.tsx
-    description: Fixed header with logo and nav links to Spec, Memory, Get started, GitHub
+    description: Persistent site header — the route into the homepage's spec sections plus the atlas, blog, docs and repo
     children:
       - name: nav-logo
         selector: ".nav-logo"
@@ -213,7 +304,25 @@ components:
   - name: Footer
     selector: '[data-component="Footer"]'
     source: src/components/Footer.tsx
-    description: Minimal footer with attribution, GitHub, license, and Subtext link
+    description: Site-wide attribution and the full secondary link set, plus the only entry point to the privacy preferences dialog
+    memory:
+      - The banner auto-shows once and never again once a choice is stored, so the "Privacy preferences" button here is the only route back to the consent dialog
     children:
       - name: footer-links
         selector: ".footer-links"
+      - name: PrivacyPreferences
+        selector: '[data-action="consent-open-preferences"]'
+        description: Reopens the consent dialog so the analytics-capture choice can be changed
+
+  - name: ConsentBanner
+    selector: '[data-component="ConsentBanner"]'
+    source: src/components/consent/ConsentUI.tsx
+    description: First-visit ask for analytics-capture consent — accept, decline, and a link out to the privacy policy
+    memory:
+      - Never present in the prerendered HTML; it mounts only after a client effect, so nothing in dist/ and no JS-disabled load has a banner
+      - "`.consent-copy` and `.consent-actions` are shared with the preferences dialog, but ConsentUI renders one or the other and never both, so they stay single-match"
+    children:
+      - name: ConsentCopy
+        selector: '.consent-copy'
+      - name: ConsentActions
+        selector: '.consent-actions'
