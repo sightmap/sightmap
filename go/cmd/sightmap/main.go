@@ -44,6 +44,8 @@ func main() {
 		err = runBrowser(args)
 	case "inspect":
 		err = runInspect(args)
+	case "explain":
+		err = runExplain(args)
 	case "snapshot":
 		err = runSnapshot(args)
 	case "capture":
@@ -124,6 +126,7 @@ Commands:
   snapshot       [--url URL] [--coverage] [--out FILE] [--sightmap-dir DIR]  observe: annotated component tree + coverage
   capture        [--url URL] [--all] [--force] [--sightmap-dir DIR]  persist a capture into the matched view's set
   inspect        [--url URL] [--out FILE] [--sightmap-dir DIR]  raw DOM tree for selector authoring
+  explain        [--snap FILE] [--id ID | --grep STR | SELECTOR] [--sightmap-dir DIR]  one node's facts, candidates, tier + owner, ancestors
   coverage       [--sightmap-dir DIR] [FILE.snap ...]            offline T1/T2/T3 check
   multi-coverage [--sightmap-dir DIR] [FILE.snap ...]            cross-page coverage matrix
   capture-novelty [--sightmap-dir DIR] FILE.snap               does a capture add new components/slots vs its view set?
