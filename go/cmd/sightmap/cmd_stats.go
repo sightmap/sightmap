@@ -174,6 +174,7 @@ func printStats(out io.Writer, s sightmap.Stats) {
 	fmt.Fprintf(out, " %-10s  %d\n", "Views", s.Views)
 	fmt.Fprintf(out, " %-10s  %d\n", "Components", s.Components)
 	fmt.Fprintf(out, " %-10s  %d\n", "Requests", s.Requests)
+	fmt.Fprintf(out, " %-10s  %d\n", "Messages", s.Messages)
 	fmt.Fprintf(out, " %-10s  %d\n", "Properties", s.Properties)
 	fmt.Fprintf(out, " %-10s  %d\n", "Memory", s.Memory)
 	fmt.Fprintln(out, sep)
