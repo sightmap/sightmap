@@ -50,6 +50,7 @@ type Totals struct {
 	Views      int `json:"views"`      // number of views
 	Components int `json:"components"` // distinct component names corpus-wide
 	Requests   int `json:"requests"`   // global + view-scoped request definitions
+	Messages   int `json:"messages"`   // file-root console/exception message definitions
 	Properties int `json:"properties"` // properties over distinct component definitions
 	Memory     int `json:"memory"`     // file-, view-, component-, and request-level entries
 }
@@ -70,7 +71,7 @@ type ViewStats struct {
 // no components, no requests, and no memory entries. A corpus that holds only
 // memory is legal (Validate accepts it) and is NOT empty.
 func (s Stats) IsEmpty() bool {
-	return s.Views == 0 && s.Components == 0 && s.Requests == 0 && s.Memory == 0
+	return s.Views == 0 && s.Components == 0 && s.Requests == 0 && s.Messages == 0 && s.Memory == 0
 }
 
 // Stats folds the corpus into its count summary. See Stats for exactly what
@@ -85,8 +86,9 @@ func (s Stats) IsEmpty() bool {
 func (c *Corpus) Stats() Stats {
 	s := Stats{
 		Totals: Totals{
-			Views:  len(c.Views),
-			Memory: len(c.Memory),
+			Views:    len(c.Views),
+			Messages: len(c.Messages),
+			Memory:   len(c.Memory),
 		},
 		PerView: make([]ViewStats, 0, len(c.Views)),
 	}

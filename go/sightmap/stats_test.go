@@ -26,6 +26,9 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 		Requests: []RequestDef{
 			{Name: "GetCurrentUser", Route: "/api/me", Method: "GET"},
 		},
+		Messages: []MessageDef{
+			{Name: "CartVersionMismatch", Level: "ERROR", Message: "cart version mismatch"},
+		},
 		Views: []ViewDef{
 			{
 				Name:   "Checkout",
@@ -66,6 +69,9 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 	}
 	if s.Requests != 2 {
 		t.Errorf("Requests = %d, want 2 (1 global + 1 view-scoped)", s.Requests)
+	}
+	if s.Messages != 1 {
+		t.Errorf("Messages = %d, want 1", s.Messages)
 	}
 	if s.Properties != 1 {
 		t.Errorf("Properties = %d, want 1", s.Properties)

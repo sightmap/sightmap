@@ -204,7 +204,7 @@ views:
 		t.Fatalf("unmarshal %q: %v", out.String(), err)
 	}
 	assertFieldSet(t, "top level", raw,
-		[]string{"components", "memory", "per_view", "properties", "requests", "views"})
+		[]string{"components", "memory", "messages", "per_view", "properties", "requests", "views"})
 
 	var rows []map[string]json.RawMessage
 	if err := json.Unmarshal(raw["per_view"], &rows); err != nil {
