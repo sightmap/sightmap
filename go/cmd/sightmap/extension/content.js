@@ -222,6 +222,54 @@ function activeComponents() {
 
 // ── Sightmap loading ──────────────────────────────────────────────────────────
 
+// The content script prefers a DIRECT fetch to the local sightmap server. On an
+// app served over http (the common dev case) the page can fetch http://localhost
+// directly, so we bypass the background service-worker proxy entirely: the MV3 SW
+// round-trip is unreliable on a cold/just-woken worker and was silently
+// delivering an empty corpus at page-load time. The SW proxy (bgFetch) remains a
+// fallback for https-origin pages, where mixed-content blocks a direct http
+// fetch. host_permissions grants http://localhost:*, and the server sends
+// Access-Control-Allow-Origin:*, so the cross-port fetch is allowed.
+let directServerBase = null; // cached resolved base, e.g. "http://localhost:7891"
+
+async function pingServer(base) {
+  try {
+    const r = await fetch(`${base}/sightmap/version`, {
+      signal: AbortSignal.timeout(400),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Resolve the local server by direct probing: the hint from chrome.storage.local
+// (injected by `browser start`), then the 7891–7900 range. Returns null when
+// nothing responds or the page origin blocks the http fetch (https mixed
+// content) — callers then fall back to the SW proxy.
+async function discoverDirect() {
+  if (directServerBase && (await pingServer(directServerBase)))
+    return directServerBase;
+  directServerBase = null;
+  let hint = 7891;
+  try {
+    const s = await chrome.storage.local.get("serverPort");
+    if (s.serverPort) hint = s.serverPort;
+  } catch {
+    /* storage unavailable — use default hint */
+  }
+  const ports = [hint];
+  for (let p = 7891; p <= 7900; p++) if (p !== hint) ports.push(p);
+  for (const p of ports) {
+    const base = `http://localhost:${p}`;
+    if (await pingServer(base)) {
+      directServerBase = base;
+      return base;
+    }
+  }
+  return null;
+}
+
 // Proxy fetches through the background service worker to avoid mixed-content
 // blocks (content script on https:// cannot directly fetch http://localhost).
 function bgFetch(type) {
@@ -236,47 +284,85 @@ function bgFetch(type) {
   });
 }
 
-async function fetchSightmap() {
+// Fetch the full corpus. Prefers a direct fetch; falls back to the SW proxy
+// (https pages). Returns the parsed payload, or null on failure.
+async function fetchSightmapData() {
+  const base = await discoverDirect();
+  if (base) {
+    try {
+      const r = await fetch(`${base}/sightmap`);
+      if (r.ok) return await r.json();
+    } catch {
+      directServerBase = null; // direct path failed — fall through to the proxy
+    }
+  }
   try {
     const resp = await bgFetch("fetch-sightmap");
-    const data = resp.data;
-    const corpus = data.corpus ?? {};
-    state.globals = (corpus.globals ?? []).map(normalizeComp);
-    state.views = (corpus.views ?? []).map((v) => ({
-      name: v.name,
-      route: v.route,
-      components: (v.components ?? []).map(normalizeComp),
-    }));
-    state.version = data.version;
-    const total =
-      state.globals.length +
-      state.views.reduce((s, v) => s + v.components.length, 0);
-    console.log(
-      `[sightmap] loaded ${total} components from ${data.site} v${data.version}`,
-    );
-    chrome.runtime
-      .sendMessage({
-        type: "sightmap-loaded",
-        version: data.version,
-        site: data.site,
-        componentCount: total,
-      })
-      .catch(() => {});
-  } catch (err) {
-    // Server not running — silent; will retry on next poll
+    return resp.data;
+  } catch {
+    return null;
   }
 }
 
+// Fetch just the version string, same direct-then-proxy strategy.
+async function fetchVersionValue() {
+  const base = await discoverDirect();
+  if (base) {
+    try {
+      const r = await fetch(`${base}/sightmap/version`);
+      if (r.ok) return (await r.json()).version;
+    } catch {
+      directServerBase = null;
+    }
+  }
+  const resp = await bgFetch("fetch-sightmap-version");
+  return resp.version;
+}
+
+async function fetchSightmap() {
+  const data = await fetchSightmapData();
+  if (!data) return false; // server unreachable — retry on next poll
+  const corpus = data.corpus ?? {};
+  const globals = (corpus.globals ?? []).map(normalizeComp);
+  const views = (corpus.views ?? []).map((v) => ({
+    name: v.name,
+    route: v.route,
+    components: (v.components ?? []).map(normalizeComp),
+  }));
+  const total =
+    globals.length + views.reduce((s, v) => s + v.components.length, 0);
+  // An empty corpus means the server answered before its corpus finished loading
+  // (or a degraded proxy delivered a stripped payload). Do NOT cache it or record
+  // its version — leave state untouched so pollVersion keeps retrying instead of
+  // sticking on an empty overlay for the life of the page.
+  if (total === 0) return false;
+  state.globals = globals;
+  state.views = views;
+  state.version = data.version;
+  console.log(
+    `[sightmap] loaded ${total} components from ${data.site} v${data.version}`,
+  );
+  chrome.runtime
+    .sendMessage({
+      type: "sightmap-loaded",
+      version: data.version,
+      site: data.site,
+      componentCount: total,
+    })
+    .catch(() => {});
+  return true;
+}
+
 async function pollVersion() {
-  if (!state.version) {
-    // Initial fetch failed (server not yet ready, or service worker was sleeping).
-    // Retry until it succeeds.
+  // Keep retrying until we have a non-empty corpus. state.version is only set
+  // once a load succeeded WITH components, so this also covers the "server
+  // answered empty at startup" case that used to stick permanently.
+  if (!state.version || !state.globals.length) {
     await fetchSightmap();
     return;
   }
   try {
-    const resp = await bgFetch("fetch-sightmap-version");
-    const v = resp.version;
+    const v = await fetchVersionValue();
     if (v !== state.version) {
       console.log(
         `[sightmap] version changed (${state.version} → ${v}), reloading`,

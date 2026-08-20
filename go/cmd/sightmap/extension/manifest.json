@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sightmap Overlay",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "description": "Component path overlay and structured event log for sightmap-instrumented pages.",
 
   "permissions": ["storage", "activeTab", "scripting", "devtools", "sidePanel"],
