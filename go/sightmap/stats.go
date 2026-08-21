@@ -55,10 +55,12 @@ type Totals struct {
 	Memory     int `json:"memory"`     // file-, view-, component-, and request-level entries
 }
 
-// ViewStats is one per-view row: the components and requests reachable in that
-// view after $ref expansion. A global component reused by several views appears
-// in each view's row but only once in Stats.Components, and global (view-less)
-// components and requests appear in the totals only — so the per-view columns
+// ViewStats is one per-view row: the components and requests DECLARED under that
+// view after $ref expansion. It does not include corpus-root globals, which
+// apply to every view (see Corpus.ComponentsForRoute) and are reported once —
+// the CLI renders them as a separate "(global)" row rather than folding them
+// into any single view, where they would misattribute coverage. A view's
+// effective coverage is thus its own row plus the globals; per-view columns
 // need not sum to the totals.
 type ViewStats struct {
 	Name       string `json:"name"`

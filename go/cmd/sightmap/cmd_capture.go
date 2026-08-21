@@ -101,8 +101,12 @@ func runCapture(args []string) error {
 	if !*forceFlag {
 		cand := viewset.SlotsFromMatch(res.Matches, cov.Orphans, cov.ParentMap)
 		if gres, write := viewset.Gate(corpus, *lf.sightmapDir, viewBasename, cand, false); !write {
-			fmt.Fprintf(os.Stderr, "capture: nothing new vs %d capture(s) in %s — not saved (use --force to keep)\n",
-				gres.ComparedTo, viewBasename)
+			// The gate always writes the first capture of a view (len(others)==0),
+			// so reaching here means a baseline already exists and this one is
+			// redundant — say that plainly rather than "nothing new vs N", which
+			// reads like the first baseline is being refused.
+			fmt.Fprintf(os.Stderr, "capture: %s already has %d capture(s); this one adds no new component or interactive slot — not saved (use --force to keep it anyway)\n",
+				viewBasename, gres.ComparedTo)
 			return nil
 		}
 	}
@@ -218,7 +222,7 @@ func runCaptureAll(
 			continue
 		}
 		if r.skipped {
-			fmt.Fprintf(os.Stderr, "%-20s  = nothing new vs %d capture(s) — not saved\n", r.name, r.skippedVs)
+			fmt.Fprintf(os.Stderr, "%-20s  = redundant vs %d existing capture(s) — not saved\n", r.name, r.skippedVs)
 			continue
 		}
 		if r.empty {

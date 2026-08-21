@@ -99,7 +99,10 @@ func runStatsOut(args []string, out io.Writer) error {
 			"Define views under a top-level \"views:\" list:\n%s", *sightmapDir, viewSchemaExample())
 	}
 
-	printStats(out, s)
+	// Globals apply to every view, so the table reports them as their own row
+	// rather than attributing them to one view. These counts are derived here
+	// from the corpus (not carried on Stats) to keep the --json contract stable.
+	printStats(out, s, len(corpus.GlobalComponents), len(corpus.Requests))
 	return nil
 }
 
@@ -157,14 +160,23 @@ func writeJSONLine(out io.Writer, v any) error {
 // printStats renders the human summary: a totals block, then a per-view table
 // in the shared offline-table style (banner, ─ separators, width-capped
 // name/route columns, trailing summary line).
-func printStats(out io.Writer, s sightmap.Stats) {
+func printStats(out io.Writer, s sightmap.Stats, globalComponents, globalRequests int) {
 	printTableBanner(out, "stats")
 
-	names := make([]string, len(s.PerView))
-	routes := make([]string, len(s.PerView))
-	for i, r := range s.PerView {
-		names[i] = r.Name
-		routes[i] = r.Route
+	// A leading synthetic row surfaces corpus-root globals, which apply to every
+	// view. Its labels join the width calculation so the columns fit it too.
+	const globalName, globalRoute = "(global)", "(all views)"
+	hasGlobals := globalComponents > 0 || globalRequests > 0
+
+	names := make([]string, 0, len(s.PerView)+1)
+	routes := make([]string, 0, len(s.PerView)+1)
+	if hasGlobals {
+		names = append(names, globalName)
+		routes = append(routes, globalRoute)
+	}
+	for _, r := range s.PerView {
+		names = append(names, r.Name)
+		routes = append(routes, r.Route)
 	}
 	nameW, routeW := viewColWidths(names, routes)
 	sep := strings.Repeat("─", nameW+routeW+25)
@@ -189,9 +201,13 @@ func printStats(out io.Writer, s sightmap.Stats) {
 		nameW, "View", routeW, "Route", "Components", "Requests")
 	fmt.Fprintln(out, sep)
 
-	sumComponents := 0
+	if hasGlobals {
+		fmt.Fprintf(out, " %-*s  %-*s  %10d  %8d\n",
+			nameW, truncate(globalName, nameW),
+			routeW, truncate(globalRoute, routeW),
+			globalComponents, globalRequests)
+	}
 	for _, r := range s.PerView {
-		sumComponents += r.Components
 		fmt.Fprintf(out, " %-*s  %-*s  %10d  %8d\n",
 			nameW, truncate(r.Name, nameW),
 			routeW, truncate(r.Route, routeW),
@@ -200,6 +216,13 @@ func printStats(out io.Writer, s sightmap.Stats) {
 
 	// ── Summary line ──────────────────────────────────────────────────────────
 	fmt.Fprintln(out, sep)
-	fmt.Fprintf(out, " %d views  ·  %d distinct components (per-view rows sum to %d)\n",
-		s.Views, s.Components, sumComponents)
+	viewWord := "views"
+	if s.Views == 1 {
+		viewWord = "view"
+	}
+	fmt.Fprintf(out, " %d %s  ·  %d distinct components", s.Views, viewWord, s.Components)
+	if globalComponents > 0 {
+		fmt.Fprintf(out, "  (%d declared globally, shared by every view)", globalComponents)
+	}
+	fmt.Fprintln(out)
 }

@@ -1,8 +1,12 @@
 package viewset
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func TestSnapshotStamp(t *testing.T) {
@@ -233,5 +237,68 @@ func TestFormatStampDisplay(t *testing.T) {
 	}
 	if got, want := FormatStamp("not-a-stamp"), "not-a-stamp"; got != want {
 		t.Errorf("unparseable stamp = %q, want passthrough %q", got, want)
+	}
+}
+
+// TestGate pins the write decision, especially the first-baseline guarantee that
+// motivated issue #251: an empty view set always writes the very first capture
+// (even one whose fingerprint is empty), and it must not be reported as if a
+// prior capture existed. A set that already holds a capture then gates a
+// redundant candidate, reporting ComparedTo == 1 so the message can say so.
+func TestGate(t *testing.T) {
+	corpus := &sightmap.Corpus{}
+
+	// ── First baseline: empty snapshots dir → always writes ──────────────────
+	empty := t.TempDir()
+	emptyDir := filepath.Join(empty, ".sightmap")
+	cand := Slots{Matched: map[string]bool{"Header": true}, Orphans: map[string]int{}}
+	res, write := Gate(corpus, emptyDir, "home", cand, false)
+	if !write {
+		t.Errorf("first capture into an empty set was refused: %+v", res)
+	}
+	if res.ComparedTo != 0 {
+		t.Errorf("ComparedTo = %d for the first capture, want 0 (nothing to compare against)", res.ComparedTo)
+	}
+
+	// Even a fingerprint-empty first capture must write — len(others)==0 wins
+	// over IsNovel(); the blank-page guard lives in the capture command, not here.
+	if _, write := Gate(corpus, emptyDir, "home", Slots{Matched: map[string]bool{}, Orphans: map[string]int{}}, false); !write {
+		t.Error("an empty first capture was refused; the first baseline must always write")
+	}
+
+	// ── Redundant second: one capture already on disk → gated ────────────────
+	second := t.TempDir()
+	secondDir := filepath.Join(second, ".sightmap")
+	writeFakeCapture(t, secondDir, "home", "20260101T000000Z")
+	res2, write2 := Gate(corpus, secondDir, "home", Slots{Matched: map[string]bool{}, Orphans: map[string]int{}}, false)
+	if write2 {
+		t.Errorf("redundant capture vs an existing set was written: %+v", res2)
+	}
+	if res2.ComparedTo != 1 {
+		t.Errorf("ComparedTo = %d, want 1 (one existing capture)", res2.ComparedTo)
+	}
+
+	// --force bypasses the gate even when nothing is novel.
+	if _, write := Gate(corpus, secondDir, "home", Slots{Matched: map[string]bool{}, Orphans: map[string]int{}}, true); !write {
+		t.Error("--force did not bypass the novelty gate")
+	}
+}
+
+// writeFakeCapture writes a minimal on-disk capture (a .snap plus its
+// .tree.json sibling) into a view set, enough for Find + SlotsForCapture to
+// treat it as one existing capture. The empty tree re-matches to an empty
+// fingerprint, which is all Gate's count needs.
+func writeFakeCapture(t *testing.T, sightmapDir, viewBasename, stamp string) {
+	t.Helper()
+	dir := filepath.Join(sightmapDir, "snapshots", viewBasename)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	snap := filepath.Join(dir, stamp+".snap")
+	if err := os.WriteFile(snap, []byte("(fake capture)\n"), 0o644); err != nil {
+		t.Fatalf("write snap: %v", err)
+	}
+	if err := os.WriteFile(snap+".tree.json", []byte("{}"), 0o644); err != nil {
+		t.Fatalf("write tree: %v", err)
 	}
 }
