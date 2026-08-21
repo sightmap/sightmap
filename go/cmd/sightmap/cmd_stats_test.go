@@ -82,8 +82,9 @@ views:
 
 // TestStats_TableRendersPerViewRows drives the table end to end over a real
 // on-disk corpus: the totals dedupe the $ref-reused global (6 distinct names,
-// not 8), each per-view row still counts its own expanded copy, and the summary
-// line prints both numbers so the reader can see where they diverge.
+// not 8), the corpus-root globals get their own leading row rather than showing
+// as 0 against a view, each per-view row still counts its own expanded copy, and
+// the summary line explains the globals so the rows reconcile with the total.
 func TestStats_TableRendersPerViewRows(t *testing.T) {
 	dir := writeStatsCorpus(t, sharedGlobalCorpus)
 
@@ -93,6 +94,7 @@ func TestStats_TableRendersPerViewRows(t *testing.T) {
 	}
 	got := out.String()
 
+	// Totals block: fixed-width, unaffected by the per-view column widths.
 	for _, want := range []string{
 		"Views       2",
 		// Navigation, Footer, CartSummary, PaymentForm, submit, ActivityFeed —
@@ -101,17 +103,39 @@ func TestStats_TableRendersPerViewRows(t *testing.T) {
 		"Requests    2", // 1 global + 1 view-scoped
 		"Properties  1",
 		"Memory      2", // Navigation's entry once + PaymentForm's
-		"Checkout   /checkout            4         1",
-		"Dashboard  /dashboard           2         0",
-		"2 views  ·  6 distinct components (per-view rows sum to 6)",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q:\n%s", want, got)
 		}
 	}
+
+	// Rows and footer: assert on whitespace-collapsed lines so the exact column
+	// padding (which shifts with the widest label) isn't baked into the test.
+	for _, want := range []string{
+		"(global) (all views) 2 1", // 2 global components + 1 global request
+		"Checkout /checkout 4 1",
+		"Dashboard /dashboard 2 0",
+		"2 views · 6 distinct components (2 declared globally, shared by every view)",
+	} {
+		if !containsCollapsed(got, want) {
+			t.Errorf("output missing row/line %q (whitespace-collapsed):\n%s", want, got)
+		}
+	}
 	if strings.Contains(got, "Components  8") {
 		t.Errorf("totals counted every expanded copy instead of distinct names:\n%s", got)
 	}
+}
+
+// containsCollapsed reports whether any line of got, with runs of whitespace
+// collapsed to a single space and trimmed, equals want. It keeps the table
+// assertions robust to column-width shifts while still pinning field order.
+func containsCollapsed(got, want string) bool {
+	for _, line := range strings.Split(got, "\n") {
+		if strings.Join(strings.Fields(line), " ") == want {
+			return true
+		}
+	}
+	return false
 }
 
 // TestStatsJSON_DedupedTotals is the --json half of the same corpus: the
