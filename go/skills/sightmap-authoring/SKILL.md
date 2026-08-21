@@ -104,6 +104,7 @@ other dependency.
 | `sightmap discover` | Crawl page links → ✓ mapped / ○ surveyed / ? unseen. `--all` shows surveyed. |
 | `sightmap suggest --exclude-known` | Candidate selectors not yet in sightmap (`--exclude-known` always on). |
 | `sightmap gap` | Orphaned interactive nodes with selector hints. Add `--include-hidden` to also list hidden/off-screen nodes. |
+| `sightmap explain [SELECTOR] [--grep STR] [--id N] [--snap FILE]` | Node-first inspection: dump a node's facts (tag/id/classes/attrs), ranked selector candidates, coverage tier + owning component, and ancestor hooks. Use `--grep 'Refresh'` (by role/name) or a selector when you've spotted a node but don't have a selector yet — the shadow-transparent replacement for hand-reading `*.snap.tree.json`. `--snap FILE` inspects a captured tree offline. |
 
 ### Session management
 
@@ -247,7 +248,18 @@ brackets when not suppressed by Rule A (exact match with a property value).
 
 ## Property extraction principles
 
-Every child component that is a link or button **must** have at least one property.
+Two property rules are **mandatory**:
+
+1. Every child component that is a link or button **must** have at least one
+   property.
+2. Every component whose selector matches **more than one instance** — a
+   repeated container or control (cards, list rows, nav tabs, feed items) —
+   **must** carry a property that *varies per instance* (a title, label, key, or
+   state), even a pure container with no link/button of its own. Without one,
+   every instance collapses to an indistinguishable node and no component query
+   can resolve a single one. `sel-probe` already prints the match count: a count
+   > 1 with no per-instance property is the tell. Extract the discriminator from
+   wherever it lives — a header title, an `aria-label`, a stable `data-*`.
 
 ```yaml
 - name: FooterLink
@@ -255,6 +267,14 @@ Every child component that is a link or button **must** have at least one proper
   properties:
     - name: label
       extract: text
+
+# Repeated container: one selector, many instances → needs a per-instance
+# discriminator so `Card[title^="Today"]` can resolve exactly one.
+- name: Card
+  selector: 'article.card'
+  properties:
+    - name: title
+      extract: '.card__title'
 ```
 
 **Choosing an extract mode:**
@@ -521,8 +541,17 @@ Unlabeled clusters:
        → [data-testid="product-pod"] a
 ```
 
-The `→` selector hint is what to use for a new child component. Use
-`sightmap sel-probe` to verify match count before writing YAML.
+The `→` selector hint (and the `container:` hook on hook-poor DOMs) is what to
+use for a new child component. Use `sightmap sel-probe` to verify match count
+before writing YAML.
+
+When you've spotted a node but need its raw facts to craft a selector — common on
+shadow-DOM / hashed-id apps where `browser eval`'s `querySelector` returns `[]` —
+reach for `sightmap explain` instead of hand-reading the tree JSON: `explain
+--grep 'Refresh'` (by role/name), `explain 'div.card'` (by selector), or `explain
+--snap PAGE.snap --id N` (offline). It dumps the node's tag/id/classes/attrs,
+ranked selector candidates, its tier + owning component, and ancestor hooks —
+shadow-transparent, matching what the offline matcher sees.
 
 After YAML edits, re-snap and check coverage. Repeat until 0 orphaned ✓.
 
