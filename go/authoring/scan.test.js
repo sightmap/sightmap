@@ -97,6 +97,26 @@ describe("__smScanCandidates", () => {
     const candidates = __smScanCandidates(10);
     expect(candidates).toEqual([]);
   });
+
+  test("falls back to another stable data-* attr", () => {
+    document.body.innerHTML = `<a data-target-selection-name="Home"></a>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates.map((c) => c.sel)).toContain(
+      '[data-target-selection-name="Home"]',
+    );
+  });
+
+  test("falls back to a portable href suffix", () => {
+    document.body.innerHTML = `<a href="https://x.example.com/lightning/page/home?foo=1"></a>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates.map((c) => c.sel)).toContain('a[href$="/home"]');
+  });
+
+  test("drops a dynamic href tail, emitting no candidate", () => {
+    document.body.innerHTML = `<a href="/lightning/r/Account/001A000001abcdefg"></a>`;
+    const candidates = __smScanCandidates(10);
+    expect(candidates).toEqual([]);
+  });
 });
 
 describe("__smScanLinks", () => {
