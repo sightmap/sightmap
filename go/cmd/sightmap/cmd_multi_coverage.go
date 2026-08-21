@@ -37,6 +37,16 @@ func runMultiCoverage(args []string) error {
 		globalNames[gc.Name] = true
 	}
 
+	// A capture dir is only a real VIEW if it matches a view in the CURRENT
+	// corpus (by SnapBasename, the name capture writes the dir under). A stale or
+	// renamed dir — snapshots/<old-name>/ left over after the view was renamed —
+	// otherwise becomes a phantom extra column and manufactures bogus "appears in
+	// 2+ views" promotion evidence for that page's own components.
+	currentBasenames := make(map[string]bool, len(corpus.Views))
+	for i := range corpus.Views {
+		currentBasenames[corpus.Views[i].SnapBasename()] = true
+	}
+
 	// Group captures into per-view sets, then fold each view's captures into one
 	// column whose cell value is the per-component MAX across the set.
 	sets := viewset.GroupByView(snapFiles)
@@ -49,7 +59,11 @@ func runMultiCoverage(args []string) error {
 	var cols []viewColumn
 	for _, v := range viewNames {
 		var caps []map[string]int
+		recorded := ""
 		for _, e := range sets[v] {
+			if recorded == "" {
+				recorded = viewset.ViewNameOf(e.Path)
+			}
 			_, matches, _, ok := matchCapture(e.Path, corpus)
 			if !ok {
 				continue
@@ -65,7 +79,10 @@ func runMultiCoverage(args []string) error {
 		if len(caps) == 0 {
 			continue
 		}
-		cols = append(cols, unionViewColumn(v, caps))
+		col := unionViewColumn(v, caps)
+		col.Current = currentBasenames[v]
+		col.Recorded = recorded
+		cols = append(cols, col)
 	}
 
 	if len(cols) == 0 {
@@ -74,6 +91,7 @@ func runMultiCoverage(args []string) error {
 
 	printMatrix(cols)
 	printGlobalCandidates(globalCandidatesAcrossViews(cols, globalNames))
+	printStaleColumns(cols)
 	return nil
 }
 
@@ -85,15 +103,27 @@ type viewColumn struct {
 	View   string
 	Snaps  int
 	Counts map[string]int
+	// Current is true when this capture dir maps to a view in the current corpus
+	// (by SnapBasename). Only current columns count toward global promotion; a
+	// non-current column is a stale/renamed dir shown for context but excluded.
+	Current bool
+	// Recorded is the "[View: NAME]" header the captures carry, surfaced only in
+	// the stale-column warning to help the author identify what the dir was.
+	Recorded string
 }
 
 // label renders the column header for a view: "view·N" when the view carries more
-// than one capture, else just the view name.
+// than one capture, else just the view name. A non-current (stale/renamed) dir
+// is suffixed with "*", tying it to the warning printed below the matrix.
 func (c viewColumn) label() string {
+	name := c.View
 	if c.Snaps > 1 {
-		return fmt.Sprintf("%s\u00b7%d", c.View, c.Snaps)
+		name = fmt.Sprintf("%s\u00b7%d", c.View, c.Snaps)
 	}
-	return c.View
+	if !c.Current {
+		name += "*"
+	}
+	return name
 }
 
 // unionViewColumn folds a view's per-capture component counts into one column,
@@ -182,12 +212,17 @@ type globalCandidate struct {
 }
 
 // globalCandidatesAcrossViews returns components that match (count > 0) in 2 or
-// more VIEWS and aren't already global. Counting views (not capture files) is the
-// A single view snapped many times no longer trips the threshold.
-// Result is sorted by name; each candidate's hits follow column order.
+// more CURRENT VIEWS and aren't already global. Counting views (not capture
+// files) means a single view snapped many times no longer trips the threshold;
+// restricting to CURRENT columns (Current == true) means a stale or renamed
+// capture dir can't manufacture phantom cross-view evidence for a page's own
+// components. Result is sorted by name; each candidate's hits follow column order.
 func globalCandidatesAcrossViews(cols []viewColumn, globalNames map[string]bool) []globalCandidate {
 	nameSet := map[string]bool{}
 	for _, c := range cols {
+		if !c.Current {
+			continue
+		}
 		for name := range c.Counts {
 			nameSet[name] = true
 		}
@@ -205,6 +240,9 @@ func globalCandidatesAcrossViews(cols []viewColumn, globalNames map[string]bool)
 		}
 		var hits []viewHit
 		for _, c := range cols {
+			if !c.Current {
+				continue
+			}
 			if count := c.Counts[name]; count > 0 {
 				hits = append(hits, viewHit{View: c.View, Count: count})
 			}
@@ -214,6 +252,39 @@ func globalCandidatesAcrossViews(cols []viewColumn, globalNames map[string]bool)
 		}
 	}
 	return candidates
+}
+
+// staleColumns returns the columns that don't map to a current corpus view, in
+// column order. These are the phantom-evidence sources #248 is about.
+func staleColumns(cols []viewColumn) []viewColumn {
+	var stale []viewColumn
+	for _, c := range cols {
+		if !c.Current {
+			stale = append(stale, c)
+		}
+	}
+	return stale
+}
+
+// printStaleColumns warns about capture dirs that match no current view. They
+// still appear in the matrix (marked "*") for context, but are excluded from the
+// global-candidate analysis so a stale or renamed dir can't mis-advise a
+// promotion. Prints nothing when every column maps to a current view.
+func printStaleColumns(cols []viewColumn) {
+	stale := staleColumns(cols)
+	if len(stale) == 0 {
+		return
+	}
+	fmt.Println()
+	fmt.Printf("⚠ %d capture dir(s) match no view in the current corpus (stale or renamed?) —\n", len(stale))
+	fmt.Println("  marked \"*\" above and EXCLUDED from the global-candidate analysis:")
+	for _, c := range stale {
+		recorded := ""
+		if c.Recorded != "" {
+			recorded = fmt.Sprintf(" (recorded [View: %s])", c.Recorded)
+		}
+		fmt.Printf("  %s%s   → delete the stale dir, or re-capture the view under its current name\n", c.View, recorded)
+	}
 }
 
 // printGlobalCandidates prints the promotion-candidate block (nothing if empty).
