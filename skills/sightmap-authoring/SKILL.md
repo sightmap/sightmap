@@ -641,6 +641,13 @@ sightmap multi-coverage
 - 2 pages, identical selectors → usually promote
 - 2 pages, different selectors → keep view-scoped
 
+Only **current** views count toward this. A capture dir that matches no view in
+the current corpus (a stale or renamed `snapshots/<dir>/`) is marked `*` in the
+matrix and excluded from the candidate list, with a warning — so a leftover dir
+can't manufacture phantom "appears in 2+ views" evidence for a page's own
+components. When you see that warning, delete the stale dir (or re-capture the
+view under its current name) and re-run.
+
 ---
 
 ## Phase 3: Validation
