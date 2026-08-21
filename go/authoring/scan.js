@@ -54,10 +54,25 @@ function __smCandidateWorthy(el) {
   return ["a", "button", "input", "select", "textarea"].includes(tag);
 }
 
+// __smHrefSuffix mirrors coverage.hrefSuffix (Go): the portable, stable
+// trailing path segment of an href, "" when the tail is dynamic/hashed.
+function __smHrefSuffix(href) {
+  let h = href;
+  const cut = h.search(/[?#]/);
+  if (cut >= 0) h = h.slice(0, cut);
+  h = h.replace(/\/+$/, "");
+  const slash = h.lastIndexOf("/");
+  if (slash < 0) return "";
+  const seg = h.slice(slash + 1);
+  if (!seg || __smLooksHashed(seg)) return "";
+  return "/" + seg;
+}
+
 // __smBestHook returns the single strongest stable selector for el, or "".
-// Priority mirrors coverage.SelectorCandidates (Go): data-* hooks lead but are
-// one input, not an override — a custom-element tag, stable id, form name, or
-// design-system class is surfaced when no data-attr exists.
+// A best-effort single pick, not the full ranked list coverage.SelectorCandidates
+// (Go) returns — but the same hooks, roughly by the same priority: data-* leads
+// but is one input, falling through to custom-element tag, stable id, form name,
+// other stable data-*, design-system class, href, then aria-label.
 function __smBestHook(el) {
   const tag = el.tagName.toLowerCase();
   const dt = el.getAttribute("data-testid");
@@ -70,6 +85,17 @@ function __smBestHook(el) {
   if (id && !__smLooksHashed(id) && !/\d+$/.test(id)) return "#" + id;
   const name = el.getAttribute("name");
   if (name && !__smLooksHashed(name)) return tag + '[name="' + name + '"]';
+  for (const attr of el.attributes) {
+    if (
+      attr.name.startsWith("data-") &&
+      attr.name !== "data-testid" &&
+      attr.name !== "data-component" &&
+      attr.value &&
+      !__smLooksHashed(attr.value)
+    ) {
+      return "[" + attr.name + '="' + attr.value + '"]';
+    }
+  }
   let utility = "";
   for (const cls of el.classList) {
     if (!cls || __smLooksHashed(cls)) continue;
@@ -80,6 +106,11 @@ function __smBestHook(el) {
     return tag + "." + cls; // first specific class wins
   }
   if (utility) return utility;
+  const href = el.getAttribute("href");
+  if (href) {
+    const suf = __smHrefSuffix(href);
+    if (suf) return 'a[href$="' + suf + '"]';
+  }
   const al = el.getAttribute("aria-label");
   if (al && !__smLooksHashed(al) && al.length <= 40)
     return tag + '[aria-label="' + al + '"]';
