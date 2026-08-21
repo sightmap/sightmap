@@ -690,12 +690,14 @@ to stdout (or `--out FILE`) — it never touches the corpus and never gates.
 (different loads, a drawer open, a tab switched).
 
 A capture that adds **no new component type or orphan slot** vs the view set is
-skipped by the **novelty gate** — `capture` prints "nothing new … not saved" and
-the overlay's Snap-view button shows "= nothing new (not saved)". The first
-capture of a view always writes; `capture --force` overrides. So just re-`capture`
-a dynamic view a few times — only loads that render something structurally new
-are kept; pure value churn (different products/prices) is ignored. `coverage`
-unions the whole view set.
+skipped by the **novelty gate** — `capture` reports that the view *already has* N
+capture(s) and this one is redundant ("not saved"), and the overlay's Snap-view
+button likewise marks it skipped. Read that as "already covered", **not** as a
+refusal of a first baseline: **the first capture of a view always writes** (an
+empty set can't be redundant), and `capture --force` keeps a redundant one
+anyway. So just re-`capture` a dynamic view a few times — only loads that render
+something structurally new are kept; pure value churn (different products/prices)
+is ignored. `coverage` unions the whole view set.
 
 **`coverage` / `multi-coverage`** require `.snap.tree.json` companion files.
 `capture` writes them automatically; `snapshot` writes one when `--tree-out` is
