@@ -63,6 +63,12 @@ func TestSelectorCandidates(t *testing.T) {
 			want: []string{`[data-target-selection-name="Home"]`},
 		},
 		{
+			name:   "single trailing digit is not treated as a counter",
+			el:     &sightmap.Element{Tag: "div", Id: "step2"},
+			want:   []string{"#step2"},
+			absent: []string{`[id^="step"]`},
+		},
+		{
 			name: "form control name",
 			el:   &sightmap.Element{Tag: "input", Attrs: map[string]string{"name": "AccountName"}},
 			want: []string{`input[name="AccountName"]`},
@@ -121,6 +127,26 @@ func TestSelectorCandidates_RankingDataAttrOverClass(t *testing.T) {
 	}
 	if !contains(got, "article.forceBaseCard") {
 		t.Errorf("class candidate suppressed: %v", got)
+	}
+}
+
+func TestSelectorCandidates_OtherDataAttrOrderIsDeterministic(t *testing.T) {
+	// Two non-testid/component data-* attrs tie at the same score. Attrs is a
+	// map, so without sorting the keys first, their relative order (and thus
+	// which one survives the top-4 cap) would vary run to run.
+	el := &sightmap.Element{
+		Tag: "a",
+		Attrs: map[string]string{
+			"data-target-selection-name": "Home",
+			"data-row-key":               "row-Home",
+		},
+	}
+	first := SelectorCandidates(el)
+	for i := 0; i < 20; i++ {
+		got := SelectorCandidates(el)
+		if strings.Join(got, ",") != strings.Join(first, ",") {
+			t.Fatalf("run %d: got %v, want %v (order must be stable across calls)", i, got, first)
+		}
 	}
 }
 

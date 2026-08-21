@@ -29,8 +29,11 @@ var (
 	reHexRun = regexp.MustCompile(`[0-9a-fA-F]{8,}`)
 	// data-component version suffix, e.g. ":v1.2.3" or ":v1.2.3-abc".
 	reComponentVersion = regexp.MustCompile(`:v\d+\.\d+\.\d+.*$`)
-	// A trailing numeric instance counter, e.g. "combobox-button-15", "tab_3".
-	reTrailingNum = regexp.MustCompile(`^(.+?)[-_]?\d+$`)
+	// A trailing numeric instance counter: digits after a "-"/"_" separator
+	// ("combobox-button-15", "tab_3"), or 2+ trailing digits with no separator
+	// ("row42"). A single bare trailing digit ("step2", "tab1") is left alone —
+	// that's normal short-token spelling, not a counter.
+	reTrailingNum = regexp.MustCompile(`^(.+?)(?:[-_]\d+|\d{2,})$`)
 	// Leading authored prefix before any digit — for [id^="prefix"] forms.
 	reLeadingPrefix = regexp.MustCompile(`^([A-Za-z][A-Za-z_-]{2,}?)[-_]?\d`)
 )
@@ -177,11 +180,20 @@ func SelectorCandidates(el *sightmap.Element) []string {
 			add("#"+id, 70)
 		}
 	}
-	// Other stable data-* attributes (e.g. data-target-selection-name).
-	for k, v := range a {
+	// Other stable data-* attributes (e.g. data-target-selection-name). Attrs is
+	// a map, so keys are sorted first — otherwise candidates tied at the same
+	// score would land in a different order (and could drop out of the top-4
+	// cap differently) on every run.
+	dataKeys := make([]string, 0, len(a))
+	for k := range a {
 		if k == "data-testid" || k == "data-component" || !strings.HasPrefix(k, "data-") {
 			continue
 		}
+		dataKeys = append(dataKeys, k)
+	}
+	sort.Strings(dataKeys)
+	for _, k := range dataKeys {
+		v := a[k]
 		if v == "" || looksHashed(v) {
 			continue
 		}
