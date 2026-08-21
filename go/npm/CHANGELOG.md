@@ -1,5 +1,22 @@
 # @sightmap/sightmap
 
+## 0.26.0
+
+### Minor Changes
+
+- 39b63fe: Authoring efficacy on hook-poor DOMs (Salesforce Lightning, Angular, framework-generated markup):
+
+  - **Generalized selector-candidate generation.** `gap` and `suggest` no longer dead-end when a DOM has no `data-testid`/`data-component`. Candidate generation now ranks custom-element tags, design-system classes, ids, other stable `data-*`, and `name`/`href`/`aria` hooks (data-attributes remain the top-ranked input, not an override), dropping only clearly machine-generated tokens. `gap` also emits a container hook on the hook-poor path.
+  - **New `explain` command.** Node-first inspection: pick nodes by selector, `--id`, or `--grep` (role/name) — live or offline via `--snap` — and dump each node's facts, ranked selector candidates, coverage tier + owning component, and ancestor hooks. Shadow-transparent (matches the offline matcher), so authors no longer hand-read `*.snap.tree.json`.
+  - **Honest coverage.** `snapshot --coverage` and `gap` now warn when a clean "0 orphaned" pass is carried entirely by global (chrome) components — i.e. the current view modeled nothing and the pass reflects a global backstop rather than a real view.
+  - **Authoring skill:** a second mandatory property rule requires a per-instance discriminator on any component whose selector matches more than one instance, so repeated cards/rows/tabs stay individually addressable; plus `explain` documentation.
+
+### Patch Changes
+
+- 65b955b: Fix the browser overlay extension rendering **0 components** on pages whose corpus the sightmap server serves correctly. The content script proxied its `/sightmap` fetch through the background service worker, and on a cold/just-woken MV3 worker that round-trip intermittently delivered an empty corpus at page load; the empty result then stuck for the life of the page because the per-instance `version` never changes (so `pollVersion` never refetched) and an open side panel keeps the worker alive. `sightmap snapshot` was unaffected (it reads the corpus in-process over CDP). The content script now fetches the local server **directly** on http-origin pages — `host_permissions` already grants `http://localhost:*` and the server sends `Access-Control-Allow-Origin: *` — using the background proxy only as an https mixed-content fallback, and it treats an empty corpus as "not loaded yet" and keeps retrying instead of caching it.
+- fffa167: Fix `snapshot`/`capture` rendering an empty component tree when the page root (or any ancestor) is reported invisible. `render.Filter` dropped an entire subtree at the first `IsVisible=false` node, but a zero-size or `visibility:hidden` ancestor — notably the document `<html>` root, which reports height 0 / ignored — can have fully visible descendants, so the whole annotated tree vanished even though coverage still counted the visible nodes. Invisible nodes are now made transparent (the node itself is omitted, visible descendants survive); a genuinely hidden `display:none` subtree still renders nothing, keeping render in lockstep with coverage.
+- d07bdf6: `sightmap stats` now reports a **Messages** count. The offline inventory listed views, components, requests, properties, and memory but silently omitted the SEP-0006 `messages:` entity, so a corpus's console/exception matchers were invisible in the totals (and in `--json`). Adds `messages` to the totals table and the `--json` contract.
+
 ## 0.25.0
 
 ### Minor Changes
