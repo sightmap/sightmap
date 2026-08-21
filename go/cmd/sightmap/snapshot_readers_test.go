@@ -67,6 +67,9 @@ func TestUnionViewColumn(t *testing.T) {
 	if !reflect.DeepEqual(col.Counts, want) {
 		t.Errorf("counts = %v, want %v", col.Counts, want)
 	}
+	// A current view's label carries no stale marker; runMultiCoverage sets
+	// Current after unioning (unionViewColumn is count-only).
+	col.Current = true
 	if got := col.label(); got != "home·3" {
 		t.Errorf("label = %q, want home·3", got)
 	}
@@ -74,6 +77,7 @@ func TestUnionViewColumn(t *testing.T) {
 
 func TestViewColumnLabelSingleCapture(t *testing.T) {
 	col := unionViewColumn("pdp", []map[string]int{{"AddToCartButton": 1}})
+	col.Current = true
 	if got := col.label(); got != "pdp" {
 		t.Errorf("single-capture label = %q, want pdp (no ·N suffix)", got)
 	}
@@ -84,15 +88,15 @@ func TestViewColumnLabelSingleCapture(t *testing.T) {
 // ProductPod (3 views) is a true candidate.
 func TestGlobalCandidatesAcrossViews(t *testing.T) {
 	cols := []viewColumn{
-		{View: "home", Snaps: 3, Counts: map[string]int{
+		{View: "home", Snaps: 3, Current: true, Counts: map[string]int{
 			"SiteHeader": 1, "GlobalNav": 7, "Footer": 1,
 			"DigitalEndcap": 4, "ProductPod": 12, "PromoBanner": 2,
 		}},
-		{View: "plp", Snaps: 2, Counts: map[string]int{
+		{View: "plp", Snaps: 2, Current: true, Counts: map[string]int{
 			"SiteHeader": 1, "GlobalNav": 7, "Footer": 1,
 			"ProductPod": 36, "FacetFilter": 8, "SortDropdown": 1,
 		}},
-		{View: "pdp", Snaps: 1, Counts: map[string]int{
+		{View: "pdp", Snaps: 1, Current: true, Counts: map[string]int{
 			"SiteHeader": 1, "GlobalNav": 7, "Footer": 1,
 			"AddToCartButton": 1, "ProductPod": 6,
 		}},
