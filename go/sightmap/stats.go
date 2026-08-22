@@ -57,7 +57,7 @@ type Totals struct {
 
 // ViewStats is one per-view row: the components and requests DECLARED under that
 // view after $ref expansion. It does not include corpus-root globals, which
-// apply to every view (see Corpus.ComponentsForRoute) and are reported once —
+// apply to every view (see Corpus.ComponentsForURL) and are reported once —
 // the CLI renders them as a separate "(global)" row rather than folding them
 // into any single view, where they would misattribute coverage. A view's
 // effective coverage is thus its own row plus the globals; per-view columns
