@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -9,79 +10,83 @@ func col(view string, current bool, counts map[string]int) viewColumn {
 	return viewColumn{View: view, Snaps: 1, Counts: counts, Current: current}
 }
 
-// TestGlobalCandidates_IgnoresStaleColumns is the #248 regression: a stale or
+// TestGlobalCandidatesAcrossViews_CurrentOnly is the #248 regression: a stale or
 // renamed capture dir (Current=false) must not manufacture "appears in 2+ views"
-// evidence for a page's own components. Here "home" (current) and "views" (stale,
-// the same page under its old dir name) both render Card and Header; without the
-// current-column filter both would look like they appear in two views and get
-// wrongly promoted.
-func TestGlobalCandidates_IgnoresStaleColumns(t *testing.T) {
-	cols := []viewColumn{
-		col("home", true, map[string]int{"Card": 3, "Header": 1}),
-		col("views", false, map[string]int{"Card": 3, "Header": 1}), // stale dup of home
+// evidence, and callers are expected to pre-filter with currentColumns before
+// calling globalCandidatesAcrossViews.
+func TestGlobalCandidatesAcrossViews_CurrentOnly(t *testing.T) {
+	tests := []struct {
+		name    string
+		cols    []viewColumn
+		globals map[string]bool
+		want    []globalCandidate
+	}{
+		{
+			name: "stale duplicate of a current view yields no candidates",
+			cols: []viewColumn{
+				col("home", true, map[string]int{"Card": 3, "Header": 1}),
+				col("views", false, map[string]int{"Card": 3, "Header": 1}), // stale dup of home
+			},
+			globals: map[string]bool{},
+			want:    nil,
+		},
+		{
+			name: "component in two current views is still promoted; stale view excluded from hits",
+			cols: []viewColumn{
+				col("home", true, map[string]int{"Nav": 1, "Card": 2}),
+				col("search", true, map[string]int{"Nav": 1, "Result": 4}),
+				col("legacy", false, map[string]int{"Nav": 1}), // stale: must not inflate Nav's hits
+			},
+			globals: map[string]bool{"AlreadyGlobal": true},
+			want: []globalCandidate{
+				{Name: "Nav", Hits: []viewHit{{View: "home", Count: 1}, {View: "search", Count: 1}}},
+			},
+		},
 	}
-
-	got := globalCandidatesAcrossViews(cols, map[string]bool{})
-	if len(got) != 0 {
-		t.Fatalf("stale column manufactured %d candidate(s), want 0: %+v", len(got), got)
-	}
-}
-
-// TestGlobalCandidates_CountsCurrentViews confirms the filter doesn't suppress a
-// genuine candidate: a component in two CURRENT views is still promoted, and one
-// already-global component is skipped.
-func TestGlobalCandidates_CountsCurrentViews(t *testing.T) {
-	cols := []viewColumn{
-		col("home", true, map[string]int{"Nav": 1, "Card": 2}),
-		col("search", true, map[string]int{"Nav": 1, "Result": 4}),
-		col("legacy", false, map[string]int{"Nav": 1}), // stale: must not inflate Nav's hits
-	}
-
-	got := globalCandidatesAcrossViews(cols, map[string]bool{"AlreadyGlobal": true})
-	if len(got) != 1 {
-		t.Fatalf("got %d candidates, want 1 (Nav): %+v", len(got), got)
-	}
-	if got[0].Name != "Nav" {
-		t.Errorf("candidate = %q, want Nav", got[0].Name)
-	}
-	// Nav appears in home + search only — the stale "legacy" column is excluded,
-	// so its two hits are exactly the two current views.
-	if len(got[0].Hits) != 2 {
-		t.Errorf("Nav hits = %+v, want exactly the 2 current views", got[0].Hits)
-	}
-	for _, h := range got[0].Hits {
-		if h.View == "legacy" {
-			t.Errorf("stale column 'legacy' leaked into Nav's hits: %+v", got[0].Hits)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := globalCandidatesAcrossViews(currentColumns(tt.cols), tt.globals)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %+v, want %+v", got, tt.want)
+			}
+		})
 	}
 }
 
-// TestStaleColumns_Detection pins the helper the warning is built from.
-func TestStaleColumns_Detection(t *testing.T) {
+func TestCurrentAndStaleColumns_Partition(t *testing.T) {
 	cols := []viewColumn{
 		col("home", true, nil),
 		col("views", false, nil),
 		col("old-dir", false, nil),
 	}
-	stale := staleColumns(cols)
-	if len(stale) != 2 {
-		t.Fatalf("staleColumns = %d, want 2: %+v", len(stale), stale)
+
+	current := currentColumns(cols)
+	if len(current) != 1 || current[0].View != "home" {
+		t.Errorf("currentColumns = %+v, want just [home]", current)
 	}
-	if stale[0].View != "views" || stale[1].View != "old-dir" {
-		t.Errorf("stale columns = %q,%q, want views,old-dir", stale[0].View, stale[1].View)
+
+	stale := staleColumns(cols)
+	if len(stale) != 2 || stale[0].View != "views" || stale[1].View != "old-dir" {
+		t.Errorf("staleColumns = %+v, want [views, old-dir]", stale)
 	}
 }
 
-// TestViewColumnLabel_MarksStale: the matrix label suffixes non-current columns
-// with "*" (and still shows the ·N set-size marker).
-func TestViewColumnLabel_MarksStale(t *testing.T) {
-	if got := (viewColumn{View: "home", Snaps: 1, Current: true}).label(); got != "home" {
-		t.Errorf("current single-capture label = %q, want home", got)
+func TestViewColumnLabel(t *testing.T) {
+	tests := []struct {
+		name string
+		col  viewColumn
+		want string
+	}{
+		{"current single-capture", viewColumn{View: "home", Snaps: 1, Current: true}, "home"},
+		{"current multi-capture", viewColumn{View: "home", Snaps: 3, Current: true}, "home·3"},
+		{"stale single-capture", viewColumn{View: "views", Snaps: 1, Current: false}, "views*"},
+		{"stale multi-capture", viewColumn{View: "views", Snaps: 2, Current: false}, "views·2*"},
 	}
-	if got := (viewColumn{View: "home", Snaps: 3, Current: true}).label(); got != "home·3" {
-		t.Errorf("current multi-capture label = %q, want home·3", got)
-	}
-	if got := (viewColumn{View: "views", Snaps: 1, Current: false}).label(); got != "views*" {
-		t.Errorf("stale label = %q, want views*", got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.col.label(); got != tt.want {
+				t.Errorf("label() = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
