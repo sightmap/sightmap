@@ -138,6 +138,45 @@ func containsCollapsed(got, want string) bool {
 	return false
 }
 
+// TestStats_ViewWithNoOwnComponentsShowsGlobalRow reproduces issue #250 itself:
+// a view that declares no components or requests of its own, with all of its
+// coverage living in corpus-root globals. Before the global row existed, this
+// rendered as an all-zero per-view table; now the view's row is legitimately 0
+// and the global row carries the real counts.
+func TestStats_ViewWithNoOwnComponentsShowsGlobalRow(t *testing.T) {
+	dir := writeStatsCorpus(t, map[string]string{
+		"components.yaml": `version: 1
+components:
+  - name: Header
+    selector: '#header'
+requests:
+  - name: Ping
+    route: /api/ping
+`,
+		"views/lightning.yaml": `version: 1
+views:
+  - name: LightningApp
+    route: /lightning/**
+`,
+	})
+
+	var out bytes.Buffer
+	if err := runStatsOut([]string{"--sightmap-dir", dir}, &out); err != nil {
+		t.Fatalf("runStatsOut: %v", err)
+	}
+	got := out.String()
+
+	for _, want := range []string{
+		"(global) (all views) 1 1",
+		"LightningApp /lightning/** 0 0",
+		"1 view · 1 distinct components (1 declared globally, shared by every view)",
+	} {
+		if !containsCollapsed(got, want) {
+			t.Errorf("output missing row/line %q (whitespace-collapsed):\n%s", want, got)
+		}
+	}
+}
+
 // TestStatsJSON_DedupedTotals is the --json half of the same corpus: the
 // machine-readable numbers must agree with the table, and the payload must be
 // nothing but JSON — no banner for a consumer to strip.
