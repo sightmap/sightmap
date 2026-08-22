@@ -81,7 +81,9 @@ func runMultiCoverage(args []string) error {
 		}
 		col := unionViewColumn(v, caps)
 		col.Current = currentBasenames[v]
-		col.Recorded = recorded
+		if !col.Current {
+			col.Recorded = recorded
+		}
 		cols = append(cols, col)
 	}
 
@@ -90,8 +92,8 @@ func runMultiCoverage(args []string) error {
 	}
 
 	printMatrix(cols)
-	printGlobalCandidates(globalCandidatesAcrossViews(cols, globalNames))
-	printStaleColumns(cols)
+	printGlobalCandidates(globalCandidatesAcrossViews(currentColumns(cols), globalNames))
+	printStaleColumns(staleColumns(cols))
 	return nil
 }
 
@@ -211,18 +213,39 @@ type globalCandidate struct {
 	Hits []viewHit
 }
 
+// currentColumns returns the columns that map to a view in the current corpus,
+// in column order.
+func currentColumns(cols []viewColumn) []viewColumn {
+	var current []viewColumn
+	for _, c := range cols {
+		if c.Current {
+			current = append(current, c)
+		}
+	}
+	return current
+}
+
+// staleColumns returns the columns that don't map to a current corpus view, in
+// column order. These are the phantom-evidence sources #248 is about.
+func staleColumns(cols []viewColumn) []viewColumn {
+	var stale []viewColumn
+	for _, c := range cols {
+		if !c.Current {
+			stale = append(stale, c)
+		}
+	}
+	return stale
+}
+
 // globalCandidatesAcrossViews returns components that match (count > 0) in 2 or
-// more CURRENT VIEWS and aren't already global. Counting views (not capture
-// files) means a single view snapped many times no longer trips the threshold;
-// restricting to CURRENT columns (Current == true) means a stale or renamed
-// capture dir can't manufacture phantom cross-view evidence for a page's own
+// more of the given views and aren't already global. Counting views (not
+// capture files) means a single view snapped many times no longer trips the
+// threshold. Callers pass currentColumns(cols) so a stale or renamed capture
+// dir can't manufacture phantom cross-view evidence for a page's own
 // components. Result is sorted by name; each candidate's hits follow column order.
 func globalCandidatesAcrossViews(cols []viewColumn, globalNames map[string]bool) []globalCandidate {
 	nameSet := map[string]bool{}
 	for _, c := range cols {
-		if !c.Current {
-			continue
-		}
 		for name := range c.Counts {
 			nameSet[name] = true
 		}
@@ -240,9 +263,6 @@ func globalCandidatesAcrossViews(cols []viewColumn, globalNames map[string]bool)
 		}
 		var hits []viewHit
 		for _, c := range cols {
-			if !c.Current {
-				continue
-			}
 			if count := c.Counts[name]; count > 0 {
 				hits = append(hits, viewHit{View: c.View, Count: count})
 			}
@@ -254,24 +274,11 @@ func globalCandidatesAcrossViews(cols []viewColumn, globalNames map[string]bool)
 	return candidates
 }
 
-// staleColumns returns the columns that don't map to a current corpus view, in
-// column order. These are the phantom-evidence sources #248 is about.
-func staleColumns(cols []viewColumn) []viewColumn {
-	var stale []viewColumn
-	for _, c := range cols {
-		if !c.Current {
-			stale = append(stale, c)
-		}
-	}
-	return stale
-}
-
 // printStaleColumns warns about capture dirs that match no current view. They
 // still appear in the matrix (marked "*") for context, but are excluded from the
 // global-candidate analysis so a stale or renamed dir can't mis-advise a
-// promotion. Prints nothing when every column maps to a current view.
-func printStaleColumns(cols []viewColumn) {
-	stale := staleColumns(cols)
+// promotion. Prints nothing when stale is empty. Callers pass staleColumns(cols).
+func printStaleColumns(stale []viewColumn) {
 	if len(stale) == 0 {
 		return
 	}
