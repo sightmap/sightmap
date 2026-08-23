@@ -4,6 +4,7 @@ import BlogIndex from '@/pages/BlogIndex'
 import BlogPost from '@/pages/BlogPost'
 import AtlasIndex from '@/pages/AtlasIndex'
 import AtlasEntry from '@/pages/AtlasEntry'
+import Developers from '@/pages/Developers'
 import NotFound from '@/pages/NotFound'
 import { ConsentProvider } from '@/components/consent/ConsentContext'
 import ConsentUI from '@/components/consent/ConsentUI'
@@ -21,6 +22,7 @@ export default function App() {
             one declared only in this file ships as a client-only page. */}
         <Route path="/atlas" element={<AtlasIndex />} />
         <Route path="/atlas/:slug" element={<AtlasEntry />} />
+        <Route path="/developers" element={<Developers />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <ConsentUI />

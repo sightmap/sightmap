@@ -2,6 +2,21 @@
   command = "pnpm build"
   publish = "dist"
 
+# Pretty API URLs. Static files at these paths win over a non-forced rewrite,
+# so /api/atlas.json and /api/atlas/<slug>.json (written by
+# scripts/generate-agent-files.ts) are the source of truth. Unknown slugs
+# fall through to the 404 catch-all; the negotiate edge function turns that
+# HTML 404 into a JSON error for /api/*.
+[[redirects]]
+  from = "/api/atlas"
+  to = "/api/atlas.json"
+  status = 200
+
+[[redirects]]
+  from = "/api/atlas/:slug"
+  to = "/api/atlas/:slug.json"
+  status = 200
+
 # Unknown URLs. Every real route has a prerendered dist/<route>/index.html, and
 # Netlify serves an existing static file before applying a non-forced redirect,
 # so this rule only ever answers paths that do not exist. It used to return 200
@@ -31,10 +46,48 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+[[headers]]
+  for = "/*.md"
+  [headers.values]
+    Content-Type = "text/markdown; charset=utf-8"
+    Vary = "Accept, Accept-Encoding"
+
+[[headers]]
+  for = "/blog/*.md"
+  [headers.values]
+    Content-Type = "text/markdown; charset=utf-8"
+    Vary = "Accept, Accept-Encoding"
+
+[[headers]]
+  for = "/atlas/*.md"
+  [headers.values]
+    Content-Type = "text/markdown; charset=utf-8"
+    Vary = "Accept, Accept-Encoding"
+
+[[headers]]
+  for = "/openapi.json"
+  [headers.values]
+    Content-Type = "application/json; charset=utf-8"
+    Access-Control-Allow-Origin = "*"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Vary = "Accept, Accept-Encoding"
+
 # Inject the visitor's consent region into app HTML (replaces <!--CC_REGION-->).
 # The function guards on content-type, so non-HTML responses pass through;
 # assets are excluded outright to avoid pointless invocations.
 [[edge_functions]]
   function = "geo-region"
+  path = "/*"
+  excludedPath = ["/assets/*"]
+
+# Accept negotiation (markdown / JSON errors / Vary: Accept). Declared after
+# geo-region so geo-region is outermost: it calls next(), this function
+# rewrites, and geo-region only injects into remaining HTML.
+[[edge_functions]]
+  function = "negotiate"
   path = "/*"
   excludedPath = ["/assets/*"]

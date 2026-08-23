@@ -102,7 +102,8 @@ describe('buildSitemap', () => {
     expect(xml).toContain('<loc>https://sightmap.org/atlas</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/atlas/sightmap-org</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/atlas/example-shop</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(7)
+    expect(xml).toContain('<loc>https://sightmap.org/developers</loc>')
+    expect(xml.match(/<url>/g)).toHaveLength(8)
   })
 
   it('uses the post date as lastmod for post URLs', () => {
@@ -122,7 +123,8 @@ describe('buildSitemap', () => {
     expect(xml).toContain('<loc>https://sightmap.org/</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/blog</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/atlas</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(3)
+    expect(xml).toContain('<loc>https://sightmap.org/developers</loc>')
+    expect(xml.match(/<url>/g)).toHaveLength(4)
     expect(xml).not.toContain('undefined')
     expect(xml).toContain('<lastmod>2026-07-28</lastmod>')
   })
@@ -133,6 +135,10 @@ describe('buildLlmsTxt', () => {
     const txt = buildLlmsTxt(POSTS, ATLAS)
     expect(txt.startsWith('# Sightmap\n')).toBe(true)
     expect(txt).toContain('> An open YAML spec and CLI')
+    expect(txt).toContain('## Sightmap developer resources')
+    expect(txt).toContain('https://sightmap.org/openapi.json')
+    expect(txt).toContain('https://sightmap.org/developers')
+    expect(txt).toContain('https://sightmap.org/api/atlas')
   })
 
   it('teaches the lookup an agent holding a hostname actually needs', () => {

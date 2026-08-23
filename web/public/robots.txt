@@ -2,3 +2,9 @@ User-agent: *
 Allow: /
 
 Sitemap: https://sightmap.org/sitemap.xml
+
+# Sightmap machine-readable index and HTTP API
+# https://sightmap.org/llms.txt
+# https://sightmap.org/openapi.json
+# https://sightmap.org/developers
+

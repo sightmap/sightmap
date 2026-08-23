@@ -9,7 +9,7 @@
     "dev": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && vite",
     "build:blog": "tsx scripts/build-blog.ts",
     "build:atlas": "tsx scripts/build-atlas.ts",
-    "build": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/check-route-coverage.ts && tsx scripts/generate-feeds.ts && tsx scripts/upload-sourcemaps.ts",
+    "build": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/check-route-coverage.ts && tsx scripts/generate-feeds.ts && tsx scripts/generate-agent-files.ts && tsx scripts/upload-sourcemaps.ts",
     "sourcemaps:upload": "tsx scripts/upload-sourcemaps.ts",
     "preview": "vite preview",
     "test": "vitest run",

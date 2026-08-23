@@ -8,6 +8,7 @@ const APP = `
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/atlas" element={<AtlasIndex />} />
         <Route path="/atlas/:slug" element={<AtlasEntry />} />
+        <Route path="/developers" element={<Developers />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
 `
@@ -20,6 +21,7 @@ describe('extractRoutePaths', () => {
       '/blog/:slug',
       '/atlas',
       '/atlas/:slug',
+      '/developers',
       '*',
     ])
   })
@@ -41,13 +43,14 @@ describe('checkCoverage', () => {
       '/blog/sightmap',
       '/atlas',
       '/atlas/airbnb',
+      '/developers',
     ])
     expect(out.uncovered).toEqual([])
     expect(out.emptyDynamic).toEqual([])
   })
 
   it('flags a static route with no prerendered page', () => {
-    const out = checkCoverage(declared, ['/', '/blog', '/blog/sightmap', '/atlas/airbnb'])
+    const out = checkCoverage(declared, ['/', '/blog', '/blog/sightmap', '/atlas/airbnb', '/developers'])
     expect(out.uncovered).toEqual(['/atlas'])
   })
 
@@ -59,7 +62,7 @@ describe('checkCoverage', () => {
   it('reports a dynamic route with no instances without failing the build', () => {
     // A production build excludes drafts, so a blog with nothing published
     // legitimately has zero /blog/<slug> pages — and those URLs *should* 404.
-    const out = checkCoverage(declared, ['/', '/blog', '/atlas', '/atlas/airbnb'])
+    const out = checkCoverage(declared, ['/', '/blog', '/atlas', '/atlas/airbnb', '/developers'])
     expect(out.uncovered).toEqual([])
     expect(out.emptyDynamic).toEqual(['/blog/:slug'])
   })
