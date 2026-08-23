@@ -31,16 +31,26 @@ type cftVersionsJSON struct {
 // cftPlatform returns the Chrome for Testing platform string for the current
 // OS/arch, or "" if the platform is unsupported.
 func cftPlatform() string {
-	switch runtime.GOOS {
+	return cftPlatformFor(runtime.GOOS, runtime.GOARCH)
+}
+
+// cftPlatformFor returns the Chrome for Testing platform string for goos/goarch
+// (Go's runtime.GOOS/GOARCH values), or "" if the platform is unsupported. It is
+// split out from cftPlatform so the arch mapping is unit-testable.
+func cftPlatformFor(goos, goarch string) string {
+	switch goos {
 	case "darwin":
-		if runtime.GOARCH == "arm64" {
+		if goarch == "arm64" {
 			return "mac-arm64"
 		}
 		return "mac-x64"
 	case "linux":
+		if goarch == "arm64" {
+			return "linux-arm64"
+		}
 		return "linux64"
 	case "windows":
-		if runtime.GOARCH == "386" {
+		if goarch == "386" {
 			return "win32"
 		}
 		return "win64"
@@ -60,6 +70,8 @@ func cftRelBin(platform string) string {
 		)
 	case "linux64":
 		return filepath.Join("chrome-linux64", "chrome")
+	case "linux-arm64":
+		return filepath.Join("chrome-linux-arm64", "chrome")
 	case "win64":
 		return filepath.Join("chrome-win64", "chrome.exe")
 	case "win32":
@@ -106,49 +118,85 @@ func InstalledCfTPath() (string, bool) {
 	return "", false
 }
 
-// ResolveLatestStableCfT queries the CfT JSON API and returns the current
-// Stable channel version and the download URL for the current platform.
-func ResolveLatestStableCfT(ctx context.Context) (version, downloadURL string, err error) {
-	platform := cftPlatform()
-	if platform == "" {
-		return "", "", fmt.Errorf("unsupported platform %s/%s", runtime.GOOS, runtime.GOARCH)
-	}
+// cftChannelOrder is the channel preference used when resolving a download.
+// Stable is always tried first; the less-stable channels are fallbacks for
+// platforms Google does not (yet) ship to Stable — notably linux-arm64, which
+// as of this writing appears only in Beta/Dev/Canary.
+var cftChannelOrder = []string{"Stable", "Beta", "Dev", "Canary"}
 
+// downloadForPlatform returns the chrome download URL (and its channel version)
+// for platform within channel, or ("", "") if that channel does not offer it.
+func (d *cftVersionsJSON) downloadForPlatform(channel, platform string) (version, url string) {
+	ch, ok := d.Channels[channel]
+	if !ok {
+		return "", ""
+	}
+	for _, dl := range ch.Downloads.Chrome {
+		if dl.Platform == platform {
+			return ch.Version, dl.URL
+		}
+	}
+	return "", ""
+}
+
+// resolve picks a download for platform, preferring Stable and falling back
+// through cftChannelOrder. It returns the channel it settled on so callers can
+// warn when a non-Stable build was used.
+func (d *cftVersionsJSON) resolve(platform string) (version, downloadURL, channel string, err error) {
+	for _, ch := range cftChannelOrder {
+		if v, u := d.downloadForPlatform(ch, platform); u != "" {
+			return v, u, ch, nil
+		}
+	}
+	return "", "", "", fmt.Errorf("no Chrome for Testing download for platform %q in any channel (%s)",
+		platform, strings.Join(cftChannelOrder, ", "))
+}
+
+// fetchCfTVersions retrieves and decodes the Chrome for Testing versions JSON.
+func fetchCfTVersions(ctx context.Context) (*cftVersionsJSON, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cftVersionsURL, nil)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("fetch CfT versions: %w", err)
+		return nil, fmt.Errorf("fetch CfT versions: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("fetch CfT versions: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("fetch CfT versions: HTTP %d", resp.StatusCode)
 	}
-
 	var data cftVersionsJSON
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", "", fmt.Errorf("parse CfT versions: %w", err)
+		return nil, fmt.Errorf("parse CfT versions: %w", err)
 	}
+	return &data, nil
+}
 
-	stable, ok := data.Channels["Stable"]
-	if !ok {
-		return "", "", fmt.Errorf("no Stable channel in CfT versions response")
+// ResolveCfT queries the CfT JSON API and returns the version, download URL and
+// channel for the current platform. It prefers the Stable channel and only
+// falls back to the less-stable channels (Beta, Dev, Canary) for platforms
+// Stable does not carry — currently just linux-arm64. For every mainstream
+// platform the returned channel is "Stable".
+func ResolveCfT(ctx context.Context) (version, downloadURL, channel string, err error) {
+	platform := cftPlatform()
+	if platform == "" {
+		return "", "", "", fmt.Errorf("unsupported platform %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
-	for _, dl := range stable.Downloads.Chrome {
-		if dl.Platform == platform {
-			return stable.Version, dl.URL, nil
-		}
+	data, err := fetchCfTVersions(ctx)
+	if err != nil {
+		return "", "", "", err
 	}
-	return "", "", fmt.Errorf("no download URL for platform %q in CfT Stable channel", platform)
+	return data.resolve(platform)
 }
 
 // InstallCfT downloads and installs Chrome for Testing into the sightmap
 // cache directory (~/.sightmap/browsers/chrome-<version>/).
 //
-// It is idempotent: if the current Stable version is already installed the
-// binary path is returned immediately without a download.
+// It is idempotent: if the resolved version is already installed the binary
+// path is returned immediately without a download. It prefers the Stable
+// channel, falling back to Beta/Dev/Canary only for platforms Stable does not
+// carry (currently just linux-arm64), warning to w when it does.
 //
 // Progress messages are written to w (pass os.Stderr for interactive use,
 // io.Discard to suppress).
@@ -159,12 +207,15 @@ func InstallCfT(ctx context.Context, w io.Writer) (binaryPath string, err error)
 	}
 	relBin := cftRelBin(platform)
 
-	fmt.Fprintf(w, "Resolving latest Chrome for Testing (Stable)...\n")
-	version, downloadURL, err := ResolveLatestStableCfT(ctx)
+	fmt.Fprintf(w, "Resolving latest Chrome for Testing...\n")
+	version, downloadURL, channel, err := ResolveCfT(ctx)
 	if err != nil {
 		return "", err
 	}
-	fmt.Fprintf(w, "  version: %s  platform: %s\n", version, platform)
+	if channel != "Stable" {
+		fmt.Fprintf(w, "warning: no Stable Chrome for Testing build for %s; falling back to the %s channel.\n", platform, channel)
+	}
+	fmt.Fprintf(w, "  version: %s  platform: %s  channel: %s\n", version, platform, channel)
 
 	cacheDir, err := CfTCacheDir()
 	if err != nil {
