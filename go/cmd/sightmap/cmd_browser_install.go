@@ -11,9 +11,10 @@ import (
 
 // runBrowserInstall implements `sightmap browser install`.
 //
-// Downloads and installs the latest stable Chrome for Testing into
-// ~/.sightmap/browsers/. Idempotent: if the current stable version is already
-// present it just prints the binary path and exits 0.
+// Downloads and installs the latest Chrome for Testing into ~/.sightmap/browsers/.
+// Prefers the Stable channel, falling back to Beta/Dev/Canary only for platforms
+// Stable does not carry (currently just linux-arm64). Idempotent: if the resolved
+// version is already present it just prints the binary path and exits 0.
 func runBrowserInstall(args []string) error {
 	// Parse args so `--help` (or any unknown flag) is handled before the
 	// download starts, rather than being ignored while the 184 MB install runs.
