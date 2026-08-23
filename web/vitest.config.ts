@@ -7,6 +7,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['scripts/**/*.test.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['scripts/**/*.test.ts', 'src/**/*.test.ts', 'src/**/*.test.tsx', 'netlify/**/*.test.ts'],
   },
 })

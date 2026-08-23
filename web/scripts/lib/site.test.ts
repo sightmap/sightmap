@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { SITE_URL, SITE_NAME, HOME_TITLE, BLOG_INDEX_TITLE, postTitle, esc, escXml } from './site'
+import {
+  SITE_URL,
+  SITE_NAME,
+  HOME_TITLE,
+  BLOG_INDEX_TITLE,
+  DEVELOPERS_TITLE,
+  postTitle,
+  esc,
+  escXml,
+} from './site'
 
 describe('site constants', () => {
   it('has no trailing slash on SITE_URL', () => {
@@ -23,6 +32,10 @@ describe('title builders', () => {
 
   it('builds a post title by appending SITE_NAME', () => {
     expect(postTitle('Announcing widgets')).toBe(`Announcing widgets — ${SITE_NAME}`)
+  })
+
+  it('names the developers page so a Sightmap search can find it', () => {
+    expect(DEVELOPERS_TITLE).toBe('Sightmap developer resources')
   })
 })
 

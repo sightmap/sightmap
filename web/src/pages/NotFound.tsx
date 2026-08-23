@@ -20,6 +20,12 @@ export default function NotFound() {
             <Link to="/" className="btn-primary">Back to home</Link>
             <Link to="/blog" className="btn-secondary">Read the blog</Link>
           </div>
+          <nav className="not-found__recover" aria-label="Where to look next">
+            <a href="/llms.txt">llms.txt</a>
+            <a href="/sitemap.xml">Sitemap</a>
+            <Link to="/developers">Sightmap developer resources</Link>
+            <a href="https://docs.sightmap.org">Docs</a>
+          </nav>
         </div>
       </main>
       <Footer />

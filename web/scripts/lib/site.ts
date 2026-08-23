@@ -46,6 +46,9 @@ export const ATLAS_INDEX_TITLE = `Atlas — ${SITE_NAME}`
 // advertising two different titles depending on who asked.
 export const NOT_FOUND_TITLE = `Page not found — ${SITE_NAME}`
 export const NOT_FOUND_DESCRIPTION = "This page doesn't exist."
+export const DEVELOPERS_TITLE = `${SITE_NAME} developer resources`
+export const DEVELOPERS_DESCRIPTION =
+  'OpenAPI, the Atlas HTTP API, documentation, CLI, and agent skills for the Sightmap spec.'
 export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`
 // An atlas entry's own title carries the mapped site's name, so the suffix
 // says which gallery it came from rather than repeating the site name twice.

@@ -25,10 +25,13 @@ import {
   ATLAS_INDEX_TITLE,
   NOT_FOUND_TITLE,
   NOT_FOUND_DESCRIPTION,
+  DEVELOPERS_TITLE,
+  DEVELOPERS_DESCRIPTION,
   postTitle,
   atlasTitle,
   esc,
 } from './lib/site'
+import { buildSiteJsonLd } from './lib/agent'
 
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
@@ -252,37 +255,51 @@ async function main() {
   }
   const shell = fs.readFileSync(shellPath, 'utf-8')
 
+  const siteJsonLd = `<script type="application/ld+json">${JSON.stringify(buildSiteJsonLd()).replace(/</g, '\\u003c')}</script>`
+  const mdAlternate = (href: string): string =>
+    `<link rel="alternate" type="text/markdown" href="${href}">`
+
   // Homepage. Overwrites the shell in place.
   fs.writeFileSync(
     shellPath,
-    renderRoute(shell, '/', {
-      url: `${SITE_URL}/`,
-      ogUrl: `${DEPLOY_URL}/`,
-      title: HOME_TITLE,
-      description: SITE_DESCRIPTION,
-      image: `${SITE_URL}/og-image.png`,
-      ogImage: `${DEPLOY_URL}/og-image.png`,
-      imageAlt: DEFAULT_IMAGE_ALT,
-      imageDimensionsKnown: true,
-      type: 'website',
-    })
+    renderRoute(
+      shell,
+      '/',
+      {
+        url: `${SITE_URL}/`,
+        ogUrl: `${DEPLOY_URL}/`,
+        title: HOME_TITLE,
+        description: SITE_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      [mdAlternate(`${SITE_URL}/index.md`), siteJsonLd].join('\n    ')
+    )
   )
   console.log('  prerendered /')
 
   // Blog index.
   write(
     'blog',
-    renderRoute(shell, '/blog', {
-      url: `${SITE_URL}/blog`,
-      ogUrl: `${DEPLOY_URL}/blog`,
-      title: BLOG_INDEX_TITLE,
-      description: BLOG_DESCRIPTION,
-      image: `${SITE_URL}/og-image.png`,
-      ogImage: `${DEPLOY_URL}/og-image.png`,
-      imageAlt: DEFAULT_IMAGE_ALT,
-      imageDimensionsKnown: true,
-      type: 'website',
-    })
+    renderRoute(
+      shell,
+      '/blog',
+      {
+        url: `${SITE_URL}/blog`,
+        ogUrl: `${DEPLOY_URL}/blog`,
+        title: BLOG_INDEX_TITLE,
+        description: BLOG_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      mdAlternate(`${SITE_URL}/blog.md`)
+    )
   )
 
   // Netlify sets CONTEXT to 'production', 'deploy-preview', or
@@ -332,6 +349,7 @@ async function main() {
       `<meta property="article:published_time" content="${fm.date}">`,
       `<meta property="article:author" content="${esc(fm.author)}">`,
       `<meta property="article:section" content="${esc(fm.topic)}">`,
+      mdAlternate(`${SITE_URL}/blog/${fm.slug}.md`),
       `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`,
     ].join('\n    ')
 
@@ -389,17 +407,22 @@ async function main() {
 
   write(
     'atlas',
-    renderRoute(shell, '/atlas', {
-      url: `${SITE_URL}/atlas`,
-      ogUrl: `${DEPLOY_URL}/atlas`,
-      title: ATLAS_INDEX_TITLE,
-      description: ATLAS_DESCRIPTION,
-      image: `${SITE_URL}/og-image.png`,
-      ogImage: `${DEPLOY_URL}/og-image.png`,
-      imageAlt: DEFAULT_IMAGE_ALT,
-      imageDimensionsKnown: true,
-      type: 'website',
-    })
+    renderRoute(
+      shell,
+      '/atlas',
+      {
+        url: `${SITE_URL}/atlas`,
+        ogUrl: `${DEPLOY_URL}/atlas`,
+        title: ATLAS_INDEX_TITLE,
+        description: ATLAS_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      mdAlternate(`${SITE_URL}/atlas.md`)
+    )
   )
 
   for (const entry of atlas.entries) {
@@ -503,15 +526,35 @@ async function main() {
         type: 'website',
         noindex: true,
       },
-      '',
+      mdAlternate(`${SITE_URL}/404.md`),
       '',
       false
     )
   )
   console.log('  prerendered /404.html')
 
+  write(
+    'developers',
+    renderRoute(
+      shell,
+      '/developers',
+      {
+        url: `${SITE_URL}/developers`,
+        ogUrl: `${DEPLOY_URL}/developers`,
+        title: DEVELOPERS_TITLE,
+        description: DEVELOPERS_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      [mdAlternate(`${SITE_URL}/developers.md`), siteJsonLd].join('\n    ')
+    )
+  )
+
   console.log(
-    `\n  prerender complete: ${posts.length + atlas.entries.length + 4} page(s)`
+    `\n  prerender complete: ${posts.length + atlas.entries.length + 5} page(s)`
   )
 }
 

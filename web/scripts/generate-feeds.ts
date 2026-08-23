@@ -91,6 +91,7 @@ export function buildSitemap(posts: FeedPost[], atlas: FeedAtlasEntry[], now: Da
   const today = now.toISOString().slice(0, 10)
   const urls = [
     { loc: `${SITE_URL}/`, lastmod: today, priority: '1.0' },
+    { loc: `${SITE_URL}/developers`, lastmod: today, priority: '0.8' },
     { loc: `${SITE_URL}/blog`, lastmod: posts[0]?.date ?? today, priority: '0.8' },
     ...posts.map((p) => ({
       loc: `${SITE_URL}/blog/${p.slug}`,
@@ -194,6 +195,13 @@ export function buildLlmsTxt(posts: FeedPost[], atlas: FeedAtlasEntry[]): string
     '',
     `- [Documentation](https://docs.sightmap.org): Guides, CLI reference, and the schema reference.`,
     `- [Specification](https://github.com/sightmap/sightmap/tree/main/spec): The normative spec, JSON Schema, and conformance fixtures.`,
+    '',
+    '## Sightmap developer resources',
+    '',
+    `- [Sightmap developer resources](${SITE_URL}/developers): OpenAPI, Atlas HTTP API, docs, CLI, and agent skills.`,
+    `- [OpenAPI specification](${SITE_URL}/openapi.json): Machine-readable description of the public Sightmap HTTP API.`,
+    `- [Atlas HTTP API](${SITE_URL}/api/atlas): JSON catalog of published sightmaps. No authentication.`,
+    `- [CLI on npm](https://www.npmjs.com/package/@sightmap/sightmap): \`npm install -g @sightmap/sightmap\`.`,
     '',
     '## Atlas',
     '',

@@ -5,6 +5,7 @@ memory:
   - All homepage sections live in src/components/ and compose into src/pages/Home.tsx
   - Posts are markdown in content/blog/; scripts/build-blog.ts generates the manifest and per-post HTML modules
   - Pages are statically prerendered by scripts/prerender.tsx; the client hydrates rather than mounting fresh
+  - The negotiate edge function (netlify/edge-functions/negotiate.ts) serves markdown twins for Accept: text/markdown and JSON errors for /api/* and for 404s that asked for JSON; it always sets Vary: Accept
   - "The offline matcher has no pseudo-class support: a selector like `.foo:first-child` probes 1 live and 0 offline, so keep selectors to attributes, classes and descendant combinators"
 
 views:
@@ -280,13 +281,28 @@ views:
         source: src/pages/AtlasEntry.tsx
         description: Returns to the gallery from an entry
 
+  - name: Developers
+    route: /developers
+    description: Sightmap developer resources — OpenAPI, Atlas HTTP API, docs, CLI, and skills
+    source: src/pages/Developers.tsx
+    memory:
+      - Title and h1 both contain "Sightmap developer resources" so name-based search can find this page
+      - The public API is read-only and unauthenticated; that is stated in the header copy
+      - Machine twins live at /developers.md, /openapi.json, and /api/openapi.yaml
+    components:
+      - name: DeveloperResource
+        selector: '.developers__item'
+        source: src/pages/Developers.tsx
+        description: One developer resource — title, what it is, and its URL
+
   - name: NotFound
     route: '*'
     description: Catch-all 404 page for any unmatched route
     source: src/pages/NotFound.tsx
     memory:
-      - "netlify.toml rewrites every path to /index.html with a 200 status, so this always renders as a soft 404 (HTTP 200 with 404 content), never a true 404 response"
-      - The prerender never emits a page for this route; it only ever renders client-side, after the catch-all route match
+      - "netlify.toml's catch-all serves dist/404.html with HTTP 404; the negotiate edge function may replace that body with markdown or JSON based on Accept"
+      - Recovery links (llms.txt, sitemap, /developers, docs) are on the HTML page so an agent that got HTML can still continue
+      - The prerender writes one unstamped dist/404.html; main.tsx mounts fresh for the actual URL
 
 components:
   - name: Navigation
@@ -304,7 +320,7 @@ components:
   - name: Footer
     selector: '[data-component="Footer"]'
     source: src/components/Footer.tsx
-    description: Site-wide attribution and the full secondary link set, plus the only entry point to the privacy preferences dialog
+    description: Site-wide attribution and the full secondary link set (including Developers), plus the only entry point to the privacy preferences dialog
     memory:
       - The banner auto-shows once and never again once a choice is stored, so the "Privacy preferences" button here is the only route back to the consent dialog
     children:
