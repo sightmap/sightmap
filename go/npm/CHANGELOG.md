@@ -1,5 +1,19 @@
 # @sightmap/sightmap
 
+## 0.26.2
+
+### Patch Changes
+
+- 03021a8: `sightmap multi-coverage` no longer manufactures phantom "global candidate" promotions from stale capture directories. It grouped columns purely by directory name under `snapshots/`, so a leftover or renamed dir (e.g. an old `snapshots/views/` kept alongside the current `snapshots/home/` for the same page) became a second column and made that page's own components look like they "appear in 2+ views" — advising the author to wrongly globalize view-scoped components.
+
+  A capture dir is now treated as a real view only when it matches a view in the _current_ corpus (by `SnapBasename`). Non-current dirs are still shown in the matrix (marked `*`) for context but are excluded from the cross-view global-candidate analysis, and a warning names them so the author can delete the stale dir or re-capture under the current name. The `sightmap-authoring` skill documents the new behavior.
+
+- 0c08758: Two authoring-clarity fixes for the offline inventory and the capture gate.
+
+  `sightmap stats` now attributes corpus-root **global** components and requests to their own `(global) · (all views)` row instead of showing `0` against every view. A corpus whose coverage lives entirely in globals (e.g. a single-view app mapped with global components) previously rendered a per-view table that read as empty, with the confusing footer "per-view rows sum to 0". The globals are shown once, on a leading row, and the footer explains them — globals apply to every view, so folding them into one view's row would misattribute coverage. The `--json` contract is unchanged.
+
+  `sightmap capture`'s novelty-gate message no longer reads like it is refusing a first baseline. The first capture of a view always writes (an empty set can't be redundant); reaching the gate means a baseline already exists and the new capture adds nothing, so the message now says so plainly ("<view> already has N capture(s); this one adds no new component or interactive slot — not saved"). The `sightmap-authoring` skill is updated to match and to reinforce the first-capture-always-writes guarantee.
+
 ## 0.26.1
 
 ### Patch Changes
