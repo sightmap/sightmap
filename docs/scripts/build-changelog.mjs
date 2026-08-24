@@ -65,6 +65,24 @@ function renderUpdate({ meta, body }) {
   return `<Update ${attrs.join(' ')}>\n\n${body}\n\n</Update>`;
 }
 
+// Reject MDX-unsafe raw tags in an entry body. changelog.mdx is MDX, so a bare
+// `<view>` in prose is parsed as an unclosed JSX/HTML element and fails
+// `mint validate` ("Expected a closing tag for `<view>`"). Placeholders belong in
+// backticks — `<view>` — which every entry already does; this guard keeps it that
+// way. Code spans and fenced blocks are stripped first, so backticked tags pass.
+// Lowercase-only by design: real Mintlify components are capitalized, and the
+// recurring hazard is a lowercase placeholder copied verbatim from a changeset.
+function lintBody(file, body) {
+  const prose = body
+    .replace(/```[\s\S]*?```/g, '') // fenced code blocks
+    .replace(/`[^`]*`/g, '');        // inline code
+  const tags = [...new Set(prose.match(/<\/?[a-z][\w-]*\/?>?/g) || [])];
+  if (!tags.length) return null;
+  return `${file}: raw tag(s) in prose — ${tags.join(', ')} — MDX reads these as JSX `
+    + `elements and \`mint validate\` will fail. Wrap angle-bracket placeholders in `
+    + `backticks, e.g. \`<view>\`.`;
+}
+
 function build() {
   let files;
   try {
@@ -78,6 +96,13 @@ function build() {
       a.meta.date === b.meta.date
         ? b.file.localeCompare(a.file)
         : b.meta.date.localeCompare(a.meta.date));
+
+  const problems = entries.map((e) => lintBody(e.file, e.body)).filter(Boolean);
+  if (problems.length) {
+    console.error('changelog: MDX-unsafe entry content:\n'
+      + problems.map((p) => '  - ' + p).join('\n'));
+    process.exit(1);
+  }
 
   const header = `---
 title: "Changelog"

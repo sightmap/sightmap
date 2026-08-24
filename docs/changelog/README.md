@@ -36,6 +36,8 @@ That's the whole workflow. No build step, no dependencies — Mintlify serves th
 
 The body below the frontmatter is the prose shown inside the entry. Keep **Markdown headings (`##`) out of the body** — Mintlify splits the RSS feed per heading, so a heading turns one release into several feed entries.
 
+Keep the body **MDX-safe**: it renders as MDX, so a bare `<view>` (or `{x}`) placeholder in prose is parsed as a JSX element/expression and fails `mint validate` with `Expected a closing tag for <view>`. Wrap placeholders in backticks — `` `<view>` `` — as every entry already does. `build-changelog.mjs` enforces this for `<…>` tags and fails the build, naming the offending entry. This matters most because entry prose is copied **verbatim** from a changeset, so an unsafe placeholder in a changeset rides straight through to the page.
+
 ## How entries get written
 
 **Automatically, as part of the release.** `npm run version-packages` — the command `changesets/action` runs to open the "Version Packages" PR — chains `scripts/changelog-entry.mjs` after `changeset version`. So the moment changesets writes a new block to `go/npm/CHANGELOG.md`, the matching entry file and the regenerated `changelog.mdx` are written too, and all of it lands in that same PR alongside the version bump.
@@ -69,6 +71,7 @@ The `docs` workflow enforces both halves, and they catch different failures:
 | Check | Catches |
 |-------|---------|
 | `node docs/scripts/build-changelog.mjs --check` | `changelog.mdx` is stale relative to the entry files — someone edited an entry and forgot to rebuild. |
+| `node docs/scripts/build-changelog.mjs` (build or `--check`) | An entry body has a raw `<tag>` placeholder outside backticks — MDX would fail `mint validate` downstream. |
 | `node scripts/changelog-entry.mjs --check` | A released version in `go/npm/CHANGELOG.md` has no entry at all — the docs site is a version behind npm. |
 
 The first passes happily when a release has no entry (there's nothing to be stale against), which is how 0.17.0 shipped without one. The second is why `go/npm/CHANGELOG.md` is in the workflow's path filter: the "Version Packages" PR touches no `docs/` files, so without it the job wouldn't run on the one PR that matters.
