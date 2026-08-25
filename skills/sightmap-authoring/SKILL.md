@@ -15,11 +15,12 @@ Two outputs drive everything:
 - **Coverage**: every interactive node has a component ancestor (T1 direct or T2 scoped)
 - **Annotation**: component names + extracted properties appear inline in the tree
 
-> **Further reading.** The Go implementation's `README.md` (`go/README.md`) has a
-> runnable quickstart, and `docs/reference.md` is the full authoring reference (coverage
-> model, component model, the outer loop, tool reference, lint rules, quality
-> checklist). To *use* a finished corpus — driving the browser and interacting
-> with the page — see the `sightmap-browser` skill.
+> **Further reading.** This skill is the authoring reference: the coverage model,
+> the component model (**Component hierarchy** and **Cross-view references**
+> below), the outer loop, the tool surface, lint rules, and the quality checklist
+> are all here. For the normative spec and deeper background, see the docs at
+> <https://docs.sightmap.org>. To *use* a finished corpus — driving the browser
+> and interacting with the page — see the `sightmap-browser` skill.
 
 ## Installation
 
