@@ -1,0 +1,11 @@
+---
+label: "sightmap 0.26.3"
+date: "2026-08-25"
+tags: ["cli"]
+---
+
+Authoring skill: document the component model. Add "Component hierarchy (`children:`)" and "Cross-view references (`$ref`)" sections covering nested components, parent-scoped selectors, the depth budget, and `$ref` attestation. The browser skill now spells out that component queries use a descendant combinator (no `>` child combinator) and that a multi-match is an ambiguity error, not a missing component.
+
+Authoring skill: fix the "Further reading" pointers. They referenced `go/README.md` (not shipped with the installed skill) and `docs/reference.md` (which does not exist). The skill is self-contained — coverage model, outer loop, tool surface, lint rules, quality checklist, and the component model are all in it — and now points to the published docs for the normative spec instead of dead repo-relative paths.
+
+Authoring skill: fill three small content gaps. Document the `memory:` shape (a list of plain strings, attachable at the file root or on a view/component), add a route-matching note (`*` matches one path segment, `**` matches zero or more, and the URL is matched decoded so `%2F` counts as a separator), and reconcile the class-selector guidance (stable hand-authored class names are fine — the volatility risk is generated/hashed classes).
