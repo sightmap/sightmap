@@ -330,6 +330,25 @@ views:
   fine. Use `$ref` to attest which globals a view can show (a rail that's usually
   there, a modal reachable from the page).
 
+## Memory (`memory:`)
+
+`memory:` carries short free-text notes that surface in your `[Guide]` context
+whenever the definition is active — quirks, invariants, "you have to click this
+twice" lore that isn't recoverable from the DOM. It is a **list of plain
+strings** (not objects — a list of `{name, text}` maps fails to parse), and it
+attaches at the file root (global notes), on a view, or on a component:
+
+```yaml
+version: 1
+memory:
+  - Auth rail is present on every page except /login.
+components:
+  - name: RangeSlider
+    selector: '.range'
+    memory:
+      - "Range: 1st click = start, 2nd = end, 3rd resets"
+```
+
 ---
 
 ## Property extraction principles
@@ -567,8 +586,10 @@ sightmap suggest --exclude-known   # candidates not in sightmap
 sightmap discover                  # URL patterns — find unseen routes
 ```
 
-Prefer selectors with `data-testid`, `data-component^=`, `#id`. Avoid
-class selectors (volatile) and auto-generated IDs.
+Prefer selectors with `data-testid`, `data-component^=`, `#id`. Stable,
+hand-authored class names are fine too — the volatility risk is *generated or
+hashed* classes (CSS-modules, hashed production builds) and auto-generated IDs;
+avoid those, not classes as a category.
 
 Create a view file `.sightmap/views/PAGE.yaml`. **View fields go under a
 top-level `views:` list** — `route:`/`url:`/`name:` are *not* file-root fields
@@ -587,6 +608,13 @@ views:
 ```
 
 Run `sightmap validate` before snapping.
+
+**Route matching (globs).** `*` matches exactly one path segment; `**` as its
+own segment matches zero or more (`/a/**` matches `/a`, `/a/b`, `/a/b/c`; `/a/*`
+matches only `/a/b`). Matching is against the URL's **decoded** path, so a `%2F`
+in the URL counts as a separator: `/app/x%2Fy%2Fz` is five segments, not three,
+and a `/app/*/*` route won't match it (use `/app/**`). When several views match,
+the most specific wins; ties go to the first-declared view.
 
 **Keep routes specific.** A `route:` glob should identify *this* view, not every
 page. A catch-all like `/lightning/**` or `/**` that matches every URL is a smell:
