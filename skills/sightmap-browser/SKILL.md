@@ -111,9 +111,14 @@ so nothing goes stale. Prefer queries on dynamic pages.
   properties** (not raw DOM attributes). Operators: `=` exact, `^=` prefix,
   `*=` substring, with an optional trailing ` i` for case-insensitive.
 - Whitespace is a **descendant** combinator; the **last** component is the target.
+  It matches at any depth (`A B` = a `B` anywhere under an `A`), and a predicate
+  on an ancestor scopes the target (`Row[title="…"] Star`). There is **no `>`
+  child combinator** — `A > B` is a parse error; use whitespace.
 - If a query matches **zero** components it errors; if it matches **several** it
   errors and prints the candidates with their distinguishing properties — add a
-  predicate to disambiguate, or append `#N`.
+  predicate to disambiguate, or append `#N`. ("Several match" is an ambiguity
+  error listing candidates, **not** a "no such component" error — read it and
+  disambiguate rather than assuming the component is unreachable.)
 - Robust queries need a corpus with disambiguating **properties**; authoring a
   property like `FulfillmentTileButton.label` is what makes the element
   addressable (see the `sightmap-authoring` skill).

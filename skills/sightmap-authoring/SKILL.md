@@ -246,6 +246,91 @@ brackets when not suppressed by Rule A (exact match with a property value).
 
 ---
 
+## Component hierarchy (`children:`)
+
+Components nest. A component may carry a `children:` list of nested components,
+and this is the idiomatic way to model a container and the controls it owns
+(a sidebar and its buttons, a row and its actions). The snap tree already *shows*
+this nesting (`Sidebar` > `NavLink`); `children:` is how you *author* it.
+
+```yaml
+components:
+  - name: Sidebar
+    selector: 'nav.rail'
+    children:
+      - name: Brand
+        selector: '.brand'          # relative to Sidebar
+      - name: NavLink
+        selector: 'a'               # generic — scoped to Sidebar's subtree
+```
+
+**A child's selector is scoped to its parent's subtree** — the effective
+selector is the ancestor selectors prepended (a descendant combinator),
+recursively. So a child only has to be unambiguous *within its parent*, not
+globally: on a page with 16 `button`s, 14 of them inside `nav.rail`, a
+`Sidebar` > `NavButton` with the generic child selector `button` matches exactly
+those 14. This shortens selectors and keeps obviously-owned sub-components out of
+the global namespace. (Flat components already earn T2 by DOM containment;
+`children:` is not required to reach 0 orphaned — it is how you express ownership
+and shorten child selectors.)
+
+**Use it for:**
+
+- **Owned sub-components** that only ever live in one container (a rail's brand,
+  collapse, new-chat, sign-out buttons): nest them with short relative selectors
+  instead of declaring long-selectored top-level globals.
+- **Repeated-identical controls** — every row's identical Rescue button, a
+  conversation row's `⋯` button, per-row stars. The row is a repeated container,
+  so by the property rules below it carries its own discriminator
+  (`ArchiveRow[title=…]`); nest the identical control beneath it
+  (`ArchiveRow` > `RescueButton`, child selector `button`). You then address one
+  instance with a **descendant component query** — `ArchiveRow[title="…"]
+  RescueButton` — because the parent's discriminator carries into the query.
+  (Query syntax lives in the `sightmap-browser` skill; whitespace is a descendant
+  combinator — there is no `>` child combinator.)
+
+**Depth budget.** Because selectors are prepended, deep trees produce long
+selectors; `lint` warns `[deep-nesting]` at ≥4 levels. When you hit it, **promote
+a singleton**: a descendant that is globally unique (e.g. the one open menu
+popover) belongs as a top-level component, not buried four levels down.
+
+**Names are unique per-parent, not global.** Two different parents may each have
+a child named `Star`; `search` shows them by breadcrumb (`TreeRow › Star`,
+`GalleryTile › Star`). Reuse generic child names freely for coverage, but give a
+**unique** name (or a per-instance property) to anything you intend to drive by
+component query.
+
+## Cross-view references (`$ref`)
+
+A component defined at the root of a `components.yaml` is **global**: it matches
+on every view with no further wiring. To record *in a view* that such a global
+appears there, reference it by name:
+
+```yaml
+views:
+  - name: Home
+    route: "/"
+    components:
+      - $ref: Sidebar            # the global Sidebar can appear on Home
+      - name: Composer
+        selector: '.composer'
+```
+
+- The spelling is exactly `$ref` (a single-key entry). `ref:` and `uses:` are
+  **not** recognized (they validate as unknown fields).
+- `$ref` resolves against a root-level component **name**. A dangling ref is a
+  hard error (`ref-unresolved`); a reference cycle errors too (`ref-circular`).
+- It is **idempotent** for a genuine global: the component already matches
+  everywhere, so `$ref`-ing it adds documentation, not a second match.
+- **What a listed component means:** anything listed on a view (or nested under
+  it), `$ref` included, is something that *can* appear there — **not** a
+  guarantee it is always present. There is no way to assert "always present", so a
+  `$ref`'d component that is absent from some captured states is expected and
+  fine. Use `$ref` to attest which globals a view can show (a rail that's usually
+  there, a modal reachable from the page).
+
+---
+
 ## Property extraction principles
 
 Two property rules are **mandatory**:
@@ -259,7 +344,10 @@ Two property rules are **mandatory**:
    every instance collapses to an indistinguishable node and no component query
    can resolve a single one. `sel-probe` already prints the match count: a count
    > 1 with no per-instance property is the tell. Extract the discriminator from
-   wherever it lives — a header title, an `aria-label`, a stable `data-*`.
+   wherever it lives — a header title, an `aria-label`, a stable `data-*`. When
+   the repeated node is an *identical leaf* that has no discriminator of its own
+   (every row's identical Rescue button), put the discriminator on its container
+   and nest the leaf beneath it — see **Component hierarchy** above.
 
 ```yaml
 - name: FooterLink
@@ -585,8 +673,8 @@ For every T2 cluster, categorise — don't just accept it:
 - **(C) Untried** — run `sightmap sel-probe` first; T2 is only acceptable after a real attempt
 
 **4. Duplicate selectors**
-Scan YAML for children in different parents with identical selectors. Consolidate
-or promote to global.
+Scan YAML for children (see **Component hierarchy**) in different parents with
+identical selectors. Consolidate or promote to global.
 
 **5. Zero-match component check** *(manual)*
 Cross-check the Guide against the view's component list. Any component defined
@@ -654,7 +742,7 @@ view under its current name) and re-run.
 
 ```bash
 sightmap validate       # ✓ no validation errors = done
-sightmap lint --warn-only   # deep-nesting warnings are expected; watch for new ones
+sightmap lint --warn-only   # deep-nesting warnings (see Component hierarchy: promote singletons); watch for new ones
 ```
 
 **Done when:**
