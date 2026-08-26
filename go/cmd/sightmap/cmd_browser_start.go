@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -149,6 +151,13 @@ func runBrowserStart(args []string) error {
 		"--no-default-browser-check",
 		"--disable-blink-features=AutomationControlled",
 	}
+	// Headless auto-detection: on Linux with no display, a non-headless Chrome
+	// dies with "Missing X server or $DISPLAY". Default to headless so a headless
+	// host just works for agents; an explicit --headless or a real display skips it.
+	if !*headlessFlag && shouldAutoHeadless() {
+		*headlessFlag = true
+		fmt.Fprintln(os.Stderr, "start: no display detected ($DISPLAY/$WAYLAND_DISPLAY unset) — running headless (pass --headless to silence).")
+	}
 	if *headlessFlag {
 		chromeArgs = append(chromeArgs, "--headless=new")
 	}
@@ -189,9 +198,11 @@ func runBrowserStart(args []string) error {
 	if pollErr := pollCDPReady(cdpAddr); pollErr != nil {
 		cmd.Process.Kill()
 		_ = cmd.Wait() // let the stderr copy goroutine finish before reading the buffer
+		report := chromeStderr.tailReport()
 		return fmt.Errorf("start: chrome did not become ready: %w\n"+
-			"  binary: %s\n  args:   %s\n%s",
-			pollErr, chromePath, strings.Join(chromeArgs, " "), chromeStderr.tailReport())
+			"  binary: %s\n  args:   %s\n%s%s",
+			pollErr, chromePath, strings.Join(chromeArgs, " "), report,
+			sandboxHint(report, slices.Contains(chromeArgs, "--no-sandbox")))
 	}
 
 	// Start the console/network collector against the now-ready session and
@@ -517,6 +528,32 @@ func tailFile(path string, maxBytes int64) string {
 		data = data[int64(len(data))-maxBytes:]
 	}
 	return string(data)
+}
+
+// shouldAutoHeadless reports whether to default to headless: only on Linux with
+// no X or Wayland display, where a non-headless Chrome would die with "Missing X
+// server or $DISPLAY". macOS/Windows always have a usable display.
+func shouldAutoHeadless() bool {
+	return runtime.GOOS == "linux" && os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == ""
+}
+
+// sandboxHint returns an actionable note when Chrome's launch failure looks like
+// its zygote sandbox being blocked (unprivileged user namespaces clamped by
+// AppArmor or a container policy). We deliberately do NOT auto-add --no-sandbox
+// (it's a security downgrade) but point straight at the fix. Empty when the
+// failure isn't sandbox-related or --no-sandbox is already set.
+func sandboxHint(chromeStderr string, hasNoSandbox bool) string {
+	if hasNoSandbox {
+		return ""
+	}
+	for _, sig := range []string{"No usable sandbox", "Running as root without --no-sandbox", "namespace sandbox"} {
+		if strings.Contains(chromeStderr, sig) {
+			return "\n  hint: this host blocks Chrome's sandbox (unprivileged user namespaces are restricted —\n" +
+				"        common under AppArmor on recent Ubuntu and inside containers).\n" +
+				"        rerun with --chrome-flag=--no-sandbox"
+		}
+	}
+	return ""
 }
 
 // runAttachedSession runs the daemon against a caller-launched Chrome reached at
