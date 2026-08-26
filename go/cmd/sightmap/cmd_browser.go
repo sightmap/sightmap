@@ -83,7 +83,7 @@ Interaction (IDs from sightmap snapshot output):
   keypress KEY                        (Enter Tab Escape ArrowUp/Down Backspace ...)
   scroll   [--component-id ID] [--delta-x N] [--delta-y N]
   drag        COMPONENT-ID --delta-x N --delta-y N
-  wait-for    --url PATTERN | --selector SEL | --load  [--timeout-ms N]
+  wait-for    --url PATTERN | --selector SEL | --component QUERY | --view NAME | --load  [--timeout-ms N]
   dialog      accept|dismiss [--text INPUT]
   screenshot  [--out FILE] [--stdout] [--component NAME | --selector SEL] [--expand-pct N]
   bounds      QUERY... | --selector SEL | --all   viewport-% bounding boxes (JSON)
