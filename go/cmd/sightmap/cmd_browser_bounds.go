@@ -18,7 +18,6 @@ import (
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/compquery"
 	"github.com/sightmap/sightmap/go/match"
-	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -177,6 +176,59 @@ func boundsByComponent(
 		return nil, fmt.Errorf("bounds: no sightmap components matched the current page (%s)", pageURL)
 	}
 
+	parsed, props, err := prepareBoundsQuery(ctx, conn, matcher, matches, pageURL, queries, all, substring)
+	if err != nil {
+		return nil, err
+	}
+	return selectBoundsResults(root, matches, queries, all, substring, parsed, props, vw, vh), nil
+}
+
+// prepareBoundsQuery parses the positional queries and, for the default
+// (query-grammar) mode, extracts live properties for the components they
+// reference so [prop] predicates resolve (mirrors resolveComponentQuery;
+// keeps the extraction small). --all and --substring don't use the query
+// grammar, so both return values are nil for those modes.
+func prepareBoundsQuery(
+	ctx context.Context,
+	conn *browser.CDPConn,
+	matcher *match.Matcher,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	pageURL string,
+	queries []string,
+	all, substring bool,
+) ([]*compquery.Query, map[string]map[string]string, error) {
+	if all || substring {
+		return nil, nil, nil
+	}
+
+	parsed := make([]*compquery.Query, len(queries))
+	for i, qs := range queries {
+		q, perr := compquery.ParseQuery(qs)
+		if perr != nil {
+			return nil, nil, fmt.Errorf("bounds: %w", perr)
+		}
+		parsed[i] = q
+	}
+	props := extractQueryProperties(ctx, conn, matcher, matches, pageURL, parsed...)
+	return parsed, props, nil
+}
+
+// selectBoundsResults runs bounds's three selection modes over an
+// already-matched component tree: --all emits every matched component,
+// --substring does a case-insensitive substring match on component name, and
+// the default mode resolves each query through the compquery grammar (names +
+// [prop] predicates + descendant chains) using parsed/props from
+// prepareBoundsQuery. Pure — no browser or filesystem I/O — so it exercises
+// the exact selection logic directly, without a live page.
+func selectBoundsResults(
+	root *sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	queries []string,
+	all, substring bool,
+	parsed []*compquery.Query,
+	props map[string]map[string]string,
+	vw, vh int,
+) []boundsResult {
 	var results []boundsResult
 	seen := map[string]bool{}
 	add := func(n *sightmap.ComponentNode, m *sightmap.ComponentMatch) {
@@ -224,34 +276,6 @@ func boundsByComponent(
 		// chains — via the same compquery engine as click/fill/hover/wait-for.
 		// FindCandidates returns EVERY match, so bounds keeps its multi-instance
 		// semantics instead of resolving to a single node.
-		parsed := make([]*compquery.Query, len(queries))
-		queryNames := map[string]bool{}
-		for i, qs := range queries {
-			q, perr := compquery.ParseQuery(qs)
-			if perr != nil {
-				return nil, fmt.Errorf("bounds: %w", perr)
-			}
-			parsed[i] = q
-			for _, part := range q.Parts {
-				queryNames[part.Name] = true
-			}
-		}
-		// Extract properties for the queried component names so [prop] predicates
-		// resolve (mirrors resolveComponentQuery; keeps the extraction small).
-		relevant := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
-		for n, m := range matches {
-			if queryNames[m.Name] {
-				relevant[n] = m
-			}
-		}
-		components := matcher.Components(pageURL)
-		compByName := make(map[string]sightmap.ComponentDef, len(components))
-		for _, c := range components {
-			compByName[c.Name] = c
-		}
-		observe.ExtractProperties(ctx, conn, relevant, compByName)
-		props := propsByNodeID(matches)
-
 		matched := make([]bool, len(queries))
 		for i, q := range parsed {
 			for _, n := range compquery.FindCandidates(root, matches, props, q) {
@@ -263,7 +287,7 @@ func boundsByComponent(
 	}
 
 	sortResults(results)
-	return results, nil
+	return results
 }
 
 // warnUnmatchedQueries prints a stderr note for each query that matched no
