@@ -19,15 +19,24 @@ const yaml = require("js-yaml");
 
 function listYamlFiles(dir) {
   const out = [];
-  const walk = (d) => {
+  const walk = (d, top) => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
       if (entry.name.startsWith(".")) continue;
+      // Skip the reference CLI's non-corpus subdirectories, as its own
+      // loader does: review/ holds punch-list YAML, snapshots/ holds
+      // snapshot blobs.
+      if (
+        entry.isDirectory() &&
+        (entry.name === "review" || entry.name === "snapshots")
+      ) {
+        continue;
+      }
       const p = path.join(d, entry.name);
-      if (entry.isDirectory()) walk(p);
+      if (entry.isDirectory()) walk(p, false);
       else if (/\.ya?ml$/.test(entry.name)) out.push(p);
     }
   };
-  walk(dir);
+  walk(dir, true);
   return out.sort();
 }
 
@@ -123,13 +132,15 @@ function loadCorpus(dir) {
   for (const p of filePaths) {
     const doc = yaml.load(fs.readFileSync(p, "utf8"));
     if (!doc || typeof doc !== "object") continue;
-    if (doc.version !== 1) {
-      throw new Error(`${p}: expected "version: 1" at file root`);
-    }
+    // A YAML file without "version: 1" is a tooling file (survey.yaml and
+    // friends), not a corpus file — skip it, as the reference loader does.
+    if (doc.version !== 1) continue;
     files.push({ path: p, doc });
   }
   if (files.length === 0) {
-    throw new Error(`sightmap corpus at ${dir} contains no YAML files`);
+    throw new Error(
+      `sightmap corpus at ${dir} contains no corpus YAML files (version: 1)`,
+    );
   }
 
   const registry = buildRegistry(files);
@@ -195,7 +206,14 @@ function loadCorpus(dir) {
     byName.get(name).push(crumb);
   }
 
-  return { dir, files: filePaths, components, byName, views, requests };
+  return {
+    dir,
+    files: files.map((f) => f.path),
+    components,
+    byName,
+    views,
+    requests,
+  };
 }
 
 module.exports = { loadCorpus };

@@ -38,7 +38,7 @@ function banner(ir, provenance) {
   lines.push(
     `// ${ir.meta.site} — WebMCP tools generated from a sightmap corpus.`,
   );
-  if (ir.meta.description) lines.push(`// ${ir.meta.description}`);
+  if (ir.meta.description) lines.push(`// ${oneLine(ir.meta.description)}`);
   lines.push(
     `// tools: ${ir.tools.map((t) => t.name).join(", ")}`,
     `// generator: @sightmap/webmcp-codegen v${provenance.generatorVersion} (github.com/sightmap/sightmap webmcp/)`,
@@ -46,6 +46,12 @@ function banner(ir, provenance) {
     `// DO NOT EDIT — edit the manifest or corpus and regenerate: sightmap-webmcp generate`,
   );
   return lines.join("\n");
+}
+
+// oneLine collapses whitespace (newlines included) so authored text cannot
+// break out of a // comment line or a userscript header field.
+function oneLine(s) {
+  return String(s).replace(/\s+/g, " ").trim();
 }
 
 function userscriptHeader(ir) {
@@ -57,7 +63,7 @@ function userscriptHeader(ir) {
     `// @name         ${ir.meta.site} WebMCP tools (sightmap)`,
     "// @namespace    https://sightmap.org/webmcp",
     `// @version      ${ir.meta.toolVersion}`,
-    `// @description  ${ir.meta.description || `WebMCP tools for ${ir.meta.site}, generated from its sightmap corpus.`}`,
+    `// @description  ${oneLine(ir.meta.description || `WebMCP tools for ${ir.meta.site}, generated from its sightmap corpus.`)}`,
   ];
   for (const m of matches) lines.push(`// @match        ${m}`);
   lines.push(
@@ -70,8 +76,8 @@ function userscriptHeader(ir) {
 }
 
 function bundleBody(ir) {
-  const meta = JSON.stringify(ir.meta, null, 2);
-  const tools = JSON.stringify(ir.tools, null, 2);
+  const meta = JSON.stringify(ir.meta, null, 2).replace(/<\//g, "<\\/");
+  const tools = JSON.stringify(ir.tools, null, 2).replace(/<\//g, "<\\/");
   return [
     "(() => {",
     '  "use strict";',

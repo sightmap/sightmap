@@ -113,7 +113,15 @@ function __smwApplyTransform(val, transform) {
 const __SMW_VALUE_CAP = 300;
 
 function __smwReadProp(el, spec) {
-  let val = __smwExtractValue(el, spec.extract);
+  // Value omission is silent (spec): an extract that errors — e.g. a
+  // selector-shaped extract that is not valid CSS — omits the value rather
+  // than aborting the tool call.
+  let val;
+  try {
+    val = __smwExtractValue(el, spec.extract);
+  } catch (e) {
+    return null;
+  }
   if (val == null) return null;
   val = String(val).trim().replace(/\s+/g, " ");
   if (val === "") return null;
@@ -215,7 +223,10 @@ function __smwPredMatch(el, link, pred, args) {
 
 function __smwResolveTarget(root, target, args) {
   if (target.kind === "css") {
-    return __smwDeepQueryAll(root, target.selector);
+    return __smwDeepQueryAll(
+      root,
+      __smwInterpolate(target.selector, args || {}, false),
+    );
   }
   let scopes = [root];
   for (const link of target.links) {
@@ -235,7 +246,9 @@ function __smwResolveTarget(root, target, args) {
 }
 
 function __smwTargetDesc(target, args) {
-  if (target.kind === "css") return target.selector;
+  if (target.kind === "css") {
+    return __smwInterpolate(target.selector, args || {}, false);
+  }
   return target.links
     .map(
       (l) =>
@@ -321,8 +334,16 @@ function __smwClick(el) {
         cx < window.innerWidth &&
         cy < window.innerHeight
       ) {
+        // elementFromPoint does not pierce shadow roots — it returns the
+        // shadow host for shadow content — so containment is checked over
+        // the composed tree, not the light tree.
         const at = document.elementFromPoint(cx, cy);
-        if (at && at !== el && !el.contains(at) && !at.contains(el)) {
+        if (
+          at &&
+          at !== el &&
+          !__smwComposedContains(el, at) &&
+          !__smwComposedContains(at, el)
+        ) {
           throw new Error(
             "click target is covered by another element (an open overlay or modal?)",
           );
@@ -333,8 +354,35 @@ function __smwClick(el) {
   el.click();
 }
 
+// __smwComposedContains reports whether ancestor contains el in the composed
+// (shadow-including) tree.
+function __smwComposedContains(ancestor, el) {
+  let n = el;
+  while (n) {
+    if (n === ancestor || (ancestor.contains && ancestor.contains(n))) {
+      return true;
+    }
+    const root = n.getRootNode ? n.getRootNode() : null;
+    n = root && root.host ? root.host : null;
+  }
+  return false;
+}
+
+const __SMW_KEYCODES = {
+  Enter: 13,
+  Tab: 9,
+  Escape: 27,
+  Backspace: 8,
+  ArrowDown: 40,
+  ArrowUp: 38,
+};
+
 function __smwPress(el, key) {
   const opts = { key, bubbles: true, cancelable: true };
+  if (__SMW_KEYCODES[key]) {
+    opts.keyCode = __SMW_KEYCODES[key];
+    opts.which = __SMW_KEYCODES[key];
+  }
   el.dispatchEvent(new KeyboardEvent("keydown", opts));
   el.dispatchEvent(new KeyboardEvent("keyup", opts));
 }
@@ -343,9 +391,10 @@ function __smwSleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function __smwWaitFor(step, args) {
+async function __smwWaitFor(step, args, signal) {
   const deadline = Date.now() + step.timeoutMs;
   for (;;) {
+    if (signal && signal.aborted) throw new Error("aborted");
     if (step.target) {
       if (__smwResolveTarget(document, step.target, args).length > 0) return;
     } else if (step.selector) {
@@ -452,7 +501,7 @@ function __smwExtractResult(spec, ctx) {
     }
   }
   if (spec.transform) val = __smwApplyTransform(val, spec.transform);
-  return val;
+  return val === "" ? undefined : val;
 }
 
 async function __smwRunApi(tool, args, meta, signal) {
@@ -504,17 +553,27 @@ async function __smwRunApi(tool, args, meta, signal) {
   }
   const out = { status: resp.status };
   if (api.result && api.result.length > 0) {
-    const ctx = { reqBody, reqHeaders: headers, rspBody, rspHeaders };
+    // Header names match case-insensitively (spec) — normalize the request
+    // side the same way the response side already is.
+    const reqHeaders = {};
+    for (const k of Object.keys(headers)) {
+      reqHeaders[k.toLowerCase()] = headers[k];
+    }
+    const ctx = { reqBody, reqHeaders, rspBody, rspHeaders };
     for (const spec of api.result) {
       const v = __smwExtractResult(spec, ctx);
       if (v !== undefined) out[spec.name] = v;
     }
   } else {
     out.url = url.toString();
-    out.body =
-      typeof rspBody === "string"
-        ? rspBody.slice(0, api.maxBodyChars)
-        : rspBody;
+    if (typeof rspBody === "string") {
+      out.body = rspBody.slice(0, api.maxBodyChars);
+    } else if (JSON.stringify(rspBody).length > api.maxBodyChars) {
+      out.body = JSON.stringify(rspBody).slice(0, api.maxBodyChars);
+      out.body_truncated = true;
+    } else {
+      out.body = rspBody;
+    }
   }
   return out;
 }
@@ -533,7 +592,7 @@ async function __smwRunFlow(tool, args, meta, signal) {
     const resp = await fetch(url.toString(), init);
     const text = await resp.text();
     const doc = new DOMParser().parseFromString(text, "text/html");
-    out.url = url.toString();
+    out.url = resp.url || url.toString();
     out.status = resp.status;
     for (const step of flow.steps.slice(1)) {
       if (step.do === "read")
@@ -545,6 +604,11 @@ async function __smwRunFlow(tool, args, meta, signal) {
   if (flow.requireView) {
     const re = new RegExp(flow.requireView.pathRegex);
     let path = location.pathname;
+    try {
+      path = decodeURIComponent(path); // route globs match the decoded path
+    } catch (e) {
+      /* malformed escape: match the raw path */
+    }
     if (path.length > 1) path = path.replace(/\/+$/, "");
     if (!re.test(path)) {
       return {
@@ -573,7 +637,7 @@ async function __smwRunFlow(tool, args, meta, signal) {
         }
       }, 0);
     } else if (step.do === "wait_for") {
-      await __smwWaitFor(step, args);
+      await __smwWaitFor(step, args, signal);
     } else if (step.do === "fill") {
       const el = __smwRequireOne(document, step.target, args, "fill");
       __smwFill(el, __smwInterpolate(step.value, args, false));

@@ -216,6 +216,38 @@ resolve is absent, never an error. Single-value reads cap at 300 chars;
 api bodies echo up to `max_body_chars` (default 20000) when no `result:` is
 declared.
 
+## Trust model
+
+Generated tools run with the page's authority, so be clear about who trusts
+whom:
+
+- **The manifest and corpus are trusted inputs.** Whoever generates a bundle
+  is asserting the tools it contains: URL templates decide where credentialed
+  (`credentials: "include"`) fetches go, and flows decide what gets clicked.
+  Review both the way you'd review code — especially a corpus installed from
+  the atlas (`atlas add` proves it loads, not that it's benign).
+- **Params are agent-supplied.** They are URL-encoded into URLs by default;
+  `{param|raw}` opts out, and the compiler warns when a template parameterizes
+  the URL's *origin*, because that hands the destination host to the caller.
+- **The shim grants no new privilege.** Any script on the page can already do
+  everything a tool does (same-origin DOM + fetch); `window.__sightmapWebMCP`
+  adds a convenient surface, not a capability. The mediated surface is
+  `document.modelContext`, where the browser controls which agents see which
+  tools. Mark mutating tools `read_only: false` so hosts can gate them.
+- **A userscript user trusts the publisher.** Installing `SITE.webmcp.user.js`
+  runs it on every matching page with their session. Publish reproducibly:
+  the banner's corpus hash lets anyone regenerate and diff.
+- **Embedded strings cannot break out.** Authored text is JSON-embedded with
+  `</` escaped (safe to inline in a `<script>`), and banner/userscript header
+  lines are collapsed to one line.
+
+Runtime limits worth knowing: single reads cap at 300 chars (`max_chars`
+raises per field), un-`result:`ed api bodies at `max_body_chars`; regex
+patterns evaluate as JS RegExp — stay in the RE2∩JS subset the authoring
+skill prescribes; fetched documents are decoded as UTF-8; `press` synthesizes
+events (keydown/keyup + keyCode for common keys) that some handlers ignore —
+prefer URL-shaped actions.
+
 ## Status & non-goals
 
 - The generator targets the current WebMCP shape (`document.modelContext`,

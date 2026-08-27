@@ -22,14 +22,33 @@ const { scaffold } = require("../src/scaffold");
 
 const GENERATOR_VERSION = require("../package.json").version;
 
-function parseArgs(argv) {
+const FLAGS = {
+  validate: ["tools", "sightmap-dir"],
+  generate: ["tools", "sightmap-dir", "format", "out", "out-dir", "check"],
+  init: ["site", "base-url", "sightmap-dir", "out"],
+};
+const BOOL_FLAGS = ["check"];
+
+// parseArgs rejects unknown flags — a typo'd --check or --format must fail
+// loudly, not silently generate (the CI drift gate depends on it).
+function parseArgs(cmd, argv) {
+  const known = FLAGS[cmd] || [];
   const args = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith("--")) {
       const key = a.slice(2);
-      if (key === "check") args.check = true;
-      else args[key] = argv[++i];
+      if (!known.includes(key)) {
+        fail(
+          `unknown flag --${key} for "${cmd}" (flags: ${known.map((k) => "--" + k).join(", ")})`,
+        );
+      }
+      if (BOOL_FLAGS.includes(key)) {
+        args[key] = true;
+      } else {
+        if (i + 1 >= argv.length) fail(`flag --${key} needs a value`);
+        args[key] = argv[++i];
+      }
     } else {
       args._.push(a);
     }
@@ -167,7 +186,7 @@ function cmdInit(args) {
 function main() {
   const argv = process.argv.slice(2);
   const cmd = argv[0];
-  const args = parseArgs(argv.slice(1));
+  const args = parseArgs(cmd, argv.slice(1));
   if (cmd === "validate") return cmdValidate(args);
   if (cmd === "generate") return cmdGenerate(args);
   if (cmd === "init") return cmdInit(args);

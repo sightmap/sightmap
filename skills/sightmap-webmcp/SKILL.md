@@ -209,3 +209,8 @@ site. Re-verify mutating tools on a page where mutation is acceptable.
   `navigate` step) moves between pages.
 - **Mark mutating tools** `read_only: false` and say in the description what
   they mutate — hosts surface `readOnlyHint` to users.
+- **The manifest is trusted input** — its URL templates decide where the
+  page's credentialed fetches go. Review an installed corpus before
+  generating from it, keep api origins fixed (the compiler warns when a
+  template parameterizes the host), and publish userscripts reproducibly:
+  the banner's corpus hash lets anyone regenerate and diff.

@@ -73,7 +73,7 @@ tools:
       - fill:
           target: SearchInput
           value: "{label}"
-      - click: "Row[label=\"{label}\"] Buy"
+      - click: 'Row[label="{label}"] Buy'
       - read:
           confirmed:
             selector: ".confirmation"

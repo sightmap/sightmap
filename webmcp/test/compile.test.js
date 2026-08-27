@@ -203,6 +203,83 @@ describe("compile", () => {
     ]);
   });
 
+  test("unknown read-spec keys and undeclared css templates are errors", () => {
+    const corpus = loadCorpus(path.join(FIXTURE, ".sightmap"));
+    const { errors } = compile(corpus, {
+      site: "x",
+      base_url: "https://x.example",
+      tools: [
+        {
+          name: "bad",
+          description: "d",
+          flow: [
+            { read: { v: { component: "Card", proprety: "title" } } },
+            { click: 'css:[data-id="{nope}"]' },
+          ],
+        },
+      ],
+    });
+    expect(errors.join("\n")).toMatch(
+      /unknown key "proprety" in a read value spec/,
+    );
+    expect(errors.join("\n")).toMatch(/undeclared param "\{nope\}"/);
+  });
+
+  test("a parameterized api origin warns", () => {
+    const corpus = loadCorpus(path.join(FIXTURE, ".sightmap"));
+    const { warnings } = compile(corpus, {
+      site: "x",
+      base_url: "https://x.example",
+      tools: [
+        {
+          name: "w",
+          description: "d",
+          params: [
+            { name: "host", type: "string", required: true, description: "h" },
+          ],
+          api: { method: "GET", url: "https://{host}/api" },
+        },
+      ],
+    });
+    expect(warnings.join("\n")).toMatch(/origin is parameterized/);
+  });
+
+  test("manifest shape errors: match string, result mapping, bad timeouts", () => {
+    const { validateManifest } = require("../src/manifest");
+    const errors = [];
+    validateManifest(
+      {
+        version: 1,
+        site: "x",
+        base_url: "https://x.example",
+        match: "https://x.example/*",
+        tools: [
+          {
+            name: "a",
+            description: "d",
+            api: { url: "/x", result: { name: "n" } },
+          },
+          {
+            name: "b",
+            description: "d",
+            flow: [
+              { wait_for: { selector: ".x", timeout_ms: "5s" } },
+              { sleep: "long" },
+              { read: { v: { selector: ".x" } } },
+            ],
+          },
+        ],
+      },
+      errors,
+      [],
+    );
+    const all = errors.join("\n");
+    expect(all).toMatch(/"match" must be a list/);
+    expect(all).toMatch(/"result" must be a list/);
+    expect(all).toMatch(/"timeout_ms" must be a positive integer/);
+    expect(all).toMatch(/sleep must be a positive integer/);
+  });
+
   test("api url mismatching the corpus route warns", () => {
     const corpus = loadCorpus(path.join(FIXTURE, ".sightmap"));
     const { warnings } = compile(corpus, {

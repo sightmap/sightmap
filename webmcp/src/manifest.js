@@ -112,6 +112,19 @@ function validateParams(params, where, errors, warnings) {
         `${where} param "${p.name}": missing description (agents rely on it)`,
       );
     }
+    if (
+      p.enum != null &&
+      (!Array.isArray(p.enum) ||
+        p.enum.length === 0 ||
+        p.enum.some((v) => typeof v === "object"))
+    ) {
+      errors.push(
+        `${where} param "${p.name}": enum must be a non-empty list of scalars`,
+      );
+    }
+    if (p.default != null && typeof p.default === "object") {
+      errors.push(`${where} param "${p.name}": default must be a scalar`);
+    }
   }
 }
 
@@ -130,6 +143,44 @@ function validateApi(api, where, errors, warnings) {
     errors.push(
       `${where}: api method "${api.method}" must be an upper-case HTTP method`,
     );
+  }
+  if (api.result != null && !Array.isArray(api.result)) {
+    errors.push(`${where}: api "result" must be a list of extractions`);
+    api.result = [];
+  }
+  for (const key of ["query", "headers"]) {
+    const v = api[key];
+    if (v == null) continue;
+    if (typeof v !== "object" || Array.isArray(v)) {
+      errors.push(
+        `${where}: api "${key}" must be a mapping of names to string templates`,
+      );
+    } else {
+      for (const [k2, v2] of Object.entries(v)) {
+        if (
+          typeof v2 !== "string" &&
+          typeof v2 !== "number" &&
+          typeof v2 !== "boolean"
+        ) {
+          errors.push(`${where}: api ${key}.${k2} must be a scalar template`);
+        }
+      }
+    }
+  }
+  if (
+    api.body != null &&
+    typeof api.body !== "object" &&
+    typeof api.body !== "string"
+  ) {
+    errors.push(
+      `${where}: api "body" must be a mapping (JSON body) or a string (raw body)`,
+    );
+  }
+  if (
+    api.max_body_chars != null &&
+    (!Number.isInteger(api.max_body_chars) || api.max_body_chars < 1)
+  ) {
+    errors.push(`${where}: "max_body_chars" must be a positive integer`);
   }
   for (const r of api.result || []) {
     const rw = `${where} result "${r && r.name}"`;
@@ -208,11 +259,36 @@ function validateFlow(flow, mode, where, errors, warnings) {
     }
     if (action === "wait_for") {
       const w = step.wait_for || {};
+      const WAIT_KEYS = [
+        "component",
+        "selector",
+        "url_includes",
+        "timeout_ms",
+        "poll_ms",
+      ];
+      for (const k of Object.keys(w)) {
+        if (!WAIT_KEYS.includes(k)) {
+          warnings.push(`${sw}: unknown wait_for key "${k}"`);
+        }
+      }
       if (!w.component && !w.selector && !w.url_includes) {
         errors.push(
           `${sw}: wait_for needs one of component|selector|url_includes`,
         );
       }
+      for (const k of ["timeout_ms", "poll_ms"]) {
+        if (w[k] != null && (!Number.isInteger(w[k]) || w[k] < 1)) {
+          errors.push(
+            `${sw}: "${k}" must be a positive integer (milliseconds)`,
+          );
+        }
+      }
+    }
+    if (
+      action === "sleep" &&
+      (!Number.isInteger(step.sleep) || step.sleep < 1)
+    ) {
+      errors.push(`${sw}: sleep must be a positive integer (milliseconds)`);
     }
     if (action === "fill") {
       const f = step.fill || {};
@@ -249,6 +325,12 @@ function validateManifest(doc, errors, warnings) {
     errors.push(
       `"base_url" must be an absolute http(s) URL (got "${doc.base_url}")`,
     );
+  }
+  if (
+    doc.match != null &&
+    (!Array.isArray(doc.match) || doc.match.some((v) => typeof v !== "string"))
+  ) {
+    errors.push('"match" must be a list of URL match patterns (strings)');
   }
   if (!Array.isArray(doc.tools) || doc.tools.length === 0) {
     errors.push('"tools" must be a non-empty list');

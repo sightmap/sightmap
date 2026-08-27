@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"unicode"
 )
@@ -59,12 +60,20 @@ func CorpusHash(corpusDir string, files []string) (string, error) {
 
 func metaOf(ir *OM) *OM { return asOM(omGet(ir, "meta")) }
 
+// oneLine collapses whitespace (newlines included) so authored text cannot
+// break out of a // comment line or a userscript header field.
+func oneLine(s string) string {
+	return strings.TrimSpace(wsRe.ReplaceAllString(s, " "))
+}
+
+var wsRe = regexp.MustCompile(`\s+`)
+
 func banner(ir *OM, p Provenance) string {
 	meta := metaOf(ir)
 	var lines []string
 	lines = append(lines, fmt.Sprintf("// %s — WebMCP tools generated from a sightmap corpus.", asString(omGet(meta, "site"))))
 	if desc := asString(omGet(meta, "description")); desc != "" {
-		lines = append(lines, "// "+desc)
+		lines = append(lines, "// "+oneLine(desc))
 	}
 	var names []string
 	for _, t := range asList(omGet(ir, "tools")) {
@@ -105,7 +114,7 @@ func userscriptHeader(ir *OM) string {
 	} else {
 		matches = []string{origin + "/*"}
 	}
-	desc := asString(omGet(meta, "description"))
+	desc := oneLine(asString(omGet(meta, "description")))
 	if desc == "" {
 		desc = fmt.Sprintf("WebMCP tools for %s, generated from its sightmap corpus.", site)
 	}
@@ -124,9 +133,11 @@ func userscriptHeader(ir *OM) string {
 }
 
 func bundleBody(ir *OM) string {
-	meta := StringifyJSON(metaOf(ir))
+	// "</" is escaped as "<\/" (a legal JSON + JS escape) so authored content
+	// can never terminate an inline <script> that serves the snippet.
+	meta := strings.ReplaceAll(StringifyJSON(metaOf(ir)), "</", "<\\/")
 	toolsV, _ := ir.Get("tools")
-	tools := StringifyJSON(toolsV)
+	tools := strings.ReplaceAll(StringifyJSON(toolsV), "</", "<\\/")
 	return strings.Join([]string{
 		"(() => {",
 		`  "use strict";`,

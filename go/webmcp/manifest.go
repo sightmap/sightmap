@@ -87,6 +87,31 @@ func validateParams(params any, where string, d *diags) {
 		if asString(omGet(pom, "description")) == "" {
 			d.warnf("%s param %q: missing description (agents rely on it)", where, name)
 		}
+		if ev, ok := pom.Get("enum"); ok && ev != nil {
+			bad := false
+			el, isList := ev.([]any)
+			if !isList || len(el) == 0 {
+				bad = true
+			} else {
+				for _, item := range el {
+					switch item.(type) {
+					case string, int, bool, float64:
+					default:
+						bad = true
+					}
+				}
+			}
+			if bad {
+				d.errf("%s param %q: enum must be a non-empty list of scalars", where, name)
+			}
+		}
+		if dv, ok := pom.Get("default"); ok && dv != nil {
+			switch dv.(type) {
+			case string, int, bool, float64:
+			default:
+				d.errf("%s param %q: default must be a scalar", where, name)
+			}
+		}
 	}
 }
 
@@ -102,6 +127,43 @@ func validateAPI(api any, where string, d *diags) {
 	}
 	if m := asString(omGet(aom, "method")); m != "" && !methodRe.MatchString(m) {
 		d.errf("%s: api method %q must be an upper-case HTTP method", where, m)
+	}
+	if rv, ok := aom.Get("result"); ok && rv != nil {
+		if _, isList := rv.([]any); !isList {
+			d.errf("%s: api \"result\" must be a list of extractions", where)
+			aom.Set("result", []any{})
+		}
+	}
+	for _, key := range []string{"query", "headers"} {
+		v, ok := aom.Get(key)
+		if !ok || v == nil {
+			continue
+		}
+		vom := asOM(v)
+		if vom == nil {
+			d.errf("%s: api %q must be a mapping of names to string templates", where, key)
+			continue
+		}
+		for _, k2 := range vom.Keys() {
+			v2, _ := vom.Get(k2)
+			switch v2.(type) {
+			case string, int, bool, float64:
+			default:
+				d.errf("%s: api %s.%s must be a scalar template", where, key, k2)
+			}
+		}
+	}
+	if bv, ok := aom.Get("body"); ok && bv != nil {
+		switch bv.(type) {
+		case *OM, []any, string:
+		default:
+			d.errf("%s: api \"body\" must be a mapping (JSON body) or a string (raw body)", where)
+		}
+	}
+	if mb, ok := aom.Get("max_body_chars"); ok && mb != nil {
+		if n, isInt := asInt(mb); !isInt || n < 1 {
+			d.errf("%s: \"max_body_chars\" must be a positive integer", where)
+		}
 	}
 	for _, r := range asList(omGet(aom, "result")) {
 		rom := asOM(r)
@@ -185,8 +247,29 @@ func validateFlow(flow any, mode, where string, d *diags) {
 		switch action {
 		case "wait_for":
 			w := asOM(omGet(som, "wait_for"))
+			if w != nil {
+				waitKeys := []string{"component", "selector", "url_includes", "timeout_ms", "poll_ms"}
+				for _, k := range w.Keys() {
+					if !contains(waitKeys, k) {
+						d.warnf("%s: unknown wait_for key %q", sw, k)
+					}
+				}
+				for _, k := range []string{"timeout_ms", "poll_ms"} {
+					if v, ok := w.Get(k); ok && v != nil {
+						if n, isInt := asInt(v); !isInt || n < 1 {
+							d.errf("%s: %q must be a positive integer (milliseconds)", sw, k)
+						}
+					}
+				}
+			}
 			if w == nil || (asString(omGet(w, "component")) == "" && asString(omGet(w, "selector")) == "" && asString(omGet(w, "url_includes")) == "") {
 				d.errf("%s: wait_for needs one of component|selector|url_includes", sw)
+			}
+		case "sleep":
+			if v, _ := som.Get("sleep"); v != nil {
+				if n, isInt := asInt(v); !isInt || n < 1 {
+					d.errf("%s: sleep must be a positive integer (milliseconds)", sw)
+				}
 			}
 		case "fill":
 			f := asOM(omGet(som, "fill"))
@@ -225,6 +308,20 @@ func validateManifest(doc any, d *diags) {
 	baseURL := asString(omGet(dom, "base_url"))
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		d.errf("\"base_url\" must be an absolute http(s) URL (got %q)", baseURL)
+	}
+	if mv, ok := dom.Get("match"); ok && mv != nil {
+		ml, isList := mv.([]any)
+		bad := !isList
+		if isList {
+			for _, item := range ml {
+				if _, isStr := item.(string); !isStr {
+					bad = true
+				}
+			}
+		}
+		if bad {
+			d.errf("\"match\" must be a list of URL match patterns (strings)")
+		}
 	}
 	tools := asList(omGet(dom, "tools"))
 	if len(tools) == 0 {

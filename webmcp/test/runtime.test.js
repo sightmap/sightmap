@@ -235,6 +235,62 @@ describe("api execution", () => {
   });
 });
 
+describe("review-driven regressions", () => {
+  const ir = compiledIR();
+
+  test("css targets interpolate {param} templates", () => {
+    document.body.innerHTML =
+      '<div data-k="alpha">A</div><div data-k="beta">B</div>';
+    const target = { kind: "css", selector: 'div[data-k="{which}"]' };
+    const els = rt.__smwResolveTarget(document.documentElement, target, {
+      which: "beta",
+    });
+    expect(els).toHaveLength(1);
+    expect(els[0].textContent).toBe("B");
+  });
+
+  test("an invalid selector-shaped extract omits the value instead of throwing", () => {
+    const el = document.createElement("div");
+    el.textContent = "x";
+    expect(rt.__smwReadProp(el, { extract: ":::not-css" })).toBeNull();
+  });
+
+  test("request-property extraction omits empty strings and matches header case-insensitively", () => {
+    const ctx = {
+      reqBody: null,
+      reqHeaders: { accept: "application/json" },
+      rspBody: { note: "" },
+      rspHeaders: { "x-total": "5" },
+    };
+    expect(
+      rt.__smwExtractResult(
+        { name: "n", source: "rsp.body", field: "note" },
+        ctx,
+      ),
+    ).toBeUndefined();
+    expect(
+      rt.__smwExtractResult(
+        { name: "a", source: "req.headers", field: "Accept" },
+        ctx,
+      ),
+    ).toBe("application/json");
+  });
+
+  test("api JSON bodies are bounded by maxBodyChars", async () => {
+    global.fetch = jest.fn(async () => ({
+      status: 200,
+      text: async () => JSON.stringify({ big: "y".repeat(500) }),
+      headers: { forEach: () => {} },
+    }));
+    const stock = ir.tools.find((t) => t.name === "stock");
+    const tool = { ...stock, api: { ...stock.api, maxBodyChars: 100 } };
+    const out = await rt.__smwExecuteTool(tool, ir.meta, { sku: "A" });
+    expect(typeof out.body).toBe("string");
+    expect(out.body.length).toBe(100);
+    expect(out.body_truncated).toBe(true);
+  });
+});
+
 describe("boot + registration", () => {
   const ir = compiledIR();
 

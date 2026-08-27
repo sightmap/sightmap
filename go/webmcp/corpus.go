@@ -68,6 +68,12 @@ func listYamlFiles(dir string) ([]string, error) {
 			}
 			return nil
 		}
+		// Skip the reference CLI's non-corpus subdirectories, as its own
+		// loader does: review/ holds punch-list YAML, snapshots/ holds
+		// snapshot blobs.
+		if d.IsDir() && p != dir && (d.Name() == "review" || d.Name() == "snapshots") {
+			return filepath.SkipDir
+		}
 		if !d.IsDir() && (strings.HasSuffix(p, ".yaml") || strings.HasSuffix(p, ".yml")) {
 			out = append(out, p)
 		}
@@ -257,6 +263,7 @@ func LoadCorpus(dir string) (*Corpus, error) {
 		return nil, err
 	}
 	var docs []any
+	var loadedFiles []string
 	for _, p := range files {
 		data, err := os.ReadFile(p)
 		if err != nil {
@@ -269,14 +276,19 @@ func LoadCorpus(dir string) (*Corpus, error) {
 		if doc == nil {
 			continue
 		}
+		// A YAML file without "version: 1" is a tooling file (survey.yaml
+		// and friends), not a corpus file — skip it, as the reference
+		// loader does.
 		if v, _ := asInt(omGet(doc, "version")); v != 1 {
-			return nil, fmt.Errorf("%s: expected \"version: 1\" at file root", p)
+			continue
 		}
 		docs = append(docs, doc)
+		loadedFiles = append(loadedFiles, p)
 	}
 	if len(docs) == 0 {
-		return nil, fmt.Errorf("sightmap corpus at %s contains no YAML files", dir)
+		return nil, fmt.Errorf("sightmap corpus at %s contains no corpus YAML files (version: 1)", dir)
 	}
+	files = loadedFiles
 
 	registry := buildRegistry(docs)
 	c := &Corpus{

@@ -14,6 +14,8 @@ import (
 )
 
 var templateRe = regexp.MustCompile(`\{([a-z][a-z0-9_]*)(\|raw)?\}`)
+var apiOriginRe = regexp.MustCompile(`^https?://[^/]*`)
+var fieldSpecKeys = []string{"component", "selector", "extract", "transform", "property", "max_chars"}
 var braceEscapeRe = regexp.MustCompile(`\{\{|\}\}`)
 
 func templateRefs(s string) []string {
@@ -225,7 +227,11 @@ func resolveTarget(c *Corpus, ref string, scopeEntry *resolvedEntry, viewScope s
 }
 
 func collectPredRefs(target *OM, refs *refSet) {
-	if kind, _ := target.Get("kind"); kind != "chain" {
+	if kind, _ := target.Get("kind"); kind == "css" {
+		sel, _ := target.Get("selector")
+		refs.addString(sel)
+		return
+	} else if kind != "chain" {
 		return
 	}
 	linksV, _ := target.Get("links")
@@ -245,6 +251,12 @@ func compileFieldSpec(c *Corpus, spec any, where string, scopeEntry *resolvedEnt
 	if som == nil {
 		return nil, fmt.Errorf("%s: must be a mapping", where)
 	}
+	for _, k := range som.Keys() {
+		if !contains(fieldSpecKeys, k) {
+			return nil, fmt.Errorf("%s: unknown key %q in a read value spec (%s)",
+				where, k, strings.Join(fieldSpecKeys, ", "))
+		}
+	}
 	var target *OM
 	lastEntry := scopeEntry
 	if comp := asString(omGet(som, "component")); comp != "" {
@@ -257,6 +269,7 @@ func compileFieldSpec(c *Corpus, spec any, where string, scopeEntry *resolvedEnt
 		collectPredRefs(target, refs)
 	} else if sel := asString(omGet(som, "selector")); sel != "" {
 		target = NewOM().Set("kind", "css").Set("selector", sel)
+		collectPredRefs(target, refs)
 		lastEntry = nil
 	}
 	extract := asString(omGet(som, "extract"))
@@ -307,6 +320,11 @@ func compileValueSpec(c *Corpus, spec any, where string, scopeEntry *resolvedEnt
 		return nil, fmt.Errorf("%s: a read value must be a mapping", where)
 	}
 	if fe := asString(omGet(som, "for_each")); fe != "" {
+		for _, k := range som.Keys() {
+			if k != "for_each" && k != "max" && k != "fields" {
+				return nil, fmt.Errorf("%s: unknown key %q in a for_each spec (for_each, max, fields)", where, k)
+			}
+		}
 		target, lastEntry, err := resolveTarget(c, fe, scopeEntry, viewScope)
 		if err != nil {
 			return nil, err
@@ -442,6 +460,9 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 		return nil
 	}
 	refs.addString(apiURL)
+	if origin := apiOriginRe.FindString(apiURL); strings.HasPrefix(apiURL, "{") || strings.Contains(origin, "{") {
+		d.warnf("tool %q: the api url's origin is parameterized — agent-supplied params choose the host that receives a credentialed request; prefer a fixed origin", name)
+	}
 	refs.addString(omGet(api, "query"))
 	refs.addString(omGet(api, "headers"))
 	refs.addString(omGet(api, "body"))

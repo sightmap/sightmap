@@ -135,6 +135,13 @@ function compileValueSpec(corpus, spec, where, scopeEntry, refs, viewScope) {
     throw new Error(`${where}: a read value must be a mapping`);
   }
   if (spec.for_each) {
+    for (const k of Object.keys(spec)) {
+      if (!["for_each", "max", "fields"].includes(k)) {
+        throw new Error(
+          `${where}: unknown key "${k}" in a for_each spec (for_each, max, fields)`,
+        );
+      }
+    }
     const { ir, lastEntry } = resolveTarget(
       corpus,
       spec.for_each,
@@ -171,9 +178,25 @@ function compileValueSpec(corpus, spec, where, scopeEntry, refs, viewScope) {
   };
 }
 
+const FIELD_SPEC_KEYS = [
+  "component",
+  "selector",
+  "extract",
+  "transform",
+  "property",
+  "max_chars",
+];
+
 function compileFieldSpec(corpus, spec, where, scopeEntry, refs, viewScope) {
   if (spec == null || typeof spec !== "object") {
     throw new Error(`${where}: must be a mapping`);
+  }
+  for (const k of Object.keys(spec)) {
+    if (!FIELD_SPEC_KEYS.includes(k)) {
+      throw new Error(
+        `${where}: unknown key "${k}" in a read value spec (${FIELD_SPEC_KEYS.join(", ")})`,
+      );
+    }
   }
   let target = null;
   let lastEntry = scopeEntry || null;
@@ -189,6 +212,7 @@ function compileFieldSpec(corpus, spec, where, scopeEntry, refs, viewScope) {
     collectPredRefs(target, refs);
   } else if (spec.selector) {
     target = { kind: "css", selector: String(spec.selector) };
+    collectPredRefs(target, refs);
     lastEntry = null;
   }
   let extract = spec.extract ? String(spec.extract) : null;
@@ -226,6 +250,10 @@ function compileFieldSpec(corpus, spec, where, scopeEntry, refs, viewScope) {
 }
 
 function collectPredRefs(targetIR, refs) {
+  if (targetIR.kind === "css") {
+    for (const r of templateRefs(targetIR.selector)) refs.add(r);
+    return;
+  }
   if (targetIR.kind !== "chain") return;
   for (const link of targetIR.links) {
     for (const pred of link.preds) {
@@ -320,6 +348,15 @@ function compileApiTool(corpus, tool, errors, warnings) {
     return null;
   }
   addStringRefs(api.url, refs);
+  {
+    const u = String(api.url);
+    const origin = u.match(/^https?:\/\/[^/]*/);
+    if (u.startsWith("{") || (origin && origin[0].includes("{"))) {
+      warnings.push(
+        `tool "${tool.name}": the api url's origin is parameterized — agent-supplied params choose the host that receives a credentialed request; prefer a fixed origin`,
+      );
+    }
+  }
   addStringRefs(api.query, refs);
   addStringRefs(api.headers, refs);
   addStringRefs(api.body, refs);
