@@ -224,13 +224,18 @@ function __smwResolveTarget(root, target, args) {
   return scopes;
 }
 
-function __smwTargetDesc(target) {
+function __smwTargetDesc(target, args) {
   if (target.kind === "css") return target.selector;
   return target.links
     .map(
       (l) =>
-        l.name +
-        (l.preds || []).map((p) => `[${p.prop}${p.op}${p.value}]`).join(""),
+        l.name.split(" ").pop() +
+        (l.preds || [])
+          .map(
+            (p) =>
+              `[${p.prop}${p.op}${__smwInterpolate(p.value, args || {}, false)}]`,
+          )
+          .join(""),
     )
     .join(" ");
 }
@@ -239,12 +244,12 @@ function __smwRequireOne(root, target, args, what) {
   const els = __smwResolveTarget(root, target, args);
   if (els.length === 0) {
     throw new Error(
-      `${what}: "${__smwTargetDesc(target)}" matched nothing on the current page`,
+      `${what}: "${__smwTargetDesc(target, args)}" matched nothing on the current page`,
     );
   }
   if (els.length > 1) {
     throw new Error(
-      `${what}: "${__smwTargetDesc(target)}" matched ${els.length} elements — add a property predicate or #N index to disambiguate`,
+      `${what}: "${__smwTargetDesc(target, args)}" matched ${els.length} elements — add a property predicate or #N index to disambiguate`,
     );
   }
   return els[0];
@@ -343,7 +348,7 @@ async function __smwWaitFor(step, args) {
     }
     if (Date.now() >= deadline) {
       const what = step.target
-        ? __smwTargetDesc(step.target)
+        ? __smwTargetDesc(step.target, args)
         : step.selector || step.urlIncludes;
       throw new Error(`wait_for "${what}" timed out after ${step.timeoutMs}ms`);
     }
