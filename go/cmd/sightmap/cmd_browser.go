@@ -70,7 +70,7 @@ Setup:
   install                                                           download Chrome for Testing
 
 Session:
-  start [--port N] [--extensions PATH] [--url URL] [--profile DIR]  launch Chrome + sightmap server
+  start [--detach] [--port N] [--extensions PATH] [--url URL] [--profile DIR]  launch Chrome + sightmap server (blocks the shell; --detach backgrounds it)
   stop
   status
   navigate <url>
@@ -83,7 +83,7 @@ Interaction (IDs from sightmap snapshot output):
   keypress KEY                        (Enter Tab Escape ArrowUp/Down Backspace ...)
   scroll   [--component-id ID] [--delta-x N] [--delta-y N]
   drag        COMPONENT-ID --delta-x N --delta-y N
-  wait-for    --url PATTERN | --selector SEL | --load  [--timeout-ms N]
+  wait-for    --url PATTERN | --selector SEL | --component QUERY | --view NAME | --load  [--timeout-ms N]
   dialog      accept|dismiss [--text INPUT]
   screenshot  [--out FILE] [--stdout] [--component NAME | --selector SEL] [--expand-pct N]
   bounds      QUERY... | --selector SEL | --all   viewport-% bounding boxes (JSON)
@@ -134,6 +134,28 @@ func isPortAlive(port int) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	return cdpVersionAlive(ctx, fmt.Sprintf("127.0.0.1:%d", port))
+}
+
+// serverAlive reports whether the sightmap HTTP server (console/network + live
+// corpus reload) answers on port. It is distinct from cdpVersionAlive, which
+// probes Chrome's DevTools endpoint: the two are separate processes on separate
+// ports, and a reaped daemon can leave Chrome's CDP up while the server is gone.
+func serverAlive(port int) bool {
+	if port <= 0 {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d/sightmap/version", port), nil)
+	if err != nil {
+		return false
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }
 
 func pollCDPReady(addr string) error {
@@ -303,8 +325,23 @@ func runStatus(args []string) error {
 	}
 
 	addr := fmt.Sprintf("localhost:%d", info.Port)
-	fmt.Printf("● running  cdp=%d  pid=%d\n", info.Port, info.PID)
-	fmt.Printf("  profile: %s\n", info.Profile)
+	if info.ServerPort > 0 && !serverAlive(info.ServerPort) {
+		// CDP is up but the sightmap HTTP server is gone — typically a reaped
+		// daemon (Chrome is launched detached and outlives its launcher). A
+		// CDP-only probe would call this "running", but console/network and live
+		// corpus reload are dead, so report the true, degraded state.
+		fmt.Printf("⚠ degraded  cdp=%d up, but the sightmap server (:%d) is not responding  pid=%d\n",
+			info.Port, info.ServerPort, info.PID)
+		fmt.Printf("  console/network + live corpus reload are unavailable (the daemon was likely reaped).\n")
+		fmt.Printf("  recover: 'browser stop' then 'browser start' — use --detach in scripts so the daemon survives.\n")
+		fmt.Printf("  profile: %s\n", info.Profile)
+	} else if info.ServerPort > 0 {
+		fmt.Printf("● running  cdp=%d  server=%d  pid=%d\n", info.Port, info.ServerPort, info.PID)
+		fmt.Printf("  profile: %s\n", info.Profile)
+	} else {
+		fmt.Printf("● running  cdp=%d  pid=%d\n", info.Port, info.PID)
+		fmt.Printf("  profile: %s\n", info.Profile)
+	}
 
 	// Enumerate CONTENT tabs (the extension side panel is excluded) so an agent
 	// can see exactly which tab IDs to pass via --tab. Page-affecting commands

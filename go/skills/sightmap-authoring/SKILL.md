@@ -111,7 +111,7 @@ other dependency.
 
 | Command | What it does |
 |---------|-------------|
-| `sightmap browser start` | Launch Chrome + the sightmap overlay server. Writes `.sightmap/.session`. |
+| `sightmap browser start` | Launch Chrome + the sightmap overlay server. **Foreground daemon — holds the shell; pass `--detach` in scripts/agents.** Writes `.sightmap/.session`. |
 | `sightmap browser status` | Check session health and current URL. |
 | `sightmap browser navigate 'URL'` | Navigate to URL (positional arg — no `--url` flag). |
 | `sightmap browser stop` | Stop Chrome session. |
@@ -567,6 +567,11 @@ transformed by the framework, and dynamic content only appears at runtime.
 cd sites/vividseats.com/    # or any site dir with a .sightmap/
 sightmap browser start   # launches Chrome + sightmap HTTP server (port 7891)
 ```
+
+`browser start` is a **foreground daemon that holds this shell** for the whole
+session. In a script or agent shell (each command run to completion), use
+`sightmap browser start --detach` instead — it backgrounds the daemon and
+returns once it's ready. See the `sightmap-browser` skill's *Session management*.
 
 Verify with `sightmap browser status` — should show `● running cdp=7892` and list your content tab(s).
 The sightmap HTTP server starts automatically and recompiles on YAML changes.

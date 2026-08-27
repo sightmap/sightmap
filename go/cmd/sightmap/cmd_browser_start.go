@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +38,8 @@ func runBrowserStart(args []string) error {
 	chromeBinaryFlag := fset.String("chrome-binary", "", "Path to a specific Chrome binary (overrides auto-detection)")
 	var chromeFlags stringSliceFlag
 	fset.Var(&chromeFlags, "chrome-flag", "Extra flag to pass to Chrome (repeatable), e.g. --chrome-flag=--no-sandbox")
+	detachFlag := fset.Bool("detach", false, "Run the daemon in the background (its own session) and return once it is ready. Use this in scripts/agents: plain 'start' blocks the shell for the whole session.")
+	logFileFlag := fset.String("log-file", "", "With --detach, where to write the daemon log (default: ~/.sightmap/logs/<site>-daemon.log)")
 	if err := fset.Parse(args); err != nil {
 		return err
 	}
@@ -58,6 +62,13 @@ func runBrowserStart(args []string) error {
 	// launch/profile/extension machinery entirely.
 	if *attachFlag != "" {
 		return runAttachedSession(*attachFlag, *sightmapDir, *portFlag, *urlFlag)
+	}
+
+	// Detached mode: re-exec ourselves as a background daemon and return once it
+	// is serving, so the launching shell is never held. Must come before any of
+	// the launch work below — the re-exec'd child does all of that.
+	if *detachFlag {
+		return startDetached(args, *sightmapDir, *logFileFlag)
 	}
 
 	// Resolve profile early so the existing-Chrome check can match it.
@@ -140,6 +151,13 @@ func runBrowserStart(args []string) error {
 		"--no-default-browser-check",
 		"--disable-blink-features=AutomationControlled",
 	}
+	// Headless auto-detection: on Linux with no display, a non-headless Chrome
+	// dies with "Missing X server or $DISPLAY". Default to headless so a headless
+	// host just works for agents; an explicit --headless or a real display skips it.
+	if !*headlessFlag && shouldAutoHeadless() {
+		*headlessFlag = true
+		fmt.Fprintln(os.Stderr, "start: no display detected ($DISPLAY/$WAYLAND_DISPLAY unset) — running headless (pass --headless to silence).")
+	}
 	if *headlessFlag {
 		chromeArgs = append(chromeArgs, "--headless=new")
 	}
@@ -180,9 +198,11 @@ func runBrowserStart(args []string) error {
 	if pollErr := pollCDPReady(cdpAddr); pollErr != nil {
 		cmd.Process.Kill()
 		_ = cmd.Wait() // let the stderr copy goroutine finish before reading the buffer
+		report := chromeStderr.tailReport()
 		return fmt.Errorf("start: chrome did not become ready: %w\n"+
-			"  binary: %s\n  args:   %s\n%s",
-			pollErr, chromePath, strings.Join(chromeArgs, " "), chromeStderr.tailReport())
+			"  binary: %s\n  args:   %s\n%s%s",
+			pollErr, chromePath, strings.Join(chromeArgs, " "), report,
+			sandboxHint(report, slices.Contains(chromeArgs, "--no-sandbox")))
 	}
 
 	// Start the console/network collector against the now-ready session and
@@ -243,7 +263,8 @@ func runBrowserStart(args []string) error {
 		resolvedServerPort, resolvedCDPPort, pid, initialTabID)
 	fmt.Fprintf(os.Stderr, "  Addr: --addr localhost:%d\n", resolvedCDPPort)
 	fmt.Fprintf(os.Stderr, "  Tab:  --tab %s  (pass this on commands once other agents open tabs here)\n", initialTabID)
-	fmt.Fprintf(os.Stderr, "  Press Ctrl-C to stop.\n")
+	fmt.Fprintf(os.Stderr, "  This is a foreground daemon — it holds THIS shell until you Ctrl-C.\n")
+	fmt.Fprintf(os.Stderr, "  Run other 'sightmap browser' commands from a DIFFERENT shell, or launch with --detach in scripts/agents.\n")
 
 	// ── Block until signal or Chrome exits ───────────────────────────────────
 	sigCh := make(chan os.Signal, 1)
@@ -359,6 +380,180 @@ func startDevtoolsServer(sightmapDir, siteName string, serverPort int) (*http.Se
 		return nil, nil, fmt.Errorf("sightmap server could not bind port %d: %w", serverPort, srvErr)
 	}
 	return srv, collectorPtr, nil
+}
+
+// ── detach ──────────────────────────────────────────────────────────────────
+
+// startDetached re-execs `browser start` (minus --detach) as a background daemon
+// in its own session, redirects its output to a log file, waits until it is
+// actually serving (session file + CDP + HTTP server), then returns. This is the
+// scriptable/agent entry point: unlike bare `start` it does NOT hold the shell,
+// and unlike `nohup start &` the daemon is not reaped when the launching shell
+// tears down (it setsid's into its own session).
+func startDetached(args []string, sightmapDir, logFile string) error {
+	// Idempotent: if a live daemon already owns this corpus, don't spawn another.
+	if info, err := browser.ReadSessionInfo(sightmapDir); err == nil && info.Port > 0 && isPortAlive(info.Port) {
+		fmt.Fprintf(os.Stderr, "● already running  cdp=%d  server=%d  (see 'sightmap browser status')\n", info.Port, info.ServerPort)
+		return nil
+	}
+
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("start --detach: locate self: %w", err)
+	}
+
+	logPath := logFile
+	if logPath == "" {
+		logPath = defaultDaemonLog(sightmapDir)
+	}
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
+		return fmt.Errorf("start --detach: create log dir: %w", err)
+	}
+	logf, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("start --detach: open log %s: %w", logPath, err)
+	}
+	defer logf.Close()
+
+	childArgs := append([]string{"browser", "start"}, stripStartFlags(args, "detach", "log-file")...)
+	cmd := exec.Command(self, childArgs...)
+	cmd.Stdout = logf
+	cmd.Stderr = logf
+	cmd.Stdin = nil
+	configureDetachedDaemon(cmd) // sysproc_*.go: setsid (unix) / detached (windows)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("start --detach: launch daemon: %w", err)
+	}
+	daemonPID := 0
+	if cmd.Process != nil {
+		daemonPID = cmd.Process.Pid
+	}
+	// Watch for early exit (Chrome missing / sandbox / no display) so we fail fast
+	// with the log instead of waiting out the whole readiness timeout. We never
+	// block on this Wait; once the parent returns and exits, the setsid'd child is
+	// reparented to init and keeps running.
+	childDone := make(chan error, 1)
+	go func() { childDone <- cmd.Wait() }()
+
+	info, ready, exitErr := waitDetachedReady(sightmapDir, childDone, 25*time.Second)
+	if exitErr != nil {
+		return fmt.Errorf("start --detach: daemon exited before it was ready (%v)\n"+
+			"  log: %s\n%s", exitErr, logPath, tailFile(logPath, 4000))
+	}
+	if !ready {
+		return fmt.Errorf("start --detach: daemon did not become ready in time\n"+
+			"  log: %s\n%s", logPath, tailFile(logPath, 4000))
+	}
+
+	fmt.Fprintf(os.Stderr, "● detached  cdp=%d  server=%d  daemon-pid=%d\n", info.Port, info.ServerPort, daemonPID)
+	fmt.Fprintf(os.Stderr, "  log:  %s\n", logPath)
+	fmt.Fprintf(os.Stderr, "  The daemon runs in the background and survives this shell.\n")
+	fmt.Fprintf(os.Stderr, "  Drive it with other 'sightmap browser' commands; stop it with 'sightmap browser stop'.\n")
+	return nil
+}
+
+// defaultDaemonLog picks a per-corpus daemon log under ~/.sightmap/logs, keyed by
+// the site directory so concurrent corpora don't clash.
+func defaultDaemonLog(sightmapDir string) string {
+	home, _ := os.UserHomeDir()
+	key := "default"
+	if abs, err := filepath.Abs(sightmapDir); err == nil {
+		if base := filepath.Base(filepath.Dir(abs)); base != "" && base != "." && base != string(os.PathSeparator) {
+			key = base
+		}
+	}
+	return filepath.Join(home, ".sightmap", "logs", key+"-daemon.log")
+}
+
+// waitDetachedReady polls until the daemon for sightmapDir is serving — session
+// file written, CDP answering, and (when its port is known) the HTTP server up —
+// or it returns early if the child process exits first (childDone) or the
+// timeout elapses.
+func waitDetachedReady(sightmapDir string, childDone <-chan error, timeout time.Duration) (browser.SessionInfo, bool, error) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		select {
+		case err := <-childDone:
+			if err == nil {
+				err = fmt.Errorf("process exited")
+			}
+			return browser.SessionInfo{}, false, err
+		default:
+		}
+		info, err := browser.ReadSessionInfo(sightmapDir)
+		if err == nil && info.Port > 0 && isPortAlive(info.Port) &&
+			(info.ServerPort == 0 || serverAlive(info.ServerPort)) {
+			return info, true, nil
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	return browser.SessionInfo{}, false, nil
+}
+
+// stripStartFlags removes the named flags (and their `=value` / separate-value
+// forms) from a start arg list, so the detach parent can re-exec the child
+// without them.
+func stripStartFlags(args []string, names ...string) []string {
+	drop := map[string]bool{}
+	takesValue := map[string]bool{"--log-file": true, "-log-file": true}
+	for _, n := range names {
+		drop["--"+n] = true
+		drop["-"+n] = true
+	}
+	var out []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if drop[a] {
+			if takesValue[a] {
+				i++ // skip the separate value token
+			}
+			continue
+		}
+		if eq := strings.IndexByte(a, '='); eq > 0 && drop[a[:eq]] {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// tailFile returns up to the last maxBytes of the file at path, for surfacing a
+// failed daemon's log without dumping the whole thing.
+func tailFile(path string, maxBytes int64) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	if int64(len(data)) > maxBytes {
+		data = data[int64(len(data))-maxBytes:]
+	}
+	return string(data)
+}
+
+// shouldAutoHeadless reports whether to default to headless: only on Linux with
+// no X or Wayland display, where a non-headless Chrome would die with "Missing X
+// server or $DISPLAY". macOS/Windows always have a usable display.
+func shouldAutoHeadless() bool {
+	return runtime.GOOS == "linux" && os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == ""
+}
+
+// sandboxHint returns an actionable note when Chrome's launch failure looks like
+// its zygote sandbox being blocked (unprivileged user namespaces clamped by
+// AppArmor or a container policy). We deliberately do NOT auto-add --no-sandbox
+// (it's a security downgrade) but point straight at the fix. Empty when the
+// failure isn't sandbox-related or --no-sandbox is already set.
+func sandboxHint(chromeStderr string, hasNoSandbox bool) string {
+	if hasNoSandbox {
+		return ""
+	}
+	for _, sig := range []string{"No usable sandbox", "Running as root without --no-sandbox", "namespace sandbox"} {
+		if strings.Contains(chromeStderr, sig) {
+			return "\n  hint: this host blocks Chrome's sandbox (unprivileged user namespaces are restricted —\n" +
+				"        common under AppArmor on recent Ubuntu and inside containers).\n" +
+				"        rerun with --chrome-flag=--no-sandbox"
+		}
+	}
+	return ""
 }
 
 // runAttachedSession runs the daemon against a caller-launched Chrome reached at

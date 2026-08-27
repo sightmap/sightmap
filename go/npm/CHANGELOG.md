@@ -1,5 +1,17 @@
 # @sightmap/sightmap
 
+## 0.27.0
+
+### Minor Changes
+
+- ea91154: `sightmap browser start --detach` runs the daemon in the background (in its own session) and returns once it is serving, so scripts and agents no longer hang on the foreground daemon. Unlike `nohup start &`, the detached daemon survives the launching shell (it `setsid`s into its own session). `browser start` also now prints that it is a foreground daemon holding the shell, and `browser status` probes the sightmap HTTP server in addition to Chrome's CDP — reporting `⚠ degraded` when CDP is up but the server has been reaped, instead of a misleading `running`.
+
+### Patch Changes
+
+- 14979a0: `browser bounds` now accepts the full component-query grammar — property predicates and descendant chains — the same engine as `click`/`fill`/`hover`/`wait-for`. Previously it matched component names only, so `bounds 'Card[title="X"]'` or `bounds 'Row Star'` returned "matched no component". Multi-match is preserved (a query returns every matching component's box), `--substring` still does name-only fuzzy matching, and `--all` is unchanged. Also documented the existing `wait-for --component` and `--view` flags in `browser --help`.
+- ba9d003: Authoring + browser skills: document the browser daemon lifecycle. `browser start` is a long-running foreground daemon that holds the shell; scripts and agents should use `browser start --detach` (which returns once serving and survives the shell) rather than `nohup start &`. Also note headless auto-detection and the `--no-sandbox` hint on sandboxed hosts, and that `browser status` can report a `⚠ degraded` daemon.
+- 1da7480: `browser start` now comes up out of the box on headless and sandboxed Linux hosts. With no display (`$DISPLAY`/`$WAYLAND_DISPLAY` unset) it defaults to headless instead of dying with "Missing X server or $DISPLAY", and when Chrome's launch fails because the host restricts its sandbox (unprivileged user namespaces clamped by AppArmor or a container) the error points straight at the fix (`--chrome-flag=--no-sandbox`) rather than leaving you to decode Chrome's stderr.
+
 ## 0.26.3
 
 ### Patch Changes

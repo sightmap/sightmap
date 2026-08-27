@@ -14,6 +14,14 @@ func setSysProcAttr(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }
 
+// configureDetachedDaemon prepares cmd to run as a background daemon in its own
+// session (setsid). Detaching from the launching shell's session is what makes
+// `browser start --detach` survive one-shot agent shells — unlike `nohup … &`,
+// which is still reaped when the launching shell tears down.
+func configureDetachedDaemon(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+}
+
 // terminateGroup sends SIGTERM to an entire process group (negative pid), so
 // Chrome's helper/renderer children are reaped too — not just the leader.
 func terminateGroup(pgid int) error {

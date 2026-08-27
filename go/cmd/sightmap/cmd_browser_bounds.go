@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/sightmap/sightmap/go/browser"
+	"github.com/sightmap/sightmap/go/compquery"
 	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -53,9 +54,9 @@ func runBounds(args []string) error {
 	fs := flag.NewFlagSet("bounds", flag.ContinueOnError)
 	addrFlag := fs.String("addr", "", "CDP address (host:port; default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component-name queries)")
-	selectorFlag := fs.String("selector", "", "Query raw DOM elements by CSS selector instead of component name")
-	substringFlag := fs.Bool("substring", false, "Match component names by case-insensitive substring (default: exact, case-insensitive)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries)")
+	selectorFlag := fs.String("selector", "", "Query raw DOM elements by CSS selector instead of a component query")
+	substringFlag := fs.Bool("substring", false, "Match a case-insensitive substring of the component NAME (name-only; skips the query grammar)")
 	offscreenFlag := fs.Bool("include-offscreen", false, "Include components whose bounds fall entirely outside the viewport")
 	allFlag := fs.Bool("all", false, "Emit bounds for every matched component (ignores positional queries)")
 
@@ -66,7 +67,7 @@ func runBounds(args []string) error {
 
 	if *selectorFlag == "" && !*allFlag && len(queries) == 0 {
 		return fmt.Errorf("usage: browser bounds [QUERY...] | --selector SEL | --all\n" +
-			"  QUERY     one or more sightmap component names\n" +
+			"  QUERY     one or more component queries (name; [prop] predicates; descendant chains)\n" +
 			"  --selector CSS selector (raw DOM, no sightmap needed)\n" +
 			"  --all     every matched component on the page")
 	}
@@ -133,7 +134,11 @@ func runBounds(args []string) error {
 }
 
 // boundsByComponent extracts the component tree, applies the sightmap corpus,
-// and returns bounds for nodes whose matched component name satisfies the query.
+// and returns bounds for the nodes selected by the positional queries. By
+// default a query is a full component query (name + [prop] predicates +
+// descendant chains) resolved with the same compquery engine as
+// click/fill/hover/wait-for; --all emits every matched component and --substring
+// switches to a name-only fuzzy match.
 func boundsByComponent(
 	ctx context.Context,
 	conn *browser.CDPConn,
@@ -165,74 +170,139 @@ func boundsByComponent(
 	if err != nil {
 		return nil, fmt.Errorf("bounds: load corpus: %w", err)
 	}
-	matches := match.NewMatcher(corpus).Match(root, pageURL)
+	matcher := match.NewMatcher(corpus)
+	matches := matcher.Match(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf("bounds: no sightmap components matched the current page (%s)", pageURL)
 	}
 
-	// Normalize the query set for matching.
-	wanted := make([]string, len(queries))
-	for i, q := range queries {
-		wanted[i] = strings.ToLower(q)
+	parsed, props, err := prepareBoundsQuery(ctx, conn, matcher, matches, pageURL, queries, all, substring)
+	if err != nil {
+		return nil, err
 	}
-	nameMatches := func(comp string) bool {
-		if all {
-			return true
+	return selectBoundsResults(root, matches, queries, all, substring, parsed, props, vw, vh), nil
+}
+
+// prepareBoundsQuery parses the positional queries and, for the default
+// (query-grammar) mode, extracts live properties for the components they
+// reference so [prop] predicates resolve (mirrors resolveComponentQuery;
+// keeps the extraction small). --all and --substring don't use the query
+// grammar, so both return values are nil for those modes.
+func prepareBoundsQuery(
+	ctx context.Context,
+	conn *browser.CDPConn,
+	matcher *match.Matcher,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	pageURL string,
+	queries []string,
+	all, substring bool,
+) ([]*compquery.Query, map[string]map[string]string, error) {
+	if all || substring {
+		return nil, nil, nil
+	}
+
+	parsed := make([]*compquery.Query, len(queries))
+	for i, qs := range queries {
+		q, perr := compquery.ParseQuery(qs)
+		if perr != nil {
+			return nil, nil, fmt.Errorf("bounds: %w", perr)
 		}
-		lc := strings.ToLower(comp)
-		for _, q := range wanted {
-			if substring {
-				if strings.Contains(lc, q) {
-					return true
-				}
-			} else if lc == q {
+		parsed[i] = q
+	}
+	props := extractQueryProperties(ctx, conn, matcher, matches, pageURL, parsed...)
+	return parsed, props, nil
+}
+
+// selectBoundsResults runs bounds's three selection modes over an
+// already-matched component tree: --all emits every matched component,
+// --substring does a case-insensitive substring match on component name, and
+// the default mode resolves each query through the compquery grammar (names +
+// [prop] predicates + descendant chains) using parsed/props from
+// prepareBoundsQuery. Pure — no browser or filesystem I/O — so it exercises
+// the exact selection logic directly, without a live page.
+func selectBoundsResults(
+	root *sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	queries []string,
+	all, substring bool,
+	parsed []*compquery.Query,
+	props map[string]map[string]string,
+	vw, vh int,
+) []boundsResult {
+	var results []boundsResult
+	seen := map[string]bool{}
+	add := func(n *sightmap.ComponentNode, m *sightmap.ComponentMatch) {
+		if m == nil || n.Bounds == nil || seen[n.Id] {
+			return
+		}
+		seen[n.Id] = true
+		results = append(results, makeBoundsResult(m.Name, n.Name, n.Id, n.Bounds, vw, vh))
+	}
+
+	switch {
+	case all:
+		sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
+			add(n, matches[n])
+			return true
+		})
+
+	case substring:
+		// Fuzzy, name-only matching (case-insensitive substring). This mode does
+		// not parse the query grammar — it exists to find a component when you
+		// only remember part of its name.
+		wanted := make([]string, len(queries))
+		for i, q := range queries {
+			wanted[i] = strings.ToLower(q)
+		}
+		matched := make([]bool, len(queries))
+		sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
+			m := matches[n]
+			if m == nil {
 				return true
 			}
-		}
-		return false
-	}
-
-	var results []boundsResult
-	seenComp := map[string]bool{}
-	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
-		m := matches[n]
-		if m == nil || !nameMatches(m.Name) {
-			return true
-		}
-		if n.Bounds == nil {
-			return true
-		}
-		seenComp[m.Name] = true
-		results = append(results, makeBoundsResult(m.Name, n.Name, n.Id, n.Bounds, vw, vh))
-		return true
-	})
-
-	// Warn about queries that matched no component, with a substring hint.
-	if !all {
-		matchedNames := map[string]bool{}
-		for name := range seenComp {
-			matchedNames[strings.ToLower(name)] = true
-		}
-		for i, q := range wanted {
-			hit := false
-			for name := range matchedNames {
-				if (substring && strings.Contains(name, q)) || (!substring && name == q) {
-					hit = true
-					break
+			lc := strings.ToLower(m.Name)
+			for i, q := range wanted {
+				if strings.Contains(lc, q) {
+					matched[i] = true
+					add(n, m)
 				}
 			}
-			if !hit {
-				fmt.Fprintf(os.Stderr, "bounds: query %q matched no component", queries[i])
-				if !substring {
-					fmt.Fprintf(os.Stderr, " (try --substring, or check the name with `sightmap snapshot`)")
-				}
-				fmt.Fprintln(os.Stderr)
+			return true
+		})
+		warnUnmatchedQueries(queries, matched, true)
+
+	default:
+		// Full component-query grammar — names + property predicates + descendant
+		// chains — via the same compquery engine as click/fill/hover/wait-for.
+		// FindCandidates returns EVERY match, so bounds keeps its multi-instance
+		// semantics instead of resolving to a single node.
+		matched := make([]bool, len(queries))
+		for i, q := range parsed {
+			for _, n := range compquery.FindCandidates(root, matches, props, q) {
+				matched[i] = true
+				add(n, matches[n])
 			}
 		}
+		warnUnmatchedQueries(queries, matched, false)
 	}
 
 	sortResults(results)
-	return results, nil
+	return results
+}
+
+// warnUnmatchedQueries prints a stderr note for each query that matched no
+// component, hinting at --substring when we were in the exact/query mode.
+func warnUnmatchedQueries(queries []string, matched []bool, substring bool) {
+	for i := range queries {
+		if matched[i] {
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "bounds: query %q matched no component", queries[i])
+		if !substring {
+			fmt.Fprintf(os.Stderr, " (try --substring for a partial name, or check the name with `sightmap snapshot`)")
+		}
+		fmt.Fprintln(os.Stderr)
+	}
 }
 
 // boundsBySelector queries raw DOM elements and returns their viewport-% bounds,

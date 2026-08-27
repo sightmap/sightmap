@@ -67,20 +67,36 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	if err != nil {
 		return nil, fmt.Errorf("resolve query: load corpus: %w", err)
 	}
-	m := match.NewMatcher(corpus)
-	matches := m.Match(root, pageURL)
+	matcher := match.NewMatcher(corpus)
+	matches := matcher.Match(root, pageURL)
 	if len(matches) == 0 {
 		return nil, fmt.Errorf(
 			"resolve query: no sightmap components matched the page (need a corpus in %s)", sightmapDir)
 	}
-	components := m.Components(pageURL)
 
-	// Extract properties only for nodes whose component name appears in the
-	// query — keeps the live extraction small and avoids the per-snapshot node
-	// cap dropping a candidate.
-	queryNames := make(map[string]bool, len(q.Parts))
-	for _, part := range q.Parts {
-		queryNames[part.Name] = true
+	props := extractQueryProperties(ctx, conn, matcher, matches, pageURL, q)
+	return compquery.Resolve(root, matches, props, q)
+}
+
+// extractQueryProperties extracts live properties for every node whose matched
+// component name is referenced by one of the given queries — keeps the live
+// extraction small and avoids the per-snapshot node cap dropping a candidate —
+// then projects them into the node-id → (name → value) map the component-query
+// engine consumes. Shared by resolveComponentQuery (single query) and
+// prepareBoundsQuery (one or more queries).
+func extractQueryProperties(
+	ctx context.Context,
+	conn *browser.CDPConn,
+	matcher *match.Matcher,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	pageURL string,
+	queries ...*compquery.Query,
+) map[string]map[string]string {
+	queryNames := make(map[string]bool)
+	for _, q := range queries {
+		for _, part := range q.Parts {
+			queryNames[part.Name] = true
+		}
 	}
 	relevant := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	for n, m := range matches {
@@ -88,18 +104,13 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 			relevant[n] = m
 		}
 	}
+	components := matcher.Components(pageURL)
 	compByName := make(map[string]sightmap.ComponentDef, len(components))
 	for _, c := range components {
 		compByName[c.Name] = c
 	}
 	observe.ExtractProperties(ctx, conn, relevant, compByName)
 
-	return compquery.Resolve(root, matches, propsByNodeID(matches), q)
-}
-
-// propsByNodeID projects the extracted property values folded into each match
-// back into the node-id → (name → value) map the component-query engine consumes.
-func propsByNodeID(matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch) map[string]map[string]string {
 	out := make(map[string]map[string]string)
 	for node, m := range matches {
 		if m == nil || len(m.Properties) == 0 {

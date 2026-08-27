@@ -40,10 +40,26 @@ invocation). Use `npm` in instructions — the published package is identical un
 
 ## Session management
 
+`browser start` is a **long-running foreground daemon**: it owns Chrome and the
+console/network collector for the whole session, so it **holds the shell** until
+you stop it. Every other command here is a thin client that connects to that
+daemon and returns immediately.
+
+- **Interactive:** run `start` in its own terminal, drive from another.
+- **Scripts / agents** (shells that run each command to completion): use
+  **`sightmap browser start --detach`**. It backgrounds the daemon in its own
+  session, waits until it is serving, and returns — so it never hangs your shell,
+  and (unlike `nohup start &`) the daemon survives between one-shot commands.
+- A **client** command that hangs almost always means the daemon isn't up —
+  run `browser status`, don't wait it out.
+- On a headless Linux host `start` auto-detects the missing display and runs
+  headless; if Chrome hits a sandbox restriction the error tells you to add
+  `--chrome-flag=--no-sandbox`.
+
 | Command | What it does |
 |---------|-------------|
-| `sightmap browser start` | Launch Chrome + the sightmap overlay server. Writes `.sightmap/.session`. |
-| `sightmap browser status` | Check session health and current URL. |
+| `sightmap browser start` | Launch Chrome + the overlay server. **Foreground daemon — holds the shell; pass `--detach` in scripts/agents.** Writes `.sightmap/.session`. |
+| `sightmap browser status` | Check session health, tabs, and current URL. Reports `⚠ degraded` when Chrome's CDP is up but the daemon's HTTP server was reaped. |
 | `sightmap browser navigate 'URL'` | Navigate to URL (positional arg — no `--url` flag). |
 | `sightmap browser stop` | Stop Chrome session. |
 | `sightmap browser eval 'js'` | Evaluate JS in page context. Returns JSON-serializable values only — DOM element references return an error. |
