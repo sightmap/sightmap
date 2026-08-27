@@ -1,0 +1,190 @@
+# WebMCP tools for github.com, authored against the community atlas corpus at
+# web/src/data/atlas/github/.sightmap. All tools are read-only and work signed
+# out; run as a userscript by a signed-in user, the same fetches carry their
+# session and see what they see.
+#
+# Which views are safe to read from a fetched (pre-hydration) document was
+# verified against live github.com HTML on 2026-08-27: /pulls, /issues, and
+# /releases render their rows into the initial document; a repository home
+# renders the file table but defers the README, latest-commit strip, and
+# sidebar to follow-up fetches (as this corpus's memory records).
+#
+# Regenerate the committed bundles after editing:
+#   node webmcp/bin/sightmap-webmcp.js generate \
+#     --tools webmcp/examples/github/webmcp.tools.yaml --format all
+version: 1
+site: github
+base_url: https://github.com
+description: Read-only repository tools for github.com — pull requests, issues, releases, files, and PR diffstat.
+sightmap: ../../../web/src/data/atlas/github/.sightmap
+match:
+  - https://github.com/*
+
+tools:
+  - name: list_pull_requests
+    title: List a repository's open pull requests
+    description: >
+      Fetch /{owner}/{repo}/pulls and return the open pull-request rows
+      (server-rendered, so no browser navigation is needed). Rows deliberately
+      carry legacy issue markup (ids like issue_<number>) — both lists render
+      from one legacy row component — and each row's text concatenates title,
+      labels, author, and review state. Review-decision badges arrive in a
+      later batch fetch and are not part of this read.
+    read_only: true
+    mode: fetch
+    view: PullList
+    params:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner, e.g. "sightmap".
+      - name: repo
+        type: string
+        required: true
+        description: Repository name, e.g. "sightmap".
+    flow:
+      - navigate: "/{owner}/{repo}/pulls"
+      - read:
+          pull_requests:
+            for_each: PullRow
+            fields:
+              text:
+                property: row_text
+              title:
+                component: PullTitleLink
+                property: title
+              url:
+                component: PullTitleLink
+                property: href
+
+  - name: list_issues
+    title: List a repository's open issues
+    description: >
+      Fetch /{owner}/{repo}/issues and return the issue rows (25 per page by
+      default). This route is served by GitHub's React frontend, but the rows
+      are in the initial document. Row state (open/closed) is an icon with no
+      text, so it is not part of this read — the list defaults to open issues.
+    read_only: true
+    mode: fetch
+    view: IssueList
+    params:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner.
+      - name: repo
+        type: string
+        required: true
+        description: Repository name.
+    flow:
+      - navigate: "/{owner}/{repo}/issues"
+      - read:
+          filters:
+            component: IssueFilters
+            property: filters
+          issues:
+            for_each: IssueRowTitle
+            fields:
+              title:
+                property: title
+              url:
+                property: href
+
+  - name: list_releases
+    title: List a repository's releases
+    description: >
+      Fetch /{owner}/{repo}/releases (newest first). Each entry is a link to a
+      release tag. The same tag URL appears several times per release — tag
+      name, source links, and the anchor heading all point at it — so
+      deduplicate by url before counting releases.
+    read_only: true
+    mode: fetch
+    view: Releases
+    params:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner.
+      - name: repo
+        type: string
+        required: true
+        description: Repository name.
+    flow:
+      - navigate: "/{owner}/{repo}/releases"
+      - read:
+          release_links:
+            for_each: ReleaseTagLink
+            fields:
+              tag:
+                property: tag
+              url:
+                extract: attr=href
+
+  - name: get_repo_files
+    title: Read a repository's root file listing
+    description: >
+      Fetch a repository home page and return its root file table and (when
+      GitHub inlines it) the README text. The table is in the initial
+      document; the README, latest-commit strip, and sidebar are sometimes
+      deferred to follow-up fetches, so an absent `readme` means "deferred on
+      this load", not "no README". Use the repository's raw file URLs for
+      file contents.
+    read_only: true
+    mode: fetch
+    view: RepoHome
+    params:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner.
+      - name: repo
+        type: string
+        required: true
+        description: Repository name.
+    flow:
+      - navigate: "/{owner}/{repo}"
+      - read:
+          files:
+            component: FileTable
+            property: entries
+            max_chars: 3000
+          readme:
+            component: Readme
+            property: readme_text
+
+  - name: get_pr_diffstat
+    title: Diffstat for one pull request
+    description: >
+      Lines added, deleted, and changed for one pull request, from the same
+      page_data endpoint the PR header uses (the header's diffstat testids are
+      filled in after the document from this response). Requires the JSON
+      accept and XMLHttpRequest headers or GitHub answers 406.
+    params:
+      - name: owner
+        type: string
+        required: true
+        description: Repository owner.
+      - name: repo
+        type: string
+        required: true
+        description: Repository name.
+      - name: number
+        type: integer
+        required: true
+        description: Pull request number.
+    api:
+      request: Diffstat
+      url: "https://github.com/{owner}/{repo}/pull/{number}/page_data/diffstat"
+      headers:
+        accept: application/json
+        x-requested-with: XMLHttpRequest
+      result:
+        - name: lines_added
+          source: rsp.body
+          field: diffstat.linesAdded
+        - name: lines_deleted
+          source: rsp.body
+          field: diffstat.linesDeleted
+        - name: lines_changed
+          source: rsp.body
+          field: diffstat.linesChanged

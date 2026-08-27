@@ -1,8 +1,8 @@
-// ikea — WebMCP tools generated from a sightmap corpus.
-// Search, browse, and product tools for the IKEA US storefront (/us/en/), signed out.
-// tools: search_products, browse_category, get_product, get_buyback_offers, add_to_cart
+// github — WebMCP tools generated from a sightmap corpus.
+// Read-only repository tools for github.com — pull requests, issues, releases, files, and PR diffstat.
+// tools: list_pull_requests, list_issues, list_releases, get_repo_files, get_pr_diffstat
 // generator: @sightmap/webmcp-codegen v0.1.0 (github.com/sightmap/sightmap webmcp/)
-// manifest: webmcp.tools.yaml | corpus: ../../../web/src/data/atlas/ikea/.sightmap (7 files, sha256:12d75d48acd1)
+// manifest: webmcp.tools.yaml | corpus: ../../../web/src/data/atlas/github/.sightmap (7 files, sha256:a875a99ca3fd)
 // DO NOT EDIT — edit the manifest or corpus and regenerate: sightmap-webmcp generate
 (() => {
   "use strict";
@@ -726,197 +726,47 @@ if (typeof module === "object" && module.exports) {
 }
 
 const __SMW_META = {
-  "site": "ikea",
-  "baseUrl": "https://www.ikea.com",
-  "description": "Search, browse, and product tools for the IKEA US storefront (/us/en/), signed out.",
+  "site": "github",
+  "baseUrl": "https://github.com",
+  "description": "Read-only repository tools for github.com — pull requests, issues, releases, files, and PR diffstat.",
   "toolVersion": "0.1.0",
   "match": [
-    "https://www.ikea.com/*"
+    "https://github.com/*"
   ]
 };
 
 const __SMW_TOOLS = [
   {
-    "name": "search_products",
-    "title": "Search IKEA products",
-    "description": "Keyword search over the IKEA US catalog. Returns the result summary (its count is the authoritative total — the grid renders only the first page of ~22 cards) and the product cards with price and availability. Product names keep their Swedish diacritics (GÖRSNYGG, PÄRKLA), so an ASCII-typed name in a follow-up filter may not match. The result page is server-rendered, which is why this tool can fetch it without a browser navigation.",
+    "name": "list_pull_requests",
+    "title": "List a repository's open pull requests",
+    "description": "Fetch /{owner}/{repo}/pulls and return the open pull-request rows (server-rendered, so no browser navigation is needed). Rows deliberately carry legacy issue markup (ids like issue_<number>) — both lists render from one legacy row component — and each row's text concatenates title, labels, author, and review state. Review-decision badges arrive in a later batch fetch and are not part of this read.",
     "readOnly": true,
     "inputSchema": {
       "type": "object",
       "properties": {
-        "query": {
+        "owner": {
           "type": "string",
-          "description": "Search keywords, e.g. \"desk chair\"."
+          "description": "Repository owner, e.g. \"sightmap\"."
         },
-        "max_results": {
-          "type": "integer",
-          "description": "Cap on returned product cards (default 20).",
-          "default": 20
+        "repo": {
+          "type": "string",
+          "description": "Repository name, e.g. \"sightmap\"."
         }
       },
       "required": [
-        "query"
+        "owner",
+        "repo"
       ]
     },
     "params": [
       {
-        "name": "query",
+        "name": "owner",
         "type": "string",
         "required": true,
         "default": null
       },
       {
-        "name": "max_results",
-        "type": "integer",
-        "required": false,
-        "default": 20
-      }
-    ],
-    "kind": "flow",
-    "flow": {
-      "mode": "fetch",
-      "requireView": null,
-      "steps": [
-        {
-          "do": "navigate",
-          "url": "/us/en/search/?q={query}"
-        },
-        {
-          "do": "read",
-          "spec": {
-            "summary": {
-              "one": {
-                "extract": "text",
-                "target": {
-                  "kind": "chain",
-                  "links": [
-                    {
-                      "name": "SearchSummary",
-                      "chain": [
-                        [
-                          ".search-summary"
-                        ]
-                      ],
-                      "props": {
-                        "summary": {
-                          "extract": "text"
-                        }
-                      },
-                      "preds": [],
-                      "index": null
-                    }
-                  ]
-                }
-              }
-            },
-            "products": {
-              "list": {
-                "target": {
-                  "kind": "chain",
-                  "links": [
-                    {
-                      "name": "ProductCard",
-                      "chain": [
-                        [
-                          "[data-testid=\"plp-product-card\"]"
-                        ]
-                      ],
-                      "props": {
-                        "card_text": {
-                          "extract": "text"
-                        }
-                      },
-                      "preds": [],
-                      "index": null
-                    }
-                  ]
-                },
-                "max": "{max_results}",
-                "fields": {
-                  "text": {
-                    "extract": "text"
-                  },
-                  "price": {
-                    "extract": "text",
-                    "target": {
-                      "kind": "chain",
-                      "links": [
-                        {
-                          "name": "ProductCard CardPrice",
-                          "chain": [
-                            [
-                              ".plp-grid-product-card__price-wrapper"
-                            ]
-                          ],
-                          "props": {
-                            "price_text": {
-                              "extract": "text"
-                            }
-                          },
-                          "preds": [],
-                          "index": null
-                        }
-                      ]
-                    }
-                  },
-                  "availability": {
-                    "extract": "text",
-                    "target": {
-                      "kind": "chain",
-                      "links": [
-                        {
-                          "name": "ProductCard CardAvailability",
-                          "chain": [
-                            [
-                              ".plp-availability--container"
-                            ]
-                          ],
-                          "props": {
-                            "availability": {
-                              "extract": "text"
-                            }
-                          },
-                          "preds": [],
-                          "index": null
-                        }
-                      ]
-                    }
-                  },
-                  "url": {
-                    "extract": "attr=href",
-                    "target": {
-                      "kind": "css",
-                      "selector": "a"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      ]
-    }
-  },
-  {
-    "name": "browse_category",
-    "title": "Browse an IKEA category",
-    "description": "Load a category page by id (the trailing token of a /cat/ URL, e.g. \"desk-chairs-20654\" or \"tables-chairs-fu002\"). One route serves two page shapes — a hub (subcategory carousel, no products) and a leaf (product grid, no carousel) — so read whichever of `subcategories` / `products` came back. A typo'd id does NOT 404: the slug half is decorative, and a bad id half silently redirects to the whole catalog, so always check `category_name` to confirm where you actually landed.",
-    "readOnly": true,
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "category_id": {
-          "type": "string",
-          "description": "Category slug-and-id, e.g. \"desk-chairs-20654\"."
-        }
-      },
-      "required": [
-        "category_id"
-      ]
-    },
-    "params": [
-      {
-        "name": "category_id",
+        "name": "repo",
         "type": "string",
         "required": true,
         "default": null
@@ -929,54 +779,26 @@ const __SMW_TOOLS = [
       "steps": [
         {
           "do": "navigate",
-          "url": "/us/en/cat/{category_id}/"
+          "url": "/{owner}/{repo}/pulls"
         },
         {
           "do": "read",
           "spec": {
-            "category_name": {
-              "one": {
-                "extract": "text",
-                "target": {
-                  "kind": "chain",
-                  "links": [
-                    {
-                      "name": "PageHeader CategoryTitle",
-                      "chain": [
-                        [
-                          ".hnf-pageheader__wrapper"
-                        ],
-                        [
-                          ".hnf-pageheader__h1"
-                        ]
-                      ],
-                      "props": {
-                        "category_name": {
-                          "extract": "text"
-                        }
-                      },
-                      "preds": [],
-                      "index": null
-                    }
-                  ]
-                }
-              }
-            },
-            "subcategories": {
+            "pull_requests": {
               "list": {
                 "target": {
                   "kind": "chain",
                   "links": [
                     {
-                      "name": "SubcategoryItem",
+                      "name": "PullRow",
                       "chain": [
                         [
-                          ".hnf-carousel__wrapper a"
+                          ".js-issue-row"
                         ]
                       ],
                       "props": {
-                        "tracking_label": {
-                          "extract": "attr=data-tracking-label"
+                        "row_text": {
+                          "extract": "text"
                         }
                       },
                       "preds": [],
@@ -986,60 +808,27 @@ const __SMW_TOOLS = [
                 },
                 "max": null,
                 "fields": {
-                  "tracking_label": {
-                    "extract": "attr=data-tracking-label"
-                  },
-                  "label": {
-                    "extract": "text"
-                  },
-                  "url": {
-                    "extract": "attr=href"
-                  }
-                }
-              }
-            },
-            "products": {
-              "list": {
-                "target": {
-                  "kind": "chain",
-                  "links": [
-                    {
-                      "name": "ProductCard",
-                      "chain": [
-                        [
-                          "[data-testid=\"plp-product-card\"]"
-                        ]
-                      ],
-                      "props": {
-                        "card_text": {
-                          "extract": "text"
-                        }
-                      },
-                      "preds": [],
-                      "index": null
-                    }
-                  ]
-                },
-                "max": 24,
-                "fields": {
                   "text": {
                     "extract": "text"
                   },
-                  "price": {
+                  "title": {
                     "extract": "text",
                     "target": {
                       "kind": "chain",
                       "links": [
                         {
-                          "name": "ProductCard CardPrice",
+                          "name": "PullRow PullTitleLink",
                           "chain": [
                             [
-                              ".plp-price-module"
+                              "a[id^=\"issue_\"]"
                             ]
                           ],
                           "props": {
-                            "price_text": {
+                            "title": {
                               "extract": "text"
+                            },
+                            "href": {
+                              "extract": "attr=href"
                             }
                           },
                           "preds": [],
@@ -1051,8 +840,27 @@ const __SMW_TOOLS = [
                   "url": {
                     "extract": "attr=href",
                     "target": {
-                      "kind": "css",
-                      "selector": "a"
+                      "kind": "chain",
+                      "links": [
+                        {
+                          "name": "PullRow PullTitleLink",
+                          "chain": [
+                            [
+                              "a[id^=\"issue_\"]"
+                            ]
+                          ],
+                          "props": {
+                            "title": {
+                              "extract": "text"
+                            },
+                            "href": {
+                              "extract": "attr=href"
+                            }
+                          },
+                          "preds": [],
+                          "index": null
+                        }
+                      ]
                     }
                   }
                 }
@@ -1064,25 +872,36 @@ const __SMW_TOOLS = [
     }
   },
   {
-    "name": "get_product",
-    "title": "Read an IKEA product page",
-    "description": "Fetch one product page by its full slug (e.g. \"goersnygg-storage-case-white-clear-40504193\") and return price, rating, and package text. The digits ending the slug are the article number the product APIs key on. Delivery/stock render client-side after load, so `fulfillment` is usually absent from this fetched read — use the get_buyback_offers tool or a live session for availability.",
+    "name": "list_issues",
+    "title": "List a repository's open issues",
+    "description": "Fetch /{owner}/{repo}/issues and return the issue rows (25 per page by default). This route is served by GitHub's React frontend, but the rows are in the initial document. Row state (open/closed) is an icon with no text, so it is not part of this read — the list defaults to open issues.",
     "readOnly": true,
     "inputSchema": {
       "type": "object",
       "properties": {
-        "product_slug": {
+        "owner": {
           "type": "string",
-          "description": "Full product slug from a /p/ URL, article number included."
+          "description": "Repository owner."
+        },
+        "repo": {
+          "type": "string",
+          "description": "Repository name."
         }
       },
       "required": [
-        "product_slug"
+        "owner",
+        "repo"
       ]
     },
     "params": [
       {
-        "name": "product_slug",
+        "name": "owner",
+        "type": "string",
+        "required": true,
+        "default": null
+      },
+      {
+        "name": "repo",
         "type": "string",
         "required": true,
         "default": null
@@ -1095,29 +914,26 @@ const __SMW_TOOLS = [
       "steps": [
         {
           "do": "navigate",
-          "url": "/us/en/p/{product_slug}/"
+          "url": "/{owner}/{repo}/issues"
         },
         {
           "do": "read",
           "spec": {
-            "price": {
+            "filters": {
               "one": {
                 "extract": "text",
                 "target": {
                   "kind": "chain",
                   "links": [
                     {
-                      "name": "PricePackage PriceModule",
+                      "name": "IssueFilters",
                       "chain": [
                         [
-                          ".pipf-price-package"
-                        ],
-                        [
-                          ".pipcom-price-module"
+                          "nav[aria-label=\"Issue filters\"]"
                         ]
                       ],
                       "props": {
-                        "price": {
+                        "filters": {
                           "extract": "text"
                         }
                       },
@@ -1128,21 +944,109 @@ const __SMW_TOOLS = [
                 }
               }
             },
-            "package": {
-              "one": {
-                "extract": "text",
+            "issues": {
+              "list": {
                 "target": {
                   "kind": "chain",
                   "links": [
                     {
-                      "name": "PricePackage",
+                      "name": "IssueRowTitle",
                       "chain": [
                         [
-                          ".pipf-price-package"
+                          "[data-testid=\"issue-pr-title-link\"]"
                         ]
                       ],
                       "props": {
-                        "package_text": {
+                        "title": {
+                          "extract": "text"
+                        },
+                        "href": {
+                          "extract": "attr=href"
+                        }
+                      },
+                      "preds": [],
+                      "index": null
+                    }
+                  ]
+                },
+                "max": null,
+                "fields": {
+                  "title": {
+                    "extract": "text"
+                  },
+                  "url": {
+                    "extract": "attr=href"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "list_releases",
+    "title": "List a repository's releases",
+    "description": "Fetch /{owner}/{repo}/releases (newest first). Each entry is a link to a release tag. The same tag URL appears several times per release — tag name, source links, and the anchor heading all point at it — so deduplicate by url before counting releases.",
+    "readOnly": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "Repository owner."
+        },
+        "repo": {
+          "type": "string",
+          "description": "Repository name."
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    },
+    "params": [
+      {
+        "name": "owner",
+        "type": "string",
+        "required": true,
+        "default": null
+      },
+      {
+        "name": "repo",
+        "type": "string",
+        "required": true,
+        "default": null
+      }
+    ],
+    "kind": "flow",
+    "flow": {
+      "mode": "fetch",
+      "requireView": null,
+      "steps": [
+        {
+          "do": "navigate",
+          "url": "/{owner}/{repo}/releases"
+        },
+        {
+          "do": "read",
+          "spec": {
+            "release_links": {
+              "list": {
+                "target": {
+                  "kind": "chain",
+                  "links": [
+                    {
+                      "name": "ReleaseTagLink",
+                      "chain": [
+                        [
+                          "a[href*=\"/releases/tag/\"]"
+                        ]
+                      ],
+                      "props": {
+                        "tag": {
                           "extract": "text"
                         }
                       },
@@ -1150,24 +1054,86 @@ const __SMW_TOOLS = [
                       "index": null
                     }
                   ]
+                },
+                "max": null,
+                "fields": {
+                  "tag": {
+                    "extract": "text"
+                  },
+                  "url": {
+                    "extract": "attr=href"
+                  }
                 }
               }
-            },
-            "rating": {
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "get_repo_files",
+    "title": "Read a repository's root file listing",
+    "description": "Fetch a repository home page and return its root file table and (when GitHub inlines it) the README text. The table is in the initial document; the README, latest-commit strip, and sidebar are sometimes deferred to follow-up fetches, so an absent `readme` means \"deferred on this load\", not \"no README\". Use the repository's raw file URLs for file contents.",
+    "readOnly": true,
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "description": "Repository owner."
+        },
+        "repo": {
+          "type": "string",
+          "description": "Repository name."
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    },
+    "params": [
+      {
+        "name": "owner",
+        "type": "string",
+        "required": true,
+        "default": null
+      },
+      {
+        "name": "repo",
+        "type": "string",
+        "required": true,
+        "default": null
+      }
+    ],
+    "kind": "flow",
+    "flow": {
+      "mode": "fetch",
+      "requireView": null,
+      "steps": [
+        {
+          "do": "navigate",
+          "url": "/{owner}/{repo}"
+        },
+        {
+          "do": "read",
+          "spec": {
+            "files": {
               "one": {
                 "extract": "text",
                 "target": {
                   "kind": "chain",
                   "links": [
                     {
-                      "name": "RatingsSummary",
+                      "name": "FileTable",
                       "chain": [
                         [
-                          ".js-ugc-container"
+                          "table[aria-labelledby=\"folders-and-files\"]"
                         ]
                       ],
                       "props": {
-                        "rating_text": {
+                        "entries": {
                           "extract": "text"
                         }
                       },
@@ -1175,24 +1141,25 @@ const __SMW_TOOLS = [
                       "index": null
                     }
                   ]
-                }
+                },
+                "cap": 3000
               }
             },
-            "fulfillment": {
+            "readme": {
               "one": {
                 "extract": "text",
                 "target": {
                   "kind": "chain",
                   "links": [
                     {
-                      "name": "FulfillmentSection",
+                      "name": "Readme",
                       "chain": [
                         [
-                          ".lower-funnel-fragments-section-group"
+                          "article.markdown-body"
                         ]
                       ],
                       "props": {
-                        "fulfillment_text": {
+                        "readme_text": {
                           "extract": "text"
                         }
                       },
@@ -1209,26 +1176,48 @@ const __SMW_TOOLS = [
     }
   },
   {
-    "name": "get_buyback_offers",
-    "title": "IKEA buy-back offers for an article",
-    "description": "Query IKEA's circular buy-back API for one article number (the digits ending a product URL, e.g. 40504193 from /p/goersnygg-storage-case-white-clear-40504193/). The endpoint only has data for articles IKEA will buy back; anything else returns a non-200 or an empty body, which is an answer, not an error.",
+    "name": "get_pr_diffstat",
+    "title": "Diffstat for one pull request",
+    "description": "Lines added, deleted, and changed for one pull request, from the same page_data endpoint the PR header uses (the header's diffstat testids are filled in after the document from this response). Requires the JSON accept and XMLHttpRequest headers or GitHub answers 406.",
     "readOnly": true,
     "inputSchema": {
       "type": "object",
       "properties": {
-        "article": {
+        "owner": {
           "type": "string",
-          "description": "Article number, digits only, e.g. \"40504193\"."
+          "description": "Repository owner."
+        },
+        "repo": {
+          "type": "string",
+          "description": "Repository name."
+        },
+        "number": {
+          "type": "integer",
+          "description": "Pull request number."
         }
       },
       "required": [
-        "article"
+        "owner",
+        "repo",
+        "number"
       ]
     },
     "params": [
       {
-        "name": "article",
+        "name": "owner",
         "type": "string",
+        "required": true,
+        "default": null
+      },
+      {
+        "name": "repo",
+        "type": "string",
+        "required": true,
+        "default": null
+      },
+      {
+        "name": "number",
+        "type": "integer",
         "required": true,
         "default": null
       }
@@ -1236,93 +1225,42 @@ const __SMW_TOOLS = [
     "kind": "api",
     "api": {
       "method": "GET",
-      "url": "https://web-api.ikea.com/circular/circular-asis/offers/articles/{article}",
+      "url": "https://github.com/{owner}/{repo}/pull/{number}/page_data/diffstat",
       "query": null,
-      "headers": null,
-      "body": null,
-      "result": [],
-      "maxBodyChars": 20000,
-      "request": "CircularOffers"
-    }
-  },
-  {
-    "name": "add_to_cart",
-    "title": "Add the open product to the cart",
-    "description": "On a product page in the live session, set the quantity and click the add-to-cart control. Mutating: this puts a real item into the basket on the storefront. Fails with a navigation hint when the current page is not a product view. Quantity is a number input paired with steppers, so it is written directly rather than clicked up.",
-    "readOnly": false,
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "quantity": {
-          "type": "integer",
-          "description": "Quantity to set before adding (default 1).",
-          "default": 1
-        }
-      }
-    },
-    "params": [
-      {
-        "name": "quantity",
-        "type": "integer",
-        "required": false,
-        "default": 1
-      }
-    ],
-    "kind": "flow",
-    "flow": {
-      "mode": "live",
-      "requireView": {
-        "view": "ProductDetail",
-        "route": "/us/en/p/:productSlug",
-        "pathRegex": "^\\/us\\/en\\/p\\/[^/]+$",
-        "url": "https://www.ikea.com/us/en/p/goersnygg-storage-case-white-clear-40504193/"
+      "headers": {
+        "accept": "application/json",
+        "x-requested-with": "XMLHttpRequest"
       },
-      "steps": [
+      "body": null,
+      "result": [
         {
-          "do": "fill",
-          "target": {
-            "kind": "css",
-            "selector": ".js-add-to-cart-section input[type=\"number\"]"
-          },
-          "value": "{quantity}"
+          "name": "lines_added",
+          "source": "rsp.body",
+          "field": "diffstat.linesAdded",
+          "pattern": null,
+          "transform": null
         },
         {
-          "do": "click",
-          "target": {
-            "kind": "css",
-            "selector": ".pipf-add-to-cart-section__buttons button"
-          }
+          "name": "lines_deleted",
+          "source": "rsp.body",
+          "field": "diffstat.linesDeleted",
+          "pattern": null,
+          "transform": null
         },
         {
-          "do": "read",
-          "spec": {
-            "added": {
-              "one": {
-                "extract": "exists:.pipf-add-to-cart-section__buttons",
-                "target": {
-                  "kind": "chain",
-                  "links": [
-                    {
-                      "name": "AddToCartSection",
-                      "chain": [
-                        [
-                          ".js-add-to-cart-section"
-                        ]
-                      ],
-                      "props": {},
-                      "preds": [],
-                      "index": null
-                    }
-                  ]
-                }
-              }
-            }
-          }
+          "name": "lines_changed",
+          "source": "rsp.body",
+          "field": "diffstat.linesChanged",
+          "pattern": null,
+          "transform": null
         }
-      ]
+      ],
+      "maxBodyChars": 20000,
+      "request": "Diffstat"
     }
   }
 ];
 
 __smwBoot(__SMW_META, __SMW_TOOLS);
 })();
+export {};

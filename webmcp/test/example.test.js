@@ -1,8 +1,8 @@
 /**
- * The committed IKEA example must stay in sync with its manifest + the
- * vendored atlas corpus (drift check), and the generated bundle must actually
- * boot: evaluated in jsdom it installs the shim and registers its tools with
- * a (faked) document.modelContext.
+ * Every committed example must stay in sync with its manifest + corpus
+ * (drift check), and each generated snippet must actually boot: evaluated in
+ * jsdom it installs the shim and registers its tools with a (faked)
+ * document.modelContext.
  */
 
 const fs = require("fs");
@@ -11,48 +11,59 @@ const { execFileSync } = require("child_process");
 
 const ROOT = path.join(__dirname, "..", "..");
 const BIN = path.join(ROOT, "webmcp", "bin", "sightmap-webmcp.js");
-const EXAMPLE = path.join(ROOT, "webmcp", "examples", "ikea");
+const EXAMPLES_DIR = path.join(ROOT, "webmcp", "examples");
 
-test("committed IKEA bundles match a fresh generation (drift check)", () => {
-  const out = execFileSync(
-    process.execPath,
-    [
-      BIN,
-      "generate",
-      "--tools",
-      path.join(EXAMPLE, "webmcp.tools.yaml"),
-      "--format",
-      "all",
-      "--check",
-    ],
-    { cwd: ROOT, encoding: "utf8" },
-  );
-  expect(out).toMatch(/up to date/);
+const examples = fs
+  .readdirSync(EXAMPLES_DIR, { withFileTypes: true })
+  .filter((e) => e.isDirectory())
+  .map((e) => e.name)
+  .sort();
+
+test("there are examples to check", () => {
+  expect(examples.length).toBeGreaterThan(0);
 });
 
-test("generated IKEA snippet boots in a plain page", () => {
-  const src = fs.readFileSync(path.join(EXAMPLE, "ikea.webmcp.js"), "utf8");
-  const registered = [];
-  delete window.__sightmapWebMCP;
-  document.modelContext = {
-    registerTool: async (d) => registered.push(d.name),
-  };
+describe.each(examples)("example %s", (site) => {
+  const dir = path.join(EXAMPLES_DIR, site);
 
-  // eslint-disable-next-line no-eval
-  (0, eval)(src);
+  test("committed bundles match a fresh generation (drift check)", () => {
+    const out = execFileSync(
+      process.execPath,
+      [
+        BIN,
+        "generate",
+        "--tools",
+        path.join(dir, "webmcp.tools.yaml"),
+        "--format",
+        "all",
+        "--check",
+      ],
+      { cwd: ROOT, encoding: "utf8" },
+    );
+    expect(out).toMatch(/up to date/);
+    expect(out).not.toMatch(/drift/);
+  });
 
-  expect(window.__sightmapWebMCP).toBeDefined();
-  expect(window.__sightmapWebMCP.site).toBe("ikea");
-  const names = window.__sightmapWebMCP.listTools().map((t) => t.name);
-  expect(names).toEqual([
-    "search_products",
-    "browse_category",
-    "get_product",
-    "get_buyback_offers",
-    "add_to_cart",
-  ]);
-  expect(registered).toEqual(names);
-  const search = window.__sightmapWebMCP.listTools()[0];
-  expect(search.annotations.readOnlyHint).toBe(true);
-  expect(search.inputSchema.properties.query.type).toBe("string");
+  test("generated snippet boots and registers every tool", () => {
+    const src = fs.readFileSync(path.join(dir, `${site}.webmcp.js`), "utf8");
+    const registered = [];
+    delete window.__sightmapWebMCP;
+    document.modelContext = {
+      registerTool: async (d) => registered.push(d.name),
+    };
+
+    // eslint-disable-next-line no-eval
+    (0, eval)(src);
+
+    expect(window.__sightmapWebMCP).toBeDefined();
+    expect(window.__sightmapWebMCP.site).toBe(site);
+    const tools = window.__sightmapWebMCP.listTools();
+    expect(tools.length).toBeGreaterThan(0);
+    expect(registered).toEqual(tools.map((t) => t.name));
+    for (const t of tools) {
+      expect(t.description.length).toBeGreaterThan(20);
+      expect(t.inputSchema.type).toBe("object");
+      expect(typeof t.annotations.readOnlyHint).toBe("boolean");
+    }
+  });
 });

@@ -113,6 +113,10 @@ webmcp/
   test/                    jest suite (runs in the repo root's jest config)
   examples/ikea/           worked example against the vendored IKEA atlas
                            corpus: manifest + all three generated bundles
+  examples/github/         second worked example (GitHub's legacy + React
+                           frontends, fetch flows + an api tool); its
+                           verify-live.js executes every tool against real
+                           github.com — run it manually, CI stays hermetic
 ```
 
 The runtime's deep-query and extraction functions are adapted from the

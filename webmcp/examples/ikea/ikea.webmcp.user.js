@@ -119,7 +119,7 @@ function __smwReadProp(el, spec) {
   if (val === "") return null;
   val = __smwApplyTransform(val, spec.transform || null);
   if (!val) return null;
-  return String(val).slice(0, __SMW_VALUE_CAP);
+  return String(val).slice(0, spec.cap || __SMW_VALUE_CAP);
 }
 
 // --- template interpolation ------------------------------------------------

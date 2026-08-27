@@ -215,6 +215,13 @@ function compileFieldSpec(corpus, spec, where, scopeEntry, refs, viewScope) {
   const out = { extract };
   if (target) out.target = target;
   if (transform) out.transform = transform;
+  if (spec.max_chars != null) {
+    const cap = Number(spec.max_chars);
+    if (!Number.isInteger(cap) || cap < 1) {
+      throw new Error(`${where}: "max_chars" must be a positive integer`);
+    }
+    out.cap = cap;
+  }
   return out;
 }
 
