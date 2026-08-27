@@ -70,6 +70,13 @@ Never change spec semantics without an SEP (`spec/seps/`).
 - The sightmap → WebMCP codegen adapter (see `webmcp/README.md` for the
   pipeline). Plain CommonJS, an npm workspace of the root `package.json`;
   its only dependency is `js-yaml`.
+- **Two generators, one output.** The user-facing CLI is `sightmap webmcp`
+  (Go, `go/webmcp/`); this directory is the reference implementation. They
+  must emit byte-identical bundles: `go/webmcp/golden_test.go` regenerates
+  the committed `webmcp/examples/` from Go and byte-compares, so any output
+  change must land in both generators plus regenerated examples. The Go side
+  embeds the shared browser runtime via `go generate ./webmcp/...`
+  (generate-and-commit, drift-checked in CI like the skills embed).
 - Tests run through the **root** jest config: `npx jest webmcp` from the repo
   root. The suite includes a drift check on `webmcp/examples/` — after
   changing the generator, the runtime, or the example manifest, regenerate

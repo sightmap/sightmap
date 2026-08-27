@@ -3,9 +3,9 @@ name: go
 on:
   push:
     branches: [main]
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'webmcp/**', '.github/workflows/go.yml']
   pull_request:
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'webmcp/**', '.github/workflows/go.yml']
 
 permissions:
   contents: read
@@ -45,6 +45,22 @@ jobs:
             echo "Run 'go generate ./skills/...' from go/ and commit the result."
             git -C .. status --porcelain -- skills go/skills
             git -C .. --no-pager diff -- skills go/skills
+            exit 1
+          fi
+
+      # The webmcp package embeds the browser runtime from the canonical
+      # source at <repo>/webmcp/src/runtime/runtime.js (plus the generator
+      # version from webmcp/package.json). Regenerate and fail on drift, the
+      # same contract as the skills embed above. The package's golden tests
+      # then byte-compare Go-generated bundles against the committed
+      # Node-generated ones under webmcp/examples/.
+      - name: webmcp runtime embed in sync
+        run: |
+          go generate ./webmcp/...
+          if [ -n "$(git -C .. status --porcelain -- webmcp go/webmcp)" ]; then
+            echo "Embedded webmcp runtime is out of sync with webmcp/src/runtime/runtime.js."
+            echo "Run 'go generate ./webmcp/...' from go/ and commit the result."
+            git -C .. status --porcelain -- webmcp go/webmcp
             exit 1
           fi
 

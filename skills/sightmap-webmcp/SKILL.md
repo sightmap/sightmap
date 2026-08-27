@@ -39,9 +39,11 @@ webmcp.tools.yaml  ──┘                              site.webmcp.module.js 
   the `sightmap-authoring` skill. Every component/property/request a tool
   references must exist in the corpus — the manifest names corpus entities,
   it never contains raw selectors except as a deliberate `css:` escape hatch.
-- **Codegen**: from a checkout of `github.com/sightmap/sightmap`:
-  `node webmcp/bin/sightmap-webmcp.js <validate|generate|init>` (not yet
-  published to npm on its own).
+- **Codegen**: ships in the `sightmap` CLI you already have:
+  `sightmap webmcp <init|validate|generate>`. (The reference implementation
+  lives at `webmcp/` in the sightmap repo as a standalone Node CLI —
+  `node webmcp/bin/sightmap-webmcp.js` — and the two emit byte-identical
+  bundles; use whichever is at hand.)
 
 ## Phase 1: pick tools by walking trajectories
 
@@ -75,7 +77,7 @@ Then choose each tool's kind — this decision is the heart of the manifest:
 
 ## Phase 2: author `webmcp.tools.yaml`
 
-Scaffold, then edit: `sightmap-webmcp init --site SLUG --base-url URL`
+Scaffold, then edit: `sightmap webmcp init --site SLUG --base-url URL`
 drafts one fetch-read tool per corpus view and one api stub per corpus
 request — keep what maps to real goals, delete the rest.
 
@@ -147,8 +149,8 @@ Semantics that do the heavy lifting:
 ## Phase 3: generate and verify in the live session
 
 ```bash
-node webmcp/bin/sightmap-webmcp.js validate --tools webmcp.tools.yaml
-node webmcp/bin/sightmap-webmcp.js generate --tools webmcp.tools.yaml --format all
+sightmap webmcp validate --tools webmcp.tools.yaml
+sightmap webmcp generate --tools webmcp.tools.yaml --format all
 ```
 
 Fix every validate error before generating — they are compile-time proof

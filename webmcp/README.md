@@ -132,19 +132,27 @@ trial.
 
 ## Try it
 
+The generator ships inside the `sightmap` CLI (Go, published to npm as
+`@sightmap/sightmap`) as `sightmap webmcp <init|validate|generate>` — a port
+of this package under `go/webmcp/` that emits **byte-identical** bundles
+(golden tests in `go/webmcp/golden_test.go` regenerate the committed examples
+from Go and byte-compare). This directory remains the reference
+implementation and the test harness for the shared browser runtime.
+
 From the repo root:
 
 ```bash
-# validate + regenerate the worked example
-node webmcp/bin/sightmap-webmcp.js validate --tools webmcp/examples/ikea/webmcp.tools.yaml
+# validate + regenerate the worked example (either entry point)
+sightmap webmcp validate --tools webmcp/examples/ikea/webmcp.tools.yaml
 node webmcp/bin/sightmap-webmcp.js generate --tools webmcp/examples/ikea/webmcp.tools.yaml --format all
 
 # scaffold a fresh manifest from any corpus
-node webmcp/bin/sightmap-webmcp.js init --site myshop --base-url https://myshop.example \
+sightmap webmcp init --site myshop --base-url https://myshop.example \
   --sightmap-dir path/to/.sightmap --out webmcp.tools.yaml
 
 # tests
-npx jest webmcp
+npx jest webmcp                 # generator + runtime (jsdom) + example drift
+(cd go && go test ./webmcp/)    # Go port incl. byte-parity golden tests
 ```
 
 The full authoring loop — including live verification via
@@ -218,6 +226,8 @@ declared.
 - Cross-document journeys inside one tool call are out of scope by design
   (so is anything the WebMCP spec itself still leaves open — streaming,
   elicitation, cross-document responses).
-- This package is repo-internal for now (`private: true`); publishing it
-  (standalone or folded into the `sightmap` CLI as `sightmap webmcp ...`)
-  is a maintainer decision once the manifest format settles.
+- The user-facing entry point is `sightmap webmcp ...` in the published CLI;
+  this npm package stays repo-internal (`private: true`) as the reference
+  implementation. The two are kept byte-identical by the golden tests, so a
+  change to either generator's output must land in both (and regenerate
+  `examples/`).
