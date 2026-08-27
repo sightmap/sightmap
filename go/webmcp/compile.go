@@ -509,6 +509,40 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 	if mb, ok := asInt(omGet(api, "max_body_chars")); ok && mb > 0 {
 		maxBody = mb
 	}
+	var rowsV any
+	if rom := asOM(omGet(api, "rows")); rom != nil {
+		fieldsOut := NewOM()
+		if fom := asOM(omGet(rom, "fields")); fom != nil {
+			for _, name := range fom.Keys() {
+				spec := asOM(omGet(fom, name))
+				var fv, tv any
+				if spec != nil {
+					if v := asString(omGet(spec, "field")); v != "" {
+						fv = v
+					}
+					if v := asString(omGet(spec, "template")); v != "" {
+						tv = v
+					}
+				}
+				entry := NewOM()
+				entry.Set("field", fv)
+				entry.Set("template", tv)
+				fieldsOut.Set(name, entry)
+			}
+		}
+		var fieldV, maxV any
+		if v := asString(omGet(rom, "field")); v != "" {
+			fieldV = v
+		}
+		if v, ok := rom.Get("max"); ok && v != nil {
+			maxV = fmt.Sprintf("%v", v)
+		}
+		rowsOM := NewOM()
+		rowsOM.Set("field", fieldV)
+		rowsOM.Set("max", maxV)
+		rowsOM.Set("fields", fieldsOut)
+		rowsV = rowsOM
+	}
 	creds := "include"
 	if v := asString(omGet(api, "credentials")); v != "" {
 		creds = v
@@ -530,6 +564,7 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 		Set("headers", headersV).
 		Set("body", bodyV).
 		Set("result", result).
+		Set("rows", rowsV).
 		Set("maxBodyChars", maxBody).
 		Set("credentials", creds).
 		Set("request", requestName)

@@ -401,6 +401,21 @@ function compileApiTool(corpus, tool, errors, warnings) {
         pattern: r.pattern || null,
         transform: r.transform || null,
       })),
+      rows: api.rows
+        ? {
+            field: api.rows.field || null,
+            max: api.rows.max != null ? String(api.rows.max) : null,
+            fields: Object.fromEntries(
+              Object.keys(api.rows.fields).map((n) => [
+                n,
+                {
+                  field: api.rows.fields[n].field || null,
+                  template: api.rows.fields[n].template || null,
+                },
+              ]),
+            ),
+          }
+        : null,
       maxBodyChars: api.max_body_chars || 20000,
       credentials: api.credentials || "include",
       request: requestName,

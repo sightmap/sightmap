@@ -24,9 +24,13 @@ var stepOptionKeys = map[string][]string{"press": {"target"}}
 var rootKeys = []string{"version", "site", "base_url", "description", "tool_version", "match", "sightmap", "tools"}
 var toolKeys = []string{"name", "title", "description", "read_only", "require_view", "view", "params", "api", "flow", "mode"}
 var paramKeys = []string{"name", "type", "description", "required", "enum", "default"}
-var apiKeys = []string{"request", "method", "url", "query", "headers", "body", "result", "max_body_chars", "credentials"}
+var apiKeys = []string{"request", "method", "url", "query", "headers", "body", "result", "max_body_chars", "credentials", "rows"}
 
 var credentialsModes = []string{"include", "same-origin", "omit"}
+
+var rowsKeys = []string{"field", "max", "fields"}
+
+var rowFieldKeys = []string{"field", "template"}
 var resultKeys = []string{"name", "source", "field", "pattern", "transform"}
 var resultSources = []string{"req.body", "rsp.body", "req.headers", "rsp.headers"}
 
@@ -117,6 +121,39 @@ func validateParams(params any, where string, d *diags) {
 	}
 }
 
+func validateAPIRows(rw any, where string, d *diags) {
+	rom := asOM(rw)
+	if rom == nil {
+		d.errf("%s: api \"rows\" must be a mapping", where)
+		return
+	}
+	warnUnknown(rom, rowsKeys, where+" rows", d)
+	if f, ok := rom.Get("field"); ok && f != nil && asString(f) == "" {
+		d.errf("%s: rows \"field\" must be a dot path into the response", where)
+	}
+	fom := asOM(omGet(rom, "fields"))
+	if fom == nil || len(fom.Keys()) == 0 {
+		d.errf("%s: rows needs a non-empty \"fields\" mapping", where)
+		return
+	}
+	for _, name := range fom.Keys() {
+		spec := asOM(omGet(fom, name))
+		if spec == nil {
+			d.errf("%s: rows field %q must be a mapping", where, name)
+			continue
+		}
+		warnUnknown(spec, rowFieldKeys, fmt.Sprintf("%s rows.%s", where, name), d)
+		_, hasField := spec.Get("field")
+		_, hasTpl := spec.Get("template")
+		if !hasField && !hasTpl {
+			d.errf("%s: rows field %q needs a \"field\" path or a \"template\"", where, name)
+		}
+		if hasField && hasTpl {
+			d.errf("%s: rows field %q sets both \"field\" and \"template\" — pick one", where, name)
+		}
+	}
+}
+
 func validateAPI(api any, where string, d *diags) {
 	aom := asOM(api)
 	if aom == nil {
@@ -161,6 +198,9 @@ func validateAPI(api any, where string, d *diags) {
 		default:
 			d.errf("%s: api \"body\" must be a mapping (JSON body) or a string (raw body)", where)
 		}
+	}
+	if rw, ok := aom.Get("rows"); ok && rw != nil {
+		validateAPIRows(rw, where, d)
 	}
 	if cr, ok := aom.Get("credentials"); ok && cr != nil {
 		v := asString(cr)

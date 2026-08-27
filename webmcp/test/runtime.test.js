@@ -244,6 +244,57 @@ describe("api execution", () => {
     }));
   }
 
+  test("rows projects a JSON array body into named per-row fields", () => {
+    const body = [
+      { id: "a1", title: "First", note: "", user: { display_name: "Ada" } },
+      { id: "b2", title: "Second", user: { display_name: null } },
+    ];
+    const rows = {
+      field: null,
+      max: "{max_results}",
+      fields: {
+        title: { field: "title", template: null },
+        creator: { field: "user.display_name", template: null },
+        note: { field: "note", template: null },
+        url: { field: null, template: "/list/{row.id}" },
+      },
+    };
+    expect(rt.__smwProjectRows(rows, body, { max_results: 5 })).toEqual([
+      { title: "First", creator: "Ada", url: "/list/a1" },
+      { title: "Second", url: "/list/b2" },
+    ]);
+  });
+
+  test("rows honours max and reads a nested array by path", () => {
+    const body = { data: [{ id: "1" }, { id: "2" }, { id: "3" }] };
+    const rows = {
+      field: "data",
+      max: "2",
+      fields: { url: { field: null, template: "/list/{row.id}" } },
+    };
+    expect(rt.__smwProjectRows(rows, body, {})).toEqual([
+      { url: "/list/1" },
+      { url: "/list/2" },
+    ]);
+  });
+
+  test("rows is absent rather than empty when the body is not an array", () => {
+    const rows = { field: null, max: null, fields: { a: { field: "x" } } };
+    expect(rt.__smwProjectRows(rows, { not: "an array" }, {})).toBeUndefined();
+  });
+
+  test("a row template resolves params before row data, so data cannot inject one", () => {
+    const rows = {
+      field: null,
+      max: null,
+      fields: { u: { field: null, template: "/s/{query}/{row.id}" } },
+    };
+    const out = rt.__smwProjectRows(rows, [{ id: "{query}" }], {
+      query: "safe",
+    });
+    expect(out).toEqual([{ u: "/s/safe/{query}" }]);
+  });
+
   test("sends credentials: include by default", async () => {
     stubFetch();
     const api = ir.tools.find((t) => t.name === "search_api");

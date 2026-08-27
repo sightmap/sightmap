@@ -197,6 +197,13 @@ tools:
       headers: { accept: application/json }
       body: { k: "{q}" } # object → JSON (typed leaves); string → raw
       credentials: include # include (default) | same-origin | omit
+      rows: # project a JSON array body into per-row fields
+        field: data # path to the array (default: the whole body)
+        max: "{limit}"
+        fields:
+          title: { field: title } # dot path within the row
+          creator: { field: user.display_name }
+          url: { template: "/item/{row.id}" } # {param} then {row.path}
       result: # request-property vocabulary
         - {
             name: outcome,
@@ -231,6 +238,13 @@ tools:
               b: { component: Child, property: p } # descendant, chain-relative
               c: { selector: a, extract: attr=href }
 ```
+
+An api tool with `rows:` answers `{status, rows}` instead of echoing the raw
+body — the array projected into exactly the fields an agent needs, with
+`template:` composing values the API itself does not return (a page URL built
+from a row id, say). It is the api-side counterpart of a flow read's
+`for_each`, and it is usually what turns a raw API response into a usable
+tool result.
 
 Reads follow sightmap's silent-omission convention: a value that doesn't
 resolve is absent, never an error. Every read value caps at 300 chars

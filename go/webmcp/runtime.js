@@ -453,6 +453,48 @@ function __smwGetPath(obj, path) {
   return cur;
 }
 
+// A JSON array in an api response projected into named per-row fields — the
+// api-side counterpart of a flow read's for_each. `field:` walks a dot path in
+// the row; `template:` composes a string, where {param} is the tool's argument
+// and {row.some.path} is a value from the row (params resolve first, so data
+// containing braces cannot be read back as a parameter).
+function __smwInterpolateRow(template, row, args) {
+  return __smwInterpolate(template, args, false).replace(
+    /\{row\.([A-Za-z0-9_.]+)\}/g,
+    (whole, path) => {
+      const v = __smwGetPath(row, path);
+      return v == null ? "" : String(v);
+    },
+  );
+}
+
+function __smwProjectRows(rows, rspBody, args) {
+  const arr = rows.field ? __smwGetPath(rspBody, rows.field) : rspBody;
+  if (!Array.isArray(arr)) return undefined;
+  let max = arr.length;
+  if (rows.max != null) {
+    const n = parseInt(__smwInterpolate(String(rows.max), args, false), 10);
+    if (!isNaN(n) && n >= 0) max = Math.min(max, n);
+  }
+  const out = [];
+  for (let i = 0; i < arr.length && out.length < max; i++) {
+    const row = arr[i];
+    const projected = {};
+    for (const name of Object.keys(rows.fields || {})) {
+      const spec = rows.fields[name];
+      let v;
+      if (spec.template != null) v = __smwInterpolateRow(spec.template, row, args);
+      else if (spec.field != null) v = __smwGetPath(row, spec.field);
+      // Same silent-omission convention as request-property extraction: a
+      // value that does not resolve, including an empty string, is absent
+      // rather than reported as null or "".
+      if (v !== undefined && v !== null && v !== "") projected[name] = v;
+    }
+    out.push(projected);
+  }
+  return out;
+}
+
 function __smwExtractResult(spec, ctx) {
   // ctx: { reqBody, reqHeaders, rspBody, rspHeaders } — bodies parsed JSON or
   // raw string; headers as maps of lower-cased names.
@@ -554,7 +596,12 @@ async function __smwRunApi(tool, args, meta, signal) {
       const v = __smwExtractResult(spec, ctx);
       if (v !== undefined) out[spec.name] = v;
     }
-  } else {
+  }
+  if (api.rows) {
+    const projected = __smwProjectRows(api.rows, rspBody, args);
+    if (projected !== undefined) out.rows = projected;
+  }
+  if (!(api.result && api.result.length > 0) && !api.rows) {
     out.url = url.toString();
     if (typeof rspBody === "string") {
       out.body = rspBody.slice(0, api.maxBodyChars);
@@ -812,6 +859,7 @@ if (typeof module === "object" && module.exports) {
     __smwRunRead,
     __smwGetPath,
     __smwExtractResult,
+    __smwProjectRows,
     __smwRunApi,
     __smwRunFlow,
     __smwExecuteTool,

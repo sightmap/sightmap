@@ -72,7 +72,10 @@ const API_KEYS = [
   "result",
   "max_body_chars",
   "credentials",
+  "rows",
 ];
+const ROWS_KEYS = ["field", "max", "fields"];
+const ROW_FIELD_KEYS = ["field", "template"];
 const CREDENTIALS_MODES = ["include", "same-origin", "omit"];
 const RESULT_KEYS = ["name", "source", "field", "pattern", "transform"];
 const RESULT_SOURCES = ["req.body", "rsp.body", "req.headers", "rsp.headers"];
@@ -130,6 +133,44 @@ function validateParams(params, where, errors, warnings) {
   }
 }
 
+function validateApiRows(rows, where, errors, warnings) {
+  if (typeof rows !== "object" || Array.isArray(rows)) {
+    errors.push(`${where}: api "rows" must be a mapping`);
+    return;
+  }
+  warnUnknown(rows, ROWS_KEYS, `${where} rows`, warnings);
+  if (rows.field != null && typeof rows.field !== "string") {
+    errors.push(`${where}: rows "field" must be a dot path into the response`);
+  }
+  if (
+    !rows.fields ||
+    typeof rows.fields !== "object" ||
+    Array.isArray(rows.fields) ||
+    Object.keys(rows.fields).length === 0
+  ) {
+    errors.push(`${where}: rows needs a non-empty "fields" mapping`);
+    return;
+  }
+  for (const name of Object.keys(rows.fields)) {
+    const f = rows.fields[name];
+    if (!f || typeof f !== "object" || Array.isArray(f)) {
+      errors.push(`${where}: rows field "${name}" must be a mapping`);
+      continue;
+    }
+    warnUnknown(f, ROW_FIELD_KEYS, `${where} rows.${name}`, warnings);
+    if (f.field == null && f.template == null) {
+      errors.push(
+        `${where}: rows field "${name}" needs a "field" path or a "template"`,
+      );
+    }
+    if (f.field != null && f.template != null) {
+      errors.push(
+        `${where}: rows field "${name}" sets both "field" and "template" — pick one`,
+      );
+    }
+  }
+}
+
 function validateApi(api, where, errors, warnings) {
   if (!api || typeof api !== "object") {
     errors.push(`${where}: "api" must be a mapping`);
@@ -178,6 +219,7 @@ function validateApi(api, where, errors, warnings) {
       `${where}: api "body" must be a mapping (JSON body) or a string (raw body)`,
     );
   }
+  if (api.rows != null) validateApiRows(api.rows, where, errors, warnings);
   if (
     api.credentials != null &&
     !CREDENTIALS_MODES.includes(api.credentials)

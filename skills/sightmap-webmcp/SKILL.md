@@ -149,6 +149,12 @@ Semantics that do the heavy lifting:
   `{error, expected_view, navigate_to}` instead of flailing (`navigate_to`
   resolves the view's route against the origin the page is on, so it points at
   the deployment in hand rather than the corpus's capture URL).
+- **`rows:` shapes an api tool's output.** A raw API body is rarely the right
+  tool result: `rows: {field, max, fields}` projects a JSON array into named
+  per-row fields, where `field:` is a dot path into the row and `template:`
+  composes a value the API never returned — `url: {template: "/item/{row.id}"}`
+  turns an id into a link. With `rows:` the tool answers `{status, rows}`
+  rather than echoing the body.
 - **`api` tools inherit the corpus request's `method` and `properties:`** as
   their result extractors (`source`/`field`/`pattern`/`transform` — the
   "200 OK but the body says declined" machinery). No `result:` and no
