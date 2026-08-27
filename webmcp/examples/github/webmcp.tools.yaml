@@ -5,9 +5,11 @@
 #
 # Which views are safe to read from a fetched (pre-hydration) document was
 # verified against live github.com HTML on 2026-08-27: /pulls, /issues, and
-# /releases render their rows into the initial document; a repository home
-# renders the file table but defers the README, latest-commit strip, and
-# sidebar to follow-up fetches (as this corpus's memory records).
+# /releases render their rows into the initial document, and a repository
+# home rendered its file table there too — an update on this corpus's
+# memory, which records the file table among the deferred fragments; the
+# README, latest-commit strip, and sidebar do still arrive in follow-up
+# fetches on some loads.
 #
 # Regenerate the committed bundles after editing:
 #   node webmcp/bin/sightmap-webmcp.js generate \

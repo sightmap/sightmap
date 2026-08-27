@@ -99,9 +99,10 @@ manifest.
 ### `sightmap webmcp validate`
 
 Compiles without writing. Every diagnostic is written to be acted on: an
-unknown component lists the corpus's candidates, a missing property lists
-the properties the component does declare, and a name defined differently
-per view tells you to set the tool's `view:`.
+ambiguous component name lists its breadcrumb candidates, a missing
+property lists the properties the component does declare, an unknown
+request or view lists the corpus's, and a name defined only per view tells
+you to set the tool's `view:`.
 
 **Flags:** `--tools` (default `webmcp.tools.yaml`), `--sightmap-dir`
 (default: the manifest's `sightmap:` field, else `.sightmap` next to it).

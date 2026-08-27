@@ -79,17 +79,18 @@ Never change spec semantics without an SEP (`spec/seps/`).
   (generate-and-commit, drift-checked in CI like the skills embed).
 - Tests run through the **root** jest config: `npx jest webmcp` from the repo
   root. The suite includes a drift check on `webmcp/examples/` — after
-  changing the generator, the runtime, or the example manifest, regenerate
-  the committed bundles:
-  `node webmcp/bin/sightmap-webmcp.js generate --tools webmcp/examples/ikea/webmcp.tools.yaml --format all`.
+  changing the generator, the runtime, an example manifest, or a corpus an
+  example hashes, regenerate every committed bundle:
+  `for d in webmcp/examples/*/; do node webmcp/bin/sightmap-webmcp.js generate --tools $d/webmcp.tools.yaml --format all; done`.
 - Generated bundles are deterministic (no timestamps); provenance is a corpus
   content hash in the banner. Never hand-edit a generated `*.webmcp*.js`.
 - The embedded browser runtime (`src/runtime/runtime.js`) mirrors the
   semantics of `go/browser/deepquery.js` and `go/observe/properties.js` —
   keep them behaviorally in sync when either side changes.
 - The WebMCP surface it targets (`document.modelContext.registerTool`, the
-  legacy `navigator.modelContext` probe) is tracked in `src/emit.js` +
-  `src/runtime/runtime.js`; update there as the proposal evolves.
+  legacy `navigator.modelContext` probe, the tool-descriptor shape) lives in
+  `src/runtime/runtime.js` (`__smwBoot`/`__smwDescriptor`); update there as
+  the proposal evolves.
 
 ### `docs/`
 - Mintlify site: `npm i -g mint`, then `mint dev` from `docs/`. See `docs/AGENTS.md`

@@ -201,7 +201,8 @@ tools:
       - read:
           key: { component: Name, property: prop }         # corpus extractor
           key2: { component: Name, extract: attr=href }    # inline extractor
-          key3: { selector: ".x", extract: text, transform: first_dollar }
+          key3: { selector: ".x", extract: text, transform: first_dollar,
+                  max_chars: 2000 }   # per-field cap (default 300)
           rows:
             for_each: Name       # or a component query
             max: "{limit}"
@@ -212,9 +213,9 @@ tools:
 ```
 
 Reads follow sightmap's silent-omission convention: a value that doesn't
-resolve is absent, never an error. Single-value reads cap at 300 chars;
-api bodies echo up to `max_body_chars` (default 20000) when no `result:` is
-declared.
+resolve is absent, never an error. Every read value caps at 300 chars
+unless the field sets `max_chars`; api bodies echo up to `max_body_chars`
+(default 20000) when no `result:` is declared.
 
 ## Trust model
 
@@ -241,8 +242,9 @@ whom:
   `</` escaped (safe to inline in a `<script>`), and banner/userscript header
   lines are collapsed to one line.
 
-Runtime limits worth knowing: single reads cap at 300 chars (`max_chars`
-raises per field), un-`result:`ed api bodies at `max_body_chars`; regex
+Runtime limits worth knowing: every read caps at 300 chars — `for_each`
+row fields included — unless the field sets `max_chars`; un-`result:`ed
+api bodies cap at `max_body_chars`; regex
 patterns evaluate as JS RegExp — stay in the RE2∩JS subset the authoring
 skill prescribes; fetched documents are decoded as UTF-8; `press` synthesizes
 events (keydown/keyup + keyCode for common keys) that some handlers ignore —
@@ -253,8 +255,9 @@ prefer URL-shaped actions.
 - The generator targets the current WebMCP shape (`document.modelContext`,
   `registerTool`, `execute` returning any JSON-serializable value,
   `annotations.readOnlyHint`) and also probes the older
-  `navigator.modelContext` location. As the proposal evolves, the emitter is
-  the single place to track it.
+  `navigator.modelContext` location. As the proposal evolves,
+  `src/runtime/runtime.js` (`__smwBoot`/`__smwDescriptor`) is the single
+  place to track it.
 - Cross-document journeys inside one tool call are out of scope by design
   (so is anything the WebMCP spec itself still leaves open — streaming,
   elicitation, cross-document responses).

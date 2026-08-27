@@ -3,9 +3,9 @@ name: go
 on:
   push:
     branches: [main]
-    paths: ['go/**', 'skills/**', 'webmcp/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'webmcp/**', 'web/src/data/atlas/**', '.github/workflows/go.yml']
   pull_request:
-    paths: ['go/**', 'skills/**', 'webmcp/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'webmcp/**', 'web/src/data/atlas/**', '.github/workflows/go.yml']
 
 permissions:
   contents: read

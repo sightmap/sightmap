@@ -3,9 +3,9 @@ name: webmcp
 on:
   push:
     branches: [main]
-    paths: ['webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+    paths: ['webmcp/**', 'web/src/data/atlas/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
   pull_request:
-    paths: ['webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+    paths: ['webmcp/**', 'web/src/data/atlas/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
 
 permissions:
   contents: read
@@ -30,6 +30,7 @@ jobs:
       - run: npm ci
 
       # The jest slice covers the generator, the browser runtime (jsdom), and
-      # the committed IKEA example bundles (regenerated and diffed — drift in
-      # examples/ fails here; regenerate with sightmap-webmcp generate).
+      # every committed example bundle (regenerated and diffed — drift in
+      # examples/ fails here; regenerate with sightmap-webmcp generate). The
+      # atlas paths trigger because the example bundles hash those corpora.
       - run: npx jest webmcp

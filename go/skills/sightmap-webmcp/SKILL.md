@@ -127,9 +127,10 @@ Semantics that do the heavy lifting:
   compiler errors, with candidates listed, on anything that doesn't resolve —
   fix the manifest or improve the corpus, never paste selectors around the
   model.
-- **`view:` disambiguates per-view names.** IKEA's `ProductCard` differs on
-  search vs category; a tool sets `view: SearchResults` and gets that view's
-  definition (globals stay visible). `require_view:` implies it for live
+- **`view:` disambiguates per-view names.** IKEA's `ProductCard` subtree
+  differs on search vs category — its `CardPrice` child resolves to a
+  different selector per view; a tool sets `view: SearchResults` and gets
+  that view's definition (globals stay visible). `require_view:` implies it for live
   flows and adds the runtime guard: off-view calls return a structured
   `{error, expected_view, navigate_to}` instead of flailing.
 - **`api` tools inherit the corpus request's `method` and `properties:`** as
