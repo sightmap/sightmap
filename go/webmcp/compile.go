@@ -509,6 +509,10 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 	if mb, ok := asInt(omGet(api, "max_body_chars")); ok && mb > 0 {
 		maxBody = mb
 	}
+	creds := "include"
+	if v := asString(omGet(api, "credentials")); v != "" {
+		creds = v
+	}
 	var queryV, headersV, bodyV any
 	if v, ok := api.Get("query"); ok && v != nil {
 		queryV = v
@@ -527,6 +531,7 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 		Set("body", bodyV).
 		Set("result", result).
 		Set("maxBodyChars", maxBody).
+		Set("credentials", creds).
 		Set("request", requestName)
 	return &compiledTool{kind: "api", body: body, refs: refs, readOnly: readOnly}
 }

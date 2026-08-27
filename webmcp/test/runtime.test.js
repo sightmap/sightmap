@@ -236,6 +236,32 @@ describe("fetch flow execution", () => {
 describe("api execution", () => {
   const ir = compiledIR();
 
+  function stubFetch() {
+    global.fetch = jest.fn(async () => ({
+      status: 200,
+      text: async () => "{}",
+      headers: { forEach: (fn) => fn("application/json", "content-type") },
+    }));
+  }
+
+  test("sends credentials: include by default", async () => {
+    stubFetch();
+    const api = ir.tools.find((t) => t.name === "search_api");
+    await rt.__smwExecuteTool(api, ir.meta, { query: "chairs" });
+    expect(global.fetch.mock.calls[0][1].credentials).toBe("include");
+  });
+
+  test("honours an explicit credentials mode", async () => {
+    // An API that answers with `Access-Control-Allow-Origin: *` — the norm for
+    // key/bearer-authenticated REST APIs — cannot be called credentialed at
+    // all: the browser rejects the response. Such a tool needs "omit".
+    stubFetch();
+    const base = ir.tools.find((t) => t.name === "search_api");
+    const api = { ...base, api: { ...base.api, credentials: "omit" } };
+    await rt.__smwExecuteTool(api, ir.meta, { query: "chairs" });
+    expect(global.fetch.mock.calls[0][1].credentials).toBe("omit");
+  });
+
   test("POST body keeps typed params; corpus result properties extract", async () => {
     global.fetch = jest.fn(async () => ({
       status: 200,

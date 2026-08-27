@@ -495,7 +495,10 @@ async function __smwRunApi(tool, args, meta, signal) {
       url.searchParams.set(k, __smwInterpolate(api.query[k], args, false));
     }
   }
-  const init = { method: api.method, credentials: "include" };
+  const init = {
+    method: api.method,
+    credentials: api.credentials || "include",
+  };
   if (signal) init.signal = signal;
   const headers = {};
   if (api.headers) {

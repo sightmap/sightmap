@@ -24,7 +24,9 @@ var stepOptionKeys = map[string][]string{"press": {"target"}}
 var rootKeys = []string{"version", "site", "base_url", "description", "tool_version", "match", "sightmap", "tools"}
 var toolKeys = []string{"name", "title", "description", "read_only", "require_view", "view", "params", "api", "flow", "mode"}
 var paramKeys = []string{"name", "type", "description", "required", "enum", "default"}
-var apiKeys = []string{"request", "method", "url", "query", "headers", "body", "result", "max_body_chars"}
+var apiKeys = []string{"request", "method", "url", "query", "headers", "body", "result", "max_body_chars", "credentials"}
+
+var credentialsModes = []string{"include", "same-origin", "omit"}
 var resultKeys = []string{"name", "source", "field", "pattern", "transform"}
 var resultSources = []string{"req.body", "rsp.body", "req.headers", "rsp.headers"}
 
@@ -158,6 +160,18 @@ func validateAPI(api any, where string, d *diags) {
 		case *OM, []any, string:
 		default:
 			d.errf("%s: api \"body\" must be a mapping (JSON body) or a string (raw body)", where)
+		}
+	}
+	if cr, ok := aom.Get("credentials"); ok && cr != nil {
+		v := asString(cr)
+		valid := false
+		for _, m := range credentialsModes {
+			if v == m {
+				valid = true
+			}
+		}
+		if !valid {
+			d.errf("%s: api \"credentials\" must be one of %s", where, strings.Join(credentialsModes, ", "))
 		}
 	}
 	if mb, ok := aom.Get("max_body_chars"); ok && mb != nil {

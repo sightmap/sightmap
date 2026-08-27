@@ -402,6 +402,7 @@ function compileApiTool(corpus, tool, errors, warnings) {
         transform: r.transform || null,
       })),
       maxBodyChars: api.max_body_chars || 20000,
+      credentials: api.credentials || "include",
       request: requestName,
     },
   };

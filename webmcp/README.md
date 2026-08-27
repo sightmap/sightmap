@@ -82,7 +82,11 @@ around that honestly:
 - **`api`** — replay an observed endpoint with `fetch` (first-party cookies
   included, so signed-in state comes free). Method and result extractors
   inherit from the corpus `requests:` entry. Preferred whenever one request
-  does the job.
+  does the job. Cross-origin APIs that answer with
+  `Access-Control-Allow-Origin: *` — the norm for key- or bearer-authenticated
+  REST APIs, Supabase and Firebase among them — cannot be called credentialed
+  at all, because the browser rejects a wildcard origin on a credentialed
+  response; set `credentials: omit` for those.
 - **`flow` + `mode: fetch`** — fetch a server-rendered page with cookies,
   parse it off-screen (DOMParser), and read components from the detached
   document. Cross-"page" reads with no navigation. Useless on client-rendered
@@ -192,6 +196,7 @@ tools:
       query: { k: "{q}" } # appended query params
       headers: { accept: application/json }
       body: { k: "{q}" } # object → JSON (typed leaves); string → raw
+      credentials: include # include (default) | same-origin | omit
       result: # request-property vocabulary
         - {
             name: outcome,

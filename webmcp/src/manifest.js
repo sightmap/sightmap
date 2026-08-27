@@ -71,7 +71,9 @@ const API_KEYS = [
   "body",
   "result",
   "max_body_chars",
+  "credentials",
 ];
+const CREDENTIALS_MODES = ["include", "same-origin", "omit"];
 const RESULT_KEYS = ["name", "source", "field", "pattern", "transform"];
 const RESULT_SOURCES = ["req.body", "rsp.body", "req.headers", "rsp.headers"];
 
@@ -174,6 +176,14 @@ function validateApi(api, where, errors, warnings) {
   ) {
     errors.push(
       `${where}: api "body" must be a mapping (JSON body) or a string (raw body)`,
+    );
+  }
+  if (
+    api.credentials != null &&
+    !CREDENTIALS_MODES.includes(api.credentials)
+  ) {
+    errors.push(
+      `${where}: api "credentials" must be one of ${CREDENTIALS_MODES.join(", ")}`,
     );
   }
   if (
