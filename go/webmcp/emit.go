@@ -132,6 +132,17 @@ func userscriptHeader(ir *OM) string {
 	return strings.Join(lines, "\n")
 }
 
+// bundledRuntime is the runtime up to the [emit-strip-below] marker; the
+// CommonJS export guard after it exists only for the jest tests and must not
+// reach pages (a leaked global `module` would have its exports clobbered).
+func bundledRuntime() string {
+	src := runtimeJS
+	if cut := strings.Index(src, "// [emit-strip-below]"); cut != -1 {
+		src = src[:cut]
+	}
+	return strings.TrimRightFunc(src, unicode.IsSpace)
+}
+
 func bundleBody(ir *OM) string {
 	// "</" is escaped as "<\/" (a legal JSON + JS escape) so authored content
 	// can never terminate an inline <script> that serves the snippet.
@@ -142,7 +153,7 @@ func bundleBody(ir *OM) string {
 		"(() => {",
 		`  "use strict";`,
 		"",
-		strings.TrimRightFunc(runtimeJS, unicode.IsSpace),
+		bundledRuntime(),
 		"",
 		"const __SMW_META = " + meta + ";",
 		"",

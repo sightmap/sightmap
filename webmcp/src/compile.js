@@ -343,9 +343,28 @@ function compileApiTool(corpus, tool, errors, warnings) {
     }
   }
   if (!method) method = "GET";
+  if (!api.url && requestName) {
+    // A corpus request whose route is literal (no wildcards, no :params) IS
+    // a usable URL — the fallback the validator promises.
+    const route = corpus.requests.get(requestName).route || "";
+    if (route && !route.includes("*") && !/\/:/g.test(route)) {
+      api.url = route;
+    }
+  }
   if (!api.url) {
-    errors.push(`tool "${tool.name}": api "url" template is required`);
+    errors.push(
+      `tool "${tool.name}": api "url" template is required (the referenced request's route has wildcards, so it cannot serve as one)`,
+    );
     return null;
+  }
+  if (
+    requestName &&
+    corpus.duplicateRequests &&
+    corpus.duplicateRequests.has(requestName)
+  ) {
+    warnings.push(
+      `tool "${tool.name}": the corpus defines more than one request named "${requestName}" — the first definition's route/method/properties are used`,
+    );
   }
   addStringRefs(api.url, refs);
   {

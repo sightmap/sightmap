@@ -82,6 +82,7 @@ function scaffold(corpus, opts) {
     version: 1,
     site,
     base_url: baseUrl,
+    ...(opts.sightmapRel ? { sightmap: opts.sightmapRel } : {}),
     description: `WebMCP tools for ${site} — draft scaffolded from its sightmap corpus.`,
     tools,
   };

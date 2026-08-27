@@ -698,13 +698,24 @@ function __smwDescriptor(tool) {
 
 function __smwBoot(meta, tools) {
   const win = typeof window !== "undefined" ? window : globalThis;
-  if (win.__sightmapWebMCP && win.__sightmapWebMCP.site === meta.site) {
-    return win.__sightmapWebMCP; // already booted on this document
+  // Idempotent only for the SAME bundle: re-injecting an updated bundle
+  // (the generate → inject → call verification loop) replaces the shim
+  // instead of silently keeping stale tools. modelContext may reject
+  // re-registration of unchanged names; the per-tool catch below logs and
+  // moves on.
+  const sig = meta.toolVersion + ":" + JSON.stringify(tools);
+  if (
+    win.__sightmapWebMCP &&
+    win.__sightmapWebMCP.site === meta.site &&
+    win.__sightmapWebMCP._sig === sig
+  ) {
+    return win.__sightmapWebMCP; // same bundle already booted
   }
 
   const shim = {
     site: meta.site,
     version: meta.toolVersion,
+    _sig: sig,
     generator: "sightmap-webmcp",
     last: null,
     listTools() {
@@ -767,32 +778,6 @@ function __smwBoot(meta, tools) {
     }
   }
   return shim;
-}
-
-// CommonJS export guard — absent in page context, active under Jest.
-if (typeof module === "object" && module.exports) {
-  module.exports = {
-    __smwDeepQueryAll,
-    __smwExtractValue,
-    __smwApplyTransform,
-    __smwReadProp,
-    __smwInterpolate,
-    __smwInterpolateBody,
-    __smwResolveTarget,
-    __smwRequireOne,
-    __smwFill,
-    __smwClick,
-    __smwWaitFor,
-    __smwReadValue,
-    __smwRunRead,
-    __smwGetPath,
-    __smwExtractResult,
-    __smwRunApi,
-    __smwRunFlow,
-    __smwExecuteTool,
-    __smwValidateArgs,
-    __smwBoot,
-  };
 }
 
 const __SMW_META = {
@@ -1318,7 +1303,7 @@ const __SMW_TOOLS = [
   {
     "name": "add_to_cart",
     "title": "Add the open product to the cart",
-    "description": "On a product page in the live session, set the quantity and click the add-to-cart control. Mutating: this puts a real item into the basket on the storefront. Fails with a navigation hint when the current page is not a product view. Quantity is a number input paired with steppers, so it is written directly rather than clicked up.",
+    "description": "On a product page in the live session, set the quantity and click the add-to-cart control. Mutating: this puts a real item into the basket on the storefront. Fails with a navigation hint when the current page is not a product view. Quantity is a number input paired with steppers, so it is written directly rather than clicked up. Returns ok once the click lands; confirm the add via the header's shopping-bag counter or the cart page — the page gives no same-document success signal this tool could read.",
     "readOnly": false,
     "inputSchema": {
       "type": "object",
@@ -1361,32 +1346,6 @@ const __SMW_TOOLS = [
           "target": {
             "kind": "css",
             "selector": ".pipf-add-to-cart-section__buttons button"
-          }
-        },
-        {
-          "do": "read",
-          "spec": {
-            "added": {
-              "one": {
-                "extract": "exists:.pipf-add-to-cart-section__buttons",
-                "target": {
-                  "kind": "chain",
-                  "links": [
-                    {
-                      "name": "AddToCartSection",
-                      "chain": [
-                        [
-                          ".js-add-to-cart-section"
-                        ]
-                      ],
-                      "props": {},
-                      "preds": [],
-                      "index": null
-                    }
-                  ]
-                }
-              }
-            }
           }
         }
       ]

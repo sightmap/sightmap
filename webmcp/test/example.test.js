@@ -52,6 +52,10 @@ describe.each(examples)("example %s", (site) => {
       registerTool: async (d) => registered.push(d.name),
     };
 
+    // The CommonJS export guard must be stripped from bundles — a page
+    // leaking a global `module` must not have its exports clobbered.
+    expect(src).not.toMatch(/module\.exports/);
+
     // eslint-disable-next-line no-eval
     (0, eval)(src);
 

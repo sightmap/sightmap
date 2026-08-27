@@ -69,11 +69,11 @@ record what the tool will need:
 
 Then choose each tool's kind — this decision is the heart of the manifest:
 
-| Kind | When | Why |
-|------|------|-----|
-| `api` | one observed endpoint does the job | Most reliable; runs with the page's cookies (first-party auth for free). Cross-subdomain calls need CORS — check with `network get` that the browser itself made the call from this origin. |
+| Kind                   | When                                                  | Why                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api`                  | one observed endpoint does the job                    | Most reliable; runs with the page's cookies (first-party auth for free). Cross-subdomain calls need CORS — check with `network get` that the browser itself made the call from this origin.                                                                                                                                                         |
 | `flow` + `mode: fetch` | read-only, and the target page is **server-rendered** | Fetches the URL with cookies, parses it off-screen (DOMParser), reads components — works from any page, never navigates. Verify SSR first: corpus memory often says ("everything here is already in the document"), else `browser eval` a `fetch(url).then(r=>r.text())` and check the markup is there. Client-rendered content is invisible to it. |
-| `flow` (live) | mutating or same-page interactions | Fills/clicks on the live DOM by component identity. **A WebMCP tool call dies with the document**, so a live flow must stay on one page — `navigate` is only legal as the *final* step, and cross-page journeys must be split into per-page tools gated by `require_view:`. |
+| `flow` (live)          | mutating or same-page interactions                    | Fills/clicks on the live DOM by component identity. **A WebMCP tool call dies with the document**, so a live flow must stay on one page — `navigate` is only legal as the _final_ step, and cross-page journeys must be split into per-page tools gated by `require_view:`.                                                                         |
 
 ## Phase 2: author `webmcp.tools.yaml`
 
@@ -85,36 +85,49 @@ request — keep what maps to real goals, delete the rest.
 version: 1
 site: ikea
 base_url: https://www.ikea.com
-sightmap: .sightmap            # path to the corpus, relative to this file
+sightmap: .sightmap # path to the corpus, relative to this file
 tools:
-  - name: search_products      # snake_case; the agent-facing tool name
-    description: >             # REQUIRED and load-bearing: fold in the
+  # description is REQUIRED and load-bearing: fold the relevant memory:
+  # hazards into it — inside a folded scalar a "#" is literal text, so keep
+  # comments out here.
+  - name: search_products # snake_case; the agent-facing tool name
+    description: >
       Keyword search... The summary count is the authoritative total —
-      the grid renders only the first page.        # relevant memory: hazards
+      the grid renders only the first page.
     read_only: true
     mode: fetch
-    view: SearchResults        # scopes component-name resolution to a view
+    view: SearchResults # scopes component-name resolution to a view
     params:
       - { name: query, type: string, required: true, description: Keywords. }
-      - { name: max_results, type: integer, default: 20, description: Card cap. }
+      - {
+          name: max_results,
+          type: integer,
+          default: 20,
+          description: Card cap.,
+        }
     flow:
       - navigate: "/us/en/search/?q={query}"
       - read:
           summary: { component: SearchSummary, property: summary }
           products:
-            for_each: ProductCard          # every match, scoped fields below
+            for_each: ProductCard # every match, scoped fields below
             max: "{max_results}"
             fields:
-              text:  { property: card_text }              # iterated element's prop
-              price: { component: CardPrice, property: price_text }  # child
-              url:   { selector: a, extract: attr=href }  # raw escape hatch
+              text: { property: card_text } # iterated element's prop
+              price: { component: CardPrice, property: price_text } # child
+              url: { selector: a, extract: attr=href } # raw escape hatch
 
   - name: get_buyback_offers
     description: Buy-back offers for one article number.
     params:
-      - { name: article, type: string, required: true, description: Digits only. }
+      - {
+          name: article,
+          type: string,
+          required: true,
+          description: Digits only.,
+        }
     api:
-      request: CircularOffers  # corpus request — method + result props inherited
+      request: CircularOffers # corpus request — method + result props inherited
       url: "https://web-api.ikea.com/circular/circular-asis/offers/articles/{article}"
 ```
 
@@ -124,9 +137,10 @@ Semantics that do the heavy lifting:
   component names or component queries (`Row[label="{x}"] Buy`, predicates
   `=`/`^=`/`*=` + ` i`, `#N` index, whitespace descendant — same DSL as the
   CLI). `property:` pulls the corpus-declared `extract`/`transform`. The
-  compiler errors, with candidates listed, on anything that doesn't resolve —
-  fix the manifest or improve the corpus, never paste selectors around the
-  model.
+  compiler errors on anything that doesn't resolve (ambiguous names list
+  their breadcrumb candidates; missing properties list what the component
+  does declare) — fix the manifest or improve the corpus, never paste
+  selectors around the model.
 - **`view:` disambiguates per-view names.** IKEA's `ProductCard` subtree
   differs on search vs category — its `CardPrice` child resolves to a
   different selector per view; a tool sets `view: SearchResults` and gets

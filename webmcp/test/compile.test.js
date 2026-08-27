@@ -225,6 +225,27 @@ describe("compile", () => {
     expect(errors.join("\n")).toMatch(/undeclared param "\{nope\}"/);
   });
 
+  test("a literal corpus route serves as the api url fallback", () => {
+    const corpus = loadCorpus(path.join(FIXTURE, ".sightmap"));
+    const { errors, ir } = compile(corpus, {
+      site: "x",
+      base_url: "https://x.example",
+      tools: [
+        {
+          name: "t",
+          description: "d",
+          params: [
+            { name: "query", type: "string", required: true, description: "q" },
+          ],
+          api: { request: "SearchApi", body: { q: "{query}" } },
+        },
+      ],
+    });
+    expect(errors).toEqual([]);
+    expect(ir.tools[0].api.url).toBe("/api/search");
+    expect(ir.tools[0].api.method).toBe("POST");
+  });
+
   test("a parameterized api origin warns", () => {
     const corpus = loadCorpus(path.join(FIXTURE, ".sightmap"));
     const { warnings } = compile(corpus, {

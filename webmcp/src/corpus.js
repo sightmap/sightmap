@@ -152,14 +152,17 @@ function loadCorpus(dir) {
   const components = new Map();
   const views = new Map();
   const requests = new Map();
+  const duplicateRequests = new Set();
 
   for (const { path: p, doc } of files) {
     for (const comp of expandRefs(doc.components, registry, new Set())) {
       indexComponent(comp, "", [], components, null);
     }
     for (const req of doc.requests || []) {
-      if (req && req.name && !requests.has(req.name))
-        requests.set(req.name, req);
+      if (req && req.name) {
+        if (requests.has(req.name)) duplicateRequests.add(req.name);
+        else requests.set(req.name, req);
+      }
     }
     for (const view of doc.views || []) {
       if (!view || !view.name) continue;
@@ -176,8 +179,10 @@ function loadCorpus(dir) {
         indexComponent(comp, "", [], components, view.name);
       }
       for (const req of view.requests || []) {
-        if (req && req.name && !requests.has(req.name))
-          requests.set(req.name, req);
+        if (req && req.name) {
+          if (requests.has(req.name)) duplicateRequests.add(req.name);
+          else requests.set(req.name, req);
+        }
       }
     }
   }
@@ -213,6 +218,7 @@ function loadCorpus(dir) {
     byName,
     views,
     requests,
+    duplicateRequests,
   };
 }
 

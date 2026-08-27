@@ -20,7 +20,11 @@ const crypto = require("crypto");
 const RUNTIME_PATH = path.join(__dirname, "runtime", "runtime.js");
 
 function runtimeSource() {
-  return fs.readFileSync(RUNTIME_PATH, "utf8");
+  // Generated bundles carry the runtime up to the [emit-strip-below] marker;
+  // the CommonJS export guard after it exists only for the jest tests.
+  const src = fs.readFileSync(RUNTIME_PATH, "utf8");
+  const cut = src.indexOf("// [emit-strip-below]");
+  return cut === -1 ? src : src.slice(0, cut);
 }
 
 function corpusHash(corpusDir, files) {

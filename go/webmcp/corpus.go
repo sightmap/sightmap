@@ -45,15 +45,16 @@ type viewEntry struct {
 }
 
 type Corpus struct {
-	Dir        string
-	Files      []string
-	Components map[string][]*componentEntry
-	crumbSeq   []string            // breadcrumbs in first-indexed order
-	ByName     map[string][]string // component name -> breadcrumbs, first-seen order
-	Views      map[string]*viewEntry
-	ViewOrder  []string
-	Requests   map[string]*requestEntry
-	ReqOrder   []string
+	Dir               string
+	Files             []string
+	Components        map[string][]*componentEntry
+	crumbSeq          []string            // breadcrumbs in first-indexed order
+	ByName            map[string][]string // component name -> breadcrumbs, first-seen order
+	Views             map[string]*viewEntry
+	ViewOrder         []string
+	Requests          map[string]*requestEntry
+	ReqOrder          []string
+	DuplicateRequests map[string]bool
 }
 
 func listYamlFiles(dir string) ([]string, error) {
@@ -240,6 +241,7 @@ func (c *Corpus) addRequest(r any) {
 		return
 	}
 	if _, ok := c.Requests[name]; ok {
+		c.DuplicateRequests[name] = true
 		return
 	}
 	c.Requests[name] = &requestEntry{
@@ -292,12 +294,13 @@ func LoadCorpus(dir string) (*Corpus, error) {
 
 	registry := buildRegistry(docs)
 	c := &Corpus{
-		Dir:        dir,
-		Files:      files,
-		Components: map[string][]*componentEntry{},
-		ByName:     map[string][]string{},
-		Views:      map[string]*viewEntry{},
-		Requests:   map[string]*requestEntry{},
+		Dir:               dir,
+		Files:             files,
+		Components:        map[string][]*componentEntry{},
+		ByName:            map[string][]string{},
+		Views:             map[string]*viewEntry{},
+		Requests:          map[string]*requestEntry{},
+		DuplicateRequests: map[string]bool{},
 	}
 
 	for _, doc := range docs {

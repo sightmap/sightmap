@@ -66,7 +66,7 @@ func readableComponents(c *Corpus, viewName string, max int) [][2]string {
 }
 
 // Scaffold renders a draft manifest for the corpus.
-func Scaffold(c *Corpus, site, baseURL string) (string, error) {
+func Scaffold(c *Corpus, site, baseURL string, sightmapRel ...string) (string, error) {
 	tools := seqNode()
 
 	for _, vname := range c.ViewOrder {
@@ -126,13 +126,18 @@ func Scaffold(c *Corpus, site, baseURL string) (string, error) {
 		))
 	}
 
-	root := mapNode(
+	rootPairs := []*yaml.Node{
 		strNode("version"), intNode(1),
 		strNode("site"), strNode(site),
 		strNode("base_url"), strNode(baseURL),
+	}
+	if len(sightmapRel) > 0 && sightmapRel[0] != "" {
+		rootPairs = append(rootPairs, strNode("sightmap"), strNode(sightmapRel[0]))
+	}
+	root := mapNode(append(rootPairs,
 		strNode("description"), strNode(fmt.Sprintf("WebMCP tools for %s — draft scaffolded from its sightmap corpus.", site)),
 		strNode("tools"), tools,
-	)
+	)...)
 
 	var sb strings.Builder
 	sb.WriteString("# Draft WebMCP tool manifest scaffolded by `sightmap-webmcp init`.\n")

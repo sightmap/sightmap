@@ -349,10 +349,15 @@ describe("boot + registration", () => {
     ]);
   });
 
-  test("boot is idempotent per site", () => {
+  test("boot is idempotent for the same bundle, replaced for a changed one", () => {
     const first = rt.__smwBoot(ir.meta, ir.tools);
     const second = rt.__smwBoot(ir.meta, ir.tools);
     expect(second).toBe(first);
+    // A changed tool set (re-injecting an updated bundle) replaces the shim.
+    const updated = ir.tools.slice(0, 2);
+    const third = rt.__smwBoot(ir.meta, updated);
+    expect(third).not.toBe(first);
+    expect(third.listTools()).toHaveLength(2);
   });
 
   test("callToolAndStore parks the outcome for eval-bridge polling", async () => {

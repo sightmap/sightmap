@@ -163,7 +163,10 @@ tools:
       add-to-cart control. Mutating: this puts a real item into the basket on
       the storefront. Fails with a navigation hint when the current page is
       not a product view. Quantity is a number input paired with steppers, so
-      it is written directly rather than clicked up.
+      it is written directly rather than clicked up. Returns ok once the
+      click lands; confirm the add via the header's shopping-bag counter or
+      the cart page — the page gives no same-document success signal this
+      tool could read.
     read_only: false
     require_view: ProductDetail
     params:
@@ -173,10 +176,6 @@ tools:
         default: 1
     flow:
       - fill:
-          target: "css:.js-add-to-cart-section input[type=\"number\"]"
+          target: 'css:.js-add-to-cart-section input[type="number"]'
           value: "{quantity}"
       - click: "css:.pipf-add-to-cart-section__buttons button"
-      - read:
-          added:
-            component: AddToCartSection
-            extract: "exists:.pipf-add-to-cart-section__buttons"

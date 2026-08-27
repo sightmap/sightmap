@@ -455,9 +455,20 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 		method = "GET"
 	}
 	apiURL := asString(omGet(api, "url"))
+	if apiURL == "" && requestName != nil {
+		// A corpus request whose route is literal (no wildcards, no :params)
+		// IS a usable URL — the fallback the validator promises.
+		route := c.Requests[requestName.(string)].Route
+		if route != "" && !strings.Contains(route, "*") && !strings.Contains(route, "/:") {
+			apiURL = route
+		}
+	}
 	if apiURL == "" {
-		d.errf("tool %q: api \"url\" template is required", name)
+		d.errf("tool %q: api \"url\" template is required (the referenced request's route has wildcards, so it cannot serve as one)", name)
 		return nil
+	}
+	if requestName != nil && c.DuplicateRequests[requestName.(string)] {
+		d.warnf("tool %q: the corpus defines more than one request named %q — the first definition's route/method/properties are used", name, requestName.(string))
 	}
 	refs.addString(apiURL)
 	if origin := apiOriginRe.FindString(apiURL); strings.HasPrefix(apiURL, "{") || strings.Contains(origin, "{") {

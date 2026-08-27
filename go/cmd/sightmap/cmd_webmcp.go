@@ -11,9 +11,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/sightmap/sightmap/go/webmcp"
 )
+
+var initSiteRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 func runWebmcp(args []string) error {
 	if len(args) == 0 {
@@ -175,6 +179,9 @@ func runWebmcpGenerate(args []string) error {
 	if *out != "" && len(formats) > 1 {
 		return fmt.Errorf("--out only works with a single --format; use --out-dir for several")
 	}
+	if *out != "" && *outDir != "" {
+		return fmt.Errorf("pass --out or --out-dir, not both")
+	}
 	baseDir := filepath.Dir(toolsFile)
 	if *outDir != "" {
 		baseDir, err = filepath.Abs(*outDir)
@@ -251,6 +258,12 @@ func runWebmcpInit(args []string) error {
 	if *site == "" || *baseURL == "" {
 		return fmt.Errorf("init needs --site SLUG and --base-url URL")
 	}
+	if !initSiteRe.MatchString(*site) {
+		return fmt.Errorf("--site must be a slug matching ^[a-z0-9][a-z0-9-]*$ (got %q)", *site)
+	}
+	if !strings.HasPrefix(*baseURL, "http://") && !strings.HasPrefix(*baseURL, "https://") {
+		return fmt.Errorf("--base-url must be an absolute http(s) URL (got %q)", *baseURL)
+	}
 	corpus, err := webmcp.LoadCorpus(*dir)
 	if err != nil {
 		return err
@@ -262,8 +275,19 @@ func runWebmcpInit(args []string) error {
 	if _, statErr := os.Stat(outFile); statErr == nil {
 		return fmt.Errorf("%s already exists — delete it first if you meant to re-scaffold", outFile)
 	}
-	content, err := webmcp.Scaffold(corpus, *site, *baseURL)
+	absDir, err := filepath.Abs(*dir)
 	if err != nil {
+		return err
+	}
+	sightmapRel, err := filepath.Rel(filepath.Dir(outFile), absDir)
+	if err != nil || sightmapRel == "" {
+		sightmapRel = "."
+	}
+	content, err := webmcp.Scaffold(corpus, *site, *baseURL, sightmapRel)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(outFile), 0o755); err != nil {
 		return err
 	}
 	if err := os.WriteFile(outFile, []byte(content), 0o644); err != nil {

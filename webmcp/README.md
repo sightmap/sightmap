@@ -55,18 +55,18 @@ Steps 1 and 3 are agent work, guided by the `sightmap-authoring` and
 
 ## Why route through a sightmap?
 
-WebMCP assumes the *site owner* writes the tools. Third-party sites mostly
+WebMCP assumes the _site owner_ writes the tools. Third-party sites mostly
 won't, for a while — but an agent with the sightmap CLI can map any site
 today. The corpus is precisely the knowledge a good tool needs:
 
-| Corpus entity | Becomes |
-|---|---|
-| `views:` (route globs, representative URLs) | navigation targets, `require_view:` guards, URL templates |
-| `components:` + `children:` (verified selectors, shadow-flattened) | act/read targets, resolved by semantic name |
-| `properties:` (`extract` + `transform`) | structured reads and query predicates (`Row[label="X"]`) |
-| `requests:` (+ request `properties:`) | api-backed tools with response extraction ("200 but the body says declined") |
-| `memory:` | the hazard lore folded into tool descriptions |
-| coverage discipline (0 orphaned, sel-probed) | tools that keep working because the map is maintained |
+| Corpus entity                                                      | Becomes                                                                      |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| `views:` (route globs, representative URLs)                        | navigation targets, `require_view:` guards, URL templates                    |
+| `components:` + `children:` (verified selectors, shadow-flattened) | act/read targets, resolved by semantic name                                  |
+| `properties:` (`extract` + `transform`)                            | structured reads and query predicates (`Row[label="X"]`)                     |
+| `requests:` (+ request `properties:`)                              | api-backed tools with response extraction ("200 but the body says declined") |
+| `memory:`                                                          | the hazard lore folded into tool descriptions                                |
+| coverage discipline (0 orphaned, sel-probed)                       | tools that keep working because the map is maintained                        |
 
 The manifest references corpus entities **by name**; the compiler inlines
 selectors and extractors at generate time and fails loudly on anything that
@@ -166,48 +166,63 @@ fully-worked manifest. In brief:
 
 ```yaml
 version: 1
-site: slug                       # required
-base_url: https://site.example   # required; resolves relative URLs
-sightmap: .sightmap              # corpus path, relative to this file
-match: [https://site.example/*]  # userscript @match (default: origin/*)
-tool_version: "0.1.0"            # userscript @version
+site: slug # required
+base_url: https://site.example # required; resolves relative URLs
+sightmap: .sightmap # corpus path, relative to this file
+match: [https://site.example/*] # userscript @match (default: origin/*)
+tool_version: "0.1.0" # userscript @version
 tools:
-  - name: tool_name              # ^[a-z][a-z0-9_-]{0,63}$
-    description: ...             # required — the agent decides by it
-    read_only: true              # default: GET api / interaction-free flow
-    view: ViewName               # scope component-name resolution to a view
-    require_view: ViewName       # live flows: runtime guard + view scope
+  - name: tool_name # ^[a-z][a-z0-9_-]{0,63}$
+    description: ... # required — the agent decides by it
+    read_only: true # default: GET api / interaction-free flow
+    view: ViewName # scope component-name resolution to a view
+    require_view: ViewName # live flows: runtime guard + view scope
     params:
-      - { name: q, type: string|number|integer|boolean,
-          required: true, description: ..., enum: [...], default: ... }
-    api:                         # exactly one of api | flow
+      - {
+          name: q,
+          type: string|number|integer|boolean,
+          required: true,
+          description: ...,
+          enum: [...],
+          default: ...,
+        }
+    api: # exactly one of api | flow
       request: CorpusRequestName # inherits method + result properties
-      url: "https://.../{q}"     # {param} URL-encoded; {param|raw} opts out
-      query: { k: "{q}" }        # appended query params
+      url: "https://.../{q}" # {param} URL-encoded; {param|raw} opts out
+      query: { k: "{q}" } # appended query params
       headers: { accept: application/json }
-      body: { k: "{q}" }         # object → JSON (typed leaves); string → raw
-      result:                    # request-property vocabulary
-        - { name: outcome, source: rsp.body, field: status,
-            pattern: "...", transform: "..." }
-    mode: fetch                  # flow only: fetch | live (default)
+      body: { k: "{q}" } # object → JSON (typed leaves); string → raw
+      result: # request-property vocabulary
+        - {
+            name: outcome,
+            source: rsp.body,
+            field: status,
+            pattern: "...",
+            transform: "...",
+          }
+    mode: fetch # flow only: fetch | live (default)
     flow:
-      - navigate: "/path?q={q}"  # fetch: first step; live: final step only
-      - wait_for: { component: Name, timeout_ms: 10000 }   # or selector/url_includes
+      - navigate: "/path?q={q}" # fetch: first step; live: final step only
+      - wait_for: { component: Name, timeout_ms: 10000 } # or selector/url_includes
       - fill: { target: "Query or css:SEL", value: "{q}" }
-      - click: "Row[label=\"{q}\"] Buy"
-      - press: Enter             # optional target:
+      - click: 'Row[label="{q}"] Buy'
+      - press: Enter # optional target:
       - sleep: 500
-      - scroll: { to: Name }     # or { delta_y: N }
+      - scroll: { to: Name } # or { delta_y: N }
       - read:
-          key: { component: Name, property: prop }         # corpus extractor
-          key2: { component: Name, extract: attr=href }    # inline extractor
-          key3: { selector: ".x", extract: text, transform: first_dollar,
-                  max_chars: 2000 }   # per-field cap (default 300)
+          key: { component: Name, property: prop } # corpus extractor
+          key2: { component: Name, extract: attr=href } # inline extractor
+          key3: {
+              selector: ".x",
+              extract: text,
+              transform: first_dollar,
+              max_chars: 2000,
+            } # per-field cap (default 300)
           rows:
-            for_each: Name       # or a component query
+            for_each: Name # or a component query
             max: "{limit}"
             fields:
-              a: { property: prop }               # iterated element's prop
+              a: { property: prop } # iterated element's prop
               b: { component: Child, property: p } # descendant, chain-relative
               c: { selector: a, extract: attr=href }
 ```
@@ -229,7 +244,7 @@ whom:
   the atlas (`atlas add` proves it loads, not that it's benign).
 - **Params are agent-supplied.** They are URL-encoded into URLs by default;
   `{param|raw}` opts out, and the compiler warns when a template parameterizes
-  the URL's *origin*, because that hands the destination host to the caller.
+  the URL's _origin_, because that hands the destination host to the caller.
 - **The shim grants no new privilege.** Any script on the page can already do
   everything a tool does (same-origin DOM + fetch); `window.__sightmapWebMCP`
   adds a convenient surface, not a capability. The mediated surface is

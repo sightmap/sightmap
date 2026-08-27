@@ -118,6 +118,7 @@ function cmdGenerate(args) {
   }
   if (args.out && formats.length > 1)
     fail("--out only works with a single --format; use --out-dir for several");
+  if (args.out && args["out-dir"]) fail("pass --out or --out-dir, not both");
   const outDir = path.resolve(
     args["out-dir"] ||
       path.dirname(args.out ? path.resolve(args.out) : toolsFile),
@@ -165,6 +166,10 @@ function cmdInit(args) {
   const site = args.site;
   const baseUrl = args["base-url"];
   if (!site || !baseUrl) fail("init needs --site SLUG and --base-url URL");
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(site))
+    fail(`--site must be a slug matching ^[a-z0-9][a-z0-9-]*$ (got "${site}")`);
+  if (!/^https?:\/\//.test(baseUrl))
+    fail(`--base-url must be an absolute http(s) URL (got "${baseUrl}")`);
   const sightmapDir = path.resolve(args["sightmap-dir"] || ".sightmap");
   let corpus;
   try {
@@ -177,7 +182,9 @@ function cmdInit(args) {
     fail(
       `${outFile} already exists — delete it first if you meant to re-scaffold`,
     );
-  fs.writeFileSync(outFile, scaffold(corpus, { site, baseUrl }));
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  const sightmapRel = path.relative(path.dirname(outFile), sightmapDir) || ".";
+  fs.writeFileSync(outFile, scaffold(corpus, { site, baseUrl, sightmapRel }));
   process.stdout.write(
     `wrote ${outFile} — a draft; see the sightmap-webmcp skill for the authoring loop\n`,
   );
