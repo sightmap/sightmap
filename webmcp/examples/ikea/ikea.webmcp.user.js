@@ -586,6 +586,23 @@ async function __smwRunApi(tool, args, meta, signal) {
 
 // --- flow execution --------------------------------------------------------
 
+// The corpus records a view's URL as the reference-capture URL it was authored
+// against, which is typically localhost. Sending an agent there from a deployed
+// page would walk it off the site, so resolve the view's route against the
+// origin the tool is actually running on and keep the corpus URL only for
+// routes too wildcarded to rebuild (and when there is no location to use).
+function __smwViewUrl(requireView) {
+  const route = requireView.route;
+  if (route && route.indexOf("*") === -1 && typeof location !== "undefined") {
+    try {
+      return new URL(route, location.origin).toString();
+    } catch (e) {
+      /* fall through to the corpus URL */
+    }
+  }
+  return requireView.url || undefined;
+}
+
 async function __smwRunFlow(tool, args, meta, signal) {
   const flow = tool.flow;
   const out = { ok: true };
@@ -620,7 +637,7 @@ async function __smwRunFlow(tool, args, meta, signal) {
       return {
         error: `this tool runs on the ${flow.requireView.view} view (route ${flow.requireView.route}); the page is at ${location.pathname}`,
         expected_view: flow.requireView.view,
-        navigate_to: flow.requireView.url || undefined,
+        navigate_to: __smwViewUrl(flow.requireView),
       };
     }
   }

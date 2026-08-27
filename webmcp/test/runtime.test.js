@@ -170,6 +170,43 @@ describe("live flow execution", () => {
     expect(out.error).toMatch(/runs on the Other view/);
     expect(out.navigate_to).toBe("https://shop.example/other");
   });
+
+  test("the navigation hint stays on the origin the tool is running on", async () => {
+    // A corpus records each view's reference-capture URL, which is usually
+    // localhost. Echoing that back from a deployed page would send the agent
+    // off the site, so the route is resolved against the current origin.
+    const tool = {
+      ...buy,
+      flow: {
+        ...buy.flow,
+        requireView: {
+          view: "Other",
+          route: "/other",
+          pathRegex: "^/other$",
+          url: "http://localhost:8081/other",
+        },
+      },
+    };
+    const out = await rt.__smwExecuteTool(tool, ir.meta, { label: "Sofa" });
+    expect(out.navigate_to).toBe("https://shop.example/other");
+  });
+
+  test("a wildcarded route falls back to the corpus URL", async () => {
+    const tool = {
+      ...buy,
+      flow: {
+        ...buy.flow,
+        requireView: {
+          view: "Detail",
+          route: "/item/*",
+          pathRegex: "^/item/[^/]+$",
+          url: "https://shop.example/item/123",
+        },
+      },
+    };
+    const out = await rt.__smwExecuteTool(tool, ir.meta, { label: "Sofa" });
+    expect(out.navigate_to).toBe("https://shop.example/item/123");
+  });
 });
 
 describe("fetch flow execution", () => {

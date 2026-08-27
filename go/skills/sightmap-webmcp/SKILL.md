@@ -146,7 +146,9 @@ Semantics that do the heavy lifting:
   different selector per view; a tool sets `view: SearchResults` and gets
   that view's definition (globals stay visible). `require_view:` implies it for live
   flows and adds the runtime guard: off-view calls return a structured
-  `{error, expected_view, navigate_to}` instead of flailing.
+  `{error, expected_view, navigate_to}` instead of flailing (`navigate_to`
+  resolves the view's route against the origin the page is on, so it points at
+  the deployment in hand rather than the corpus's capture URL).
 - **`api` tools inherit the corpus request's `method` and `properties:`** as
   their result extractors (`source`/`field`/`pattern`/`transform` — the
   "200 OK but the body says declined" machinery). No `result:` and no
