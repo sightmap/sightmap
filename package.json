@@ -4,15 +4,16 @@
   "private": true,
   "description": "Workspace root — hosts the changesets release tooling. Not published.",
   "workspaces": [
-    "go/npm"
+    "go/npm",
+    "webmcp"
   ],
   "scripts": {
     "changeset": "npx --yes @changesets/cli@^2.27.0",
     "version-packages": "npx --yes @changesets/cli@^2.27.0 version && node scripts/sync-manifest-versions.mjs && node scripts/changelog-entry.mjs && node docs/scripts/build-changelog.mjs",
     "sync-docs": "node docs/scripts/sync-spec.mjs",
     "test": "jest",
-    "fmt": "prettier --write \"go/**/*.js\" \"*.js\"",
-    "fmt:check": "prettier --check \"go/**/*.js\" \"*.js\""
+    "fmt": "prettier --write \"go/**/*.js\" \"webmcp/**/*.js\" \"*.js\"",
+    "fmt:check": "prettier --check \"go/**/*.js\" \"webmcp/**/*.js\" \"*.js\""
   },
   "devDependencies": {
     "jest": "29.7.0",

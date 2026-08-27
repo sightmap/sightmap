@@ -1,0 +1,182 @@
+# WebMCP tools for the IKEA US storefront, authored against the community
+# atlas corpus at web/src/data/atlas/ikea/.sightmap (vendored copy of the
+# `ikea` atlas entry). Every component, property, request, and hazard note
+# referenced below was verified against the live site when that corpus was
+# curated — this manifest just picks the user goals worth exposing as tools.
+#
+# Regenerate the committed bundle after editing:
+#   node webmcp/bin/sightmap-webmcp.js generate \
+#     --tools webmcp/examples/ikea/webmcp.tools.yaml --format all
+version: 1
+site: ikea
+base_url: https://www.ikea.com
+description: Search, browse, and product tools for the IKEA US storefront (/us/en/), signed out.
+sightmap: ../../../web/src/data/atlas/ikea/.sightmap
+match:
+  - https://www.ikea.com/*
+
+tools:
+  - name: search_products
+    title: Search IKEA products
+    description: >
+      Keyword search over the IKEA US catalog. Returns the result summary
+      (its count is the authoritative total — the grid renders only the first
+      page of ~22 cards) and the product cards with price and availability.
+      Product names keep their Swedish diacritics (GÖRSNYGG, PÄRKLA), so an
+      ASCII-typed name in a follow-up filter may not match. The result page is
+      server-rendered, which is why this tool can fetch it without a browser
+      navigation.
+    read_only: true
+    mode: fetch
+    view: SearchResults
+    params:
+      - name: query
+        type: string
+        required: true
+        description: Search keywords, e.g. "desk chair".
+      - name: max_results
+        type: integer
+        description: Cap on returned product cards (default 20).
+        default: 20
+    flow:
+      - navigate: "/us/en/search/?q={query}"
+      - read:
+          summary:
+            component: SearchSummary
+            property: summary
+          products:
+            for_each: ProductCard
+            max: "{max_results}"
+            fields:
+              text:
+                property: card_text
+              price:
+                component: CardPrice
+                property: price_text
+              availability:
+                component: CardAvailability
+                property: availability
+              url:
+                selector: a
+                extract: attr=href
+
+  - name: browse_category
+    title: Browse an IKEA category
+    description: >
+      Load a category page by id (the trailing token of a /cat/ URL, e.g.
+      "desk-chairs-20654" or "tables-chairs-fu002"). One route serves two page
+      shapes — a hub (subcategory carousel, no products) and a leaf (product
+      grid, no carousel) — so read whichever of `subcategories` / `products`
+      came back. A typo'd id does NOT 404: the slug half is decorative, and a
+      bad id half silently redirects to the whole catalog, so always check
+      `category_name` to confirm where you actually landed.
+    read_only: true
+    mode: fetch
+    view: CategoryBrowse
+    params:
+      - name: category_id
+        type: string
+        required: true
+        description: Category slug-and-id, e.g. "desk-chairs-20654".
+    flow:
+      - navigate: "/us/en/cat/{category_id}/"
+      - read:
+          category_name:
+            component: CategoryTitle
+            property: category_name
+          subcategories:
+            for_each: SubcategoryItem
+            fields:
+              tracking_label:
+                property: tracking_label
+              label:
+                extract: text
+              url:
+                extract: attr=href
+          products:
+            for_each: ProductCard
+            max: 24
+            fields:
+              text:
+                property: card_text
+              price:
+                component: CardPrice
+                property: price_text
+              url:
+                selector: a
+                extract: attr=href
+
+  - name: get_product
+    title: Read an IKEA product page
+    description: >
+      Fetch one product page by its full slug (e.g.
+      "goersnygg-storage-case-white-clear-40504193") and return price, rating,
+      and package text. The digits ending the slug are the article number the
+      product APIs key on. Delivery/stock render client-side after load, so
+      `fulfillment` is usually absent from this fetched read — use the
+      get_buyback_offers tool or a live session for availability.
+    read_only: true
+    mode: fetch
+    view: ProductDetail
+    params:
+      - name: product_slug
+        type: string
+        required: true
+        description: Full product slug from a /p/ URL, article number included.
+    flow:
+      - navigate: "/us/en/p/{product_slug}/"
+      - read:
+          price:
+            component: PriceModule
+            property: price
+          package:
+            component: PricePackage
+            property: package_text
+          rating:
+            component: RatingsSummary
+            property: rating_text
+          fulfillment:
+            component: FulfillmentSection
+            property: fulfillment_text
+
+  - name: get_buyback_offers
+    title: IKEA buy-back offers for an article
+    description: >
+      Query IKEA's circular buy-back API for one article number (the digits
+      ending a product URL, e.g. 40504193 from
+      /p/goersnygg-storage-case-white-clear-40504193/). The endpoint only has
+      data for articles IKEA will buy back; anything else returns a non-200 or
+      an empty body, which is an answer, not an error.
+    params:
+      - name: article
+        type: string
+        required: true
+        description: Article number, digits only, e.g. "40504193".
+    api:
+      request: CircularOffers
+      url: "https://web-api.ikea.com/circular/circular-asis/offers/articles/{article}"
+
+  - name: add_to_cart
+    title: Add the open product to the cart
+    description: >
+      On a product page in the live session, set the quantity and click the
+      add-to-cart control. Mutating: this puts a real item into the basket on
+      the storefront. Fails with a navigation hint when the current page is
+      not a product view. Quantity is a number input paired with steppers, so
+      it is written directly rather than clicked up.
+    read_only: false
+    require_view: ProductDetail
+    params:
+      - name: quantity
+        type: integer
+        description: Quantity to set before adding (default 1).
+        default: 1
+    flow:
+      - fill:
+          target: "css:.js-add-to-cart-section input[type=\"number\"]"
+          value: "{quantity}"
+      - click: "css:.pipf-add-to-cart-section__buttons button"
+      - read:
+          added:
+            component: AddToCartSection
+            extract: "exists:.pipf-add-to-cart-section__buttons"

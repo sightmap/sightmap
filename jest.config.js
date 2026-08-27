@@ -1,8 +1,10 @@
 // Tests the browser-side JS embedded (via go:embed) into the Go binary —
-// go/**/*.js files evaluated in jsdom, next to a *.test.js sibling.
+// go/**/*.js files evaluated in jsdom, next to a *.test.js sibling — and the
+// webmcp/ codegen adapter (generator + its generated browser runtime, which
+// also needs jsdom).
 module.exports = {
   testEnvironment: "jsdom",
-  testMatch: ["<rootDir>/go/**/*.test.js"],
+  testMatch: ["<rootDir>/go/**/*.test.js", "<rootDir>/webmcp/**/*.test.js"],
   testPathIgnorePatterns: ["/node_modules/", "<rootDir>/go/npm/"],
   // This machine's system-wide watchman can't write its LaunchAgents plist
   // under sandboxing, which crashes Jest's file crawl. Not needed for a

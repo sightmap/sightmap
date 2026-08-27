@@ -1,0 +1,35 @@
+name: webmcp
+
+on:
+  push:
+    branches: [main]
+    paths: ['webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+  pull_request:
+    paths: ['webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webmcp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test + example drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      # The jest slice covers the generator, the browser runtime (jsdom), and
+      # the committed IKEA example bundles (regenerated and diffed — drift in
+      # examples/ fails here; regenerate with sightmap-webmcp generate).
+      - run: npx jest webmcp

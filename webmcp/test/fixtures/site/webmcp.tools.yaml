@@ -1,0 +1,80 @@
+version: 1
+site: fixture
+base_url: https://shop.example
+description: Fixture manifest exercising every tool kind.
+tools:
+  - name: search
+    description: Search the fixture shop by fetching the results page.
+    mode: fetch
+    view: Results
+    params:
+      - name: query
+        type: string
+        required: true
+        description: Keywords.
+      - name: max
+        type: integer
+        description: Result cap.
+        default: 10
+    flow:
+      - navigate: "/search?q={query}"
+      - read:
+          summary:
+            component: Summary
+            property: text
+          rows:
+            for_each: Row
+            max: "{max}"
+            fields:
+              label:
+                property: label
+              href:
+                selector: a
+                extract: attr=href
+
+  - name: search_api
+    description: Search via the JSON API.
+    params:
+      - name: query
+        type: string
+        required: true
+        description: Keywords.
+      - name: limit
+        type: integer
+        description: Max results.
+        default: 5
+    api:
+      request: SearchApi
+      url: "/api/search"
+      body:
+        q: "{query}"
+        limit: "{limit}"
+
+  - name: stock
+    description: Raw stock lookup (no result spec — echoes the body).
+    params:
+      - name: sku
+        type: string
+        required: true
+        description: SKU.
+    api:
+      request: StockApi
+      url: "/api/stock/{sku}"
+
+  - name: buy_first_match
+    description: Click the Buy button on the row whose label matches.
+    require_view: Results
+    params:
+      - name: label
+        type: string
+        required: true
+        description: Row label to buy.
+    flow:
+      - fill:
+          target: SearchInput
+          value: "{label}"
+      - click: "Row[label=\"{label}\"] Buy"
+      - read:
+          confirmed:
+            selector: ".confirmation"
+            extract: text

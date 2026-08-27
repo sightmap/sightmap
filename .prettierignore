@@ -6,3 +6,7 @@ go/npm/
 # effect of `npm run fmt` picking up every go/**/*.js file.
 go/probe/probe.js
 go/cmd/sightmap/extension/
+
+# Generated WebMCP bundles -- byte-exact output of `sightmap-webmcp generate`,
+# drift-checked in CI. Reformatting them would break the check.
+webmcp/examples/**/*.webmcp*.js

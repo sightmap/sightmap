@@ -1,0 +1,712 @@
+// Browser runtime embedded into every generated WebMCP bundle. A dumb
+// interpreter over the compile-time IR: shadow-piercing selector resolution,
+// sightmap property extraction, live-DOM actions, fetched-document reads, and
+// API replay — plus registration with document.modelContext (WebMCP) and a
+// window.__sightmapWebMCP shim for verification and non-WebMCP browsers.
+//
+// The deep-query and extraction functions are adapted from the sightmap
+// reference implementation's own browser-side helpers (go/browser/deepquery.js
+// and go/observe/properties.js) so generated tools resolve nodes and values
+// the same way the CLI the corpus was authored with does.
+
+// --- deep query (shadow-piercing, offline-matcher flattening order) --------
+
+function __smwDeepQueryAll(root, sel) {
+  const out = [];
+  function visit(node) {
+    for (const child of node.children) {
+      let m = false;
+      try {
+        m = child.matches(sel);
+      } catch (e) {
+        throw new Error(`invalid selector "${sel}"`);
+      }
+      if (m) out.push(child);
+      visit(child);
+      if (child.shadowRoot) visit(child.shadowRoot);
+    }
+  }
+  visit(root);
+  if (root.shadowRoot) visit(root.shadowRoot);
+  return out;
+}
+
+// --- property extraction (sightmap extract modes + transforms) -------------
+
+function __smwExtractValue(el, extract) {
+  if (!extract) return null;
+  if (extract === "text") return el.textContent;
+  if (extract === "inner_text")
+    return el.innerText != null ? el.innerText : el.textContent;
+  if (extract === "text_only") {
+    const clone = el.cloneNode(true);
+    clone.querySelectorAll("img,svg,[alt]").forEach((e) => e.remove());
+    return clone.textContent;
+  }
+  if (extract === "inner_html") return el.innerHTML;
+  if (extract.startsWith("attr=")) return el.getAttribute(extract.slice(5));
+  if (extract.startsWith("exists:")) {
+    return __smwDeepQueryAll(el, extract.slice(7)).length > 0 ? "true" : null;
+  }
+  const subs = __smwDeepQueryAll(el, extract);
+  if (subs.length === 0) return null;
+  const sub = subs[0];
+  return sub.innerText != null ? sub.innerText : sub.textContent;
+}
+
+function __smwApplyTransform(val, transform) {
+  if (!transform || !val) return val;
+  if (transform.indexOf("match:") === 0) {
+    try {
+      const m = val.match(new RegExp(transform.slice(6)));
+      if (!m) return val;
+      return m[1] != null ? m[1] : m[0];
+    } catch (e) {
+      return val;
+    }
+  }
+  const words = val.trim().split(/\s+/);
+  switch (transform) {
+    case "first_word":
+      return words[0] || val;
+    case "last_word":
+      return words[words.length - 1] || val;
+    case "first_number": {
+      const m = val.match(/\d[\d,.]*/);
+      return m ? m[0] : val;
+    }
+    case "first_dollar": {
+      const m = val.match(/\$[\d,.]+/);
+      return m ? m[0] : val;
+    }
+    case "number":
+      return val.replace(/[^\d.]/g, "");
+    case "slug":
+      return val
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
+    default:
+      return val;
+  }
+}
+
+const __SMW_VALUE_CAP = 300;
+
+function __smwReadProp(el, spec) {
+  let val = __smwExtractValue(el, spec.extract);
+  if (val == null) return null;
+  val = String(val).trim().replace(/\s+/g, " ");
+  if (val === "") return null;
+  val = __smwApplyTransform(val, spec.transform || null);
+  if (!val) return null;
+  return String(val).slice(0, __SMW_VALUE_CAP);
+}
+
+// --- template interpolation ------------------------------------------------
+
+function __smwInterpolate(template, args, urlMode) {
+  const s = String(template);
+  let out = "";
+  let i = 0;
+  while (i < s.length) {
+    if (s[i] === "{" && s[i + 1] === "{") {
+      out += "{";
+      i += 2;
+      continue;
+    }
+    if (s[i] === "}" && s[i + 1] === "}") {
+      out += "}";
+      i += 2;
+      continue;
+    }
+    if (s[i] === "{") {
+      const m = s.slice(i).match(/^\{([a-z][a-z0-9_]*)(\|raw)?\}/);
+      if (m) {
+        const v = args[m[1]];
+        const str = v == null ? "" : String(v);
+        out += urlMode && !m[2] ? encodeURIComponent(str) : str;
+        i += m[0].length;
+        continue;
+      }
+    }
+    out += s[i];
+    i++;
+  }
+  return out;
+}
+
+// A body leaf that is exactly one "{param}" of a non-string type substitutes
+// the typed value, so JSON bodies keep their numbers and booleans.
+function __smwInterpolateBody(node, args, paramTypes) {
+  if (typeof node === "string") {
+    const m = node.match(/^\{([a-z][a-z0-9_]*)\}$/);
+    if (m && paramTypes[m[1]] && paramTypes[m[1]] !== "string") {
+      return args[m[1]];
+    }
+    return __smwInterpolate(node, args, false);
+  }
+  if (Array.isArray(node))
+    return node.map((n) => __smwInterpolateBody(n, args, paramTypes));
+  if (node && typeof node === "object") {
+    const out = {};
+    for (const k of Object.keys(node))
+      out[k] = __smwInterpolateBody(node[k], args, paramTypes);
+    return out;
+  }
+  return node;
+}
+
+// --- target resolution -----------------------------------------------------
+
+function __smwResolveLevels(scopes, levels) {
+  let current = Array.isArray(scopes) ? scopes : [scopes];
+  for (const alternatives of levels) {
+    let matched = [];
+    for (const sel of alternatives) {
+      for (const scope of current) {
+        for (const el of __smwDeepQueryAll(scope, sel)) {
+          if (!matched.includes(el)) matched.push(el);
+        }
+      }
+      if (matched.length > 0) break; // first alternative that matches wins
+    }
+    current = matched;
+    if (current.length === 0) return [];
+  }
+  return current;
+}
+
+function __smwPredMatch(el, link, pred, args) {
+  const propSpec = link.props[pred.prop];
+  if (!propSpec) return false;
+  const val = __smwReadProp(el, propSpec);
+  if (val == null) return false;
+  let want = __smwInterpolate(pred.value, args, false);
+  let have = val;
+  if (pred.ci) {
+    want = want.toLowerCase();
+    have = have.toLowerCase();
+  }
+  if (pred.op === "=") return have === want;
+  if (pred.op === "^=") return have.startsWith(want);
+  if (pred.op === "*=") return have.includes(want);
+  return false;
+}
+
+function __smwResolveTarget(root, target, args) {
+  if (target.kind === "css") {
+    return __smwDeepQueryAll(root, target.selector);
+  }
+  let scopes = [root];
+  for (const link of target.links) {
+    let els = __smwResolveLevels(scopes, link.chain);
+    if (link.preds && link.preds.length > 0) {
+      els = els.filter((el) =>
+        link.preds.every((p) => __smwPredMatch(el, link, p, args)),
+      );
+    }
+    if (link.index != null) {
+      els = link.index < els.length ? [els[link.index]] : [];
+    }
+    scopes = els;
+    if (scopes.length === 0) return [];
+  }
+  return scopes;
+}
+
+function __smwTargetDesc(target) {
+  if (target.kind === "css") return target.selector;
+  return target.links
+    .map(
+      (l) =>
+        l.name +
+        (l.preds || []).map((p) => `[${p.prop}${p.op}${p.value}]`).join(""),
+    )
+    .join(" ");
+}
+
+function __smwRequireOne(root, target, args, what) {
+  const els = __smwResolveTarget(root, target, args);
+  if (els.length === 0) {
+    throw new Error(
+      `${what}: "${__smwTargetDesc(target)}" matched nothing on the current page`,
+    );
+  }
+  if (els.length > 1) {
+    throw new Error(
+      `${what}: "${__smwTargetDesc(target)}" matched ${els.length} elements — add a property predicate or #N index to disambiguate`,
+    );
+  }
+  return els[0];
+}
+
+// --- actions ---------------------------------------------------------------
+
+function __smwFill(el, value) {
+  const proto =
+    typeof HTMLTextAreaElement !== "undefined" &&
+    el instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : typeof HTMLInputElement !== "undefined" &&
+          el instanceof HTMLInputElement
+        ? HTMLInputElement.prototype
+        : null;
+  if (!proto) {
+    if (el.isContentEditable) {
+      el.textContent = value;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
+    }
+    throw new Error(
+      "fill target is not an input, textarea, or contenteditable element",
+    );
+  }
+  if (el.focus) el.focus();
+  const setter = Object.getOwnPropertyDescriptor(proto, "value");
+  if (setter && setter.set) setter.set.call(el, value);
+  else el.value = value;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function __smwClick(el) {
+  if (el.scrollIntoView) {
+    try {
+      el.scrollIntoView({
+        block: "center",
+        inline: "center",
+        behavior: "instant",
+      });
+    } catch (e) {
+      /* older engines */
+    }
+  }
+  // Covered-target check, when the engine supports it (jsdom doesn't).
+  if (
+    typeof document.elementFromPoint === "function" &&
+    el.getBoundingClientRect
+  ) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      const cx = Math.floor(r.left + r.width / 2);
+      const cy = Math.floor(r.top + r.height / 2);
+      if (
+        cx >= 0 &&
+        cy >= 0 &&
+        cx < window.innerWidth &&
+        cy < window.innerHeight
+      ) {
+        const at = document.elementFromPoint(cx, cy);
+        if (at && at !== el && !el.contains(at) && !at.contains(el)) {
+          throw new Error(
+            "click target is covered by another element (an open overlay or modal?)",
+          );
+        }
+      }
+    }
+  }
+  el.click();
+}
+
+function __smwPress(el, key) {
+  const opts = { key, bubbles: true, cancelable: true };
+  el.dispatchEvent(new KeyboardEvent("keydown", opts));
+  el.dispatchEvent(new KeyboardEvent("keyup", opts));
+}
+
+function __smwSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function __smwWaitFor(step, args) {
+  const deadline = Date.now() + step.timeoutMs;
+  for (;;) {
+    if (step.target) {
+      if (__smwResolveTarget(document, step.target, args).length > 0) return;
+    } else if (step.selector) {
+      if (__smwDeepQueryAll(document, step.selector).length > 0) return;
+    } else if (step.urlIncludes) {
+      if (
+        location.href.includes(__smwInterpolate(step.urlIncludes, args, false))
+      )
+        return;
+    }
+    if (Date.now() >= deadline) {
+      const what = step.target
+        ? __smwTargetDesc(step.target)
+        : step.selector || step.urlIncludes;
+      throw new Error(`wait_for "${what}" timed out after ${step.timeoutMs}ms`);
+    }
+    await __smwSleep(step.pollMs);
+  }
+}
+
+// --- reads -----------------------------------------------------------------
+
+function __smwReadValue(root, valueIR, args) {
+  if (valueIR.one) {
+    const spec = valueIR.one;
+    let el = root;
+    if (spec.target) {
+      const els = __smwResolveTarget(root, spec.target, args);
+      if (els.length === 0) return undefined;
+      el = els[0];
+    }
+    const v = __smwReadProp(el, spec);
+    return v == null ? undefined : v;
+  }
+  const list = valueIR.list;
+  let els = __smwResolveTarget(root, list.target, args);
+  let max = list.max;
+  if (typeof max === "string")
+    max = parseInt(__smwInterpolate(max, args, false), 10) || null;
+  if (max != null && els.length > max) els = els.slice(0, max);
+  return els.map((el) => {
+    const row = {};
+    for (const key of Object.keys(list.fields)) {
+      const spec = list.fields[key];
+      let target = el;
+      if (spec.target) {
+        const found = __smwResolveTarget(el, spec.target, args);
+        if (found.length === 0) continue;
+        target = found[0];
+      }
+      const v = __smwReadProp(target, spec);
+      if (v != null) row[key] = v;
+    }
+    return row;
+  });
+}
+
+function __smwRunRead(root, spec, args, out) {
+  for (const key of Object.keys(spec)) {
+    const v = __smwReadValue(root, spec[key], args);
+    if (v !== undefined) out[key] = v;
+  }
+}
+
+// --- request/response property extraction (api tools) ----------------------
+
+function __smwGetPath(obj, path) {
+  let cur = obj;
+  for (const seg of String(path).split(".")) {
+    if (cur == null) return undefined;
+    if (Array.isArray(cur) && /^\d+$/.test(seg)) cur = cur[parseInt(seg, 10)];
+    else if (typeof cur === "object") cur = cur[seg];
+    else return undefined;
+  }
+  return cur;
+}
+
+function __smwExtractResult(spec, ctx) {
+  // ctx: { reqBody, reqHeaders, rspBody, rspHeaders } — bodies parsed JSON or
+  // raw string; headers as maps of lower-cased names.
+  let raw;
+  if (spec.source === "rsp.headers" || spec.source === "req.headers") {
+    const headers =
+      spec.source === "rsp.headers" ? ctx.rspHeaders : ctx.reqHeaders;
+    raw = headers ? headers[String(spec.field).toLowerCase()] : undefined;
+  } else {
+    const body = spec.source === "rsp.body" ? ctx.rspBody : ctx.reqBody;
+    if (spec.field != null) {
+      raw =
+        typeof body === "string" ? undefined : __smwGetPath(body, spec.field);
+    } else {
+      raw = typeof body === "string" ? body : JSON.stringify(body);
+    }
+  }
+  if (raw == null) return undefined;
+  let val = typeof raw === "string" ? raw : JSON.stringify(raw);
+  if (spec.pattern) {
+    try {
+      const m = val.match(new RegExp(spec.pattern));
+      if (!m) return undefined;
+      val = m[1] != null ? m[1] : m[0];
+    } catch (e) {
+      return undefined;
+    }
+  }
+  if (spec.transform) val = __smwApplyTransform(val, spec.transform);
+  return val;
+}
+
+async function __smwRunApi(tool, args, meta, signal) {
+  const api = tool.api;
+  const paramTypes = {};
+  for (const p of tool.params) paramTypes[p.name] = p.type;
+  const url = new URL(__smwInterpolate(api.url, args, true), meta.baseUrl);
+  if (api.query) {
+    for (const k of Object.keys(api.query)) {
+      url.searchParams.set(k, __smwInterpolate(api.query[k], args, false));
+    }
+  }
+  const init = { method: api.method, credentials: "include" };
+  if (signal) init.signal = signal;
+  const headers = {};
+  if (api.headers) {
+    for (const k of Object.keys(api.headers)) {
+      headers[k] = __smwInterpolate(api.headers[k], args, false);
+    }
+  }
+  let reqBody = null;
+  if (api.body != null) {
+    if (typeof api.body === "string") {
+      reqBody = __smwInterpolate(api.body, args, false);
+      init.body = reqBody;
+    } else {
+      reqBody = __smwInterpolateBody(api.body, args, paramTypes);
+      init.body = JSON.stringify(reqBody);
+      if (!headers["content-type"] && !headers["Content-Type"]) {
+        headers["content-type"] = "application/json";
+      }
+    }
+  }
+  if (Object.keys(headers).length > 0) init.headers = headers;
+
+  const resp = await fetch(url.toString(), init);
+  const text = await resp.text();
+  let rspBody = text;
+  try {
+    rspBody = JSON.parse(text);
+  } catch (e) {
+    /* not JSON */
+  }
+  const rspHeaders = {};
+  if (resp.headers && resp.headers.forEach) {
+    resp.headers.forEach((v, k) => {
+      rspHeaders[String(k).toLowerCase()] = v;
+    });
+  }
+  const out = { status: resp.status };
+  if (api.result && api.result.length > 0) {
+    const ctx = { reqBody, reqHeaders: headers, rspBody, rspHeaders };
+    for (const spec of api.result) {
+      const v = __smwExtractResult(spec, ctx);
+      if (v !== undefined) out[spec.name] = v;
+    }
+  } else {
+    out.url = url.toString();
+    out.body =
+      typeof rspBody === "string"
+        ? rspBody.slice(0, api.maxBodyChars)
+        : rspBody;
+  }
+  return out;
+}
+
+// --- flow execution --------------------------------------------------------
+
+async function __smwRunFlow(tool, args, meta, signal) {
+  const flow = tool.flow;
+  const out = { ok: true };
+
+  if (flow.mode === "fetch") {
+    const nav = flow.steps[0];
+    const url = new URL(__smwInterpolate(nav.url, args, true), meta.baseUrl);
+    const init = { credentials: "include" };
+    if (signal) init.signal = signal;
+    const resp = await fetch(url.toString(), init);
+    const text = await resp.text();
+    const doc = new DOMParser().parseFromString(text, "text/html");
+    out.url = url.toString();
+    out.status = resp.status;
+    for (const step of flow.steps.slice(1)) {
+      if (step.do === "read")
+        __smwRunRead(doc.documentElement, step.spec, args, out);
+    }
+    return out;
+  }
+
+  if (flow.requireView) {
+    const re = new RegExp(flow.requireView.pathRegex);
+    let path = location.pathname;
+    if (path.length > 1) path = path.replace(/\/+$/, "");
+    if (!re.test(path)) {
+      return {
+        error: `this tool runs on the ${flow.requireView.view} view (route ${flow.requireView.route}); the page is at ${location.pathname}`,
+        expected_view: flow.requireView.view,
+        navigate_to: flow.requireView.url || undefined,
+      };
+    }
+  }
+
+  for (const step of flow.steps) {
+    if (signal && signal.aborted) throw new Error("aborted");
+    if (step.do === "navigate") {
+      const url = new URL(
+        __smwInterpolate(step.url, args, true),
+        meta.baseUrl,
+      ).toString();
+      out.navigated = url;
+      out.note =
+        "navigation started; the tool set re-registers on the new document";
+      setTimeout(() => {
+        try {
+          location.assign(url);
+        } catch (e) {
+          /* jsdom: not implemented */
+        }
+      }, 0);
+    } else if (step.do === "wait_for") {
+      await __smwWaitFor(step, args);
+    } else if (step.do === "fill") {
+      const el = __smwRequireOne(document, step.target, args, "fill");
+      __smwFill(el, __smwInterpolate(step.value, args, false));
+    } else if (step.do === "click") {
+      const el = __smwRequireOne(document, step.target, args, "click");
+      __smwClick(el);
+    } else if (step.do === "press") {
+      const el = step.target
+        ? __smwRequireOne(document, step.target, args, "press")
+        : document.activeElement || document.body;
+      __smwPress(el, step.key);
+    } else if (step.do === "sleep") {
+      await __smwSleep(step.ms);
+    } else if (step.do === "scroll") {
+      if (step.target) {
+        const els = __smwResolveTarget(document, step.target, args);
+        if (els[0] && els[0].scrollIntoView) {
+          els[0].scrollIntoView({ block: "center", behavior: "instant" });
+        }
+      } else if (step.deltaY != null && typeof window.scrollBy === "function") {
+        window.scrollBy(0, step.deltaY);
+      }
+    } else if (step.do === "read") {
+      __smwRunRead(document.documentElement, step.spec, args, out);
+    }
+  }
+  return out;
+}
+
+// --- tool execution + registration ----------------------------------------
+
+function __smwValidateArgs(tool, args) {
+  const out = {};
+  for (const p of tool.params) {
+    let v = args ? args[p.name] : undefined;
+    if (v == null && p.default != null) v = p.default;
+    if (v == null) {
+      if (p.required) throw new Error(`missing required param "${p.name}"`);
+      continue;
+    }
+    out[p.name] = v;
+  }
+  return out;
+}
+
+async function __smwExecuteTool(tool, meta, rawArgs, signal) {
+  const args = __smwValidateArgs(tool, rawArgs || {});
+  if (tool.kind === "api") return __smwRunApi(tool, args, meta, signal);
+  return __smwRunFlow(tool, args, meta, signal);
+}
+
+function __smwDescriptor(tool) {
+  const d = {
+    name: tool.name,
+    description: tool.description,
+    inputSchema: tool.inputSchema,
+    annotations: { readOnlyHint: !!tool.readOnly },
+  };
+  if (tool.title) d.title = tool.title;
+  return d;
+}
+
+function __smwBoot(meta, tools) {
+  const win = typeof window !== "undefined" ? window : globalThis;
+  if (win.__sightmapWebMCP && win.__sightmapWebMCP.site === meta.site) {
+    return win.__sightmapWebMCP; // already booted on this document
+  }
+
+  const shim = {
+    site: meta.site,
+    version: meta.toolVersion,
+    generator: "sightmap-webmcp",
+    last: null,
+    listTools() {
+      return tools.map(__smwDescriptor);
+    },
+    callTool(name, args) {
+      const tool = tools.find((t) => t.name === name);
+      if (!tool) {
+        return Promise.reject(
+          new Error(
+            `no tool named "${name}" (tools: ${tools.map((t) => t.name).join(", ")})`,
+          ),
+        );
+      }
+      return __smwExecuteTool(tool, meta, args);
+    },
+    // For harnesses whose eval bridge can't await a promise (e.g. `sightmap
+    // browser eval`): starts the call, stores the outcome on shim.last.
+    callToolAndStore(name, args) {
+      shim.last = { tool: name, done: false };
+      shim.callTool(name, args).then(
+        (result) => {
+          shim.last = { tool: name, done: true, result };
+        },
+        (err) => {
+          shim.last = {
+            tool: name,
+            done: true,
+            error: String((err && err.message) || err),
+          };
+        },
+      );
+      return "started";
+    },
+  };
+  win.__sightmapWebMCP = shim;
+
+  // WebMCP proper: document.modelContext today; navigator.modelContext in
+  // earlier drafts of the proposal. Registration failures (origin trial off,
+  // permissions policy) degrade to the shim alone.
+  const mc =
+    (typeof document !== "undefined" && document.modelContext) ||
+    (typeof navigator !== "undefined" && navigator.modelContext) ||
+    null;
+  if (mc && typeof mc.registerTool === "function") {
+    for (const tool of tools) {
+      const descriptor = __smwDescriptor(tool);
+      descriptor.execute = (input, options) =>
+        __smwExecuteTool(tool, meta, input, options && options.signal);
+      try {
+        Promise.resolve(mc.registerTool(descriptor)).catch((e) => {
+          console.warn(
+            `[sightmap-webmcp] registerTool(${tool.name}) rejected:`,
+            e,
+          );
+        });
+      } catch (e) {
+        console.warn(`[sightmap-webmcp] registerTool(${tool.name}) threw:`, e);
+      }
+    }
+  }
+  return shim;
+}
+
+// CommonJS export guard — absent in page context, active under Jest.
+if (typeof module === "object" && module.exports) {
+  module.exports = {
+    __smwDeepQueryAll,
+    __smwExtractValue,
+    __smwApplyTransform,
+    __smwReadProp,
+    __smwInterpolate,
+    __smwInterpolateBody,
+    __smwResolveTarget,
+    __smwRequireOne,
+    __smwFill,
+    __smwClick,
+    __smwWaitFor,
+    __smwReadValue,
+    __smwRunRead,
+    __smwGetPath,
+    __smwExtractResult,
+    __smwRunApi,
+    __smwRunFlow,
+    __smwExecuteTool,
+    __smwValidateArgs,
+    __smwBoot,
+  };
+}

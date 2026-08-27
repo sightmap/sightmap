@@ -13,7 +13,8 @@ both websites.
 |---|---|---|
 | `spec/` | Markdown + JSON Schema | Normative specification, SEP process, conformance fixtures. Source of truth. |
 | `go/` | Go | Reference implementation: `sightmap` CLI + `go get`-able library. npm: `@sightmap/sightmap`. |
-| `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
+| `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`, `sightmap-webmcp`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
+| `webmcp/` | Node (CJS) | WebMCP codegen adapter: `.sightmap/` corpus + `webmcp.tools.yaml` → a `document.modelContext` tool bundle. npm workspace, repo-internal (not published). |
 | `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
 
@@ -65,6 +66,24 @@ Never change spec semantics without an SEP (`spec/seps/`).
   so you normally never hand-edit them. (Gemini is intentionally not a target —
   its extension manifest is MCP-only and has no skills concept.)
 
+### `webmcp/`
+- The sightmap → WebMCP codegen adapter (see `webmcp/README.md` for the
+  pipeline). Plain CommonJS, an npm workspace of the root `package.json`;
+  its only dependency is `js-yaml`.
+- Tests run through the **root** jest config: `npx jest webmcp` from the repo
+  root. The suite includes a drift check on `webmcp/examples/` — after
+  changing the generator, the runtime, or the example manifest, regenerate
+  the committed bundles:
+  `node webmcp/bin/sightmap-webmcp.js generate --tools webmcp/examples/ikea/webmcp.tools.yaml --format all`.
+- Generated bundles are deterministic (no timestamps); provenance is a corpus
+  content hash in the banner. Never hand-edit a generated `*.webmcp*.js`.
+- The embedded browser runtime (`src/runtime/runtime.js`) mirrors the
+  semantics of `go/browser/deepquery.js` and `go/observe/properties.js` —
+  keep them behaviorally in sync when either side changes.
+- The WebMCP surface it targets (`document.modelContext.registerTool`, the
+  legacy `navigator.modelContext` probe) is tracked in `src/emit.js` +
+  `src/runtime/runtime.js`; update there as the proposal evolves.
+
 ### `docs/`
 - Mintlify site: `npm i -g mint`, then `mint dev` from `docs/`. See `docs/AGENTS.md`
   for page conventions.
@@ -103,7 +122,7 @@ Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
 `go` (gofmt + build + `go test` + embedded-skills drift check; also triggered by
 `skills/**`), `spec` (schema-validate examples + conformance),
 `docs` (schema-page sync check + `mint validate` + `mint broken-links`), `web`
-(build). On every push to `main`, `release` opens/updates the "Version Packages"
+(build), `webmcp` (jest suite + generated-example drift check). On every push to `main`, `release` opens/updates the "Version Packages"
 PR when changesets are pending; once that PR is merged (no changesets left), the
 same workflow tags the release, runs goreleaser (config `go/.goreleaser.yml`),
 and publishes `@sightmap/sightmap` from `go/npm/` to npm. No manual tag push.
