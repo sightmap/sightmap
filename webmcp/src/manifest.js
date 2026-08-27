@@ -77,6 +77,8 @@ const API_KEYS = [
 const ROWS_KEYS = ["field", "max", "fields"];
 const ROW_FIELD_KEYS = ["field", "template"];
 const CREDENTIALS_MODES = ["include", "same-origin", "omit"];
+const PAGE_SOURCES = ["local_storage", "session_storage", "cookie", "dom"];
+const PAGE_VALUE_KEYS = ["from", "key", "selector", "attr", "json", "prefix"];
 const RESULT_KEYS = ["name", "source", "field", "pattern", "transform"];
 const RESULT_SOURCES = ["req.body", "rsp.body", "req.headers", "rsp.headers"];
 
@@ -129,6 +131,31 @@ function validateParams(params, where, errors, warnings) {
     }
     if (p.default != null && typeof p.default === "object") {
       errors.push(`${where} param "${p.name}": default must be a scalar`);
+    }
+  }
+}
+
+function validatePageValue(v, where, errors, warnings) {
+  warnUnknown(v, PAGE_VALUE_KEYS, where, warnings);
+  if (!PAGE_SOURCES.includes(v.from)) {
+    errors.push(`${where}: "from" must be one of ${PAGE_SOURCES.join(", ")}`);
+    return;
+  }
+  if (v.from === "dom") {
+    if (typeof v.selector !== "string" || !v.selector) {
+      errors.push(`${where}: a dom page value needs a "selector"`);
+    }
+    if (v.key != null) {
+      errors.push(`${where}: a dom page value takes "selector", not "key"`);
+    }
+  } else {
+    if (typeof v.key !== "string" || !v.key) {
+      errors.push(`${where}: a ${v.from} page value needs a "key"`);
+    }
+    if (v.selector != null || v.attr != null) {
+      errors.push(
+        `${where}: "selector"/"attr" apply to a dom page value, not ${v.from}`,
+      );
     }
   }
 }
@@ -200,12 +227,16 @@ function validateApi(api, where, errors, warnings) {
       );
     } else {
       for (const [k2, v2] of Object.entries(v)) {
-        if (
+        if (v2 != null && typeof v2 === "object" && !Array.isArray(v2)) {
+          validatePageValue(v2, `${where}: api ${key}.${k2}`, errors, warnings);
+        } else if (
           typeof v2 !== "string" &&
           typeof v2 !== "number" &&
           typeof v2 !== "boolean"
         ) {
-          errors.push(`${where}: api ${key}.${k2} must be a scalar template`);
+          errors.push(
+            `${where}: api ${key}.${k2} must be a scalar template or a page-value mapping`,
+          );
         }
       }
     }

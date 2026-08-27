@@ -244,6 +244,41 @@ describe("api execution", () => {
     }));
   }
 
+  test("page values read the session out of storage, a cookie, or the DOM", () => {
+    localStorage.setItem(
+      "sb-auth",
+      JSON.stringify({ access_token: "jwt123", user: { id: "u-9" } }),
+    );
+    sessionStorage.setItem("plain", "sess-tok");
+    document.cookie = "csrf=abc123";
+    document.body.innerHTML +=
+      '<meta name="csrf-token" content="meta-tok"><input id="hid" value="x">';
+
+    const V = (spec) => rt.__smwPageValue(spec);
+    expect(
+      V({ from: "local_storage", key: "sb-auth", json: "access_token", prefix: "Bearer " }),
+    ).toBe("Bearer jwt123");
+    expect(V({ from: "local_storage", key: "sb-auth", json: "user.id", prefix: "eq." })).toBe(
+      "eq.u-9",
+    );
+    expect(V({ from: "session_storage", key: "plain" })).toBe("sess-tok");
+    expect(V({ from: "cookie", key: "csrf" })).toBe("abc123");
+    expect(
+      V({ from: "dom", selector: 'meta[name="csrf-token"]', attr: "content" }),
+    ).toBe("meta-tok");
+  });
+
+  test("a page value that is absent is undefined, so the header is omitted", () => {
+    expect(rt.__smwPageValue({ from: "local_storage", key: "nope" })).toBeUndefined();
+    expect(rt.__smwPageValue({ from: "cookie", key: "nope" })).toBeUndefined();
+    expect(rt.__smwPageValue({ from: "dom", selector: ".nope" })).toBeUndefined();
+    // present but not the JSON shape the path expects
+    localStorage.setItem("notjson", "raw");
+    expect(
+      rt.__smwPageValue({ from: "local_storage", key: "notjson", json: "a.b" }),
+    ).toBeUndefined();
+  });
+
   test("rows projects a JSON array body into named per-row fields", () => {
     const body = [
       { id: "a1", title: "First", note: "", user: { display_name: "Ada" } },

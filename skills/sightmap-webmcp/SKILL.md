@@ -149,6 +149,15 @@ Semantics that do the heavy lifting:
   `{error, expected_view, navigate_to}` instead of flailing (`navigate_to`
   resolves the view's route against the origin the page is on, so it points at
   the deployment in hand rather than the corpus's capture URL).
+- **Page values reach the signed-in session.** `credentials: include` only
+  authenticates a cookie session. Where the app sends a header instead (most
+  SPAs), a header or query value may be read from the page:
+  `{from: local_storage|session_storage|cookie|dom, key|selector, json, prefix}`
+  — e.g. `authorization: {from: local_storage, key: sb-auth, json: access_token,
+  prefix: "Bearer "}`. The tool then acts as the signed-in user, which is the
+  thing an in-page tool can do that a server-side one cannot. A tool that reads
+  page state must pin its URL origin (the compiler errors otherwise), and the
+  value is redacted from `req.headers` so no `result:` can leak it.
 - **`rows:` shapes an api tool's output.** A raw API body is rarely the right
   tool result: `rows: {field, max, fields}` projects a JSON array into named
   per-row fields, where `field:` is a dot path into the row and `template:`

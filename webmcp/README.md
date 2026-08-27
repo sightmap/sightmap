@@ -197,6 +197,14 @@ tools:
       headers: { accept: application/json }
       body: { k: "{q}" } # object → JSON (typed leaves); string → raw
       credentials: include # include (default) | same-origin | omit
+      headers: # a value may be read from the page instead of written here
+        authorization:
+          from: local_storage # local_storage | session_storage | cookie | dom
+          key: sb-auth-token # storage key or cookie name
+          json: access_token # dot path, when the stored value is JSON
+          prefix: "Bearer " # literal prefix
+        x-csrf-token:
+          { from: dom, selector: 'meta[name="csrf-token"]', attr: content }
       rows: # project a JSON array body into per-row fields
         field: data # path to the array (default: the whole body)
         max: "{limit}"
@@ -250,6 +258,35 @@ Reads follow sightmap's silent-omission convention: a value that doesn't
 resolve is absent, never an error. Every read value caps at 300 chars
 unless the field sets `max_chars`; api bodies echo up to `max_body_chars`
 (default 20000) when no `result:` is declared.
+
+## Reaching the signed-in session
+
+`credentials: include` covers sites whose session is a cookie, HttpOnly ones
+included. It covers nothing on a site that authenticates with a header, which
+is most SPAs: the token sits in Web Storage and is attached by the app's own
+client. A page value bridges that — the tool reads the token the page already
+holds and sends it itself:
+
+| `from:` | Reads | Typical of |
+| --- | --- | --- |
+| `local_storage` / `session_storage` | `key`, optionally a `json` dot path | Supabase, Auth0 SPA, MSAL, hand-rolled JWT |
+| `cookie` | `key` | readable session cookies, double-submit CSRF |
+| `dom` | `selector`, optionally `attr` | `<meta name="csrf-token">`, hidden inputs |
+
+It is a name, not an expression: a manifest may read a value it points at, and
+cannot run code. Two rules follow the credential around, both enforced at
+compile time or in the runtime:
+
+- A tool that reads page state **must** pin its URL origin. Parameterizing the
+  origin is a warning normally and an error here, because an agent-supplied
+  param would otherwise choose who receives the user's session.
+- A page-sourced header is **redacted from `req.headers`**, so a `result:`
+  extraction cannot lift the token back out of the request and hand it to the
+  agent. Manifest-written headers stay readable.
+
+Not covered: tokens held only in memory (unreachable by design, and arguably
+correct), and IndexedDB — Firebase Auth's default persistence — which is async
+and would need a different shape.
 
 ## Trust model
 

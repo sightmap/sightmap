@@ -504,6 +504,80 @@ function __smwProjectRows(rows, rspBody, args) {
   return out;
 }
 
+// A value read from the page itself rather than written into the manifest —
+// how a tool reaches the session the user is already signed in with. Covers
+// the ways browser apps actually hold credentials:
+//
+//   local_storage / session_storage  key (+ json path) — SPA bearer tokens
+//   cookie                           key — readable session and CSRF cookies
+//   dom                              selector (+ attr) — <meta name="csrf-token">,
+//                                    hidden inputs, data attributes
+//
+// HttpOnly cookies need none of this; `credentials: include` already sends
+// them. Deliberately declarative — a key or a selector, an optional JSON path,
+// an optional literal prefix — and not an expression language: a manifest may
+// name a value, not run code.
+function __smwPageValue(spec) {
+  let raw;
+  if (spec.from === "cookie") {
+    try {
+      const all = String(document.cookie || "").split(";");
+      for (const part of all) {
+        const eq = part.indexOf("=");
+        if (eq < 0) continue;
+        if (part.slice(0, eq).trim() === spec.key) {
+          raw = decodeURIComponent(part.slice(eq + 1).trim());
+          break;
+        }
+      }
+    } catch (e) {
+      return undefined;
+    }
+  } else if (spec.from === "dom") {
+    const el = __smwDeepQueryAll(document, spec.selector)[0];
+    if (!el) return undefined;
+    raw = spec.attr ? el.getAttribute(spec.attr) : el.textContent;
+    if (raw != null) raw = String(raw).trim();
+  } else {
+    let store;
+    try {
+      store =
+        spec.from === "session_storage"
+          ? typeof sessionStorage !== "undefined" && sessionStorage
+          : typeof localStorage !== "undefined" && localStorage;
+    } catch (e) {
+      return undefined; // storage blocked by the embedder
+    }
+    if (!store) return undefined;
+    try {
+      raw = store.getItem(spec.key);
+    } catch (e) {
+      return undefined;
+    }
+  }
+  if (raw == null || raw === "") return undefined;
+  let val = raw;
+  if (spec.json) {
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return undefined;
+    }
+    val = __smwGetPath(parsed, spec.json);
+    if (val == null) return undefined;
+  }
+  return (spec.prefix || "") + String(val);
+}
+
+// Header/query/body leaves are either a "{param}" template or a page-state
+// mapping. Returns undefined when a page value is missing, so the caller can
+// omit the header rather than send an empty one.
+function __smwResolveValue(v, args) {
+  if (v != null && typeof v === "object" && v.from) return __smwPageValue(v);
+  return __smwInterpolate(v, args, false);
+}
+
 function __smwExtractResult(spec, ctx) {
   // ctx: { reqBody, reqHeaders, rspBody, rspHeaders } — bodies parsed JSON or
   // raw string; headers as maps of lower-cased names.
@@ -543,7 +617,8 @@ async function __smwRunApi(tool, args, meta, signal) {
   const url = new URL(__smwInterpolate(api.url, args, true), meta.baseUrl);
   if (api.query) {
     for (const k of Object.keys(api.query)) {
-      url.searchParams.set(k, __smwInterpolate(api.query[k], args, false));
+      const qv = __smwResolveValue(api.query[k], args);
+      if (qv !== undefined) url.searchParams.set(k, qv);
     }
   }
   const init = {
@@ -552,9 +627,19 @@ async function __smwRunApi(tool, args, meta, signal) {
   };
   if (signal) init.signal = signal;
   const headers = {};
+  // Header names whose value came from page state. They are never exposed back
+  // to the caller: a result spec reading req.headers must not be able to lift
+  // the user's session token out of the request and hand it to the agent.
+  const secretHeaders = {};
   if (api.headers) {
     for (const k of Object.keys(api.headers)) {
-      headers[k] = __smwInterpolate(api.headers[k], args, false);
+      const hv = __smwResolveValue(api.headers[k], args);
+      if (hv === undefined) continue;
+      headers[k] = hv;
+      const spec = api.headers[k];
+      if (spec != null && typeof spec === "object" && spec.from) {
+        secretHeaders[k.toLowerCase()] = true;
+      }
     }
   }
   let reqBody = null;
@@ -598,6 +683,7 @@ async function __smwRunApi(tool, args, meta, signal) {
     // side the same way the response side already is.
     const reqHeaders = {};
     for (const k of Object.keys(headers)) {
+      if (secretHeaders[k.toLowerCase()]) continue;
       reqHeaders[k.toLowerCase()] = headers[k];
     }
     const ctx = { reqBody, reqHeaders, rspBody, rspHeaders };

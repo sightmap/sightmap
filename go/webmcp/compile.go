@@ -412,6 +412,54 @@ type compiledTool struct {
 	readOnly bool
 }
 
+// normalizeValueMap keeps scalar templates as-is and rewrites page-value
+// mappings into a fixed key order, so the Go and Node emitters agree byte for
+// byte.
+func normalizeValueMap(m *OM) any {
+	if m == nil {
+		return nil
+	}
+	out := NewOM()
+	for _, k := range m.Keys() {
+		v, _ := m.Get(k)
+		if vom := asOM(v); vom != nil {
+			e := NewOM()
+			e.Set("from", asString(omGet(vom, "from")))
+			for _, f := range []string{"key", "selector", "attr", "json", "prefix"} {
+				if sv := asString(omGet(vom, f)); sv != "" {
+					e.Set(f, sv)
+				} else {
+					e.Set(f, nil)
+				}
+			}
+			out.Set(k, e)
+		} else {
+			out.Set(k, v)
+		}
+	}
+	return out
+}
+
+// usesPageValues reports whether any query or header value is read from the
+// page rather than written in the manifest.
+func usesPageValues(api *OM) bool {
+	for _, key := range []string{"query", "headers"} {
+		m := asOM(omGet(api, key))
+		if m == nil {
+			continue
+		}
+		for _, k := range m.Keys() {
+			v, _ := m.Get(k)
+			if vom := asOM(v); vom != nil {
+				if asString(omGet(vom, "from")) != "" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 	api := asOM(omGet(tool, "api"))
 	name := asString(omGet(tool, "name"))
@@ -472,7 +520,14 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 	}
 	refs.addString(apiURL)
 	if origin := apiOriginRe.FindString(apiURL); strings.HasPrefix(apiURL, "{") || strings.Contains(origin, "{") {
-		d.warnf("tool %q: the api url's origin is parameterized — agent-supplied params choose the host that receives a credentialed request; prefer a fixed origin", name)
+		// A tool that reads the user's session out of the page and sends it to a
+		// host the agent chose is a credential-exfiltration primitive, so this is
+		// an error there rather than the usual warning.
+		if usesPageValues(api) {
+			d.errf("tool %q: the api url's origin is parameterized and the tool reads page state — an agent-supplied param would choose who receives the user's session; pin the origin", name)
+		} else {
+			d.warnf("tool %q: the api url's origin is parameterized — agent-supplied params choose the host that receives a credentialed request; prefer a fixed origin", name)
+		}
 	}
 	refs.addString(omGet(api, "query"))
 	refs.addString(omGet(api, "headers"))
@@ -549,10 +604,10 @@ func compileAPITool(c *Corpus, tool *OM, d *diags) *compiledTool {
 	}
 	var queryV, headersV, bodyV any
 	if v, ok := api.Get("query"); ok && v != nil {
-		queryV = v
+		queryV = normalizeValueMap(asOM(v))
 	}
 	if v, ok := api.Get("headers"); ok && v != nil {
-		headersV = v
+		headersV = normalizeValueMap(asOM(v))
 	}
 	if v, ok := api.Get("body"); ok && v != nil {
 		bodyV = v

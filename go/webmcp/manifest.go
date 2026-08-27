@@ -28,6 +28,10 @@ var apiKeys = []string{"request", "method", "url", "query", "headers", "body", "
 
 var credentialsModes = []string{"include", "same-origin", "omit"}
 
+var pageSources = []string{"local_storage", "session_storage", "cookie", "dom"}
+
+var pageValueKeys = []string{"from", "key", "selector", "attr", "json", "prefix"}
+
 var rowsKeys = []string{"field", "max", "fields"}
 
 var rowFieldKeys = []string{"field", "template"}
@@ -121,6 +125,36 @@ func validateParams(params any, where string, d *diags) {
 	}
 }
 
+func validatePageValue(v *OM, where string, d *diags) {
+	if v == nil {
+		d.errf("%s: page value must be a mapping", where)
+		return
+	}
+	warnUnknown(v, pageValueKeys, where, d)
+	from := asString(omGet(v, "from"))
+	if !contains(pageSources, from) {
+		d.errf("%s: \"from\" must be one of %s", where, strings.Join(pageSources, ", "))
+		return
+	}
+	if from == "dom" {
+		if asString(omGet(v, "selector")) == "" {
+			d.errf("%s: a dom page value needs a \"selector\"", where)
+		}
+		if _, ok := v.Get("key"); ok {
+			d.errf("%s: a dom page value takes \"selector\", not \"key\"", where)
+		}
+	} else {
+		if asString(omGet(v, "key")) == "" {
+			d.errf("%s: a %s page value needs a \"key\"", where, from)
+		}
+		_, hasSel := v.Get("selector")
+		_, hasAttr := v.Get("attr")
+		if hasSel || hasAttr {
+			d.errf("%s: \"selector\"/\"attr\" apply to a dom page value, not %s", where, from)
+		}
+	}
+}
+
 func validateAPIRows(rw any, where string, d *diags) {
 	rom := asOM(rw)
 	if rom == nil {
@@ -187,8 +221,10 @@ func validateAPI(api any, where string, d *diags) {
 			v2, _ := vom.Get(k2)
 			switch v2.(type) {
 			case string, int, bool, float64:
+			case *OM:
+				validatePageValue(asOM(v2), fmt.Sprintf("%s: api %s.%s", where, key, k2), d)
 			default:
-				d.errf("%s: api %s.%s must be a scalar template", where, key, k2)
+				d.errf("%s: api %s.%s must be a scalar template or a page-value mapping", where, key, k2)
 			}
 		}
 	}

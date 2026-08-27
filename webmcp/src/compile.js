@@ -294,6 +294,44 @@ function addStringRefs(value, refs) {
   }
 }
 
+// query/headers values are either scalar templates or page-value mappings; the
+// mappings are emitted in a fixed key order so the Go port can match byte for
+// byte.
+function normalizeValueMap(m) {
+  if (!m) return null;
+  const out = {};
+  for (const k of Object.keys(m)) {
+    const v = m[k];
+    if (v != null && typeof v === "object" && !Array.isArray(v)) {
+      out[k] = {
+        from: v.from,
+        key: v.key != null ? String(v.key) : null,
+        selector: v.selector != null ? String(v.selector) : null,
+        attr: v.attr != null ? String(v.attr) : null,
+        json: v.json != null ? String(v.json) : null,
+        prefix: v.prefix != null ? String(v.prefix) : null,
+      };
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function usesPageValues(api) {
+  for (const key of ["query", "headers"]) {
+    const m = api[key];
+    if (!m) continue;
+    for (const k of Object.keys(m)) {
+      const v = m[k];
+      if (v != null && typeof v === "object" && !Array.isArray(v) && v.from) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function compileApiTool(corpus, tool, errors, warnings) {
   const api = tool.api;
   const refs = new Set();
@@ -370,10 +408,21 @@ function compileApiTool(corpus, tool, errors, warnings) {
   {
     const u = String(api.url);
     const origin = u.match(/^https?:\/\/[^/]*/);
-    if (u.startsWith("{") || (origin && origin[0].includes("{"))) {
-      warnings.push(
-        `tool "${tool.name}": the api url's origin is parameterized — agent-supplied params choose the host that receives a credentialed request; prefer a fixed origin`,
-      );
+    const parameterizedOrigin =
+      u.startsWith("{") || (origin && origin[0].includes("{"));
+    if (parameterizedOrigin) {
+      // A tool that reads the user's session out of the page and sends it to a
+      // host the agent chose is a credential-exfiltration primitive, so this is
+      // an error there rather than the usual warning.
+      if (usesPageValues(api)) {
+        errors.push(
+          `tool "${tool.name}": the api url's origin is parameterized and the tool reads page state — an agent-supplied param would choose who receives the user's session; pin the origin`,
+        );
+      } else {
+        warnings.push(
+          `tool "${tool.name}": the api url's origin is parameterized — agent-supplied params choose the host that receives a credentialed request; prefer a fixed origin`,
+        );
+      }
     }
   }
   addStringRefs(api.query, refs);
@@ -391,8 +440,8 @@ function compileApiTool(corpus, tool, errors, warnings) {
     api: {
       method,
       url: String(api.url),
-      query: api.query || null,
-      headers: api.headers || null,
+      query: normalizeValueMap(api.query),
+      headers: normalizeValueMap(api.headers),
       body: api.body != null ? api.body : null,
       result: (api.result || []).map((r) => ({
         name: r.name,
