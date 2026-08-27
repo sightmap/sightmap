@@ -1,0 +1,137 @@
+---
+title: "Sightmap CLI: WebMCP Generator Reference"
+sidebarTitle: "WebMCP"
+description: "Generate WebMCP tool bundles (document.modelContext) for any mapped site from its corpus and a small tool manifest — scaffold, validate, and emit publishable snippet, module, and userscript formats."
+---
+
+`sightmap webmcp` turns a corpus into **WebMCP tools** — functions a page
+registers on [`document.modelContext`](https://github.com/webmachinelearning/webmcp)
+so AI agents can call them instead of clicking through the UI. WebMCP assumes
+the site's owner writes those tools; for every site that hasn't, the corpus
+already holds what a good tool needs (verified selectors, per-instance
+properties, view routes, observed API endpoints, hazard memory), and this
+command compiles it into a publishable bundle.
+
+The division of labor: the corpus stays the single source of truth for *how
+to address the site*, and a small hand-authored manifest
+(`webmcp.tools.yaml`) says *which user goals become tools*. The compiler
+resolves every component, property, view, and request the manifest names —
+by name, against the corpus — and fails loudly on anything that doesn't
+resolve. Nothing in a generated bundle is guessed.
+
+| Command | What it does |
+| --- | --- |
+| `sightmap webmcp init` | Scaffold a draft manifest from the corpus: one read tool per view, one API stub per request |
+| `sightmap webmcp validate` | Compile the manifest against the corpus; errors name the unresolved reference and the candidates |
+| `sightmap webmcp generate` | Emit the bundle — snippet, ES module, and userscript formats; `--check` gates drift in CI |
+
+<Note>
+The full authoring loop — walking user-goal trajectories with the [browser
+CLI](/cli/browser), watching `network list` for the request that carries the
+real work, verifying tools in the live session — is the `sightmap-webmcp`
+agent skill (`sightmap skills install`). This page is the command reference.
+</Note>
+
+---
+
+### The manifest
+
+A tool is a user goal ("search products", "what does this item cost"), not a
+page. Each declares its `params` (compiled into a JSON Schema `inputSchema`),
+a `description` the agent decides by, and one of three implementations:
+
+| Kind | Manifest shape | When |
+| --- | --- | --- |
+| API replay | `api:` | One observed endpoint does the whole job. Runs with the page's cookies, so signed-in state comes free; result values extract via the corpus request's `properties:`. |
+| Fetched read | `flow:` + `mode: fetch` | Read-only, and the target page is server-rendered. Fetches the URL with cookies and reads components from the parsed document — no navigation, works from any page. |
+| Live flow | `flow:` | Mutating or same-page interactions: fill, click, wait, read by component identity, gated by `require_view:`. |
+
+The split exists because **a WebMCP tool call dies with the document it runs
+in**. A live flow therefore cannot navigate mid-flow — the generator rejects
+it at compile time — and cross-page journeys become per-page tools the agent
+sequences itself. Component references use the same query DSL as the
+[interaction commands](/cli/interaction) (`Row[label="X"] Buy`), so a query
+verified against the live session transfers into the manifest verbatim.
+
+```yaml
+version: 1
+site: ikea
+base_url: https://www.ikea.com
+tools:
+  - name: search_products
+    description: >
+      Keyword search over the catalog. The summary count is the
+      authoritative total — the grid renders only the first page.
+    mode: fetch
+    view: SearchResults          # scopes component-name resolution
+    params:
+      - { name: query, type: string, required: true, description: Keywords. }
+    flow:
+      - navigate: "/us/en/search/?q={query}"
+      - read:
+          summary: { component: SearchSummary, property: summary }
+          products:
+            for_each: ProductCard
+            fields:
+              text:  { property: card_text }
+              price: { component: CardPrice, property: price_text }
+```
+
+Worked examples live in the sightmap repo under
+[`webmcp/examples/`](https://github.com/sightmap/sightmap/tree/main/webmcp/examples)
+— IKEA and GitHub, each generated from its community-atlas corpus.
+
+### `sightmap webmcp init`
+
+```bash
+sightmap webmcp init --site myshop --base-url https://myshop.example
+```
+
+Reads the corpus and writes a draft `webmcp.tools.yaml`: a fetch-read tool
+for every view that has a representative `url:`, and an API stub for every
+corpus request. Every entry is marked TODO — the draft is where the
+authoring loop starts, not where it ends. Refuses to overwrite an existing
+manifest.
+
+**Flags:** `--site` and `--base-url` (both required), `--sightmap-dir`
+(default `.sightmap`), `--out` (default `webmcp.tools.yaml`).
+
+### `sightmap webmcp validate`
+
+Compiles without writing. Every diagnostic is written to be acted on: an
+unknown component lists the corpus's candidates, a missing property lists
+the properties the component does declare, and a name defined differently
+per view tells you to set the tool's `view:`.
+
+**Flags:** `--tools` (default `webmcp.tools.yaml`), `--sightmap-dir`
+(default: the manifest's `sightmap:` field, else `.sightmap` next to it).
+
+### `sightmap webmcp generate`
+
+```bash
+sightmap webmcp generate --tools webmcp.tools.yaml --format all
+```
+
+Emits up to three files, one per format:
+
+| Format | File | For |
+| --- | --- | --- |
+| `snippet` | `SITE.webmcp.js` | Injection — `sightmap browser eval "$(cat SITE.webmcp.js)"` to verify tools in a live session |
+| `module` | `SITE.webmcp.module.js` | Site owners — `<script type="module">` makes the site itself WebMCP-enabled |
+| `userscript` | `SITE.webmcp.user.js` | Third-party publishing — Tampermonkey/Violentmonkey, `@match` from the manifest |
+
+Every bundle registers its tools with `document.modelContext` where the
+browser provides it, and always installs a `window.__sightmapWebMCP` shim
+(`listTools()`, `callTool()`, `callToolAndStore()` for eval bridges that
+cannot await) — the verification surface, and the fallback in browsers
+without the origin trial.
+
+Output is deterministic: no timestamps, and the banner carries a content
+hash of the corpus, so a committed bundle can be drift-checked. That is what
+`--check` does — regenerate in memory, compare, exit **2** on drift, write
+nothing — and it is how the sightmap repo's own CI keeps the committed
+examples honest.
+
+**Flags:** `--tools`, `--sightmap-dir` (as above), `--format`
+(`snippet|module|userscript|all`, default `snippet`), `--out FILE` (single
+format), `--out-dir DIR` (default: the manifest's directory), `--check`.
