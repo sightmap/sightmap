@@ -551,7 +551,13 @@ async function __smwRunApi(tool, args, meta, signal) {
       rspHeaders[String(k).toLowerCase()] = v;
     });
   }
-  const out = { status: resp.status };
+  // A result spec named "status" shadows the HTTP identity (spec: reserved
+  // identity names) — the declared extraction is the only thing that may set
+  // it, and on a miss the key is silently absent, never the HTTP code.
+  const out = {};
+  if (!(api.result || []).some((r) => r.name === "status")) {
+    out.status = resp.status;
+  }
   if (api.result && api.result.length > 0) {
     // Header names match case-insensitively (spec) — normalize the request
     // side the same way the response side already is.

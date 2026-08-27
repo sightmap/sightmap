@@ -276,6 +276,40 @@ describe("review-driven regressions", () => {
     ).toBe("application/json");
   });
 
+  test("a result spec named status shadows the HTTP identity", async () => {
+    const stock = ir.tools.find((t) => t.name === "stock");
+    const shadowed = {
+      ...stock,
+      api: {
+        ...stock.api,
+        result: [
+          {
+            name: "status",
+            source: "rsp.body",
+            field: "state",
+            pattern: null,
+            transform: null,
+          },
+        ],
+      },
+    };
+    global.fetch = jest.fn(async () => ({
+      status: 200,
+      text: async () => JSON.stringify({ state: "declined" }),
+      headers: { forEach: () => {} },
+    }));
+    let out = await rt.__smwExecuteTool(shadowed, ir.meta, { sku: "A" });
+    expect(out).toEqual({ status: "declined" });
+    // On a miss the shadowed key is absent — never the HTTP code.
+    global.fetch = jest.fn(async () => ({
+      status: 200,
+      text: async () => JSON.stringify({ other: 1 }),
+      headers: { forEach: () => {} },
+    }));
+    out = await rt.__smwExecuteTool(shadowed, ir.meta, { sku: "A" });
+    expect(out).toEqual({});
+  });
+
   test("api JSON bodies are bounded by maxBodyChars", async () => {
     global.fetch = jest.fn(async () => ({
       status: 200,
