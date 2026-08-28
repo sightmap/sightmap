@@ -17,10 +17,14 @@ Redefine component `properties[]` extraction so it resolves against the abstract
 component tree instead of the live DOM. Every `extract` directive references only
 (a) the matched node's own carried data — its accessible text and its
 attributes — or (b) the extracted property of a component nested beneath it. The
-DOM-shaped modes (`inner_text`, `text_only`, `inner_html`, bare-CSS
-sub-selectors) and `transform` are removed. This makes property values resolvable
-offline, from a serialized tree, on any UI platform — closing the gap where the
-only path that produced values was a live-DOM pass over CDP.
+DOM-shaped component modes (`inner_text`, `text_only`, `inner_html`, bare-CSS
+sub-selectors) are removed. Separately, `transform` is removed from **every**
+property type — component, request, and message: the fixed transform vocabulary
+was ill-conceived and inconsistent (an unspecced `match:` mode even leaked into
+tooling), and request/message extraction already has `pattern` (RE2 + capture
+groups) for the cases that matter. The tree-closed component change makes property
+values resolvable offline, from a serialized tree, on any UI platform — closing
+the gap where the only path that produced values was a live-DOM pass over CDP.
 
 ## Motivation
 
@@ -118,6 +122,8 @@ property name; in `exists:PATH` the whole path names components.
 ### JSON Schema diff
 
 - `$defs.componentProperty`: remove the `transform` property entirely.
+- `$defs.requestProperty` and `$defs.messageProperty`: remove the `transform`
+  property entirely; their `source`/`field`/`pattern` extraction is unchanged.
 - `$defs.componentProperty.extract`: unchanged as a type (`string`, `minLength:
   1`); its *accepted grammar* narrows to the four forms above. The named DOM
   modes `inner_text`, `text_only`, `inner_html` and the bare-CSS-sub-selector
@@ -159,8 +165,9 @@ A conforming SDK:
   serialized component tree, without requiring a live DOM.
 - MUST resolve references over the complete tree and MUST descend only.
 - MUST omit a property that does not resolve, silently.
-- MUST reject `transform` and the removed DOM extract modes as invalid corpus
-  input (validation error), rather than silently accepting them.
+- MUST reject `transform` (on any property type) and the removed DOM component
+  extract modes as invalid corpus input (validation error), rather than silently
+  accepting them.
 - MAY define what `text` and the carried attribute set contain for its platform.
 
 ## Alternatives considered
@@ -187,7 +194,11 @@ on the matched node.
 - **Corpora** using a bare-CSS sub-selector, `exists:SEL`, `inner_text`,
   `text_only`, or `inner_html` must promote the referenced sub-element to a
   declared child component and reference it via `PATH.prop` / `exists:PATH`.
-  Corpora using `transform` must drop it.
+  Corpora using `transform` on **any** property type (component, request, or
+  message) must drop it; for request/message, fold the extraction into `pattern`
+  where possible (`first_number` → `(\d[\d,.]*)`, `first_dollar` → `(\$[\d,.]+)`,
+  etc.). The two mutation transforms `number` and `slug` have no `pattern`
+  equivalent, but are near-useless on request bodies and stack frames.
 - **SDKs** replace the live-DOM extraction pass with tree resolution; the live
   path becomes "build tree → match → resolve over the tree," so one
   implementation serves both live and offline.
@@ -199,7 +210,9 @@ on the matched node.
 
 This SEP supersedes the extraction model of SEP-0003; SEP-0003's property
 *declaration shape* (`name`/`extract`, the reserved `value` name, silent
-omission) carries forward.
+omission) carries forward. It also removes the `transform` field from request
+(SEP-0005) and message (SEP-0006) properties; the `source`/`field`/`pattern`
+extraction those SEPs define is otherwise unchanged.
 
 ## Open questions
 
@@ -215,6 +228,7 @@ omission) carries forward.
 
 - SEP-0003 (component `properties[]`) — the declaration shape this supersedes the
   extraction model of.
-- SEP-0005 / SEP-0006 and issue #170 — the request/message offline-evaluation
-  precedent this parallels.
+- SEP-0005 / SEP-0006 — the request/message property SEPs; this SEP removes their
+  `transform` field (issue #170 is the offline-evaluation precedent this
+  parallels).
 - Issue #282 — the missing offline component-property evaluation half.

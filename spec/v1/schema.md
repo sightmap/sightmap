@@ -261,7 +261,6 @@ A named API endpoint.
 | `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. |
 | `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). For a `.headers` source, a header name matched case-insensitively; **required** whenever `source` is a headers source. |
 | `pattern` | string | see below | An [RE2](#regular-expressions) regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
-| `transform` | string | no | Optional post-processing applied to the extracted string; see [Transforms](#transforms). |
 
 At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source `field` is required too (a bare regex across a raw header block is the addressing foot-gun this shape removes). `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`).
 
@@ -272,19 +271,6 @@ Extraction requires **live traffic**. A tool operating on static corpus definiti
 `status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. They sit outside `source` entirely — a consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
 
 `properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](../seps/0005-request-properties.md).
-
-#### Transforms
-
-When `transform` is set it is applied to the trimmed extracted string; if the value is empty or absent, the transform is skipped and the property omitted. Exactly one transform may be given (not composable in v1). Used by request and message `properties:`.
-
-| Value | Effect |
-|---|---|
-| `first_word` | First whitespace-delimited token |
-| `last_word` | Last whitespace-delimited token |
-| `first_number` | First substring matching `\d[\d,.]*` |
-| `first_dollar` | First substring matching `\$[\d,.]+` |
-| `number` | Strip all non-digit, non-decimal characters |
-| `slug` | Lowercase; spaces and underscores → hyphens; strip non-`[a-z0-9-]` |
 
 ### Payload
 
@@ -342,7 +328,7 @@ A record matches when every declared constraint holds. Declaring neither `level`
 
 ### Message properties
 
-`properties:` declares named values to pull out of an uncaught exception's **stack trace**, so a corpus can classify an exception by where it came from and extract the failing location — the message-side analogue of a request's [`properties:`](#request-properties). It reuses that mechanism's `source` / `field` / `pattern` / `transform` shape.
+`properties:` declares named values to pull out of an uncaught exception's **stack trace**, so a corpus can classify an exception by where it came from and extract the failing location — the message-side analogue of a request's [`properties:`](#request-properties). It reuses that mechanism's `source` / `field` / `pattern` shape.
 
 ```yaml
 messages:
@@ -370,7 +356,6 @@ messages:
 | `source` | string | yes | Which root to read from. The only value in v1 is `stack` (the exception's call stack). |
 | `field` | string | yes | The frame and attribute to select, `<frame>.<attribute>`: `<frame>` is `top` (an alias for `0`) or a non-negative frame index (`0`, `1`, …), throwing frame first; `<attribute>` is one of `function`, `file`, `line`, or `column`. Required — a `stack` source has no meaningful bare-regex scan, the same reasoning that requires `field` for a request's headers source. |
 | `pattern` | string | no | An [RE2](#regular-expressions) regex applied to whatever `field` resolved. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
-| `transform` | string | no | Optional post-processing applied to the extracted string; see [Transforms](#transforms). |
 
 Extraction requires **live traffic** and **value omission is silent**, exactly as for [request properties](#request-properties): a property that doesn't resolve (a plain console record with no stack, a frame index out of range, an unknown attribute, no pattern match) is simply absent, never an error. See [SEP-0006](../seps/0006-message-entity.md).
 
@@ -560,12 +545,11 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - MUST resolve `properties:` only from live traffic, and MUST NOT error when a `properties:`-declaring request is used in a static context — omit the value instead
 - MUST omit an unresolved property value silently, without a diagnostic
 - MUST apply `pattern` to the value `field` resolved (not the whole source) when both are present, taking capture group 1 as the value when the pattern has one, else the entire match
-- SHOULD apply `transform` as [Transforms](#transforms) specifies: skipped on an empty or absent raw value, single transform only, not composable
 - MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
 - MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern`, applies no `transform`, and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern` and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

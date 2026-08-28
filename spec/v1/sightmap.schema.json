@@ -258,11 +258,6 @@
           "type": "string",
           "minLength": 1,
           "description": "RE2 regex (no backreferences or lookaround) applied to what field resolved, or to the raw source text when field is absent. Capture group 1 is the value if present, else the full match."
-        },
-        "transform": {
-          "type": "string",
-          "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
-          "description": "Optional post-processing applied to the extracted string: first_word | last_word | first_number | first_dollar | number | slug. See schema.md Transforms."
         }
       }
     },
@@ -324,11 +319,6 @@
           "type": "string",
           "minLength": 1,
           "description": "RE2 regex (no backreferences or lookaround) applied to what field resolved. Capture group 1 is the value if present, else the full match."
-        },
-        "transform": {
-          "type": "string",
-          "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
-          "description": "Optional post-processing applied to the extracted string: first_word | last_word | first_number | first_dollar | number | slug. See schema.md Transforms."
         }
       }
     },

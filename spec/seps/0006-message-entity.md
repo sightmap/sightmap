@@ -10,6 +10,11 @@ related-issues: [158]
 related-discussions: []
 ---
 
+> **Amended by [SEP-0010](0010-tree-closed-component-properties.md):** the
+> `transform` field is removed from message `properties[]`. Fold any
+> post-processing into `pattern` (RE2 + capture groups). The `source` / `field` /
+> `pattern` extraction described below is otherwise unchanged.
+
 ## Summary
 
 Introduce a new top-level `messages` concept, peer to `views`/`components`/`requests`: a named, declarative pattern matching console output and runtime exceptions by `level` and a `message` regex. It gives console/exception activity the same thing `requests:` already gives network activity — a named, referenceable entity.
