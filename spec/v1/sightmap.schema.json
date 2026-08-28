@@ -178,24 +178,19 @@
     },
     "componentProperty": {
       "type": "object",
-      "description": "A named DOM-value extraction from a matched element. See SEP-0003.",
+      "description": "A named value extracted from a matched component's node, resolved over the component tree. See SEP-0010.",
       "required": ["name", "extract"],
       "additionalProperties": false,
       "properties": {
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "Key used in the snapshot annotation (name=\"value\"). The name 'value' is reserved: it may be declared to override the AX built-in, but SDKs treat 'value' as the AX-value fallback even without a declaration."
+          "description": "Key used in the snapshot annotation (name=\"value\"). Must be unique within a component. The name 'value' is reserved: it may be declared to override the AX built-in, but SDKs treat 'value' as the AX-value fallback even without a declaration."
         },
         "extract": {
           "type": "string",
           "minLength": 1,
-          "description": "Extraction directive: text | inner_text | text_only | inner_html | attr=NAME | exists:SEL | a CSS sub-selector. See SEP-0003 Extract modes."
-        },
-        "transform": {
-          "type": "string",
-          "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
-          "description": "Optional post-processing applied to the extracted string."
+          "description": "Extraction directive, one of: text | attr=NAME | PATH.prop | exists:PATH. The grammar is validated by the SDK. See SEP-0010 Extract grammar."
         }
       }
     },
@@ -267,7 +262,7 @@
         "transform": {
           "type": "string",
           "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
-          "description": "Optional post-processing applied to the extracted string. Same vocabulary as componentProperty.transform (SEP-0003)."
+          "description": "Optional post-processing applied to the extracted string: first_word | last_word | first_number | first_dollar | number | slug. See schema.md Transforms."
         }
       }
     },
@@ -333,7 +328,7 @@
         "transform": {
           "type": "string",
           "enum": ["first_word", "last_word", "first_number", "first_dollar", "number", "slug"],
-          "description": "Optional post-processing applied to the extracted string. Same vocabulary as componentProperty.transform (SEP-0003)."
+          "description": "Optional post-processing applied to the extracted string: first_word | last_word | first_number | first_dollar | number | slug. See schema.md Transforms."
         }
       }
     },
