@@ -18,46 +18,93 @@ func codesFor(errs []ValidationError) map[string]int {
 	return m
 }
 
-func TestCheckComponentProperties_ValidForms(t *testing.T) {
-	c := compCorpus(
-		ComponentPropertyDef{Name: "label", Extract: "text"},
-		ComponentPropertyDef{Name: "href", Extract: "attr=href"},
-		ComponentPropertyDef{Name: "price", Extract: "Price.text"},
-		ComponentPropertyDef{Name: "sold_out", Extract: "exists:SoldOutBadge"},
-		ComponentPropertyDef{Name: "amount", Extract: "Row.Price.amount"},
-	)
-	if errs := checkComponentProperties(c); len(errs) != 0 {
-		t.Fatalf("valid forms must not error, got %v", errs)
+func TestCheckComponentProperties(t *testing.T) {
+	tests := []struct {
+		name  string
+		props []ComponentPropertyDef
+		want  map[string]int // error code -> count; nil means no errors
+	}{
+		{
+			name: "valid forms",
+			props: []ComponentPropertyDef{
+				{Name: "label", Extract: "text"},
+				{Name: "href", Extract: "attr=href"},
+				{Name: "price", Extract: "Price.text"},
+				{Name: "sold_out", Extract: "exists:SoldOutBadge"},
+				{Name: "amount", Extract: "Row.Price.amount"},
+			},
+		},
+		{
+			name: "duplicate name",
+			props: []ComponentPropertyDef{
+				{Name: "price", Extract: "text"},
+				{Name: "price", Extract: "attr=data-price"},
+			},
+			want: map[string]int{"component-property-duplicate": 1},
+		},
+		{
+			name:  "removed DOM mode: inner_text",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "inner_text"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "removed DOM mode: text_only",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "text_only"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "removed DOM mode: inner_html",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "inner_html"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "bare CSS sub-selector",
+			props: []ComponentPropertyDef{{Name: "x", Extract: ".price"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "bare CSS selector",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "[data-testid=x]"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "mistyped attr (missing =)",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "attr"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "attr with no name",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "attr="}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "mistyped exists (missing :)",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "exists"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "exists with empty path",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "exists:"}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
+		{
+			name:  "path with empty prop",
+			props: []ComponentPropertyDef{{Name: "x", Extract: "Price."}},
+			want:  map[string]int{"component-property-extract-invalid": 1},
+		},
 	}
-}
 
-func TestCheckComponentProperties_DuplicateName(t *testing.T) {
-	c := compCorpus(
-		ComponentPropertyDef{Name: "price", Extract: "text"},
-		ComponentPropertyDef{Name: "price", Extract: "attr=data-price"},
-	)
-	if n := codesFor(checkComponentProperties(c))["component-property-duplicate"]; n != 1 {
-		t.Fatalf("expected 1 duplicate-name error, got %d (%v)", n, checkComponentProperties(c))
-	}
-}
-
-func TestCheckComponentProperties_RejectsRemovedAndMalformed(t *testing.T) {
-	bad := []string{
-		"inner_text",      // removed DOM mode
-		"text_only",       // removed DOM mode
-		"inner_html",      // removed DOM mode
-		".price",          // bare CSS sub-selector (empty leading segment)
-		"[data-testid=x]", // bare CSS selector
-		"attr",            // mistyped attr (missing =)
-		"attr=",           // attr with no name
-		"exists",          // mistyped exists (missing :)
-		"exists:",         // exists with empty path
-		"Price.",          // path with empty prop
-	}
-	for _, extract := range bad {
-		c := compCorpus(ComponentPropertyDef{Name: "x", Extract: extract})
-		if n := codesFor(checkComponentProperties(c))["component-property-extract-invalid"]; n != 1 {
-			t.Errorf("extract %q: expected 1 extract-invalid error, got %d", extract, n)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := codesFor(checkComponentProperties(compCorpus(tt.props...)))
+			if len(got) != len(tt.want) {
+				t.Fatalf("got error codes %v, want %v", got, tt.want)
+			}
+			for code, wantCount := range tt.want {
+				if got[code] != wantCount {
+					t.Errorf("code %q: got %d, want %d", code, got[code], wantCount)
+				}
+			}
+		})
 	}
 }

@@ -50,7 +50,7 @@ func propVal(cm *sightmap.ComponentMatch, name string) (string, bool) {
 	return pv.Value, ok
 }
 
-func TestResolveComponentProperties_AllForms(t *testing.T) {
+func TestResolveComponentProperties(t *testing.T) {
 	price := &sightmap.ComponentNode{Id: "price", Name: "$42.00", Element: &sightmap.Element{Tag: "span", Attrs: map[string]string{"data-testid": "price"}}}
 	badge := &sightmap.ComponentNode{Id: "badge", Name: "Sold Out", Element: &sightmap.Element{Tag: "span", Classes: []string{"sold-out"}}}
 	link := &sightmap.ComponentNode{Id: "link", Name: "Buy", Element: &sightmap.Element{Tag: "a", Attrs: map[string]string{"href": "/p/1"}}}
@@ -61,79 +61,27 @@ func TestResolveComponentProperties_AllForms(t *testing.T) {
 		Children: []*sightmap.ComponentNode{price, badge, link},
 	}
 
-	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: productCardDefs()}).Match(card, "")
-
-	// Local text on the card itself.
-	if v, ok := propVal(res[card], "label"); !ok || v != "Product X" {
-		t.Errorf("label = %q, %v; want \"Product X\", true", v, ok)
-	}
-	// PATH.prop into the Price child's own text.
-	if v, ok := propVal(res[card], "price"); !ok || v != "$42.00" {
-		t.Errorf("price = %q, %v; want \"$42.00\", true", v, ok)
-	}
-	// exists:PATH — the SoldOutBadge is present.
-	if v, ok := propVal(res[card], "sold_out"); !ok || v != "true" {
-		t.Errorf("sold_out = %q, %v; want \"true\", true", v, ok)
-	}
-	// attr= on the Link child.
-	if v, ok := propVal(res[link], "href"); !ok || v != "/p/1" {
-		t.Errorf("href = %q, %v; want \"/p/1\", true", v, ok)
-	}
-	// The Price child carries its own resolved text.
-	if v, ok := propVal(res[price], "text"); !ok || v != "$42.00" {
-		t.Errorf("Price.text = %q, %v; want \"$42.00\", true", v, ok)
-	}
-}
-
-func TestResolveComponentProperties_SilentOmission(t *testing.T) {
-	// A card with no SoldOutBadge and no Price, and a link with no href.
-	link := &sightmap.ComponentNode{Id: "link", Name: "Buy", Element: &sightmap.Element{Tag: "a"}}
-	card := &sightmap.ComponentNode{
+	noHrefLink := &sightmap.ComponentNode{Id: "link", Name: "Buy", Element: &sightmap.Element{Tag: "a"}}
+	emptyCard := &sightmap.ComponentNode{
 		Id:       "card",
 		Name:     "", // empty accessible name → label omitted
 		Element:  &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "pod"}},
-		Children: []*sightmap.ComponentNode{link},
+		Children: []*sightmap.ComponentNode{noHrefLink},
 	}
 
-	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: productCardDefs()}).Match(card, "")
-
-	if _, ok := propVal(res[card], "label"); ok {
-		t.Error("label should be omitted when accessible name is empty")
-	}
-	if _, ok := propVal(res[card], "price"); ok {
-		t.Error("price should be omitted when there is no Price descendant")
-	}
-	if _, ok := propVal(res[card], "sold_out"); ok {
-		t.Error("sold_out should be omitted when SoldOutBadge is absent")
-	}
-	if _, ok := propVal(res[link], "href"); ok {
-		t.Error("href should be omitted when the attribute is not carried")
-	}
-}
-
-func TestResolveComponentProperties_MultiMatchFirstInDocumentOrder(t *testing.T) {
 	price1 := &sightmap.ComponentNode{Id: "p1", Name: "$10.00", Element: &sightmap.Element{Tag: "span", Attrs: map[string]string{"data-testid": "price"}}}
 	price2 := &sightmap.ComponentNode{Id: "p2", Name: "$20.00", Element: &sightmap.Element{Tag: "span", Attrs: map[string]string{"data-testid": "price"}}}
-	card := &sightmap.ComponentNode{
+	multiCard := &sightmap.ComponentNode{
 		Id:       "card",
 		Name:     "Product X",
 		Element:  &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "pod"}},
 		Children: []*sightmap.ComponentNode{price1, price2},
 	}
 
-	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: productCardDefs()}).Match(card, "")
-
-	if v, ok := propVal(res[card], "price"); !ok || v != "$10.00" {
-		t.Errorf("price = %q, %v; want first-in-document-order \"$10.00\", true", v, ok)
-	}
-}
-
-func TestResolveComponentProperties_NestedPath(t *testing.T) {
 	amount := &sightmap.ComponentNode{Id: "amt", Name: "$5.00", Element: &sightmap.Element{Tag: "b", Attrs: map[string]string{"data-testid": "amount"}}}
 	pricebox := &sightmap.ComponentNode{Id: "pb", Element: &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "price"}}, Children: []*sightmap.ComponentNode{amount}}
 	row := &sightmap.ComponentNode{Id: "row", Element: &sightmap.Element{Tag: "li", Attrs: map[string]string{"data-testid": "row"}}, Children: []*sightmap.ComponentNode{pricebox}}
-
-	defs := []sightmap.ComponentDef{
+	nestedDefs := []sightmap.ComponentDef{
 		{
 			Name:       "Row",
 			Selectors:  []string{"[data-testid=row]"},
@@ -143,8 +91,68 @@ func TestResolveComponentProperties_NestedPath(t *testing.T) {
 		{Name: "Amount", Selectors: []string{"[data-testid=row] [data-testid=price] [data-testid=amount]"}, ParentChain: []string{"Row", "Price"}, Properties: []sightmap.ComponentPropertyDef{{Name: "text", Extract: "text"}}},
 	}
 
-	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(row, "")
-	if v, ok := propVal(res[row], "amount"); !ok || v != "$5.00" {
-		t.Errorf("amount (Price.Amount.text) = %q, %v; want \"$5.00\", true", v, ok)
+	type check struct {
+		node *sightmap.ComponentNode
+		prop string
+		want string
+		ok   bool
+	}
+	tests := []struct {
+		name   string
+		defs   []sightmap.ComponentDef
+		root   *sightmap.ComponentNode
+		checks []check
+	}{
+		{
+			name: "all extract forms",
+			defs: productCardDefs(),
+			root: card,
+			checks: []check{
+				{card, "label", "Product X", true}, // local text
+				{card, "price", "$42.00", true},    // PATH.prop into Price child's text
+				{card, "sold_out", "true", true},   // exists:PATH — SoldOutBadge present
+				{link, "href", "/p/1", true},       // attr= on Link child
+				{price, "text", "$42.00", true},    // Price child carries its own resolved text
+			},
+		},
+		{
+			name: "silent omission",
+			defs: productCardDefs(),
+			root: emptyCard,
+			checks: []check{
+				{emptyCard, "label", "", false},    // empty accessible name
+				{emptyCard, "price", "", false},    // no Price descendant
+				{emptyCard, "sold_out", "", false}, // SoldOutBadge absent
+				{noHrefLink, "href", "", false},    // attribute not carried
+			},
+		},
+		{
+			name: "multi-match resolves first in document order",
+			defs: productCardDefs(),
+			root: multiCard,
+			checks: []check{
+				{multiCard, "price", "$10.00", true},
+			},
+		},
+		{
+			name: "nested PATH.prop",
+			defs: nestedDefs,
+			root: row,
+			checks: []check{
+				{row, "amount", "$5.00", true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: tt.defs}).Match(tt.root, "")
+			for _, c := range tt.checks {
+				v, ok := propVal(res[c.node], c.prop)
+				if ok != c.ok || v != c.want {
+					t.Errorf("%s = %q, %v; want %q, %v", c.prop, v, ok, c.want, c.ok)
+				}
+			}
+		})
 	}
 }

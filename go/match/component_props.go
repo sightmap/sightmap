@@ -12,9 +12,9 @@ import (
 // DOM. It runs after all matches are collected, so PATH.prop / exists:PATH can
 // see sibling and descendant matches.
 //
-// A property is dropped silently when it does not resolve (empty text, an
+// A property is dropped silently when it does not resolve: empty text, an
 // attribute the node does not carry, or a PATH that matches no descendant
-// component), matching the spec's silent-omission rule.
+// component.
 func resolveComponentProperties(
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
@@ -100,9 +100,6 @@ func resolvePath(
 			return nil
 		}
 		cur = next
-	}
-	if cur == node {
-		return nil // empty path resolves to self, which is not a descendant
 	}
 	return cur
 }
