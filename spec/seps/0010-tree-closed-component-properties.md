@@ -2,7 +2,7 @@
 sep: 0010
 title: Tree-closed component property extraction
 author: Joel Webber (@joelgwebber)
-status: Draft
+status: Accepted
 created: 2026-08-27
 updated: 2026-08-27
 spec-version-target: 1
