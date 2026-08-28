@@ -36,11 +36,9 @@
 
 /**
  * @typedef {Object} PropertyDescriptor
- * @property {string}  name       - Output key, e.g. "price"
- * @property {string}  extract    - Extraction mode: "text" | "inner_text" | "text_only" |
- *                                   "inner_html" | "attr=NAME" | "exists:SEL" | CSS selector
- * @property {string}  [transform] - Post-process: "first_word" | "last_word" | "first_number" |
- *                                   "first_dollar" | "number" | "slug" | "match:REGEX"
+ * @property {string}  name    - Output key, e.g. "price"
+ * @property {string}  extract - Tree-closed extract form (SEP-0010):
+ *                               "text" | "attr=NAME" | "PATH.prop" | "exists:PATH"
  */
 
 /**
