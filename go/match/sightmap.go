@@ -14,7 +14,8 @@ func ParseQueries(defs []sightmap.ComponentDef) ([]MatchQuery, []error) {
 	var queries []MatchQuery
 	var errs []error
 
-	for _, def := range defs {
+	for i := range defs {
+		def := &defs[i]
 		for _, selStr := range def.Selectors {
 			ps, err := sightmap.ParseSightmapSelector(selStr)
 			if err != nil {
@@ -25,6 +26,7 @@ func ParseQueries(defs []sightmap.ComponentDef) ([]MatchQuery, []error) {
 				Name:        def.Name,
 				Parts:       ps.Parts,
 				Combinators: ps.Combinators,
+				Def:         def,
 			})
 		}
 	}

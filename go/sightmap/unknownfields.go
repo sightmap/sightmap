@@ -29,7 +29,7 @@ var (
 	requestFields   = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
 	payloadFields   = set("fields")
 	fieldFields     = set("name", "type", "description")
-	propertyFields  = set("name", "extract", "transform")
+	propertyFields  = set("name", "extract")
 	accessFields    = set("status", "reason")
 	snapshotFields  = set("name", "notes", "url")
 

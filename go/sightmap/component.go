@@ -14,16 +14,16 @@ type ComponentDef struct {
 	Stability   string                 `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"
 }
 
-// ComponentPropertyDef describes a value to extract from a matched DOM element.
+// ComponentPropertyDef describes a value extracted from a matched component,
+// resolved over the component tree (SEP-0010).
 type ComponentPropertyDef struct {
-	Name      string `json:"name"`
-	Extract   string `json:"extract"`   // see extract modes: text, inner_text, text_only, attr=NAME, exists:SEL, CSS selector
-	Transform string `json:"transform"` // optional post-processing
+	Name    string `json:"name"`
+	Extract string `json:"extract"` // SEP-0010: text | attr=NAME | PATH.prop | exists:PATH
 }
 
 // ComponentMatch records which component definition matched a node, and carries
-// any live-extracted property values for it (Properties, in the definition's
-// order; nil unless properties were extracted).
+// its resolved property values (Properties, in the definition's order; nil
+// unless the component declares properties that resolved).
 type ComponentMatch struct {
 	Name       string
 	Memory     []string

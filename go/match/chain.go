@@ -61,17 +61,12 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 		}
 	}
 
-	byName := make(map[string]*sightmap.ComponentDef, len(entry.components))
-	for i := range entry.components {
-		byName[entry.components[i].Name] = &entry.components[i]
-	}
-
 	var out []ChainMatch
 	FindAllMatches(nodes[0], entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		cm := ChainMatch{Depth: depthOf[node], Name: q.Name}
-		if def := byName[q.Name]; def != nil {
-			cm.Tags = def.Tags
-			cm.Memory = def.Memory
+		if q.Def != nil {
+			cm.Tags = q.Def.Tags
+			cm.Memory = q.Def.Memory
 		}
 		out = append(out, cm)
 	})

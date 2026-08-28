@@ -89,9 +89,8 @@ type rawAccess struct {
 }
 
 type rawProperty struct {
-	Name      string `yaml:"name"`
-	Extract   string `yaml:"extract"`
-	Transform string `yaml:"transform"`
+	Name    string `yaml:"name"`
+	Extract string `yaml:"extract"`
 }
 
 type rawRequest struct {
@@ -314,7 +313,7 @@ func rawPropsToMatch(rps []rawProperty) []ComponentPropertyDef {
 	}
 	ps := make([]ComponentPropertyDef, len(rps))
 	for i, rp := range rps {
-		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract, Transform: rp.Transform}
+		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract}
 	}
 	return ps
 }

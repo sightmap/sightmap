@@ -58,24 +58,25 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 		return nil
 	}
 
-	// Map component name → definition for memory resolution at match time.
-	byName := make(map[string]*sightmap.ComponentDef, len(entry.components))
-	for i := range entry.components {
-		byName[entry.components[i].Name] = &entry.components[i]
-	}
-
 	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
+	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
 	FindAllMatches(root, entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		if _, already := result[node]; already {
 			return // first-match-wins
 		}
 		cm := &sightmap.ComponentMatch{Name: q.Name}
-		if def := byName[q.Name]; def != nil {
-			cm.Memory = def.Memory
-			cm.Tags = def.Tags
+		if q.Def != nil {
+			cm.Memory = q.Def.Memory
+			cm.Tags = q.Def.Tags
+			defByNode[node] = q.Def
 		}
 		result[node] = cm
 	})
+
+	// Resolve declared component properties over the matched tree (SEP-0010):
+	// text/attr read the node itself; PATH.prop and exists:PATH resolve a
+	// descendant matched component. No live DOM is required.
+	resolveComponentProperties(result, defByNode)
 	return result
 }
 
