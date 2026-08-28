@@ -1,0 +1,19 @@
+title: "skills generate writes a router SKILL.md, an area index, and one reference file per corpus file"
+run:
+  args: [skills, generate, --out, out, --name, verify-app]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '1 area\(s\)'
+      why: the fixture's single corpus file (library-ui.yaml) should become exactly one area
+  files:
+    - exists: out/verify-app/SKILL.md
+      must_match: 'name: verify-app'
+      why: the router frontmatter names the generated skill
+    - exists: out/verify-app/references/README.md
+      must_match: 'library-ui'
+      why: the index links every area
+    - exists: out/verify-app/references/areas/library-ui.md
+      must_match: 'LibrarySearchBar'
+      why: a nested component from the corpus reaches its area file

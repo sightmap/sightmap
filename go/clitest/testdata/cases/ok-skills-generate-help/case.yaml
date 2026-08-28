@@ -1,0 +1,18 @@
+title: "skills generate --help prints usage and exits zero with no corpus lookup and no writes"
+run:
+  args: [skills, generate, --help]
+expect:
+  exit: zero
+  output:
+    - must_match: '(?i)usage'
+      why: --help on any subcommand must print usage and exit 0 with no side effects
+    - must_not_match: '\.sightmap.*not found|no \.sightmap'
+      why: >
+        a help request must resolve at flag-parsing time, before the corpus
+        lookup ever runs — this cwd has no .sightmap/ dir, so if --help fell
+        through to real work it would fail with that message instead of
+        printing usage (the browser-install-help-executes bug class this
+        guards against: a flag falling through to the real command's side
+        effects).
+    - must_not_match: 'area\(s\)'
+      why: --help must never reach the point of actually generating anything

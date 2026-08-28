@@ -137,6 +137,11 @@ type rawComponent struct {
 	Children    []rawComponent `yaml:"children"`
 	Properties  []rawProperty  `yaml:"properties"`
 	Stability   string         `yaml:"stability"`
+
+	// sourceFile is set by the loader (stampSourceFile), never parsed from
+	// YAML: the basename (sans extension) of the corpus file this component's
+	// name: was declared in. See ComponentDef.SourceFile.
+	sourceFile string
 }
 
 // rawSelector handles the selector field as either a scalar string or a YAML
@@ -161,6 +166,43 @@ func (r *rawSelector) UnmarshalYAML(value *yaml.Node) error {
 }
 
 // ---- DirLoader implementation -----------------------------------------------
+
+// rawRequestFile pairs a raw request declaration with the basename of the
+// corpus file it was declared in — requests carry no hierarchy or $ref, so
+// (unlike components) the file is simply the one they were read from.
+type rawRequestFile struct {
+	rr   rawRequest
+	file string
+}
+
+// rawMessageFile pairs a raw message declaration with its declaring file's
+// basename. Messages are file-root only.
+type rawMessageFile struct {
+	rm   rawMessage
+	file string
+}
+
+// viewFileWithPath pairs a parsed file's views with the file's full path, so
+// the view-building pass can derive SourceFile (and default url:) per file.
+type viewFileWithPath struct {
+	rf   rawFile
+	path string
+}
+
+// stampSourceFile records, recursively, which corpus file each raw component
+// was declared in. The loader flattens hierarchy away during compile, so
+// without this a flattened ComponentDef cannot be attributed back to the
+// .sightmap/*.yaml file it came from — the gap Corpus.Memory's doc comment
+// already flags for memory entries. Not parsed from YAML; see
+// rawComponent.sourceFile and ComponentDef.SourceFile.
+func stampSourceFile(rcs []rawComponent, file string) {
+	for i := range rcs {
+		rcs[i].sourceFile = file
+		if len(rcs[i].Children) > 0 {
+			stampSourceFile(rcs[i].Children, file)
+		}
+	}
+}
 
 func loadDir(path string) (*Corpus, error) {
 	// Collect all .yaml / .yml files in lexical order.
@@ -188,13 +230,10 @@ func loadDir(path string) (*Corpus, error) {
 	}
 
 	var memory []string
+	var fileMemory []FileMemory
 	var globalRaws []rawComponent
-	var globalRequestRaws []rawRequest
-	var messageRaws []rawMessage
-	type viewFileWithPath struct {
-		rf   rawFile
-		path string
-	}
+	var globalRequestRaws []rawRequestFile
+	var messageRaws []rawMessageFile
 	var viewFiles []viewFileWithPath
 	var fieldDiags []ValidationError
 
@@ -207,20 +246,26 @@ func loadDir(path string) (*Corpus, error) {
 		if err := yaml.Unmarshal(data, &rf); err != nil {
 			return nil, fmt.Errorf("sightmap: parse %q: %w", p, err)
 		}
+		base := filepath.Base(p)
+		basename := strings.TrimSuffix(base, filepath.Ext(base))
 		// Tooling files (config.yaml, survey.yaml) have their own schemas and are
 		// not corpus files — don't run the corpus unknown-field check over them.
-		if base := filepath.Base(p); base != "config.yaml" && base != "config.yml" && base != "survey.yaml" && base != "survey.yml" {
+		if base != "config.yaml" && base != "config.yml" && base != "survey.yaml" && base != "survey.yml" {
 			fieldDiags = append(fieldDiags, unknownFieldWarnings(data, base)...)
 		}
-		memory = append(memory, rf.Memory...)
+		if len(rf.Memory) > 0 {
+			memory = append(memory, rf.Memory...)
+			fileMemory = append(fileMemory, FileMemory{SourceFile: basename, Memory: rf.Memory})
+		}
 		if len(rf.Components) > 0 {
+			stampSourceFile(rf.Components, basename)
 			globalRaws = append(globalRaws, rf.Components...)
 		}
-		if len(rf.Requests) > 0 {
-			globalRequestRaws = append(globalRequestRaws, rf.Requests...)
+		for _, rr := range rf.Requests {
+			globalRequestRaws = append(globalRequestRaws, rawRequestFile{rr: rr, file: basename})
 		}
-		if len(rf.Messages) > 0 {
-			messageRaws = append(messageRaws, rf.Messages...)
+		for _, rm := range rf.Messages {
+			messageRaws = append(messageRaws, rawMessageFile{rm: rm, file: basename})
 		}
 		if len(rf.Views) > 0 {
 			viewFiles = append(viewFiles, viewFileWithPath{rf: rf, path: p})
@@ -280,23 +325,32 @@ func loadDir(path string) (*Corpus, error) {
 			if viewURL == "" {
 				viewURL = vf.URL
 			}
+			// View-declared components belong to this view's file, same as any
+			// global component belongs to the file it was declared in.
+			stampSourceFile(rv.Components, basename)
+			var viewRequests []rawRequestFile
+			for _, rr := range rv.Requests {
+				viewRequests = append(viewRequests, rawRequestFile{rr: rr, file: basename})
+			}
 			views = append(views, ViewDef{
-				Name:       rv.Name,
-				Route:      rv.Route,
-				Memory:     rv.Memory,
-				Components: flattenAll(rv.Components, ctx),
-				Requests:   toRequestDefs(rv.Requests, ctx),
-				Stability:  rv.Stability,
-				Access:     access,
-				URL:        viewURL,
-				Snapshots:  snapshots,
-				SourceFile: basename,
+				Name:        rv.Name,
+				Route:       rv.Route,
+				Memory:      rv.Memory,
+				Components:  flattenAll(rv.Components, ctx),
+				Requests:    toRequestDefs(viewRequests, ctx),
+				Stability:   rv.Stability,
+				Access:      access,
+				URL:         viewURL,
+				Snapshots:   snapshots,
+				SourceFile:  basename,
+				Description: rv.Description,
 			})
 		}
 	}
 
 	return &Corpus{
 		Memory:           memory,
+		FileMemory:       fileMemory,
 		GlobalComponents: globalComps,
 		Views:            views,
 		Requests:         globalRequests,
@@ -322,12 +376,13 @@ func rawPropsToMatch(rps []rawProperty) []ComponentPropertyDef {
 // toRequestDefs converts raw request definitions into RequestDefs. A request
 // missing its required name or route is dropped with a diagnostic (the schema
 // requires both), mirroring how flattenOne surfaces missing component fields.
-func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
+func toRequestDefs(rrs []rawRequestFile, ctx *flattenCtx) []RequestDef {
 	if len(rrs) == 0 {
 		return nil
 	}
 	out := make([]RequestDef, 0, len(rrs))
-	for _, rr := range rrs {
+	for _, item := range rrs {
+		rr := item.rr
 		if rr.Name == "" {
 			ctx.addDiag("request-missing-name\x00"+rr.Route, ValidationError{
 				Code:     "missing-name",
@@ -357,6 +412,7 @@ func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
 			Memory:      rr.Memory,
 			Tags:        rr.Tags,
 			Properties:  toRequestProperties(rr.Properties),
+			SourceFile:  item.file,
 		})
 	}
 	return out
@@ -387,12 +443,13 @@ func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 // problems (a missing name, a duplicate, an uncompilable regex) are reported by
 // checkMessages at validation time rather than dropped here, so an author sees
 // every problem at once.
-func toMessageDefs(rms []rawMessage) []MessageDef {
+func toMessageDefs(rms []rawMessageFile) []MessageDef {
 	if len(rms) == 0 {
 		return nil
 	}
 	out := make([]MessageDef, 0, len(rms))
-	for _, rm := range rms {
+	for _, item := range rms {
+		rm := item.rm
 		md := MessageDef{
 			Name:        rm.Name,
 			Level:       rm.Level,
@@ -400,6 +457,7 @@ func toMessageDefs(rms []rawMessage) []MessageDef {
 			Description: rm.Description,
 			Source:      rm.Source,
 			Properties:  toMessageProperties(rm.Properties),
+			SourceFile:  item.file,
 		}
 		md.precompile() // cache the compiled pattern once, at load time
 		out = append(out, md)
@@ -612,6 +670,12 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		Properties:  rawPropsToMatch(rc.Properties),
 		ParentChain: parentChain, // nil for top-level; omitted from JSON
 		Stability:   rc.Stability,
+		Description: rc.Description,
+		// rc.sourceFile was stamped (stampSourceFile) before flattening began. A
+		// $ref keeps the origin file of the global it expands, not the
+		// referencing site: rc was reassigned to that global's raw struct above,
+		// which already carries its own stamp.
+		SourceFile: rc.sourceFile,
 	}}
 
 	// Recurse into children: extend the parent chain with this component's name.

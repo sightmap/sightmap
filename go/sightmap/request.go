@@ -31,6 +31,12 @@ type RequestDef struct {
 	Memory      []string             `json:"memory,omitempty"`   // request-level memory entries
 	Tags        []string             `json:"tags,omitempty"`     // open-vocabulary labels (SEP-0004)
 	Properties  []RequestPropertyDef `json:"properties,omitempty"`
+
+	// SourceFile is the basename (sans extension) of the .sightmap/*.yaml file
+	// this request was declared in, for both a global (file-root) request and a
+	// view-scoped one (which matches its owning ViewDef.SourceFile). Kept off
+	// the wire like ComponentDef.SourceFile.
+	SourceFile string `json:"-"`
 }
 
 // RequestPropertyDef declares a named value to extract from a live request/response

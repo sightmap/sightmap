@@ -1,0 +1,13 @@
+version: 1
+views:
+  - name: LibraryView
+    route: /library
+    description: Object library listing all saved objects
+    components:
+      - name: LibraryTable
+        selector: '[data-component="LibraryTable"]'
+        description: Main library object listing table
+        children:
+          - name: LibrarySearchBar
+            selector: input
+            description: Search bar for filtering library objects

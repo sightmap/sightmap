@@ -37,10 +37,25 @@ type Corpus struct {
 	// file-root `messages:` list). There is no view-scoped form.
 	Messages []MessageDef `json:"messages,omitempty"`
 
+	// FileMemory holds file-level memory entries scoped to the file they came
+	// from, in file-path (lexical) order — the "tighten this" follow-on to
+	// Memory above, needed by tooling (e.g. skillgen) that groups the corpus by
+	// source file. Memory keeps its corpus-wide concatenation unchanged for
+	// existing callers; this is additive, authoring/tooling-only, kept off the
+	// wire like ViewDef.SourceFile.
+	FileMemory []FileMemory `json:"-"`
+
 	// loadDiagnostics holds structural problems detected while loading that are
 	// no longer visible in the flattened data (e.g. a circular $ref chain, which
 	// is expanded away). Validate surfaces these alongside its own checks.
 	loadDiagnostics []ValidationError
+}
+
+// FileMemory is one corpus file's `memory:` list, attributed to its source
+// file. See Corpus.FileMemory.
+type FileMemory struct {
+	SourceFile string // basename, sans extension
+	Memory     []string
 }
 
 // Access describes the reachability of a view for the reference capture account.
@@ -66,11 +81,12 @@ type ViewDef struct {
 	Requests   []RequestDef   `json:"requests,omitempty"` // view-scoped API request definitions
 
 	// Authoring/tooling fields — kept out of the serialized wire form.
-	Stability  string     `json:"-"` // "" (default/active), "stub", or "deferred"
-	Access     Access     `json:"-"` // reachability for the reference capture account
-	URL        string     `json:"-"` // Representative URL for this view
-	Snapshots  []Snapshot `json:"-"` // List of snapshots for this view
-	SourceFile string     `json:"-"` // Source YAML filename (without .yaml extension)
+	Stability   string     `json:"-"` // "" (default/active), "stub", or "deferred"
+	Access      Access     `json:"-"` // reachability for the reference capture account
+	URL         string     `json:"-"` // Representative URL for this view
+	Snapshots   []Snapshot `json:"-"` // List of snapshots for this view
+	SourceFile  string     `json:"-"` // Source YAML filename (without .yaml extension)
+	Description string     `json:"-"` // Parsed from `description:`, previously dropped during compile
 }
 
 // ViewByName returns a pointer to the first View with the given name, or nil.

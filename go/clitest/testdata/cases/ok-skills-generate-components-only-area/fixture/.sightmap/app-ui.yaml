@@ -1,0 +1,5 @@
+version: 1
+components:
+  - name: GlobalNav
+    selector: nav.global
+    description: Global navigation shell present on every page

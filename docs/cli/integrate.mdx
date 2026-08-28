@@ -1,10 +1,10 @@
 ---
 title: "Sightmap CLI: Integration Tools Reference"
 sidebarTitle: "Integrations"
-description: "Find and install corpora from the community atlas, serve the compiled corpus over HTTP, install the bundled agent skills, and print the CLI version."
+description: "Find and install corpora from the community atlas, serve the compiled corpus over HTTP, install or generate agent skills, and print the CLI version."
 ---
 
-`sightmap atlas` finds and installs corpora published in the community atlas. `sightmap serve-sightmap` serves the compiled corpus as JSON and recompiles it when YAML changes. `sightmap skills install` extracts the bundled agent skills. `sightmap version` prints the binary version.
+`sightmap atlas` finds and installs corpora published in the community atlas. `sightmap serve-sightmap` serves the compiled corpus as JSON and recompiles it when YAML changes. `sightmap skills install` extracts the bundled agent skills; `sightmap skills generate` derives a skill router from your own corpus. `sightmap version` prints the binary version.
 
 <Note>
 `sightmap browser start` runs the same HTTP server alongside Chrome. Use `serve-sightmap` when you need the corpus endpoint without a managed browser session. See [Browser](/cli/browser) for session management.
@@ -321,6 +321,52 @@ installed 2 sightmap skill(s) → /Users/you/.agents/skills
 
 <Tip>
 The skills are embedded in the binary. Run `sightmap skills install` again after upgrading the CLI.
+</Tip>
+
+---
+
+### `sightmap skills generate`
+
+Compiles a `.sightmap/` corpus into an agent skill router: a `SKILL.md` that routes a natural-language prompt ("verify the fix on the left nav") to one reference file per corpus file, each teaching that area's component vocabulary and the `sightmap browser` commands that drive it. Where `skills install` extracts a static, hand-written skill, `skills generate` derives one from your own app — the corpus becomes the source of the app's semantics for an agent, not just something a browser session snapshots against.
+
+Each area file has two generated sections (routes, components, and ready-to-run `sightmap browser` commands) and two author-owned sections ("How to get to it (user POV)" and "Gotchas") that are seeded once and never overwritten — an author's edit to either survives every later run. The area's one-line summary, right under its heading, is the same: seeded from the corpus, then author-owned, and read back into the index on the next generate.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--sightmap-dir` | nearest `.sightmap/` at or above cwd | Corpus to read |
+| `--out` | `.claude/skills` | Skills root to write into (or check) |
+| `--name` | `verify-<app>` | Generated skill directory name. `<app>` is `config.yaml`'s `name:` when set, else the directory containing `.sightmap/` |
+| `--check` | off | Write nothing; report drift against `--out` and exit non-zero if stale |
+
+```bash
+sightmap skills generate
+```
+
+```text
+sightmap skills generate: 26 area(s) → .claude/skills/verify-fullstory (28 written, 0 unchanged)
+```
+
+A validation error (`sightmap validate` would report it too) is printed as a warning but does not block generation — a reference file for the areas that validate cleanly is strictly better than none, and unlike `sightmap stats` there's no numeric contract at stake here.
+
+<Tip>
+Commit the generated tree and gate it in CI the same way the embedded-skills mirror is gated:
+
+```bash
+sightmap skills generate
+git diff --exit-code -- .claude/skills
+```
+
+Or use `--check`, which does the same comparison without needing a git checkout:
+
+```text
+$ sightmap skills generate --check
+stale     .claude/skills/verify-fullstory/references/areas/library-ui.md
+missing   .claude/skills/verify-fullstory/references/areas/dqm-ui.md
+
+2 file(s) out of date. Run 'sightmap skills generate' and commit the result.
+```
 </Tip>
 
 ---

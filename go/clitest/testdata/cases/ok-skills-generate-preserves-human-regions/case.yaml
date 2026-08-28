@@ -1,0 +1,22 @@
+title: "skills generate preserves an area file's hand-authored regions and reads its summary back into the index"
+run:
+  args: [skills, generate, --out, out, --name, verify-app]
+  fixture: fixture
+expect:
+  exit: zero
+  files:
+    - exists: out/verify-app/references/areas/library-ui.md
+      must_match: 'HAND-AUTHORED SUMMARY: the object library and saved objects'
+      why: the summary blockquote is author-owned once seeded; a regenerate must not overwrite it
+    - exists: out/verify-app/references/areas/library-ui.md
+      must_match: 'HAND-AUTHORED USER POV: users call this "the library"\.'
+      why: "\"How to get to it (user POV)\" is author-owned prose sandwiched between the two generated regions"
+    - exists: out/verify-app/references/areas/library-ui.md
+      must_match: 'HAND-AUTHORED GOTCHA: BulkActionTable also exists in dqm-ui\.'
+      why: Gotchas is author-owned and must survive regardless of corpus changes elsewhere
+    - exists: out/verify-app/references/areas/library-ui.md
+      must_match: '<!-- sightmap:begin sub-features -->'
+      why: the managed regions themselves must still regenerate normally around the preserved prose
+    - exists: out/verify-app/references/README.md
+      must_match: 'HAND-AUTHORED SUMMARY: the object library and saved objects'
+      why: the index reads each area's actual on-disk summary back rather than recomputing its own guess

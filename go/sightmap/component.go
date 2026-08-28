@@ -12,6 +12,15 @@ type ComponentDef struct {
 	Properties  []ComponentPropertyDef `json:"properties,omitempty"`
 	ParentChain []string               `json:"parentChain,omitempty"` // ancestor component names, root-first
 	Stability   string                 `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"
+
+	// Authoring/tooling fields — kept out of the serialized wire form, matching
+	// ViewDef's convention. Description is parsed from `description:` but was
+	// previously dropped during flattening; SourceFile is the basename (sans
+	// extension) of the .sightmap/*.yaml file this definition's `name:` was
+	// declared in — a $ref'd component keeps its origin file, not the
+	// referencing view's file.
+	Description string `json:"-"`
+	SourceFile  string `json:"-"`
 }
 
 // ComponentPropertyDef describes a value to extract from a matched DOM element.

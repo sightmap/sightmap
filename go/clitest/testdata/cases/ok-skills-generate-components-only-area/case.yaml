@@ -1,0 +1,17 @@
+title: "skills generate still produces an area for a components-only file (no views:)"
+run:
+  args: [skills, generate, --out, out, --name, verify-app]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: '1 area\(s\)'
+      why: >
+        several real corpus files declare no views: at all (a global shell,
+        a shared-primitives file) — SourceFile attribution must still bucket
+        their root-level components into an area, or those files silently
+        produce nothing.
+  files:
+    - exists: out/verify-app/references/areas/app-ui.md
+      must_match: 'GlobalNav'
+      why: the file-root global component reaches its own area file

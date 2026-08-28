@@ -1,0 +1,7 @@
+version: 1
+views:
+  - name: BrokenView
+    route: /broken
+    components:
+      - name: BugReportForm
+        selector: '[aria-label="bug"]:has-text("Report a bug")'

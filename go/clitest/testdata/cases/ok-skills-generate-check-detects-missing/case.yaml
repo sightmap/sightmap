@@ -1,0 +1,11 @@
+title: "skills generate --check reports missing files and exits nonzero before anything is ever generated"
+run:
+  args: [skills, generate, --check, --out, out, --name, verify-app]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'missing'
+      why: nothing has been generated yet, so every planned file is missing
+    - must_match: "sightmap skills generate"
+      why: the failure message points at the fix, not just the symptom

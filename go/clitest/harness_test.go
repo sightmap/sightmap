@@ -64,8 +64,10 @@ type outputCheck struct {
 }
 
 type fileCheck struct {
-	Exists string `yaml:"exists"` // path relative to the run cwd
-	Why    string `yaml:"why"`
+	Exists       string `yaml:"exists"` // path relative to the run cwd
+	MustMatch    string `yaml:"must_match"`
+	MustNotMatch string `yaml:"must_not_match"`
+	Why          string `yaml:"why"`
 }
 
 type repoCheck struct {
@@ -105,8 +107,18 @@ func (c caseSpec) check(t *testing.T, caseDir string) {
 				failures = append(failures, checkPattern("output", out, oc.MustMatch, oc.MustNotMatch, oc.Why)...)
 			}
 			for _, fc := range c.Expect.Files {
-				if _, statErr := os.Stat(filepath.Join(cwd, fc.Exists)); statErr != nil {
+				full := filepath.Join(cwd, fc.Exists)
+				if _, statErr := os.Stat(full); statErr != nil {
 					failures = append(failures, withWhy(fmt.Sprintf("expected %s to exist after run", fc.Exists), fc.Why))
+					continue
+				}
+				if fc.MustMatch != "" || fc.MustNotMatch != "" {
+					data, readErr := os.ReadFile(full)
+					if readErr != nil {
+						failures = append(failures, fmt.Sprintf("file check: read %s: %v", fc.Exists, readErr))
+						continue
+					}
+					failures = append(failures, checkPattern(fc.Exists, string(data), fc.MustMatch, fc.MustNotMatch, fc.Why)...)
 				}
 			}
 		}

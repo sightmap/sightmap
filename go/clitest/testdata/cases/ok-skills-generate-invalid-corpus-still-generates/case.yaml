@@ -1,0 +1,20 @@
+title: "skills generate warns on a validation error but still generates every area — a broken selector in one file must not block the rest of the corpus"
+run:
+  args: [skills, generate, --out, out, --name, verify-app]
+  fixture: fixture
+expect:
+  exit: zero
+  output:
+    - must_match: 'unsupported pseudo-class'
+      why: >
+        the validation finding is surfaced (an author should see it), but
+        unlike `sightmap stats` this command does not refuse to run — a
+        reference file for the areas that DO validate is strictly better
+        than none, and there is no numeric contract at stake here.
+  files:
+    - exists: out/verify-app/references/areas/library-ui.md
+      must_match: 'LibraryView'
+      why: the valid area is unaffected by the other file's broken selector
+    - exists: out/verify-app/references/areas/broken-ui.md
+      must_match: 'BugReportForm'
+      why: even the area containing the broken selector still gets a reference file

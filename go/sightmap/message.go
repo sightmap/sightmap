@@ -40,6 +40,11 @@ type MessageDef struct {
 	// request properties). Resolved by ExtractProperties against Message.Stack.
 	Properties []MessagePropertyDef `json:"properties,omitempty"`
 
+	// SourceFile is the basename (sans extension) of the .sightmap/*.yaml file
+	// this message was declared in. Messages are file-root only, so this is
+	// always set for a loaded corpus. Kept off the wire like ComponentDef.SourceFile.
+	SourceFile string `json:"-"`
+
 	// re is the compiled Message pattern, cached by the loader (precompile) so
 	// MessagesForRecord doesn't recompile per record. Nil when Message is empty,
 	// the pattern is invalid (validation reports that), or the def was built in

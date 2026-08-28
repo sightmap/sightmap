@@ -23,14 +23,15 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 		Views: []sightmap.ViewDef{{
 			Name:       "Home",
 			Route:      "/",
-			Components: []sightmap.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}}},
+			Components: []sightmap.ComponentDef{{Name: "Hero", Selectors: []string{".hero"}, SourceFile: "herofile", Description: "the hero banner"}},
 			Requests:   []sightmap.RequestDef{{Name: "Ping", Route: "/api/ping"}},
 			// Authoring fields that must NOT appear on the wire:
-			URL:        "https://x.test/",
-			SourceFile: "homefile",
-			Stability:  "stub",
-			Access:     sightmap.Access{Status: "blocked", Reason: "admin"},
-			Snapshots:  []sightmap.Snapshot{{Name: "base"}},
+			URL:         "https://x.test/",
+			SourceFile:  "homefile",
+			Stability:   "stub",
+			Access:      sightmap.Access{Status: "blocked", Reason: "admin"},
+			Snapshots:   []sightmap.Snapshot{{Name: "base"}},
+			Description: "the home page",
 		}},
 	}
 
@@ -45,7 +46,7 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 			t.Errorf("wire JSON missing %s:\n%s", want, js)
 		}
 	}
-	for _, bad := range []string{`"url"`, `"sourceFile"`, `"access"`, `"snapshots"`, `"stability"`, `"reason"`, `"blocked"`, `"homefile"`} {
+	for _, bad := range []string{`"url"`, `"sourceFile"`, `"access"`, `"snapshots"`, `"stability"`, `"reason"`, `"blocked"`, `"homefile"`, `"herofile"`, `"description"`, `"the home page"`, `"the hero banner"`} {
 		if strings.Contains(js, bad) {
 			t.Errorf("wire JSON should not contain authoring token %s:\n%s", bad, js)
 		}
@@ -69,7 +70,10 @@ func TestCorpusWireRoundTrip(t *testing.T) {
 		back.Messages[0].Level != "ERROR" || back.Messages[0].Message != "cart version mismatch" {
 		t.Errorf("messages did not round-trip: %+v", back.Messages)
 	}
-	if back.Views[0].URL != "" || back.Views[0].Stability != "" || back.Views[0].SourceFile != "" {
+	if back.Views[0].URL != "" || back.Views[0].Stability != "" || back.Views[0].SourceFile != "" || back.Views[0].Description != "" {
 		t.Errorf("authoring fields should be empty after a wire round-trip: %+v", back.Views[0])
+	}
+	if len(back.Views[0].Components) != 1 || back.Views[0].Components[0].SourceFile != "" || back.Views[0].Components[0].Description != "" {
+		t.Errorf("component authoring fields should be empty after a wire round-trip: %+v", back.Views[0].Components)
 	}
 }

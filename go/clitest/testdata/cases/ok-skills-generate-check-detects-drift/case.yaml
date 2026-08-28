@@ -1,0 +1,15 @@
+title: "skills generate --check reports a stale managed region and exits nonzero without writing"
+run:
+  args: [skills, generate, --check, --out, out, --name, verify-app]
+  fixture: fixture
+expect:
+  exit: nonzero
+  output:
+    - must_match: 'stale'
+      why: the committed area file's generated region no longer matches what generate would produce
+    - must_match: 'library-ui\.md'
+      why: the report names the specific file that's out of date
+  files:
+    - exists: out/verify-app/references/areas/library-ui.md
+      must_match: 'STALE — corpus description was edited'
+      why: --check must never write, so the committed (stale) content is untouched

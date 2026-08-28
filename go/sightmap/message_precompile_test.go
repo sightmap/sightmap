@@ -8,10 +8,10 @@ import "testing"
 // rotting (matching would still work via the on-the-fly fallback, so a
 // behavioral test wouldn't catch a missing precompile).
 func TestToMessageDefsPrecompiles(t *testing.T) {
-	defs := toMessageDefs([]rawMessage{
-		{Name: "Valid", Message: "cart .* mismatch"},
-		{Name: "LevelOnly", Level: "error"},
-		{Name: "Invalid", Message: "("}, // unbalanced group
+	defs := toMessageDefs([]rawMessageFile{
+		{rm: rawMessage{Name: "Valid", Message: "cart .* mismatch"}},
+		{rm: rawMessage{Name: "LevelOnly", Level: "error"}},
+		{rm: rawMessage{Name: "Invalid", Message: "("}}, // unbalanced group
 	})
 
 	if defs[0].re == nil {

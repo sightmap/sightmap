@@ -153,6 +153,7 @@ Commands:
   atlas add SLUG [--target DIR]                             install a published corpus into .sightmap/
   init     [--sightmap-dir DIR]                             scaffold a schema-correct .sightmap/ corpus
   skills install [--target DIR]                             install sightmap authoring skill to ~/.agents/skills/
+  skills generate [--out DIR] [--name NAME] [--check]        generate an agent skill router from .sightmap/
   version                                                    print version and exit
 
 Run 'sightmap <command> --help' for full flag list.

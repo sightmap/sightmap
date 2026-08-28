@@ -1,0 +1,11 @@
+title: "skills generate against a cwd with no .sightmap/ fails and points at sightmap init"
+run:
+  args: [skills, generate]
+expect:
+  exit: nonzero
+  output:
+    - must_match: '\.sightmap'
+      why: the error names the directory that wasn't found
+    - must_match: 'sightmap init'
+      why: a missing corpus is fixed by scaffolding one — the same next step every other offline command points at
+    - must_not_match: 'panic'

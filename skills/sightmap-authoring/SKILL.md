@@ -20,7 +20,11 @@ Two outputs drive everything:
 > below), the outer loop, the tool surface, lint rules, and the quality checklist
 > are all here. For the normative spec and deeper background, see the docs at
 > <https://docs.sightmap.org>. To *use* a finished corpus — driving the browser
-> and interacting with the page — see the `sightmap-browser` skill.
+> and interacting with the page — see the `sightmap-browser` skill. To turn a
+> corpus into a natural-language skill router — one reference file per app
+> area, so a cold prompt like "verify the fix on the left nav" routes straight
+> to the components and commands that drive it — run `sightmap skills
+> generate` (see the CLI reference at <https://docs.sightmap.org/cli/integrate>).
 
 ## Installation
 

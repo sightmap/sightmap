@@ -1,0 +1,5 @@
+version: 1
+views:
+  - name: LibraryView
+    route: /library
+    description: Object library listing all saved objects

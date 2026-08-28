@@ -48,6 +48,7 @@ Foundation (offline, no browser dependency):
 | `probe` | Embeds the canonical `cdp-probe.js` browser-side extractor. |
 | `render` | Formats a `comps` tree (+ matches) into the annotated snapshot and the raw `inspect` tree. Presentation only. |
 | `atlas` | The community atlas: the catalog schema and its cache, domain-ranked search, the fetch policy, and the corpus `Install` operation. Talks HTTPS, never a browser. Search reads the catalog; `Install` fetches one archive and does not, so a catalog outage cannot stop an install. |
+| `skillgen` | The agent skill router behind `sightmap skills generate`: groups a `Corpus` into per-file `Area`s, renders a `SKILL.md` + one reference file per area, and reconciles that output against an existing tree so hand-edited prose survives regeneration. Imports only `sightmap`; never `browser` — it emits text *naming* `sightmap browser` commands, not calls to them. |
 | `coverage` **(planned)** | Pure T1/T2/T3 coverage math over a tree + matches: parent map, orphan slots, annotation gaps, T2/T3 cluster traces. |
 | `viewset` **(planned)** | On-disk capture sets: paths, discovery, stamps, the novelty gate, and the prune planner. Offline; built on `coverage`. |
 

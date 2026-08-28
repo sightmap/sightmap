@@ -12,12 +12,15 @@ import (
 
 func runSkills(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: sightmap skills install [--target DIR]\n")
+		fmt.Fprintf(os.Stderr, "usage: sightmap skills install [--target DIR]\n"+
+			"       sightmap skills generate [--sightmap-dir DIR] [--out DIR] [--name NAME] [--check]\n")
 		return nil
 	}
 	switch args[0] {
 	case "install":
 		return runSkillsInstall(args[1:])
+	case "generate":
+		return runSkillsGenerate(args[1:])
 	default:
 		return fmt.Errorf("skills: unknown subcommand %q", args[0])
 	}
