@@ -244,6 +244,29 @@ describe("api execution", () => {
     }));
   }
 
+  test("a missing page value fails the call instead of dropping the filter", () => {
+    // Regression: omitting an unresolved "id=eq.<me>" turned "my profile" into
+    // "every row the server will part with". A page value is the thing that
+    // scopes the request, so its absence must stop the request.
+    localStorage.removeItem("gone");
+    const api = {
+      query: {
+        id: { from: "local_storage", key: "gone", json: "user.id", prefix: "eq." },
+      },
+    };
+    expect(rt.__smwMissingPageValue(api, {})).toMatch(/query\.id/);
+  });
+
+  test("a page value marked optional may be absent", () => {
+    localStorage.removeItem("gone");
+    const api = {
+      headers: {
+        "x-trace": { from: "local_storage", key: "gone", optional: true },
+      },
+    };
+    expect(rt.__smwMissingPageValue(api, {})).toBeNull();
+  });
+
   test("page values read the session out of storage, a cookie, or the DOM", () => {
     localStorage.setItem(
       "sb-auth",

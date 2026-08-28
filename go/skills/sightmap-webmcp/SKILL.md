@@ -156,8 +156,11 @@ Semantics that do the heavy lifting:
   — e.g. `authorization: {from: local_storage, key: sb-auth, json: access_token,
   prefix: "Bearer "}`. The tool then acts as the signed-in user, which is the
   thing an in-page tool can do that a server-side one cannot. A tool that reads
-  page state must pin its URL origin (the compiler errors otherwise), and the
-  value is redacted from `req.headers` so no `result:` can leak it.
+  page state must pin its URL origin (the compiler errors otherwise), the value
+  is redacted from `req.headers` so no `result:` can leak it, and a value that
+  does not resolve fails the call rather than being dropped — a missing
+  `id=eq.<me>` filter would otherwise widen the query to every row the server
+  allows. Use `optional: true` only where absence is genuinely harmless.
 - **`rows:` shapes an api tool's output.** A raw API body is rarely the right
   tool result: `rows: {field, max, fields}` projects a JSON array into named
   per-row fields, where `field:` is a dot path into the row and `template:`

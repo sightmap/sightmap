@@ -432,6 +432,11 @@ func normalizeValueMap(m *OM) any {
 					e.Set(f, nil)
 				}
 			}
+			if opt, ok := omGet(vom, "optional").(bool); ok && opt {
+				e.Set("optional", true)
+			} else {
+				e.Set("optional", nil)
+			}
 			out.Set(k, e)
 		} else {
 			out.Set(k, v)

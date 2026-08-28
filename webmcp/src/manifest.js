@@ -78,7 +78,7 @@ const ROWS_KEYS = ["field", "max", "fields"];
 const ROW_FIELD_KEYS = ["field", "template"];
 const CREDENTIALS_MODES = ["include", "same-origin", "omit"];
 const PAGE_SOURCES = ["local_storage", "session_storage", "cookie", "dom"];
-const PAGE_VALUE_KEYS = ["from", "key", "selector", "attr", "json", "prefix"];
+const PAGE_VALUE_KEYS = ["from", "key", "selector", "attr", "json", "prefix", "optional"];
 const RESULT_KEYS = ["name", "source", "field", "pattern", "transform"];
 const RESULT_SOURCES = ["req.body", "rsp.body", "req.headers", "rsp.headers"];
 
@@ -137,6 +137,9 @@ function validateParams(params, where, errors, warnings) {
 
 function validatePageValue(v, where, errors, warnings) {
   warnUnknown(v, PAGE_VALUE_KEYS, where, warnings);
+  if (v.optional != null && typeof v.optional !== "boolean") {
+    errors.push(`${where}: "optional" must be true or false`);
+  }
   if (!PAGE_SOURCES.includes(v.from)) {
     errors.push(`${where}: "from" must be one of ${PAGE_SOURCES.join(", ")}`);
     return;

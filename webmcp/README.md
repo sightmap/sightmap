@@ -283,6 +283,13 @@ compile time or in the runtime:
 - A page-sourced header is **redacted from `req.headers`**, so a `result:`
   extraction cannot lift the token back out of the request and hand it to the
   agent. Manifest-written headers stay readable.
+- A page value that does not resolve **fails the call**, returning
+  `{error, missing_page_value}` without sending anything. This default is the
+  important one: dropping a missing `Authorization` header would only make a
+  call unauthenticated, but dropping a missing `id=eq.<me>` filter widens the
+  query to every row the server will part with — a tool answering "your
+  profile" with everyone's. Mark a value `optional: true` when its absence
+  really is harmless.
 
 Not covered: tokens held only in memory (unreachable by design, and arguably
 correct), and IndexedDB — Firebase Auth's default persistence — which is async

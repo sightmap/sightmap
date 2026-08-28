@@ -310,6 +310,7 @@ function normalizeValueMap(m) {
         attr: v.attr != null ? String(v.attr) : null,
         json: v.json != null ? String(v.json) : null,
         prefix: v.prefix != null ? String(v.prefix) : null,
+        optional: v.optional === true ? true : null,
       };
     } else {
       out[k] = v;

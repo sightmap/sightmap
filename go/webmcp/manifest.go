@@ -30,7 +30,7 @@ var credentialsModes = []string{"include", "same-origin", "omit"}
 
 var pageSources = []string{"local_storage", "session_storage", "cookie", "dom"}
 
-var pageValueKeys = []string{"from", "key", "selector", "attr", "json", "prefix"}
+var pageValueKeys = []string{"from", "key", "selector", "attr", "json", "prefix", "optional"}
 
 var rowsKeys = []string{"field", "max", "fields"}
 

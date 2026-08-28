@@ -329,6 +329,7 @@ describe("compile", () => {
       "attr",
       "json",
       "prefix",
+      "optional",
     ]);
     expect(ir.tools[0].api.headers.accept).toBe("application/json");
   });

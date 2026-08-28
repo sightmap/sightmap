@@ -571,11 +571,32 @@ function __smwPageValue(spec) {
 }
 
 // Header/query/body leaves are either a "{param}" template or a page-state
-// mapping. Returns undefined when a page value is missing, so the caller can
-// omit the header rather than send an empty one.
+// mapping. Returns undefined when a page value is missing.
 function __smwResolveValue(v, args) {
   if (v != null && typeof v === "object" && v.from) return __smwPageValue(v);
   return __smwInterpolate(v, args, false);
+}
+
+// A page value that does not resolve fails the whole call by default, and the
+// default is not negotiable lightly: these values are usually the thing that
+// scopes a request to one user. Dropping a missing Authorization header only
+// makes a call unauthenticated, but dropping a missing "id=eq.<me>" filter
+// widens the query to every row the server will part with — the tool would
+// answer "your profile" with everyone's. Anything genuinely optional says so.
+function __smwMissingPageValue(api, args) {
+  for (const key of ["query", "headers"]) {
+    const m = api[key];
+    if (!m) continue;
+    for (const k of Object.keys(m)) {
+      const spec = m[k];
+      if (spec == null || typeof spec !== "object" || !spec.from) continue;
+      if (spec.optional) continue;
+      if (__smwPageValue(spec) === undefined) {
+        return `${key}.${k} (${spec.from} ${spec.key || spec.selector})`;
+      }
+    }
+  }
+  return null;
 }
 
 function __smwExtractResult(spec, ctx) {
@@ -614,6 +635,14 @@ async function __smwRunApi(tool, args, meta, signal) {
   const api = tool.api;
   const paramTypes = {};
   for (const p of tool.params) paramTypes[p.name] = p.type;
+  const missing = __smwMissingPageValue(api, args);
+  if (missing) {
+    return {
+      error:
+        "this tool reads a value from the page that is not there — usually because nobody is signed in on this page",
+      missing_page_value: missing,
+    };
+  }
   const url = new URL(__smwInterpolate(api.url, args, true), meta.baseUrl);
   if (api.query) {
     for (const k of Object.keys(api.query)) {
