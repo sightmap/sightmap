@@ -82,7 +82,7 @@ func runSnapshot(args []string) error {
 	if corpus == nil {
 		fmt.Fprintf(os.Stderr, "snapshot: no .sightmap corpus at %q — rendering the raw tree with no component names or coverage (pass --sightmap-dir to point at your corpus)\n", *lf.sightmapDir)
 	}
-	res, err := observe.Page(ctx, conn, corpus, observe.Options{VisibleOnly: visible, ExtractProps: true})
+	res, err := observe.Page(ctx, conn, corpus, observe.Options{VisibleOnly: visible})
 	if err != nil {
 		return fmt.Errorf("snapshot: observe: %v", err)
 	}

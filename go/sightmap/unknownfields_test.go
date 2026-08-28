@@ -214,7 +214,6 @@ requests:
       - name: outcome
         source: rsp.body
         field: status
-        transform: slug
       - name: legacy
         source: rsp.body
         pattern: 'declined'

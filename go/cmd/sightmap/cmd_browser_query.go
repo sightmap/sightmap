@@ -10,7 +10,6 @@ import (
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/compquery"
 	"github.com/sightmap/sightmap/go/match"
-	"github.com/sightmap/sightmap/go/observe"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -74,43 +73,16 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 			"resolve query: no sightmap components matched the page (need a corpus in %s)", sightmapDir)
 	}
 
-	props := extractQueryProperties(ctx, conn, matcher, matches, pageURL, q)
-	return compquery.Resolve(root, matches, props, q)
+	return compquery.Resolve(root, matches, queryPropertyValues(matches), q)
 }
 
-// extractQueryProperties extracts live properties for every node whose matched
-// component name is referenced by one of the given queries — keeps the live
-// extraction small and avoids the per-snapshot node cap dropping a candidate —
-// then projects them into the node-id → (name → value) map the component-query
-// engine consumes. Shared by resolveComponentQuery (single query) and
-// prepareBoundsQuery (one or more queries).
-func extractQueryProperties(
-	ctx context.Context,
-	conn *browser.CDPConn,
-	matcher *match.Matcher,
+// queryPropertyValues projects each match's resolved properties (populated
+// offline by the matcher, SEP-0010) into the node-id → (name → value) map the
+// component-query engine consumes. Shared by resolveComponentQuery and
+// prepareBoundsQuery.
+func queryPropertyValues(
 	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
-	pageURL string,
-	queries ...*compquery.Query,
 ) map[string]map[string]string {
-	queryNames := make(map[string]bool)
-	for _, q := range queries {
-		for _, part := range q.Parts {
-			queryNames[part.Name] = true
-		}
-	}
-	relevant := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
-	for n, m := range matches {
-		if queryNames[m.Name] {
-			relevant[n] = m
-		}
-	}
-	components := matcher.Components(pageURL)
-	compByName := make(map[string]sightmap.ComponentDef, len(components))
-	for _, c := range components {
-		compByName[c.Name] = c
-	}
-	observe.ExtractProperties(ctx, conn, relevant, compByName)
-
 	out := make(map[string]map[string]string)
 	for node, m := range matches {
 		if m == nil || len(m.Properties) == 0 {

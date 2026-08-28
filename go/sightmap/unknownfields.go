@@ -33,9 +33,9 @@ var (
 	accessFields    = set("status", "reason")
 	snapshotFields  = set("name", "notes", "url")
 
-	requestPropertyFields = set("name", "source", "field", "pattern", "transform")
+	requestPropertyFields = set("name", "source", "field", "pattern")
 	messageFields         = set("name", "level", "message", "description", "source", "properties")
-	messagePropertyFields = set("name", "source", "field", "pattern", "transform")
+	messagePropertyFields = set("name", "source", "field", "pattern")
 )
 
 func set(keys ...string) map[string]bool {
@@ -250,7 +250,7 @@ func walkRequest(node *yaml.Node, file string, out *[]ValidationError) {
 	}
 	forEachItem(v["properties"], func(n *yaml.Node) {
 		pv := checkKeys(n, requestPropertyFields, file, out)
-		checkStringScalars(pv, []string{"name", "source", "field", "pattern", "transform"}, file, out)
+		checkStringScalars(pv, []string{"name", "source", "field", "pattern"}, file, out)
 	})
 }
 
@@ -263,7 +263,7 @@ func walkMessage(node *yaml.Node, file string, out *[]ValidationError) {
 	checkStringScalars(v, []string{"name", "level", "message", "description", "source"}, file, out)
 	forEachItem(v["properties"], func(n *yaml.Node) {
 		pv := checkKeys(n, messagePropertyFields, file, out)
-		checkStringScalars(pv, []string{"name", "source", "field", "pattern", "transform"}, file, out)
+		checkStringScalars(pv, []string{"name", "source", "field", "pattern"}, file, out)
 	})
 }
 
