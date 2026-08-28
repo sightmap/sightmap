@@ -5,6 +5,8 @@
 import {
   DEVELOPERS_DESCRIPTION,
   DEVELOPERS_TITLE,
+  WEBMCP_TITLE,
+  WEBMCP_DESCRIPTION,
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_URL,
@@ -112,6 +114,51 @@ Machine index: ${SITE_URL}/atlas/index.json
 HTTP API: ${SITE_URL}/api/atlas
 
 ${items}
+`
+}
+
+export function buildWebmcpMarkdown(): string {
+  return `# ${WEBMCP_TITLE}
+
+${WEBMCP_DESCRIPTION}
+
+## The problem
+
+WebMCP lets a page hand an agent callable tools instead of a click-path, but it
+assumes the site's own authors write them, and almost none have. A computer-use
+agent is left driving pixels: a screenshot before every decision and another
+after every action.
+
+## What a sightmap adds
+
+A corpus already holds what a tool needs — verified selectors, per-instance
+properties, view routes, the API requests the app actually makes, and the
+hazard notes that explain what goes wrong. \`sightmap webmcp\` compiles that
+plus a short manifest into a bundle, resolving every reference at generate time
+and failing on anything it cannot resolve.
+
+## Shipping formats
+
+- Snippet — injected by an agent harness or an extension.
+- ES module — for the site's own owners: \`<script type="module">\`.
+- Userscript — for everyone else, via Tampermonkey or Violentmonkey.
+
+Bundles register with \`document.modelContext\` where the browser supports
+WebMCP and always install a \`window.__sightmapWebMCP\` shim, so a browser
+without it renders and behaves exactly as before.
+
+## Where it pays
+
+- **Cobrowsing** — the agent is already in the signed-in session, on the page.
+- **VM agents** — a browser on a virtual machine pays the full screenshot loop.
+- **Agentic QA** — one call puts an account in the state you meant to test.
+
+## Links
+
+- [CLI reference](https://docs.sightmap.org/cli/webmcp)
+- [Generator source](https://github.com/sightmap/sightmap/tree/main/webmcp)
+- [Quickstart](https://docs.sightmap.org/start/quickstart)
+- [llms.txt](${SITE_URL}/llms.txt)
 `
 }
 

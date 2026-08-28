@@ -27,6 +27,8 @@ import {
   NOT_FOUND_DESCRIPTION,
   DEVELOPERS_TITLE,
   DEVELOPERS_DESCRIPTION,
+  WEBMCP_TITLE,
+  WEBMCP_DESCRIPTION,
   postTitle,
   atlasTitle,
   esc,
@@ -553,8 +555,28 @@ async function main() {
     )
   )
 
+  write(
+    'webmcp',
+    renderRoute(
+      shell,
+      '/webmcp',
+      {
+        url: `${SITE_URL}/webmcp`,
+        ogUrl: `${DEPLOY_URL}/webmcp`,
+        title: WEBMCP_TITLE,
+        description: WEBMCP_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      [mdAlternate(`${SITE_URL}/webmcp.md`), siteJsonLd].join('\n    ')
+    )
+  )
+
   console.log(
-    `\n  prerender complete: ${posts.length + atlas.entries.length + 5} page(s)`
+    `\n  prerender complete: ${posts.length + atlas.entries.length + 6} page(s)`
   )
 }
 

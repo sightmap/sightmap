@@ -20,6 +20,7 @@ import {
   buildBlogIndexMarkdown,
   buildBlogPostMarkdown,
   buildDevelopersMarkdown,
+  buildWebmcpMarkdown,
   buildHomeMarkdown,
   buildNotFoundMarkdown,
   buildOpenApiSpec,
@@ -82,6 +83,7 @@ async function main() {
   write('blog.md', buildBlogIndexMarkdown(posts))
   write('atlas.md', buildAtlasIndexMarkdown(atlas))
   write('developers.md', buildDevelopersMarkdown())
+  write('webmcp.md', buildWebmcpMarkdown())
 
   for (const post of loaded) {
     write(

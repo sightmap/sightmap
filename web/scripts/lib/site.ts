@@ -46,6 +46,10 @@ export const ATLAS_INDEX_TITLE = `Atlas — ${SITE_NAME}`
 // advertising two different titles depending on who asked.
 export const NOT_FOUND_TITLE = `Page not found — ${SITE_NAME}`
 export const NOT_FOUND_DESCRIPTION = "This page doesn't exist."
+export const WEBMCP_TITLE = `WebMCP tools from a sightmap — ${SITE_NAME}`
+export const WEBMCP_DESCRIPTION =
+  'Computer-use agents pay for every screenshot. Compile a sightmap corpus into WebMCP tools a browser agent can call instead — for sites that never shipped any.'
+
 export const DEVELOPERS_TITLE = `${SITE_NAME} developer resources`
 export const DEVELOPERS_DESCRIPTION =
   'OpenAPI, the Atlas HTTP API, documentation, CLI, and agent skills for the Sightmap spec.'

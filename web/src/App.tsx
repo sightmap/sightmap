@@ -5,6 +5,7 @@ import BlogPost from '@/pages/BlogPost'
 import AtlasIndex from '@/pages/AtlasIndex'
 import AtlasEntry from '@/pages/AtlasEntry'
 import Developers from '@/pages/Developers'
+import WebMCP from '@/pages/WebMCP'
 import NotFound from '@/pages/NotFound'
 import { ConsentProvider } from '@/components/consent/ConsentContext'
 import ConsentUI from '@/components/consent/ConsentUI'
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/atlas" element={<AtlasIndex />} />
         <Route path="/atlas/:slug" element={<AtlasEntry />} />
         <Route path="/developers" element={<Developers />} />
+        <Route path="/webmcp" element={<WebMCP />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <ConsentUI />

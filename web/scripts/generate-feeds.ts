@@ -91,6 +91,7 @@ export function buildSitemap(posts: FeedPost[], atlas: FeedAtlasEntry[], now: Da
   const today = now.toISOString().slice(0, 10)
   const urls = [
     { loc: `${SITE_URL}/`, lastmod: today, priority: '1.0' },
+    { loc: `${SITE_URL}/webmcp`, lastmod: today, priority: '0.9' },
     { loc: `${SITE_URL}/developers`, lastmod: today, priority: '0.8' },
     { loc: `${SITE_URL}/blog`, lastmod: posts[0]?.date ?? today, priority: '0.8' },
     ...posts.map((p) => ({
@@ -195,6 +196,10 @@ export function buildLlmsTxt(posts: FeedPost[], atlas: FeedAtlasEntry[]): string
     '',
     `- [Documentation](https://docs.sightmap.org): Guides, CLI reference, and the schema reference.`,
     `- [Specification](https://github.com/sightmap/sightmap/tree/main/spec): The normative spec, JSON Schema, and conformance fixtures.`,
+    '',
+    '## WebMCP',
+    '',
+    `- [WebMCP tools from a sightmap](${SITE_URL}/webmcp): Compile a corpus into callable tools so agents stop driving pixels.`,
     '',
     '## Sightmap developer resources',
     '',
