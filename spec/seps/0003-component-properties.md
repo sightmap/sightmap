@@ -10,6 +10,13 @@ related-issues: [52]
 related-discussions: []
 ---
 
+> **Superseded in part by [SEP-0010](0010-tree-closed-component-properties.md).**
+> The `extract` grammar and live-DOM extraction model described below are
+> replaced by SEP-0010, which resolves property values over the component tree
+> (offline, cross-platform) and removes `transform`. The property *declaration
+> shape* introduced here — `properties[]` with `name`/`extract`, the reserved
+> `value` name, and silent omission — carries forward unchanged.
+
 ## Summary
 
 Add an optional `properties: Property[]` field to `Component` entries. Each

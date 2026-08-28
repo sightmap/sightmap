@@ -128,43 +128,32 @@ See [SEP-0002](https://github.com/sightmap/sightmap/blob/main/spec/seps/0002-com
 - A list of strings is tried in order; the first selector that matches wins.
 - Selectors in `children` are evaluated **within** their parent's matched subtree, not globally. This scoping is how Sightmap avoids naming collisions between, say, two different card components that both contain a `button.primary`.
 - Selectors are not required to be unique at their level. If a selector matches multiple elements, all matches are named.
-- **Shadow DOM.** Selectors are matched against the captured component tree, which is a *flattened* representation: each shadow root's content is inlined as ordinary children of its host. Selectors therefore match **across shadow boundaries** — shadow-DOM content is addressed exactly like light-DOM content, and there is no piercing syntax (standard CSS has none: `>>>`/`/deep/` were removed, and `::part()`/`::slotted()` reach only explicitly-exposed nodes). `children` scoping and combinators operate over the flattened tree, where a shadow host → shadow child is an ordinary parent→child edge. This is a deliberate divergence from a live `document.querySelector`, which does **not** cross shadow roots: a tool re-implementing matching or property extraction against the live DOM MUST traverse shadow roots (walk each element's `shadowRoot`) to agree with the corpus. The same rule governs the `exists:`/sub-selector extract modes below — they resolve within the matched element's flattened subtree, including its shadow DOM.
+- **Shadow DOM.** Selectors are matched against the captured component tree, which is a *flattened* representation: each shadow root's content is inlined as ordinary children of its host. Selectors therefore match **across shadow boundaries** — shadow-DOM content is addressed exactly like light-DOM content, and there is no piercing syntax (standard CSS has none: `>>>`/`/deep/` were removed, and `::part()`/`::slotted()` reach only explicitly-exposed nodes). `children` scoping and combinators operate over the flattened tree, where a shadow host → shadow child is an ordinary parent→child edge. This is a deliberate divergence from a live `document.querySelector`, which does **not** cross shadow roots: a tool re-implementing matching against the live DOM MUST traverse shadow roots (walk each element's `shadowRoot`) to agree with the corpus.
 
 
 ### Component properties
 
-A component may declare `properties: Property[]` — named values extracted from its matched DOM element and surfaced alongside the component name in enriched snapshots, e.g. `[DateFilterButton label="This Weekend"]`. Extraction operates on the exact element the selector matched (not an ancestor, not the AX node). Properties are read from the **live DOM at snapshot time**; SDKs operating on saved component-tree data MUST omit the values rather than approximate them (the declarations are not an error offline). When a component's selector matches multiple elements, extraction runs independently on each. See [SEP-0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md).
+A component may declare `properties: Property[]` — named values surfaced alongside the component name in enriched snapshots, e.g. `[DateFilterButton label="This Weekend"]`. Values are **resolved over the component tree**, from the matched component's own node and the extracted properties of components nested beneath it — never from arbitrary DOM. This makes resolution work offline, against a serialized tree, on any UI platform. See [SEP-0010](https://github.com/sightmap/sightmap/blob/main/spec/seps/0010-tree-closed-component-properties.md), which supersedes the extraction model of [SEP-0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md).
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | yes | Key used in the annotation (`name="value"`). Must match `^[a-z][a-z0-9_]*$`. The name `value` is reserved: it may be declared to override the AX built-in, and SDKs MUST prefer a declared `value` over the AX tree's own value. |
+| `name` | string | yes | Key used in the annotation (`name="value"`). Must match `^[a-z][a-z0-9_]*$`, and must be unique within a component. The name `value` is reserved: it may be declared to override the AX built-in, and SDKs MUST prefer a declared `value` over the AX tree's own value. |
 | `extract` | string | yes | Extraction directive (see below). |
-| `transform` | string | no | Optional post-processing applied to the extracted string (see below). |
 
-**Extract modes.** The `extract` value is interpreted in this order (named modes match by exact, case-sensitive equality before the `attr=`/`exists:` prefixes):
+**Extract grammar.** The `extract` value is exactly one of the following forms; any other value is invalid and MUST be rejected by validation.
 
-| Value | Source |
+| Form | Resolves to |
 |---|---|
-| `text` | `element.textContent.trim()`, internal whitespace collapsed to single spaces |
-| `inner_text` | `element.innerText.trim()` — layout-aware; use when `text` runs adjacent inline elements together |
-| `text_only` | `textContent` after removing `img`, `svg`, and `[alt]` descendants — use when icon alt-text bleeds into the label |
-| `inner_html` | `element.innerHTML` |
-| `attr=NAME` | `element.getAttribute(NAME)` |
-| `exists:SEL` | `"true"` if `SEL` matches an element within the matched element's subtree — **including its shadow DOM** (see [Selector semantics](#selector-semantics)) — else **omitted** (boolean state flag) |
-| *any other string* | Treated as a CSS sub-selector resolved within the matched element's subtree, **including its shadow DOM**: the first match's `innerText` (falling back to `textContent`), trimmed; omitted when nothing matches |
+| `text` | the node's accessible text (implementation-defined accessible name) |
+| `attr=NAME` | the value of attribute `NAME` carried on the node's observed attribute set; omitted if the node does not carry it |
+| `PATH.prop` | the value extracted for property `prop` of the descendant component addressed by `PATH` |
+| `exists:PATH` | `"true"` if `PATH` resolves to at least one matched component; omitted otherwise (boolean state flag) |
 
-**Transforms.** When `transform` is set it is applied to the trimmed extracted string; if the value is empty or absent, the transform is skipped and the property omitted. Exactly one transform may be given (not composable in v1).
+`PATH` is a dotted sequence of component names naming a descendant, each segment resolved first-match (in document order) within the previous segment's matched subtree (`Price`, `Row.Price`). In a `PATH.prop` value reference the final segment is a property name; in `exists:PATH` the whole path names components. References descend only — a property may address a component nested beneath the one declaring it, never a parent, sibling, or cousin — so resolution is a bottom-up pass over a DAG. To surface a value from a sub-element, promote that sub-element to a declared child component and reference it.
 
-| Value | Effect |
-|---|---|
-| `first_word` | First whitespace-delimited token |
-| `last_word` | Last whitespace-delimited token |
-| `first_number` | First substring matching `\d[\d,.]*` |
-| `first_dollar` | First substring matching `\$[\d,.]+` |
-| `number` | Strip all non-digit, non-decimal characters |
-| `slug` | Lowercase; spaces and underscores → hyphens; strip non-`[a-z0-9-]` |
+The observed attribute set read by `attr=NAME` is implementation-defined: which attributes a node carries depends on the consumer (a web SDK may carry a fixed allowlist plus `aria-*`/`data-*`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
 
-**Value omission is silent** — a property that extracts to an empty string (or whose `exists:`/sub-selector finds nothing) is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
+**Value omission is silent** — a property whose `text` is empty, whose attribute is not carried, or whose `PATH` matches nothing is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
 
 ## Dependencies
 
@@ -280,7 +269,6 @@ A named API endpoint.
 | `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. |
 | `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). For a `.headers` source, a header name matched case-insensitively; **required** whenever `source` is a headers source. |
 | `pattern` | string | see below | An [RE2](#regular-expressions) regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
-| `transform` | string | no | Same vocabulary as [Component properties](#component-properties)' transform. |
 
 At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source `field` is required too (a bare regex across a raw header block is the addressing foot-gun this shape removes). `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`).
 
@@ -348,7 +336,7 @@ A record matches when every declared constraint holds. Declaring neither `level`
 
 ### Message properties
 
-`properties:` declares named values to pull out of an uncaught exception's **stack trace**, so a corpus can classify an exception by where it came from and extract the failing location — the message-side analogue of a request's [`properties:`](#request-properties). It reuses that mechanism's `source` / `field` / `pattern` / `transform` shape.
+`properties:` declares named values to pull out of an uncaught exception's **stack trace**, so a corpus can classify an exception by where it came from and extract the failing location — the message-side analogue of a request's [`properties:`](#request-properties). It reuses that mechanism's `source` / `field` / `pattern` shape.
 
 ```yaml
 messages:
@@ -376,7 +364,6 @@ messages:
 | `source` | string | yes | Which root to read from. The only value in v1 is `stack` (the exception's call stack). |
 | `field` | string | yes | The frame and attribute to select, `<frame>.<attribute>`: `<frame>` is `top` (an alias for `0`) or a non-negative frame index (`0`, `1`, …), throwing frame first; `<attribute>` is one of `function`, `file`, `line`, or `column`. Required — a `stack` source has no meaningful bare-regex scan, the same reasoning that requires `field` for a request's headers source. |
 | `pattern` | string | no | An [RE2](#regular-expressions) regex applied to whatever `field` resolved. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
-| `transform` | string | no | Same vocabulary as [Component properties](#component-properties)' transform. |
 
 Extraction requires **live traffic** and **value omission is silent**, exactly as for [request properties](#request-properties): a property that doesn't resolve (a plain console record with no stack, a frame index out of range, an unknown attribute, no pattern match) is simply absent, never an error. See [SEP-0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md).
 
@@ -566,12 +553,11 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - MUST resolve `properties:` only from live traffic, and MUST NOT error when a `properties:`-declaring request is used in a static context — omit the value instead
 - MUST omit an unresolved property value silently, without a diagnostic
 - MUST apply `pattern` to the value `field` resolved (not the whole source) when both are present, taking capture group 1 as the value when the pattern has one, else the entire match
-- SHOULD apply `transform` as [Component properties](#component-properties) does: skipped on an empty or absent raw value, single transform only, not composable
 - MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
 - MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern`, applies no `transform`, and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern` and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

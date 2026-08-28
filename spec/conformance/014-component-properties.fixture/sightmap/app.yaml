@@ -7,9 +7,16 @@ views:
         selector: '[data-testid="product-pod"]'
         properties:
           - name: price
-            extract: '[data-testid="price"]'
-            transform: first_dollar
+            extract: Price.text
           - name: sold_out
-            extract: 'exists:[aria-label="Sold Out"]'
+            extract: exists:SoldOutBadge
           - name: label
             extract: text
+        children:
+          - name: Price
+            selector: '[data-testid="price"]'
+            properties:
+              - name: text
+                extract: text
+          - name: SoldOutBadge
+            selector: '[aria-label="Sold Out"]'
