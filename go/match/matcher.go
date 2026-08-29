@@ -12,6 +12,10 @@ type MatchQuery struct {
 	Name        string
 	Parts       []*sightmap.SelectorPart
 	Combinators []string
+	// Def is the component definition this query was compiled from — the precise
+	// def for this match (component names are unique only per parent, so a name
+	// lookup would collide). Consumers read Memory/Tags/Properties from it.
+	Def *sightmap.ComponentDef
 }
 
 // FindAllMatches traverses root depth-first, invoking onMatch for every node

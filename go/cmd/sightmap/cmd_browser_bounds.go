@@ -176,7 +176,7 @@ func boundsByComponent(
 		return nil, fmt.Errorf("bounds: no sightmap components matched the current page (%s)", pageURL)
 	}
 
-	parsed, props, err := prepareBoundsQuery(ctx, conn, matcher, matches, pageURL, queries, all, substring)
+	parsed, props, err := prepareBoundsQuery(matches, queries, all, substring)
 	if err != nil {
 		return nil, err
 	}
@@ -184,16 +184,11 @@ func boundsByComponent(
 }
 
 // prepareBoundsQuery parses the positional queries and, for the default
-// (query-grammar) mode, extracts live properties for the components they
-// reference so [prop] predicates resolve (mirrors resolveComponentQuery;
-// keeps the extraction small). --all and --substring don't use the query
-// grammar, so both return values are nil for those modes.
+// (query-grammar) mode, projects the matches' resolved properties so [prop]
+// predicates resolve (mirrors resolveComponentQuery). --all and --substring
+// don't use the query grammar, so both return values are nil for those modes.
 func prepareBoundsQuery(
-	ctx context.Context,
-	conn *browser.CDPConn,
-	matcher *match.Matcher,
 	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
-	pageURL string,
 	queries []string,
 	all, substring bool,
 ) ([]*compquery.Query, map[string]map[string]string, error) {
@@ -209,8 +204,7 @@ func prepareBoundsQuery(
 		}
 		parsed[i] = q
 	}
-	props := extractQueryProperties(ctx, conn, matcher, matches, pageURL, parsed...)
-	return parsed, props, nil
+	return parsed, queryPropertyValues(matches), nil
 }
 
 // selectBoundsResults runs bounds's three selection modes over an

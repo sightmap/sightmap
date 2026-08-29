@@ -11,9 +11,9 @@ import (
 
 // Result is one observation of a live page: the extracted component tree, the
 // corpus matches applied to it, the view it resolved to, and the coverage score.
-// Matches/View/Coverage are zero when no corpus was supplied. When
-// Options.ExtractProps was set, each ComponentMatch in Matches carries its
-// live-extracted property values (ComponentMatch.Properties).
+// Matches/View/Coverage are zero when no corpus was supplied. Each
+// ComponentMatch in Matches carries any resolved property values
+// (ComponentMatch.Properties), computed offline by the matcher over the tree.
 type Result struct {
 	Root        *sightmap.ComponentNode
 	URL         string
@@ -44,16 +44,13 @@ type Options struct {
 	// VisibleOnly scores coverage over visible interactive nodes only (the CLI
 	// default); false counts hidden/off-screen nodes too.
 	VisibleOnly bool
-	// ExtractProps runs a live DOM pass to pull component property values. Skip
-	// it when only the tree/coverage are needed (e.g. bulk capture).
-	ExtractProps bool
 }
 
 // Page observes the page currently loaded in conn: it extracts the component
 // tree, applies corpus (when non-nil) to produce matches, the view, the merged
-// component list, and coverage, and optionally extracts property values.
-// Navigation and the browser lifecycle are the caller's responsibility — Page
-// only reads the current page state.
+// component list, and coverage. Component property values are resolved offline
+// by the matcher and travel on each match. Navigation and the browser lifecycle
+// are the caller's responsibility — Page only reads the current page state.
 func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, opts Options) (*Result, error) {
 	page, err := conn.DefaultPage()
 	if err != nil {
@@ -87,12 +84,5 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	res.TiedViews = corpus.TiedViews(url)
 	res.ComponentConflicts = m.Conflicts(root, url)
 
-	if opts.ExtractProps && len(res.Matches) > 0 && len(res.Components) > 0 {
-		compByName := make(map[string]sightmap.ComponentDef, len(res.Components))
-		for _, c := range res.Components {
-			compByName[c.Name] = c
-		}
-		ExtractProperties(ctx, conn, res.Matches, compByName)
-	}
 	return res, nil
 }

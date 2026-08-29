@@ -58,11 +58,10 @@ type rawMessage struct {
 }
 
 type rawMessageProperty struct {
-	Name      string `yaml:"name"`
-	Source    string `yaml:"source"`
-	Field     string `yaml:"field"`
-	Pattern   string `yaml:"pattern"`
-	Transform string `yaml:"transform"`
+	Name    string `yaml:"name"`
+	Source  string `yaml:"source"`
+	Field   string `yaml:"field"`
+	Pattern string `yaml:"pattern"`
 }
 
 type rawSnapshot struct {
@@ -89,9 +88,8 @@ type rawAccess struct {
 }
 
 type rawProperty struct {
-	Name      string `yaml:"name"`
-	Extract   string `yaml:"extract"`
-	Transform string `yaml:"transform"`
+	Name    string `yaml:"name"`
+	Extract string `yaml:"extract"`
 }
 
 type rawRequest struct {
@@ -109,11 +107,10 @@ type rawRequest struct {
 }
 
 type rawRequestProperty struct {
-	Name      string `yaml:"name"`
-	Source    string `yaml:"source"`
-	Field     string `yaml:"field"`
-	Pattern   string `yaml:"pattern"`
-	Transform string `yaml:"transform"`
+	Name    string `yaml:"name"`
+	Source  string `yaml:"source"`
+	Field   string `yaml:"field"`
+	Pattern string `yaml:"pattern"`
 }
 
 type rawPayload struct {
@@ -314,7 +311,7 @@ func rawPropsToMatch(rps []rawProperty) []ComponentPropertyDef {
 	}
 	ps := make([]ComponentPropertyDef, len(rps))
 	for i, rp := range rps {
-		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract, Transform: rp.Transform}
+		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract}
 	}
 	return ps
 }
@@ -373,11 +370,10 @@ func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 	out := make([]RequestPropertyDef, 0, len(rps))
 	for _, rp := range rps {
 		out = append(out, RequestPropertyDef{
-			Name:      rp.Name,
-			Source:    rp.Source,
-			Field:     rp.Field,
-			Pattern:   rp.Pattern,
-			Transform: rp.Transform,
+			Name:    rp.Name,
+			Source:  rp.Source,
+			Field:   rp.Field,
+			Pattern: rp.Pattern,
 		})
 	}
 	return out
@@ -418,11 +414,10 @@ func toMessageProperties(rps []rawMessageProperty) []MessagePropertyDef {
 	out := make([]MessagePropertyDef, 0, len(rps))
 	for _, rp := range rps {
 		out = append(out, MessagePropertyDef{
-			Name:      rp.Name,
-			Source:    rp.Source,
-			Field:     rp.Field,
-			Pattern:   rp.Pattern,
-			Transform: rp.Transform,
+			Name:    rp.Name,
+			Source:  rp.Source,
+			Field:   rp.Field,
+			Pattern: rp.Pattern,
 		})
 	}
 	return out

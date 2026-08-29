@@ -98,20 +98,6 @@ func TestExtractProperties_PatternNoFieldScansRawBody(t *testing.T) {
 	}
 }
 
-func TestExtractProperties_Transform(t *testing.T) {
-	d := &RequestDef{
-		Properties: []RequestPropertyDef{
-			{Name: "amount", Source: "rsp.body", Field: "total", Transform: "number"},
-		},
-	}
-	rec := Request{RspBody: jsonBody(`{"total":"$1,299.00"}`)}
-	got := d.ExtractProperties(rec)
-	want := []PropertyValue{{Name: "amount", Value: "1299.00"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("got %+v, want %+v", got, want)
-	}
-}
-
 func TestExtractProperties_SilentOmission(t *testing.T) {
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{

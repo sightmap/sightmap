@@ -58,9 +58,6 @@ type RequestPropertyDef struct {
 	// absent. Capture group 1 is the extracted value when present, else the
 	// entire match.
 	Pattern string `json:"pattern,omitempty"`
-	// Transform is optional post-processing, sharing componentProperty's
-	// vocabulary (SEP-0003).
-	Transform string `json:"transform,omitempty"`
 }
 
 // RequestPropertySources is the closed set of roots a RequestPropertyDef.Source

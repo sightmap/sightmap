@@ -107,7 +107,6 @@ views:
         properties:
           - name: price
             extract: text
-            transform: first_dollar
         children:
           - name: Inner
             selector: .inner
@@ -215,7 +214,6 @@ requests:
       - name: outcome
         source: rsp.body
         field: status
-        transform: slug
       - name: legacy
         source: rsp.body
         pattern: 'declined'

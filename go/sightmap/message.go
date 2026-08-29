@@ -50,10 +50,10 @@ type MessageDef struct {
 
 // MessagePropertyDef declares a named value to extract from an observed
 // exception's stack (SEP-0006 stack-addressing follow-on). It mirrors
-// RequestPropertyDef's source/field/pattern/transform shape, but the only source
+// RequestPropertyDef's source/field/pattern shape, but the only source
 // is "stack": Field addresses a frame ("top" or a numeric index) and one of its
 // attributes (function/file/line/column) — e.g. "top.file" or "1.function";
-// Pattern optionally refines the resolved string; Transform post-processes it.
+// Pattern optionally refines the resolved string.
 type MessagePropertyDef struct {
 	Name string `json:"name"`
 	// Source is the extraction root; the only value in v1 is "stack".
@@ -65,9 +65,6 @@ type MessagePropertyDef struct {
 	// Pattern is an RE2 regex applied to what Field resolved. Capture group 1 is
 	// the value when present, else the entire match.
 	Pattern string `json:"pattern,omitempty"`
-	// Transform is optional post-processing, sharing componentProperty's
-	// vocabulary (SEP-0003).
-	Transform string `json:"transform,omitempty"`
 }
 
 // MessagePropertySources is the closed set of roots a MessagePropertyDef.Source
