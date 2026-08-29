@@ -50,7 +50,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
 | 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
 | 013 | `route-trailing-slash` | Trailing slashes on the URL path are normalized away before matching |
-| 014 | `component-properties` | `properties:` (`name`/`extract`/`transform`) validates ([SEP-0003](../seps/0003-component-properties.md)) |
+| 014 | `component-properties` | `properties:` (`name`/`extract`, tree-closed grammar `text`/`attr=`/`PATH.prop`/`exists:PATH`) validates ([SEP-0010](../seps/0010-tree-closed-component-properties.md)) |
 | 015 | `view-url` | `url:` on a view (and a file-level default) validates |
 | 016 | `stability-tooling-fields` | `stability:` (view + component) validates; reserved tooling fields `access:`/`snapshots:` are permitted |
 | 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, and views ([SEP-0004](../seps/0004-component-tags.md)) |

@@ -10,6 +10,11 @@ related-issues: [157]
 related-discussions: []
 ---
 
+> **Amended by [SEP-0010](0010-tree-closed-component-properties.md):** the
+> `transform` field is removed from request `properties[]`. Fold any
+> post-processing into `pattern` (RE2 + capture groups). The `source` / `field` /
+> `pattern` extraction described below is otherwise unchanged.
+
 ## Summary
 
 Add an optional `properties: RequestProperty[]` field to `Request` entries. Each property declares a named value extracted from a live request's own request/response body or headers: `source` names the root (a request/response body or header block), `field` names the value within it, and an optional `pattern` regex refines whatever `field` resolved. It is the request-side analogue of SEP-0003's DOM `properties[]`: SEP-0003 answers "what state is this element in," this answers "what does this endpoint's traffic actually say."
