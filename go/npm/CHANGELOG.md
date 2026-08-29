@@ -1,5 +1,17 @@
 # @sightmap/sightmap
 
+## 0.28.0
+
+### Minor Changes
+
+- 05e3193: Component properties now resolve offline over the component tree (SEP-0010). `Matcher.Match` populates each `ComponentMatch.Properties` from the matched tree with no live DOM, so a downstream consumer holding a serialized component tree gets property values directly. The `extract` grammar is the four tree-closed forms — `text`, `attr=NAME`, `PATH.prop`, `exists:PATH` — and `transform` is removed from component properties. `sightmap validate` now checks component `properties[]`: duplicate names within a component and unrecognized/removed extract modes are errors.
+- f2b1cda: Retire the live-DOM component-property extraction pass and remove `transform` from request and message properties (SEP-0010). Component property values now come solely from the matcher's offline, tree-closed resolution — the CDP/JS extraction (`observe.ExtractProperties` and its `properties.js`) is gone, and `snapshot`/`bounds`/`query` read the values the matcher already resolved. Request and message `properties[]` keep `source`/`field`/`pattern`; fold any post-processing into `pattern` (RE2 + capture groups). `ApplyTransform` is removed.
+
+### Patch Changes
+
+- 1ce6f82: Port the DevTools extension's component-property extraction to the SEP-0010 tree-closed model. The embedded overlay (`resolver.js` and its inlined `content.js` copy) now resolves the four extract forms — `text`, `attr=NAME`, `PATH.prop`, `exists:PATH` — over the matched component tree, replacing the removed DOM-shaped modes (`inner_text`/`text_only`/`inner_html`/raw CSS sub-selector) and transforms. Descendant paths resolve a child component's own extracted property (`text` is the element's DOM text content, the extension's implementation-defined accessible text).
+- 4f217d7: Update the `sightmap-authoring` skill for SEP-0010: component `properties[]` now document the four tree-closed extract forms (`text`, `attr=NAME`, `PATH.prop`, `exists:PATH`) and the promote-a-sub-element-to-a-child-component pattern. Removed the DOM-shaped modes (`inner_text`/`text_only`/`inner_html`/raw CSS sub-selectors) and all `transform` guidance (including the request-properties `transform` reference).
+
 ## 0.27.0
 
 ### Minor Changes
