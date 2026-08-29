@@ -174,6 +174,12 @@ func TestScaffoldValidatesAgainstItsCorpus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if strings.Contains(out, "sightmap-webmcp init") {
+		t.Fatal("scaffold still names the deleted Node bin")
+	}
+	if !strings.Contains(out, "sightmap webmcp init") {
+		t.Fatal("scaffold missing shipped CLI")
+	}
 	doc, err := parseYAMLOrdered([]byte(out))
 	if err != nil {
 		t.Fatalf("scaffold output is not valid YAML: %v", err)
