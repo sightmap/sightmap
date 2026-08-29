@@ -3,9 +3,9 @@ name: go
 on:
   push:
     branches: [main]
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'webmcp/**', 'web/src/data/atlas/**', '.github/workflows/go.yml']
   pull_request:
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'webmcp/**', 'web/src/data/atlas/**', '.github/workflows/go.yml']
 
 permissions:
   contents: read
@@ -45,6 +45,20 @@ jobs:
             echo "Run 'go generate ./skills/...' from go/ and commit the result."
             git -C .. status --porcelain -- skills go/skills
             git -C .. --no-pager diff -- skills go/skills
+            exit 1
+          fi
+
+      # The webmcp package embeds the browser runtime from
+      # <repo>/webmcp/src/runtime/runtime.js (plus the generator version from
+      # webmcp/package.json) and regenerates the fixture IR the jsdom tests
+      # consume. Fail on drift, the same contract as the skills embed above.
+      - name: webmcp runtime embed in sync
+        run: |
+          go generate ./webmcp/...
+          if [ -n "$(git -C .. status --porcelain -- webmcp go/webmcp)" ]; then
+            echo "Embedded webmcp runtime or fixture IR is out of sync."
+            echo "Run 'go generate ./webmcp/...' from go/ and commit the result."
+            git -C .. status --porcelain -- webmcp go/webmcp
             exit 1
           fi
 

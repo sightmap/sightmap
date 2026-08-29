@@ -1,0 +1,6 @@
+{
+  "name": "@sightmap/webmcp-codegen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical browser runtime for sightmap webmcp bundles, plus jsdom tests. The generator itself is `sightmap webmcp` in the Go CLI."
+}

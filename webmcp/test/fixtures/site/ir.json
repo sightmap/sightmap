@@ -1,0 +1,350 @@
+{
+  "meta": {
+    "site": "fixture",
+    "baseUrl": "https://shop.example",
+    "description": "Fixture manifest exercising every tool kind.",
+    "toolVersion": "0.1.0",
+    "match": null
+  },
+  "tools": [
+    {
+      "name": "search",
+      "title": null,
+      "description": "Search the fixture shop by fetching the results page.",
+      "readOnly": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Keywords."
+          },
+          "max": {
+            "type": "integer",
+            "description": "Result cap.",
+            "default": 10
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "params": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "max",
+          "type": "integer",
+          "required": false,
+          "default": 10
+        }
+      ],
+      "kind": "flow",
+      "flow": {
+        "mode": "fetch",
+        "requireView": null,
+        "steps": [
+          {
+            "do": "navigate",
+            "url": "/search?q={query}"
+          },
+          {
+            "do": "read",
+            "spec": {
+              "summary": {
+                "one": {
+                  "extract": "text",
+                  "target": {
+                    "kind": "chain",
+                    "links": [
+                      {
+                        "name": "Summary",
+                        "chain": [
+                          [
+                            ".summary"
+                          ]
+                        ],
+                        "props": {
+                          "text": {
+                            "extract": "text"
+                          }
+                        },
+                        "preds": [],
+                        "index": null
+                      }
+                    ]
+                  }
+                }
+              },
+              "rows": {
+                "list": {
+                  "target": {
+                    "kind": "chain",
+                    "links": [
+                      {
+                        "name": "Row",
+                        "chain": [
+                          [
+                            "li.result"
+                          ]
+                        ],
+                        "props": {
+                          "label": {
+                            "extract": ".label"
+                          }
+                        },
+                        "preds": [],
+                        "index": null
+                      }
+                    ]
+                  },
+                  "max": "{max}",
+                  "fields": {
+                    "label": {
+                      "extract": ".label"
+                    },
+                    "href": {
+                      "extract": "attr=href",
+                      "target": {
+                        "kind": "css",
+                        "selector": "a"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "search_api",
+      "title": null,
+      "description": "Search via the JSON API.",
+      "readOnly": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Keywords."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results.",
+            "default": 5
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "params": [
+        {
+          "name": "query",
+          "type": "string",
+          "required": true,
+          "default": null
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "required": false,
+          "default": 5
+        }
+      ],
+      "kind": "api",
+      "api": {
+        "method": "POST",
+        "url": "/api/search",
+        "query": null,
+        "headers": null,
+        "body": {
+          "q": "{query}",
+          "limit": "{limit}"
+        },
+        "result": [
+          {
+            "name": "total",
+            "source": "rsp.body",
+            "field": "meta.total",
+            "pattern": null,
+            "transform": null
+          },
+          {
+            "name": "first_title",
+            "source": "rsp.body",
+            "field": "results.0.title",
+            "pattern": null,
+            "transform": null
+          }
+        ],
+        "maxBodyChars": 20000,
+        "request": "SearchApi"
+      }
+    },
+    {
+      "name": "stock",
+      "title": null,
+      "description": "Raw stock lookup (no result spec — echoes the body).",
+      "readOnly": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sku": {
+            "type": "string",
+            "description": "SKU."
+          }
+        },
+        "required": [
+          "sku"
+        ]
+      },
+      "params": [
+        {
+          "name": "sku",
+          "type": "string",
+          "required": true,
+          "default": null
+        }
+      ],
+      "kind": "api",
+      "api": {
+        "method": "GET",
+        "url": "/api/stock/{sku}",
+        "query": null,
+        "headers": null,
+        "body": null,
+        "result": [],
+        "maxBodyChars": 20000,
+        "request": "StockApi"
+      }
+    },
+    {
+      "name": "buy_first_match",
+      "title": null,
+      "description": "Click the Buy button on the row whose label matches.",
+      "readOnly": false,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Row label to buy."
+          }
+        },
+        "required": [
+          "label"
+        ]
+      },
+      "params": [
+        {
+          "name": "label",
+          "type": "string",
+          "required": true,
+          "default": null
+        }
+      ],
+      "kind": "flow",
+      "flow": {
+        "mode": "live",
+        "requireView": {
+          "view": "Results",
+          "route": "/search",
+          "pathRegex": "^\\/search$",
+          "url": "https://shop.example/search?q=chairs"
+        },
+        "steps": [
+          {
+            "do": "fill",
+            "target": {
+              "kind": "chain",
+              "links": [
+                {
+                  "name": "Header SearchInput",
+                  "chain": [
+                    [
+                      "header.site"
+                    ],
+                    [
+                      "input.search-v2",
+                      "input.search"
+                    ]
+                  ],
+                  "props": {
+                    "value": {
+                      "extract": "attr=value"
+                    }
+                  },
+                  "preds": [],
+                  "index": null
+                }
+              ]
+            },
+            "value": "{label}"
+          },
+          {
+            "do": "click",
+            "target": {
+              "kind": "chain",
+              "links": [
+                {
+                  "name": "Row",
+                  "chain": [
+                    [
+                      "li.result"
+                    ]
+                  ],
+                  "props": {
+                    "label": {
+                      "extract": ".label"
+                    }
+                  },
+                  "preds": [
+                    {
+                      "prop": "label",
+                      "op": "=",
+                      "value": "{label}",
+                      "ci": false
+                    }
+                  ],
+                  "index": null
+                },
+                {
+                  "name": "Row Buy",
+                  "chain": [
+                    [
+                      "button.buy"
+                    ]
+                  ],
+                  "props": {},
+                  "preds": [],
+                  "index": null
+                }
+              ]
+            }
+          },
+          {
+            "do": "read",
+            "spec": {
+              "confirmed": {
+                "one": {
+                  "extract": "text",
+                  "target": {
+                    "kind": "css",
+                    "selector": ".confirmation"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

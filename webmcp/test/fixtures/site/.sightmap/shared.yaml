@@ -1,0 +1,37 @@
+version: 1
+
+components:
+  - name: Header
+    selector: "header.site"
+    children:
+      - name: SearchInput
+        selector: ["input.search-v2", "input.search"]
+        properties:
+          - name: value
+            extract: attr=value
+  - name: Card
+    selector: "article.card"
+    properties:
+      - name: title
+        extract: ".card-title"
+      - name: price
+        extract: text
+        transform: first_dollar
+      - name: fancy
+        extract: "exists:.badge"
+
+requests:
+  - name: SearchApi
+    route: /api/search
+    method: POST
+    description: Keyword search endpoint.
+    properties:
+      - name: total
+        source: rsp.body
+        field: meta.total
+      - name: first_title
+        source: rsp.body
+        field: results.0.title
+  - name: StockApi
+    route: /api/stock/*
+    method: GET

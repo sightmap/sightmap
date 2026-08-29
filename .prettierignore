@@ -6,3 +6,9 @@ go/npm/
 # effect of `npm run fmt` picking up every go/**/*.js file.
 go/probe/probe.js
 go/cmd/sightmap/extension/
+
+# Generated WebMCP bundles a caller commits next to a manifest. Reformatting
+# them would break `sightmap webmcp generate --check`.
+**/*.webmcp.js
+**/*.webmcp.module.js
+**/*.webmcp.user.js

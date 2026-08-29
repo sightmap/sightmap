@@ -1,0 +1,31 @@
+version: 1
+
+views:
+  - name: Results
+    route: /search
+    url: https://shop.example/search?q=chairs
+    components:
+      - $ref: Header
+      - name: Summary
+        selector: ".summary"
+        properties:
+          - name: text
+            extract: text
+      - name: Row
+        selector: "li.result"
+        properties:
+          - name: label
+            extract: ".label"
+        children:
+          - name: Buy
+            selector: "button.buy"
+
+  - name: Detail
+    route: /items/:id
+    url: https://shop.example/items/42
+    components:
+      - name: Summary
+        selector: ".detail-summary"
+        properties:
+          - name: text
+            extract: text

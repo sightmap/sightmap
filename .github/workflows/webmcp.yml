@@ -1,0 +1,34 @@
+name: webmcp
+
+on:
+  push:
+    branches: [main]
+    paths: ['webmcp/**', 'go/webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+  pull_request:
+    paths: ['webmcp/**', 'go/webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webmcp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: runtime jsdom tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      # jsdom coverage of the browser runtime. The Go generator's tests live
+      # in go.yml (`go test ./webmcp/`); this job does not re-run them.
+      - run: npx jest webmcp
