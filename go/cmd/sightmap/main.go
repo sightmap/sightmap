@@ -108,6 +108,11 @@ func main() {
 		if errors.Is(err, flag.ErrHelp) {
 			return
 		}
+		// generate --check already printed per-file drift lines; map to exit 2
+		// without a second generic "sightmap webmcp: …" wrapper.
+		if errors.Is(err, errGenerateDrift) {
+			os.Exit(2)
+		}
 		fmt.Fprintf(os.Stderr, "sightmap %s: %v\n", cmd, err)
 		os.Exit(1)
 	}
@@ -154,7 +159,7 @@ Commands:
   atlas list [--category C] [--limit N] [--json]            browse the community atlas
   atlas add SLUG [--target DIR]                             install a published corpus into .sightmap/
   init     [--sightmap-dir DIR]                             scaffold a schema-correct .sightmap/ corpus
-  skills install [--target DIR]                             install sightmap authoring skill to ~/.agents/skills/
+  skills install [--target DIR]                             install bundled agent skills to ~/.agents/skills/
   webmcp init/validate/generate                             WebMCP tools (document.modelContext) from a corpus + manifest
   version                                                    print version and exit
 

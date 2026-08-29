@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -14,6 +15,10 @@ import (
 
 	"github.com/sightmap/sightmap/go/webmcp"
 )
+
+// errGenerateDrift is returned by `sightmap webmcp generate --check` when a
+// committed bundle does not match a fresh emit. main maps it to exit 2.
+var errGenerateDrift = errors.New("generated output is stale")
 
 var initSiteRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
@@ -139,6 +144,24 @@ func joinNames(names []string) string {
 	return out
 }
 
+// displayPath prefers a path under the working directory so generate/init
+// output is readable and matches the docs samples.
+func displayPath(p string) string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return p
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	rel, err := filepath.Rel(cwd, abs)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return p
+	}
+	return rel
+}
+
 func runWebmcpGenerate(args []string) error {
 	fs := flag.NewFlagSet("webmcp generate", flag.ContinueOnError)
 	tools := fs.String("tools", "webmcp.tools.yaml", "Tool manifest to compile")
@@ -223,10 +246,10 @@ func runWebmcpGenerate(args []string) error {
 		if *check {
 			existing, readErr := os.ReadFile(outFile)
 			if readErr != nil || string(existing) != content {
-				fmt.Fprintf(os.Stderr, "drift: %s is stale — regenerate with sightmap webmcp generate\n", outFile)
+				fmt.Fprintf(os.Stderr, "drift: %s is stale — regenerate with sightmap webmcp generate\n", displayPath(outFile))
 				drift = true
 			} else {
-				fmt.Printf("✓ %s is up to date\n", outFile)
+				fmt.Printf("✓ %s is up to date\n", displayPath(outFile))
 			}
 		} else {
 			if err := os.MkdirAll(filepath.Dir(outFile), 0o755); err != nil {
@@ -235,11 +258,11 @@ func runWebmcpGenerate(args []string) error {
 			if err := os.WriteFile(outFile, []byte(content), 0o644); err != nil {
 				return err
 			}
-			fmt.Printf("wrote %s (%d bytes, %d tools)\n", outFile, len(content), len(webmcp.ToolNames(ir)))
+			fmt.Printf("wrote %s (%d bytes, %d tools)\n", displayPath(outFile), len(content), len(webmcp.ToolNames(ir)))
 		}
 	}
 	if drift {
-		os.Exit(2)
+		return errGenerateDrift
 	}
 	return nil
 }
@@ -291,6 +314,6 @@ func runWebmcpInit(args []string) error {
 	if err := os.WriteFile(outFile, []byte(content), 0o644); err != nil {
 		return err
 	}
-	fmt.Printf("wrote %s — a draft; see the sightmap-webmcp skill for the authoring loop\n", outFile)
+	fmt.Printf("wrote %s — a draft; see the sightmap-webmcp skill for the authoring loop\n", displayPath(outFile))
 	return nil
 }

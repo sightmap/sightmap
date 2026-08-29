@@ -45,7 +45,7 @@ Several flags appear in multiple command groups:
 
 ## Exit codes
 
-Commands exit `0` on success and `1` when command execution returns an error. Errors print to stderr as `sightmap <command>: <message>`.
+Commands exit `0` on success and `1` when command execution returns an error. Errors print to stderr as `sightmap <command>: <message>`. `webmcp generate --check` is the exception: it exits **2** when a committed bundle does not match a fresh emit (and writes nothing).
 
 What counts as failure for the check-style commands:
 

@@ -13,8 +13,8 @@ both websites.
 |---|---|---|
 | `spec/` | Markdown + JSON Schema | Normative specification, SEP process, conformance fixtures. Source of truth. |
 | `go/` | Go | Reference implementation: `sightmap` CLI + `go get`-able library. npm: `@sightmap/sightmap`. |
-| `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
-| `webmcp/` | JS runtime + jsdom tests | Canonical browser runtime for generated WebMCP bundles, plus jsdom tests. Generator library: `go/webmcp/`. |
+| `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`, `sightmap-webmcp`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
+| `webmcp/` | JS runtime + jsdom tests | Canonical browser runtime for generated WebMCP bundles, plus jsdom tests. Generator: `sightmap webmcp` (`go/webmcp/`). |
 | `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
 
@@ -43,7 +43,8 @@ Never change spec semantics without an SEP (`spec/seps/`).
   (see below) — never hand-edit it.
 
 ### `skills/` (canonical agent skills)
-- The source of truth for the `sightmap-authoring` and `sightmap-browser` skills.
+- The source of truth for the `sightmap-authoring`, `sightmap-browser`, and
+  `sightmap-webmcp` skills.
   Edit the skill Markdown **here**, at the repo root.
 - `go:embed` can't reach outside the `go/` module or follow symlinks, so a copy
   is generated into `go/skills/<name>/` and checked in (the same generate-and-commit
@@ -68,8 +69,8 @@ Never change spec semantics without an SEP (`spec/seps/`).
 
 ### `webmcp/`
 - Canonical browser runtime (`src/runtime/runtime.js`) plus jsdom tests.
-  The generator library is `go/webmcp/` (the `sightmap webmcp` CLI command
-  is a follow-up).
+  The generator is `sightmap webmcp` (`go/webmcp/`). The authoring loop is
+  the `sightmap-webmcp` skill.
 - `go generate ./webmcp/...` (from `go/`) copies the runtime into
   `go/webmcp/runtime.js`, writes `version_gen.go`, and regenerates
   `webmcp/test/fixtures/site/ir.json` for the jsdom tests. CI fails on drift.

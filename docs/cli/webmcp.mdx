@@ -81,6 +81,8 @@ Worked examples live in the sightmap repo under
 [`webmcp/examples/`](https://github.com/sightmap/sightmap/tree/main/webmcp/examples)
 — IKEA and GitHub, each generated from its community-atlas corpus.
 
+---
+
 ### `sightmap webmcp init`
 
 ```bash
@@ -89,12 +91,24 @@ sightmap webmcp init --site myshop --base-url https://myshop.example
 
 Reads the corpus and writes a draft `webmcp.tools.yaml`: a fetch-read tool
 for every view that has a representative `url:`, and an API stub for every
-corpus request. Every entry is marked TODO — the draft is where the
+corpus request. Every entry is marked TODO. The draft is where the
 authoring loop starts, not where it ends. Refuses to overwrite an existing
 manifest.
 
-**Flags:** `--site` and `--base-url` (both required), `--sightmap-dir`
-(default `.sightmap`), `--out` (default `webmcp.tools.yaml`).
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--site` | (required) | Site slug (`^[a-z0-9][a-z0-9-]*$`) |
+| `--base-url` | (required) | Site origin used to resolve relative URLs |
+| `--sightmap-dir` | `.sightmap` | Corpus to scaffold from |
+| `--out` | `webmcp.tools.yaml` | Manifest path to write |
+
+```text
+wrote webmcp.tools.yaml — a draft; see the sightmap-webmcp skill for the authoring loop
+```
+
+---
 
 ### `sightmap webmcp validate`
 
@@ -104,8 +118,22 @@ property lists the properties the component does declare, an unknown
 request or view lists the corpus's, and a name defined only per view tells
 you to set the tool's `view:`.
 
-**Flags:** `--tools` (default `webmcp.tools.yaml`), `--sightmap-dir`
-(default: the manifest's `sightmap:` field, else `.sightmap` next to it).
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--tools` | `webmcp.tools.yaml` | Manifest to compile |
+| `--sightmap-dir` | manifest `sightmap:`, else `.sightmap` next to it | Corpus directory |
+
+```bash
+sightmap webmcp validate --tools webmcp.tools.yaml
+```
+
+```text
+✓ 4 tool(s) compile against 2 corpus file(s): search, search_api, stock, buy_first_match
+```
+
+---
 
 ### `sightmap webmcp generate`
 
@@ -117,21 +145,38 @@ Emits up to three files, one per format:
 
 | Format | File | For |
 | --- | --- | --- |
-| `snippet` | `SITE.webmcp.js` | Injection — `sightmap browser eval "$(cat SITE.webmcp.js)"` to verify tools in a live session |
-| `module` | `SITE.webmcp.module.js` | Site owners — `<script type="module">` makes the site itself WebMCP-enabled |
-| `userscript` | `SITE.webmcp.user.js` | Third-party publishing — Tampermonkey/Violentmonkey, `@match` from the manifest |
+| `snippet` | `SITE.webmcp.js` | Injection. `sightmap browser eval "$(cat SITE.webmcp.js)"` verifies tools in a live session |
+| `module` | `SITE.webmcp.module.js` | Site owners. `<script type="module">` makes the site itself WebMCP-enabled |
+| `userscript` | `SITE.webmcp.user.js` | Third-party publishing. Tampermonkey/Violentmonkey, `@match` from the manifest |
 
 Every bundle registers its tools with `document.modelContext` where the
 browser provides it, and always installs a `window.__sightmapWebMCP` shim
 (`listTools()`, `callTool()`, `callToolAndStore()` for eval bridges that
-cannot await) — the verification surface, and the fallback in browsers
-without the origin trial.
+cannot await). That shim is the verification surface, and the fallback in
+browsers without the origin trial.
 
-Output is deterministic: no timestamps, and the banner carries a content
-hash of the corpus, so a committed bundle can be drift-checked. `--check`
+Output is deterministic. No timestamps. The banner carries a content hash
+of the corpus, so a committed bundle can be drift-checked. `--check`
 regenerates in memory, compares, exits **2** on drift, and writes nothing.
 Use it in your own CI if you commit generated bundles next to a manifest.
 
-**Flags:** `--tools`, `--sightmap-dir` (as above), `--format`
-(`snippet|module|userscript|all`, default `snippet`), `--out FILE` (single
-format), `--out-dir DIR` (default: the manifest's directory), `--check`.
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--tools` | `webmcp.tools.yaml` | Manifest to compile |
+| `--sightmap-dir` | manifest `sightmap:`, else `.sightmap` next to it | Corpus directory |
+| `--format` | `snippet` | `snippet`, `module`, `userscript`, or `all` |
+| `--out` | (unset) | Output file. Single format only |
+| `--out-dir` | the manifest's directory | Output directory |
+| `--check` | off | Compare against existing files. Exit 2 on drift. Write nothing |
+
+```text
+wrote fixture.webmcp.js (32651 bytes, 4 tools)
+```
+
+`--check` against a matching file:
+
+```text
+✓ fixture.webmcp.js is up to date
+```
