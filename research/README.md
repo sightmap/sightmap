@@ -10,4 +10,4 @@ at which point the note stays as the record of where the idea came from.
 
 | Note | What it explores |
 |---|---|
-| [`flows-and-agentic-verification.md`](flows-and-agentic-verification.md) | A `flows:` entity — Gherkin-shaped user flows bound to corpus entities — as the shared artifact between test generation, WebMCP codegen, and Subtext session review. |
+| [`journeys-and-agentic-verification.md`](journeys-and-agentic-verification.md) | A `journeys:` entity — user trajectories whose steps bind to corpus entities rather than selectors — as the shared artifact between test generation, WebMCP codegen, and session review. |
