@@ -82,9 +82,9 @@ func banner(ir *OM, p Provenance) string {
 	}
 	lines = append(lines,
 		"// tools: "+strings.Join(names, ", "),
-		fmt.Sprintf("// generator: @sightmap/webmcp-codegen v%s (github.com/sightmap/sightmap webmcp/)", p.GeneratorVersion),
+		fmt.Sprintf("// generator: sightmap webmcp v%s (github.com/sightmap/sightmap)", p.GeneratorVersion),
 		fmt.Sprintf("// manifest: %s | corpus: %s (%d files, sha256:%s)", p.Manifest, p.Corpus, p.CorpusFiles, p.CorpusHash[:12]),
-		"// DO NOT EDIT — edit the manifest or corpus and regenerate: sightmap-webmcp generate",
+		"// DO NOT EDIT — edit the manifest or corpus and regenerate: sightmap webmcp generate",
 	)
 	return strings.Join(lines, "\n")
 }

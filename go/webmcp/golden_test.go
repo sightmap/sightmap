@@ -97,12 +97,38 @@ func TestExamplesCompileAndEmit(t *testing.T) {
 				if strings.Contains(got, "module.exports") {
 					t.Fatalf("%s: CommonJS export guard leaked into the bundle", format)
 				}
+				if !strings.Contains(got, "sightmap webmcp generate") {
+					t.Fatalf("%s: banner missing shipped CLI", format)
+				}
+				if strings.Contains(got, "@sightmap/webmcp-codegen") {
+					t.Fatalf("%s: banner still names the deleted Node package", format)
+				}
 			}
 		})
 		tested++
 	}
 	if tested == 0 {
 		t.Skip("no example directories")
+	}
+}
+
+func TestEmitBannerNamesTheShippedCLI(t *testing.T) {
+	ir := fixtureCompile(t)
+	got, err := Emit(ir, "snippet", Provenance{
+		GeneratorVersion: "0.1.0",
+		Manifest:         "webmcp.tools.yaml",
+		Corpus:           ".sightmap",
+		CorpusFiles:      2,
+		CorpusHash:       strings.Repeat("ab", 32),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "regenerate: sightmap webmcp generate") {
+		t.Fatalf("banner missing shipped CLI:\n%s", got)
+	}
+	if strings.Contains(got, "sightmap-webmcp generate") || strings.Contains(got, "@sightmap/webmcp-codegen") {
+		t.Fatal("banner still names the deleted Node generator")
 	}
 }
 
