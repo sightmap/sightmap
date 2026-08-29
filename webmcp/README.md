@@ -1,10 +1,12 @@
 # webmcp/ — the sightmap → WebMCP codegen adapter
 
 Turn any publicly accessible website into a set of **WebMCP tools** an agent
-can call, by way of its sightmap corpus. This directory holds the codegen
-adapter: a compiler from `.sightmap/` (views, components, properties,
-requests, memory) plus a small hand-authored tool manifest to a
-self-contained JS bundle that registers tools on
+can call, by way of its sightmap corpus. This directory holds the canonical
+browser runtime, jsdom tests, and worked example manifests. The compiler
+lives in `go/webmcp/` and ships as `sightmap webmcp`. It turns a `.sightmap/`
+corpus (views, components, properties, requests, memory) plus a small
+hand-authored tool manifest into a self-contained JS bundle that registers
+tools on
 [`document.modelContext`](https://github.com/webmachinelearning/webmcp) —
 the W3C Web Machine Learning CG's WebMCP proposal, in origin trial in Chrome
 149 / Edge 150 and supported by ChatGPT Desktop and Brave Leo.

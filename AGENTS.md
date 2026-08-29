@@ -14,7 +14,7 @@ both websites.
 | `spec/` | Markdown + JSON Schema | Normative specification, SEP process, conformance fixtures. Source of truth. |
 | `go/` | Go | Reference implementation: `sightmap` CLI + `go get`-able library. npm: `@sightmap/sightmap`. |
 | `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`, `sightmap-webmcp`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
-| `webmcp/` | JS runtime + jsdom tests | Canonical browser runtime for generated WebMCP bundles, plus jsdom tests. Generator: `sightmap webmcp` (`go/webmcp/`). |
+| `webmcp/` | JS runtime + examples | Canonical browser runtime, jsdom tests, and worked example manifests. Generator: `sightmap webmcp` (`go/webmcp/`). |
 | `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
 
@@ -68,9 +68,10 @@ Never change spec semantics without an SEP (`spec/seps/`).
   its extension manifest is MCP-only and has no skills concept.)
 
 ### `webmcp/`
-- Canonical browser runtime (`src/runtime/runtime.js`) plus jsdom tests.
-  The generator is `sightmap webmcp` (`go/webmcp/`). The authoring loop is
-  the `sightmap-webmcp` skill.
+- Canonical browser runtime (`src/runtime/runtime.js`) plus jsdom tests and
+  worked example manifests. See `webmcp/README.md`. The generator is
+  `sightmap webmcp` (`go/webmcp/`). The authoring loop is the
+  `sightmap-webmcp` skill.
 - `go generate ./webmcp/...` (from `go/`) copies the runtime into
   `go/webmcp/runtime.js`, writes `version_gen.go`, and regenerates
   `webmcp/test/fixtures/site/ir.json` for the jsdom tests. CI fails on drift.

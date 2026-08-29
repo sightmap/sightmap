@@ -174,6 +174,8 @@ tools:
         type: integer
         description: Quantity to set before adding (default 1).
         default: 1
+    # css: hatch: the atlas corpus names AddToCartSection / AddToCartButtons
+    # but not the quantity input. Prefer a named child if the corpus grows one.
     flow:
       - fill:
           target: 'css:.js-add-to-cart-section input[type="number"]'
