@@ -56,15 +56,15 @@ func (c *Corpus) RequestsForRecord(rec Request) []RequestMatch {
 // live-traffic contract, where whether a body or header is even available depends
 // on the capture layer.
 //
-// Resolution is source → field → pattern → transform: the source selects a body
+// Resolution is source → field → pattern: the source selects a body
 // or header block on rec; field selects within it (a JSON dot-path for a body, a
 // case-insensitive header name for a header block); an optional RE2 pattern
 // refines what field resolved (capture group 1 when present, else the whole
-// match) or scans the raw source text when field is absent; an optional transform
-// post-processes the string. The reserved identity names (status/method/duration)
-// are not handled here — they are a signal-layer concern and need no properties[]
-// declaration; a property that happens to be named after one still extracts from
-// its own source (the shadowing validation warns about).
+// match) or scans the raw source text when field is absent. The reserved
+// identity names (status/method/duration) are not handled here — they are a
+// signal-layer concern and need no properties[] declaration; a property that
+// happens to be named after one still extracts from its own source (the
+// shadowing validation warns about).
 func (d *RequestDef) ExtractProperties(rec Request) []PropertyValue {
 	if len(d.Properties) == 0 {
 		return nil
@@ -95,11 +95,11 @@ func resolveRequestProperty(p RequestPropertyDef, rec Request) (string, bool) {
 	if raw == "" {
 		return "", false
 	}
-	return ApplyTransform(raw, p.Transform), true
+	return raw, true
 }
 
 // resolveSourceValue resolves the source+field half of a property to a raw
-// string (before pattern/transform). For a body source with a field it walks the
+// string (before pattern). For a body source with a field it walks the
 // JSON dot-path; with no field it returns the whole raw body for a pattern to
 // scan. For a header source it looks up the (required) named header.
 func resolveSourceValue(p RequestPropertyDef, rec Request) (string, bool) {

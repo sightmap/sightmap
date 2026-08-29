@@ -12,10 +12,10 @@ import (
 // match — the same live-traffic contract as request-property extraction: a plain
 // console record (empty Stack) simply yields nothing.
 //
-// Resolution is source → field → pattern → transform. The only source is
+// Resolution is source → field → pattern. The only source is
 // "stack"; field addresses a frame and attribute ("top.file", "1.function"),
-// pattern optionally refines the resolved string (capture group 1 else the whole
-// match), and transform post-processes it.
+// and pattern optionally refines the resolved string (capture group 1 else the
+// whole match).
 func (d *MessageDef) ExtractProperties(rec Message) []PropertyValue {
 	if len(d.Properties) == 0 {
 		return nil
@@ -52,7 +52,7 @@ func resolveMessageProperty(p MessagePropertyDef, rec Message) (string, bool) {
 	if raw == "" {
 		return "", false
 	}
-	return ApplyTransform(raw, p.Transform), true
+	return raw, true
 }
 
 // resolveStackField resolves a "<frame>.<attribute>" field against a call stack.
