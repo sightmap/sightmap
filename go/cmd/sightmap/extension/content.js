@@ -45,57 +45,57 @@ function domDepth(el) {
   return d;
 }
 
-function extractProperties(el, descriptors) {
+// Inlined from resolver.js (content scripts run as classic scripts). Keep in
+// sync with resolver.js.
+function firstDescendantEl(el, name, components) {
+  const def = components.find((c) => c.name === name);
+  if (!def || !def.selector) return null;
+  try {
+    return el.querySelectorAll(def.selector)[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function resolvePath(el, path, components) {
+  let cur = el;
+  for (const seg of path.split(".")) {
+    if (!seg) return null;
+    const next = firstDescendantEl(cur, seg, components);
+    if (!next) return null;
+    cur = next;
+  }
+  return cur === el ? null : cur;
+}
+
+function resolveExtract(el, extract, components) {
+  if (extract === "text") return el.textContent;
+  if (typeof extract !== "string") return null;
+  if (extract.startsWith("attr=")) return el.getAttribute(extract.slice(5));
+  if (extract.startsWith("exists:")) {
+    return resolvePath(el, extract.slice(7), components) ? "true" : null;
+  }
+  const dot = extract.lastIndexOf(".");
+  if (dot <= 0 || dot === extract.length - 1) return null;
+  const path = extract.slice(0, dot);
+  const target = resolvePath(el, path, components);
+  if (!target) return null;
+  const def = components.find((c) => c.name === path.split(".").pop());
+  if (!def) return null;
+  const pd = (def.properties || []).find((p) => p.name === extract.slice(dot + 1));
+  if (!pd) return null;
+  return resolveExtract(target, pd.extract, components);
+}
+
+function extractProperties(el, descriptors, components) {
   if (!descriptors || !descriptors.length) return {};
   const result = {};
   for (const desc of descriptors) {
     try {
-      const { name, extract, transform } = desc;
-      let val = null;
-      if (extract === "text") val = el.textContent;
-      else if (extract === "inner_text") val = el.innerText;
-      else if (extract === "text_only") {
-        const c = el.cloneNode(true);
-        c.querySelectorAll("img,svg,[alt]").forEach((n) => n.remove());
-        val = c.textContent;
-      } else if (extract === "inner_html") val = el.innerHTML;
-      else if (extract?.startsWith("attr="))
-        val = el.getAttribute(extract.slice(5));
-      else if (extract?.startsWith("exists:"))
-        val = el.querySelector(extract.slice(7)) ? "true" : null;
-      else if (typeof extract === "string" && extract.length > 0) {
-        const ch = el.querySelector(extract);
-        if (ch) val = ch.innerText ?? ch.textContent;
-      }
+      let val = resolveExtract(el, desc.extract, components || []);
       if (val == null || val === "") continue;
       val = String(val).trim().replace(/\s+/g, " ");
-      // Transforms — canonical set mirrored in resolver.js. sightmap/property.go
-      // was removed in SEP-0010; the extension keeps its own copy since it has
-      // no access to the Go matcher. No-match → value unchanged.
-      if (transform === "first_word") val = val.split(/\s+/)[0] ?? val;
-      else if (transform === "last_word") val = val.split(/\s+/).pop() ?? val;
-      else if (transform === "first_number") {
-        const m = val.match(/\d[\d,.]*/);
-        if (m) val = m[0];
-      } else if (transform === "first_dollar") {
-        const m = val.match(/\$[\d,.]+/);
-        if (m) val = m[0];
-      } else if (transform === "number") {
-        val = val.replace(/[^\d.]/g, "");
-      } else if (transform === "slug") {
-        val = val
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^a-z0-9-]/g, "");
-      } else if (
-        typeof transform === "string" &&
-        transform.startsWith("match:")
-      ) {
-        // capture group 1 if present, else full match; no match → unchanged
-        const m = val.match(new RegExp(transform.slice(6)));
-        if (m) val = m[1] != null ? m[1] : m[0];
-      }
-      if (val) result[name] = val.slice(0, 120);
+      if (val) result[desc.name] = val.slice(0, 120);
     } catch {
       /* skip */
     }
@@ -146,7 +146,7 @@ function resolveElement(el, components) {
   matchList.sort((a, b) => a.depth - b.depth);
   return matchList.map((m) => ({
     name: m.name,
-    properties: extractProperties(m.element, m.properties),
+    properties: extractProperties(m.element, m.properties, components),
     boundingBox: m.element.getBoundingClientRect(),
   }));
 }
