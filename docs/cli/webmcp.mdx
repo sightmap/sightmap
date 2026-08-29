@@ -128,10 +128,9 @@ cannot await) — the verification surface, and the fallback in browsers
 without the origin trial.
 
 Output is deterministic: no timestamps, and the banner carries a content
-hash of the corpus, so a committed bundle can be drift-checked. That is what
-`--check` does — regenerate in memory, compare, exit **2** on drift, write
-nothing — and it is how the sightmap repo's own CI keeps the committed
-examples honest.
+hash of the corpus, so a committed bundle can be drift-checked. `--check`
+regenerates in memory, compares, exits **2** on drift, and writes nothing.
+Use it in your own CI if you commit generated bundles next to a manifest.
 
 **Flags:** `--tools`, `--sightmap-dir` (as above), `--format`
 (`snippet|module|userscript|all`, default `snippet`), `--out FILE` (single

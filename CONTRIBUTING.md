@@ -75,6 +75,7 @@ A couple of artifacts are **generated from a canonical source and checked in**, 
 
 - `docs/reference/schema.md` — generated from `spec/v1/schema.md`. Regenerate with `npm run sync-docs` (or `node docs/scripts/sync-spec.mjs`).
 - `go/skills/<name>/` — generated from the canonical `skills/`. Regenerate with `go generate ./skills/...` from `go/`.
+- `go/webmcp/runtime.js`, `go/webmcp/version_gen.go`, and `webmcp/test/fixtures/site/ir.json` — generated from `webmcp/src/runtime/runtime.js` and the fixture manifest. Regenerate with `go generate ./webmcp/...` from `go/`.
 
 If you edit `spec/v1/schema.md`, run `npm run sync-docs` and commit the regenerated page in the same PR. To have this happen automatically on commit, enable the opt-in git hooks once:
 

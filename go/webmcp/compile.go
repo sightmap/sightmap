@@ -1,10 +1,9 @@
 package webmcp
 
-// Compiler — a direct port of webmcp/src/compile.js. Resolves a validated
-// manifest against a loaded corpus and produces the ordered-JSON IR the
-// emitter embeds. Every object below is built with the exact key order the
-// Node implementation uses, because the golden tests byte-compare the two
-// generators' output.
+// Compiler. Resolves a validated manifest against a loaded corpus and
+// produces the ordered-JSON IR the emitter embeds. Objects are built with
+// insertion-ordered keys so the embedded JSON (and thus generated bundles)
+// stays deterministic.
 
 import (
 	"fmt"
@@ -27,8 +26,8 @@ func templateRefs(s string) []string {
 	return refs
 }
 
-// refSet is an insertion-ordered string set (mirrors the JS Set the Node
-// compiler uses, so diagnostics come out in the same order every run).
+// refSet is an insertion-ordered string set so diagnostics come out in the
+// same order every run.
 type refSet struct {
 	order []string
 	seen  map[string]bool
@@ -63,7 +62,8 @@ func (r *refSet) addString(v any) {
 	}
 }
 
-// resolvedEntry mirrors the Node compiler's pickEntry result.
+// resolvedEntry is a corpus component after name lookup, with its selector
+// chain and properties ready to inline.
 type resolvedEntry struct {
 	Crumb     string
 	Levels    [][]string
@@ -774,8 +774,5 @@ func Compile(c *Corpus, manifest any) (*OM, []string, []string) {
 		Set("toolVersion", toolVersion).
 		Set("match", matchV)
 	ir := NewOM().Set("meta", meta).Set("tools", tools)
-	// Reference the two error orderings the Node compiler interleaves: it
-	// pushes template-ref errors after tool compilation, which the loop above
-	// mirrors, so d already holds them in the same order.
 	return ir, d.errors, d.warnings
 }

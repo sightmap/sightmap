@@ -1,10 +1,9 @@
 package webmcp
 
-// Route-glob helpers — a direct port of webmcp/src/globs.js (the Node
-// generator), implementing the spec's "Route matching" rules. The produced
-// regex SOURCE strings are embedded into generated bundles (require_view
-// guards), so this port must build the exact same strings the Node
-// implementation does.
+// Route-glob helpers implementing the spec's "Route matching" rules. The
+// produced regex SOURCE strings are embedded into generated bundles
+// (require_view guards) and evaluated as JavaScript RegExp, so they must
+// match what `new RegExp(source)` would compile in the page.
 
 import (
 	"regexp"
@@ -52,12 +51,11 @@ func segmentToRegex(seg string) string {
 	return strings.Join(parts, "[^/]*")
 }
 
-// routeGlobRegexSource builds the same regex source string as the Node
-// implementation's routeGlobToRegex(...).source. JavaScript's RegExp.source
-// escapes literal "/" outside character classes (so the source is valid in a
-// /.../ literal); the structural slashes below are written pre-escaped to
-// match, while the "/" inside [^/] classes stays bare, exactly as JS reports
-// it.
+// routeGlobRegexSource returns a regex source string for a sightmap route
+// glob. JavaScript's RegExp.source escapes literal "/" outside character
+// classes (so the source is valid in a /.../ literal); structural slashes
+// below are written pre-escaped to match, while the "/" inside [^/] classes
+// stays bare, exactly as JS reports it.
 func routeGlobRegexSource(route string) string {
 	norm := normalizePath(route)
 	if norm == "/" {

@@ -24,7 +24,7 @@ mechanical, verifiable steps everywhere else.
        ▼
  .sightmap/ corpus
        │
-       │  2. SCAFFOLD — sightmap-webmcp init drafts one read tool per view
+       │  2. SCAFFOLD — sightmap webmcp init drafts one read tool per view
        │     and one api stub per corpus request
        ▼
  webmcp.tools.yaml
@@ -34,7 +34,7 @@ mechanical, verifiable steps everywhere else.
        │     tool's kind (api / fetch flow / live flow), and folds corpus
        │     memory into tool descriptions (sightmap-webmcp skill)
        ▼
-       │  4. GENERATE — sightmap-webmcp generate compiles manifest + corpus
+       │  4. GENERATE — sightmap webmcp generate compiles manifest + corpus
        │     into a bundle (compile-time resolution of every component,
        │     property, view, and request reference; errors, not guesses)
        ▼
@@ -96,67 +96,42 @@ around that honestly:
 
 ```
 webmcp/
-  bin/sightmap-webmcp.js   CLI: init | validate | generate [--check]
-  src/
-    corpus.js              .sightmap/ loader ($ref expansion, breadcrumb index,
-                           view scoping, selector chains)
-    manifest.js            webmcp.tools.yaml structural validation
-    query.js               component-query DSL parser (CLI-compatible subset)
-    globs.js               spec route-glob → regex
-    compile.js             manifest + corpus → self-contained tool IR
-    emit.js                IR → snippet / module / userscript (deterministic,
-                           corpus-hash provenance banner)
-    scaffold.js            init: corpus → draft manifest
-    runtime/runtime.js     the embedded browser interpreter (shadow-piercing
-                           query, extraction, actions, fetch/api executors,
-                           modelContext registration + __sightmapWebMCP shim)
-  test/                    jest suite (runs in the repo root's jest config)
-  examples/ikea/           worked example against the vendored IKEA atlas
-                           corpus: manifest + all three generated bundles
-  examples/github/         second worked example (GitHub's legacy + React
-                           frontends, fetch flows + an api tool); its
-                           verify-live.js executes every tool against real
-                           github.com — run it manually, CI stays hermetic
+  src/runtime/runtime.js   browser interpreter embedded into every bundle
+  test/                    jsdom suite (root jest config)
+  test/fixtures/site/      tiny corpus + manifest + compiled ir.json
+  examples/ikea/           worked manifest against the vendored IKEA atlas
+  examples/github/         second worked manifest; verify-live.js hits
+                           github.com (manual, CI stays hermetic)
 ```
 
-The runtime's deep-query and extraction functions are adapted from the
-reference implementation's own browser-side helpers (`go/browser/deepquery.js`,
-`go/observe/properties.js`), so generated tools resolve nodes and values the
-way the CLI that authored the corpus did.
+The generator lives in `go/webmcp/` and ships as `sightmap webmcp`.
+`go generate ./webmcp/...` (from `go/`) copies this runtime into the Go
+package and regenerates `test/fixtures/site/ir.json` for the jsdom tests.
+
+The runtime's deep-query and extraction functions are adapted from
+`go/browser/deepquery.js` and `go/observe/properties.js`, so generated tools
+resolve nodes the way the CLI that authored the corpus did.
 
 Generated bundles always install `window.__sightmapWebMCP`
-(`listTools()` / `callTool()` / `callToolAndStore()` for eval bridges that
-can't await) alongside `document.modelContext` registration — that's the
-verification surface, and the fallback for browsers without the origin
-trial.
+(`listTools()` / `callTool()` / `callToolAndStore()`) alongside
+`document.modelContext` registration. That is the verification surface, and
+the fallback for browsers without the origin trial.
 
 ## Try it
 
-The generator ships inside the `sightmap` CLI (Go, published to npm as
-`@sightmap/sightmap`) as `sightmap webmcp <init|validate|generate>` — a port
-of this package under `go/webmcp/` that emits **byte-identical** bundles
-(golden tests in `go/webmcp/golden_test.go` regenerate the committed examples
-from Go and byte-compare). This directory remains the reference
-implementation and the test harness for the shared browser runtime.
-
-From the repo root:
-
 ```bash
-# validate + regenerate the worked example (either entry point)
 sightmap webmcp validate --tools webmcp/examples/ikea/webmcp.tools.yaml
-node webmcp/bin/sightmap-webmcp.js generate --tools webmcp/examples/ikea/webmcp.tools.yaml --format all
+sightmap webmcp generate --tools webmcp/examples/ikea/webmcp.tools.yaml --format all
 
-# scaffold a fresh manifest from any corpus
 sightmap webmcp init --site myshop --base-url https://myshop.example \
   --sightmap-dir path/to/.sightmap --out webmcp.tools.yaml
 
-# tests
-npx jest webmcp                 # generator + runtime (jsdom) + example drift
-(cd go && go test ./webmcp/)    # Go port incl. byte-parity golden tests
+npx jest webmcp              # browser runtime in jsdom
+(cd go && go test ./webmcp/) # compiler, emitter, examples
 ```
 
-The full authoring loop — including live verification via
-`sightmap browser eval` — is in [`skills/sightmap-webmcp/`](../skills/sightmap-webmcp/SKILL.md).
+The authoring loop, including live verification via `sightmap browser eval`,
+is in [`skills/sightmap-webmcp/`](../skills/sightmap-webmcp/SKILL.md).
 
 ## Manifest reference
 
@@ -276,8 +251,6 @@ prefer URL-shaped actions.
 - Cross-document journeys inside one tool call are out of scope by design
   (so is anything the WebMCP spec itself still leaves open — streaming,
   elicitation, cross-document responses).
-- The user-facing entry point is `sightmap webmcp ...` in the published CLI;
-  this npm package stays repo-internal (`private: true`) as the reference
-  implementation. The two are kept byte-identical by the golden tests, so a
-  change to either generator's output must land in both (and regenerate
-  `examples/`).
+- The user-facing entry point is `sightmap webmcp` in the published CLI.
+  This directory holds the browser runtime the generator embeds, the jsdom
+  tests for that runtime, and the worked example manifests.

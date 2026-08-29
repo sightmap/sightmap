@@ -4,8 +4,8 @@
 # referenced below was verified against the live site when that corpus was
 # curated — this manifest just picks the user goals worth exposing as tools.
 #
-# Regenerate the committed bundle after editing:
-#   node webmcp/bin/sightmap-webmcp.js generate \
+# Generate a bundle after editing (not committed in this repo):
+#   sightmap webmcp generate \
 #     --tools webmcp/examples/ikea/webmcp.tools.yaml --format all
 version: 1
 site: ikea

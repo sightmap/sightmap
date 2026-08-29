@@ -3,9 +3,9 @@ name: webmcp
 on:
   push:
     branches: [main]
-    paths: ['webmcp/**', 'web/src/data/atlas/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+    paths: ['webmcp/**', 'go/webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
   pull_request:
-    paths: ['webmcp/**', 'web/src/data/atlas/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
+    paths: ['webmcp/**', 'go/webmcp/**', 'jest.config.js', 'package.json', 'package-lock.json', '.github/workflows/webmcp.yml']
 
 permissions:
   contents: read
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test:
-    name: test + example drift
+    name: runtime jsdom tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +29,6 @@ jobs:
 
       - run: npm ci
 
-      # The jest slice covers the generator, the browser runtime (jsdom), and
-      # every committed example bundle (regenerated and diffed — drift in
-      # examples/ fails here; regenerate with sightmap-webmcp generate). The
-      # atlas paths trigger because the example bundles hash those corpora.
+      # jsdom coverage of the browser runtime. The Go generator's tests live
+      # in go.yml (`go test ./webmcp/`); this job does not re-run them.
       - run: npx jest webmcp

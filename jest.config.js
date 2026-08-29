@@ -1,7 +1,6 @@
 // Tests the browser-side JS embedded (via go:embed) into the Go binary —
 // go/**/*.js files evaluated in jsdom, next to a *.test.js sibling — and the
-// webmcp/ codegen adapter (generator + its generated browser runtime, which
-// also needs jsdom).
+// webmcp/ browser runtime (also jsdom).
 module.exports = {
   testEnvironment: "jsdom",
   testMatch: ["<rootDir>/go/**/*.test.js", "<rootDir>/webmcp/**/*.test.js"],

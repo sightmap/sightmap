@@ -1,10 +1,8 @@
 package webmcp
 
-// `sightmap webmcp init` — a port of webmcp/src/scaffold.js. Drafts a tool
-// manifest from a corpus: one fetch-read tool per view with a representative
-// URL, one api stub per corpus request, every one marked TODO. The YAML
-// styling differs cosmetically from the Node scaffolder (yaml.v3 vs js-yaml);
-// the content is the same and a draft is for editing anyway.
+// `sightmap webmcp init` drafts a tool manifest from a corpus: one fetch-read
+// tool per view with a representative URL, one api stub per corpus request,
+// every one marked TODO. A draft is for editing.
 
 import (
 	"fmt"

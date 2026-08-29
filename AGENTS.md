@@ -14,7 +14,7 @@ both websites.
 | `spec/` | Markdown + JSON Schema | Normative specification, SEP process, conformance fixtures. Source of truth. |
 | `go/` | Go | Reference implementation: `sightmap` CLI + `go get`-able library. npm: `@sightmap/sightmap`. |
 | `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`, `sightmap-webmcp`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
-| `webmcp/` | Node (CJS) | WebMCP codegen adapter: `.sightmap/` corpus + `webmcp.tools.yaml` → a `document.modelContext` tool bundle. npm workspace, repo-internal (not published). |
+| `webmcp/` | JS runtime + examples | Canonical browser runtime for generated WebMCP bundles, jsdom tests, and worked example manifests. The generator is `sightmap webmcp` in `go/webmcp/`. |
 | `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
 
@@ -43,7 +43,8 @@ Never change spec semantics without an SEP (`spec/seps/`).
   (see below) — never hand-edit it.
 
 ### `skills/` (canonical agent skills)
-- The source of truth for the `sightmap-authoring` and `sightmap-browser` skills.
+- The source of truth for the `sightmap-authoring`, `sightmap-browser`, and
+  `sightmap-webmcp` skills.
   Edit the skill Markdown **here**, at the repo root.
 - `go:embed` can't reach outside the `go/` module or follow symlinks, so a copy
   is generated into `go/skills/<name>/` and checked in (the same generate-and-commit
@@ -67,30 +68,18 @@ Never change spec semantics without an SEP (`spec/seps/`).
   its extension manifest is MCP-only and has no skills concept.)
 
 ### `webmcp/`
-- The sightmap → WebMCP codegen adapter (see `webmcp/README.md` for the
-  pipeline). Plain CommonJS, an npm workspace of the root `package.json`;
-  its only dependency is `js-yaml`.
-- **Two generators, one output.** The user-facing CLI is `sightmap webmcp`
-  (Go, `go/webmcp/`); this directory is the reference implementation. They
-  must emit byte-identical bundles: `go/webmcp/golden_test.go` regenerates
-  the committed `webmcp/examples/` from Go and byte-compares, so any output
-  change must land in both generators plus regenerated examples. The Go side
-  embeds the shared browser runtime via `go generate ./webmcp/...`
-  (generate-and-commit, drift-checked in CI like the skills embed).
-- Tests run through the **root** jest config: `npx jest webmcp` from the repo
-  root. The suite includes a drift check on `webmcp/examples/` — after
-  changing the generator, the runtime, an example manifest, or a corpus an
-  example hashes, regenerate every committed bundle:
-  `for d in webmcp/examples/*/; do node webmcp/bin/sightmap-webmcp.js generate --tools $d/webmcp.tools.yaml --format all; done`.
-- Generated bundles are deterministic (no timestamps); provenance is a corpus
-  content hash in the banner. Never hand-edit a generated `*.webmcp*.js`.
-- The embedded browser runtime (`src/runtime/runtime.js`) mirrors the
-  semantics of `go/browser/deepquery.js` and `go/observe/properties.js` —
-  keep them behaviorally in sync when either side changes.
-- The WebMCP surface it targets (`document.modelContext.registerTool`, the
-  legacy `navigator.modelContext` probe, the tool-descriptor shape) lives in
-  `src/runtime/runtime.js` (`__smwBoot`/`__smwDescriptor`); update there as
-  the proposal evolves.
+- Canonical browser runtime (`src/runtime/runtime.js`) plus jsdom tests and
+  worked example manifests. See `webmcp/README.md`. The generator is
+  `sightmap webmcp` (`go/webmcp/`).
+- `go generate ./webmcp/...` (from `go/`) copies the runtime into
+  `go/webmcp/runtime.js`, writes `version_gen.go`, and regenerates
+  `webmcp/test/fixtures/site/ir.json` for the jsdom tests. CI fails on drift.
+- Runtime tests: `npx jest webmcp` from the repo root. Generator tests:
+  `go test ./webmcp/` from `go/`.
+- The runtime mirrors `go/browser/deepquery.js` and `go/observe/properties.js`
+  — keep them behaviorally in sync when either side changes.
+- `document.modelContext.registerTool` and the `__sightmapWebMCP` shim live in
+  `src/runtime/runtime.js` (`__smwBoot`/`__smwDescriptor`).
 
 ### `docs/`
 - Mintlify site: `npm i -g mint`, then `mint dev` from `docs/`. See `docs/AGENTS.md`
@@ -130,7 +119,7 @@ Path-filtered GitHub Actions run per area on every PR (`.github/workflows/`):
 `go` (gofmt + build + `go test` + embedded-skills drift check; also triggered by
 `skills/**`), `spec` (schema-validate examples + conformance),
 `docs` (schema-page sync check + `mint validate` + `mint broken-links`), `web`
-(build), `webmcp` (jest suite + generated-example drift check). On every push to `main`, `release` opens/updates the "Version Packages"
+(build), `webmcp` (jsdom runtime tests). On every push to `main`, `release` opens/updates the "Version Packages"
 PR when changesets are pending; once that PR is merged (no changesets left), the
 same workflow tags the release, runs goreleaser (config `go/.goreleaser.yml`),
 and publishes `@sightmap/sightmap` from `go/npm/` to npm. No manual tag push.

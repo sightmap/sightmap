@@ -11,8 +11,8 @@
 # README, latest-commit strip, and sidebar do still arrive in follow-up
 # fetches on some loads.
 #
-# Regenerate the committed bundles after editing:
-#   node webmcp/bin/sightmap-webmcp.js generate \
+# Generate bundles after editing (not committed in this repo):
+#   sightmap webmcp generate \
 #     --tools webmcp/examples/github/webmcp.tools.yaml --format all
 version: 1
 site: github

@@ -20,15 +20,14 @@ hazard lore in `memory:`.
 
 This skill is the loop that turns that corpus into a **generated, publishable
 WebMCP bundle**: map → walk trajectories → author a tool manifest → generate
-→ verify live → publish. The codegen adapter lives in the sightmap repo under
-`webmcp/` (`sightmap-webmcp` CLI). Each generated bundle registers its tools
-with `document.modelContext` where available **and** always installs
-`window.__sightmapWebMCP` — a shim with the same tools, used for verification
-below and by non-WebMCP browsers.
+→ verify live → publish. The generator is `sightmap webmcp`. Each generated
+bundle registers its tools with `document.modelContext` where available
+**and** always installs `window.__sightmapWebMCP` — a shim with the same
+tools, used for verification below and by non-WebMCP browsers.
 
 ```
 .sightmap/ corpus  ──┐
-                     ├─ sightmap-webmcp generate ──► site.webmcp.js        (snippet — inject & verify)
+                     ├─ sightmap webmcp generate ──► site.webmcp.js        (snippet — inject & verify)
 webmcp.tools.yaml  ──┘                              site.webmcp.module.js  (ES module — site owners)
    (you author this)                                site.webmcp.user.js    (userscript — third-party publish)
 ```
@@ -40,10 +39,7 @@ webmcp.tools.yaml  ──┘                              site.webmcp.module.js 
   references must exist in the corpus — the manifest names corpus entities,
   it never contains raw selectors except as a deliberate `css:` escape hatch.
 - **Codegen**: ships in the `sightmap` CLI you already have:
-  `sightmap webmcp <init|validate|generate>`. (The reference implementation
-  lives at `webmcp/` in the sightmap repo as a standalone Node CLI —
-  `node webmcp/bin/sightmap-webmcp.js` — and the two emit byte-identical
-  bundles; use whichever is at hand.)
+  `sightmap webmcp <init|validate|generate>`.
 
 ## Phase 1: pick tools by walking trajectories
 

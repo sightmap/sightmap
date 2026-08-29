@@ -1,7 +1,7 @@
 package webmcp
 
-// Component-query parser — a direct port of webmcp/src/query.js. See that
-// file (and the sightmap-browser skill) for the DSL this accepts.
+// Component-query parser for the sightmap-browser DSL
+// (`Row[label="X"] Buy`, plus a `css:` hatch for a raw selector).
 
 import (
 	"fmt"

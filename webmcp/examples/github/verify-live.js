@@ -51,17 +51,14 @@ async function main() {
     };
   };
 
-  const { loadCorpus } = require("../../src/corpus");
-  const { loadManifest } = require("../../src/manifest");
-  const { compile } = require("../../src/compile");
-  const rt = require("../../src/runtime/runtime");
-
   const manifestPath = path.join(__dirname, "webmcp.tools.yaml");
-  const { manifest, errors: merrs } = loadManifest(manifestPath);
-  if (merrs.length) throw new Error(merrs.join("\n"));
-  const corpus = loadCorpus(path.resolve(__dirname, manifest.sightmap));
-  const { ir, errors } = compile(corpus, manifest);
-  if (errors.length) throw new Error(errors.join("\n"));
+  const ir = JSON.parse(
+    execFileSync("go", ["run", "./webmcp/internal/dumpir", manifestPath], {
+      cwd: path.join(ROOT, "go"),
+      encoding: "utf8",
+    }),
+  );
+  const rt = require("../../src/runtime/runtime");
 
   const CALLS = {
     list_pull_requests: { owner, repo },

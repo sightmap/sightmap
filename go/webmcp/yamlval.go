@@ -1,9 +1,8 @@
 package webmcp
 
 // Ordered YAML decoding. The compiler must preserve mapping order from the
-// manifest (read specs, query/header/body maps) the way js-yaml's plain-object
-// load does in the Node generator, so YAML decodes into *OM / []any / scalars
-// via yaml.Node rather than into Go maps.
+// manifest (read specs, query/header/body maps), so YAML decodes into *OM /
+// []any / scalars via yaml.Node rather than into Go maps.
 
 import (
 	"fmt"

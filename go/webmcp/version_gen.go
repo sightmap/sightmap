@@ -3,7 +3,5 @@
 
 package webmcp
 
-// GeneratorVersion is the @sightmap/webmcp-codegen version this generator
-// mirrors; it appears verbatim in every bundle's provenance banner, so the Go
-// and Node generators stay byte-identical.
+// GeneratorVersion appears in every bundle's provenance banner.
 const GeneratorVersion = "0.1.0"

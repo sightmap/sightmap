@@ -2,16 +2,5 @@
   "name": "@sightmap/webmcp-codegen",
   "version": "0.1.0",
   "private": true,
-  "description": "Generate WebMCP tools (document.modelContext) for any website from its sightmap corpus — a codegen adapter from .sightmap/ views, components, and requests to publishable in-page agent tools.",
-  "license": "MIT",
-  "bin": {
-    "sightmap-webmcp": "bin/sightmap-webmcp.js"
-  },
-  "main": "src/index.js",
-  "scripts": {
-    "test": "jest --config ../jest.config.js webmcp"
-  },
-  "dependencies": {
-    "js-yaml": "^4.1.0"
-  }
+  "description": "Canonical browser runtime for sightmap webmcp bundles, plus jsdom tests. The generator itself is `sightmap webmcp` in the Go CLI."
 }

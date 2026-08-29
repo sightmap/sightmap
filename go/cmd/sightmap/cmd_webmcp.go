@@ -1,9 +1,7 @@
 // webmcp generates WebMCP tool bundles (document.modelContext) from a
 // sightmap corpus + a webmcp.tools.yaml manifest. The compiler, emitter, and
 // embedded browser runtime live in the webmcp package; this file is flags in,
-// files out — mirroring the standalone Node CLI at <repo>/webmcp/ flag for
-// flag, and producing byte-identical bundles (the webmcp package's golden
-// tests enforce that).
+// files out.
 package main
 
 import (

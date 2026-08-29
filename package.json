@@ -4,8 +4,7 @@
   "private": true,
   "description": "Workspace root — hosts the changesets release tooling. Not published.",
   "workspaces": [
-    "go/npm",
-    "webmcp"
+    "go/npm"
   ],
   "scripts": {
     "changeset": "npx --yes @changesets/cli@^2.27.0",

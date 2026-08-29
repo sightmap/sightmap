@@ -48,17 +48,15 @@ jobs:
             exit 1
           fi
 
-      # The webmcp package embeds the browser runtime from the canonical
-      # source at <repo>/webmcp/src/runtime/runtime.js (plus the generator
-      # version from webmcp/package.json). Regenerate and fail on drift, the
-      # same contract as the skills embed above. The package's golden tests
-      # then byte-compare Go-generated bundles against the committed
-      # Node-generated ones under webmcp/examples/.
+      # The webmcp package embeds the browser runtime from
+      # <repo>/webmcp/src/runtime/runtime.js (plus the generator version from
+      # webmcp/package.json) and regenerates the fixture IR the jsdom tests
+      # consume. Fail on drift, the same contract as the skills embed above.
       - name: webmcp runtime embed in sync
         run: |
           go generate ./webmcp/...
           if [ -n "$(git -C .. status --porcelain -- webmcp go/webmcp)" ]; then
-            echo "Embedded webmcp runtime is out of sync with webmcp/src/runtime/runtime.js."
+            echo "Embedded webmcp runtime or fixture IR is out of sync."
             echo "Run 'go generate ./webmcp/...' from go/ and commit the result."
             git -C .. status --porcelain -- webmcp go/webmcp
             exit 1

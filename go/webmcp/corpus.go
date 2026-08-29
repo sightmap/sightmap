@@ -351,8 +351,7 @@ func LoadCorpus(dir string) (*Corpus, error) {
 
 	// Collapse duplicate identical entries (a merged entry keeps the widest
 	// scope), then build the name -> breadcrumbs index in first-indexed crumb
-	// order — matching the Node loader, where JS object key insertion order
-	// plays the role crumbSeq plays here.
+	// order. crumbSeq is that insertion order.
 	for _, crumb := range c.crumbSeq {
 		entries := c.Components[crumb]
 		var unique []*componentEntry

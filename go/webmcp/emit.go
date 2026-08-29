@@ -1,8 +1,8 @@
 package webmcp
 
-// Emitter — a direct port of webmcp/src/emit.js. Renders compiled IR into the
-// three bundle formats, byte-identical to the Node generator's output (the
-// golden tests enforce this).
+// Emitter renders compiled IR into the three bundle formats. The snippet,
+// module, and userscript wrappers differ only in how they load the shared
+// runtime and IR.
 
 //go:generate go run ./internal/gen
 
@@ -25,11 +25,11 @@ import (
 //go:embed runtime.js
 var runtimeJS string
 
-// Formats lists the emit formats, in the Node CLI's order.
+// Formats lists the emit formats.
 var Formats = []string{"snippet", "module", "userscript"}
 
-// Provenance mirrors the Node CLI's provenance block (paths relative to the
-// output file's directory, corpus content hash).
+// Provenance is the banner block written above every bundle (paths relative
+// to the output file's directory, plus the corpus content hash).
 type Provenance struct {
 	GeneratorVersion string
 	Manifest         string
@@ -38,8 +38,9 @@ type Provenance struct {
 	CorpusHash       string
 }
 
-// CorpusHash matches the Node corpusHash: sha256 over each file's
-// dir-relative path + "\n" + raw contents, in sorted path order.
+// CorpusHash is sha256 over each file's dir-relative path + "\n" + raw
+// contents, in sorted path order. The banner prints this so a published
+// userscript can be regenerated and diffed.
 func CorpusHash(corpusDir string, files []string) (string, error) {
 	h := sha256.New()
 	for _, f := range files {
@@ -179,7 +180,7 @@ func Emit(ir *OM, format string, p Provenance) (string, error) {
 	return "", fmt.Errorf("unknown format %q (snippet|module|userscript)", format)
 }
 
-// DefaultFileName matches the Node CLI's per-format output names.
+// DefaultFileName is the per-format output name for a site slug.
 func DefaultFileName(site, format string) string {
 	switch format {
 	case "snippet":

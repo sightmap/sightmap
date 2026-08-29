@@ -1,11 +1,10 @@
 package webmcp
 
 // Ordered JSON values and a serializer that reproduces JavaScript's
-// JSON.stringify(v, null, 2) byte for byte. The generated bundle embeds the
-// compiled IR as JSON, and the Go and Node generators must emit identical
-// files (the golden tests byte-compare them), so this package controls key
-// order and escaping itself instead of using encoding/json — which sorts map
-// keys, HTML-escapes, and encodes U+2028/U+2029 differently from JS.
+// JSON.stringify(v, null, 2). The generated bundle embeds the compiled IR as
+// JSON that the browser runtime parses, so this package controls key order
+// and escaping itself instead of using encoding/json — which sorts map keys,
+// HTML-escapes, and encodes U+2028/U+2029 differently from JS.
 
 import (
 	"fmt"
