@@ -96,7 +96,8 @@
           {
             "group": "Integrations",
             "pages": [
-              "cli/integrate"
+              "cli/integrate",
+              "cli/webmcp"
             ]
           }
         ]

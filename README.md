@@ -22,7 +22,8 @@ implementation, and both websites in one place:
 |---|---|
 | [`spec/`](spec/) | The **normative** specification — `spec/v1/` schema + JSON Schema, the SEP process (`spec/seps/`), and language-agnostic conformance fixtures. Source of truth. |
 | [`go/`](go/) | The reference **Go implementation** — the `sightmap` CLI (live browser capture, annotated snapshots, coverage) plus a `go get`-able library for the component model and selector matching. Published to npm as [`@sightmap/sightmap`](https://www.npmjs.com/package/@sightmap/sightmap). |
-| [`skills/`](skills/) | The **agent skills** — `sightmap-authoring` and `sightmap-browser`. This is the canonical, standalone skills directory; the CLI embeds a committed copy under `go/skills/` (regenerated via `go generate`). |
+| [`skills/`](skills/) | The **agent skills** — `sightmap-authoring`, `sightmap-browser`, and `sightmap-webmcp`. This is the canonical, standalone skills directory; the CLI embeds a committed copy under `go/skills/` (regenerated via `go generate`). |
+| [`webmcp/`](webmcp/) | Browser runtime, jsdom tests, and example manifests for `sightmap webmcp`. The generator lives in the Go CLI. |
 | [`docs/`](docs/) | The documentation site at [docs.sightmap.org](https://docs.sightmap.org) (Mintlify). |
 | [`web/`](web/) | The marketing landing page at [sightmap.org](https://sightmap.org) (React + Vite). |
 

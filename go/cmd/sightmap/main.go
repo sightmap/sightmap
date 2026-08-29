@@ -90,6 +90,8 @@ func main() {
 		err = runNetwork(args)
 	case "skills":
 		err = runSkills(args)
+	case "webmcp":
+		err = runWebmcp(args)
 	case "version", "--version", "-v":
 		fmt.Printf("sightmap version %s\n", Version)
 	case "help", "--help", "-h":
@@ -153,6 +155,7 @@ Commands:
   atlas add SLUG [--target DIR]                             install a published corpus into .sightmap/
   init     [--sightmap-dir DIR]                             scaffold a schema-correct .sightmap/ corpus
   skills install [--target DIR]                             install sightmap authoring skill to ~/.agents/skills/
+  webmcp init/validate/generate                             WebMCP tools (document.modelContext) from a corpus + manifest
   version                                                    print version and exit
 
 Run 'sightmap <command> --help' for full flag list.
