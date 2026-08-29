@@ -28,6 +28,9 @@ func TestExamplesCompileAndEmit(t *testing.T) {
 	examplesDir := filepath.Join(root, "webmcp", "examples")
 	entries, err := os.ReadDir(examplesDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("webmcp/examples not in this checkout")
+		}
 		t.Fatal(err)
 	}
 	tested := 0
