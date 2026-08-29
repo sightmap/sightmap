@@ -12,6 +12,9 @@ Nothing in here overrides [`GOVERNANCE.md`](https://github.com/sightmap/.github/
 - [`spec-evolution.md`](spec-evolution.md) — shepherding an SEP from Draft to Final
 - [`community.md`](community.md) — Discussions moderation, cadence, tone
 
+Planning notes that are not yet a Discussion, SEP, or prototype live under
+[`research/`](../research/). They are not normative.
+
 ## Principles
 
 Four rules to return to when the playbooks don't cover something:
