@@ -11,3 +11,4 @@ at which point the note stays as the record of where the idea came from.
 | Note | What it explores |
 |---|---|
 | [`journeys-and-agentic-verification.md`](journeys-and-agentic-verification.md) | A `journeys:` entity — user trajectories whose steps bind to corpus entities rather than selectors — as the shared artifact between test generation, WebMCP codegen, and session review. |
+| [`journeys-vs-runtime-graph-and-areas.md`](journeys-vs-runtime-graph-and-areas.md) | How journeys relate to the Sightmap Runtime Graph and App Areas designs: what each layer answers, what the prior art corrects, and a proposed sequencing. |

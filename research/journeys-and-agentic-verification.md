@@ -1,11 +1,21 @@
 # Journeys: verified user trajectories as a first-class Sightmap entity
 
 > **Status:** research note, pre-SEP. Not normative. See [`README.md`](README.md).
-> **Date:** 2026-08-29 · **Revised:** 2026-08-29 (rev 2)
+> **Date:** 2026-08-29 · **Revised:** 2026-08-29 (rev 3)
 > **Prompted by:** a conversation with a customer engineer on Gherkin,
 > playwright-bdd, and agentic BDD, in the context of Subtext session review and
 > Sightmap.
 
+> **Rev 3** reconciles against Clint's prior art (the Sightmap Runtime Graph
+> and App Areas designs). Six corrections, worked through in
+> [`journeys-vs-runtime-graph-and-areas.md`](journeys-vs-runtime-graph-and-areas.md):
+> the enricher blocker is narrower and worse than §2.2 claimed; the `expect:`
+> dialect already exists in the areas proposal and should be inherited rather
+> than reinvented; the step emitter already exists as `plan.py`; `requires:`
+> synthesis makes a journey much smaller than §3.1 sketches; the coverage funnel
+> in the index doc supersedes J1/J2/J3; and numeric comparison now blocks three
+> proposals at once. The sections below carry those corrections inline.
+>
 > **Rev 2 changed four things** after review. The entity is renamed `journeys:`;
 > rev 1 called it `flows:`, which collides with the WebMCP tool's own `flow:`
 > step list. The bidirectional claim now carries its dependency: it needs an
@@ -201,23 +211,32 @@ a `.feature` file. And the only production-grade enricher today is Subtext,
 which makes the backward direction a Sightmap + Subtext capability. It belongs
 in Stage 3 (§7) rather than in the OSS pitch.
 
-Two things might keep it from being purely proprietary. Both need testing, not
-asserting:
+**Rev 3 correction.** An earlier draft proposed a one-day spike to find out
+whether an enricher could exist outside Subtext. That was aimed at the wrong
+question. Enrichment already exists: authored component and request tags are
+unioned onto `Signal.Tags` in the pipeline today, and the runtime-graph design
+specs a schema-aware `live-*` layer as "a stateless match pass over the loaded
+sightmap, sitting between CDP output and the tool response." It is a match pass,
+not a proprietary capability, and it degrades gracefully on partial coverage.
 
-1. The corpus matcher is **offline** by design. `sightmap` never imports
-   `browser`, and `match.MatchTree` runs over any serialized component tree. So
-   any recorder that can produce component trees plus an interaction log (an
-   rrweb capture, a Playwright trace, `sightmap journey record` from Stage 0)
-   should be enough to match backward without Subtext. Unproven. Spike it,
-   because the answer decides whether the loop is an open capability or a
-   commercial one.
-2. Meticulous shows the recorder half is buildable and that customers will
-   install a snippet for it. What they lack is the readable, editable spec on
-   the other end.
+The real blockers are narrower and worse, and both are already documented:
 
-So the format makes the backward read *possible*, and Sightmap + Subtext is the
-first place it's *practical*. That is a strong position without the "nobody else
-can" that rev 1 claimed.
+1. **View tags don't reach the signal stream.** Enrichment consults components
+   and requests only, and matches route-blind. A journey step keyed on `view:`
+   cannot be matched backward until that changes.
+2. **There is no org-level persisted corpus.** A corpus exists per session, via
+   a single-use MCP upload. Matching a population needs it persisted
+   server-side.
+
+The second is infrastructure rather than a spike, it gates the areas proposal
+identically, and it should be sequenced as shared work. The corpus matcher being
+offline by design (`sightmap` never imports `browser`; `match.MatchTree` runs
+over any serialized component tree) still suggests a non-Subtext recorder could
+feed it, but that is a secondary question behind the persisted-corpus one.
+
+So the format makes the backward read *possible*, the enrichment to do it
+exists, and what's missing is where the corpus lives. That is a strong position
+without the "nobody else can" that rev 1 claimed.
 
 ### 2.3 A spec derived from the running app is a spec you can't lie in
 
@@ -281,6 +300,26 @@ journeys:
 One `prose:` string per step, documentation only, and nothing resolves by
 matching it. Everything else is the WebMCP vocabulary (`navigate` / `fill` /
 `click` / `read`) plus `await` and `expect`.
+
+**Rev 3: two corrections to this shape.**
+
+*Inherit the `expect:` dialect, don't invent one.* The areas proposal already
+defines `expect: { path: [...], requests: {Name: {status}}, never: [...] }`,
+where `path` is an ordered view subsequence that tolerates detours and
+`requests:` reuses SEP-0007's `filter:` verbatim. That is the same matching
+semantics §6 arrives at independently, already scoped against a real corpus.
+Journeys should take it unchanged and extend only where a journey needs more
+than an area does: assertions at step granularity rather than per surface, and
+component bindings between the view waypoints. `not_expect:` above is that
+proposal's `never:` under a worse name.
+
+*The steps get shorter.* The runtime-graph planner synthesizes mechanical steps
+from a component's `requires:` clauses — `field_filled: X` becomes `fill X`,
+`field_filled_and_blurred: X` becomes `fill X` then `blur X`. A journey that
+spells out every fill and blur restates what the graph derives. Name the
+waypoints and the assertions; let the planner fill in the mechanics. The example
+above is roughly twice as long as it needs to be against a corpus that carries
+edges.
 
 ### 3.2 Gherkin keys are a Stage 2 question
 
@@ -427,8 +466,13 @@ everything → IR → emit`. Only the emitters differ.
 - **`--emit steps`.** A compact, pre-resolved step list an agent executes with
   the `sightmap-browser` tools: the "pre-scripted sequences of browser
   interactions an agent can piece together to save tokens and increase
-  reliability" from the original conversation. A journey becomes a macro the
-  agent calls instead of re-deriving from a snapshot every time.
+  reliability" from the original conversation. **Rev 3: this already exists.**
+  The runtime-graph work ships `plan.py`, validated by playback in a real
+  Subtext-Local session, with measured token math (roughly 12 round-trips
+  collapsing to one plan plus one verification snapshot) and a proposed
+  `sightmap-plan(from, goal, params)` MCP tool. Journeys should call the
+  planner, not reimplement it — a journey names the waypoints and the planner
+  produces the steps between them.
 - **`--emit feature`.** A `.feature` file, derived per §3.2, if the round-trip
   proves wanted.
 
@@ -450,17 +494,24 @@ Today's coverage is **spatial**: of the interactive nodes on this page, how many
 resolve to a named component (T1/T2/T3)? The sibling metric is **behavioral**:
 of the trajectories users actually perform, how many does a journey describe?
 
-- **J1, described.** The trajectory matches a known journey end to end.
-- **J2, partially described.** It matches a prefix, then diverges. Users abandon,
-  back out and retry, so this is the majority case and it has to be first-class
-  rather than a failure mode.
-- **J3, undescribed.** No journey matches. The behavioral analogue of an orphan,
-  and the authoring queue.
+**Rev 3: use the index doc's funnel, not a parallel ladder.** The App Areas work
+already defines this and specifies it better:
 
-"J3 = 0 against last week's production traffic" beats any line-coverage number
-as a done signal. It is also **Stage 3 and enricher-dependent**, since computing
-it needs the same resolved stream §2.2 describes, so it stays out of the
-near-term open-source story.
+```
+114 raw signals
+ → 112 matched a sightmap entity          98%  (named)
+ →  90 that entity is an area member      79%  (attributed)
+```
+
+Two numbers, both deterministic, both computable with no LLM, and the second can
+never exceed the first. Journey coverage is a third rung on that funnel — *of the
+attributed activity, how much lies on a declared journey?* — not a new
+vocabulary. The rev-2 J1/J2/J3 tiers are withdrawn; the distinction they were
+reaching for (full match versus prefix match versus none) belongs inside the
+third rung as a breakdown, not as a peer metric to T1/T2/T3.
+
+Whatever it is called, it is **Stage 3 and blocked on the persisted corpus** from
+§2.2, so it stays out of the near-term open-source story.
 
 ---
 
@@ -511,9 +562,13 @@ communities rather than only from the AI-agent one.
    its own credibility.
 3. **Ordinal binding produces false failures (§3.3).** Extracted journeys bind
    by property predicate, and `#N` needs a lint rule rather than a convention.
-4. **Assertions can re-import the glue layer (§3.3),** and SEP-0010's removal of
-   `transform` leaves a real gap for value-shaped assertions. Signals are the
-   intended answer; confirm that before promising typed comparisons.
+4. **Numeric comparison blocks three proposals at once.** SEP-0010's removal of
+   `transform` leaves a real gap for value-shaped assertions (§3.3), SEP-0007
+   deferred comparison operators, and the areas proposal needs them too ("no
+   more than two password attempts", "under 8 seconds"). The rev-1
+   `matches: '\d+ results'` mistake was this gap in disguise, and the three
+   options in §3.3 are all workarounds for its absence. Resolve it once, across
+   proposals, before either areas or journeys drafts.
 5. **Privacy is first-order, not a footnote.** Production trajectories carry PII
    in the exact places journey params live, and §3.3's fix makes it sharper:
    binding by predicate means the discriminating value is the thing you capture.
@@ -557,13 +612,13 @@ Generalize the WebMCP compiler's `compile → IR → emit` spine to a second fro
 end. `--emit playwright` and `--emit steps` first. `--emit feature` once someone
 asks for the round-trip.
 
-**Stage 3: the session matcher (enricher-dependent).**
+**Stage 3: the session matcher (blocked on shared infrastructure).**
 Align an enriched signal stream against corpus journeys; emit
 `journey.matched` / `journey.failed_at_step` / `journey.unmatched`. Frame it as
 "`signals:` with sequence": SEP-0007 classifies a point, this classifies a path.
-Before committing, spike the §2.2 question of whether the offline matcher can
-run against a non-Subtext recording. The answer decides whether this is an open
-capability or a commercial one, which changes how Stage 1 should be pitched.
+Gated on the two blockers in §2.2 — view tags reaching the signal stream, and an
+org-level persisted corpus — both of which gate the areas proposal identically
+and should be sequenced as shared work rather than discovered twice.
 
 **Stage 4: coverage and CI.**
 `sightmap journey coverage` (J1/J2/J3 against a session set),
@@ -579,9 +634,9 @@ capability or a commercial one, which changes how Stage 1 should be pitched.
    atlas corpus already vendored for the WebMCP examples, and one real customer
    journey. Three journeys each, in the §3.1 shape. If it holds, write the SEP.
    If it doesn't, this note cost a week.
-3. **Spike the §2.2 question** in parallel. Can `match.MatchTree` align a journey
-   against a recording Subtext didn't produce? It's a day of work and it
-   determines the honest shape of the pitch.
+3. **Sequence the shared blocker** with the areas proposal: org-level persisted
+   corpus, and view tags reaching the signal stream. Neither proposal should
+   discover it independently.
 4. **Land the WebMCP branches** (#281, #292, #293, #294). They are the compiler
    this depends on.
 5. **Answer the privacy question in writing before Stage 3.** Not after.
