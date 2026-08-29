@@ -161,7 +161,7 @@ func componentIdentity(c ComponentDef) string {
 	writeField(c.Tags...)
 	writeField(c.Memory...)
 	for _, p := range c.Properties {
-		writeField(p.Name, p.Extract, p.Transform)
+		writeField(p.Name, p.Extract)
 	}
 	return b.String()
 }

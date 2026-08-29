@@ -31,9 +31,8 @@ func ExtractProperties(
 	compByName map[string]sightmap.ComponentDef,
 ) {
 	type specProp struct {
-		Name      string `json:"name"`
-		Extract   string `json:"extract"`
-		Transform string `json:"transform"`
+		Name    string `json:"name"`
+		Extract string `json:"extract"`
 	}
 	type spec struct {
 		ID       string     `json:"id"`
@@ -57,7 +56,7 @@ func ExtractProperties(
 			Props:    make([]specProp, len(comp.Properties)),
 		}
 		for i, p := range comp.Properties {
-			sp.Props[i] = specProp{Name: p.Name, Extract: p.Extract, Transform: p.Transform}
+			sp.Props[i] = specProp{Name: p.Name, Extract: p.Extract}
 		}
 		specs = append(specs, sp)
 	}

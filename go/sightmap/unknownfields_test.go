@@ -107,7 +107,6 @@ views:
         properties:
           - name: price
             extract: text
-            transform: first_dollar
         children:
           - name: Inner
             selector: .inner
