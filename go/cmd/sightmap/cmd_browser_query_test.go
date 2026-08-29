@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -21,16 +22,29 @@ func TestQueryPropertyValues(t *testing.T) {
 		row:   {Name: "Row"}, // no values → omitted
 		other: {Name: "Other", Properties: []sightmap.PropertyValue{{Name: "leftover", Value: "stale"}}},
 	}
-
 	props := queryPropertyValues(matches)
 
-	if got := props[card.Id]["title"]; got != "Widgets" {
-		t.Errorf("card title: got %q, want %q", got, "Widgets")
+	cases := []struct {
+		name   string
+		nodeID string
+		want   map[string]string // nil means the node must be absent from props
+	}{
+		{name: "match with a property value is projected", nodeID: card.Id, want: map[string]string{"title": "Widgets"}},
+		{name: "match with no property values is omitted", nodeID: row.Id, want: nil},
+		{name: "value survives regardless of which component matched", nodeID: other.Id, want: map[string]string{"leftover": "stale"}},
 	}
-	if _, ok := props[row.Id]; ok {
-		t.Errorf("row carries no property values, should be absent from the map")
-	}
-	if got := props[other.Id]["leftover"]; got != "stale" {
-		t.Errorf("other leftover: got %q, want %q", got, "stale")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := props[tc.nodeID]
+			if tc.want == nil {
+				if ok {
+					t.Errorf("got %v, want node absent from props", got)
+				}
+				return
+			}
+			if !ok || !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

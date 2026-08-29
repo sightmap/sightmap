@@ -50,7 +50,7 @@ type MessageDef struct {
 
 // MessagePropertyDef declares a named value to extract from an observed
 // exception's stack (SEP-0006 stack-addressing follow-on). It mirrors
-// RequestPropertyDef's source/field/pattern/transform shape, but the only source
+// RequestPropertyDef's source/field/pattern shape, but the only source
 // is "stack": Field addresses a frame ("top" or a numeric index) and one of its
 // attributes (function/file/line/column) — e.g. "top.file" or "1.function";
 // Pattern optionally refines the resolved string.

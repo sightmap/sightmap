@@ -39,10 +39,10 @@ func resolveTarget(ctx context.Context, conn *browser.CDPConn, sightmapDir, arg 
 }
 
 // resolveComponentQuery extracts the live component tree once, applies the
-// sightmap, extracts properties for the queried component names, and resolves
-// the query to a single node. Everything happens within one extraction, so the
-// returned node's bounds are fresh and no id crosses a call boundary — the
-// atomic resolve+act that fixes the dynamic-page race.
+// sightmap, projects the matches' resolved properties, and resolves the query
+// to a single node. Everything happens within one extraction, so the returned
+// node's bounds are fresh and no id crosses a call boundary — the atomic
+// resolve+act that fixes the dynamic-page race.
 func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapDir, queryStr string) (*sightmap.ComponentNode, error) {
 	q, err := compquery.ParseQuery(queryStr)
 	if err != nil {

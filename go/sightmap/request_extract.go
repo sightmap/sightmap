@@ -60,10 +60,11 @@ func (c *Corpus) RequestsForRecord(rec Request) []RequestMatch {
 // or header block on rec; field selects within it (a JSON dot-path for a body, a
 // case-insensitive header name for a header block); an optional RE2 pattern
 // refines what field resolved (capture group 1 when present, else the whole
-// match) or scans the raw source text when field is absent. The reserved identity names (status/method/duration)
-// are not handled here — they are a signal-layer concern and need no properties[]
-// declaration; a property that happens to be named after one still extracts from
-// its own source (the shadowing validation warns about).
+// match) or scans the raw source text when field is absent. The reserved
+// identity names (status/method/duration) are not handled here — they are a
+// signal-layer concern and need no properties[] declaration; a property that
+// happens to be named after one still extracts from its own source (the
+// shadowing validation warns about).
 func (d *RequestDef) ExtractProperties(rec Request) []PropertyValue {
 	if len(d.Properties) == 0 {
 		return nil

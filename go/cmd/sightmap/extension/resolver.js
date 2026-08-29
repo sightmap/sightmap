@@ -69,8 +69,9 @@ export function extractProperties(el, descriptors) {
       val = String(val).trim().replace(/\s+/g, " ");
 
       // ── Transforms ──────────────────────────────────────────────────────
-      // Canonical set mirrored in sightmap/property.go, cmd_snapshot.go
-      // jsTemplate, and content.js. No match → value passes through unchanged.
+      // Canonical set mirrored in content.js. sightmap/property.go was removed
+      // in SEP-0010; the extension keeps its own copy since it has no access
+      // to the Go matcher. No match → value passes through unchanged.
       if (transform === "first_word") {
         val = val.split(/\s+/)[0] ?? val;
       } else if (transform === "last_word") {
