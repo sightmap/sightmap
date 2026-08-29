@@ -68,8 +68,9 @@ browser.
 ## Skills & plugin
 
 The [`skills/`](skills/) directory is a first-class, installable skill set for
-coding agents — `sightmap-authoring` (build and maintain a corpus) and
-`sightmap-browser` (drive a live session). It reaches agents three ways, all
+coding agents — `sightmap-authoring` (build and maintain a corpus),
+`sightmap-browser` (drive a live session), and `sightmap-webmcp` (turn a map
+into in-page WebMCP tools). It reaches agents three ways, all
 from the same source:
 
 - **As a plugin** — install this repo like any other (Claude Code:

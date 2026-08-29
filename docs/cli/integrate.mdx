@@ -295,10 +295,11 @@ The `properties` entries reflect property extraction (`properties:` on component
 
 ### `sightmap skills install`
 
-Extracts the two agent skills embedded in the binary, each into its own subdirectory of the target directory:
+Extracts the agent skills embedded in the binary, each into its own subdirectory of the target directory:
 
 - **`sightmap-authoring`**: the corpus authoring playbook, including the edit-verify loop, coverage tiers, selector rules, and quality checks.
 - **`sightmap-browser`**: instructions for reading annotated snapshots and interacting with a live browser by component query.
+- **`sightmap-webmcp`**: turn a mapped site into WebMCP tools (`sightmap webmcp`). See [WebMCP](/cli/webmcp).
 
 The default target is `~/.agents/skills/`. The command removes any existing directory for each bundled skill before extracting the new copy.
 
@@ -313,9 +314,10 @@ sightmap skills install
 ```
 
 ```text
-installed 2 sightmap skill(s) → /Users/you/.agents/skills
+installed 3 sightmap skill(s) → /Users/you/.agents/skills
   sightmap-authoring
   sightmap-browser
+  sightmap-webmcp
   version: 0.13.1
 ```
 
