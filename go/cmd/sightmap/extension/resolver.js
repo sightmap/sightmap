@@ -36,14 +36,11 @@ function domDepth(el) {
 function firstDescendantEl(el, name, components) {
   const def = components.find((c) => c.name === name);
   if (!def || !def.selector) return null;
-  let nodes;
   try {
-    nodes = document.querySelectorAll(def.selector);
+    return el.querySelectorAll(def.selector)[0] ?? null;
   } catch {
     return null;
   }
-  for (const n of nodes) if (n !== el && el.contains(n)) return n;
-  return null;
 }
 
 /** Walk a dotted component-name path into el's subtree; deepest element or null. */
