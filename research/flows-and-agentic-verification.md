@@ -2,8 +2,9 @@
 
 > **Status:** research note, pre-SEP. Not normative. See [`README.md`](README.md).
 > **Date:** 2026-08-29
-> **Prompted by:** a conversation with James (Clay) on Gherkin, playwright-bdd,
-> and agentic BDD, in the context of Subtext session review + Sightmap.
+> **Prompted by:** a conversation with a customer engineer on Gherkin,
+> playwright-bdd, and agentic BDD, in the context of Subtext session review +
+> Sightmap.
 
 ---
 
@@ -333,7 +334,7 @@ everything → IR → emit`. Only the emitters differ.
   `navigate` boundaries into per-view tools gated by `require_view:`. The
   slicing rule is already implemented; flows just become a second front end to it.
 - **`--emit steps`** — a compact, pre-resolved step list an agent executes with
-  the `sightmap-browser` tools. This is James's "pre-scripted sequences of
+  the `sightmap-browser` tools. This is the ask from that conversation: "pre-scripted sequences of
   browser interactions for common user flow components which could be pieced
   together by an agent to save tokens and increase reliability." A flow becomes
   a **macro** the agent calls instead of re-deriving from a snapshot every time.
@@ -489,9 +490,9 @@ from §4.3 actually become products.
 ## 8. What to do next
 
 1. **Float it.** A Discussion under Ideas, per the SEP process — this note is
-   the float material. James is the obvious first reader; he asked the question.
+   the float material. The engineer who raised it is the obvious first reader.
 2. **Stage 0, against three apps.** The docs site's own `.sightmap/`, the IKEA
-   atlas corpus (already vendored for the WebMCP examples), and one real Clay
+   atlas corpus (already vendored for the WebMCP examples), and one real customer
    flow. Three flows each. If the shape holds, write the SEP; if it doesn't,
    this note cost a week.
 3. **Land the WebMCP branches.** They are the compiler this depends on, and
