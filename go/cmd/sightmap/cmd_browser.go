@@ -456,6 +456,10 @@ func runNavigate(args []string) error {
 	return nil
 }
 
+// evalTimeout bounds a single `browser eval`, so an awaited promise that never
+// settles fails cleanly instead of hanging the CLI.
+const evalTimeout = 30 * time.Second
+
 func runEval(args []string) error {
 	sightmapDir, args := resolveSightmapDir(args)
 	addr, args := resolveAddr(args, sightmapDir)
@@ -471,7 +475,12 @@ func runEval(args []string) error {
 	}
 	defer conn.Close()
 
-	result, err := browser.EvalJSON(context.Background(), conn, script)
+	// EvalJSON awaits a returned Promise; bound it so a never-settling promise
+	// can't hang the CLI indefinitely.
+	ctx, cancel := context.WithTimeout(context.Background(), evalTimeout)
+	defer cancel()
+
+	result, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
 		return err
 	}

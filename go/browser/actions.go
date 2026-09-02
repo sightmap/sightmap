@@ -257,11 +257,17 @@ func NavigateAndWaitIdle(ctx context.Context, conn *CDPConn, url string, maxWait
 
 // EvalJSON evaluates script, unwraps Runtime.evaluate's double-envelope,
 // returns the raw JSON value. Errors on JS exception.
+//
+// awaitPromise is on: when the expression evaluates to a Promise, CDP resolves
+// it and returns the settled value (a rejection surfaces as a JS exception).
+// This is a no-op for synchronous results, so driving async page/tool code
+// (e.g. an awaited executeTool()) returns the real value instead of an opaque
+// unresolved-promise handle. Callers bound long-running work via ctx.
 func EvalJSON(ctx context.Context, conn *CDPConn, script string) (json.RawMessage, error) {
 	result, err := conn.call(ctx, "Runtime.evaluate", map[string]interface{}{
 		"expression":    script,
 		"returnByValue": true,
-		"awaitPromise":  false,
+		"awaitPromise":  true,
 	})
 	if err != nil {
 		return nil, err
