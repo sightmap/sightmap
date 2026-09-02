@@ -155,6 +155,35 @@ func TestTextCapturedAndNormalized(t *testing.T) {
 	}
 }
 
+// Non-standard attributes (e.g. `value` on a role=option <li>) are captured
+// into Element.Attrs so offline attribute selectors + attr= extraction match
+// the live DOM, even though they never appear in the generated selector string.
+func TestFullAttributeCapture(t *testing.T) {
+	probe := &ProbeResult{
+		Success: true,
+		Results: []ProbeComponent{{
+			Id:         "1",
+			TagName:    "LI",
+			Selector:   "li[role=\"option\"]", // selector omits the value attr
+			Attributes: map[string]string{"role": "option", "value": "JFK", "class": "opt"},
+		}},
+	}
+	domRoot := domWrapper("#document", domChild(1, 10, "LI", "1"))
+	root, err := BuildTree(probe, nil, domRoot)
+	if err != nil {
+		t.Fatalf("BuildTree error: %v", err)
+	}
+	if root.Element == nil {
+		t.Fatal("Element is nil")
+	}
+	if got := root.Element.Attrs["value"]; got != "JFK" {
+		t.Errorf("Attrs[value] = %q, want %q (non-standard attr not captured offline)", got, "JFK")
+	}
+	if got := root.Element.Attrs["class"]; got != "opt" {
+		t.Errorf("Attrs[class] = %q, want %q", got, "opt")
+	}
+}
+
 func TestNormalizeText(t *testing.T) {
 	cases := map[string]string{
 		"":              "",

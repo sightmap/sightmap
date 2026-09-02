@@ -21,7 +21,8 @@ type ProbeComponent struct {
 	Value         string            `json:"value"` // empty pre-merge
 	Properties    map[string]string `json:"properties"`
 	Bounds        *sightmap.Bounds  `json:"bounds"`
-	Selector      string            `json:"selector"` // CSS selector string
+	Selector      string            `json:"selector"`   // CSS selector string
+	Attributes    map[string]string `json:"attributes"` // full attribute set (minus data-sightmap-*)
 	OnTop         bool              `json:"onTop"`
 	IsVisible     bool              `json:"isVisible"`
 	InViewport    bool              `json:"inViewport"`
