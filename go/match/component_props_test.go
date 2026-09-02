@@ -91,6 +91,23 @@ func TestResolveComponentProperties(t *testing.T) {
 		{Name: "Amount", Selectors: []string{"[data-testid=row] [data-testid=price] [data-testid=amount]"}, ParentChain: []string{"Row", "Price"}, Properties: []sightmap.ComponentPropertyDef{{Name: "text", Extract: "text"}}},
 	}
 
+	// Role-less nodes carry no accessible Name but do carry rendered Text.
+	// `extract: text` must fall back to Text, and prefer Name when both exist.
+	textOnlyCard := &sightmap.ComponentNode{
+		Id:       "card",
+		Name:     "", // role-less: no accessible name
+		Text:     "B6 123",
+		Element:  &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "pod"}},
+		Children: []*sightmap.ComponentNode{},
+	}
+	nameWinsCard := &sightmap.ComponentNode{
+		Id:       "card",
+		Name:     "Product X", // accessible name present
+		Text:     "raw fallback text",
+		Element:  &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "pod"}},
+		Children: []*sightmap.ComponentNode{},
+	}
+
 	type check struct {
 		node *sightmap.ComponentNode
 		prop string
@@ -140,6 +157,22 @@ func TestResolveComponentProperties(t *testing.T) {
 			root: row,
 			checks: []check{
 				{row, "amount", "$5.00", true},
+			},
+		},
+		{
+			name: "text falls back to rendered Text when accessible name is empty",
+			defs: productCardDefs(),
+			root: textOnlyCard,
+			checks: []check{
+				{textOnlyCard, "label", "B6 123", true},
+			},
+		},
+		{
+			name: "text prefers accessible name over rendered Text",
+			defs: productCardDefs(),
+			root: nameWinsCard,
+			checks: []check{
+				{nameWinsCard, "label", "Product X", true},
 			},
 		},
 	}

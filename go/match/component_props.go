@@ -44,7 +44,13 @@ func resolveExtract(
 ) (string, bool) {
 	switch {
 	case extract == "text":
-		return node.Name, node.Name != ""
+		// Prefer the accessible name; fall back to the node's rendered text
+		// (populated for role-less nodes that have no accessible name). Both are
+		// already whitespace-normalized to the same shape at capture time.
+		if node.Name != "" {
+			return node.Name, true
+		}
+		return node.Text, node.Text != ""
 
 	case strings.HasPrefix(extract, "attr="):
 		name := extract[len("attr="):]

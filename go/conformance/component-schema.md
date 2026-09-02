@@ -71,6 +71,7 @@ Viewport bounding box in pixels.
 | Id | string | `id` | pre-merge | Globally unique node ID. Frame-prefixed for sub-frames (`"1_5"`). |
 | Role | string | `role` | post-merge | WAI-ARIA role. `"StaticText"` for text nodes, `"none"` for ignored. |
 | Name | string | `name` | post-merge | Computed accessible name (NOT raw `textContent`). |
+| Text | string | `text` | post-merge | Rendered text content (`innerText`, `textContent` fallback), normalized to a single clean shape (whitespace runs collapsed, ends trimmed). Present for role-less nodes that have no accessible name; the fallback source for `extract: text`. Omitted when empty. |
 | Value | string | `value` | post-merge | Current value for form controls. |
 | Properties | map[string]string | `properties` | post-merge | Additional A11Y properties (`aria-*` etc.). |
 | Element | \*Element | `element` | pre-merge | Observed element identity (tag/id/classes/attrs). Nil for virtual nodes. Matched against `SelectorPart` patterns. |
