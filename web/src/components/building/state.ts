@@ -20,6 +20,9 @@ export interface SharedState {
   focus: string | null
   mobile: boolean
   reduced: boolean
+  /** 'tour' frames the whole table for the /building page; 'billboard' is
+   *  the tight, centred crop used by the homepage slice. */
+  frame: 'tour' | 'billboard'
 }
 
 export function createSharedState(): SharedState {
@@ -32,6 +35,7 @@ export function createSharedState(): SharedState {
     focus: null,
     mobile: false,
     reduced: false,
+    frame: 'tour',
   }
 }
 

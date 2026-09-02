@@ -1,3 +1,5 @@
+import BuildingBillboard from './BuildingBillboard'
+
 export default function Hero() {
   return (
     <section className="hero" data-component="Hero">
@@ -26,6 +28,8 @@ export default function Hero() {
           A sightmap is YAML checked into your repo. It maps views, components, and API routes to source files, so every agent gets the same context. Agents check it against the running app to keep it current.
         </p>
       </div>
+
+      <BuildingBillboard />
 
       <div className="hero-diff-wrap">
         <div className="hero-diff-caption">

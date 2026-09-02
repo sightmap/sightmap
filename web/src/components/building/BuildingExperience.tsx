@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CHAPTERS } from './chapters'
 import { createSharedState, SharedStateContext } from './state'
+import { webglAvailable } from './webgl'
 import Poster from './Poster'
 import BuildingNav from './BuildingNav'
 
@@ -13,15 +14,6 @@ import BuildingNav from './BuildingNav'
 // text is real markup and the poster is inline SVG. The scene is decoration
 // on top — aria-hidden, lazy, and skipped entirely when WebGL is missing.
 const Scene = lazy(() => import('./Scene'))
-
-function webglAvailable(): boolean {
-  try {
-    const c = document.createElement('canvas')
-    return !!(c.getContext('webgl2') || c.getContext('webgl'))
-  } catch {
-    return false
-  }
-}
 
 /** Renders `code` spans in chapter copy. */
 function inline(text: string): ReactNode[] {
