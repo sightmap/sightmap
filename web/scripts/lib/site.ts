@@ -49,6 +49,12 @@ export const NOT_FOUND_DESCRIPTION = "This page doesn't exist."
 export const DEVELOPERS_TITLE = `${SITE_NAME} developer resources`
 export const DEVELOPERS_DESCRIPTION =
   'OpenAPI, the Atlas HTTP API, documentation, CLI, and agent skills for the Sightmap spec.'
+// The immersive tour at /building: the app-as-a-building metaphor, rendered as
+// a scroll-driven 3D scene. Read by scripts/prerender.tsx, src/pages/Building.tsx,
+// and the sitemap / llms.txt / markdown-twin generators.
+export const BUILDING_TITLE = `The Building — how ${SITE_NAME} works`
+export const BUILDING_DESCRIPTION =
+  'An interactive tour of how Sightmap works: code is the blueprint, the running app is the building, a sightmap is its wayfinding, and agents are the people moving through it.'
 export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`
 // An atlas entry's own title carries the mapped site's name, so the suffix
 // says which gallery it came from rather than repeating the site name twice.

@@ -12,6 +12,7 @@ export default function Footer() {
           <div className="footer-links">
             <a href="/atlas">Atlas</a>
             <a href="/blog">Blog</a>
+            <a href="/building">The Building</a>
             <a href="/developers">Developers</a>
             <a href="https://docs.sightmap.org">Docs</a>
             <a href="https://docs.sightmap.org/start/quickstart">Quickstart</a>

@@ -22,6 +22,7 @@ import {
   BLOG_DESCRIPTION,
   ATLAS_DESCRIPTION,
   escXml,
+  BUILDING_DESCRIPTION,
 } from './lib/site'
 
 const DIST = path.resolve('dist')
@@ -92,6 +93,7 @@ export function buildSitemap(posts: FeedPost[], atlas: FeedAtlasEntry[], now: Da
   const urls = [
     { loc: `${SITE_URL}/`, lastmod: today, priority: '1.0' },
     { loc: `${SITE_URL}/developers`, lastmod: today, priority: '0.8' },
+    { loc: `${SITE_URL}/building`, lastmod: today, priority: '0.8' },
     { loc: `${SITE_URL}/blog`, lastmod: posts[0]?.date ?? today, priority: '0.8' },
     ...posts.map((p) => ({
       loc: `${SITE_URL}/blog/${p.slug}`,
@@ -195,6 +197,7 @@ export function buildLlmsTxt(posts: FeedPost[], atlas: FeedAtlasEntry[]): string
     '',
     `- [Documentation](https://docs.sightmap.org): Guides, CLI reference, and the schema reference.`,
     `- [Specification](https://github.com/sightmap/sightmap/tree/main/spec): The normative spec, JSON Schema, and conformance fixtures.`,
+    `- [The Building](${SITE_URL}/building): ${oneLine(BUILDING_DESCRIPTION)}`,
     '',
     '## Sightmap developer resources',
     '',
