@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -208,6 +209,160 @@ func TestCollectorStop_NoDeadlockWhileConnected(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Collector.Stop deadlocked with a healthy (uncancelled) drain")
 	}
+}
+
+// TestCollector_PersistentScripts drives the real attach path against a fake
+// browser that records the CDP commands it receives, then exercises the
+// persistent-script registry: adding a script must send
+// Page.addScriptToEvaluateOnNewDocument with the source to the attached tab, and
+// removing it must send Page.removeScriptToEvaluateOnNewDocument with the
+// identifier CDP handed back.
+func TestCollector_PersistentScripts(t *testing.T) {
+	rec := &cdpRecorder{}
+	c := NewCollector(newRecordingBrowser(t, rec))
+	c.Start()
+	t.Cleanup(c.Stop)
+	waitForTabs(t, c, 1, "collector never attached the fake tab")
+
+	ctx := context.Background()
+	const src = "window.__x = 1;"
+	id, err := c.AddPersistentScript(ctx, src)
+	if err != nil || id == "" {
+		t.Fatalf("AddPersistentScript: id=%q err=%v", id, err)
+	}
+
+	adds := rec.withMethod("Page.addScriptToEvaluateOnNewDocument")
+	if len(adds) != 1 {
+		t.Fatalf("add: sent %d addScriptToEvaluateOnNewDocument, want 1", len(adds))
+	}
+	if adds[0].Source != src {
+		t.Errorf("add: source = %q, want %q", adds[0].Source, src)
+	}
+
+	if got := c.PersistentScripts(); len(got) != 1 || got[0].ID != id || got[0].Tabs != 1 || got[0].Bytes != len(src) {
+		t.Fatalf("PersistentScripts() = %+v, want one {ID:%s Tabs:1 Bytes:%d}", got, id, len(src))
+	}
+
+	removed, err := c.RemovePersistentScript(ctx, id)
+	if err != nil || !removed {
+		t.Fatalf("RemovePersistentScript: removed=%v err=%v", removed, err)
+	}
+	rems := rec.withMethod("Page.removeScriptToEvaluateOnNewDocument")
+	if len(rems) != 1 {
+		t.Fatalf("remove: sent %d removeScriptToEvaluateOnNewDocument, want 1", len(rems))
+	}
+	// The identifier removed must be the one the fake returned for the add.
+	if rems[0].Identifier != "cdp-script-1" {
+		t.Errorf("remove: identifier = %q, want cdp-script-1", rems[0].Identifier)
+	}
+	if got := c.PersistentScripts(); len(got) != 0 {
+		t.Errorf("after remove: PersistentScripts() = %+v, want empty", got)
+	}
+
+	// Unknown id is a clean no-op.
+	if removed, err := c.RemovePersistentScript(ctx, "inj-999"); removed || err != nil {
+		t.Errorf("RemovePersistentScript(absent) = removed=%v err=%v, want false, nil", removed, err)
+	}
+}
+
+// cdpRecorder captures the injection-related CDP commands a fake browser saw.
+type cdpRecorder struct {
+	mu    sync.Mutex
+	calls []recordedCall
+}
+
+type recordedCall struct {
+	Method     string
+	Source     string
+	Identifier string
+}
+
+func (r *cdpRecorder) add(call recordedCall) {
+	r.mu.Lock()
+	r.calls = append(r.calls, call)
+	r.mu.Unlock()
+}
+
+func (r *cdpRecorder) withMethod(method string) []recordedCall {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []recordedCall
+	for _, c := range r.calls {
+		if c.Method == method {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// newRecordingBrowser is newFakeBrowser plus command recording: it records the
+// injection commands into rec and replies to addScriptToEvaluateOnNewDocument
+// with a stable identifier so removal has something to target.
+func newRecordingBrowser(t *testing.T, rec *cdpRecorder) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	srv := httptest.NewUnstartedServer(mux)
+
+	mux.HandleFunc("/json/list", func(w http.ResponseWriter, r *http.Request) {
+		targets := []map[string]string{{
+			"id": "tab-1", "type": "page", "url": "http://fake.test/",
+			"webSocketDebuggerUrl": "ws://" + r.Host + "/ws",
+		}}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(targets); err != nil {
+			t.Logf("newRecordingBrowser: encode targets: %v", err)
+		}
+	})
+
+	var scriptSeq int
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		wsConn, err := wsUpgrader.Upgrade(w, r, nil)
+		if err != nil {
+			t.Logf("newRecordingBrowser: ws upgrade: %v", err)
+			return
+		}
+		var wsMu sync.Mutex
+		go func() {
+			for {
+				_, raw, readErr := wsConn.ReadMessage()
+				if readErr != nil {
+					return
+				}
+				var req struct {
+					ID     int64  `json:"id"`
+					Method string `json:"method"`
+					Params struct {
+						Source     string `json:"source"`
+						Identifier string `json:"identifier"`
+					} `json:"params"`
+				}
+				if json.Unmarshal(raw, &req) != nil {
+					continue
+				}
+				result := map[string]any{}
+				switch req.Method {
+				case "Page.addScriptToEvaluateOnNewDocument":
+					scriptSeq++
+					ident := fmt.Sprintf("cdp-script-%d", scriptSeq)
+					result["identifier"] = ident
+					rec.add(recordedCall{Method: req.Method, Source: req.Params.Source, Identifier: ident})
+				case "Page.removeScriptToEvaluateOnNewDocument":
+					rec.add(recordedCall{Method: req.Method, Identifier: req.Params.Identifier})
+				}
+				reply, _ := json.Marshal(map[string]any{"id": req.ID, "result": result})
+				wsMu.Lock()
+				err := wsConn.WriteMessage(websocket.TextMessage, reply)
+				wsMu.Unlock()
+				if err != nil {
+					return
+				}
+			}
+		}()
+	})
+
+	srv.Start()
+	t.Cleanup(srv.Close)
+	return srv.Listener.Addr().String()
 }
 
 // newFakeBrowser starts a fake Chrome CDP endpoint exposing a single page target

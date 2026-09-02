@@ -68,6 +68,34 @@ type Collector struct {
 	cancel context.CancelFunc
 
 	wg sync.WaitGroup
+
+	// scriptsMu guards the persistent-script registry: sources registered via
+	// AddPersistentScript that the collector re-applies to every attached tab
+	// (current and future) so they survive navigations and new tabs. It is held
+	// across the CDP (un)register calls so a tab attaching concurrently with an
+	// Add can neither double-apply a script nor miss one (the per-tab guard in
+	// applyScriptsToTab / AddPersistentScript keys off ps.cdpIDs).
+	scriptsMu sync.Mutex
+	scripts   []*persistentScript
+	scriptSeq int
+}
+
+// persistentScript is one source registered for auto-injection at the start of
+// every new document. id is the logical handle handed to callers; cdpIDs maps a
+// tabID to the identifier CDP returned on that tab, which removal needs (and
+// whose presence marks the script as already applied to that tab).
+type persistentScript struct {
+	id     string
+	source string
+	cdpIDs map[string]string
+}
+
+// PersistentScriptInfo is a public, source-free snapshot of one registered
+// script for the daemon's list surface.
+type PersistentScriptInfo struct {
+	ID    string `json:"id"`
+	Bytes int    `json:"bytes"`
+	Tabs  int    `json:"tabs"`
 }
 
 type tabColl struct {
@@ -200,6 +228,11 @@ func (c *Collector) attachTab(tabID string) {
 	c.tabsMu.Unlock()
 
 	go c.drain(ctx, tabID, conn, consoleCh, excCh, reqCh, respCh, finishedCh)
+
+	// A newly-attached tab (a fresh tab, or the initial one) must carry every
+	// persistent script so injection survives new tabs, not just navigations
+	// within one tab. No-op when nothing is registered.
+	c.applyScriptsToTab(ctx, tabID, conn)
 }
 
 // drain funnels one tab's CDP events into the shared buffers until ctx is
@@ -484,6 +517,143 @@ func (c *Collector) lookupRequest(index int) (string, *CDPConn, bool) {
 		}
 	}
 	return "", nil, false
+}
+
+// ── persistent script injection ─────────────────────────────────────────────
+//
+// Scripts registered with Page.addScriptToEvaluateOnNewDocument live only as
+// long as the CDP session that added them, so a transient per-command connection
+// cannot persist one. The collector is the session-lifetime CDP owner, so it
+// holds the registry and re-applies each script to every tab it attaches. Because
+// addScriptToEvaluateOnNewDocument re-runs the script at the start of every new
+// document, a script registered here survives navigations, and re-applying on
+// attach extends that to new tabs.
+
+// AddPersistentScript registers source to auto-run at the start of every new
+// document, in every tab of the session (now and future), returning a logical id
+// for RemovePersistentScript. It applies the script to every attached tab
+// immediately; because CDP only injects into FUTURE documents, a caller that also
+// wants it in the currently-loaded document must eval it once separately (the
+// `inject` command does).
+func (c *Collector) AddPersistentScript(ctx context.Context, source string) (string, error) {
+	c.scriptsMu.Lock()
+	defer c.scriptsMu.Unlock()
+
+	c.scriptSeq++
+	ps := &persistentScript{
+		id:     fmt.Sprintf("inj-%d", c.scriptSeq),
+		source: source,
+		cdpIDs: make(map[string]string),
+	}
+	// Apply to every currently-attached tab. A tab attaching concurrently is
+	// covered by attachTab's own apply pass (also under scriptsMu); the cdpIDs
+	// guard there makes the two idempotent so neither double-applies.
+	for tabID, conn := range c.tabConns() {
+		cdpID, err := addScriptOnNewDocument(ctx, conn, source)
+		if err != nil {
+			continue // tab may be navigating/closing; a later attach re-applies
+		}
+		ps.cdpIDs[tabID] = cdpID
+	}
+	c.scripts = append(c.scripts, ps)
+	return ps.id, nil
+}
+
+// RemovePersistentScript unregisters the script with the given id and best-effort
+// removes it from every tab it was applied to. It reports whether such an id
+// existed.
+func (c *Collector) RemovePersistentScript(ctx context.Context, id string) (bool, error) {
+	c.scriptsMu.Lock()
+	defer c.scriptsMu.Unlock()
+
+	idx := -1
+	for i, ps := range c.scripts {
+		if ps.id == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return false, nil
+	}
+	ps := c.scripts[idx]
+	conns := c.tabConns()
+	for tabID, cdpID := range ps.cdpIDs {
+		if conn, ok := conns[tabID]; ok {
+			_ = removeScriptOnNewDocument(ctx, conn, cdpID) // best-effort; tab may be gone
+		}
+	}
+	c.scripts = append(c.scripts[:idx], c.scripts[idx+1:]...)
+	return true, nil
+}
+
+// PersistentScripts returns a source-free snapshot of the registry.
+func (c *Collector) PersistentScripts() []PersistentScriptInfo {
+	c.scriptsMu.Lock()
+	defer c.scriptsMu.Unlock()
+	out := make([]PersistentScriptInfo, 0, len(c.scripts))
+	for _, ps := range c.scripts {
+		out = append(out, PersistentScriptInfo{ID: ps.id, Bytes: len(ps.source), Tabs: len(ps.cdpIDs)})
+	}
+	return out
+}
+
+// applyScriptsToTab registers every not-yet-applied persistent script on conn.
+// Called from attachTab for each new tab; the ps.cdpIDs guard skips a script a
+// concurrent AddPersistentScript already put on this tab, keeping the two paths
+// idempotent.
+func (c *Collector) applyScriptsToTab(ctx context.Context, tabID string, conn *CDPConn) {
+	c.scriptsMu.Lock()
+	defer c.scriptsMu.Unlock()
+	for _, ps := range c.scripts {
+		if _, done := ps.cdpIDs[tabID]; done {
+			continue
+		}
+		cdpID, err := addScriptOnNewDocument(ctx, conn, ps.source)
+		if err != nil {
+			continue
+		}
+		ps.cdpIDs[tabID] = cdpID
+	}
+}
+
+// tabConns snapshots the attached tabs' connections. Taken under tabsMu only;
+// callers already hold scriptsMu, so the lock order is always scriptsMu→tabsMu.
+func (c *Collector) tabConns() map[string]*CDPConn {
+	c.tabsMu.Lock()
+	defer c.tabsMu.Unlock()
+	out := make(map[string]*CDPConn, len(c.tabs))
+	for id, tc := range c.tabs {
+		out[id] = tc.conn
+	}
+	return out
+}
+
+// addScriptOnNewDocument registers source to run at the start of every future
+// document on conn's target, returning CDP's identifier for later removal. It
+// does not require Page.enable.
+func addScriptOnNewDocument(ctx context.Context, conn *CDPConn, source string) (string, error) {
+	raw, err := conn.call(ctx, "Page.addScriptToEvaluateOnNewDocument", map[string]interface{}{
+		"source": source,
+	})
+	if err != nil {
+		return "", err
+	}
+	var resp struct {
+		Identifier string `json:"identifier"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return "", fmt.Errorf("addScriptToEvaluateOnNewDocument: unmarshal: %w", err)
+	}
+	return resp.Identifier, nil
+}
+
+// removeScriptOnNewDocument unregisters a script previously added on conn.
+func removeScriptOnNewDocument(ctx context.Context, conn *CDPConn, identifier string) error {
+	_, err := conn.call(ctx, "Page.removeScriptToEvaluateOnNewDocument", map[string]interface{}{
+		"identifier": identifier,
+	})
+	return err
 }
 
 // tailLimit keeps only the most recent n entries when n > 0.
