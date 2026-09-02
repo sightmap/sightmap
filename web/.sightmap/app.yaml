@@ -35,6 +35,26 @@ views:
           - name: hero-diff
             selector: ".hero-diff"
 
+      - name: BuildingBillboard
+        selector: '[data-component="BuildingBillboard"]'
+        source: src/components/BuildingBillboard.tsx
+        dependencies:
+          - src/components/building/BillboardScene.tsx
+        description: Billboard for the /building tour — headline, subcopy, CTA, and a live slice of the 3D building that orbits slowly through a day/night cycle
+        memory:
+          - Rendered inside the Hero section, between the hero copy and the date-picker diff, so it sits inside `[data-component="Hero"]` in the DOM
+          - A full-bleed dark band (always dark, unlike /building which only darkens at nightfall); text inside uses light colours regardless of the slice's day/night phase
+          - The WebGL slice mounts only once the frame has scrolled near the viewport and pauses while off-screen; the SVG poster covers the frame before that and for no-WebGL visitors
+          - The whole frame is one link to /building and carries `data-night` on the section while the slice is in its night phase; there are no interactive nodes inside the frame
+        children:
+          - name: billboard-copy
+            selector: '.billboard__copy'
+          - name: billboard-ctas
+            selector: '.billboard__ctas'
+          - name: BillboardFrame
+            selector: '.billboard__frame'
+            description: The live slice, linked to the tour
+
       - name: PitchSection
         selector: '[data-component="PitchSection"]'
         source: src/components/PitchSection.tsx

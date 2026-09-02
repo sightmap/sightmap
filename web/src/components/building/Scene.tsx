@@ -22,9 +22,21 @@ import FrontDesk from './FrontDesk'
 
 const CAMERA_DISTANCE = 42
 
-function Updater({ onReady }: { onReady: () => void }) {
-  const s = useShared()
+/** Calls `onReady` after the first rendered frame, so the poster can fade. */
+export function Ready({ onReady }: { onReady: () => void }) {
   const fired = useRef(false)
+  useFrame(() => {
+    if (!fired.current) {
+      fired.current = true
+      onReady()
+    }
+  }, -99)
+  return null
+}
+
+/** The tour's driver: scroll position → chapter blend → damped parameters. */
+function Updater() {
+  const s = useShared()
   useEffect(() => {
     // Start on the chapter the page loaded at, not on a morph from chapter 0.
     paramsAt(s.progress, s.cur)
@@ -34,15 +46,11 @@ function Updater({ onReady }: { onReady: () => void }) {
     const d = Math.min(dt, 0.25)
     const lambda = s.reduced ? 16 : 4.5
     for (const k of PARAM_KEYS) s.cur[k] = THREE.MathUtils.damp(s.cur[k], s.target[k], lambda, d)
-    if (!fired.current) {
-      fired.current = true
-      onReady()
-    }
   }, -100)
   return null
 }
 
-function Stats() {
+export function Stats() {
   // Exposes draw calls / triangles / fps for the headless verification loop.
   const { gl } = useThree()
   const frames = useRef(0)
@@ -67,7 +75,7 @@ function Stats() {
   return null
 }
 
-function Rig() {
+export function Rig() {
   const s = useShared()
   const { camera, size } = useThree()
   const az = useRef(s.cur.az)
@@ -94,8 +102,10 @@ function Rig() {
 
     // Frame the model: the table's isometric footprint is ~27 world units
     // wide and, with the tower on it, ~18 tall, whatever the viewport.
-    const fit = Math.min(size.width / 27, size.height / 22)
-    const zoom = fit * c.zoom * (s.mobile ? 1.3 : 1)
+    // The billboard crops in tight on the tower instead.
+    const billboard = s.frame === 'billboard'
+    const fit = billboard ? Math.min(size.width / 15, size.height / 12.5) : Math.min(size.width / 27, size.height / 22)
+    const zoom = fit * c.zoom * (s.mobile && !billboard ? 1.3 : 1)
 
     v.dir.set(Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a))
     v.right.set(Math.cos(a), 0, -Math.sin(a))
@@ -103,8 +113,9 @@ function Rig() {
 
     // Desktop: the story card sits on the left, so push the model right.
     // Mobile: the card sits at the bottom, so push the model up.
-    const shiftRight = s.mobile ? (-size.width * 0.12) / zoom : (size.width * 0.13) / zoom
-    const shiftUp = s.mobile ? (size.height * 0.11) / zoom : 0
+    // Billboard: nudge the tower left so the floor directory fits in the frame.
+    const shiftRight = billboard ? (-size.width * 0.07) / zoom : s.mobile ? (-size.width * 0.12) / zoom : (size.width * 0.13) / zoom
+    const shiftUp = billboard || !s.mobile ? 0 : (size.height * 0.11) / zoom
     v.target.set(0, c.lookY, 0).addScaledVector(v.right, -shiftRight).addScaledVector(v.up, -shiftUp)
 
     camera.position.copy(v.target).addScaledVector(v.dir, CAMERA_DISTANCE)
@@ -119,6 +130,32 @@ function Rig() {
   return null
 }
 
+/** Everything on the table. Reads the shared state; needs a driver and a Rig. */
+export function SceneContent() {
+  return (
+    <>
+      <Lights />
+      <Table />
+      <Tower />
+      <Core />
+      <Wayfinding />
+      <Agents />
+      <HealDemo />
+      <Trajectory />
+      <FrontDesk />
+    </>
+  )
+}
+
+export const CANVAS_PROPS = {
+  orthographic: true,
+  shadows: 'percentage',
+  flat: true,
+  gl: { antialias: true, alpha: true, powerPreference: 'high-performance' },
+  camera: { position: [24, 24, 24], zoom: 50, near: 0.1, far: 140 },
+  style: { position: 'absolute', inset: 0 },
+} satisfies Partial<React.ComponentProps<typeof Canvas>>
+
 export interface SceneProps {
   shared: SharedState
   onReady: () => void
@@ -127,28 +164,16 @@ export interface SceneProps {
 export default function Scene({ shared, onReady }: SceneProps) {
   return (
     <Canvas
-      orthographic
-      shadows="percentage"
-      flat
+      {...CANVAS_PROPS}
       dpr={shared.mobile ? [1, 1.5] : [1, 1.75]}
-      gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-      camera={{ position: [24, 24, 24], zoom: 50, near: 0.1, far: 140 }}
-      style={{ position: 'absolute', inset: 0 }}
       onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
       <SharedStateContext.Provider value={shared}>
-        <Updater onReady={onReady} />
+        <Updater />
+        <Ready onReady={onReady} />
         <Stats />
         <Rig />
-        <Lights />
-        <Table />
-        <Tower />
-        <Core />
-        <Wayfinding />
-        <Agents />
-        <HealDemo />
-        <Trajectory />
-        <FrontDesk />
+        <SceneContent />
       </SharedStateContext.Provider>
     </Canvas>
   )
