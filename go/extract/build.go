@@ -155,12 +155,27 @@ func elementFor(pc *ProbeComponent) *sightmap.Element {
 		el = &sightmap.Element{Tag: strings.ToLower(pc.TagName)}
 	}
 
+	// Overlay the full observed attribute set so offline matching sees every
+	// attribute the live DOM carries, not just the subset the generated
+	// selector encoded. Raw live values win over the selector-parsed subset
+	// (they're what a live querySelector would compare against).
+	for name, val := range pc.Attributes {
+		if el.Attrs == nil {
+			el.Attrs = make(map[string]string)
+		}
+		el.Attrs[name] = val
+	}
+
 	// Duplicate classes into Attrs["class"] for attribute selector support.
+	// (pc.Attributes usually already carries "class"; this keeps the fallback
+	// path — where el came only from a parsed selector — correct too.)
 	if len(el.Classes) > 0 {
 		if el.Attrs == nil {
 			el.Attrs = make(map[string]string)
 		}
-		el.Attrs["class"] = strings.Join(el.Classes, " ")
+		if _, ok := el.Attrs["class"]; !ok {
+			el.Attrs["class"] = strings.Join(el.Classes, " ")
+		}
 	}
 
 	return el

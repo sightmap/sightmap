@@ -325,6 +325,23 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
         const metadata = extractMetadata(element);
         const selector = generateSelector(element);
 
+        // Capture the full attribute set (minus our own injected ids) so the
+        // offline model can match ANY attribute the live DOM carries — not just
+        // the curated subset that lands in the generated selector string. This
+        // is what closes offline/live divergence for non-standard attributes
+        // like `value` on a non-form element (react-aria listbox options).
+        const attributes = {};
+        if (element.hasAttributes()) {
+            for (const attr of element.attributes) {
+                // Skip our own injected ids, and framework-internal scoping
+                // attributes (Angular's valueless _nghost-*/_ngcontent-*, hashed
+                // per build) which are pure noise and never a stable selector.
+                if (attr.name.startsWith('data-sightmap-')) continue;
+                if (attr.name.charCodeAt(0) === 95 /* '_' */) continue;
+                attributes[attr.name] = attr.value;
+            }
+        }
+
         const tag = (element.tagName || '').toLowerCase();
 
         // For iframe/frame elements, use content box instead of border box so
@@ -361,6 +378,7 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
             properties: {},                                            // Will be filled by accessibility data
             bounds: bounds,
             selector: selector,
+            attributes: attributes,
             onTop: onTop,
             isVisible: isVisible,
             inViewport: inViewport,
