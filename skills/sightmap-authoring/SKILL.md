@@ -137,8 +137,11 @@ that `snapshot`/`coverage`/`capture` actually use — it prints both counts and 
 `⚠ offline/live divergence` warning when they disagree. Trust the **offline**
 count: that is what the corpus will see. Wrong match count = corrupt coverage.
 
-**Attribute selectors on `class` and `id` match offline**, the same as live
-(`[class*=…]`, `[class^=…]`, `[class~=…]`, `[id^=…]`, `[id$=…]`, …). `class` and
+**Every attribute matches offline**, the same as live: the offline element model
+captures the full attribute set the DOM carries — minus injected sightmap ids and
+framework `_ng*`-style scoping attrs — so `[class*=…]`, `[id^=…]`, `[value=…]`,
+`[data-*=…]` and `extract: attr=NAME` all resolve offline for standard **and**
+non-standard attributes (e.g. `value` on a `role="option"` `<li>`). `class` and
 `id` are captured for every element (SVG included) and resolve to the same fields
 `.classname` / `#id` use. Prefer `.classname` / `#id` when a full class or id is
 stable — they're the shortest forms — but reach for the attribute forms when only
@@ -385,7 +388,7 @@ Two property rules are **mandatory**:
 
 | Mode | Resolves to |
 |------|-------------|
-| `text` | the matched node's accessible text (the default) |
+| `text` | the matched node's accessible name (the default), falling back to its rendered `innerText` when it has no accessible name — so role-less `<span>`s / custom elements resolve their visible value offline, not empty |
 | `attr=NAME` | the value of attribute `NAME` on the matched node |
 | `Child.prop` | the extracted `prop` of a descendant *component* `Child` |
 | `exists:Child` | `"true"` if descendant component `Child` matched, else omitted (a boolean flag) |

@@ -62,7 +62,7 @@ daemon and returns immediately.
 | `sightmap browser status` | Check session health, tabs, and current URL. Reports `⚠ degraded` when Chrome's CDP is up but the daemon's HTTP server was reaped. |
 | `sightmap browser navigate 'URL'` | Navigate to URL (positional arg — no `--url` flag). |
 | `sightmap browser stop` | Stop Chrome session. |
-| `sightmap browser eval 'js'` | Evaluate JS in page context. Returns JSON-serializable values only — DOM element references return an error. |
+| `sightmap browser eval 'js'` | Evaluate JS in page context. Returns JSON-serializable values only — DOM element references return an error. A returned promise is awaited, so `async` evals resolve to their value. |
 | `sightmap browser screenshot --out FILE.png` | Screenshot the page. Clip to a component with `--component NAME` (or `--selector CSS`), optionally `--expand-pct N` for context. |
 
 ## Reading the page: annotated snapshots
