@@ -63,6 +63,7 @@ daemon and returns immediately.
 | `sightmap browser navigate 'URL'` | Navigate to URL (positional arg — no `--url` flag). |
 | `sightmap browser stop` | Stop Chrome session. |
 | `sightmap browser eval 'js'` | Evaluate JS in page context. Returns JSON-serializable values only — DOM element references return an error. |
+| `sightmap browser inject --file X --persist` | Inject a script that re-runs on **every** new document/tab for the whole session (survives navigations), vs `eval`'s one-shot. `--list` / `--remove ID` manage them. Needs a running session (the daemon holds the registry). |
 | `sightmap browser screenshot --out FILE.png` | Screenshot the page. Clip to a component with `--component NAME` (or `--selector CSS`), optionally `--expand-pct N` for context. |
 
 ## Reading the page: annotated snapshots

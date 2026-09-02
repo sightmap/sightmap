@@ -8,6 +8,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"sync/atomic"
@@ -16,6 +17,10 @@ import (
 	"github.com/sightmap/sightmap/go/browser"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
+
+// maxInjectBytes caps a persisted script's size. Generous enough for a bundled
+// runtime while refusing a pathological upload.
+const maxInjectBytes = 16 << 20 // 16 MiB
 
 // registerDevtoolsHandlers wires the /devtools/* endpoints onto mux. The
 // collector is supplied via ptr because it is created only after Chrome is
@@ -74,6 +79,59 @@ func registerDevtoolsHandlers(mux *http.ServeMux, ptr *atomic.Pointer[browser.Co
 			Limit:        atoiDefault(q.Get("limit"), 0),
 		})
 		writeJSON(w, map[string]any{"entries": annotateNetwork(corpusNow(), entries), "dropped": dropped})
+	})
+
+	// Persistent script injection. POST registers a script (raw body) and returns
+	// its id; DELETE?id= removes one; GET lists them. The collector holds the
+	// registry because it is the session-lifetime CDP client — a script must
+	// outlive any single per-command connection.
+	mux.HandleFunc("/inject", func(w http.ResponseWriter, r *http.Request) {
+		c, ok := load(w)
+		if !ok {
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			writeJSON(w, map[string]any{"scripts": c.PersistentScripts()})
+		case http.MethodPost:
+			src, err := io.ReadAll(io.LimitReader(r.Body, maxInjectBytes))
+			if err != nil {
+				http.Error(w, "read body: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			if len(src) == 0 {
+				http.Error(w, "empty script", http.StatusBadRequest)
+				return
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+			defer cancel()
+			id, err := c.AddPersistentScript(ctx, string(src))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, map[string]any{"id": id, "bytes": len(src)})
+		case http.MethodDelete:
+			id := r.URL.Query().Get("id")
+			if id == "" {
+				http.Error(w, "id required", http.StatusBadRequest)
+				return
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+			defer cancel()
+			removed, err := c.RemovePersistentScript(ctx, id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if !removed {
+				http.Error(w, "no such script id", http.StatusNotFound)
+				return
+			}
+			writeJSON(w, map[string]any{"removed": id})
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 
 	mux.HandleFunc("/devtools/network/body", func(w http.ResponseWriter, r *http.Request) {

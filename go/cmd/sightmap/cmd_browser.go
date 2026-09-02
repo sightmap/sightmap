@@ -32,6 +32,8 @@ func runBrowser(args []string) error {
 		return runNavigate(args[1:])
 	case "eval":
 		return runEval(args[1:])
+	case "inject", "add-script":
+		return runInject(args[1:])
 	case "click":
 		return runClick(args[1:])
 	case "fill":
@@ -75,6 +77,8 @@ Session:
   status
   navigate <url>
   eval <script>
+  inject [--file PATH | <script>] [--persist]   run a script now; --persist re-injects it on every new document/tab (whole session)
+  inject --list | --remove ID                   list or remove persisted scripts
 
 Interaction (IDs from sightmap snapshot output):
   click    COMPONENT-ID | --x N --y N

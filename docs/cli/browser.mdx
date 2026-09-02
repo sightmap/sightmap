@@ -170,6 +170,34 @@ sightmap browser eval '({url: location.href, title: document.title})'
 
 ---
 
+### `browser inject`
+
+Injects a script into the page. Where `eval` runs once in the current document, `inject --persist` registers the script with the session daemon so it re-runs at the start of **every new document, in every tab, for the life of the session** — surviving navigations. It is backed by CDP `Page.addScriptToEvaluateOnNewDocument`, held on the daemon's session-lifetime connection (a script added over a per-command connection would be dropped the moment that command exits). Handy for polyfills, overlays, and instrumentation or experimentation bundles that must outlive a multi-page flow.
+
+Provide the source as an inline positional argument or with `--file`. `--persist` also runs the script once in the currently-loaded document (best-effort), since `addScriptToEvaluateOnNewDocument` only affects future documents.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--file` | — | Read the script source from this file instead of an inline arg |
+| `--persist` | `false` | Re-inject on every new document and new tab for the whole session |
+| `--remove` | — | Remove a previously-persisted script by its id |
+| `--list` | `false` | List the scripts currently persisted for this session |
+| `--addr` | `localhost:7892` | CDP address (one-shot run) |
+| `--tab` | the lone content tab | Target tab ID (one-shot run) |
+
+`--persist`, `--remove`, and `--list` require a running `browser start` session, since the registry lives in its daemon.
+
+```bash
+# Register a bundle that re-applies on every navigation, and print its id.
+sightmap browser inject --file ./runtime.js --persist
+# inject: persisted as inj-1 — re-injected on every new document; remove with 'browser inject --remove inj-1'
+
+sightmap browser inject --list
+sightmap browser inject --remove inj-1
+```
+
+---
+
 ### `browser clear-storage`
 
 Clears all cookies, including `httpOnly` cookies, and clears storage for one origin. Origin storage includes localStorage, IndexedDB, service workers, and caches.
