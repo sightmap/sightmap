@@ -48,6 +48,7 @@ export default function BuildingBillboard() {
 
   return (
     <section className="billboard" data-component="BuildingBillboard" data-night={night ? 'true' : 'false'}>
+      <div className="billboard__inner">
       <div className="billboard__grid">
         <div className="billboard__copy">
           <div className="section-label">The Building · interactive tour</div>
@@ -84,6 +85,7 @@ export default function BuildingBillboard() {
             Enter the building →
           </span>
         </a>
+      </div>
       </div>
     </section>
   )

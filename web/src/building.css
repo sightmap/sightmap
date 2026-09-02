@@ -675,13 +675,38 @@
 /* ---- Homepage billboard for the tour ----------------------------------- */
 
 .billboard {
-  --bb-frame-bg: #eef1f8;
   --bb-chip-bg: rgba(250, 248, 246, 0.86);
   --bb-chip-fg: var(--text);
-  max-width: 1180px;
-  margin: 0.5rem auto 4.5rem;
-  padding: 0 2rem;
+  position: relative;
+  margin: 5rem 0 4.5rem;
+  padding: 5.5rem 2rem 6rem;
   text-align: left;
+  color: #b9c2d6;
+  background:
+    radial-gradient(90% 70% at 80% 0%, rgba(107, 138, 237, 0.22) 0%, rgba(12, 21, 49, 0) 60%),
+    linear-gradient(180deg, #0f1a3d 0%, #0a1230 60%, #070d22 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* A faint drafting grid, so the band reads as the same table the tour sits on. */
+.billboard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(80% 90% at 50% 40%, #000 30%, transparent 100%);
+  -webkit-mask-image: radial-gradient(80% 90% at 50% 40%, #000 30%, transparent 100%);
+}
+
+.billboard__inner {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
 }
 
 .billboard__grid {
@@ -698,7 +723,7 @@
   line-height: 1.1;
   letter-spacing: -0.03em;
   font-weight: 700;
-  color: var(--text-bright);
+  color: #f5f1ea;
   margin: 0 0 1rem;
   text-wrap: balance;
 }
@@ -706,7 +731,7 @@
 .billboard__body {
   font-size: 1.02rem;
   line-height: 1.62;
-  color: var(--text-dim);
+  color: #b9c2d6;
   margin: 0 0 1.5rem;
   max-width: 34rem;
 }
@@ -722,7 +747,12 @@
   font-family: var(--mono);
   font-size: 0.72rem;
   letter-spacing: 0.04em;
-  color: var(--text-dim);
+  color: #8f9ab8;
+}
+
+.billboard .billboard__ctas .btn-primary {
+  background: #f5f1ea;
+  color: #0c1531;
 }
 
 .billboard__frame {
@@ -732,8 +762,8 @@
   border-radius: 20px;
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid var(--border);
-  box-shadow: 0 30px 80px rgba(24, 44, 92, 0.16), 0 2px 6px rgba(24, 44, 92, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.3);
   text-decoration: none;
   color: inherit;
   transition: transform 0.4s ease, box-shadow 0.4s ease;
@@ -741,7 +771,7 @@
 
 .billboard__frame:hover {
   transform: translateY(-3px);
-  box-shadow: 0 40px 90px rgba(24, 44, 92, 0.22), 0 2px 6px rgba(24, 44, 92, 0.06);
+  box-shadow: 0 40px 90px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .billboard__frame::before,
@@ -826,8 +856,8 @@
   z-index: 2;
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
-  background: var(--text-bright);
-  color: var(--bg);
+  background: #f5f1ea;
+  color: #0c1531;
   font-family: var(--mono);
   font-size: 0.78rem;
   font-weight: 600;
@@ -843,7 +873,7 @@
 }
 
 @media (max-width: 900px) {
-  .billboard { margin-bottom: 3.5rem; padding: 0 1.25rem; }
+  .billboard { margin: 3.5rem 0 3rem; padding: 3.5rem 1.25rem 4rem; }
   .billboard__grid { grid-template-columns: 1fr; gap: 1.75rem; }
   .billboard__frame { aspect-ratio: 5 / 4; border-radius: 16px; }
   .billboard__enter { opacity: 1; transform: none; }
