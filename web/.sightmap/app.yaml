@@ -295,6 +295,57 @@ views:
         source: src/pages/Developers.tsx
         description: One developer resource — title, what it is, and its URL
 
+  - name: Building
+    route: /building
+    description: Scroll-driven 3D tour of the app-as-a-building metaphor — code as blueprint, the running app as the building, the sightmap as its wayfinding, agents as the people inside
+    source: src/pages/Building.tsx
+    dependencies:
+      - src/components/building/**
+      - src/building.css
+    memory:
+      - The WebGL scene (src/components/building/Scene.tsx) mounts only after a client effect and is code-split; the prerendered HTML carries the SVG poster and the full chapter text, so the page reads without JS or WebGL
+      - Scroll position drives the scene — each `.bld-chapter` section is one chapter and the active one carries `data-active="true"`; the canvas itself is aria-hidden and has no interactive nodes
+      - Chapter copy lives in src/components/building/chapters.ts, not in the page component
+      - "Chapters 05–07 (self-healing tests, trajectories, Web MCP tools) describe exploratory work and carry the `exploratory` badge; they are not shipped features"
+    components:
+      - name: BuildingNav
+        selector: '[data-component="BuildingNav"]'
+        source: src/components/building/BuildingNav.tsx
+        description: Page-local header — logo home link plus Home, Docs and GitHub; swaps to a dark treatment at nightfall
+      - name: BuildingStage
+        selector: '[data-component="BuildingStage"]'
+        source: src/components/building/BuildingExperience.tsx
+        description: Fixed full-viewport stage holding the SVG poster and, once mounted, the WebGL canvas
+        children:
+          - name: BuildingPoster
+            selector: '[data-component="BuildingPoster"]'
+            description: Static isometric blueprint illustration — the prerendered fallback, faded out once the scene renders
+      - name: BuildingChapter
+        selector: '[data-component="BuildingChapter"]'
+        source: src/components/building/BuildingExperience.tsx
+        description: One scroll chapter of the story — eyebrow, heading, body, and an optional call to action
+        properties:
+          - name: chapter
+            extract: attr=data-chapter
+          - name: active
+            extract: attr=data-active
+        children:
+          - name: bld-card
+            selector: '.bld-card'
+          - name: bld-card-ctas
+            selector: '.bld-card__ctas'
+      - name: BuildingHud
+        selector: '[data-component="BuildingHud"]'
+        source: src/components/building/BuildingExperience.tsx
+        description: Desktop-only readout in the top right — three live-looking figures that change with the chapter
+      - name: BuildingRail
+        selector: '[data-component="BuildingRail"]'
+        source: src/components/building/BuildingExperience.tsx
+        description: Bottom progress rail — one button per chapter, the current one pressed; clicking scrolls to that chapter
+        children:
+          - name: bld-rail-dot
+            selector: '.bld-rail__dot'
+
   - name: NotFound
     route: '*'
     description: Catch-all 404 page for any unmatched route

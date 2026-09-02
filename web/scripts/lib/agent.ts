@@ -3,6 +3,8 @@
 // writes them into dist/; the negotiate edge function serves the twins
 // when Accept prefers text/markdown.
 import {
+  BUILDING_DESCRIPTION,
+  BUILDING_TITLE,
   DEVELOPERS_DESCRIPTION,
   DEVELOPERS_TITLE,
   SITE_DESCRIPTION,
@@ -55,6 +57,7 @@ This is the ${SITE_NAME} homepage at ${SITE_URL}. ${SITE_NAME} is an open YAML s
 ## Start here
 
 - [Sightmap developer resources](${SITE_URL}${DEVELOPERS_PATH})
+- [The Building — how Sightmap works](${SITE_URL}/building)
 - [OpenAPI specification](${SITE_URL}/openapi.json)
 - [llms.txt](${SITE_URL}/llms.txt)
 - [Documentation](https://docs.sightmap.org)
@@ -112,6 +115,35 @@ Machine index: ${SITE_URL}/atlas/index.json
 HTTP API: ${SITE_URL}/api/atlas
 
 ${items}
+`
+}
+
+export function buildBuildingMarkdown(): string {
+  return `# ${BUILDING_TITLE}
+
+${BUILDING_DESCRIPTION}
+
+The interactive version at ${SITE_URL}/building is a scroll-driven 3D scene. This is the same story in text.
+
+## The metaphor
+
+- **Code is the blueprint.** Source files describe every wall: components, routes, API handlers. They are complete and exact, and almost useless to someone standing in the lobby.
+- **The running app is the building.** Each view is a floor with its own route. Components are the rooms on that floor. API requests are the service risers running up the core.
+- **A sightmap is the wayfinding.** A \`.sightmap/\` directory names every floor, room, and riser, links each back to its source file, and keeps memory notes for the quirks the drawings never recorded.
+- **Users and agents are the people.** Every session is a journey through rooms and floors. Subtext records those journeys against the map, so a replay reads as named components rather than a list of divs.
+
+## Built on top (exploratory)
+
+- **Self-healing tests.** A test written against the map asks the building where a room went when a selector changes; the name stays stable and the run finishes.
+- **Trajectories.** Codified journeys: the views a flow visits, the components it touches, and the requests it expects on the way.
+- **Web MCP tools.** Tools generated from the map, each backed by a real view and a real request, so an agent walks up to the front desk instead of wandering the halls.
+
+## Next
+
+- [Homepage](${SITE_URL}/)
+- [Quickstart](https://docs.sightmap.org/start/quickstart)
+- [Documentation](https://docs.sightmap.org)
+- [GitHub](https://github.com/sightmap/sightmap)
 `
 }
 

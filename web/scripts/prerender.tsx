@@ -27,6 +27,8 @@ import {
   NOT_FOUND_DESCRIPTION,
   DEVELOPERS_TITLE,
   DEVELOPERS_DESCRIPTION,
+  BUILDING_TITLE,
+  BUILDING_DESCRIPTION,
   postTitle,
   atlasTitle,
   esc,
@@ -553,8 +555,31 @@ async function main() {
     )
   )
 
+  // The 3D scene mounts client-side only (see src/pages/Building.tsx), so this
+  // file carries the full narrative text plus the static SVG poster — which is
+  // what crawlers, unfurlers, and a no-JS visitor get.
+  write(
+    'building',
+    renderRoute(
+      shell,
+      '/building',
+      {
+        url: `${SITE_URL}/building`,
+        ogUrl: `${DEPLOY_URL}/building`,
+        title: BUILDING_TITLE,
+        description: BUILDING_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      [mdAlternate(`${SITE_URL}/building.md`), siteJsonLd].join('\n    ')
+    )
+  )
+
   console.log(
-    `\n  prerender complete: ${posts.length + atlas.entries.length + 5} page(s)`
+    `\n  prerender complete: ${posts.length + atlas.entries.length + 6} page(s)`
   )
 }
 

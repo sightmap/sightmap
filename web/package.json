@@ -18,11 +18,14 @@
     "og:card": "node og/render.mjs --post"
   },
   "dependencies": {
+    "@react-three/drei": "10.7.8",
+    "@react-three/fiber": "9.7.0",
     "html-react-parser": "^6.1.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.1.0",
-    "react-syntax-highlighter": "^16.1.1"
+    "react-syntax-highlighter": "^16.1.1",
+    "three": "0.185.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
@@ -30,6 +33,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/three": "0.185.4",
     "@vitejs/plugin-react": "^4.3.0",
     "gray-matter": "^4.0.3",
     "marked": "^15.0.12",

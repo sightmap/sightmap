@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./building.css";
 
 :root {
   --bg: #faf8f6;
