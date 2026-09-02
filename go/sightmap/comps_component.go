@@ -110,6 +110,13 @@ type ComponentNode struct {
 	// This is NOT raw textContent. (post-merge)
 	Name string `json:"name"`
 
+	// Text is the node's rendered text content, normalized to a single clean
+	// shape (whitespace runs collapsed, ends trimmed). It is captured by the
+	// probe (innerText, with a textContent fallback) and is the fallback source
+	// for `extract: text` when the accessible Name is empty (role-less nodes).
+	// Unlike Name, it is present for role-less leaves/containers. (post-merge)
+	Text string `json:"text,omitempty"`
+
 	// Value is the current value for form controls (inputs, selects, etc.). (post-merge)
 	Value string `json:"value"`
 

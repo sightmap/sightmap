@@ -2,8 +2,9 @@ package extract
 
 import (
 	"fmt"
-	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // BuildTree runs the full post-probe pipeline:
@@ -109,6 +110,7 @@ func walkDOMNode(
 		Id:            pc.Id,
 		Role:          role,
 		Name:          name,
+		Text:          normalizeText(pc.Text),
 		Value:         value,
 		Properties:    props,
 		Element:       el,
@@ -122,6 +124,16 @@ func walkDOMNode(
 	}
 
 	return compNode, nil
+}
+
+// normalizeText collapses every run of whitespace (spaces, tabs, newlines) to a
+// single space and trims the ends, giving component text one clean shape
+// regardless of how the source DOM laid it out. This is what innerText and the
+// accessible-name algorithm already do for inline content, so a role-less
+// node's captured text renders the same way its accessible name would. Applied
+// once at the build boundary so every downstream consumer sees the same value.
+func normalizeText(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 // elementFor parses ProbeComponent.Selector with sightmap.ParseSightmapSelector and

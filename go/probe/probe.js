@@ -347,7 +347,16 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
         return {
             id: sightmapId,                                               // Map sightmapId -> id
             role: '',                                                  // Will be filled by accessibility data
-            text: noTextTags.has(tag) ? '' : (element.textContent || '').substring(0, 100), // Map textContent -> text
+            // Rendered text (innerText): reflects text-transform + visibility, is
+            // whitespace-collapsed, and — crucially — excludes non-rendered
+            // <style>/<script> descendants, matching the accessible name and what
+            // runtime consumers read. We deliberately do NOT fall back to
+            // textContent (it would re-introduce descendant style/script text on
+            // container nodes with empty innerText), and we skip non-rendered
+            // elements entirely — innerText is unreliable there (e.g. <head>
+            // returns its <style> text). Go-side normalizeText collapses any
+            // residual whitespace.
+            text: (noTextTags.has(tag) || !isVisible) ? '' : ((element.innerText || '').substring(0, 100)),
             value: '',                                                 // Will be filled by accessibility data
             properties: {},                                            // Will be filled by accessibility data
             bounds: bounds,

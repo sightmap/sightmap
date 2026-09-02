@@ -127,6 +127,50 @@ func TestTextNode(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Text capture + normalization
+// ---------------------------------------------------------------------------
+
+// A role-less node has no accessible name, but its captured (rendered) text is
+// carried onto the ComponentNode and normalized to a single clean shape.
+func TestTextCapturedAndNormalized(t *testing.T) {
+	probe := &ProbeResult{
+		Success: true,
+		Results: []ProbeComponent{
+			{Id: "1", TagName: "SPAN", Selector: "span", Text: "  B6\n   123  "},
+		},
+	}
+	a11y := []A11YNode{} // role-less: no accessible name
+	domRoot := domWrapper("#document",
+		domChild(1, 10, "SPAN", "1"),
+	)
+	root, err := BuildTree(probe, a11y, domRoot)
+	if err != nil {
+		t.Fatalf("BuildTree error: %v", err)
+	}
+	if root.Name != "" {
+		t.Errorf("Name = %q, want empty (role-less)", root.Name)
+	}
+	if root.Text != "B6 123" {
+		t.Errorf("Text = %q, want %q (whitespace collapsed + trimmed)", root.Text, "B6 123")
+	}
+}
+
+func TestNormalizeText(t *testing.T) {
+	cases := map[string]string{
+		"":              "",
+		"  hi  ":        "hi",
+		"a\n\t b   c":   "a b c",
+		"Nonstop":       "Nonstop",
+		"\n  B6 123 \n": "B6 123",
+	}
+	for in, want := range cases {
+		if got := normalizeText(in); got != want {
+			t.Errorf("normalizeText(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Test 4 – Nested tree: parent > child1 > grandchild
 // ---------------------------------------------------------------------------
 
