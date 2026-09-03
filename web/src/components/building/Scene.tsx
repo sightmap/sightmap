@@ -11,6 +11,7 @@ import * as THREE from 'three'
 import { PARAM_KEYS, paramsAt } from './chapters'
 import { MobileTierContext, SharedStateContext, useMobileTier, useShared, type SharedState } from './state'
 import Lights from './Lights'
+import BakedEnvironment from './Environment'
 import Table from './Table'
 import Tower from './Tower'
 import Core from './Core'
@@ -191,6 +192,7 @@ export function Rig() {
 export function SceneContent() {
   return (
     <>
+      <BakedEnvironment />
       <Lights />
       <Table />
       <Tower />
@@ -204,13 +206,41 @@ export function SceneContent() {
   )
 }
 
+/**
+ * Exposure for AgX.
+ *
+ * AgX rolls off rather than clipping, so it needs less headroom than the
+ * NoToneMapping path it replaces; above ~1.1 the day scene's white slabs go
+ * chalky. One value for both surfaces, checked against the tour's pale
+ * background and the billboard's dark navy — there is one canvas
+ * configuration, so an exposure that only suits one of them is not available.
+ */
+const TONE_MAPPING_EXPOSURE = 1.0
+
+/**
+ * One canvas configuration, shared by the tour and the homepage billboard.
+ *
+ * `flat` stays off: it means `NoToneMapping`, which is what clipped the
+ * highlights and crushed the midtones. AgX is set explicitly rather than
+ * relying on the ACESFilmic default, because ACES pushes saturation into the
+ * warm daylight this model is lit by.
+ *
+ * `onCreated` lives here rather than on each `<Canvas>` so neither surface can
+ * drift from the other — the homepage moving with the tour is the point, not a
+ * side effect.
+ */
 export const CANVAS_PROPS = {
   orthographic: true,
   shadows: 'percentage',
-  flat: true,
+  flat: false,
   gl: { antialias: true, alpha: true, powerPreference: 'high-performance' },
   camera: { position: [24, 24, 24], zoom: 50, near: 0.1, far: 140 },
   style: { position: 'absolute', inset: 0 },
+  onCreated: ({ gl }: { gl: THREE.WebGLRenderer }) => {
+    gl.setClearColor(0x000000, 0)
+    gl.toneMapping = THREE.AgXToneMapping
+    gl.toneMappingExposure = TONE_MAPPING_EXPOSURE
+  },
 } satisfies Partial<React.ComponentProps<typeof Canvas>>
 
 export interface SceneProps {
@@ -233,7 +263,6 @@ export default function Scene({ shared, mobile, frameloop, onReady }: SceneProps
       {...CANVAS_PROPS}
       dpr={mobile ? [1, 1.5] : [1, 1.75]}
       frameloop={frameloop}
-      onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
       {/* The canvas is its own reconciler, so both contexts are re-provided here. */}
       <SharedStateContext.Provider value={shared}>

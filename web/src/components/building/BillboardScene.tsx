@@ -48,7 +48,6 @@ export default function BillboardScene({ shared, active, onReady, onNight }: Bil
       {...CANVAS_PROPS}
       dpr={[1, 1.5]}
       frameloop={active ? 'always' : 'never'}
-      onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
       <SharedStateContext.Provider value={shared}>
         <Driver onNight={onNight} />
