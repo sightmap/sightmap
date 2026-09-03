@@ -239,6 +239,16 @@ func TestCollector_PersistentScripts(t *testing.T) {
 		t.Errorf("add: source = %q, want %q", adds[0].Source, src)
 	}
 
+	// Regression guard: Page must be enabled before the add, or the script is
+	// registered but never fires on new documents (persist-across-navigation bug).
+	enableIdx := rec.firstIndexOf("Page.enable")
+	addIdx := rec.firstIndexOf("Page.addScriptToEvaluateOnNewDocument")
+	if enableIdx < 0 {
+		t.Error("Page.enable was never sent; persisted scripts won't fire on navigation")
+	} else if enableIdx > addIdx {
+		t.Errorf("Page.enable (idx %d) sent AFTER addScriptToEvaluateOnNewDocument (idx %d); must precede it", enableIdx, addIdx)
+	}
+
 	if got := c.PersistentScripts(); len(got) != 1 || got[0].ID != id || got[0].Tabs != 1 || got[0].Bytes != len(src) {
 		t.Fatalf("PersistentScripts() = %+v, want one {ID:%s Tabs:1 Bytes:%d}", got, id, len(src))
 	}
@@ -295,6 +305,18 @@ func (r *cdpRecorder) withMethod(method string) []recordedCall {
 	return out
 }
 
+// firstIndexOf returns the position of the first recorded call for method, or -1.
+func (r *cdpRecorder) firstIndexOf(method string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, c := range r.calls {
+		if c.Method == method {
+			return i
+		}
+	}
+	return -1
+}
+
 // newRecordingBrowser is newFakeBrowser plus command recording: it records the
 // injection commands into rec and replies to addScriptToEvaluateOnNewDocument
 // with a stable identifier so removal has something to target.
@@ -348,6 +370,10 @@ func newRecordingBrowser(t *testing.T, rec *cdpRecorder) string {
 					rec.add(recordedCall{Method: req.Method, Source: req.Params.Source, Identifier: ident})
 				case "Page.removeScriptToEvaluateOnNewDocument":
 					rec.add(recordedCall{Method: req.Method, Identifier: req.Params.Identifier})
+				default:
+					// Record every other command (e.g. Page.enable) so ordering
+					// assertions can see the domain was enabled before the add.
+					rec.add(recordedCall{Method: req.Method})
 				}
 				reply, _ := json.Marshal(map[string]any{"id": req.ID, "result": result})
 				wsMu.Lock()
