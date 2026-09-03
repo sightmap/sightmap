@@ -1,5 +1,15 @@
 # @sightmap/sightmap
 
+## 0.30.0
+
+### Minor Changes
+
+- ef6ec4b: Add `browser inject` for persistent script injection. Unlike `eval` (which runs once in the current document), `inject --persist` registers a script with the running session daemon, which re-applies it at the start of every new document in every tab via CDP `Page.addScriptToEvaluateOnNewDocument` — so it survives navigations and new tabs for the life of the session. `--file` loads the source from disk, and `--list` / `--remove ID` manage the persisted set. Useful for polyfills, overlays, and debugging/experimentation bundles that must outlive a multi-page flow.
+
+### Patch Changes
+
+- 72b1d3d: Docs: sync the authoring and browser agent skills to recent offline-extraction and `eval` changes. The authoring skill now states that every attribute (not just `class`/`id`) matches offline and that `text` falls back to a node's rendered `innerText` when it has no accessible name; the browser skill notes that `browser eval` awaits a returned promise.
+
 ## 0.29.0
 
 ### Minor Changes
