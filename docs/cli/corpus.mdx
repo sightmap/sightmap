@@ -66,6 +66,8 @@ By default, `lint` exits 1 when it finds a warning. Pass `--warn-only` to print 
 
 Snapshot data refines `multi-instance-no-property`. `--snapshot FILE` counts selector matches in one capture; `--all-snapshots` reads `.sightmap/snapshots/**/*.snap.tree.json`. A count of 1 suppresses the warning. A count of 0 adds `(0 matches in snapshot — selector may be broken)`, while a higher count adds `(matched N times in snapshot)`.
 
+When you pass no snapshot flag, `lint` **auto-reconciles** against any captures under `.sightmap/snapshots/` — so a container-ish selector that actually matches a single node is not falsely flagged. With no captures present it runs the static heuristics unchanged. Pass `--snapshot`/`--all-snapshots` to control the set explicitly.
+
 **Flags:**
 
 | Flag | Default | Description |

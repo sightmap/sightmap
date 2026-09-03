@@ -26,21 +26,12 @@ func runLint(args []string) error {
 		return fmt.Errorf("load corpus: %w", err)
 	}
 
-	// Collect tree JSON paths from flags.
-	var treeFiles []string
-	if *snapshotFlag != "" {
-		tf := *snapshotFlag
-		if !strings.HasSuffix(tf, ".tree.json") {
-			tf = tf + ".tree.json"
-		}
-		treeFiles = append(treeFiles, tf)
+	treeFiles, autoUsed, err := resolveLintTreeFiles(*sightmapDir, *snapshotFlag, *allSnapshotsFlag)
+	if err != nil {
+		return fmt.Errorf("find snapshots: %w", err)
 	}
-	if *allSnapshotsFlag {
-		found, findErr := findLintSnapshotTreeFiles(*sightmapDir)
-		if findErr != nil {
-			return fmt.Errorf("find snapshots: %w", findErr)
-		}
-		treeFiles = append(treeFiles, found...)
+	if autoUsed && len(treeFiles) > 0 {
+		fmt.Fprintf(os.Stderr, "lint: reconciling against %d captured snapshot(s); pass --snapshot/--all-snapshots to control this, or capture with 'sightmap capture'\n", len(treeFiles))
 	}
 
 	var warnings []sightmap.LintWarning
@@ -67,10 +58,48 @@ func runLint(args []string) error {
 	return fmt.Errorf("%d lint warning(s)", len(warnings))
 }
 
+// resolveLintTreeFiles decides which snapshot tree files lint uses for
+// match-count reconciliation. Explicit --snapshot / --all-snapshots win;
+// otherwise it auto-discovers captured snapshots (auto=true) so the default run
+// reconciles the static [multi-instance-no-property] heuristic against real
+// counts — a container-ish selector that matches a single node then isn't
+// flagged. A missing snapshots/ dir yields no files, so lint falls back to the
+// static heuristic unchanged.
+func resolveLintTreeFiles(sightmapDir, snapshotFlag string, allSnapshots bool) (files []string, auto bool, err error) {
+	if snapshotFlag != "" {
+		tf := snapshotFlag
+		if !strings.HasSuffix(tf, ".tree.json") {
+			tf += ".tree.json"
+		}
+		files = append(files, tf)
+	}
+	if allSnapshots {
+		found, findErr := findLintSnapshotTreeFiles(sightmapDir)
+		if findErr != nil {
+			return nil, false, findErr
+		}
+		files = append(files, found...)
+	}
+	if snapshotFlag == "" && !allSnapshots {
+		found, findErr := findLintSnapshotTreeFiles(sightmapDir)
+		if findErr != nil {
+			return nil, false, findErr
+		}
+		files = append(files, found...)
+		auto = true
+	}
+	return files, auto, nil
+}
+
 // findLintSnapshotTreeFiles walks sightmapDir/snapshots/ and returns all
-// .snap.tree.json files found.
+// .snap.tree.json files found. A missing snapshots/ dir is not an error — it
+// yields no files, so callers (including the default auto-reconcile) degrade to
+// the static heuristic instead of failing.
 func findLintSnapshotTreeFiles(sightmapDir string) ([]string, error) {
 	snapshotsDir := filepath.Join(sightmapDir, "snapshots")
+	if _, err := os.Stat(snapshotsDir); os.IsNotExist(err) {
+		return nil, nil
+	}
 	var treeFiles []string
 	err := filepath.Walk(snapshotsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
