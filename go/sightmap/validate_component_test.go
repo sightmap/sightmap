@@ -42,6 +42,51 @@ func TestCheckComponentProperties(t *testing.T) {
 			},
 			want: map[string]int{"component-property-duplicate": 1},
 		},
+		// component-property-invalid-name: the schema pattern for a component
+		// property name is ^[a-z][a-z0-9_]*$ (sightmap.schema.json), enforced by
+		// ajv. The Go CLI never validates against the schema, so without the
+		// pattern check in checkComponentProperties a property named "5" or
+		// "Header Text" passes `sightmap validate` while the reference checker
+		// rejects it. Mirrors request-property-invalid-name / message-property-
+		// invalid-name. The empty string also fails the pattern (a `name:` or
+		// `name: ""` is already a schema violation).
+		{
+			name:  "invalid name: starts with digit",
+			props: []ComponentPropertyDef{{Name: "5", Extract: "text"}},
+			want:  map[string]int{"component-property-invalid-name": 1},
+		},
+		{
+			name:  "invalid name: uppercase first char",
+			props: []ComponentPropertyDef{{Name: "Header", Extract: "text"}},
+			want:  map[string]int{"component-property-invalid-name": 1},
+		},
+		{
+			name:  "invalid name: contains space",
+			props: []ComponentPropertyDef{{Name: "header text", Extract: "text"}},
+			want:  map[string]int{"component-property-invalid-name": 1},
+		},
+		{
+			name:  "invalid name: hyphen",
+			props: []ComponentPropertyDef{{Name: "out-come", Extract: "text"}},
+			want:  map[string]int{"component-property-invalid-name": 1},
+		},
+		{
+			name:  "invalid name: empty (null or quoted-empty decodes to \"\")",
+			props: []ComponentPropertyDef{{Name: "", Extract: "text"}},
+			want:  map[string]int{"component-property-invalid-name": 1},
+		},
+		// The pattern check and the duplicate-dedup check are independent: a
+		// pair of identical pattern-invalid names reports invalid-name once per
+		// declaration AND the duplicate once. The dedup guard keeps empty names
+		// out of the duplicate check, so this only applies to non-empty names.
+		{
+			name: "invalid name duplicated reports both codes",
+			props: []ComponentPropertyDef{
+				{Name: "5", Extract: "text"},
+				{Name: "5", Extract: "text"},
+			},
+			want: map[string]int{"component-property-invalid-name": 2, "component-property-duplicate": 1},
+		},
 		{
 			name:  "removed DOM mode: inner_text",
 			props: []ComponentPropertyDef{{Name: "x", Extract: "inner_text"}},

@@ -236,7 +236,15 @@ func walkComponentOrRef(node *yaml.Node, file string, out *[]ValidationError) {
 
 func walkComponent(node *yaml.Node, file string, out *[]ValidationError) {
 	v := checkKeys(node, componentFields, file, out)
-	forEachItem(v["properties"], func(n *yaml.Node) { checkKeys(n, propertyFields, file, out) })
+	// Mirrors walkRequest/walkMessage: yaml.v3 decodes any scalar into a Go
+	// string field by taking the raw lexeme, so `name: true` loads as Name:"true"
+	// while ajv rejects it as must be string. Without checkStringScalars the Go
+	// validator accepts corpora the reference JSON Schema refuses. `extract` is
+	// tag-parity only — its content is already enforced by checkExtractMode.
+	forEachItem(v["properties"], func(n *yaml.Node) {
+		pv := checkKeys(n, propertyFields, file, out)
+		checkStringScalars(pv, []string{"name", "extract"}, file, out)
+	})
 	forEachItem(v["children"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 }
 
