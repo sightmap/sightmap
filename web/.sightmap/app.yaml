@@ -340,6 +340,15 @@ views:
           - name: BuildingPoster
             selector: '[data-component="BuildingPoster"]'
             description: Static isometric blueprint illustration — the prerendered fallback, faded out once the scene renders
+      - name: BuildingOverlay
+        selector: '[data-component="BuildingOverlay"]'
+        source: src/components/building/BuildingExperience.tsx
+        description: Empty full-viewport host the scene portals its 3D-anchored labels into — the floor directory, room tags, memory notes, trajectory pins, tool cards and status chips
+        memory:
+          - Deliberately a sibling of BuildingStage rather than a child; the stage is `position: fixed`, so anything inside it is trapped in the stage's stacking context and cannot paint above page chrome
+          - Sits at z-index 10 — over the story cards (1), under the HUD and rail (15) and the nav (20); labels order among themselves with drei's zIndexRange (floor tags 4, route tags 6, status chips 7)
+          - Empty in the prerendered HTML and while WebGL is unavailable; drei's `Html` fills it only once the scene mounts
+          - Unlike the canvas it is not aria-hidden — the labels carry real content
       - name: BuildingChapter
         selector: '[data-component="BuildingChapter"]'
         source: src/components/building/BuildingExperience.tsx
