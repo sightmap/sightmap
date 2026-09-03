@@ -19,6 +19,8 @@ interface Runner {
   next: number
   wait: number
   fade: number
+  /** Elapsed time since this leg started walking, for the accel-out-of-dwell ease. */
+  walkT: number
 }
 
 export function Walker({
@@ -76,7 +78,7 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
   const tg = useRef<THREE.Mesh>(null)
-  const run = useRef<Runner>({ d: 0, dwell: DWELL, next: 1, wait: journey.delay, fade: 0 })
+  const run = useRef<Runner>({ d: 0, dwell: DWELL, next: 1, wait: journey.delay, fade: 0, walkT: 0 })
   const tmp = useMemo(() => new THREE.Vector3(), [])
   const ahead = useMemo(() => new THREE.Vector3(), [])
   const color = TRAVELLER_COLORS[journey.who]
@@ -93,11 +95,16 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
         r.dwell -= d
         r.fade = Math.min(1, r.fade + d * 2.5)
       } else if (r.next < path.stops.length) {
+        // Ease speed up from zero instead of snapping to WALK the instant
+        // dwell ends, so a walker accelerates out of a stop.
+        r.walkT += d
+        const ease = smoothstep(r.walkT / DWELL)
         const target = path.cum[path.stops[r.next]]
-        r.d = Math.min(target, r.d + WALK * d)
+        r.d = Math.min(target, r.d + WALK * ease * d)
         if (r.d >= target - 1e-4) {
           r.next += 1
           r.dwell = DWELL
+          r.walkT = 0
         }
       } else {
         // Journey complete: fade out, go back to the start.
@@ -107,6 +114,7 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
           r.next = 1
           r.dwell = DWELL
           r.wait = RESET
+          r.walkT = 0
         }
       }
     } else {
