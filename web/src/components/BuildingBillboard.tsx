@@ -71,7 +71,9 @@ export default function BuildingBillboard() {
         </div>
 
         <a ref={frame} href="/building" className="billboard__frame" aria-label="Enter the building tour">
-          <Poster hidden={ready} />
+          {/* Chapter 4 ("the people"): the same chapter BillboardScene's own
+              driver pins, so the still and the live scene show one subject. */}
+          <Poster hidden={ready} chapter={4} />
           {mounted && webgl && seen && (
             <Suspense fallback={null}>
               <BillboardScene shared={shared} active={near} onReady={() => setReady(true)} onNight={setNight} />
