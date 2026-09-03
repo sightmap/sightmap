@@ -34,9 +34,9 @@ export default function Lights() {
       dir.current.color.copy(col.day).lerp(col.night, n)
     }
     if (amb.current) {
-      // Night keeps proportionally more fill than day: at nightfall the sun is
-      // down to 0.45 and the IBL is the same daylit sky it always was, so the
-      // lit windows need something to sit against that isn't the environment.
+      // Night keeps almost as much ambient as day even though the sun drops to
+      // 0.45, because the environment fades out with it (see Environment.tsx):
+      // something has to keep the unlit side of the model off pure black.
       amb.current.intensity = THREE.MathUtils.lerp(0.15, 0.14, n)
       amb.current.color.copy(col.ambDay).lerp(col.ambNight, n)
     }

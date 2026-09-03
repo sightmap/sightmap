@@ -9,10 +9,11 @@
 // The HDR ships in the bundle (Vite fingerprints it like any other asset) —
 // deliberately not drei's <Environment preset>, which fetches multi-megabyte
 // HDRs from a CDN at runtime.
-import { useThree } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
 import * as THREE from 'three'
 import { RGBELoader } from 'three-stdlib'
+import { useShared } from './state'
 import skylightUrl from './skylight.hdr?url'
 
 /**
@@ -26,6 +27,17 @@ import skylightUrl from './skylight.hdr?url'
  * here to be reflected by glass and steel rather than to light the model.
  */
 export const ENVIRONMENT_INTENSITY = 0.34
+
+/**
+ * The same daylit sky, dimmed to a memory of itself at nightfall.
+ *
+ * There is one map and it is a day map. Left at full strength after dark it
+ * lit the model with cool daylight the sun had already left, which washed the
+ * warm emissive out of the lit windows — nightfall is the chapter the rest of
+ * the tour is measured against, and it lost its glow before this was added.
+ * Dimming the environment as night falls is also just what happens outdoors.
+ */
+export const ENVIRONMENT_INTENSITY_NIGHT = 0.1
 
 /**
  * The decoded equirect texture, shared by every canvas on the page.
@@ -53,6 +65,18 @@ function loadSkylight(): Promise<THREE.DataTexture> {
  */
 export default function BakedEnvironment() {
   const { gl, scene, invalidate } = useThree()
+  const shared = useShared()
+
+  // Tracks the same night factor the lights do. Cheap: a scalar write per
+  // frame, and only on frames that were going to be drawn anyway.
+  useFrame(() => {
+    if (!scene.environment) return
+    scene.environmentIntensity = THREE.MathUtils.lerp(
+      ENVIRONMENT_INTENSITY,
+      ENVIRONMENT_INTENSITY_NIGHT,
+      shared.cur.night
+    )
+  })
 
   useEffect(() => {
     let target: THREE.WebGLRenderTarget | null = null
