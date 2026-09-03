@@ -46,6 +46,13 @@ function Updater() {
     const d = Math.min(dt, 0.25)
     const lambda = s.reduced ? 16 : 4.5
     for (const k of PARAM_KEYS) s.cur[k] = THREE.MathUtils.damp(s.cur[k], s.target[k], lambda, d)
+    // The overlay is the common DOM ancestor every portalled label resolves
+    // into (see .bld-overlay in building.css), so publishing the damped
+    // night value here — once — lets any label's CSS read --bld-night and
+    // cross-fade colour with the same continuous curve Lights and Table
+    // already lerp their materials against, instead of re-deriving it per
+    // component or snapping on the page's discrete data-night boundary.
+    s.overlay.current?.style.setProperty('--bld-night', s.cur.night.toFixed(3))
   }, -100)
   return null
 }

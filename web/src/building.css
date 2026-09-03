@@ -524,7 +524,26 @@
   font-weight: 600;
 }
 
-.bld-tag--floor span { color: #9aa3b2; }
+/* Unlike the titleblock, this span's real backdrop is its own .bld-tag chip
+   (rgba(26,23,20,0.86)) — not the scene. There is no night-specific override
+   of that chip background, and at 86% opacity the scene can lighten it by at
+   most ~32 luminance units (measured: near-black up to a pure-white backdrop
+   still composites to rgb(58,55,53)). A darker "day" text colour was tried
+   here first and measured out to 1.8:1-2.8:1 against that ceiling — it fails
+   contrast in every case, because the chip never actually gets light enough
+   for dark text to read against it. The fix that actually holds at both ends
+   is a day/night hue swap at matched lightness: warm tan by day (paired with
+   the titleblock's own day warmth) for cool grey by night, both measured
+   ≥5.9:1 against the chip's full day/night range. */
+.bld-tag--floor span {
+  --bld-tag-floor-day: #c7b79c;
+  --bld-tag-floor-night: #9aa3b2;
+  color: color-mix(
+    in srgb,
+    var(--bld-tag-floor-day) calc((1 - var(--bld-night, 0)) * 100%),
+    var(--bld-tag-floor-night) calc(var(--bld-night, 0) * 100%)
+  );
+}
 
 .bld-tag--tag {
   font-size: 0.62rem;
@@ -633,7 +652,19 @@
   font-size: 0.6rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  /* Styled against nightfall and never re-checked: white at 55% opacity
+     reads fine over the dark stage but washes out over the light day stage
+     that's actually behind it in 8 of 9 chapters. Cross-fade between a dark
+     day ink and the original night white on --bld-night, the same damped
+     value Lights and Table already lerp their own colours against — see
+     Scene.tsx's Updater, which publishes it onto .bld-overlay every frame. */
+  --bld-titleblock-day: color-mix(in srgb, var(--text-bright) 68%, transparent);
+  --bld-titleblock-night: rgba(255, 255, 255, 0.55);
+  color: color-mix(
+    in srgb,
+    var(--bld-titleblock-day) calc((1 - var(--bld-night, 0)) * 100%),
+    var(--bld-titleblock-night) calc(var(--bld-night, 0) * 100%)
+  );
   border: 1px solid rgba(255, 255, 255, 0.28);
   padding: 0.35rem 0.6rem;
   white-space: nowrap;
