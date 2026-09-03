@@ -383,10 +383,15 @@
 
 /* Rail ------------------------------------------------------------------- */
 
+/* .bld-rail sits at z-index 15, well under the consent banner's 50, but
+   raising it above the banner would put chapter dots on top of legally
+   required consent copy — wrong regardless of who technically painted last.
+   The fix is spatial, not z-order: bottom reserves --consent-h (published by
+   ConsentUI's ResizeObserver, index.css) so the two never share a pixel. */
 .bld-rail {
   position: fixed;
   left: 50%;
-  bottom: 1.1rem;
+  bottom: calc(1.1rem + var(--consent-h, 0px));
   z-index: 15;
   transform: translateX(-50%);
   width: min(880px, calc(100vw - 2.5rem));
@@ -427,14 +432,31 @@
 
 .bld-rail__dot {
   position: relative;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   padding: 0;
   border-radius: 50%;
   border: 2px solid var(--bld-dim);
   background: var(--bg);
   cursor: pointer;
   transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+}
+
+/* Invisible touch-target expansion: 9 dots packed into the rail have no
+   room to grow visually without colliding, so the 44px WCAG-minimum hit
+   area is a pseudo-element centred on the dot instead of a bigger dot —
+   it doesn't occupy flex layout space, so it can't push neighbouring dots
+   apart, and it's real-DOM-backed (a child box of the button, not a
+   separate node) so elementFromPoint resolves a tap anywhere in it straight
+   to this button. */
+.bld-rail__dot::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
 }
 
 .bld[data-night='true'] .bld-rail__dot { background: #0c1531; }
@@ -447,7 +469,11 @@
 
 .bld-rail__label {
   position: absolute;
-  top: 18px;
+  /* 6px (half the 12px dot) + 4px gap below the dot's own vertical centre —
+     written relative to centre, not a fixed px offset from the button's
+     top, because the button's own box no longer equals the dot's visual
+     size once the ::after hit-area is centred inside it. */
+  top: calc(50% + 10px);
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -470,7 +496,11 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 1.25rem;
-  padding: 1.5rem 1rem 6rem;
+  padding: 1.5rem 1rem 0;
+  /* The flat 6rem below cleared the rail by 21.6px purely by coincidence —
+     it never accounted for the banner. Keep the same base and add whatever
+     the banner is actually publishing on top of it. */
+  padding-bottom: calc(6rem + var(--consent-h, 0px));
   border-top: 0;
   font-family: var(--mono);
   font-size: 0.75rem;
@@ -747,17 +777,21 @@
   .bld-card__body { font-size: 0.92rem; line-height: 1.55; }
 
   .bld-rail {
-    bottom: 0.7rem;
+    bottom: calc(0.7rem + var(--consent-h, 0px));
     width: calc(100vw - 1.8rem);
     padding: 0.7rem 1rem 1.5rem;
   }
 
   .bld-rail__dots { left: 1rem; right: 1rem; top: calc(0.7rem + 0.4rem + 1px); }
-  .bld-rail__dot { width: 12px; height: 12px; }
   .bld-rail__label { display: none; }
   .bld-rail__dot[aria-pressed='true'] .bld-rail__label { display: block; }
 
   .bld-tag { font-size: 0.6rem; }
+  /* Route tags, floor path segments and the titleblock stay hidden below
+     899px — the mobile HUD restoration above covers the "argues from
+     numbers with the numbers switched off" complaint; these are
+     supplementary in-scene chrome, and unhiding them is a separate,
+     unaudited density call on an already-tight 390px width. */
   .bld-tag--tag,
   .bld-tag--floor span,
   .bld-titleblock { display: none; }
