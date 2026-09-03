@@ -22,6 +22,9 @@ const T = {
   passEnd: 7.8,
 }
 
+/** Mid-'pass': the room has moved and the test has found it at the new spot. */
+const REST_T = (T.walk2End + T.passEnd) / 2
+
 type Phase = 'idle' | 'walk' | 'fail' | 'update' | 'walk2' | 'pass' | 'reset'
 
 function phaseAt(t: number): Phase {
@@ -68,7 +71,11 @@ export default function HealDemo() {
     } else if (start.current === null) {
       start.current = now
     }
-    const t = start.current === null ? 0 : (now - start.current) % PERIOD
+    // Reduced motion holds the vignette at its resolved state — room moved,
+    // test arrived — instead of looping it. Core and FrontDesk already zero
+    // their motion the same way, and a scene that settles is what lets the
+    // tour idle without drawing under frameloop="demand".
+    const t = s.reduced ? REST_T : start.current === null ? 0 : (now - start.current) % PERIOD
     const phase: Phase = active ? phaseAt(t) : 'reset'
     if (active) {
       const slide = smoothstep((t - T.slideStart) / (T.slideEnd - T.slideStart))

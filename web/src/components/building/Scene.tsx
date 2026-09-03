@@ -191,12 +191,24 @@ export interface SceneProps {
   shared: SharedState
   /** The quality tier, as state, so a resize past the boundary re-renders it. */
   mobile: boolean
+  /**
+   * How hard the tour is allowed to run. 'always' while the stage is on screen
+   * and the tab is visible; 'never' when it is not; 'demand' under reduced
+   * motion, where the scene settles to a still and only redraws when the scroll
+   * or a resize asks it to.
+   */
+  frameloop: 'always' | 'never' | 'demand'
   onReady: () => void
 }
 
-export default function Scene({ shared, mobile, onReady }: SceneProps) {
+export default function Scene({ shared, mobile, frameloop, onReady }: SceneProps) {
   return (
-    <Canvas {...CANVAS_PROPS} dpr={mobile ? [1, 1.5] : [1, 1.75]} onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}>
+    <Canvas
+      {...CANVAS_PROPS}
+      dpr={mobile ? [1, 1.5] : [1, 1.75]}
+      frameloop={frameloop}
+      onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
+    >
       {/* The canvas is its own reconciler, so both contexts are re-provided here. */}
       <SharedStateContext.Provider value={shared}>
         <MobileTierContext.Provider value={mobile}>

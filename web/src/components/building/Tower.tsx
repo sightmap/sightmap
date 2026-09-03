@@ -555,8 +555,11 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
       g.current.rotation.y = p.ry
     }
     // The line work sketches itself in once, on load, then fades as the
-    // sheet becomes a slab.
-    const drawT = THREE.MathUtils.clamp((performance.now() - t0 - i * 260) / 3200, 0, 1)
+    // sheet becomes a slab. Reduced motion gets it already drawn: the sketch
+    // is exactly the kind of motion the preference asks us to skip, and it
+    // runs on wall-clock time, so under frameloop="demand" it would otherwise
+    // freeze half-finished when the scene stops drawing.
+    const drawT = s.reduced ? 1 : THREE.MathUtils.clamp((performance.now() - t0 - i * 260) / 3200, 0, 1)
     const sheetA = 1 - smoothstep(rise * 1.7)
     if (sheetMat.current) {
       sheetMat.current.opacity = sheetA
