@@ -20,7 +20,15 @@ import {
   type Room,
 } from './model'
 import { furnish, type Item, type ItemType } from './furnish'
-import { floorRise, makeFloorPlace, placeFloor } from './floors'
+import {
+  RAMP_DRAWN,
+  RAMP_FLOOR,
+  SLAB_DRAWN,
+  floorGroupMatrix,
+  floorRise,
+  makeFloorPlace,
+  placeFloor,
+} from './floors'
 import { sheetLinePoints } from './geometry'
 import { smoothstep } from './chapters'
 import { useShared } from './state'
@@ -65,6 +73,9 @@ interface Mats {
   kinds: Record<Kind, THREE.MeshStandardMaterial>
   /** Merged component carpets: one mesh per floor, colour per vertex. */
   zone: THREE.MeshStandardMaterial
+  /** Kiosk cap: lit panel, tinted by the one colour every action component shares. */
+  kioskCap: THREE.MeshStandardMaterial
+  kioskScreen: THREE.MeshStandardMaterial
   slab: THREE.MeshStandardMaterial
   steel: THREE.MeshStandardMaterial
   glass: THREE.MeshStandardMaterial
@@ -112,6 +123,18 @@ function useMaterials(): Mats {
     return {
       kinds,
       zone,
+      kioskCap: new THREE.MeshStandardMaterial({
+        color: '#fbf8f2',
+        emissive: new THREE.Color(KIND_COLORS.action),
+        emissiveIntensity: 0.6,
+        roughness: 0.4,
+      }),
+      kioskScreen: new THREE.MeshStandardMaterial({
+        color: '#fbf8f2',
+        emissive: new THREE.Color('#ffffff'),
+        emissiveIntensity: 0.35,
+        roughness: 0.3,
+      }),
       slab: new THREE.MeshStandardMaterial({ color: '#f2ece3', roughness: 0.92 }),
       steel: new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.55, metalness: 0.2 }),
       glass: new THREE.MeshStandardMaterial({
@@ -231,20 +254,16 @@ interface FloorCarpets {
   merged: THREE.BufferGeometry | null
   /** Carpets the self-healing chapter slides sideways, so they keep their own mesh. */
   moving: Room[]
-  /** Static action components, whose kiosk is posed from the same static data. */
-  kiosks: Room[]
 }
 
 function floorCarpets(floor: Floor): FloorCarpets {
   const parts: Part[] = []
   const moving: Room[] = []
-  const kiosks: Room[] = []
   for (const room of floor.rooms) {
     if (room.alt) {
       moving.push(room)
       continue
     }
-    if (room.kind === 'action') kiosks.push(room)
     const color = new THREE.Color(KIND_COLORS[room.kind])
     const lift = liftOf(room)
     for (const b of room.blocks ?? [{ x: room.x, z: room.z, w: room.w, d: room.d }]) {
@@ -255,26 +274,7 @@ function floorCarpets(floor: Floor): FloorCarpets {
       })
     }
   }
-  return { merged: parts.length ? mergeParts(parts) : null, moving, kiosks }
-}
-
-function Kiosk({ room, mats }: { room: Room; mats: Mats }) {
-  const c = KIND_COLORS[room.kind]
-  return (
-    <group position={[0, PLATE, 0]}>
-      <RoundedBox args={[0.55, KIOSK_H - 0.1, 0.55]} radius={0.04} position={[0, (KIOSK_H - 0.1) / 2, 0]} castShadow receiveShadow>
-        <primitive object={mats.kinds[room.kind]} attach="material" />
-      </RoundedBox>
-      <mesh position={[0, KIOSK_H - 0.05, 0]}>
-        <boxGeometry args={[0.62, 0.1, 0.62]} />
-        <meshStandardMaterial color="#fbf8f2" emissive={c} emissiveIntensity={0.6} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, KIOSK_H / 2, 0.29]}>
-        <planeGeometry args={[0.36, 0.5]} />
-        <meshStandardMaterial color="#fbf8f2" emissive="#ffffff" emissiveIntensity={0.35} roughness={0.3} />
-      </mesh>
-    </group>
-  )
+  return { merged: parts.length ? mergeParts(parts) : null, moving }
 }
 
 /**
@@ -306,11 +306,6 @@ function MovingZone({ room, mats }: { room: Room; mats: Mats }) {
           <primitive object={mats.kinds[room.kind]} attach="material" />
         </RoundedBox>
       ))}
-      {room.kind === 'action' && (
-        <group position={[room.x, lift, room.z]}>
-          <Kiosk room={room} mats={mats} />
-        </group>
-      )}
     </group>
   )
 }
@@ -364,6 +359,164 @@ function buildCurtainWalls(): CurtainWalls {
 const CURTAIN_WALLS = buildCurtainWalls()
 
 // ---------------------------------------------------------------------------
+// The per-floor reveal ramp.
+//
+// Three things need a floor's transform each frame: the floor's own group, the
+// mullion instances and the kiosk instances. Deriving it once, here, from the
+// damped scene parameters is what lets the instanced meshes live outside the
+// floor groups without their pose ever drifting from the floor's own.
+
+/** Parks an instance at a degenerate scale: rasterises nothing, hits no ray. */
+const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0)
+
+// ---------------------------------------------------------------------------
+// Parts instanced across floors.
+//
+// Mullions and kiosks are identical from floor to floor, so each floor building
+// its own was six times the draw calls for one distinct shape. They cannot just
+// be hoisted and left alone, though: the scroll hides and scales each floor
+// independently, so every instance composes its own floor's ramp via
+// `floorGroupMatrix` and a floor that is not drawn parks its instances.
+//
+// Parking matters beyond the pixels. The label occlusion raycast targets the
+// tower group, so a mullion left standing over a hidden floor would occlude
+// labels that ought to be readable.
+
+/** Local matrices of one floor's mullions, in the curtain wall's own space. */
+const MULLION_LOCAL = CURTAIN_WALLS.mullions.map((m) =>
+  new THREE.Matrix4().compose(new THREE.Vector3(...m.position), new THREE.Quaternion(), new THREE.Vector3(...m.scale))
+)
+
+function Mullions({ mats }: { mats: Mats }) {
+  const s = useShared()
+  const mesh = useRef<THREE.InstancedMesh>(null)
+  const per = MULLION_LOCAL.length
+  const v = useMemo(
+    () => ({
+      place: makeFloorPlace(),
+      floor: new THREE.Matrix4(),
+      scratch: new THREE.Matrix4(),
+      out: new THREE.Matrix4(),
+    }),
+    []
+  )
+  useFrame(() => {
+    const m = mesh.current
+    if (!m) return
+    let any = false
+    for (let i = 0; i < FLOORS.length; i++) {
+      const p = placeFloor(i, s.cur.rise, s.cur.spread, s.cur.walls, v.place)
+      const drawn = p.walls > RAMP_DRAWN
+      if (drawn) {
+        any = true
+        floorGroupMatrix(p, p.walls, v.floor, v.scratch)
+      }
+      for (let k = 0; k < per; k++) {
+        m.setMatrixAt(i * per + k, drawn ? v.out.multiplyMatrices(v.floor, MULLION_LOCAL[k]) : HIDDEN)
+      }
+    }
+    m.instanceMatrix.needsUpdate = true
+    m.visible = any
+  })
+  // Frustum culling is off on both instanced meshes: the instances move every
+  // frame and span the whole tower, so the bounding sphere would have to be
+  // recomputed just as often to stay honest.
+  return <instancedMesh ref={mesh} args={[unitBox, mats.steel, FLOORS.length * per]} castShadow frustumCulled={false} />
+}
+
+/** One kiosk's placement, in its floor's `rooms` group space. */
+interface KioskSpec {
+  floor: number
+  position: [number, number, number]
+  /** Where the self-healing chapter slides it to, if it moves at all. */
+  alt: [number, number] | null
+}
+
+// Every action component is `kind: 'action'`, so all four kiosks share one
+// colour and the instances need no per-instance colour at all.
+const KIOSKS: KioskSpec[] = FLOORS.flatMap((floor, i) =>
+  floor.rooms
+    .filter((r) => r.kind === 'action')
+    .map((r) => ({
+      floor: i,
+      position: [r.x, liftOf(r) + PLATE, r.z] as [number, number, number],
+      alt: r.alt ? ([r.alt.x, r.alt.z] as [number, number]) : null,
+    }))
+)
+
+const KIOSK_BODY = roundedBoxGeometry(0.55, KIOSK_H - 0.1, 0.55, 0.04, 2).translate(0, (KIOSK_H - 0.1) / 2, 0)
+const KIOSK_CAP = new THREE.BoxGeometry(0.62, 0.1, 0.62).translate(0, KIOSK_H - 0.05, 0)
+const KIOSK_SCREEN = new THREE.PlaneGeometry(0.36, 0.5).translate(0, KIOSK_H / 2, 0.29)
+
+/**
+ * Every floor's kiosks, as three instanced meshes: body, cap, screen.
+ *
+ * The one kiosk the self-healing chapter relocates carries its carpet's offset
+ * here, since it no longer rides inside that carpet's moving group.
+ */
+function Kiosks({ mats }: { mats: Mats }) {
+  const s = useShared()
+  const body = useRef<THREE.InstancedMesh>(null)
+  const cap = useRef<THREE.InstancedMesh>(null)
+  const screen = useRef<THREE.InstancedMesh>(null)
+  const v = useMemo(
+    () => ({
+      places: FLOORS.map(makeFloorPlace),
+      floors: FLOORS.map(() => new THREE.Matrix4()),
+      scratch: new THREE.Matrix4(),
+      local: new THREE.Matrix4(),
+      out: new THREE.Matrix4(),
+    }),
+    []
+  )
+  useFrame(() => {
+    const meshes = [body.current, cap.current, screen.current]
+    if (!body.current || !cap.current || !screen.current) return
+    for (let i = 0; i < FLOORS.length; i++) {
+      const p = placeFloor(i, s.cur.rise, s.cur.spread, s.cur.walls, v.places[i])
+      if (p.fill > RAMP_DRAWN) floorGroupMatrix(p, p.fill, v.floors[i], v.scratch)
+    }
+    const heal = smoothstep(s.healShift)
+    let any = false
+    for (let k = 0; k < KIOSKS.length; k++) {
+      const spec = KIOSKS[k]
+      const drawn = v.places[spec.floor].fill > RAMP_DRAWN
+      if (drawn) {
+        any = true
+        const [x, y, z] = spec.position
+        const dx = spec.alt ? (spec.alt[0] - x) * heal : 0
+        const dz = spec.alt ? (spec.alt[1] - z) * heal : 0
+        v.local.makeTranslation(x + dx, y, z + dz)
+        v.out.multiplyMatrices(v.floors[spec.floor], v.local)
+      }
+      const at = drawn ? v.out : HIDDEN
+      body.current.setMatrixAt(k, at)
+      cap.current.setMatrixAt(k, at)
+      screen.current.setMatrixAt(k, at)
+    }
+    for (const m of meshes) {
+      if (!m) continue
+      m.instanceMatrix.needsUpdate = true
+      m.visible = any
+    }
+  })
+  const n = KIOSKS.length
+  return (
+    <>
+      <instancedMesh
+        ref={body}
+        args={[KIOSK_BODY, mats.kinds.action, n]}
+        castShadow
+        receiveShadow
+        frustumCulled={false}
+      />
+      <instancedMesh ref={cap} args={[KIOSK_CAP, mats.kioskCap, n]} frustumCulled={false} />
+      <instancedMesh ref={screen} args={[KIOSK_SCREEN, mats.kioskScreen, n]} frustumCulled={false} />
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 
 function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: number }) {
   const s = useShared()
@@ -392,9 +545,10 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
     }
     return l
   }, [pts])
+
   useFrame(() => {
     const c = s.cur
-    const p = placeFloor(i, c.rise, c.spread, place)
+    const p = placeFloor(i, c.rise, c.spread, c.walls, place)
     const rise = p.rise
     if (g.current) {
       g.current.position.set(p.x, p.y, p.z)
@@ -418,17 +572,16 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
       lines.current.visible = a > 0.01
     }
     if (slab.current) {
-      slab.current.visible = rise > 0.02
-      slab.current.scale.set(1, Math.max(rise, 0.001), 1)
+      slab.current.visible = p.rise > SLAB_DRAWN
+      slab.current.scale.set(1, Math.max(p.rise, RAMP_FLOOR), 1)
     }
     if (rooms.current) {
-      rooms.current.scale.y = Math.max(p.fill, 0.001)
-      rooms.current.visible = p.fill > 0.005
+      rooms.current.scale.y = Math.max(p.fill, RAMP_FLOOR)
+      rooms.current.visible = p.fill > RAMP_DRAWN
     }
     if (walls.current) {
-      const w = c.walls * smoothstep((rise - 0.55) / 0.45)
-      walls.current.scale.y = Math.max(w, 0.001)
-      walls.current.visible = w > 0.005
+      walls.current.scale.y = Math.max(p.walls, RAMP_FLOOR)
+      walls.current.visible = p.walls > RAMP_DRAWN
     }
   })
 
@@ -464,11 +617,6 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
       </group>
       <group ref={rooms} position={[0, SLAB_T, 0]}>
         {carpets.merged && <mesh geometry={carpets.merged} material={mats.zone} receiveShadow />}
-        {carpets.kiosks.map((r) => (
-          <group key={r.name} position={[r.x, liftOf(r), r.z]}>
-            <Kiosk room={r} mats={mats} />
-          </group>
-        ))}
         {carpets.moving.map((r) => (
           <MovingZone key={r.name} room={r} mats={mats} />
         ))}
@@ -478,17 +626,8 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
         <mesh geometry={CURTAIN_WALLS.spandrel} material={mats.spandrel} castShadow receiveShadow />
         <mesh geometry={CURTAIN_WALLS.glass} material={mats.glass} />
         <mesh geometry={CURTAIN_WALLS.head} material={mats.steel} castShadow />
-        <Instances
-          limit={CURTAIN_WALLS.mullions.length}
-          range={CURTAIN_WALLS.mullions.length}
-          geometry={unitBox}
-          material={mats.steel}
-          castShadow
-        >
-          {CURTAIN_WALLS.mullions.map((m, k) => (
-            <Instance key={k} position={m.position} scale={m.scale} />
-          ))}
-        </Instances>
+        {/* Mullions are not here: they are instanced across all floors at once,
+            by <Mullions />, which composes this group's ramp itself. */}
       </group>
     </group>
   )
@@ -655,6 +794,8 @@ export default function Tower() {
       {FLOORS.map((_, i) => (
         <FloorUnit key={i} index={i} mats={mats} t0={t0} />
       ))}
+      <Mullions mats={mats} />
+      <Kiosks mats={mats} />
       <Roof mats={mats} />
       <Frame mats={mats} />
     </group>

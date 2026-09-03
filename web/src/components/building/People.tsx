@@ -284,7 +284,8 @@ export default function People() {
     // The people who work here. They ride their floor up out of the fanned
     // sheets, so each one is placed through the same transform Tower gives
     // that floor, and grows in with the room around them.
-    for (let i = 0; i < places.length; i++) placeFloor(i, s.cur.rise, s.cur.spread, places[i])
+    for (let i = 0; i < places.length; i++)
+      placeFloor(i, s.cur.rise, s.cur.spread, s.cur.walls, places[i])
     for (const r of locals) {
       if (n >= cap) break
       const place = places[r.floor]
