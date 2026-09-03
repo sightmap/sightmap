@@ -198,6 +198,40 @@ sightmap browser inject --remove inj-1
 
 ---
 
+### `browser mcp`
+
+Enumerate and call the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools a page exposes. A page can declare callable actions to an in-browser agent through `document.modelContext` (`getTools()` / `executeTool()`); `mcp list` reads them and `mcp call` invokes one — so you can call a named action instead of driving the UI blind.
+
+`mcp list` distinguishes three states: **native** WebMCP (a browser-provided `document.modelContext`), a **polyfilled** one (provided by a page script), and **absent**. When absent it fails loudly with the Chrome flags that enable native WebMCP. One tool runs at a single point in time; WebMCP has no cross-navigation tool responses, so if a tool triggers a client-side navigation, re-run `mcp list` on the new view. Any guidance the tool returns (e.g. a hint toward the next tool) is part of its result.
+
+Native WebMCP is behind Chrome flags; start the session with them:
+
+```bash
+sightmap browser start \
+  --chrome-flag=--enable-blink-features=ModelContext,ModelContextTesting \
+  --chrome-flag=--enable-features=DevToolsWebMCPSupport
+```
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `mcp list` | `--json` | Enumerate exposed tools (name, description, input schema). `--json` emits the full schemas. |
+| `mcp call <tool>` | `--args JSON`, `--param k=v`, `--json` | Invoke a tool via `executeTool` and print its result. Supply arguments as a JSON object (`--args`) and/or repeatable `--param key=value` pairs (each value parsed as JSON when possible, else a string) layered over `--args`. |
+
+Tools return the standard WebMCP `CallToolResult` envelope (`{ content, isError }`). `mcp call` unwraps it — rendering the text/structured content (and any guidance the tool includes) as itself rather than a stringified blob — and **exits non-zero when the tool reports `isError`**, so it is scriptable. `--json` prints the raw envelope verbatim.
+
+```bash
+sightmap browser mcp list
+# WebMCP (polyfilled) — 1 tool(s):
+#   search — Search flights by route
+
+sightmap browser mcp call search --args '{"query": "ATL to LHR"}'
+sightmap browser mcp call search --param query="ATL to LHR"   # equivalent
+```
+
+Both accept `--addr` and `--tab` like the other page commands.
+
+---
+
 ### `browser clear-storage`
 
 Clears all cookies, including `httpOnly` cookies, and clears storage for one origin. Origin storage includes localStorage, IndexedDB, service workers, and caches.
