@@ -409,3 +409,65 @@ func nodeWith(tag, id string, classes []string, attrs map[string]string) *sightm
 		Attrs:   attrs,
 	}
 }
+
+// Multiple :not() pseudo-classes on one compound selector are rejected.
+// Previously the second silently overwrote the first (part.Not = inner), so a
+// button.disabled wrongly matched button:not(.disabled):not(.hidden).
+func TestParse_MultipleNotRejected(t *testing.T) {
+	cases := []string{
+		"button:not(.disabled):not(.hidden)",
+		"div:not(.a):not(.b):not(.c)",
+		// A second :not() interleaved with another pseudo still errors.
+		"div:not(.a):has(.b):not(.c)",
+		// Repeated after classes/attrs.
+		"button.foo:not(.disabled)[type=submit]:not(.hidden)",
+	}
+	for _, s := range cases {
+		t.Run(s, func(t *testing.T) {
+			parseErr(t, s)
+		})
+	}
+}
+
+// Multiple :is()/:where() pseudo-classes on one compound selector are rejected.
+// They share the Is field, so a second occurrence silently overwrote the
+// first, making the selector more permissive than intended.
+func TestParse_MultipleIsWhereRejected(t *testing.T) {
+	cases := []string{
+		"div:is(.foo):is(.bar)",
+		"div:where(.foo):where(.bar)",
+		// Mixed :is() and :where() share the same field; the second errors.
+		"div:is(.foo):where(.bar)",
+		"div:where(.foo):is(.bar)",
+		// Three pseudos on one compound.
+		"div:is(.a):is(.b):is(.c)",
+	}
+	for _, s := range cases {
+		t.Run(s, func(t *testing.T) {
+			parseErr(t, s)
+		})
+	}
+}
+
+// One :not() and one :is()/:where() on the same compound must still parse —
+// they occupy different fields and must not collide.
+func TestParse_NotPlusIsCoexist(t *testing.T) {
+	ps := parseOK(t, "div:not(.a):is(.b)")
+	part := ps.Parts[0]
+	if part.Not == nil {
+		t.Fatal("Not is nil")
+	}
+	if len(part.Not.Classes) != 1 || part.Not.Classes[0] != "a" {
+		t.Errorf("Not.Classes: got %v, want [a]", part.Not.Classes)
+	}
+	if len(part.Is) != 1 || len(part.Is[0].Classes) != 1 || part.Is[0].Classes[0] != "b" {
+		t.Errorf("Is: got %v, want one alt [.b]", part.Is)
+	}
+
+	// :where() coexists with :not() too.
+	ps = parseOK(t, "div:not(.a):where(.b)")
+	part = ps.Parts[0]
+	if part.Not == nil || len(part.Is) != 1 {
+		t.Errorf("Not/where coexistence: Not=%v Is=%v", part.Not, part.Is)
+	}
+}
