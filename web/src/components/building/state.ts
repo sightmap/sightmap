@@ -2,9 +2,33 @@
 // pointer) and the scene (which reads them every frame). Deliberately not
 // React state: scroll fires far more often than React should re-render, and
 // the scene only needs the latest value when it draws.
-import { createContext, useContext, type RefObject } from 'react'
+import { createContext, useContext, useEffect, useMemo, type RefObject } from 'react'
 import type * as THREE from 'three'
 import { defaultParams, type SceneParams } from './chapters'
+
+/**
+ * A person the instanced crowd draws on someone else's behalf. The scripted
+ * vignettes (the front-desk visitor, the self-healing test) animate one figure
+ * each on their own schedule, so they own the numbers and People.tsx owns the
+ * meshes — that way there is still exactly one body-part system in the scene.
+ * Plain numbers rather than an Object3D: the slot crosses from a vignette into
+ * the crowd's instance matrices, and never needs a node of its own.
+ */
+export interface PersonSlot {
+  x: number
+  y: number
+  z: number
+  /** Heading in radians; 0 faces +Z, matching `atan2(dx, dz)`. */
+  ry: number
+  scale: number
+  visible: boolean
+  /** Shirt colour; the crowd derives trousers from it. */
+  color: string
+}
+
+export function createPersonSlot(color: string): PersonSlot {
+  return { x: 0, y: 0, z: 0, ry: 0, scale: 1, visible: false, color }
+}
 
 export interface SharedState {
   /** Continuous chapter position, 0 … CHAPTERS.length-1. */
@@ -19,6 +43,8 @@ export interface SharedState {
   healShift: number
   /** Journey the crowd is reduced to (null = everyone). */
   focus: string | null
+  /** Figures driven by a scripted vignette, drawn by the shared crowd meshes. */
+  slots: PersonSlot[]
   mobile: boolean
   reduced: boolean
   /** 'tour' frames the whole table for the /building page; 'billboard' is
@@ -42,6 +68,7 @@ export function createSharedState(): SharedState {
     target: defaultParams(),
     healShift: 0,
     focus: null,
+    slots: [],
     mobile: false,
     reduced: false,
     frame: 'tour',
@@ -56,4 +83,18 @@ export function useShared(): SharedState {
   const s = useContext(SharedStateContext)
   if (!s) throw new Error('useShared: no SharedStateContext')
   return s
+}
+
+/** Claim a figure in the shared crowd meshes for as long as this component lives. */
+export function usePersonSlot(color: string): PersonSlot {
+  const s = useShared()
+  const slot = useMemo(() => createPersonSlot(color), [color])
+  useEffect(() => {
+    s.slots.push(slot)
+    return () => {
+      const i = s.slots.indexOf(slot)
+      if (i >= 0) s.slots.splice(i, 1)
+    }
+  }, [s, slot])
+  return slot
 }

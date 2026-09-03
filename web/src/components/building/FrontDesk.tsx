@@ -5,8 +5,7 @@ import { useRef } from 'react'
 import * as THREE from 'three'
 import { SLAB_T, TOOLS, TRAVELLER_COLORS } from './model'
 import { smoothstep } from './chapters'
-import { useShared } from './state'
-import { Walker } from './Agents'
+import { usePersonSlot, useShared } from './state'
 
 // Chapter 07. A front desk in the lobby with the tools the building offers,
 // and an agent at the door about to use one.
@@ -15,7 +14,7 @@ const DESK: [number, number, number] = [4.05, SLAB_T, -1.2]
 export default function FrontDesk() {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
-  const visitor = useRef<THREE.Group>(null)
+  const visitor = usePersonSlot(TRAVELLER_COLORS.agent)
   const cards = useRef<(HTMLDivElement | null)[]>([])
   const desk = useRef<THREE.Group>(null)
   useFrame(({ clock }) => {
@@ -29,12 +28,14 @@ export default function FrontDesk() {
       g.current.scale.setScalar(Math.max(o, 0.001))
       g.current.visible = o > 0.01
     }
-    if (visitor.current) {
-      const t = clock.getElapsedTime()
-      visitor.current.position.set(6.1 + (s.reduced ? 0 : Math.sin(t * 0.8) * 0.05), 0, -1.2)
-      visitor.current.scale.setScalar(Math.max(o, 0.001))
-      visitor.current.visible = o > 0.01
-    }
+    const t = clock.getElapsedTime()
+    visitor.x = 6.1 + (s.reduced ? 0 : Math.sin(t * 0.8) * 0.05)
+    visitor.y = 0
+    visitor.z = -1.2
+    // Turned towards the desk, which stands at -X of where the visitor waits.
+    visitor.ry = -Math.PI / 2
+    visitor.scale = o
+    visitor.visible = o > 0.01
     cards.current.forEach((el, k) => {
       if (!el) return
       const po = Math.min(1, Math.max(0, o * 1.8 - k * 0.25))
@@ -92,7 +93,6 @@ export default function FrontDesk() {
           </Label>
         ))}
       </group>
-      <Walker color={TRAVELLER_COLORS.agent} group={visitor} trail={false} />
     </>
   )
 }

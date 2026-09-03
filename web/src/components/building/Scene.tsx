@@ -15,7 +15,7 @@ import Table from './Table'
 import Tower from './Tower'
 import Core from './Core'
 import Wayfinding from './Wayfinding'
-import Agents from './Agents'
+import People from './People'
 import HealDemo from './HealDemo'
 import Trajectory from './Trajectory'
 import FrontDesk from './FrontDesk'
@@ -139,7 +139,7 @@ export function SceneContent() {
       <Tower />
       <Core />
       <Wayfinding />
-      <Agents />
+      <People />
       <HealDemo />
       <Trajectory />
       <FrontDesk />
