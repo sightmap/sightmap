@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { Instance, Instances, Line, RoundedBox } from '@react-three/drei'
+import { mergeParts, roundedBoxGeometry, type Part } from './merge'
 import { useMemo, useRef, type ComponentRef } from 'react'
 import * as THREE from 'three'
 import {
@@ -14,6 +15,7 @@ import {
   SLAB_T,
   WALL_T,
   floorY,
+  type Floor,
   type Kind,
   type Room,
 } from './model'
@@ -37,8 +39,32 @@ const STEEL = '#26272c'
 // ---------------------------------------------------------------------------
 // Shared materials, retinted at nightfall.
 
+/**
+ * Make a material's vertex colour drive emissive as well as diffuse.
+ *
+ * The per-kind materials this stands in for carry `emissive === color`, so a
+ * component's carpet glows its own colour at nightfall. One shared material
+ * cannot do that from a uniform — but the colour is already in `vColor`, so
+ * emissive reads it from there and the night ramp stays a single
+ * `emissiveIntensity`. Requires `vertexColors` and a `color` attribute: three
+ * only declares the varying to the fragment shader under `USE_COLOR`.
+ */
+function emissiveFollowsColor(material: THREE.MeshStandardMaterial): void {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\n\ttotalEmissiveRadiance *= vColor.rgb;'
+    )
+  }
+  // Without this, a materially identical unpatched material would be handed
+  // the same compiled program.
+  material.customProgramCacheKey = () => 'emissiveFollowsColor'
+}
+
 interface Mats {
   kinds: Record<Kind, THREE.MeshStandardMaterial>
+  /** Merged component carpets: one mesh per floor, colour per vertex. */
+  zone: THREE.MeshStandardMaterial
   slab: THREE.MeshStandardMaterial
   steel: THREE.MeshStandardMaterial
   glass: THREE.MeshStandardMaterial
@@ -75,8 +101,17 @@ function useMaterials(): Mats {
       rail: plain({ roughness: 0.5 }),
       counter: plain({ roughness: 0.6 }),
     }
+    const zone = new THREE.MeshStandardMaterial({
+      color: '#ffffff',
+      roughness: 0.92,
+      vertexColors: true,
+      emissive: new THREE.Color('#ffffff'),
+      emissiveIntensity: 0,
+    })
+    emissiveFollowsColor(zone)
     return {
       kinds,
+      zone,
       slab: new THREE.MeshStandardMaterial({ color: '#f2ece3', roughness: 0.92 }),
       steel: new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.55, metalness: 0.2 }),
       glass: new THREE.MeshStandardMaterial({
@@ -115,6 +150,7 @@ function useMaterials(): Mats {
     mats.furniture.monitor.emissiveIntensity = THREE.MathUtils.lerp(0.25, 1.3, n)
     mats.furniture.screen.emissiveIntensity = THREE.MathUtils.lerp(0.3, 1.2, n)
     for (const k of Object.keys(mats.kinds) as Kind[]) mats.kinds[k].emissiveIntensity = n * 0.35
+    mats.zone.emissiveIntensity = n * 0.35
   })
   return mats
 }
@@ -183,6 +219,45 @@ function Furniture({ items, mats }: { items: Item[]; mats: Mats }) {
 // ---------------------------------------------------------------------------
 // Zones and kiosks.
 
+const CARPET_RADIUS = 0.03
+const CARPET_SMOOTHNESS = 2
+
+/** Where a component's carpet sits, given whatever platform it stands on. */
+const liftOf = (room: Room): number => (room.base ? PLATE : 0)
+
+/** A floor's component carpets, sorted into what can be baked and what cannot. */
+interface FloorCarpets {
+  /** Every static carpet on the floor, in one buffer, colour per vertex. */
+  merged: THREE.BufferGeometry | null
+  /** Carpets the self-healing chapter slides sideways, so they keep their own mesh. */
+  moving: Room[]
+  /** Static action components, whose kiosk is posed from the same static data. */
+  kiosks: Room[]
+}
+
+function floorCarpets(floor: Floor): FloorCarpets {
+  const parts: Part[] = []
+  const moving: Room[] = []
+  const kiosks: Room[] = []
+  for (const room of floor.rooms) {
+    if (room.alt) {
+      moving.push(room)
+      continue
+    }
+    if (room.kind === 'action') kiosks.push(room)
+    const color = new THREE.Color(KIND_COLORS[room.kind])
+    const lift = liftOf(room)
+    for (const b of room.blocks ?? [{ x: room.x, z: room.z, w: room.w, d: room.d }]) {
+      parts.push({
+        geometry: roundedBoxGeometry(b.w, PLATE, b.d, CARPET_RADIUS, CARPET_SMOOTHNESS),
+        position: [b.x, lift + PLATE / 2, b.z],
+        color,
+      })
+    }
+  }
+  return { merged: parts.length ? mergeParts(parts) : null, moving, kiosks }
+}
+
 function Kiosk({ room, mats }: { room: Room; mats: Mats }) {
   const c = KIND_COLORS[room.kind]
   return (
@@ -202,11 +277,16 @@ function Kiosk({ room, mats }: { room: Room; mats: Mats }) {
   )
 }
 
-function Zone({ room, mats }: { room: Room; mats: Mats }) {
+/**
+ * A component whose carpet moves during the self-healing chapter. Its offset is
+ * per-frame, so it cannot be baked into the floor's merged buffer and keeps the
+ * per-block meshes the whole floor used to have.
+ */
+function MovingZone({ room, mats }: { room: Room; mats: Mats }) {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
   const blocks = room.blocks ?? [{ x: room.x, z: room.z, w: room.w, d: room.d }]
-  const lift = room.base ? PLATE : 0
+  const lift = liftOf(room)
   useFrame(() => {
     if (!room.alt || !g.current) return
     const t = smoothstep(s.healShift)
@@ -237,36 +317,51 @@ function Zone({ room, mats }: { room: Room; mats: Mats }) {
 
 // ---------------------------------------------------------------------------
 // Curtain walls on the two back sides: spandrel, glass, mullions, head beam.
+//
+// Every floor's walls are the same two runs, so the merged buffers are built
+// once at module scope and shared by all six floors' meshes. Each floor still
+// gets its own mesh, hung under its own `walls` group, so the ramp that grows
+// the glazing out of the slab is untouched.
 
-function CurtainWall({ mats, side }: { mats: Mats; side: 'x' | 'z' }) {
-  const len = side === 'x' ? FLOOR_D : FLOOR_W
-  const n = Math.round(len / 1.25)
-  const mullions = useMemo(() => Array.from({ length: n + 1 }, (_, k) => -len / 2 + (k * len) / n), [len, n])
-  const at = (u: number, y: number): [number, number, number] =>
-    side === 'x' ? [-FLOOR_W / 2 + WALL_T / 2, y, u] : [u, y, -FLOOR_D / 2 + WALL_T / 2]
-  const size = (u: number, y: number, t: number): [number, number, number] => (side === 'x' ? [t, y, u] : [u, y, t])
-  return (
-    <group>
-      <mesh position={at(0, 0.16)} castShadow receiveShadow>
-        <boxGeometry args={size(len, 0.32, WALL_T)} />
-        <primitive object={mats.spandrel} attach="material" />
-      </mesh>
-      <mesh position={at(0, 0.32 + (WALL_H - 0.42) / 2)}>
-        <boxGeometry args={size(len, WALL_H - 0.42, 0.02)} />
-        <primitive object={mats.glass} attach="material" />
-      </mesh>
-      <mesh position={at(0, WALL_H - 0.05)} castShadow>
-        <boxGeometry args={size(len, 0.1, WALL_T + 0.02)} />
-        <primitive object={mats.steel} attach="material" />
-      </mesh>
-      <Instances limit={mullions.length} range={mullions.length} geometry={unitBox} material={mats.steel} castShadow>
-        {mullions.map((u) => (
-          <Instance key={u} position={at(u, WALL_H / 2)} scale={size(0.07, WALL_H, WALL_T + 0.02)} />
-        ))}
-      </Instances>
-    </group>
-  )
+/** Local pose of one mullion, in the curtain wall's space. */
+interface Mullion {
+  position: [number, number, number]
+  scale: [number, number, number]
 }
+
+interface CurtainWalls {
+  spandrel: THREE.BufferGeometry
+  glass: THREE.BufferGeometry
+  head: THREE.BufferGeometry
+  mullions: Mullion[]
+}
+
+function buildCurtainWalls(): CurtainWalls {
+  const spandrel: Part[] = []
+  const glass: Part[] = []
+  const head: Part[] = []
+  const mullions: Mullion[] = []
+  for (const side of ['x', 'z'] as const) {
+    const len = side === 'x' ? FLOOR_D : FLOOR_W
+    const n = Math.round(len / 1.25)
+    const at = (u: number, y: number): [number, number, number] =>
+      side === 'x' ? [-FLOOR_W / 2 + WALL_T / 2, y, u] : [u, y, -FLOOR_D / 2 + WALL_T / 2]
+    const size = (u: number, y: number, t: number): [number, number, number] => (side === 'x' ? [t, y, u] : [u, y, t])
+    spandrel.push({ geometry: new THREE.BoxGeometry(...size(len, 0.32, WALL_T)), position: at(0, 0.16) })
+    glass.push({
+      geometry: new THREE.BoxGeometry(...size(len, WALL_H - 0.42, 0.02)),
+      position: at(0, 0.32 + (WALL_H - 0.42) / 2),
+    })
+    head.push({ geometry: new THREE.BoxGeometry(...size(len, 0.1, WALL_T + 0.02)), position: at(0, WALL_H - 0.05) })
+    for (let k = 0; k <= n; k++) {
+      const u = -len / 2 + (k * len) / n
+      mullions.push({ position: at(u, WALL_H / 2), scale: size(0.07, WALL_H, WALL_T + 0.02) })
+    }
+  }
+  return { spandrel: mergeParts(spandrel), glass: mergeParts(glass), head: mergeParts(head), mullions }
+}
+
+const CURTAIN_WALLS = buildCurtainWalls()
 
 // ---------------------------------------------------------------------------
 
@@ -285,6 +380,7 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
   // occupants of every floor into one set of instanced meshes.
   const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r).items), [floor])
   const place = useMemo(() => makeFloorPlace(), [])
+  const carpets = useMemo(() => floorCarpets(floor), [floor])
   // LineSegments2 accumulates dash distance across every segment, so one
   // growing dash draws the sheet in sequence: border, footprint, then rooms.
   const total = useMemo(() => {
@@ -367,14 +463,32 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
         </mesh>
       </group>
       <group ref={rooms} position={[0, SLAB_T, 0]}>
-        {floor.rooms.map((r) => (
-          <Zone key={r.name} room={r} mats={mats} />
+        {carpets.merged && <mesh geometry={carpets.merged} material={mats.zone} receiveShadow />}
+        {carpets.kiosks.map((r) => (
+          <group key={r.name} position={[r.x, liftOf(r), r.z]}>
+            <Kiosk room={r} mats={mats} />
+          </group>
+        ))}
+        {carpets.moving.map((r) => (
+          <MovingZone key={r.name} room={r} mats={mats} />
         ))}
         <Furniture items={items} mats={mats} />
       </group>
       <group ref={walls} position={[0, SLAB_T, 0]}>
-        <CurtainWall mats={mats} side="x" />
-        <CurtainWall mats={mats} side="z" />
+        <mesh geometry={CURTAIN_WALLS.spandrel} material={mats.spandrel} castShadow receiveShadow />
+        <mesh geometry={CURTAIN_WALLS.glass} material={mats.glass} />
+        <mesh geometry={CURTAIN_WALLS.head} material={mats.steel} castShadow />
+        <Instances
+          limit={CURTAIN_WALLS.mullions.length}
+          range={CURTAIN_WALLS.mullions.length}
+          geometry={unitBox}
+          material={mats.steel}
+          castShadow
+        >
+          {CURTAIN_WALLS.mullions.map((m, k) => (
+            <Instance key={k} position={m.position} scale={m.scale} />
+          ))}
+        </Instances>
       </group>
     </group>
   )
