@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CHAPTERS } from './chapters'
-import { createSharedState, SharedStateContext } from './state'
+import { createSharedState, isMobileViewport, SharedStateContext } from './state'
 import { webglAvailable } from './webgl'
 import Poster from './Poster'
 import BuildingNav from './BuildingNav'
@@ -26,13 +26,17 @@ export default function BuildingExperience() {
   const [webgl, setWebgl] = useState(false)
   const [ready, setReady] = useState(false)
   const [active, setActive] = useState(0)
+  // Real state, not just shared.mobile: DPR, shadow-map size and walker count
+  // are chosen at render time, so the tier has to be able to re-render them
+  // when the viewport crosses the boundary.
+  const [mobile, setMobile] = useState(false)
   const sections = useRef<(HTMLElement | null)[]>([])
 
   useEffect(() => {
     setMounted(true)
     setWebgl(webglAvailable())
     shared.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    shared.mobile = window.innerWidth < 900
+    setMobile(isMobileViewport())
 
     let raf = 0
     const measure = () => {
@@ -68,7 +72,7 @@ export default function BuildingExperience() {
       }
     }
     const onResize = () => {
-      shared.mobile = window.innerWidth < 900
+      setMobile(isMobileViewport())
       onScroll()
     }
     const onMove = (e: PointerEvent) => {
@@ -87,6 +91,12 @@ export default function BuildingExperience() {
       if (raf) cancelAnimationFrame(raf)
     }
   }, [shared])
+
+  // The per-frame readers (camera framing, the pointer handler) still take the
+  // tier off the shared object, so keep the two in step.
+  useEffect(() => {
+    shared.mobile = mobile
+  }, [mobile, shared])
 
   useEffect(() => {
     shared.focus = CHAPTERS[active].focus ?? null
@@ -108,7 +118,7 @@ export default function BuildingExperience() {
           <Poster hidden={ready} />
           {mounted && webgl && (
             <Suspense fallback={null}>
-              <Scene shared={shared} onReady={() => setReady(true)} />
+              <Scene shared={shared} mobile={mobile} onReady={() => setReady(true)} />
             </Suspense>
           )}
         </div>

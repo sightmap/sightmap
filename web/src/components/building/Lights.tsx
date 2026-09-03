@@ -1,12 +1,13 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { useShared } from './state'
+import { useMobileTier, useShared } from './state'
 
 // Daylight from the front-right, softening to moonlight at nightfall. One
 // shadow-casting directional light covers the whole table.
 export default function Lights() {
   const s = useShared()
+  const mobile = useMobileTier()
   const dir = useRef<THREE.DirectionalLight>(null)
   const amb = useRef<THREE.AmbientLight>(null)
   const hemi = useRef<THREE.HemisphereLight>(null)
@@ -31,7 +32,7 @@ export default function Lights() {
     }
     if (hemi.current) hemi.current.intensity = THREE.MathUtils.lerp(0.7, 0.28, n)
   })
-  const mapSize = s.mobile ? 1024 : 2048
+  const mapSize = mobile ? 1024 : 2048
   return (
     <>
       <ambientLight ref={amb} intensity={0.72} />
