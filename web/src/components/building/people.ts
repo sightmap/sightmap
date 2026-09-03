@@ -132,6 +132,33 @@ export function standPose(out: PartPose[]): PartPose[] {
   return gaitPose(0, 0, out)
 }
 
+/**
+ * Seated proportions: the pelvis drops to chair height and the thighs come
+ * forward. Same six parts, same instanced meshes — a seated figure is a pose,
+ * not a second kind of person.
+ */
+const SEAT = { hipY: 0.4, torsoY: 0.56, shoulderY: 0.63, headY: 0.73 } as const
+/** Thighs forward and slightly down; arms resting towards a desk. */
+const SEAT_LEG_RX = -1.35
+const SEAT_ARM_RX = -0.5
+
+export function seatPose(out: PartPose[]): PartPose[] {
+  const [torso, head, armL, armR, legL, legR] = out
+  torso.x = 0
+  torso.y = SEAT.torsoY
+  torso.z = 0
+  torso.rx = 0.06
+  head.x = 0
+  head.y = SEAT.headY
+  head.z = 0
+  head.rx = 0
+  hang(armL, -RIG.armX, SEAT.shoulderY, ARM_LEN, SEAT_ARM_RX)
+  hang(armR, RIG.armX, SEAT.shoulderY, ARM_LEN, SEAT_ARM_RX)
+  hang(legL, -RIG.legX, SEAT.hipY, LEG_LEN, SEAT_LEG_RX)
+  hang(legR, RIG.legX, SEAT.hipY, LEG_LEN, SEAT_LEG_RX)
+  return out
+}
+
 /** Per-person gait state, advanced from where that person was last frame. */
 export interface Gait {
   phase: number

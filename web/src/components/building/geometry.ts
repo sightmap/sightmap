@@ -58,7 +58,7 @@ export function sheetLinePoints(floorIndex: number): P3[] {
   for (const r of FLOORS[floorIndex].rooms) {
     const blocks = r.blocks ?? [{ x: r.x, z: r.z, w: r.w, d: r.d }]
     for (const b of blocks) rect(b.x, b.z, b.w, b.d)
-    for (const it of furnish(r)) {
+    for (const it of furnish(r).items) {
       if (!DRAWN.includes(it.type)) continue
       const c = Math.cos(it.ry)
       const s = Math.sin(it.ry)

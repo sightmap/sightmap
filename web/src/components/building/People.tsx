@@ -1,11 +1,13 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { JOURNEYS, TRAVELLER_COLORS, type Journey } from './model'
+import { FLOORS, JOURNEYS, TRAVELLER_COLORS, type Journey } from './model'
 import { buildPath, pointAt, type Path } from './geometry'
+import { furnish } from './furnish'
+import { floorToWorld, makeFloorPlace, placeFloor } from './floors'
 import { smoothstep } from './chapters'
 import { useShared, type PersonSlot } from './state'
-import { PART_KEYS, RIG, gaitPose, makeGait, makePose, stepGait, type Gait, type PartPose } from './people'
+import { PART_KEYS, RIG, gaitPose, makeGait, makePose, seatPose, standPose, stepGait, type Gait, type PartPose } from './people'
 
 // Everybody in the building, drawn by six instanced meshes — one per body
 // part. A person is six matrix writes a frame, so walkers and the scripted
@@ -14,13 +16,24 @@ import { PART_KEYS, RIG, gaitPose, makeGait, makePose, stepGait, type Gait, type
 // each) in Agents.tsx.
 //
 // One walker per journey, looping through its stops and riding the core
-// between floors. Users are pink, coding agents green, tests gold.
+// between floors. Users are pink, coding agents green, tests gold. Everyone
+// else is an occupant of a room — at a desk, on a sofa, behind a counter —
+// placed by furnish.ts and drawn here rather than as a pair of furniture
+// primitives that could never move.
 const WALK = 1.75
 const DWELL = 0.9
 const RESET = 1.4
 
-/** Instances allocated per part. The per-frame budget picks who fills them. */
+/**
+ * Population budget. Instances are allocated for the desktop figure; the
+ * per-frame count decides who fills them — walkers first, because they are
+ * what the chapter is about, then the scripted vignettes, then residents.
+ */
 const MAX_PEOPLE = 50
+const MAX_PEOPLE_MOBILE = 25
+
+/** How many people the last frame actually drew, for Stats / __bldStats. */
+export const crowd = { drawn: 0 }
 
 /** The rig is ~1 unit tall; a person in this model is a little over 0.8. */
 const WALKER_SCALE = 0.82
@@ -64,6 +77,44 @@ interface Palette {
 function palette(shirt: string, skin: string): Palette {
   const c = new THREE.Color(shirt)
   return { shirt: c, trousers: c.clone().multiplyScalar(0.55), skin: new THREE.Color(skin) }
+}
+
+/** Someone who lives in a room, in the coordinates of the floor they are on. */
+interface Resident {
+  floor: number
+  x: number
+  y: number
+  z: number
+  ry: number
+  seated: boolean
+  colors: Palette
+}
+
+/**
+ * Every room occupant in the building, taken a floor at a time in rotation so
+ * that a truncated budget still spreads people up the whole tower instead of
+ * crowding them onto the lowest floors.
+ */
+function residents(): Resident[] {
+  const byFloor = FLOORS.map((f, floor) =>
+    f.rooms.flatMap((room) =>
+      furnish(room).people.map((p) => ({
+        floor,
+        x: p.x,
+        y: p.y,
+        z: p.z,
+        ry: p.ry,
+        seated: p.seated,
+        colors: palette(p.shirt, p.skin),
+      }))
+    )
+  )
+  const out: Resident[] = []
+  const deepest = Math.max(...byFloor.map((list) => list.length))
+  for (let i = 0; i < deepest; i++) {
+    for (const list of byFloor) if (i < list.length) out.push(list[i])
+  }
+  return out
 }
 
 /** Slot colours are fixed per vignette but not known until one mounts. */
@@ -117,6 +168,9 @@ export default function People() {
   // Slots come and go with their vignettes, so their gait state is keyed off
   // the slot itself rather than an index that would drift.
   const slotGaits = useMemo(() => new WeakMap<PersonSlot, Gait>(), [])
+
+  const locals = useMemo(residents, [])
+  const places = useMemo(() => FLOORS.map(() => makeFloorPlace()), [])
 
   const k = useMemo(
     () => ({
@@ -191,10 +245,11 @@ export default function People() {
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.2)
     const rise = smoothstep(Math.min(1, s.cur.rise * 1.3 - 0.3))
+    const cap = s.mobile ? MAX_PEOPLE_MOBILE : MAX_PEOPLE
     const walking = s.mobile ? 5 : walkers.length
     let n = 0
 
-    for (let i = 0; i < walking && n < MAX_PEOPLE; i++) {
+    for (let i = 0; i < walking && n < cap; i++) {
       const w = walkers[i]
       const scale = advance(w, dt, rise)
       if (scale <= MIN_SCALE) continue
@@ -213,7 +268,7 @@ export default function People() {
 
     // Figures a vignette drives itself (the front desk, the self-healing test).
     for (const slot of s.slots) {
-      if (n >= MAX_PEOPLE) break
+      if (n >= cap) break
       if (!slot.visible || slot.scale <= MIN_SCALE) continue
       let gait = slotGaits.get(slot)
       if (!gait) {
@@ -225,6 +280,25 @@ export default function People() {
       draw(n, slot.x, slot.y, slot.z, slot.ry, slot.scale * WALKER_SCALE, k.pose, slotPalette(slot.color))
       n++
     }
+
+    // The people who work here. They ride their floor up out of the fanned
+    // sheets, so each one is placed through the same transform Tower gives
+    // that floor, and grows in with the room around them.
+    for (let i = 0; i < places.length; i++) placeFloor(i, s.cur.rise, s.cur.spread, places[i])
+    for (const r of locals) {
+      if (n >= cap) break
+      const place = places[r.floor]
+      const scale = place.fill * WALKER_SCALE
+      if (scale <= MIN_SCALE) continue
+      floorToWorld(place, r.x, r.y, r.z, k.here)
+      // Seated or standing, both at rest: same six meshes, gait amplitude 0.
+      if (r.seated) seatPose(k.pose)
+      else standPose(k.pose)
+      draw(n, k.here.x, k.here.y, k.here.z, place.ry + r.ry, scale, k.pose, r.colors)
+      n++
+    }
+
+    crowd.drawn = n
 
     for (const mesh of meshes.current) {
       if (!mesh) continue
