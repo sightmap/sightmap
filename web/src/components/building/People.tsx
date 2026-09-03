@@ -247,6 +247,9 @@ export default function People() {
     const rise = smoothstep(Math.min(1, s.cur.rise * 1.3 - 0.3))
     const cap = s.mobile ? MAX_PEOPLE_MOBILE : MAX_PEOPLE
     const walking = s.mobile ? 5 : walkers.length
+    // Published for the perf harness, so the tier can be verified from what the
+    // crowd actually is rather than recomputed from the viewport.
+    s.walkers = walking
     let n = 0
 
     for (let i = 0; i < walking && n < cap; i++) {
@@ -284,7 +287,8 @@ export default function People() {
     // The people who work here. They ride their floor up out of the fanned
     // sheets, so each one is placed through the same transform Tower gives
     // that floor, and grows in with the room around them.
-    for (let i = 0; i < places.length; i++) placeFloor(i, s.cur.rise, s.cur.spread, places[i])
+    for (let i = 0; i < places.length; i++)
+      placeFloor(i, s.cur.rise, s.cur.spread, s.cur.walls, places[i])
     for (const r of locals) {
       if (n >= cap) break
       const place = places[r.floor]

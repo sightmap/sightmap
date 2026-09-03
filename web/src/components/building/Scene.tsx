@@ -9,7 +9,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { PARAM_KEYS, paramsAt } from './chapters'
-import { SharedStateContext, useShared, type SharedState } from './state'
+import { MobileTierContext, SharedStateContext, useMobileTier, useShared, type SharedState } from './state'
 import Lights from './Lights'
 import Table from './Table'
 import Tower from './Tower'
@@ -67,29 +67,59 @@ function Updater() {
   return null
 }
 
+/**
+ * Exposes renderer counters for the headless verification loop.
+ *
+ * Published on a timer rather than from `useFrame`, because under
+ * `frameloop="demand"` an idle scene runs no frames at all — and a probe that
+ * only ever hears from `useFrame` would read the last *drawn* frame's counters
+ * and conclude the idle scene was still submitting that much work. A sample
+ * window with no frames in it reports zeroes, which is what actually happened.
+ */
 export function Stats() {
-  // Exposes draw calls / triangles / fps for the headless verification loop.
-  const { gl } = useThree()
+  const { gl, scene } = useThree()
+  const s = useShared()
+  const mobile = useMobileTier()
   const frames = useRef(0)
-  const t0 = useRef(performance.now())
+  const last = useRef({ calls: 0, triangles: 0 })
   useFrame(() => {
     frames.current++
-    const now = performance.now()
-    if (now - t0.current > 1000) {
+    last.current.calls = gl.info.render.calls
+    last.current.triangles = gl.info.render.triangles
+  })
+  useEffect(() => {
+    let t0 = performance.now()
+    const publish = () => {
+      const now = performance.now()
+      const drawn = frames.current
+      // The shadow map size is read off the light itself rather than
+      // recomputed here, so the probe sees what the renderer actually has.
+      let shadowMapSize = 0
+      scene.traverse((o) => {
+        const l = o as THREE.DirectionalLight
+        if (l.isDirectionalLight && l.castShadow) shadowMapSize = l.shadow.mapSize.x
+      })
       const w = window as unknown as { __bldStats?: Record<string, number> }
       w.__bldStats = {
-        fps: Math.round((frames.current * 1000) / (now - t0.current)),
-        calls: gl.info.render.calls,
-        triangles: gl.info.render.triangles,
+        fps: Math.round((drawn * 1000) / Math.max(now - t0, 1)),
+        framesDrawn: drawn,
+        calls: drawn ? last.current.calls : 0,
+        triangles: drawn ? last.current.triangles : 0,
         geometries: gl.info.memory.geometries,
         textures: gl.info.memory.textures,
         shadows: gl.shadowMap.enabled ? 1 : 0,
         people: crowd.drawn,
+        shadowMapSize,
+        dpr: gl.getPixelRatio(),
+        walkers: s.walkers,
+        mobile: mobile ? 1 : 0,
       }
       frames.current = 0
-      t0.current = now
+      t0 = now
     }
-  })
+    const id = window.setInterval(publish, 1000)
+    return () => window.clearInterval(id)
+  }, [gl, scene, s, mobile])
   return null
 }
 
@@ -185,22 +215,35 @@ export const CANVAS_PROPS = {
 
 export interface SceneProps {
   shared: SharedState
+  /** The quality tier, as state, so a resize past the boundary re-renders it. */
+  mobile: boolean
+  /**
+   * How hard the tour is allowed to run. 'always' while the stage is on screen
+   * and the tab is visible; 'never' when it is not; 'demand' under reduced
+   * motion, where the scene settles to a still and only redraws when the scroll
+   * or a resize asks it to.
+   */
+  frameloop: 'always' | 'never' | 'demand'
   onReady: () => void
 }
 
-export default function Scene({ shared, onReady }: SceneProps) {
+export default function Scene({ shared, mobile, frameloop, onReady }: SceneProps) {
   return (
     <Canvas
       {...CANVAS_PROPS}
-      dpr={shared.mobile ? [1, 1.5] : [1, 1.75]}
+      dpr={mobile ? [1, 1.5] : [1, 1.75]}
+      frameloop={frameloop}
       onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
     >
+      {/* The canvas is its own reconciler, so both contexts are re-provided here. */}
       <SharedStateContext.Provider value={shared}>
-        <Updater />
-        <Ready onReady={onReady} />
-        <Stats />
-        <Rig />
-        <SceneContent />
+        <MobileTierContext.Provider value={mobile}>
+          <Updater />
+          <Ready onReady={onReady} />
+          <Stats />
+          <Rig />
+          <SceneContent />
+        </MobileTierContext.Provider>
       </SharedStateContext.Provider>
     </Canvas>
   )

@@ -45,8 +45,17 @@ export interface SharedState {
   focus: string | null
   /** Figures driven by a scripted vignette, drawn by the shared crowd meshes. */
   slots: PersonSlot[]
+  /**
+   * The quality tier, for the per-frame readers only (the Rig's camera framing,
+   * the pointer handler). Anything chosen at *render* time — DPR, shadow-map
+   * size, walker count — must read `useMobileTier()` instead: a mutable field
+   * re-renders nothing, so those decisions would stay pinned to whatever the
+   * viewport was at first mount.
+   */
   mobile: boolean
   reduced: boolean
+  /** Walkers People is actually animating, published for the perf harness. */
+  walkers: number
   /** 'tour' frames the whole table for the /building page; 'billboard' is
    *  the tight, centred crop used by the homepage slice. */
   frame: 'tour' | 'billboard'
@@ -71,6 +80,7 @@ export function createSharedState(): SharedState {
     slots: [],
     mobile: false,
     reduced: false,
+    walkers: 0,
     frame: 'tour',
     overlay: { current: null },
     tower: { current: null },
@@ -98,3 +108,17 @@ export function usePersonSlot(color: string): PersonSlot {
   }, [s, slot])
   return slot
 }
+/** Viewport width at or below which the scene drops to its cheaper tier. */
+export const MOBILE_MAX = 900
+
+export const isMobileViewport = (): boolean => window.innerWidth < MOBILE_MAX
+
+/**
+ * The quality tier as real React state, so a resize across MOBILE_MAX actually
+ * re-renders the things that are decided at render time. The canvas is a
+ * separate reconciler, so this is re-provided inside it, next to the shared
+ * state.
+ */
+export const MobileTierContext = createContext(false)
+
+export const useMobileTier = (): boolean => useContext(MobileTierContext)

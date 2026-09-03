@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { invalidate } from '@react-three/fiber'
 import { CHAPTERS } from './chapters'
-import { createSharedState, SharedStateContext } from './state'
+import { createSharedState, isMobileViewport, SharedStateContext } from './state'
 import { webglAvailable } from './webgl'
 import Poster from './Poster'
 import BuildingNav from './BuildingNav'
@@ -15,6 +16,9 @@ import BuildingNav from './BuildingNav'
 // on top — aria-hidden, lazy, and skipped entirely when WebGL is missing.
 const Scene = lazy(() => import('./Scene'))
 
+/** How long to keep drawing after a scroll or resize, in demand mode. */
+const SETTLE_MS = 2500
+
 /** Renders `code` spans in chapter copy. */
 function inline(text: string): ReactNode[] {
   return text.split('`').map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part))
@@ -26,13 +30,45 @@ export default function BuildingExperience() {
   const [webgl, setWebgl] = useState(false)
   const [ready, setReady] = useState(false)
   const [active, setActive] = useState(0)
+  // Real state, not just shared.mobile: DPR, shadow-map size and walker count
+  // are chosen at render time, so the tier has to be able to re-render them
+  // when the viewport crosses the boundary.
+  const [mobile, setMobile] = useState(false)
+  // Reduced motion is settled in the same effect as the tier, but it decides
+  // the frame loop, so it has to be state too.
+  const [reduced, setReduced] = useState(false)
+  // The stage is fixed, so it costs a full GPU frame whether or not any of it
+  // is on screen. Gate on both the scroll position and the tab, the way
+  // BuildingBillboard already gates its own canvas.
+  const [onScreen, setOnScreen] = useState(true)
+  const [visible, setVisible] = useState(true)
+  const stage = useRef<HTMLDivElement>(null)
   const sections = useRef<(HTMLElement | null)[]>([])
 
   useEffect(() => {
     setMounted(true)
     setWebgl(webglAvailable())
     shared.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    shared.mobile = window.innerWidth < 900
+    setReduced(shared.reduced)
+    setMobile(isMobileViewport())
+
+    // Under frameloop="demand" nothing redraws unless it is asked to, and the
+    // scene's damping is asymptotic — there is no frame on which it is exactly
+    // finished. Rather than have each component guess when it has arrived,
+    // pump frames for a fixed window after the last scroll or resize, long
+    // enough for the slowest damping (the camera, λ 3) to converge, then stop
+    // dead. Harmless in 'always' mode, where the frames were coming anyway.
+    let pumpUntil = 0
+    let pumpRaf = 0
+    const pump = () => {
+      pumpUntil = performance.now() + SETTLE_MS
+      if (pumpRaf) return
+      const step = () => {
+        invalidate()
+        pumpRaf = performance.now() < pumpUntil ? requestAnimationFrame(step) : 0
+      }
+      pumpRaf = requestAnimationFrame(step)
+    }
 
     let raf = 0
     const measure = () => {
@@ -64,29 +100,48 @@ export default function BuildingExperience() {
         raf = requestAnimationFrame(() => {
           raf = 0
           measure()
+          pump()
         })
       }
     }
     const onResize = () => {
-      shared.mobile = window.innerWidth < 900
+      setMobile(isMobileViewport())
       onScroll()
     }
+    const onVisibility = () => setVisible(document.visibilityState === 'visible')
     const onMove = (e: PointerEvent) => {
       if (shared.reduced || shared.mobile) return
       shared.pointer.x = (e.clientX / window.innerWidth) * 2 - 1
       shared.pointer.y = (e.clientY / window.innerHeight) * 2 - 1
     }
     measure()
+    pump()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onResize)
     window.addEventListener('pointermove', onMove, { passive: true })
+    document.addEventListener('visibilitychange', onVisibility)
+
+    const io = stage.current
+      ? new IntersectionObserver((entries) => setOnScreen(entries.some((e) => e.isIntersecting)), { threshold: 0 })
+      : null
+    if (io && stage.current) io.observe(stage.current)
+
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', onMove)
+      document.removeEventListener('visibilitychange', onVisibility)
+      io?.disconnect()
       if (raf) cancelAnimationFrame(raf)
+      if (pumpRaf) cancelAnimationFrame(pumpRaf)
     }
   }, [shared])
+
+  // The per-frame readers (camera framing, the pointer handler) still take the
+  // tier off the shared object, so keep the two in step.
+  useEffect(() => {
+    shared.mobile = mobile
+  }, [mobile, shared])
 
   useEffect(() => {
     shared.focus = CHAPTERS[active].focus ?? null
@@ -94,6 +149,11 @@ export default function BuildingExperience() {
 
   const night = CHAPTERS[active].scene.night >= 0.5
   const hud = CHAPTERS[active].hud
+
+  // Off-screen or backgrounded: stop entirely. Reduced motion: the scene is a
+  // still once it settles, so draw on demand instead of paying for a redraw of
+  // an unchanging image 60 times a second.
+  const frameloop = !onScreen || !visible ? 'never' : reduced ? 'demand' : 'always'
 
   const goTo = (i: number) => {
     sections.current[i]?.scrollIntoView({ behavior: shared.reduced ? 'auto' : 'smooth', block: 'start' })
@@ -104,11 +164,11 @@ export default function BuildingExperience() {
       <div className="bld" data-night={night ? 'true' : 'false'} data-ready={ready ? 'true' : 'false'}>
         <BuildingNav />
 
-        <div className="bld-stage" data-component="BuildingStage" aria-hidden="true">
+        <div className="bld-stage" data-component="BuildingStage" aria-hidden="true" ref={stage}>
           <Poster hidden={ready} />
           {mounted && webgl && (
             <Suspense fallback={null}>
-              <Scene shared={shared} onReady={() => setReady(true)} />
+              <Scene shared={shared} mobile={mobile} frameloop={frameloop} onReady={() => setReady(true)} />
             </Suspense>
           )}
         </div>

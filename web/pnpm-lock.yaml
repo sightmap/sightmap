@@ -32,6 +32,9 @@ importers:
       three:
         specifier: 0.185.1
         version: 0.185.1
+      three-stdlib:
+        specifier: 2.36.1
+        version: 2.36.1(three@0.185.1)
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.0.0
