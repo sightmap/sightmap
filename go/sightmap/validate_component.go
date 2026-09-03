@@ -25,6 +25,23 @@ func checkComponentProperties(c *Corpus) []ValidationError {
 	for _, comp := range c.AllComponents() {
 		seen := make(map[string]bool, len(comp.Properties))
 		for _, p := range comp.Properties {
+			// name mirrors the schema pattern (sightmap.schema.json). The JSON
+			// Schema enforces it via ajv; the Go CLI never validates against the
+			// schema, so without this a property named "5" or "Header Text" passes
+			// `sightmap validate` while the reference checker rejects it. Matches
+			// request-property-invalid-name / message-property-invalid-name. The
+			// empty string also fails the pattern, which is the right call here: a
+			// `name:` (null) or `name: ""` is already a schema violation, and the
+			// duplicate-dedup guard below intentionally skips empty names rather
+			// than treating two empty names as one duplicate.
+			if !propertyNameRe.MatchString(p.Name) {
+				errs = append(errs, ValidationError{
+					Component: comp.Name,
+					Code:      "component-property-invalid-name",
+					Severity:  SeverityError,
+					Message:   fmt.Sprintf("component %q declares a property named %q; names must match %s", comp.Name, p.Name, propertyNameRe),
+				})
+			}
 			if p.Name != "" {
 				if seen[p.Name] {
 					errs = append(errs, ValidationError{
