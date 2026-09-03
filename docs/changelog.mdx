@@ -8,6 +8,12 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.31.1" description="Released September 3, 2026" tags={["cli"]}>
+
+Fix `browser mcp call` failing against native Chrome WebMCP. `executeTool` on a native `document.modelContext` requires the arguments as a JSON string (and returns the result as a JSON string), whereas a JS polyfill takes and returns objects. `mcp call` passed arguments as an object unconditionally, so it worked against a polyfill but failed on native with "Failed to parse input arguments". It now detects the native surface (the built-in `executeTool` reads as `[native code]`) and serializes the arguments accordingly; the native JSON-string result was already normalized.
+
+</Update>
+
 <Update label="sightmap 0.31.0" description="Released September 3, 2026" tags={["cli"]}>
 
 Add `browser mcp list` and `browser mcp call` for the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools a page exposes via `document.modelContext`. `mcp list` enumerates the tools (name, description, input schema; `--json` for full schemas) and distinguishes native, polyfilled, and absent WebMCP — failing loudly with the Chrome flags that enable native WebMCP when there is none. `mcp call <tool>` resolves a tool by name and invokes it via `executeTool`; arguments are supplied as a JSON object (`--args`) and/or repeatable `--param key=value` pairs. It unwraps the standard `CallToolResult` envelope (rendering the tool's text/structured content and any guidance as itself rather than a stringified blob), exits non-zero when the tool reports `isError` so it is scriptable, and reports not-found or thrown errors distinctly. One tool runs at a single point in time; there is no cross-navigation tool response.
