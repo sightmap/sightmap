@@ -19,6 +19,19 @@ export interface SurfaceAtlas {
 
 export type SurfaceAtlases = Record<AtlasName, SurfaceAtlas>
 
+/** Everything the scene's materials need off disk, decoded once. */
+export interface Surfaces {
+  atlases: SurfaceAtlases
+  /**
+   * Per-floor baked contact occlusion, all six floors in one image.
+   *
+   * Rides here rather than in its own loader because it shares the KTX2Loader
+   * and the transcoder download with the atlases, and because a material that
+   * has its roughness but not its occlusion is a material mid-pop.
+   */
+  floorAo: THREE.CompressedTexture
+}
+
 const ATLAS_NAMES: AtlasName[] = ['arch', 'furniture', 'soft']
 
 /**
@@ -31,7 +44,7 @@ const ATLAS_NAMES: AtlasName[] = ['arch', 'furniture', 'soft']
  * Unlike the HDR, the *result* is shareable too — a transcoded compressed
  * texture is plain image data with no renderer-owned render target behind it.
  */
-let loading: Promise<SurfaceAtlases> | null = null
+let loading: Promise<Surfaces> | null = null
 
 function loadOne(loader: KTX2Loader, url: string): Promise<THREE.CompressedTexture> {
   return new Promise((resolve, reject) => {
@@ -51,10 +64,11 @@ function loadOne(loader: KTX2Loader, url: string): Promise<THREE.CompressedTextu
  * supports — Basis is a supercompressed intermediate, and what it becomes
  * (ETC, BC, ASTC) depends on the GPU. It is not retained.
  */
-export function loadSurfaceAtlases(renderer: THREE.WebGLRenderer): Promise<SurfaceAtlases> {
+export function loadSurfaceAtlases(renderer: THREE.WebGLRenderer): Promise<Surfaces> {
   loading ??= (async () => {
     const loader = new KTX2Loader().setTranscoderPath('/basis/').detectSupport(renderer)
     try {
+      const aoPromise = loadOne(loader, '/building/textures/floor-ao.ktx2')
       const loaded = await Promise.all(
         ATLAS_NAMES.map(async (name) => {
           const [orm, normal] = await Promise.all([
@@ -76,7 +90,22 @@ export function loadSurfaceAtlases(renderer: THREE.WebGLRenderer): Promise<Surfa
           return [name, { orm, normal }] as const
         })
       )
-      return Object.fromEntries(loaded) as SurfaceAtlases
+      const floorAo = await aoPromise
+      // Same clamping reason as the surface atlases: cell coordinates are
+      // arithmetic, and a wrap here would fetch a different floor's shadows.
+      floorAo.wrapS = THREE.ClampToEdgeWrapping
+      floorAo.wrapT = THREE.ClampToEdgeWrapping
+      // An occlusion factor is a multiplier, not a colour.
+      floorAo.colorSpace = THREE.NoColorSpace
+      // Read `uv1`, not `uv`. `Texture.channel` defaults to 0, and leaving it
+      // there is a silent, plausible-looking bug rather than an error: the AO
+      // still renders, but sampled with each primitive's own 0..1 box UVs,
+      // which stretches the whole six-floor atlas across every deck. It shows
+      // up as soft grey shapes on bare floor that look almost like occlusion.
+      floorAo.channel = 1
+      // No anisotropy: this is a low-frequency map read at a grazing angle by
+      // nothing — the camera looks down on these surfaces.
+      return { atlases: Object.fromEntries(loaded) as SurfaceAtlases, floorAo }
     } finally {
       loader.dispose()
     }

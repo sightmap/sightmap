@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "og": "node og/render.mjs",
     "og:card": "node og/render.mjs --post",
-    "build:basis": "tsx scripts/copy-basis-transcoder.ts"
+    "build:basis": "tsx scripts/copy-basis-transcoder.ts",
+    "bake:textures": "tsx scripts/build-building-textures.ts",
+    "bake:ao": "tsx scripts/build-building-ao.ts"
   },
   "dependencies": {
     "@react-three/drei": "10.7.8",
