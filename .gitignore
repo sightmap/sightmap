@@ -42,3 +42,7 @@ go/cmd/sightmap/sightmap-go
 
 # npm wrapper: downloaded binary
 go/npm/vendor/
+
+# Basis transcoder, copied from the installed three package by
+# web/scripts/copy-basis-transcoder.ts so it cannot drift from three.
+web/public/basis/

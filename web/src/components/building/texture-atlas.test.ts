@@ -54,25 +54,41 @@ describe.each(ATLASES)('%s atlas', (_name, layout, tiles) => {
     }
   })
 
-  it('insets by the stated margin on both sides', () => {
+  it('insets by the stated margin measured on the smaller of the two atlases', () => {
     const { offset, scale } = tileTransform(layout, { col: 0, row: 0 })
-    const inset = TILE_INSET_TEXELS / layout.size
+    // One tile coordinate samples both the ORM atlas and the half-resolution
+    // normal atlas, so the margin has to be big enough on the normal one.
+    const inset = TILE_INSET_TEXELS / layout.normalSize
     expect(offset[0]).toBeCloseTo(inset, 12)
     expect(scale).toBeCloseTo(1 / layout.grid - inset * 2, 12)
   })
 
-  it('bounds the bake to the same cell the shader reads', () => {
+  it('bounds the bake to the same cell the shader reads, on both atlases', () => {
     for (const tile of Object.values(tiles)) {
-      const { x, y, size } = tileBounds(layout, tile)
       const { offset } = tileTransform(layout, tile)
-      // The bake fills from the cell corner; the shader starts one inset in.
-      expect(offset[0] * layout.size).toBeCloseTo(x + TILE_INSET_TEXELS, 6)
-      expect(offset[1] * layout.size).toBeCloseTo(y + TILE_INSET_TEXELS, 6)
-      expect(x + size).toBeLessThanOrEqual(layout.size)
-      expect(y + size).toBeLessThanOrEqual(layout.size)
+      for (const atlasSize of [layout.size, layout.normalSize]) {
+        const { x, y, size } = tileBounds(layout, tile, atlasSize)
+        // The bake fills from the cell corner; the shader starts one inset in.
+        // Expressed in this atlas's own texels, that inset is whatever the
+        // shared fractional margin comes to here — at least a full texel on
+        // the smaller atlas, which is the point of measuring it there.
+        expect(offset[0] * atlasSize).toBeGreaterThanOrEqual(x + 1)
+        expect(offset[1] * atlasSize).toBeGreaterThanOrEqual(y + 1)
+        expect((offset[0] + scaleOf(layout, tile)) * atlasSize).toBeLessThanOrEqual(x + size - 1)
+        expect(x + size).toBeLessThanOrEqual(atlasSize)
+        expect(y + size).toBeLessThanOrEqual(atlasSize)
+      }
     }
   })
+
+  it('keeps the normal atlas at half the ORM atlas, tiled the same way', () => {
+    expect(layout.normalSize).toBe(layout.size / 2)
+    expect(layout.normalSize % layout.grid).toBe(0)
+  })
 })
+
+const scaleOf = (l: Parameters<typeof tileTransform>[0], t: Parameters<typeof tileTransform>[1]) =>
+  tileTransform(l, t).scale
 
 describe('atlas budget', () => {
   it('holds the sizes the memory budget was calculated from', () => {
@@ -82,5 +98,20 @@ describe('atlas budget', () => {
     expect(ARCH.size).toBe(1024)
     expect(FURNITURE.size).toBe(512)
     expect(SOFT.size).toBe(512)
+  })
+
+  it('stays under the 4 MB mobile ceiling at the worst-case block rate', () => {
+    // Every atlas transcodes to whatever the device supports, and the formats
+    // at the top of three's preference list — BC7 on desktop, ASTC 4x4 on
+    // modern iOS — are 8 bits per texel. A full mip chain adds a third. This
+    // is the number that has to fit, not the 303 KiB on disk.
+    const bytes = [ARCH, FURNITURE, SOFT].reduce(
+      (n, l) => n + (l.size * l.size + l.normalSize * l.normalSize) * (4 / 3),
+      0
+    )
+    expect(bytes).toBeLessThan(4 * 1024 * 1024)
+    // And with enough room left that a future surface does not silently bust
+    // the cap: 2.50 MB when this was written.
+    expect(bytes).toBeLessThan(3 * 1024 * 1024)
   })
 })

@@ -1,7 +1,7 @@
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Instance, Instances, Line, RoundedBox } from '@react-three/drei'
 import { mergeParts, roundedBoxGeometry, type Part } from './merge'
-import { useMemo, useRef, type ComponentRef } from 'react'
+import { useEffect, useMemo, useRef, type ComponentRef } from 'react'
 import * as THREE from 'three'
 import {
   FLOORS,
@@ -30,6 +30,8 @@ import {
   placeFloor,
 } from './floors'
 import { sheetLinePoints } from './geometry'
+import { ARCH, ARCH_TILES, FURNITURE, FURNITURE_TILES, SOFT, SOFT_TILES } from './texture-atlas'
+import { applyTiledSurface, loadSurfaceAtlases, type SurfaceAtlases } from './surfaces'
 import { smoothstep } from './chapters'
 import { useShared } from './state'
 
@@ -67,6 +69,67 @@ function emissiveFollowsColor(material: THREE.MeshStandardMaterial): void {
   // Without this, a materially identical unpatched material would be handed
   // the same compiled program.
   material.customProgramCacheKey = () => 'emissiveFollowsColor'
+}
+
+/**
+ * Which baked surface every material wears, and how densely it tiles.
+ *
+ * `repeat` is in tiles per UV unit, and the UV unit here is one face of one
+ * primitive — the merge bakes each box's own 0..1 UVs into the floor buffer
+ * rather than unwrapping the merged result. So the numbers are chosen per
+ * material against the size of the thing that wears it: a 10 m slab deck wants
+ * its concrete five times across, a 0.6 m chair wants its upholstery once.
+ * Getting this wrong shows up as texel density that jumps between neighbouring
+ * objects, which is worse than no texture at all.
+ */
+function dressSurfaces(mats: Mats, atlases: SurfaceAtlases): void {
+  const { arch, furniture, soft } = atlases
+
+  applyTiledSurface(mats.slab, { atlas: arch, layout: ARCH, tile: ARCH_TILES.concrete, repeat: [5, 4] })
+  applyTiledSurface(mats.spandrel, { atlas: arch, layout: ARCH, tile: ARCH_TILES.plaster, repeat: [6, 2] })
+  applyTiledSurface(mats.steel, {
+    atlas: arch,
+    layout: ARCH,
+    tile: ARCH_TILES.steel,
+    repeat: [2, 2],
+    // The one genuinely metallic surface in the scene, and the only one where
+    // a varying metalness reads as anything: brushed streaks catching the
+    // skylight differently along their length.
+    metalness: true,
+    normalScale: 0.35,
+  })
+
+  // The carpets are the largest textured area in the building, and the one
+  // most often seen at grazing angles, so they get the gentlest normal.
+  const carpet = { atlas: soft, layout: SOFT, tile: SOFT_TILES.carpet, repeat: [3, 3], normalScale: 0.3 } as const
+  applyTiledSurface(mats.zone, carpet)
+  for (const k of Object.keys(mats.kinds) as Kind[]) applyTiledSurface(mats.kinds[k], carpet)
+
+  const f = (tile: (typeof FURNITURE_TILES)[keyof typeof FURNITURE_TILES], repeat: readonly [number, number]) => ({
+    atlas: furniture,
+    layout: FURNITURE,
+    tile,
+    repeat,
+  })
+  applyTiledSurface(mats.furniture.desk, f(FURNITURE_TILES.wood, [2, 1]))
+  applyTiledSurface(mats.furniture.table, f(FURNITURE_TILES.wood, [1, 1]))
+  applyTiledSurface(mats.furniture.shelf, f(FURNITURE_TILES.wood, [1, 1]))
+  applyTiledSurface(mats.furniture.counter, f(FURNITURE_TILES.wood, [2, 1]))
+  applyTiledSurface(mats.furniture.pot, f(FURNITURE_TILES.plastic, [1, 1]))
+  applyTiledSurface(mats.furniture.rail, f(FURNITURE_TILES.plastic, [1, 1]))
+  applyTiledSurface(mats.furniture.monitor, f(FURNITURE_TILES.bezel, [1, 1]))
+  applyTiledSurface(mats.furniture.screen, f(FURNITURE_TILES.bezel, [1, 1]))
+  applyTiledSurface(mats.furniture.book, f(FURNITURE_TILES.board, [1, 1]))
+
+  const upholstery = { atlas: soft, layout: SOFT, tile: SOFT_TILES.upholstery, repeat: [1, 1] } as const
+  applyTiledSurface(mats.furniture.chair, upholstery)
+  applyTiledSurface(mats.furniture.sofa, { ...upholstery, repeat: [2, 1] })
+  applyTiledSurface(mats.furniture.leaf, { atlas: soft, layout: SOFT, tile: SOFT_TILES.leaf, repeat: [1, 1] })
+
+  // Deliberately left bare: glass and the partitions are near-transparent and
+  // depth-write off, where a normal map buys nothing but a shimmer; the kiosk
+  // cap and screen are emissive panels, and grain on a lit panel reads as
+  // dirt on a lightbulb.
 }
 
 interface Mats {
@@ -163,6 +226,29 @@ function useMaterials(): Mats {
     }),
     []
   )
+  // The atlases arrive well after first paint. Until they do, every material
+  // is exactly what it was before this existed — an untextured surface with a
+  // uniform roughness — so a slow or failed fetch costs fidelity, never the
+  // scene.
+  const { gl, invalidate } = useThree()
+  useEffect(() => {
+    let live = true
+    loadSurfaceAtlases(gl)
+      .then((atlases) => {
+        if (!live) return
+        dressSurfaces(mats, atlases)
+        // Under reduced motion the tour renders on demand and has very likely
+        // already settled, exactly as with the environment map next door.
+        invalidate()
+      })
+      .catch((err) => {
+        console.error('[building] surface atlases failed to load; materials stay untextured', err)
+      })
+    return () => {
+      live = false
+    }
+  }, [gl, mats, invalidate])
+
   useFrame(() => {
     const n = s.cur.night
     mats.slab.color.copy(col.slabDay).lerp(col.slabNight, n)

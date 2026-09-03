@@ -6,16 +6,17 @@
   "packageManager": "pnpm@10.32.1",
   "type": "module",
   "scripts": {
-    "dev": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && vite",
+    "dev": "tsx scripts/copy-basis-transcoder.ts && tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && vite",
     "build:blog": "tsx scripts/build-blog.ts",
     "build:atlas": "tsx scripts/build-atlas.ts",
-    "build": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/check-route-coverage.ts && tsx scripts/generate-feeds.ts && tsx scripts/generate-agent-files.ts && tsx scripts/upload-sourcemaps.ts",
+    "build": "tsx scripts/copy-basis-transcoder.ts && tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/check-route-coverage.ts && tsx scripts/generate-feeds.ts && tsx scripts/generate-agent-files.ts && tsx scripts/upload-sourcemaps.ts",
     "sourcemaps:upload": "tsx scripts/upload-sourcemaps.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "og": "node og/render.mjs",
-    "og:card": "node og/render.mjs --post"
+    "og:card": "node og/render.mjs --post",
+    "build:basis": "tsx scripts/copy-basis-transcoder.ts"
   },
   "dependencies": {
     "@react-three/drei": "10.7.8",

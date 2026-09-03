@@ -209,26 +209,38 @@ const bush: Surface = {
  */
 function bakeAtlas(layout: AtlasLayout, surfaces: Surface[]): { orm: Raster; normal: Raster } {
   const orm = raster(layout.size, layout.size, 3)
-  const normal = raster(layout.size, layout.size, 3)
+  const normal = raster(layout.normalSize, layout.normalSize, 3)
   for (const s of surfaces) {
-    const { x: ox, y: oy, size } = tileBounds(layout, s.tile)
-    const heights = new Float32Array(size * size)
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        heights[y * size + x] = s.height((x + 0.5) / size, (y + 0.5) / size)
+    const ormCell = tileBounds(layout, s.tile)
+    for (let y = 0; y < ormCell.size; y++) {
+      for (let x = 0; x < ormCell.size; x++) {
+        const u = (x + 0.5) / ormCell.size
+        const v = (y + 0.5) / ormCell.size
+        put(orm, ormCell.x + x, ormCell.y + y, [255, s.roughness(u, v) * 255, (s.metalness?.(u, v) ?? 1) * 255])
+      }
+    }
+
+    // The normal is re-derived at its own resolution rather than downsampled
+    // from a full-resolution one. Averaging neighbouring normals shortens the
+    // vector and flattens the surface unevenly; re-evaluating the height field
+    // on the coarser grid gives an honest gradient at that scale.
+    const nCell = tileBounds(layout, s.tile, layout.normalSize)
+    const heights = new Float32Array(nCell.size * nCell.size)
+    for (let y = 0; y < nCell.size; y++) {
+      for (let x = 0; x < nCell.size; x++) {
+        heights[y * nCell.size + x] = s.height((x + 0.5) / nCell.size, (y + 0.5) / nCell.size)
       }
     }
     const at = (x: number, y: number): number => {
-      const wx = ((Math.round(x) % size) + size) % size
-      const wy = ((Math.round(y) % size) + size) % size
-      return heights[wy * size + wx]
+      const wx = ((Math.round(x) % nCell.size) + nCell.size) % nCell.size
+      const wy = ((Math.round(y) % nCell.size) + nCell.size) % nCell.size
+      return heights[wy * nCell.size + wx]
     }
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const u = (x + 0.5) / size
-        const v = (y + 0.5) / size
-        put(orm, ox + x, oy + y, [255, s.roughness(u, v) * 255, (s.metalness?.(u, v) ?? 1) * 255])
-        put(normal, ox + x, oy + y, heightToNormal(at, x, y, s.relief))
+    for (let y = 0; y < nCell.size; y++) {
+      for (let x = 0; x < nCell.size; x++) {
+        // Halving the grid halves every finite difference, so the relief is
+        // scaled back up to keep the surface as deep as it was authored.
+        put(normal, nCell.x + x, nCell.y + y, heightToNormal(at, x, y, s.relief * (layout.size / layout.normalSize)))
       }
     }
   }
@@ -252,14 +264,20 @@ function bake(name: string, layout: AtlasLayout, surfaces: Surface[]): Baked {
 }
 
 /**
- * What a Basis ETC1S file costs once transcoded and resident, in bytes.
+ * What an atlas pair costs once transcoded and resident, in bytes.
  *
- * Half a byte per texel is the ETC1/ETC2 block rate every ETC1S transcode
- * target lands on, and a full mip chain adds a third. Advisory only — the
- * number that governs the budget is measured in the browser against
- * `renderer.info` and the GL upload path, not predicted here.
+ * One byte per texel, plus a third for the mip chain. A byte is the *worst*
+ * case and therefore the one worth budgeting against: an ETC1S payload
+ * transcodes to whatever the device supports, and the 8-bits-per-texel targets
+ * (BC7, ASTC 4x4) sit at the top of three's preference list, so they are what
+ * desktop and modern iOS actually get. Measured, not assumed — a capture of
+ * the running page reported 0x8E8C (BC7) for every atlas.
+ *
+ * Advisory only: the number that governs the budget is the one measured at the
+ * GL upload boundary in the browser, not predicted here.
  */
-const decodedEstimate = (layout: AtlasLayout): number => layout.size * layout.size * 0.5 * (4 / 3)
+const decodedEstimate = (layout: AtlasLayout): number =>
+  (layout.size * layout.size + layout.normalSize * layout.normalSize) * (4 / 3)
 
 const baked = [
   bake('arch', ARCH, [concrete, plaster, steel, timber]),
@@ -277,7 +295,8 @@ let onDisk = 0
 let decoded = 0
 for (const b of baked) {
   onDisk += b.ormBytes + b.normalBytes
-  decoded += decodedEstimate(b.layout) * 2
+  // No doubling: decodedEstimate already covers both images of the pair.
+  decoded += decodedEstimate(b.layout)
   console.log(
     `${b.name.padEnd(10)} ${String(b.layout.size).padStart(4)}²  orm ${kb(b.ormBytes).padStart(10)}  normal ${kb(b.normalBytes).padStart(10)}`
   )

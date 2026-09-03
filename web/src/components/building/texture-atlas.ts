@@ -15,17 +15,36 @@ export interface Tile {
 }
 
 export interface AtlasLayout {
-  /** Edge length of the atlas in texels. */
+  /** Edge length of the packed roughness/metalness atlas, in texels. */
   readonly size: number
   /** Tiles per axis. `size / grid` must be a whole number. */
   readonly grid: number
+  /**
+   * Edge length of the companion normal atlas, in texels. Half `size`.
+   *
+   * Not an aesthetic choice — a budget one, made against a measurement. The
+   * pair transcodes to whatever block format the device offers, and the
+   * *worst* case is 8 bits per texel (BC7 on desktop, ASTC 4x4 on iOS): at
+   * full resolution the six images land on 4.00 MB, which is not under a 4 MB
+   * mobile cap, it *is* the cap. Halving the normals brings the set to about
+   * 2.5 MB and leaves room for a device whose transcode target is worse than
+   * anything measured here.
+   *
+   * Halving the normals rather than the ORM maps because of what each one
+   * does at this camera. The ORM map is read per texel and its roughness
+   * directly drives how the skylight breaks up across a surface. The normal
+   * map perturbs shading on surfaces the orthographic camera never brings
+   * close enough to resolve as relief — it is here to stop a wall reading as
+   * one flat sheen, and it does that just as well at half the texels.
+   */
+  readonly normalSize: number
 }
 
 /**
  * The architectural atlas: the four surfaces the building's fabric is made of.
  * 1024², so each tile is a 512² tiling surface.
  */
-export const ARCH: AtlasLayout = { size: 1024, grid: 2 }
+export const ARCH: AtlasLayout = { size: 1024, grid: 2, normalSize: 512 }
 export const ARCH_TILES = {
   /** Slab decks and the forecourt: cast concrete, fine aggregate speckle. */
   concrete: { col: 0, row: 0 },
@@ -38,7 +57,7 @@ export const ARCH_TILES = {
 } as const satisfies Record<string, Tile>
 
 /** The furniture atlas: 512², four 256² tiling surfaces. */
-export const FURNITURE: AtlasLayout = { size: 512, grid: 2 }
+export const FURNITURE: AtlasLayout = { size: 512, grid: 2, normalSize: 256 }
 export const FURNITURE_TILES = {
   /** Desks, shelves, counters, table tops. */
   wood: { col: 0, row: 0 },
@@ -51,7 +70,7 @@ export const FURNITURE_TILES = {
 } as const satisfies Record<string, Tile>
 
 /** The foliage-and-fabric atlas: 512², four 256² tiling surfaces. */
-export const SOFT: AtlasLayout = { size: 512, grid: 2 }
+export const SOFT: AtlasLayout = { size: 512, grid: 2, normalSize: 256 }
 export const SOFT_TILES = {
   /** Component carpets: loop-pile weave. This is the biggest area in the scene. */
   carpet: { col: 0, row: 0 },
@@ -86,15 +105,30 @@ export const TILE_INSET_TEXELS = 4
  */
 export function tileTransform(layout: AtlasLayout, tile: Tile): { offset: [number, number]; scale: number } {
   const cell = 1 / layout.grid
-  const inset = TILE_INSET_TEXELS / layout.size
+  // One transform serves both atlases, because the shader computes a single
+  // tile coordinate and samples roughness and normal with it. So the inset
+  // has to be measured against the *smaller* of the pair: four texels of
+  // margin on the 1024 map is only two on the 512 normal beside it, and the
+  // inset exists to keep a bilinear tap from reaching into the neighbouring
+  // tile on either image.
+  const inset = TILE_INSET_TEXELS / Math.min(layout.size, layout.normalSize)
   return {
     offset: [tile.col * cell + inset, tile.row * cell + inset],
     scale: cell - inset * 2,
   }
 }
 
-/** The texel rectangle a tile owns, for the bake to fill. */
-export function tileBounds(layout: AtlasLayout, tile: Tile): { x: number; y: number; size: number } {
-  const size = layout.size / layout.grid
+/**
+ * The texel rectangle a tile owns, for the bake to fill.
+ *
+ * `size` overrides the atlas edge length so the same tile can be located on
+ * the half-resolution normal atlas as well as the ORM one.
+ */
+export function tileBounds(
+  layout: AtlasLayout,
+  tile: Tile,
+  atlasSize: number = layout.size
+): { x: number; y: number; size: number } {
+  const size = atlasSize / layout.grid
   return { x: tile.col * size, y: tile.row * size, size }
 }
