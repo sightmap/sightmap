@@ -1,7 +1,7 @@
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { Instance, Instances, Line, RoundedBox } from '@react-three/drei'
 import { mergeParts, roundedBoxGeometry, type Part } from './merge'
-import { useMemo, useRef, type ComponentRef } from 'react'
+import { useEffect, useMemo, useRef, type ComponentRef } from 'react'
 import * as THREE from 'three'
 import {
   FLOORS,
@@ -30,6 +30,9 @@ import {
   placeFloor,
 } from './floors'
 import { sheetLinePoints } from './geometry'
+import { ARCH, ARCH_TILES, FURNITURE, FURNITURE_TILES, SOFT, SOFT_TILES } from './texture-atlas'
+import { applyTiledSurface, loadSurfaceAtlases, type Surfaces } from './surfaces'
+import { AO_WHITE_CELL, aoUvArray } from './ao-atlas'
 import { smoothstep } from './chapters'
 import { useShared } from './state'
 
@@ -67,6 +70,88 @@ function emissiveFollowsColor(material: THREE.MeshStandardMaterial): void {
   // Without this, a materially identical unpatched material would be handed
   // the same compiled program.
   material.customProgramCacheKey = () => 'emissiveFollowsColor'
+}
+
+/**
+ * Which baked surface every material wears, and how densely it tiles.
+ *
+ * `repeat` is in tiles per UV unit, and the UV unit here is one face of one
+ * primitive — the merge bakes each box's own 0..1 UVs into the floor buffer
+ * rather than unwrapping the merged result. So the numbers are chosen per
+ * material against the size of the thing that wears it: a 10 m slab deck wants
+ * its concrete five times across, a 0.6 m chair wants its upholstery once.
+ * Getting this wrong shows up as texel density that jumps between neighbouring
+ * objects, which is worse than no texture at all.
+ */
+function dressSurfaces(mats: Mats, surfaces: Surfaces): void {
+  const { arch, furniture, soft } = surfaces.atlases
+
+  // Baked contact occlusion, on the two materials that make up a floor plane:
+  // the slab deck and the component carpets resting on it. Both carry a `uv1`
+  // that lands on their own floor's cell of the atlas, so one texture and one
+  // material serve all six floors and the merge's draw-call win is untouched.
+  //
+  // Only these two. Occlusion here is a top-down bake of what rests on a
+  // horizontal plane, so it has nothing true to say about a wall, a mullion or
+  // a chair's own sides — those keep `AO_WHITE_CELL` and stay unoccluded.
+  //
+  // `mats.kinds` is pointedly absent. Those dress the carpets that *move*
+  // during the self-healing chapter, and this bake is nailed to floor
+  // coordinates: a carpet that slides two metres would drag a shadow of where
+  // its furniture used to be along with it.
+  for (const m of [mats.slab, mats.zone]) {
+    m.aoMap = surfaces.floorAo
+    // Under 1 the shadows read as smudges; over 1 the crowded floors go to
+    // ink. The bake already carries its own falloff, so this is a trim.
+    m.aoMapIntensity = 0.9
+    m.needsUpdate = true
+  }
+
+  applyTiledSurface(mats.slab, { atlas: arch, layout: ARCH, tile: ARCH_TILES.concrete, repeat: [5, 4] })
+  applyTiledSurface(mats.spandrel, { atlas: arch, layout: ARCH, tile: ARCH_TILES.plaster, repeat: [6, 2] })
+  applyTiledSurface(mats.steel, {
+    atlas: arch,
+    layout: ARCH,
+    tile: ARCH_TILES.steel,
+    repeat: [2, 2],
+    // The one genuinely metallic surface in the scene, and the only one where
+    // a varying metalness reads as anything: brushed streaks catching the
+    // skylight differently along their length.
+    metalness: true,
+    normalScale: 0.35,
+  })
+
+  // The carpets are the largest textured area in the building, and the one
+  // most often seen at grazing angles, so they get the gentlest normal.
+  const carpet = { atlas: soft, layout: SOFT, tile: SOFT_TILES.carpet, repeat: [3, 3], normalScale: 0.3 } as const
+  applyTiledSurface(mats.zone, carpet)
+  for (const k of Object.keys(mats.kinds) as Kind[]) applyTiledSurface(mats.kinds[k], carpet)
+
+  const f = (tile: (typeof FURNITURE_TILES)[keyof typeof FURNITURE_TILES], repeat: readonly [number, number]) => ({
+    atlas: furniture,
+    layout: FURNITURE,
+    tile,
+    repeat,
+  })
+  applyTiledSurface(mats.furniture.desk, f(FURNITURE_TILES.wood, [2, 1]))
+  applyTiledSurface(mats.furniture.table, f(FURNITURE_TILES.wood, [1, 1]))
+  applyTiledSurface(mats.furniture.shelf, f(FURNITURE_TILES.wood, [1, 1]))
+  applyTiledSurface(mats.furniture.counter, f(FURNITURE_TILES.wood, [2, 1]))
+  applyTiledSurface(mats.furniture.pot, f(FURNITURE_TILES.plastic, [1, 1]))
+  applyTiledSurface(mats.furniture.rail, f(FURNITURE_TILES.plastic, [1, 1]))
+  applyTiledSurface(mats.furniture.monitor, f(FURNITURE_TILES.bezel, [1, 1]))
+  applyTiledSurface(mats.furniture.screen, f(FURNITURE_TILES.bezel, [1, 1]))
+  applyTiledSurface(mats.furniture.book, f(FURNITURE_TILES.board, [1, 1]))
+
+  const upholstery = { atlas: soft, layout: SOFT, tile: SOFT_TILES.upholstery, repeat: [1, 1] } as const
+  applyTiledSurface(mats.furniture.chair, upholstery)
+  applyTiledSurface(mats.furniture.sofa, { ...upholstery, repeat: [2, 1] })
+  applyTiledSurface(mats.furniture.leaf, { atlas: soft, layout: SOFT, tile: SOFT_TILES.leaf, repeat: [1, 1] })
+
+  // Deliberately left bare: glass and the partitions are near-transparent and
+  // depth-write off, where a normal map buys nothing but a shimmer; the kiosk
+  // cap and screen are emissive panels, and grain on a lit panel reads as
+  // dirt on a lightbulb.
 }
 
 interface Mats {
@@ -163,6 +248,29 @@ function useMaterials(): Mats {
     }),
     []
   )
+  // The atlases arrive well after first paint. Until they do, every material
+  // is exactly what it was before this existed — an untextured surface with a
+  // uniform roughness — so a slow or failed fetch costs fidelity, never the
+  // scene.
+  const { gl, invalidate } = useThree()
+  useEffect(() => {
+    let live = true
+    loadSurfaceAtlases(gl)
+      .then((surfaces) => {
+        if (!live) return
+        dressSurfaces(mats, surfaces)
+        // Under reduced motion the tour renders on demand and has very likely
+        // already settled, exactly as with the environment map next door.
+        invalidate()
+      })
+      .catch((err) => {
+        console.error('[building] surface atlases failed to load; materials stay untextured', err)
+      })
+    return () => {
+      live = false
+    }
+  }, [gl, mats, invalidate])
+
   useFrame(() => {
     const n = s.cur.night
     mats.slab.color.copy(col.slabDay).lerp(col.slabNight, n)
@@ -256,7 +364,24 @@ interface FloorCarpets {
   moving: Room[]
 }
 
-function floorCarpets(floor: Floor): FloorCarpets {
+/**
+ * Give a floor-space geometry the second UV set `aoMap` reads, aimed at this
+ * floor's cell of the occlusion atlas.
+ *
+ * Derived from the vertex positions rather than authored, which is what lets
+ * one bake cover a merged buffer of a few hundred primitives: the unwrap is
+ * top-down, so a vertex's texel is simply where it stands on the floor plan.
+ */
+function setFloorAoUv(geometry: THREE.BufferGeometry, cell: number): THREE.BufferGeometry {
+  const pos = geometry.getAttribute('position')
+  geometry.setAttribute(
+    'uv1',
+    new THREE.BufferAttribute(aoUvArray(pos.array as Float32Array, FLOOR_W, FLOOR_D, cell), 2)
+  )
+  return geometry
+}
+
+function floorCarpets(floor: Floor, index: number): FloorCarpets {
   const parts: Part[] = []
   const moving: Room[] = []
   for (const room of floor.rooms) {
@@ -274,7 +399,7 @@ function floorCarpets(floor: Floor): FloorCarpets {
       })
     }
   }
-  return { merged: parts.length ? mergeParts(parts) : null, moving }
+  return { merged: parts.length ? setFloorAoUv(mergeParts(parts), index) : null, moving }
 }
 
 /**
@@ -533,7 +658,15 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
   // occupants of every floor into one set of instanced meshes.
   const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r).items), [floor])
   const place = useMemo(() => makeFloorPlace(), [])
-  const carpets = useMemo(() => floorCarpets(floor), [floor])
+  const carpets = useMemo(() => floorCarpets(floor, i), [floor, i])
+  // The deck is the other half of the floor plane, and the half the contact
+  // shadows mostly land on. Built here rather than as JSX `<boxGeometry>` so
+  // it can carry this floor's AO cell in its second UV set.
+  const deck = useMemo(() => {
+    const g = new THREE.BoxGeometry(FLOOR_W, 0.04, FLOOR_D)
+    return setFloorAoUv(g, i)
+  }, [i])
+  useEffect(() => () => deck.dispose(), [deck])
   // LineSegments2 accumulates dash distance across every segment, so one
   // growing dash draws the sheet in sequence: border, footprint, then rooms.
   const total = useMemo(() => {
@@ -613,8 +746,7 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
           <boxGeometry args={[FLOOR_W + 0.06, SLAB_T - 0.04, FLOOR_D + 0.06]} />
           <primitive object={mats.steel} attach="material" />
         </mesh>
-        <mesh position={[0, SLAB_T - 0.02, 0]} receiveShadow>
-          <boxGeometry args={[FLOOR_W, 0.04, FLOOR_D]} />
+        <mesh position={[0, SLAB_T - 0.02, 0]} geometry={deck} receiveShadow>
           <primitive object={mats.slab} attach="material" />
         </mesh>
       </group>
@@ -642,6 +774,12 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
 function Roof({ mats }: { mats: Mats }) {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
+  // The roof wears the same material as the floor decks, so it inherits their
+  // `aoMap` — and a geometry with no `uv1` samples that map at 0,0, which is
+  // the corner of floor 0's cell. Without this the roof garden would wear the
+  // ground floor's furniture shadows. Aim it at the white cell instead.
+  const roofDeck = useMemo(() => setFloorAoUv(new THREE.BoxGeometry(FLOOR_W, 0.04, FLOOR_D), AO_WHITE_CELL), [])
+  useEffect(() => () => roofDeck.dispose(), [roofDeck])
   const beds = useMemo(
     () => [
       { x: -2.6, z: 1.6, w: 3.6, d: 1.3 },
@@ -687,8 +825,7 @@ function Roof({ mats }: { mats: Mats }) {
         <boxGeometry args={[FLOOR_W + 0.06, SLAB_T - 0.04, FLOOR_D + 0.06]} />
         <primitive object={mats.steel} attach="material" />
       </mesh>
-      <mesh position={[0, SLAB_T - 0.02, 0]} receiveShadow>
-        <boxGeometry args={[FLOOR_W, 0.04, FLOOR_D]} />
+      <mesh position={[0, SLAB_T - 0.02, 0]} geometry={roofDeck} receiveShadow>
         <primitive object={mats.slab} attach="material" />
       </mesh>
       {/* Parapet rail. */}
