@@ -10,6 +10,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { PARAM_KEYS, paramsAt } from './chapters'
 import { MobileTierContext, SharedStateContext, useMobileTier, useShared, type SharedState } from './state'
+import { publishCaptureProgress } from './capture'
+import { createTierSampler, type TierWindow } from './tier'
 import Lights from './Lights'
 import BakedEnvironment from './Environment'
 import Table from './Table'
@@ -48,6 +50,7 @@ export function Ready({ onReady }: { onReady: () => void }) {
 /** The tour's driver: scroll position → chapter blend → damped parameters. */
 function Updater() {
   const s = useShared()
+  const frames = useRef(0)
   useEffect(() => {
     // Start on the chapter the page loaded at, not on a morph from chapter 0.
     paramsAt(s.progress, s.cur)
@@ -56,7 +59,14 @@ function Updater() {
     paramsAt(s.progress, s.target)
     const d = Math.min(dt, 0.25)
     const lambda = s.reduced ? 16 : 4.5
-    for (const k of PARAM_KEYS) s.cur[k] = THREE.MathUtils.damp(s.cur[k], s.target[k], lambda, d)
+    let delta = 0
+    for (const k of PARAM_KEYS) {
+      s.cur[k] = THREE.MathUtils.damp(s.cur[k], s.target[k], lambda, d)
+      if (s.capture) delta = Math.max(delta, Math.abs(s.target[k] - s.cur[k]))
+    }
+    // How far the scene still has to travel, for the capture harness to wait
+    // on. Only under capture: a real session pays nothing for this.
+    if (s.capture) publishCaptureProgress({ delta, frames: ++frames.current, progress: s.progress })
     // The overlay is the common DOM ancestor every portalled label resolves
     // into (see .bld-overlay in building.css), so publishing the damped
     // night value here — once — lets any label's CSS read --bld-night and
@@ -141,7 +151,9 @@ export function Rig() {
   useFrame((_, dt) => {
     const c = s.cur
     const d = Math.min(dt, 0.25)
-    const drift = s.reduced ? 0 : Math.sin(performance.now() * 0.00018) * 1.4
+    // Capture mode freezes the drift: an unattended still has to be the same
+    // image every run, and this term never repeats.
+    const drift = s.reduced || s.capture ? 0 : Math.sin(performance.now() * 0.00018) * 1.4
     const tAz = c.az + drift + s.pointer.x * 3
     const tEl = c.el - s.pointer.y * 2
     az.current = THREE.MathUtils.damp(az.current, tAz, 3, d)
@@ -185,6 +197,30 @@ export function Rig() {
       ortho.updateProjectionMatrix()
     }
   }, -90)
+  return null
+}
+
+/**
+ * Watches how fast this device is actually drawing and reports the moment the
+ * answer is "not fast enough to be worth it" (see tier.ts for why measured
+ * rather than recognised, and what it costs).
+ *
+ * Only meaningful under frameloop="always": in demand mode frames arrive when
+ * something asks for one, so their spacing measures the pump, not the GPU.
+ * BuildingExperience withholds `onDemote` in every other case — including
+ * capture, and including a visitor who has already overridden a demotion.
+ */
+export function TierProbe({ onDemote }: { onDemote: (w: TierWindow) => void }) {
+  const sampler = useMemo(() => createTierSampler(), [])
+  const fired = useRef(false)
+  useFrame((_, dt) => {
+    if (fired.current) return
+    const w = sampler.frame(dt * 1000)
+    if (w?.demote) {
+      fired.current = true
+      onDemote(w)
+    }
+  }, -98)
   return null
 }
 
@@ -255,9 +291,12 @@ export interface SceneProps {
    */
   frameloop: 'always' | 'never' | 'demand'
   onReady: () => void
+  /** Called once if this device measures below the floor twice running.
+   *  Omitted when the measurement would be meaningless or unwanted. */
+  onDemote?: (w: TierWindow) => void
 }
 
-export default function Scene({ shared, mobile, frameloop, onReady }: SceneProps) {
+export default function Scene({ shared, mobile, frameloop, onReady, onDemote }: SceneProps) {
   return (
     <Canvas
       {...CANVAS_PROPS}
@@ -270,6 +309,7 @@ export default function Scene({ shared, mobile, frameloop, onReady }: SceneProps
           <Updater />
           <Ready onReady={onReady} />
           <Stats />
+          {onDemote && <TierProbe onDemote={onDemote} />}
           <Rig />
           <SceneContent />
         </MobileTierContext.Provider>

@@ -54,6 +54,9 @@ export interface SharedState {
    */
   mobile: boolean
   reduced: boolean
+  /** True only under the poster-capture harness (see capture.ts): freezes the
+   *  camera drift so a still is reproducible. Never set in a real session. */
+  capture: boolean
   /** Walkers People is actually animating, published for the perf harness. */
   walkers: number
   /** 'tour' frames the whole table for the /building page; 'billboard' is
@@ -80,6 +83,7 @@ export function createSharedState(): SharedState {
     slots: [],
     mobile: false,
     reduced: false,
+    capture: false,
     walkers: 0,
     frame: 'tour',
     overlay: { current: null },
