@@ -101,6 +101,27 @@ func TestRenderCallResult(t *testing.T) {
 		}
 	})
 
+	t.Run("unwraps a native JSON-string-wrapped envelope", func(t *testing.T) {
+		// Native Chrome returns the CallToolResult as a JSON string. renderCallResult
+		// must unwrap that layer and still read isError + surface the content.
+		innerEnv := `{"content":[{"type":"text","text":"nope"}],"isError":true}`
+		wrapped, _ := json.Marshal(innerEnv) // a JSON string literal wrapping the envelope
+		out, failed := renderCallResult(wrapped, false)
+		if !failed {
+			t.Error("failed = false, want true (isError inside the string-wrapped envelope)")
+		}
+		if !strings.Contains(out, "nope") {
+			t.Errorf("content not surfaced from string-wrapped envelope; got:\n%s", out)
+		}
+	})
+
+	t.Run("plain text string result prints as-is", func(t *testing.T) {
+		out, failed := renderCallResult(json.RawMessage(`"just text"`), false)
+		if failed || out != "just text" {
+			t.Errorf("renderCallResult(plain string) = (%q,%v), want (\"just text\",false)", out, failed)
+		}
+	})
+
 	t.Run("plain non-envelope value is pretty-printed", func(t *testing.T) {
 		out, failed := renderCallResult(json.RawMessage(`{"a":1}`), false)
 		if failed {

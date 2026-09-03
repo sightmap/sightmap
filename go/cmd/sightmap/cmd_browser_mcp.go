@@ -159,7 +159,11 @@ func mcpCallScript(name, argsJSON string) string {
   const tool = tools.find(t => t && t.name === name);
   if (!tool) return { present: true, found: false, names: tools.map(t => t && t.name).filter(Boolean) };
   try {
-    const result = await mc.executeTool(tool, %s);
+    let result = await mc.executeTool(tool, %s);
+    // Native document.modelContext returns the CallToolResult as a JSON string;
+    // the polyfill returns an object. Normalize to an object so the CLI sees one
+    // shape (mirrors what an in-page WebMCP client does).
+    if (typeof result === 'string') { try { result = JSON.parse(result); } catch (_) {} }
     return { present: true, found: true, result: result };
   } catch (e) {
     return { present: true, found: true, error: String((e && e.message) || e) };
@@ -282,6 +286,25 @@ func runMCPCall(args []string) error {
 // isError as failure. A plain (non-envelope) value is printed as-is. --json
 // always emits the raw value verbatim.
 func renderCallResult(raw json.RawMessage, asJSON bool) (out string, failed bool) {
+	// Native Chrome returns the CallToolResult as a JSON *string*; the polyfill
+	// returns an object. The call script normalizes this in-page, but if a
+	// string-wrapped envelope still arrives, unwrap one JSON-string layer so both
+	// shapes render identically. A JSON string literal starts with a quote; a
+	// plain-text string result whose contents aren't JSON is printed as-is.
+	if len(raw) > 0 && raw[0] == '"' {
+		var s string
+		if json.Unmarshal(raw, &s) == nil {
+			if t := strings.TrimSpace(s); json.Valid([]byte(t)) {
+				raw = json.RawMessage(t)
+			} else {
+				if asJSON {
+					return string(raw), false
+				}
+				return s, false
+			}
+		}
+	}
+
 	var top map[string]json.RawMessage
 	isEnvelope := json.Unmarshal(raw, &top) == nil && top["content"] != nil
 
