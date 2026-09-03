@@ -18,8 +18,6 @@ export type ItemType =
   | 'shelf'
   | 'book'
   | 'screen'
-  | 'body'
-  | 'head'
   | 'partition'
   | 'rail'
   | 'counter'
@@ -35,6 +33,27 @@ export interface Item {
   sy: number
   sz: number
   color: string
+}
+
+/**
+ * Someone who lives in a room: at a desk, on a sofa, behind a counter. They
+ * are not furniture — People.tsx draws them from the same instanced body-part
+ * rig as the walkers, so the building has one population, not two.
+ */
+export interface Occupant {
+  /** Floor-local, like `Item`: x/z across the plate, y above the slab top. */
+  x: number
+  y: number
+  z: number
+  ry: number
+  seated: boolean
+  shirt: string
+  skin: string
+}
+
+export interface Furnishing {
+  items: Item[]
+  people: Occupant[]
 }
 
 /** Footprints worth drawing on the blueprint sheet. */
@@ -73,15 +92,14 @@ function plant(out: Item[], x: number, z: number, y: number, r: () => number, bi
   if (big) out.push(item('leaf', x + 0.12, y + h + 0.6, z - 0.08, [0.42, 0.4, 0.42], GREENS[(GREENS.indexOf(g) + 1) % GREENS.length]))
 }
 
-function person(out: Item[], x: number, z: number, y: number, ry: number, r: () => number): void {
+function person(out: Occupant[], x: number, z: number, y: number, ry: number, r: () => number, seated = true): void {
   const shirt = SHIRT[Math.floor(r() * SHIRT.length)]
   const skin = SKIN[Math.floor(r() * SKIN.length)]
-  out.push(item('body', x, y + 0.24, z, [0.26, 0.34, 0.22], shirt, ry))
-  out.push(item('head', x, y + 0.52, z, [0.17, 0.17, 0.17], skin))
+  out.push({ x, y, z, ry, seated, shirt, skin })
 }
 
 /** A desk facing +z (chair on the +z side). `ry` rotates the whole cluster. */
-function workstation(out: Item[], cx: number, cz: number, y: number, ry: number, r: () => number): void {
+function workstation(out: Item[], who: Occupant[], cx: number, cz: number, y: number, ry: number, r: () => number): void {
   const c = Math.cos(ry)
   const s = Math.sin(ry)
   const at = (dx: number, dz: number): [number, number] => [cx + dx * c - dz * s, cz + dx * s + dz * c]
@@ -91,11 +109,12 @@ function workstation(out: Item[], cx: number, cz: number, y: number, ry: number,
   out.push(item('monitor', mx, y + 0.56, mz, [0.46, 0.28, 0.04], DARK, ry))
   const [chx, chz] = at(0, 0.52)
   out.push(item('chair', chx, y + 0.22, chz, [0.4, 0.44, 0.4], '#3b3f4a', ry))
-  if (r() < 0.6) person(out, chx, chz, y + 0.2, ry + Math.PI, r)
+  if (r() < 0.6) person(who, chx, chz, y, ry + Math.PI, r)
 }
 
-export function furnish(room: Room): Item[] {
+export function furnish(room: Room): Furnishing {
   const out: Item[] = []
+  const who: Occupant[] = []
   const r = rng(room.name)
   const y = (room.base ? PLATE : 0) + PLATE
   const blocks = room.blocks ?? [{ x: room.x, z: room.z, w: room.w, d: room.d }]
@@ -122,7 +141,7 @@ export function furnish(room: Room): Item[] {
             const v = -dep / 2 + (j + 0.5) * (dep / rows) - 0.15
             const x = long ? b.x + u : b.x + v
             const z = long ? b.z + v : b.z + u
-            workstation(out, x, z, y, long ? 0 : Math.PI / 2, r)
+            workstation(out, who, x, z, y, long ? 0 : Math.PI / 2, r)
           }
         }
         if (b.w > 2 && b.d > 1.2) plant(out, b.x + b.w / 2 - 0.3, b.z - b.d / 2 + 0.3, y, r)
@@ -135,7 +154,9 @@ export function furnish(room: Room): Item[] {
         out.push(item('counter', b.x, y + 0.545, b.z, long ? [len + 0.12, 0.05, 0.54] : [0.54, 0.05, len + 0.12], WHITE))
         if (len > 2.5) out.push(item('screen', b.x, y + 0.82, b.z, long ? [0.9, 0.42, 0.04] : [0.04, 0.42, 0.9], DARK))
         plant(out, long ? b.x - len / 2 - 0.05 : b.x, long ? b.z : b.z - len / 2 - 0.05, y, r)
-        if (b.w > 1.8 && b.d > 1.0 && r() < 0.8) person(out, b.x + (long ? 0.4 : 0.35), b.z + (long ? 0.35 : 0.4), y, Math.PI, r)
+        // Standing, not seated: this one is staffing the counter.
+        if (b.w > 1.8 && b.d > 1.0 && r() < 0.8)
+          person(who, b.x + (long ? 0.4 : 0.35), b.z + (long ? 0.35 : 0.4), y, Math.PI, r, false)
         break
       }
       case 'content': {
@@ -158,7 +179,7 @@ export function furnish(room: Room): Item[] {
           out.push(item('sofa', b.x - 0.2, y + 0.22, sz, [sofaW, 0.44, 0.6], '#7f8fb8'))
           out.push(item('sofa', b.x - 0.2, y + 0.55, sz - 0.24, [sofaW, 0.28, 0.12], '#6d7ca3'))
           out.push(item('table', b.x - 0.2, y + 0.17, sz - 0.75, [0.5, 0.34, 0.5], WOOD))
-          if (r() < 0.7) person(out, b.x - 0.5, sz, y + 0.2, 0, r)
+          if (r() < 0.7) person(who, b.x - 0.5, sz, y, 0, r)
         }
         plant(out, b.x + b.w / 2 - 0.32, b.z + b.d / 2 - 0.32, y, r, b.w > 3)
         break
@@ -177,7 +198,7 @@ export function furnish(room: Room): Item[] {
             const x = long ? b.x + u : b.x + v
             const z = long ? b.z + v : b.z + u
             out.push(item('chair', x, y + 0.22, z, [0.38, 0.44, 0.38], '#3b3f4a'))
-            if (r() < 0.55) person(out, x, z, y + 0.2, long ? (side > 0 ? Math.PI : 0) : side > 0 ? -Math.PI / 2 : Math.PI / 2, r)
+            if (r() < 0.55) person(who, x, z, y, long ? (side > 0 ? Math.PI : 0) : side > 0 ? -Math.PI / 2 : Math.PI / 2, r)
           }
         }
         out.push(item('screen', b.x + (long ? 0 : -b.w / 2 + 0.12), y + 0.95, b.z + (long ? -b.d / 2 + 0.12 : 0), long ? [1.3, 0.72, 0.05] : [0.05, 0.72, 1.3], DARK))
@@ -189,5 +210,5 @@ export function furnish(room: Room): Item[] {
         break
     }
   }
-  return out
+  return { items: out, people: who }
 }

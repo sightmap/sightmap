@@ -15,7 +15,7 @@ import Table from './Table'
 import Tower from './Tower'
 import Core from './Core'
 import Wayfinding from './Wayfinding'
-import Agents from './Agents'
+import People, { crowd } from './People'
 import HealDemo from './HealDemo'
 import Trajectory from './Trajectory'
 import FrontDesk from './FrontDesk'
@@ -67,6 +67,7 @@ export function Stats() {
         geometries: gl.info.memory.geometries,
         textures: gl.info.memory.textures,
         shadows: gl.shadowMap.enabled ? 1 : 0,
+        people: crowd.drawn,
       }
       frames.current = 0
       t0.current = now
@@ -139,7 +140,7 @@ export function SceneContent() {
       <Tower />
       <Core />
       <Wayfinding />
-      <Agents />
+      <People />
       <HealDemo />
       <Trajectory />
       <FrontDesk />

@@ -18,6 +18,7 @@ import {
   type Room,
 } from './model'
 import { furnish, type Item, type ItemType } from './furnish'
+import { floorRise, makeFloorPlace, placeFloor } from './floors'
 import { sheetLinePoints } from './geometry'
 import { smoothstep } from './chapters'
 import { useShared } from './state'
@@ -32,14 +33,6 @@ type LineRef = ComponentRef<typeof Line>
 const WALL_H = FLOOR_H - SLAB_T
 const N = FLOORS.length
 const STEEL = '#26272c'
-
-/** Where sheet i lies when fanned across the table. */
-function fan(i: number): { x: number; z: number; r: number } {
-  const k = i - (N - 1) / 2
-  return { x: k * 1.05 - 0.3, z: -k * 0.85 + 0.3, r: k * 0.09 }
-}
-
-const stagger = (rise: number, i: number): number => smoothstep(THREE.MathUtils.clamp(rise * 1.6 - i * 0.11, 0, 1))
 
 // ---------------------------------------------------------------------------
 // Shared materials, retinted at nightfall.
@@ -78,8 +71,6 @@ function useMaterials(): Mats {
       shelf: plain(),
       book: plain(),
       screen: plain({ roughness: 0.3, emissive: new THREE.Color('#9fc2ff'), emissiveIntensity: 0.3 }),
-      body: plain(),
-      head: plain(),
       partition: plain({ transparent: true, opacity: 0.22, roughness: 0.1, depthWrite: false }),
       rail: plain({ roughness: 0.5 }),
       counter: plain({ roughness: 0.6 }),
@@ -134,7 +125,6 @@ function useMaterials(): Mats {
 const unitBox = new THREE.BoxGeometry(1, 1, 1)
 const unitCyl = new THREE.CylinderGeometry(0.5, 0.5, 1, 14)
 const unitSphere = new THREE.SphereGeometry(0.5, 12, 10)
-const unitCapsule = new THREE.CapsuleGeometry(0.5, 0.6, 4, 10)
 const GEOM: Record<ItemType, THREE.BufferGeometry> = {
   desk: unitBox,
   monitor: unitBox,
@@ -146,8 +136,6 @@ const GEOM: Record<ItemType, THREE.BufferGeometry> = {
   shelf: unitBox,
   book: unitBox,
   screen: unitBox,
-  body: unitCapsule,
-  head: unitSphere,
   partition: unitBox,
   rail: unitBox,
   counter: unitBox,
@@ -293,7 +281,10 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
   const rooms = useRef<THREE.Group>(null)
   const walls = useRef<THREE.Group>(null)
   const pts = useMemo(() => sheetLinePoints(i), [i])
-  const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r)), [floor])
+  // People are not here: the crowd is drawn by People.tsx, which places the
+  // occupants of every floor into one set of instanced meshes.
+  const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r).items), [floor])
+  const place = useMemo(() => makeFloorPlace(), [])
   // LineSegments2 accumulates dash distance across every segment, so one
   // growing dash draws the sheet in sequence: border, footprint, then rooms.
   const total = useMemo(() => {
@@ -305,20 +296,13 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
     }
     return l
   }, [pts])
-  const pose = fan(i)
-
   useFrame(() => {
     const c = s.cur
-    const rise = stagger(c.rise, i)
-    const flat = 1 - rise
-    const y0 = 0.012 + i * 0.014
+    const p = placeFloor(i, c.rise, c.spread, place)
+    const rise = p.rise
     if (g.current) {
-      g.current.position.set(
-        pose.x * c.spread * flat,
-        THREE.MathUtils.lerp(y0, floorY(i), rise),
-        pose.z * c.spread * flat
-      )
-      g.current.rotation.y = pose.r * c.spread * flat
+      g.current.position.set(p.x, p.y, p.z)
+      g.current.rotation.y = p.ry
     }
     // The line work sketches itself in once, on load, then fades as the
     // sheet becomes a slab.
@@ -342,9 +326,8 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
       slab.current.scale.set(1, Math.max(rise, 0.001), 1)
     }
     if (rooms.current) {
-      const sy = smoothstep((rise - 0.35) / 0.65)
-      rooms.current.scale.y = Math.max(sy, 0.001)
-      rooms.current.visible = sy > 0.005
+      rooms.current.scale.y = Math.max(p.fill, 0.001)
+      rooms.current.visible = p.fill > 0.005
     }
     if (walls.current) {
       const w = c.walls * smoothstep((rise - 0.55) / 0.45)
@@ -436,7 +419,7 @@ function Roof({ mats }: { mats: Mats }) {
   }, [])
   useFrame(() => {
     if (!g.current) return
-    const rise = stagger(s.cur.rise, N) * s.cur.walls
+    const rise = floorRise(s.cur.rise, N) * s.cur.walls
     g.current.visible = rise > 0.01
     g.current.position.y = THREE.MathUtils.lerp(floorY(N) - 0.6, floorY(N), rise)
     g.current.scale.setScalar(Math.max(rise, 0.001))
