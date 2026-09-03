@@ -125,7 +125,7 @@ export const CHAPTERS: Chapter[] = [
     eyebrow: '03 · The wayfinding',
     title: 'A sightmap is the signage.',
     body:
-      'Real buildings do not hand visitors blueprints. They put a directory in the lobby, numbers on the doors, and a note on the door that sticks. A `.sightmap/` does the same for agents: names for every floor, room and riser, links back to the drawings, and memory for the quirks the drawings never recorded.',
+      'A `.sightmap/` names every floor, room and riser, links each name back to its source, and keeps memory for the quirks the drawings never recorded — the lobby directory a real building has and a blueprint never does.',
     hud: {
       title: 'The map',
       rows: [
@@ -142,7 +142,7 @@ export const CHAPTERS: Chapter[] = [
     eyebrow: '04 · The people',
     title: 'Every day, people move through it.',
     body:
-      'Users book a flight. Agents reproduce a bug, verify a fix, run a checkout. Each trip is a journey through rooms and floors, and Subtext records those journeys against the map, so a session reads as `FlightSearch → FareCard → PaymentForm` instead of a list of divs.',
+      'Subtext records every session against the map, so a run reads as `FlightSearch → FareCard → PaymentForm` instead of a list of divs. Users book a flight; agents reproduce a bug, verify a fix, run a checkout — every trip is a journey through the same named rooms and floors.',
     hud: {
       title: 'Today',
       rows: [
@@ -160,7 +160,7 @@ export const CHAPTERS: Chapter[] = [
     badge: 'exploratory',
     title: 'Tests that find the moved door.',
     body:
-      'When a room moves, a test written against selectors walks into a wall. A test written against the map asks the building where the room went. The selector changes, the name does not, and the run finishes.',
+      'A test written against the map survives a redesign that breaks one written against selectors: point it at `ContinueButton`, and when the button moves, the test still finds it. The selector changes, the name does not, and the run finishes instead of walking into a wall.',
     hud: {
       title: 'Self-healing run',
       rows: [
@@ -179,7 +179,7 @@ export const CHAPTERS: Chapter[] = [
     badge: 'exploratory',
     title: 'Journeys you can name and rerun.',
     body:
-      'Codify a journey on top of the primitives: the floors it visits, the rooms it touches, the requests it expects on the way. A trajectory is a route through the building any agent can follow, and any run can be checked against.',
+      'A trajectory is a named route through the building — the floors it visits, the rooms it touches, the requests it expects on the way — codified once so any agent can follow it and any run can be checked against it.',
     hud: {
       title: 'Trajectory',
       rows: [
