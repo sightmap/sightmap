@@ -22,6 +22,16 @@ import FrontDesk from './FrontDesk'
 
 const CAMERA_DISTANCE = 42
 
+/**
+ * Above this width the desktop framing applies unchanged; below `s.mobile`'s
+ * own 900px threshold the mobile framing takes over. In between — 1024 is
+ * the audited case — the card's intermediate max-width step (building.css)
+ * still leaves it wider, proportionally, than at 1440, so the tower needs to
+ * sit smaller and further from the card's edge or the card lands on it and
+ * crops its right face. Matches the `.bld-card` intermediate breakpoint.
+ */
+const COMPACT_MAX_WIDTH = 1279
+
 /** Calls `onReady` after the first rendered frame, so the poster can fade. */
 export function Ready({ onReady }: { onReady: () => void }) {
   const fired = useRef(false)
@@ -46,6 +56,13 @@ function Updater() {
     const d = Math.min(dt, 0.25)
     const lambda = s.reduced ? 16 : 4.5
     for (const k of PARAM_KEYS) s.cur[k] = THREE.MathUtils.damp(s.cur[k], s.target[k], lambda, d)
+    // The overlay is the common DOM ancestor every portalled label resolves
+    // into (see .bld-overlay in building.css), so publishing the damped
+    // night value here — once — lets any label's CSS read --bld-night and
+    // cross-fade colour with the same continuous curve Lights and Table
+    // already lerp their materials against, instead of re-deriving it per
+    // component or snapping on the page's discrete data-night boundary.
+    s.overlay.current?.style.setProperty('--bld-night', s.cur.night.toFixed(3))
   }, -100)
   return null
 }
@@ -105,17 +122,26 @@ export function Rig() {
     // wide and, with the tower on it, ~18 tall, whatever the viewport.
     // The billboard crops in tight on the tower instead.
     const billboard = s.frame === 'billboard'
+    const compact = !billboard && !s.mobile && size.width <= COMPACT_MAX_WIDTH
     const fit = billboard ? Math.min(size.width / 15, size.height / 12.5) : Math.min(size.width / 27, size.height / 22)
-    const zoom = fit * c.zoom * (s.mobile && !billboard ? 1.3 : 1)
+    const zoom = fit * c.zoom * (s.mobile && !billboard ? 1.3 : compact ? 0.86 : 1)
 
     v.dir.set(Math.cos(e) * Math.sin(a), Math.sin(e), Math.cos(e) * Math.cos(a))
     v.right.set(Math.cos(a), 0, -Math.sin(a))
     v.up.crossVectors(v.dir, v.right).normalize()
 
     // Desktop: the story card sits on the left, so push the model right.
-    // Mobile: the card sits at the bottom, so push the model up.
-    // Billboard: nudge the tower left so the floor directory fits in the frame.
-    const shiftRight = billboard ? (-size.width * 0.07) / zoom : s.mobile ? (-size.width * 0.12) / zoom : (size.width * 0.13) / zoom
+    // Mobile: the card sits at the bottom, so push the model up. Compact
+    // (the 900–1279px band the card's intermediate step covers): push it
+    // right less than desktop does, since the narrower viewport leaves less
+    // room before that push runs the tower into the card.
+    const shiftRight = billboard
+      ? (-size.width * 0.07) / zoom
+      : s.mobile
+        ? (-size.width * 0.12) / zoom
+        : compact
+          ? (size.width * 0.08) / zoom
+          : (size.width * 0.13) / zoom
     const shiftUp = billboard || !s.mobile ? 0 : (size.height * 0.11) / zoom
     v.target.set(0, c.lookY, 0).addScaledVector(v.right, -shiftRight).addScaledVector(v.up, -shiftUp)
 

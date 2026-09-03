@@ -2072,6 +2072,19 @@ footer {
 }
 
 /* ---- CONSENT ---- */
+
+/* The banner owns the space it needs, not the elements that sit near it:
+   ConsentUI's ResizeObserver keeps this in sync with the banner's real
+   rendered height (see ConsentUI.tsx), overriding the fallback below with an
+   inline style the instant it mounts. The :has() fallback only has to cover
+   first paint, before that observer has run, and 0px once the banner is
+   gone (accepted/declined) and the observer removes its own override.
+   Measured via a headless render at 1440x900, 1024x768 and 390x844 (all
+   146.03px — the banner's max-width caps its width, and its line count,
+   below 700px too) and rounded up a hair for slop. */
+:root:has(.consent-banner) { --consent-h: 147px; }
+:root:not(:has(.consent-banner)) { --consent-h: 0px; }
+
 .consent-banner {
   position: fixed;
   bottom: 1rem;

@@ -12,8 +12,30 @@ export default function ConsentUI() {
 
 function ConsentBanner() {
   const { setConsent } = useConsent()
+  const bannerRef = useRef<HTMLDivElement>(null)
+
+  // Publish the banner's real height so bottom chrome (the Building rail,
+  // its footer) can reserve exactly that much space instead of guessing or
+  // racing it on z-index — see the --consent-h fallback in index.css for the
+  // first-paint value this overrides. Removing the property on unmount
+  // (accept/decline) hands control back to that :root:not(:has(...)) rule
+  // rather than leaving a stale height reserved.
+  useEffect(() => {
+    const el = bannerRef.current
+    if (!el) return
+    const publish = () => document.documentElement.style.setProperty('--consent-h', `${el.getBoundingClientRect().height}px`)
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      document.documentElement.style.removeProperty('--consent-h')
+    }
+  }, [])
+
   return (
     <div
+      ref={bannerRef}
       data-component="ConsentBanner"
       className="consent-banner"
       role="region"
