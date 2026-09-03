@@ -671,6 +671,18 @@
   transform: translate(-50%, 8px);
 }
 
+/* Compact (tablet) -------------------------------------------------------- */
+
+/* 470px is a fixed pixel width, so it holds steady from 1440 down to this
+   band while the viewport doesn't: at 1024 it's grown from 33% of the frame
+   to 46%, wide enough to land on the tower and crop its right face. This
+   step, paired with Scene.tsx's Rig `compact` camera tier, keeps the card's
+   share of the frame close to its 1440 proportion instead of ballooning as
+   the viewport narrows toward the mobile layout below. */
+@media (min-width: 900px) and (max-width: 1279px) {
+  .bld-card { max-width: 360px; }
+}
+
 /* Mobile ----------------------------------------------------------------- */
 
 @media (max-width: 899px) {
