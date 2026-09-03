@@ -92,6 +92,10 @@ async function main() {
     server = await startDevServer()
     url = server.url
   } else {
+    // A bare origin means "the dev server is over there", not "verify the home
+    // page". Without this, --url=http://localhost:5173 checks the wrong route
+    // and fails as a hydration error, which is a maddening thing to debug.
+    if (new URL(url).pathname === '/') url = new URL('/building', url).href
     await waitForServer(url)
   }
 
@@ -114,11 +118,35 @@ async function main() {
         return real.call(this, type, ...rest)
       }
     })
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60_000 })
-
-    const chapterCount = await page.evaluate(() => document.querySelectorAll('.bld-chapter').length)
+    // The dev SPA intermittently comes up with an empty root, and a failure to
+    // hydrate looks exactly like the bug this script hunts: no chapters, no
+    // stills, a blank frame. Reload rather than report a false negative — but
+    // give up loudly rather than loop, because a page that never hydrates in
+    // four tries is a real failure and not a flake.
+    // Note this waits on the poster, not on a canvas: WebGL is denied here, so
+    // there is no canvas to wait for and its absence is the point.
+    let chapterCount = 0
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60_000 })
+      try {
+        await page.waitForFunction(
+          (expected) =>
+            document.querySelectorAll('.bld-chapter').length === expected &&
+            !!document.querySelector('.bld-poster__still[data-active="true"]'),
+          { timeout: 20_000 },
+          CHAPTERS_EXPECTED,
+        )
+        chapterCount = CHAPTERS_EXPECTED
+        break
+      } catch {
+        chapterCount = await page.evaluate(() => document.querySelectorAll('.bld-chapter').length)
+        console.warn(`  hydration incomplete (attempt ${attempt}: ${chapterCount} chapters) — reloading`)
+      }
+    }
     if (chapterCount !== CHAPTERS_EXPECTED) {
-      throw new Error(`page has ${chapterCount} chapters, expected ${CHAPTERS_EXPECTED} — did it hydrate?`)
+      throw new Error(
+        `page never hydrated: ${chapterCount} chapters after 4 attempts, expected ${CHAPTERS_EXPECTED}`,
+      )
     }
     const hasCanvas = await page.evaluate(() => !!document.querySelector('.bld-stage canvas'))
     if (hasCanvas) throw new Error('a canvas exists — WebGL was not actually denied, so this proves nothing')
