@@ -1,6 +1,7 @@
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { fitShadowFrustum, makeShadowFitScratch, MAX_HALF_EXTENT } from './shadowFrustum'
 import { useMobileTier, useShared } from './state'
 
 // Daylight from the front-right, softening to moonlight at nightfall. One
@@ -15,9 +16,12 @@ import { useMobileTier, useShared } from './state'
 export default function Lights() {
   const s = useShared()
   const mobile = useMobileTier()
+  const { size } = useThree()
   const dir = useRef<THREE.DirectionalLight>(null)
   const amb = useRef<THREE.AmbientLight>(null)
   const hemi = useRef<THREE.HemisphereLight>(null)
+  const shadowCam = useRef<THREE.OrthographicCamera>(null)
+  const shadowScratch = useMemo(makeShadowFitScratch, [])
   const col = useMemo(
     () => ({
       day: new THREE.Color('#fff2dc'),
@@ -41,6 +45,39 @@ export default function Lights() {
       amb.current.color.copy(col.ambDay).lerp(col.ambNight, n)
     }
     if (hemi.current) hemi.current.intensity = THREE.MathUtils.lerp(0.2, 0.12, n)
+
+    // Fit the shadow camera to what's actually on screen this frame. Reads
+    // the scroll-blended `s.cur` — not Rig's own damped az/el, which layer
+    // idle drift and pointer parallax on top for visual flair a shadow
+    // frustum should not chase (see shadowFrustum.ts).
+    const cam = shadowCam.current
+    if (cam) {
+      const bounds = fitShadowFrustum(
+        {
+          az: s.cur.az,
+          el: s.cur.el,
+          chapterZoom: s.cur.zoom,
+          lookY: s.cur.lookY,
+          mobile: s.mobile,
+          frame: s.frame,
+          width: size.width,
+          height: size.height,
+        },
+        shadowScratch
+      )
+      if (
+        Math.abs(cam.left - bounds.left) > 1e-3 ||
+        Math.abs(cam.right - bounds.right) > 1e-3 ||
+        Math.abs(cam.top - bounds.top) > 1e-3 ||
+        Math.abs(cam.bottom - bounds.bottom) > 1e-3
+      ) {
+        cam.left = bounds.left
+        cam.right = bounds.right
+        cam.top = bounds.top
+        cam.bottom = bounds.bottom
+        cam.updateProjectionMatrix()
+      }
+    }
   })
   const mapSize = mobile ? 1024 : 2048
   return (
@@ -56,7 +93,11 @@ export default function Lights() {
         shadow-bias={-0.0004}
         shadow-normalBias={0.03}
       >
-        <orthographicCamera attach="shadow-camera" args={[-15, 15, 15, -15, 1, 50]} />
+        <orthographicCamera
+          ref={shadowCam}
+          attach="shadow-camera"
+          args={[-MAX_HALF_EXTENT, MAX_HALF_EXTENT, MAX_HALF_EXTENT, -MAX_HALF_EXTENT, 1, 50]}
+        />
       </directionalLight>
     </>
   )
