@@ -1,5 +1,17 @@
 # @sightmap/sightmap
 
+## 0.31.0
+
+### Minor Changes
+
+- b169e09: Add `browser mcp list` and `browser mcp call` for the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools a page exposes via `document.modelContext`. `mcp list` enumerates the tools (name, description, input schema; `--json` for full schemas) and distinguishes native, polyfilled, and absent WebMCP — failing loudly with the Chrome flags that enable native WebMCP when there is none. `mcp call <tool>` resolves a tool by name and invokes it via `executeTool`; arguments are supplied as a JSON object (`--args`) and/or repeatable `--param key=value` pairs. It unwraps the standard `CallToolResult` envelope (rendering the tool's text/structured content and any guidance as itself rather than a stringified blob), exits non-zero when the tool reports `isError` so it is scriptable, and reports not-found or thrown errors distinctly. One tool runs at a single point in time; there is no cross-navigation tool response.
+
+### Patch Changes
+
+- c15da21: Fix `browser start` silently running sessionless when it couldn't persist the session file. `start` now creates the corpus dir if absent (so the session lives at the per-corpus `.sightmap/.session` rather than a shared `$TMPDIR` fallback) and fails loudly if it still can't write it, instead of continuing without a session. Client commands that find no session file now warn before falling back to the default CDP port — where a session may belong to a different corpus or agent — rather than silently attaching to a foreign tab. Applies to both the launched and `--attach` start paths.
+- 89dd7dd: Fix `browser inject --persist` not re-injecting across navigations. The persisted script was registered with `Page.addScriptToEvaluateOnNewDocument` on the daemon's collector connection, but that connection never enabled the Page domain — so the command returned an identifier (and `inject --list` showed the entry) while the script was never actually evaluated on new documents. Only the initial one-shot run fired. The collector now enables Page before registering, so a persisted script runs at document start on every subsequent navigation and new tab, as documented.
+- c77eef5: `sightmap lint` now auto-reconciles the `multi-instance-no-property` rule against captured snapshots by default. The static heuristic guesses from selector shape alone and false-positived on container-ish selectors that in fact match a single node; when captures exist under `.sightmap/snapshots/`, lint now uses their real match counts (a count of 1 suppresses the warning) without needing an explicit `--all-snapshots`. With no captures present it runs the static heuristics unchanged, and `--snapshot`/`--all-snapshots` still control the set explicitly. A missing `snapshots/` directory is no longer an error.
+
 ## 0.30.0
 
 ### Minor Changes
