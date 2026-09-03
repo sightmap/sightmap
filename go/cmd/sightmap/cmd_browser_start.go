@@ -83,6 +83,17 @@ func runBrowserStart(args []string) error {
 	}
 	_ = os.MkdirAll(resolvedProfile, 0o700)
 
+	// Ensure the corpus dir exists BEFORE any session-file access. The session
+	// file lives at <sightmap-dir>/.session and is the per-corpus rendezvous that
+	// keeps concurrent sessions from finding each other. When the dir is absent,
+	// SessionFilePath falls back to a single shared $TMPDIR file, so two corpus-
+	// less starts clobber each other's session and a later client command can
+	// silently drive a foreign tab. Creating it up front keeps the session
+	// per-corpus; failing here is loud rather than degrading to sessionless.
+	if err := os.MkdirAll(*sightmapDir, 0o755); err != nil {
+		return fmt.Errorf("start: cannot create %s (needed to persist the session): %w", *sightmapDir, err)
+	}
+
 	// ── Detect existing Chrome for this corpus ────────────────────────────────
 	// The session file is keyed to --sightmap-dir, so this only ever matches a
 	// prior session for THIS corpus — never another agent's browser.
@@ -217,10 +228,19 @@ func runBrowserStart(args []string) error {
 	if cmd.Process != nil {
 		pid = cmd.Process.Pid
 	}
-	_ = browser.WriteSessionInfo(*sightmapDir, browser.SessionInfo{
+	if err := browser.WriteSessionInfo(*sightmapDir, browser.SessionInfo{
 		Port: resolvedCDPPort, PID: pid, Pgid: pid, Profile: resolvedProfile,
 		ServerPort: resolvedServerPort,
-	})
+	}); err != nil {
+		// Refuse to run sessionless: without the session file, client commands fall
+		// back to the default CDP port and could attach to another session's tab.
+		// Tear down the Chrome we just launched rather than leaving it orphaned.
+		cmd.Process.Kill()
+		_ = cmd.Wait()
+		return fmt.Errorf("start: cannot persist the session file at %s — refusing to run "+
+			"sessionless (clients would fall back to the default CDP port and could drive "+
+			"another session's tab): %w", browser.SessionFilePath(*sightmapDir), err)
+	}
 
 	var initialTabID string
 	ctx := context.Background()
@@ -583,6 +603,13 @@ func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlF
 	}
 	cdpAddr := net.JoinHostPort(host, port)
 
+	// Keep the session per-corpus (see the launch path): create the corpus dir so
+	// the session file isn't the shared $TMPDIR fallback, and fail loudly if it
+	// can't be created rather than advertising a session we can't persist.
+	if err := os.MkdirAll(sightmapDir, 0o755); err != nil {
+		return fmt.Errorf("start --attach: cannot create %s (needed to persist the session): %w", sightmapDir, err)
+	}
+
 	// Verify the endpoint is actually reachable before we advertise a session.
 	if !cdpVersionAlive(context.Background(), cdpAddr) {
 		return fmt.Errorf("start --attach: no Chrome CDP endpoint answering at %s\n"+
@@ -607,9 +634,13 @@ func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlF
 
 	// Record the session. PID is the DAEMON's pid (there is no owned Chrome), and
 	// Attached tells stop to detach rather than kill. Profile is empty.
-	_ = browser.WriteSessionInfo(sightmapDir, browser.SessionInfo{
+	if err := browser.WriteSessionInfo(sightmapDir, browser.SessionInfo{
 		Port: cdpPort, PID: os.Getpid(), ServerPort: resolvedServerPort, Attached: true,
-	})
+	}); err != nil {
+		return fmt.Errorf("start --attach: cannot persist the session file at %s — refusing to run "+
+			"sessionless (clients would fall back to the default CDP port and could drive "+
+			"another session's tab): %w", browser.SessionFilePath(sightmapDir), err)
+	}
 
 	// Install signal handling and liveness polling up front, so the daemon is
 	// always interruptible even while the best-effort setup below is still running.

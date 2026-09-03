@@ -40,7 +40,7 @@ The final line is the binary path on stdout, so scripts can capture it; progress
 
 The `start` daemon owns the session: it is the only way to launch Chrome for sightmap, and every live command attaches to it. It also runs the console/network **collector** that buffers browser activity for the [`console` and `network`](/cli/devtools) commands, so those need a running `start` session.
 
-Run it from the site directory (the one containing `.sightmap/`), typically in a second terminal or as a background job.
+Run it from the site directory (the one containing `.sightmap/`), typically in a second terminal or as a background job. `start` creates `.sightmap/` if it is absent and records the session at `.sightmap/.session`; if it cannot persist that file it fails loudly rather than running sessionless. Every other command finds the session through this file, keyed by `--sightmap-dir` — so with no session file a command falls back to the default CDP port and **warns**, since a session answering there may belong to a different corpus or agent. Pass `--addr` to target a specific session explicitly.
 
 | Flag | Default | Description |
 |------|---------|-------------|

@@ -63,10 +63,31 @@ func (lf *liveFlags) connect(ctx context.Context) (*browser.CDPConn, func(), err
 // corpora from finding each other's daemon. Commands pass "" for explicitAddr
 // when --addr was left at its empty default.
 func resolveCDPAddr(explicitAddr, sightmapDir string) string {
-	if explicitAddr != "" {
-		return explicitAddr
+	addr, warn := cdpAddrForDir(explicitAddr, sightmapDir)
+	if warn != "" {
+		fmt.Fprintln(os.Stderr, "warning: "+warn)
 	}
-	return browser.DefaultAddr(sightmapDir)
+	return addr
+}
+
+// cdpAddrForDir resolves the CDP address for a client command. When it has to
+// fall back to the default CDP port because no usable session file exists for
+// sightmapDir, it also returns a warning (empty otherwise): a session answering
+// on the default port may belong to a different corpus/agent, and silently
+// attaching to it returns a foreign tab's DOM with no signal why. Kept pure so
+// the fallback decision is unit-testable; resolveCDPAddr prints the warning.
+func cdpAddrForDir(explicitAddr, sightmapDir string) (addr, warn string) {
+	if explicitAddr != "" {
+		return explicitAddr, ""
+	}
+	if info, err := browser.ReadSessionInfo(sightmapDir); err == nil && info.Port > 0 && info.Port <= 65535 {
+		return fmt.Sprintf("localhost:%d", info.Port), ""
+	}
+	return fmt.Sprintf("localhost:%d", browser.DefaultCDPPort),
+		fmt.Sprintf("no session file at %s — falling back to the default CDP port %d; "+
+			"a session answering there may belong to a different corpus/agent. Run "+
+			"'sightmap browser start' or pass --addr to target a specific session.",
+			browser.SessionFilePath(sightmapDir), browser.DefaultCDPPort)
 }
 
 // navOpts tunes how navigate waits for the page to settle.
