@@ -5,6 +5,12 @@ import type * as THREE from 'three'
 import { isOccluded } from './occlusion'
 import { useShared } from './state'
 
+/**
+ * Breathing room kept between a label's edge and the viewport edge, so a
+ * clamped label doesn't sit flush against the glass.
+ */
+const VIEWPORT_MARGIN = 12
+
 // A label anchored in 3D and drawn as DOM.
 //
 // Every one of these has to render *outside* .bld-stage. The stage is
@@ -63,6 +69,7 @@ export default function Label({ position, zIndexRange, center, children }: Label
   const s = useShared()
   const { camera, raycaster } = useThree()
   const anchor = useRef<THREE.Group>(null)
+  const wrapper = useRef<HTMLDivElement>(null)
   const since = useRef(nextPhase())
   const [occluded, setOccluded] = useState(false)
 
@@ -71,10 +78,12 @@ export default function Label({ position, zIndexRange, center, children }: Label
     if (since.current < OCCLUSION_PERIOD) return
     since.current = 0
     const tower = s.tower.current
-    if (!tower || !anchor.current) return
-    // Re-setting the same value is a no-op in React, so this re-renders on a
-    // transition, not ten times a second.
-    setOccluded(isOccluded(anchor.current, tower, camera, raycaster))
+    if (tower && anchor.current) {
+      // Re-setting the same value is a no-op in React, so this re-renders on
+      // a transition, not ten times a second.
+      setOccluded(isOccluded(anchor.current, tower, camera, raycaster))
+    }
+    clampToViewport(wrapper.current)
   })
 
   // `display`, not `visibility`: several call sites drive their own child's
@@ -99,8 +108,47 @@ export default function Label({ position, zIndexRange, center, children }: Label
         // behaviour.
         portal={s.overlay as RefObject<HTMLElement>}
       >
-        {children}
+        {/* A label's own box is sized by its text (`white-space: nowrap`) and
+            positioned by drei from the 3D anchor, which knows nothing about
+            the viewport it's projecting into. Near an edge that pushes the
+            box past the glass, where .bld-overlay's own `overflow: hidden`
+            used to just clip it mid-word. This wrapper is the one place
+            every label passes through (Wayfinding, Table, Trajectory,
+            FrontDesk, HealDemo), so the correction lives here once instead
+            of five times. */}
+        <div ref={wrapper} style={CLAMP_STYLE}>
+          {children}
+        </div>
       </Html>
     </group>
   )
+}
+
+const CLAMP_STYLE: CSSProperties = { display: 'inline-block' }
+
+/**
+ * Shifts `el` horizontally so its rendered box stays within
+ * [VIEWPORT_MARGIN, innerWidth - VIEWPORT_MARGIN], without touching its font
+ * size or wrapping. Anchors near the tower's right edge otherwise push their
+ * box — which hangs to the right of the anchor by default — straight past
+ * the glass; anchors near the left edge (memory notes, which hang left) can
+ * do the same in the other direction.
+ */
+function clampToViewport(el: HTMLDivElement | null): void {
+  if (!el) return
+  // Undo any previous correction before measuring, so a label that has
+  // scrolled back into bounds isn't measured with yesterday's shift baked in.
+  el.style.transform = ''
+  const rect = el.getBoundingClientRect()
+  // clientWidth, not window.innerWidth: the page can carry a vertical
+  // scrollbar (it does at 390px), and innerWidth includes that scrollbar's
+  // own width while the actual content box a label can occupy does not.
+  // Clamping against innerWidth let a label sit a scrollbar's-width past
+  // the real right edge -- exactly the residual overflow this fix exists
+  // to remove.
+  const viewportWidth = document.documentElement.clientWidth
+  const overflowRight = rect.right - (viewportWidth - VIEWPORT_MARGIN)
+  const overflowLeft = VIEWPORT_MARGIN - rect.left
+  const shift = overflowRight > 0 ? -overflowRight : overflowLeft > 0 ? overflowLeft : 0
+  if (shift !== 0) el.style.transform = `translateX(${shift.toFixed(1)}px)`
 }
