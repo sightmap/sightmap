@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber'
-import { Html, Line } from '@react-three/drei'
+import { Line } from '@react-three/drei'
+import Label from './Label'
 import { useMemo, useRef, type ComponentRef } from 'react'
 import { JOURNEYS, TRAVELLER_COLORS } from './model'
 import { buildPath } from './geometry'
@@ -45,7 +46,7 @@ export default function Trajectory() {
       {journey.stops.map(([, name], k) => {
         const p = path.points[path.stops[k]]
         return (
-          <Html key={name + k} position={[p.x, p.y + 0.15, p.z]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
+          <Label key={name + k} position={[p.x, p.y + 0.15, p.z]} center zIndexRange={[7, 0]}>
             <div
               ref={(el) => {
                 pins.current[k] = el
@@ -56,7 +57,7 @@ export default function Trajectory() {
               <b>{k + 1}</b>
               <span>{name}</span>
             </div>
-          </Html>
+          </Label>
         )
       })}
     </>

@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber'
-import { Html, Line, RoundedBox } from '@react-three/drei'
+import { Line, RoundedBox } from '@react-three/drei'
+import Label from './Label'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { TABLE } from './model'
@@ -34,16 +35,12 @@ export default function Table() {
         <meshStandardMaterial ref={mat} color="#12315f" roughness={0.96} />
       </RoundedBox>
       <Line points={grid} segments color="#2f62b8" lineWidth={1} transparent opacity={0.5} depthWrite={false} />
-      <Html
-        position={[-TABLE.w / 2 + 0.6, 0.02, TABLE.d / 2 - 0.6]}
-        zIndexRange={[4, 0]}
-        style={{ pointerEvents: 'none' }}
-      >
+      <Label position={[-TABLE.w / 2 + 0.6, 0.02, TABLE.d / 2 - 0.6]} zIndexRange={[4, 0]}>
         <div className="bld-titleblock">
           <span>Drawing set A-101</span>
           <span>northwind-air · .sightmap/ · v1</span>
         </div>
-      </Html>
+      </Label>
     </group>
   )
 }

@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import { useRef } from 'react'
+import Label from './Label'
 import { FLOORS, FLOOR_D, FLOOR_W, SLAB_T, floorY, roomTop } from './model'
 import { smoothstep } from './chapters'
 import { useShared } from './state'
@@ -72,13 +72,7 @@ export default function Wayfinding() {
   return (
     <>
       {anchors.map((a, k) => (
-        <Html
-          key={k}
-          position={a.pos}
-          center={a.kind === 'tag'}
-          zIndexRange={[6, 0]}
-          style={{ pointerEvents: 'none' }}
-        >
+        <Label key={k} position={a.pos} center={a.kind === 'tag'} zIndexRange={[6, 0]}>
           <div
             ref={(el) => {
               els.current[k] = el
@@ -88,7 +82,7 @@ export default function Wayfinding() {
           >
             {a.node}
           </div>
-        </Html>
+        </Label>
       ))}
     </>
   )
