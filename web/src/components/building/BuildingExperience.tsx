@@ -113,6 +113,12 @@ export default function BuildingExperience() {
           )}
         </div>
 
+        {/* Where the scene's 3D-anchored labels land. A sibling of the stage,
+            never a child of it — see .bld-overlay in building.css. Left
+            readable by assistive tech: the text in it (floor directory, room
+            tags, memory notes) is content, not decoration like the canvas. */}
+        <div className="bld-overlay" data-component="BuildingOverlay" ref={shared.overlay} />
+
         <main className="bld-story">
           {CHAPTERS.map((ch, i) => {
             const isActive = i === active

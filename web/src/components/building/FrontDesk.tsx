@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber'
-import { Html, RoundedBox } from '@react-three/drei'
+import { RoundedBox } from '@react-three/drei'
+import Label from './Label'
 import { useRef } from 'react'
 import * as THREE from 'three'
 import { SLAB_T, TOOLS, TRAVELLER_COLORS } from './model'
@@ -74,7 +75,7 @@ export default function FrontDesk() {
           <meshStandardMaterial color="#8a8272" roughness={0.6} />
         </mesh>
         {TOOLS.map((tool, k) => (
-          <Html key={tool.name} position={[1.0, 0.9 + k * 0.7, -1.4]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
+          <Label key={tool.name} position={[1.0, 0.9 + k * 0.7, -1.4]} center zIndexRange={[7, 0]}>
             <div
               ref={(el) => {
                 cards.current[k] = el
@@ -88,7 +89,7 @@ export default function FrontDesk() {
               </b>
               <small>{tool.via}</small>
             </div>
-          </Html>
+          </Label>
         ))}
       </group>
       <Walker color={TRAVELLER_COLORS.agent} group={visitor} trail={false} />

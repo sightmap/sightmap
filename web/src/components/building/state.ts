@@ -2,7 +2,8 @@
 // pointer) and the scene (which reads them every frame). Deliberately not
 // React state: scroll fires far more often than React should re-render, and
 // the scene only needs the latest value when it draws.
-import { createContext, useContext } from 'react'
+import { createContext, useContext, type RefObject } from 'react'
+import type * as THREE from 'three'
 import { defaultParams, type SceneParams } from './chapters'
 
 export interface SharedState {
@@ -23,6 +24,14 @@ export interface SharedState {
   /** 'tour' frames the whole table for the /building page; 'billboard' is
    *  the tight, centred crop used by the homepage slice. */
   frame: 'tour' | 'billboard'
+  /** The .bld-overlay element the scene's labels portal into. Owned by the
+   *  page, read by the scene: the canvas is a separate reconciler, so a plain
+   *  ref object carried on the shared state is how the two sides meet. Null
+   *  until the page mounts; drei falls back to the canvas container. */
+  overlay: RefObject<HTMLDivElement | null>
+  /** The tower's root group. Labels raycast against it to decide whether the
+   *  building is standing between them and the camera. */
+  tower: RefObject<THREE.Group | null>
 }
 
 export function createSharedState(): SharedState {
@@ -36,6 +45,8 @@ export function createSharedState(): SharedState {
     mobile: false,
     reduced: false,
     frame: 'tour',
+    overlay: { current: null },
+    tower: { current: null },
   }
 }
 

@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
-import { Html } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import Label from './Label'
 import { KIOSK_H, PLATE, SLAB_T, TRAVELLER_COLORS, findRoom, floorY, roomStand } from './model'
 import { smoothstep } from './chapters'
 import { useShared } from './state'
@@ -122,9 +122,9 @@ export default function HealDemo() {
         <boxGeometry args={[room.w, KIOSK_H, room.d]} />
         <meshStandardMaterial color="#ffffff" transparent opacity={0} wireframe emissive="#ffffff" emissiveIntensity={0.6} />
       </mesh>
-      <Html position={[room.x - 1.6, floorY(FLOOR) + SLAB_T + KIOSK_H + 1.15, room.z - 0.4]} zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
+      <Label position={[room.x - 1.6, floorY(FLOOR) + SLAB_T + KIOSK_H + 1.15, room.z - 0.4]} zIndexRange={[7, 0]}>
         <div ref={status} className="bld-status bld-status--run" style={{ opacity: 0, visibility: 'hidden' }} />
-      </Html>
+      </Label>
     </>
   )
 }

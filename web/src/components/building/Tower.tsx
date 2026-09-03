@@ -548,10 +548,13 @@ function Frame({ mats }: { mats: Mats }) {
 }
 
 export default function Tower() {
+  const s = useShared()
   const mats = useMaterials()
   const t0 = useMemo(() => performance.now() + 400, [])
+  // Published on the shared state so the labels can raycast against it: this
+  // group is what stands between them and the camera.
   return (
-    <group>
+    <group ref={s.tower}>
       {FLOORS.map((_, i) => (
         <FloorUnit key={i} index={i} mats={mats} t0={t0} />
       ))}
