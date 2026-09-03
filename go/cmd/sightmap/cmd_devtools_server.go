@@ -94,9 +94,19 @@ func registerDevtoolsHandlers(mux *http.ServeMux, ptr *atomic.Pointer[browser.Co
 		case http.MethodGet:
 			writeJSON(w, map[string]any{"scripts": c.PersistentScripts()})
 		case http.MethodPost:
-			src, err := io.ReadAll(io.LimitReader(r.Body, maxInjectBytes))
+			// Read one byte past the cap so an over-limit body is detected
+			// rather than silently truncated (the same cap+1 idiom
+			// go/atlas/fetch.go uses). A plain LimitReader at exactly the cap
+			// presents EOF to ReadAll, so a body larger than the cap would
+			// otherwise be cut to maxInjectBytes with err == nil and stored
+			// verbatim.
+			src, err := io.ReadAll(io.LimitReader(r.Body, maxInjectBytes+1))
 			if err != nil {
 				http.Error(w, "read body: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			if len(src) > maxInjectBytes {
+				http.Error(w, "script too large", http.StatusRequestEntityTooLarge)
 				return
 			}
 			if len(src) == 0 {
