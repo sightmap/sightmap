@@ -689,7 +689,44 @@
   .bld-nav { padding: 0 1rem; }
   .bld-nav__title { display: none; }
   .bld-nav__links { gap: 1rem; }
-  .bld-hud { display: none; }
+
+  /* Several chapters' copy argues from the exact figures in these rows
+     ("41 source files", "128 / 128 runs passed"...) — hiding the HUD below
+     899px left the claim in prose with the numbers behind it switched off.
+     Collapse it into a horizontal strip under the nav instead of dropping
+     it: title and leader lines are what don't fit a narrow width, not the
+     rows themselves. */
+  .bld-hud {
+    top: 64px;
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    display: flex;
+    gap: 0.9rem;
+    padding: 0.55rem 0.8rem;
+    border-radius: 10px;
+    overflow-x: auto;
+  }
+
+  .bld-hud__title { display: none; }
+
+  .bld-hud__row {
+    flex: none;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    padding: 0;
+    white-space: nowrap;
+  }
+
+  .bld-hud__row i { display: none; }
+  .bld-hud__row span {
+    font-size: 0.56rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--bld-dim);
+  }
+  .bld-hud__row b { font-size: 0.72rem; }
 
   .bld-poster { padding: 10vh 2vw 46vh; }
 
