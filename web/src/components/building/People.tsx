@@ -4,8 +4,8 @@ import * as THREE from 'three'
 import { JOURNEYS, TRAVELLER_COLORS, type Journey } from './model'
 import { buildPath, pointAt, type Path } from './geometry'
 import { smoothstep } from './chapters'
-import { useShared } from './state'
-import { PART_KEYS, RIG, makePose, standPose, type PartPose } from './people'
+import { useShared, type PersonSlot } from './state'
+import { PART_KEYS, RIG, gaitPose, makeGait, makePose, stepGait, type Gait, type PartPose } from './people'
 
 // Everybody in the building, drawn by six instanced meshes — one per body
 // part. A person is six matrix writes a frame, so walkers and the scripted
@@ -50,6 +50,7 @@ interface Walker {
   journey: Journey
   path: Path
   run: Runner
+  gait: Gait
   colors: Palette
 }
 
@@ -83,10 +84,12 @@ export default function People() {
 
   const walkers = useMemo<Walker[]>(
     () =>
-      JOURNEYS.map((journey) => ({
+      JOURNEYS.map((journey, i) => ({
         journey,
         path: buildPath(journey),
         run: { d: 0, dwell: DWELL, next: 1, wait: journey.delay, fade: 0, walkT: 0, yaw: 0 },
+        // Stagger the starting phases so the crowd does not march in lockstep.
+        gait: makeGait(i * 1.7),
         colors: palette(TRAVELLER_COLORS[journey.who], WALKER_SKIN),
       })),
     []
@@ -110,6 +113,10 @@ export default function People() {
     },
     [rig]
   )
+
+  // Slots come and go with their vignettes, so their gait state is keyed off
+  // the slot itself rather than an index that would drift.
+  const slotGaits = useMemo(() => new WeakMap<PersonSlot, Gait>(), [])
 
   const k = useMemo(
     () => ({
@@ -198,7 +205,8 @@ export default function People() {
       if (k.ahead.distanceToSquared(k.here) > 1e-8) {
         w.run.yaw = Math.atan2(k.ahead.x - k.here.x, k.ahead.z - k.here.z)
       }
-      standPose(k.pose)
+      stepGait(w.gait, k.here.x, k.here.z, dt, s.reduced)
+      gaitPose(w.gait.phase, w.gait.amp, k.pose)
       draw(n, k.here.x, k.here.y, k.here.z, w.run.yaw, scale, k.pose, w.colors)
       n++
     }
@@ -207,7 +215,13 @@ export default function People() {
     for (const slot of s.slots) {
       if (n >= MAX_PEOPLE) break
       if (!slot.visible || slot.scale <= MIN_SCALE) continue
-      standPose(k.pose)
+      let gait = slotGaits.get(slot)
+      if (!gait) {
+        gait = makeGait()
+        slotGaits.set(slot, gait)
+      }
+      stepGait(gait, slot.x, slot.z, dt, s.reduced)
+      gaitPose(gait.phase, gait.amp, k.pose)
       draw(n, slot.x, slot.y, slot.z, slot.ry, slot.scale * WALKER_SCALE, k.pose, slotPalette(slot.color))
       n++
     }

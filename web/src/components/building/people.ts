@@ -69,20 +69,108 @@ function hang(out: PartPose, px: number, py: number, len: number, rx: number): v
   out.rx = rx
 }
 
-/** The neutral standing pose: upright, limbs hanging. */
-export function standPose(out: PartPose[]): PartPose[] {
+/** Peak swing of each limb pair in radians, and the hip dip at mid-stride. */
+export const SWING = { arm: 0.5, leg: 0.62 } as const
+export const BOB = 0.024
+/** Forward lean of the torso at full walking speed. */
+export const LEAN = 0.07
+
+/**
+ * Ground covered by one full two-step cycle, in world units. Phase advances
+ * with distance travelled rather than with wall time, so a figure easing out
+ * of a stop takes slower steps instead of moon-walking at a fixed cadence.
+ */
+export const STRIDE = 1.15
+
+/** Speed, in world units per second, at which the gait reaches full swing. */
+export const FULL_SWING_SPEED = 1.4
+
+const TAU = Math.PI * 2
+
+/** Advance gait phase by `travelled` world units, wrapped to [0, TAU). */
+export function advancePhase(phase: number, travelled: number, stride: number = STRIDE): number {
+  const next = phase + (travelled / stride) * TAU
+  return ((next % TAU) + TAU) % TAU
+}
+
+/** How much of the swing a figure moving at `speed` should be showing. */
+export function gaitAmplitude(speed: number, reduced: boolean): number {
+  if (reduced) return 0
+  return Math.min(1, Math.max(0, speed / FULL_SWING_SPEED))
+}
+
+/**
+ * The walk cycle: the legs swing in antiphase, each arm opposes the leg on
+ * its own side, and the hips dip when the legs are furthest apart. `amp`
+ * scales all of it, so amp 0 is a figure standing neutrally rather than one
+ * frozen mid-stride — which is what reduced motion asks for.
+ *
+ * At this camera you never see a face, so the swing is the whole read; the
+ * amplitudes are tuned for legibility at 6–10px, not for anatomy.
+ */
+export function gaitPose(phase: number, amp: number, out: PartPose[]): PartPose[] {
+  const swing = Math.sin(phase)
+  const dip = -Math.abs(swing) * BOB * amp
   const [torso, head, armL, armR, legL, legR] = out
   torso.x = 0
-  torso.y = RIG.torsoY
+  torso.y = RIG.torsoY + dip
   torso.z = 0
-  torso.rx = 0
+  torso.rx = LEAN * amp
   head.x = 0
-  head.y = RIG.headY
+  head.y = RIG.headY + dip
   head.z = 0
   head.rx = 0
-  hang(armL, -RIG.armX, RIG.shoulderY, ARM_LEN, 0)
-  hang(armR, RIG.armX, RIG.shoulderY, ARM_LEN, 0)
-  hang(legL, -RIG.legX, RIG.hipY, LEG_LEN, 0)
-  hang(legR, RIG.legX, RIG.hipY, LEG_LEN, 0)
+  hang(armL, -RIG.armX, RIG.shoulderY + dip, ARM_LEN, -swing * SWING.arm * amp)
+  hang(armR, RIG.armX, RIG.shoulderY + dip, ARM_LEN, swing * SWING.arm * amp)
+  hang(legL, -RIG.legX, RIG.hipY + dip, LEG_LEN, swing * SWING.leg * amp)
+  hang(legR, RIG.legX, RIG.hipY + dip, LEG_LEN, -swing * SWING.leg * amp)
   return out
+}
+
+/** The neutral standing pose: upright, limbs hanging. */
+export function standPose(out: PartPose[]): PartPose[] {
+  return gaitPose(0, 0, out)
+}
+
+/** Per-person gait state, advanced from where that person was last frame. */
+export interface Gait {
+  phase: number
+  amp: number
+  /** Last horizontal position, so travel is measured rather than assumed. */
+  px: number
+  pz: number
+  seeded: boolean
+}
+
+export function makeGait(phase = 0): Gait {
+  return { phase, amp: 0, px: 0, pz: 0, seeded: false }
+}
+
+/** A jump larger than this is a teleport (a journey restarting), not a stride. */
+const TELEPORT = 0.5
+
+/** How fast the swing amplitude chases the speed it should be showing. */
+const AMP_RESPONSE = 10
+
+/**
+ * Advance one figure's gait to its new position. Horizontal travel only: a
+ * walker riding the core between floors is moving, but it is not stepping.
+ */
+export function stepGait(g: Gait, x: number, z: number, dt: number, reduced: boolean): Gait {
+  let travelled = 0
+  if (g.seeded) {
+    const dist = Math.hypot(x - g.px, z - g.pz)
+    if (dist < TELEPORT) travelled = dist
+  }
+  g.px = x
+  g.pz = z
+  g.seeded = true
+  if (reduced) {
+    g.amp = 0
+    return g
+  }
+  const target = gaitAmplitude(travelled / Math.max(dt, 1e-4), false)
+  g.amp += (target - g.amp) * Math.min(1, dt * AMP_RESPONSE)
+  g.phase = advancePhase(g.phase, travelled)
+  return g
 }
