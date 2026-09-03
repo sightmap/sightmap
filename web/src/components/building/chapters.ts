@@ -194,11 +194,19 @@ export const CHAPTERS: Chapter[] = [
   {
     id: 'web-mcp',
     short: 'Web MCP',
-    eyebrow: '07 · Built on top',
-    badge: 'exploratory',
-    title: 'A front desk for agents.',
+    eyebrow: '07 · sightkick',
+    title: 'sightkick is the front desk.',
     body:
-      'Once the building knows its own rooms, it can offer services at the door. Generate MCP tools from the map: `search_flights`, `select_fare`, `create_booking`, each backed by a real view and a real request. An agent walks up to the counter instead of wandering the halls.',
+      '`@sightmap/sightkick` (0.4.0) compiles a `.sightkick/` tool layer against the `.sightmap/` corpus into WebMCP tool IR: `search_flights`, `select_fare`, `create_booking`, each backed by a real view and a real request. Every tool is UI-driven — calling one does not just return JSON, it lights up the room it touches on screen.',
+    ctas: [
+      {
+        label: 'npx @sightmap/sightkick skills install',
+        href: 'https://www.npmjs.com/package/@sightmap/sightkick',
+        primary: true,
+        external: true,
+      },
+      { label: 'View on GitHub', href: 'https://github.com/sightmap/sightkick', external: true },
+    ],
     hud: {
       title: 'Front desk',
       rows: [
