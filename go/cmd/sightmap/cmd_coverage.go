@@ -215,11 +215,14 @@ func coverCapture(snapPath string, corpus *sightmap.Corpus, visible, trace bool)
 			if counts[comp.Name] > 0 || len(comp.Selectors) == 0 {
 				continue // matched or no selector — nothing to probe
 			}
-			if n := countLeafMatches(root, comp.Selectors[0]); n > 0 {
-				if leafCounts == nil {
-					leafCounts = make(map[string]int)
+			for _, sel := range comp.Selectors {
+				if n := countLeafMatches(root, sel); n > 0 {
+					if leafCounts == nil {
+						leafCounts = make(map[string]int)
+					}
+					leafCounts[comp.Name] = n
+					break // first leaf-matching alternative suffices; preserves the per-leaf node-count contract
 				}
-				leafCounts[comp.Name] = n
 			}
 		}
 		// Page-check: if every top-level view-specific component matched 0 nodes,
