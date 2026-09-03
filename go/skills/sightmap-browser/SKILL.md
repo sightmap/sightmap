@@ -64,6 +64,8 @@ daemon and returns immediately.
 | `sightmap browser stop` | Stop Chrome session. |
 | `sightmap browser eval 'js'` | Evaluate JS in page context. Returns JSON-serializable values only — DOM element references return an error. A returned promise is awaited, so `async` evals resolve to their value. |
 | `sightmap browser inject --file X --persist` | Inject a script that re-runs on **every** new document/tab for the whole session (survives navigations), vs `eval`'s one-shot. `--list` / `--remove ID` manage them. Needs a running session (the daemon holds the registry). |
+| `sightmap browser mcp list` | Enumerate the WebMCP tools the page exposes via `document.modelContext` (name, description, input schema; `--json` for full schemas). Reports native vs polyfilled vs absent; fails loudly with the Chrome-flag hint when absent. When a page exposes tools, prefer a named `mcp call` over blind click/fill. |
+| `sightmap browser mcp call <tool> --args '{…}'` | Invoke one exposed tool via `executeTool` and print its result. One tool at a point in time — no cross-navigation; if the tool navigates, re-run `mcp list` on the new view. |
 | `sightmap browser screenshot --out FILE.png` | Screenshot the page. Clip to a component with `--component NAME` (or `--selector CSS`), optionally `--expand-pct N` for context. |
 
 ## Reading the page: annotated snapshots

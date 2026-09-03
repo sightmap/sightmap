@@ -34,6 +34,8 @@ func runBrowser(args []string) error {
 		return runEval(args[1:])
 	case "inject", "add-script":
 		return runInject(args[1:])
+	case "mcp":
+		return runMCP(args[1:])
 	case "click":
 		return runClick(args[1:])
 	case "fill":
@@ -79,6 +81,10 @@ Session:
   eval <script>
   inject [--file PATH | <script>] [--persist]   run a script now; --persist re-injects it on every new document/tab (whole session)
   inject --list | --remove ID                   list or remove persisted scripts
+
+WebMCP (tools a page exposes via document.modelContext):
+  mcp list [--json]                             enumerate the page's WebMCP tools (name, description, input schema)
+  mcp call <tool> [--args JSON] [--json]        invoke a tool via executeTool and print its result
 
 Interaction (IDs from sightmap snapshot output):
   click    COMPONENT-ID | --x N --y N
