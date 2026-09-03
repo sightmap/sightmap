@@ -54,7 +54,11 @@ func TestBuildMCPArgs(t *testing.T) {
 
 func TestMCPCallScript(t *testing.T) {
 	s := mcpCallScript("search", `{"query":"ATL to LHR"}`)
-	for _, want := range []string{"getTools", "executeTool", `const name = "search"`, `{"query":"ATL to LHR"}`} {
+	for _, want := range []string{
+		"getTools", "executeTool", `const name = "search"`, `const args = {"query":"ATL to LHR"}`,
+		// Native surfaces need args as a JSON string; the script must branch on it.
+		"nativeSurface", "JSON.stringify(args)",
+	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("mcpCallScript missing %q in:\n%s", want, s)
 		}

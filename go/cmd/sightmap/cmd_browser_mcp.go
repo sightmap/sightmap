@@ -158,11 +158,15 @@ func mcpCallScript(name, argsJSON string) string {
   const name = %s;
   const tool = tools.find(t => t && t.name === name);
   if (!tool) return { present: true, found: false, names: tools.map(t => t && t.name).filter(Boolean) };
+  const args = %s;
+  // Native document.modelContext wants arguments as a JSON string and hands the
+  // CallToolResult back as a JSON string; a JS polyfill takes/returns objects. A
+  // built-in method reads as "[native code]", so shape the payload to the surface
+  // (native rejects a bare object with "Failed to parse input arguments").
+  const nativeSurface = /\[native code\]/.test(Function.prototype.toString.call(mc.executeTool));
   try {
-    let result = await mc.executeTool(tool, %s);
-    // Native document.modelContext returns the CallToolResult as a JSON string;
-    // the polyfill returns an object. Normalize to an object so the CLI sees one
-    // shape (mirrors what an in-page WebMCP client does).
+    let result = await mc.executeTool(tool, nativeSurface ? JSON.stringify(args) : args);
+    // Normalize the native JSON-string result to an object so the CLI sees one shape.
     if (typeof result === 'string') { try { result = JSON.parse(result); } catch (_) {} }
     return { present: true, found: true, result: result };
   } catch (e) {
