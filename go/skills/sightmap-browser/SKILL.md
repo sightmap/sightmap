@@ -58,7 +58,7 @@ daemon and returns immediately.
 
 | Command | What it does |
 |---------|-------------|
-| `sightmap browser start` | Launch Chrome + the overlay server. **Foreground daemon — holds the shell; pass `--detach` in scripts/agents.** Writes `.sightmap/.session`. |
+| `sightmap browser start` | Launch Chrome + the overlay server. **Foreground daemon — holds the shell; pass `--detach` in scripts/agents.** Creates `.sightmap/` if absent and writes `.sightmap/.session` (fails loudly if it can't). Every other command finds the session via this file, so with no session file a command warns and falls back to the default CDP port — which may be a **different agent's** Chrome; pass `--addr` to be explicit. |
 | `sightmap browser status` | Check session health, tabs, and current URL. Reports `⚠ degraded` when Chrome's CDP is up but the daemon's HTTP server was reaped. |
 | `sightmap browser navigate 'URL'` | Navigate to URL (positional arg — no `--url` flag). |
 | `sightmap browser stop` | Stop Chrome session. |
