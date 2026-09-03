@@ -84,7 +84,7 @@ Session:
 
 WebMCP (tools a page exposes via document.modelContext):
   mcp list [--json]                             enumerate the page's WebMCP tools (name, description, input schema)
-  mcp call <tool> [--args JSON] [--json]        invoke a tool via executeTool and print its result
+  mcp call <tool> [--args JSON] [--param k=v] [--json]   invoke a tool via executeTool; prints its result, non-zero exit on tool error
 
 Interaction (IDs from sightmap snapshot output):
   click    COMPONENT-ID | --x N --y N

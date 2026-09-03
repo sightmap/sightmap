@@ -167,18 +167,45 @@ func mcpCallScript(name, argsJSON string) string {
 })()`, nameLit, argsJSON)
 }
 
-// normalizeMCPArgs validates the --args JSON and returns it (defaulting to an
-// empty object). WebMCP tool arguments are a JSON object, so a non-object is
-// rejected up front with an actionable message rather than failing in the page.
-func normalizeMCPArgs(raw string) (string, error) {
-	if raw == "" {
-		return "{}", nil
+// kvList collects repeatable --param key=value flags.
+type kvList []string
+
+func (l *kvList) String() string { return strings.Join(*l, ",") }
+func (l *kvList) Set(v string) error {
+	*l = append(*l, v)
+	return nil
+}
+
+// buildMCPArgs assembles the tool argument object from --args (a JSON object,
+// the base) and any --param key=value overrides layered on top. WebMCP tool
+// arguments are a JSON object, so a non-object --args is rejected up front with
+// an actionable message rather than failing in the page. Each --param value is
+// parsed as JSON when possible (so count=3 / watched=true become a number/bool)
+// and falls back to a raw string, matching the ergonomics of a hand-driven call.
+func buildMCPArgs(argsFlag string, params []string) (string, error) {
+	obj := map[string]any{}
+	if strings.TrimSpace(argsFlag) != "" {
+		if err := json.Unmarshal([]byte(argsFlag), &obj); err != nil {
+			return "", fmt.Errorf("--args must be a JSON object (e.g. '{\"query\":\"ATL to LHR\"}'): %w", err)
+		}
 	}
-	var obj map[string]any
-	if err := json.Unmarshal([]byte(raw), &obj); err != nil {
-		return "", fmt.Errorf("--args must be a JSON object (e.g. '{\"query\":\"ATL to LHR\"}'): %w", err)
+	for _, p := range params {
+		k, v, ok := strings.Cut(p, "=")
+		if !ok {
+			return "", fmt.Errorf("--param %q is not in key=value form", p)
+		}
+		var decoded any
+		if json.Unmarshal([]byte(v), &decoded) == nil {
+			obj[k] = decoded
+		} else {
+			obj[k] = v
+		}
 	}
-	return raw, nil
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func runMCPCall(args []string) error {
@@ -187,16 +214,18 @@ func runMCPCall(args []string) error {
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	argsFlag := fs.String("args", "", "Tool arguments as a JSON object (default: {})")
+	var params kvList
+	fs.Var(&params, "param", "Tool arg as key=value (repeatable; value parses as JSON when possible, else string). Merged over --args.")
 	jsonFlag := fs.Bool("json", false, "Emit the raw result value as compact JSON")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
 	rest := fs.Args()
 	if len(rest) != 1 {
-		return fmt.Errorf("usage: browser mcp call <tool> [--args JSON]")
+		return fmt.Errorf("usage: browser mcp call <tool> [--args JSON] [--param k=v ...]")
 	}
 	toolName := rest[0]
-	argsJSON, err := normalizeMCPArgs(*argsFlag)
+	argsJSON, err := buildMCPArgs(*argsFlag, params)
 	if err != nil {
 		return err
 	}
@@ -230,21 +259,86 @@ func runMCPCall(args []string) error {
 		return fmt.Errorf("mcp call: tool %q threw: %s (args: %s)", toolName, res.Error, argsJSON)
 	}
 
-	// The result may carry the tool's own guidance breadcrumbs (e.g. an
-	// after_navigation hint toward the next tool); printing it whole surfaces them.
 	if len(res.Result) == 0 {
 		res.Result = json.RawMessage("null")
 	}
-	if *jsonFlag {
-		fmt.Println(string(res.Result))
-		return nil
-	}
-	var v any
-	if err := json.Unmarshal(res.Result, &v); err == nil {
-		out, _ := json.MarshalIndent(v, "", "  ")
-		fmt.Println(string(out))
-	} else {
-		fmt.Println(string(res.Result))
+	out, failed := renderCallResult(res.Result, *jsonFlag)
+	fmt.Println(out)
+	// A tool that ran but reported failure (WebMCP isError) is a non-zero exit, so
+	// the command is scriptable — the result (with its error content) is still
+	// printed above.
+	if failed {
+		return fmt.Errorf("mcp call: tool %q reported an error (isError)", toolName)
 	}
 	return nil
+}
+
+// renderCallResult formats executeTool's return value and reports whether the
+// tool signalled failure. WebMCP tools return a CallToolResult envelope —
+// { content: [{type,text}], isError?, structuredContent? } — which is what both
+// native Chrome and sightkick's polyfill produce (sightkick JSON-stringifies its
+// own ToolResult, with ok/guidance, into content[0].text). We unwrap that so the
+// text/guidance render as themselves rather than a stringified blob, and treat
+// isError as failure. A plain (non-envelope) value is printed as-is. --json
+// always emits the raw value verbatim.
+func renderCallResult(raw json.RawMessage, asJSON bool) (out string, failed bool) {
+	var top map[string]json.RawMessage
+	isEnvelope := json.Unmarshal(raw, &top) == nil && top["content"] != nil
+
+	if asJSON {
+		if isEnvelope {
+			return string(raw), envelopeIsError(top)
+		}
+		return string(raw), false
+	}
+
+	if !isEnvelope {
+		return prettyJSON(raw), false
+	}
+
+	var env struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+		StructuredContent json.RawMessage `json:"structuredContent"`
+	}
+	_ = json.Unmarshal(raw, &env)
+
+	var b strings.Builder
+	for _, part := range env.Content {
+		if part.Type != "" && part.Type != "text" {
+			continue // only text parts are human-renderable here
+		}
+		b.WriteString(prettyJSON(json.RawMessage(part.Text)))
+		b.WriteByte('\n')
+	}
+	if len(env.StructuredContent) > 0 {
+		b.WriteString(prettyJSON(env.StructuredContent))
+		b.WriteByte('\n')
+	}
+	return strings.TrimRight(b.String(), "\n"), envelopeIsError(top)
+}
+
+// envelopeIsError reports whether a CallToolResult envelope's isError is true.
+func envelopeIsError(top map[string]json.RawMessage) bool {
+	var isErr bool
+	if v, ok := top["isError"]; ok {
+		_ = json.Unmarshal(v, &isErr)
+	}
+	return isErr
+}
+
+// prettyJSON indents s when it is valid JSON, otherwise returns it unchanged
+// (e.g. a plain-text content part that isn't itself JSON).
+func prettyJSON(s json.RawMessage) string {
+	var v any
+	if json.Unmarshal(s, &v) != nil {
+		return string(s)
+	}
+	out, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return string(s)
+	}
+	return string(out)
 }

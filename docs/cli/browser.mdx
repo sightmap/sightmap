@@ -215,7 +215,9 @@ sightmap browser start \
 | Command | Flags | Description |
 |---------|-------|-------------|
 | `mcp list` | `--json` | Enumerate exposed tools (name, description, input schema). `--json` emits the full schemas. |
-| `mcp call <tool>` | `--args JSON`, `--json` | Invoke a tool via `executeTool` and print its structured result. `--args` is a JSON object (default `{}`). |
+| `mcp call <tool>` | `--args JSON`, `--param k=v`, `--json` | Invoke a tool via `executeTool` and print its result. Supply arguments as a JSON object (`--args`) and/or repeatable `--param key=value` pairs (each value parsed as JSON when possible, else a string) layered over `--args`. |
+
+Tools return the standard WebMCP `CallToolResult` envelope (`{ content, isError }`). `mcp call` unwraps it — rendering the text/structured content (and any guidance the tool includes) as itself rather than a stringified blob — and **exits non-zero when the tool reports `isError`**, so it is scriptable. `--json` prints the raw envelope verbatim.
 
 ```bash
 sightmap browser mcp list
@@ -223,6 +225,7 @@ sightmap browser mcp list
 #   search — Search flights by route
 
 sightmap browser mcp call search --args '{"query": "ATL to LHR"}'
+sightmap browser mcp call search --param query="ATL to LHR"   # equivalent
 ```
 
 Both accept `--addr` and `--tab` like the other page commands.
