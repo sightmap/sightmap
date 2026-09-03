@@ -1,0 +1,8 @@
+# .obvious/config.yml — repo policy for obvious workers.
+# Auto-detected from GitHub repo settings on 2026-09-03.
+repo: sightmap/sightmap
+defaultBranch: main
+merge:
+  # Repo allows squash and rebase; merge commits are disabled. Squash is the convention.
+  method: squash
+  deleteBranchOnMerge: true
