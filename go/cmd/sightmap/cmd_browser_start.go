@@ -392,7 +392,19 @@ func startDevtoolsServer(sightmapDir, siteName string, serverPort int) (*http.Se
 // tears down (it setsid's into its own session).
 func startDetached(args []string, sightmapDir, logFile string) error {
 	// Idempotent: if a live daemon already owns this corpus, don't spawn another.
+	// In detach mode Chrome (CDP) and the sightmap HTTP daemon are separate
+	// processes on separate ports; a reaped daemon can leave Chrome's CDP up
+	// while the server is gone. A CDP-only probe would call that "running",
+	// but every downstream command resolves the daemon via ServerPort and
+	// fails immediately — so probe the server too and report the degraded
+	// state honestly with a non-zero exit (mirroring `browser status`).
 	if info, err := browser.ReadSessionInfo(sightmapDir); err == nil && info.Port > 0 && isPortAlive(info.Port) {
+		if info.ServerPort > 0 && !serverAlive(info.ServerPort) {
+			fmt.Fprintf(os.Stderr, "⚠ degraded  cdp=%d up, but the sightmap server (:%d) is not responding\n", info.Port, info.ServerPort)
+			fmt.Fprintf(os.Stderr, "  console/network + live corpus reload are unavailable (the daemon was likely reaped).\n")
+			fmt.Fprintf(os.Stderr, "  recover: 'sightmap browser stop' then 'sightmap browser start --detach'\n")
+			return fmt.Errorf("start --detach: existing session is degraded (server :%d not responding)", info.ServerPort)
+		}
 		fmt.Fprintf(os.Stderr, "● already running  cdp=%d  server=%d  (see 'sightmap browser status')\n", info.Port, info.ServerPort)
 		return nil
 	}
