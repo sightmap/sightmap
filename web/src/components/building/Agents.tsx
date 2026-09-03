@@ -78,6 +78,7 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
   const tg = useRef<THREE.Mesh>(null)
   const run = useRef<Runner>({ d: 0, dwell: DWELL, next: 1, wait: journey.delay, fade: 0 })
   const tmp = useMemo(() => new THREE.Vector3(), [])
+  const ahead = useMemo(() => new THREE.Vector3(), [])
   const color = TRAVELLER_COLORS[journey.who]
 
   useFrame((_, dt) => {
@@ -114,6 +115,12 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
     if (!g.current) return
     pointAt(path, r.d, tmp)
     g.current.position.copy(tmp)
+    // Heading follows the path tangent: sample a point slightly further
+    // along the (now Catmull-Rom-rounded) path and face it.
+    pointAt(path, r.d + 0.05, ahead)
+    if (ahead.distanceToSquared(tmp) > 1e-8) {
+      g.current.rotation.y = Math.atan2(ahead.x - tmp.x, ahead.z - tmp.z)
+    }
     const focus = s.focus && s.focus !== journey.name ? 0.3 : 1
     const rise = smoothstep(Math.min(1, c.rise * 1.3 - 0.3))
     const sc = c.agents * focus * smoothstep(r.fade) * rise
