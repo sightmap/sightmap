@@ -23,6 +23,7 @@ import People, { crowd } from './People'
 import HealDemo from './HealDemo'
 import Trajectory from './Trajectory'
 import FrontDesk from './FrontDesk'
+import NightfallBloom from './NightfallBloom'
 
 const CAMERA_DISTANCE = 42
 
@@ -280,6 +281,13 @@ export default function Scene({ shared, mobile, frameloop, onReady, onDemote }: 
           {onDemote && <TierProbe onDemote={onDemote} />}
           <Rig />
           <SceneContent />
+          {/* Tour-only, not the billboard: NightfallBloom lives outside
+              SceneContent (which BillboardScene.tsx also mounts) because
+              BillboardScene never provides MobileTierContext, so a
+              `useMobileTier()` gate inside SceneContent would silently read
+              `false` there and run bloom on every homepage visitor's device,
+              phones included. */}
+          {!mobile && <NightfallBloom />}
         </MobileTierContext.Provider>
       </SharedStateContext.Provider>
     </Canvas>

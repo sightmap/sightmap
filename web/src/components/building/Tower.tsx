@@ -1,5 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { Instance, Instances, Line, RoundedBox } from '@react-three/drei'
+import { BLOOM_LAYER } from './bloom'
 import { mergeParts, roundedBoxGeometry, type Part } from './merge'
 import { useMemo, useRef, type ComponentRef } from 'react'
 import * as THREE from 'three'
@@ -627,7 +628,15 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
       </group>
       <group ref={walls} position={[0, SLAB_T, 0]}>
         <mesh geometry={CURTAIN_WALLS.spandrel} material={mats.spandrel} castShadow receiveShadow />
-        <mesh geometry={CURTAIN_WALLS.glass} material={mats.glass} />
+        {/* Tagged onto BLOOM_LAYER (see bloom.ts) so NightfallBloom can render
+            just this mesh for its bloom source — the only reliable way to
+            scope bloom to the windows given monitors and screens read
+            brighter than this glass does at night. */}
+        <mesh
+          ref={(o) => o?.layers.enable(BLOOM_LAYER)}
+          geometry={CURTAIN_WALLS.glass}
+          material={mats.glass}
+        />
         <mesh geometry={CURTAIN_WALLS.head} material={mats.steel} castShadow />
         {/* Mullions are not here: they are instanced across all floors at once,
             by <Mullions />, which composes this group's ramp itself. */}
