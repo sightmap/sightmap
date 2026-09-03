@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } 
 import { invalidate } from '@react-three/fiber'
 import { CHAPTERS } from './chapters'
 import { createSharedState, isMobileViewport, SharedStateContext } from './state'
+import { captureMode } from './capture'
+import { FLOOR_FPS, type RenderTier, type TierWindow } from './tier'
 import { webglAvailable } from './webgl'
 import Poster from './Poster'
 import BuildingNav from './BuildingNav'
@@ -34,6 +36,15 @@ export default function BuildingExperience() {
   // are chosen at render time, so the tier has to be able to re-render them
   // when the viewport crosses the boundary.
   const [mobile, setMobile] = useState(false)
+  // Which tier this device earns. Starts optimistic — every device gets to try
+  // — and only ever moves to 'poster' on measured evidence, or back to 'full'
+  // because the visitor said so.
+  const [tier, setTier] = useState<RenderTier>('full')
+  const [demoted, setDemoted] = useState<TierWindow | null>(null)
+  const [override, setOverride] = useState(false)
+  // Set only by the poster-capture harness; freezes the camera drift and keeps
+  // frames coming so a still is reproducible.
+  const capture = useMemo(captureMode, [])
   // Reduced motion is settled in the same effect as the tier, but it decides
   // the frame loop, so it has to be state too.
   const [reduced, setReduced] = useState(false)
@@ -48,6 +59,7 @@ export default function BuildingExperience() {
   useEffect(() => {
     setMounted(true)
     setWebgl(webglAvailable())
+    shared.capture = captureMode()
     shared.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     setReduced(shared.reduced)
     setMobile(isMobileViewport())
@@ -153,7 +165,26 @@ export default function BuildingExperience() {
   // Off-screen or backgrounded: stop entirely. Reduced motion: the scene is a
   // still once it settles, so draw on demand instead of paying for a redraw of
   // an unchanging image 60 times a second.
-  const frameloop = !onScreen || !visible ? 'never' : reduced ? 'demand' : 'always'
+  // Capture overrides all of it: the harness needs frames whatever the page
+  // would otherwise decide, or it photographs a scene mid-damp.
+  const frameloop = capture ? 'always' : !onScreen || !visible ? 'never' : reduced ? 'demand' : 'always'
+
+  // Only measure when the number would mean something. Under 'demand' the gaps
+  // between frames are the pump's, not the GPU's; under 'never' there are no
+  // frames; under capture we are deliberately hammering it; and once a visitor
+  // has overridden a demotion, we have been told to stop asking.
+  const onDemote =
+    frameloop === 'always' && !capture && !override
+      ? (w: TierWindow) => {
+          setDemoted(w)
+          setTier('poster')
+        }
+      : undefined
+
+  const showTour = () => {
+    setOverride(true)
+    setTier('full')
+  }
 
   const goTo = (i: number) => {
     sections.current[i]?.scrollIntoView({ behavior: shared.reduced ? 'auto' : 'smooth', block: 'start' })
@@ -165,13 +196,37 @@ export default function BuildingExperience() {
         <BuildingNav />
 
         <div className="bld-stage" data-component="BuildingStage" aria-hidden="true" ref={stage}>
-          <Poster hidden={ready} />
-          {mounted && webgl && (
+          <Poster hidden={ready && tier === 'full'} chapter={active} />
+          {mounted && webgl && tier === 'full' && (
             <Suspense fallback={null}>
-              <Scene shared={shared} mobile={mobile} frameloop={frameloop} onReady={() => setReady(true)} />
+              <Scene
+                shared={shared}
+                mobile={mobile}
+                frameloop={frameloop}
+                onReady={() => setReady(true)}
+                onDemote={onDemote}
+              />
             </Suspense>
           )}
         </div>
+
+        {/* A demoted device is not a stuck one. The measurement can be wrong —
+            a cold shader compile on a flagship reads much like a slow GPU — so
+            the way back is on screen, and taking it stops the sampler for the
+            rest of the session. Only offered when there is something to go back
+            to: a device with no WebGL at all is on the poster tier for a reason
+            no button can fix. */}
+        {tier === 'poster' && webgl && (
+          <div className="bld-tier" data-component="BuildingTierNotice">
+            <p className="bld-tier__text">
+              Showing stills — this device drew the tour below {FLOOR_FPS}fps
+              {demoted ? ` (${Math.round(demoted.fps)}fps)` : ''}.
+            </p>
+            <button type="button" className="bld-tier__btn" onClick={showTour}>
+              Show the 3D tour
+            </button>
+          </div>
+        )}
 
         {/* Where the scene's 3D-anchored labels land. A sibling of the stage,
             never a child of it — see .bld-overlay in building.css. Left
