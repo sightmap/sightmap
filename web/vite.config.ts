@@ -66,6 +66,11 @@ export default defineConfig({
       '@': resolve(__dirname, './src'),
     },
   },
+  // The building's environment map is a Radiance .hdr imported with `?url`.
+  // Vite has no built-in handling for that extension, so listing it here is
+  // what makes it a fingerprinted bundle asset like any image — and what keeps
+  // the scene's IBL out of a runtime CDN fetch.
+  assetsInclude: ['**/*.hdr'],
   build: {
     // Emit .map files next to the bundles so a Replay recording of
     // sightmap.org resolves to the original TSX instead of a 460KB minified
