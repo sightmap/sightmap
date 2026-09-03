@@ -630,9 +630,19 @@ func (c *Collector) tabConns() map[string]*CDPConn {
 }
 
 // addScriptOnNewDocument registers source to run at the start of every future
-// document on conn's target, returning CDP's identifier for later removal. It
-// does not require Page.enable.
+// document on conn's target, returning CDP's identifier for later removal.
+//
+// The Page domain MUST be enabled first: without it,
+// Page.addScriptToEvaluateOnNewDocument still returns an identifier (so the
+// script looks registered) but is never actually evaluated on new documents —
+// the persist-across-navigation bug. Enabling Page is idempotent, so calling it
+// per registration is safe; the collector connection subscribes to Runtime and
+// Network only, so the Page lifecycle events it turns on are dispatched to no
+// subscribers and dropped.
 func addScriptOnNewDocument(ctx context.Context, conn *CDPConn, source string) (string, error) {
+	if err := conn.EnableDomain(ctx, "Page"); err != nil {
+		return "", fmt.Errorf("addScriptToEvaluateOnNewDocument: enable Page: %w", err)
+	}
 	raw, err := conn.call(ctx, "Page.addScriptToEvaluateOnNewDocument", map[string]interface{}{
 		"source": source,
 	})
