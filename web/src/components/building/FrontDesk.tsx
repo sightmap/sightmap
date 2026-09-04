@@ -74,7 +74,7 @@ export default function FrontDesk() {
           <meshStandardMaterial color="#8a8272" roughness={0.6} />
         </mesh>
         {TOOLS.map((tool, k) => (
-          <Html key={tool.name} position={[1.0, 0.9 + k * 1.05, -1.4]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
+          <Html key={tool.name} position={[1.0 + k * 0.08, 0.85 + k * 1.25, -1.4]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
             <div
               ref={(el) => {
                 cards.current[k] = el

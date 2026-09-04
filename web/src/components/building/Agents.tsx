@@ -118,7 +118,10 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
     const focusTarget = s.focus && s.focus !== journey.name ? 0.55 : 1
     r.focus = THREE.MathUtils.damp(r.focus, focusTarget, 5, d)
     const rise = smoothstep(Math.min(1, c.rise * 1.3 - 0.3))
-    const sc = c.agents * r.focus * smoothstep(r.fade) * rise
+    // Neighbouring chapters still leak a little `agents` while the heal
+    // vignette is up; hide the crowd for the whole self-healing beat.
+    const crowd = c.agents * (1 - smoothstep((c.heal - 0.2) / 0.4))
+    const sc = crowd * r.focus * smoothstep(r.fade) * rise
     g.current.scale.setScalar(Math.max(sc, 0.001))
     g.current.visible = sc > 0.02
     if (tg.current) tg.current.visible = sc > 0.4 && r.fade > 0.5 && r.dwell <= 0

@@ -368,7 +368,7 @@
   z-index: 15;
   transform: translateX(-50%);
   width: min(880px, calc(100vw - 2.5rem));
-  padding: 0.8rem 2.4rem 1.7rem;
+  padding: 0.8rem 2.8rem 1.7rem;
   border-radius: 100px;
   background: var(--bld-chrome-bg);
   border: 1px solid var(--bld-chrome-border);
@@ -395,8 +395,8 @@
 
 .bld-rail__dots {
   position: absolute;
-  left: 2.4rem;
-  right: 2.4rem;
+  left: 2.8rem;
+  right: 2.8rem;
   top: calc(0.8rem + 0.4rem + 1px);
   display: flex;
   justify-content: space-between;
@@ -821,7 +821,7 @@
   position: absolute;
   top: 0.9rem;
   left: 0.9rem;
-  z-index: 2;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -852,7 +852,7 @@
   position: absolute;
   right: 0.9rem;
   bottom: 0.9rem;
-  z-index: 2;
+  z-index: 4;
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   background: #f5f1ea;
