@@ -5,7 +5,7 @@ memory:
   - All homepage sections live in src/components/ and compose into src/pages/Home.tsx
   - Posts are markdown in content/blog/; scripts/build-blog.ts generates the manifest and per-post HTML modules
   - Pages are statically prerendered by scripts/prerender.tsx; the client hydrates rather than mounting fresh
-  - The negotiate edge function (netlify/edge-functions/negotiate.ts) serves markdown twins for Accept: text/markdown and JSON errors for /api/* and for 404s that asked for JSON; it always sets Vary: Accept
+  - "The negotiate edge function (netlify/edge-functions/negotiate.ts) serves markdown twins for Accept: text/markdown and JSON errors for /api/* and for 404s that asked for JSON; it always sets Vary: Accept"
   - "The offline matcher has no pseudo-class support: a selector like `.foo:first-child` probes 1 live and 0 offline, so keep selectors to attributes, classes and descendant combinators"
 
 views:
