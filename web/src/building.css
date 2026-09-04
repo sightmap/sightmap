@@ -78,13 +78,23 @@
    `position: fixed`, which makes it a stacking context on its own, so a label
    parented inside it is pinned at the stage's level however high a z-index it
    asks for. Portalled out to here, a label's zIndexRange finally resolves
-   against the page — above .bld-story (1), below .bld-hud / .bld-rail (15)
-   and .bld-nav (20).
+   against the page — below .bld-story (11), .bld-hud / .bld-rail (15) and
+   .bld-nav (20).
+
+   Labels used to outrank the story card here (this was 10, .bld-story was 1):
+   on a full-viewport label layer, that is a card that loses to whatever
+   floor tag or chip happens to overlap it. Fine on desktop, where the card is
+   a fixed column with room around it; broken at 390px, where the card is most
+   of the viewport and a label painting over it takes the chapter's headline
+   and body copy with it (reported live on chapters 03 and 07). The card is
+   the page's primary content whenever it is on screen, so it wins now —
+   labels still sit above the stage itself, still depth-test against the
+   tower, still order 4/6/7 amongst each other by zIndexRange.
 
    The box mirrors the stage's exactly, because the labels' transforms are
    still computed relative to the canvas's top-left corner. `pointer-events`
-   stays off so a full-viewport layer at z-index 10 cannot swallow clicks on
-   the story cards underneath it. */
+   stays off so a full-viewport layer cannot swallow clicks on the story cards
+   underneath it. */
 .bld-overlay {
   position: fixed;
   inset: 0;
@@ -224,9 +234,14 @@
 
 /* Story ------------------------------------------------------------------ */
 
+/* Above the label overlay (10), not just the stage (0): the story card is
+   the page's primary content whenever it is on screen and must never lose a
+   pixel to a floor tag or chip, mobile above all (see .bld-overlay). Still
+   below the chrome that has to stay reachable over any card — HUD/rail (15)
+   and nav (20). */
 .bld-story {
   position: relative;
-  z-index: 1;
+  z-index: 11;
 }
 
 .bld-chapter {
