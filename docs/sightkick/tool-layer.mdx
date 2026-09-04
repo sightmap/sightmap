@@ -1,0 +1,155 @@
+---
+title: "Authoring a Sightkick Tool Layer: Tools, Steps, Returns, and Journeys"
+sidebarTitle: "Tool layer"
+description: "Write the .sightkick/ YAML that turns corpus components into named WebMCP tools, and understand what the compiler checks."
+---
+
+The tool layer lives in `.sightkick/`, beside the corpus it reads:
+
+```
+your-app/
+  .sightmap/     # the corpus — components and views
+  .sightkick/    # the tool layer
+    tools.yaml
+```
+
+Every `*.yaml` file inside `.sightkick/` is merged into one manifest. `tools` and `journeys` accumulate across files; the singular fields are taken from whichever file sets them. Split a large layer however helps, one file per view plus a `journeys.yaml`, or keep a small one in a single `tools.yaml`.
+
+## File shape
+
+```yaml
+version: 1                 # optional, defaults to 1
+name: myapp                # optional, defaults to the app directory's name
+corpus: ../.sightmap       # optional, defaults to the sibling ../.sightmap
+tools: [ ... ]             # at least one across the whole directory
+journeys: [ ... ]          # optional
+```
+
+## Tools
+
+A tool is one atomic action at a single point in time. It bundles ordered `steps`, a `returns` read, or both, and yields a structured result.
+
+```yaml
+- name: add_task
+  description: Add a task to the list.
+  mode: live               # live (default) drives the DOM; api is reads-only
+  ensure_view: Home        # a corpus view name
+  params:
+    - name: title
+      type: string         # string | number | boolean | enum
+      required: true
+      description: The task title.
+      # values: [A, B, C]  # required when type: enum
+  guard:
+    present: { query: 'TaskItem[title="{{title}}"]' }
+  steps:
+    - fill:  { query: NewTaskInput, value: "{{title}}" }
+    - click: { query: AddTaskButton }
+    - wait_for: { query: 'TaskItem[title="{{title}}"]' }
+  returns:
+    value: { query: 'TaskItem[title="{{title}}"]', property: title }
+```
+
+A `live` tool needs at least one step or a `returns`.
+
+<Warning>
+Set `ensure_view` on every tool. The documentation describes it as optional, but a tool that omits it currently fails to resolve any component reference at compile time, with `Available: (none)`. Tracked as [sightkick#9](https://github.com/sightmap/sightkick/issues/9).
+</Warning>
+
+`ensure_view` does two jobs: it scopes component resolution to that view plus globals, and it view-scopes the tool at runtime, so the tool only registers on pages whose route matches. An empty tool list on a non-matching page is correct behaviour, not a failure.
+
+### Steps
+
+Each step is a single-key mapping naming the operation.
+
+| Step | Body | Does |
+|------|------|------|
+| `fill` | `query`, `value` | Types `value` into the matched input. Supports `{{param}}`. |
+| `click` | `query` | Clicks the matched element. |
+| `wait_for` | `query`, `timeout_ms` (default 5000) | Waits until the query matches. |
+| `navigate` | `view` | Client-navigates to a corpus view by name. |
+| `goto` | `url` | Navigates to a URL template, with `{{param}}` interpolated. |
+
+Reads are not steps. Declare them with `returns`. A tool that ends in a mutation should `wait_for` its own visible feedback before returning.
+
+<Warning>
+Narrow every `wait_for` query to a single node. A component query that matches many nodes — which repeated rows always do — currently times out rather than matching, and the failure reads as though the page never loaded. Use `'RowName#0'` or a property predicate. Tracked as [sightmap#387](https://github.com/sightmap/sightmap/issues/387).
+</Warning>
+
+### Returns
+
+Exactly one of `value` or `list`, or a description on its own.
+
+```yaml
+returns:
+  description: One task title.
+  value:
+    query: 'TaskItem[title="{{title}}"]'
+    property: title              # a declared corpus property of the match
+```
+
+```yaml
+returns:
+  description: The current task rows.
+  list:
+    rows: TaskItem               # every match becomes a row
+    fields:
+      title: title               # outputName: declared property of the row
+      done: done
+```
+
+## Component queries
+
+Tools address elements by component identity, never by raw CSS.
+
+| Query | Resolves to |
+|-------|-------------|
+| `TaskItem` | every match of that corpus component |
+| `TaskItem[title="Buy milk"]` | filtered on an extracted property |
+| `TaskItem[title^="Buy"]` | prefix match; `*=` is substring, add ` i` for case-insensitive |
+| `TaskItem TaskToggle` | descendant; the last component is the target |
+| `TaskItem#0` | occurrence 0 when several match |
+
+Every property you filter on or read must be declared in the corpus. There is no `>` child combinator; whitespace is the descendant combinator.
+
+## Journeys
+
+A journey is a compile-time ordering over tools. It never executes anything. It compiles into guidance breadcrumbs attached to each tool's result, so an agent that calls one tool is told what tends to come next and why.
+
+```yaml
+journeys:
+  - name: add_and_review
+    description: Add a task, then review the list.
+    steps:
+      - add_task
+      - tool: list_tasks
+        reason: confirm the task you just added
+```
+
+Each journey needs at least two steps to produce guidance edges. A tool used in several journeys accumulates the union of its successors.
+
+A result then carries them:
+
+```json
+{
+  "ok": true,
+  "value": "Buy milk",
+  "guidance": [
+    { "tool": "list_tasks", "reason": "confirm the task you just added", "when": "now" }
+  ]
+}
+```
+
+## What the compiler checks
+
+`sightkick build` is the validator. Common diagnostics:
+
+| Message | Fix |
+|---------|-----|
+| unresolved component / property / view | The name is not in the corpus for that view. `build` prints candidates. Fix the query, or declare it in `.sightmap/`. |
+| `returns has both value and list` | Pick one. |
+| `live tool needs at least one step or a returns` | Add a step or a read. |
+| `unrecognized step op` | Each step is one op key with its body. |
+| `--verify`: a field resolves empty on every row | The declared property extracts nothing on the live DOM. Fix the extractor in the corpus. |
+
+`--verify` needs a captured snapshot of the view. Run `sightmap capture` on it first.

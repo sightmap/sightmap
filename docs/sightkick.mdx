@@ -1,0 +1,114 @@
+---
+title: "Sightkick: Compile WebMCP Tools From Your Sightmap"
+sidebarTitle: "What is Sightkick?"
+description: "Sightkick is the companion CLI that turns a .sightmap/ corpus and a YAML tool layer into WebMCP tools an agent can call by name."
+---
+
+Sightkick compiles a `.sightmap/` corpus and a `.sightkick/` tool layer into [WebMCP](https://webmachinelearning.github.io/webmcp/) tool IR. Agents call `search_flights(origin, destination, date)` on your running app instead of reading the DOM and guessing which element is the search box.
+
+It ships separately from Sightmap, as [`@sightmap/sightkick`](https://www.npmjs.com/package/@sightmap/sightkick), and it reads the corpus Sightmap produces. The component names, selectors, and `memory` notes already committed in `.sightmap/` are what the tools are written against.
+
+<Note>
+Sightkick requires a corpus. If your app has no `.sightmap/` yet, author one first — see the [quickstart](/start/quickstart) — then come back here.
+</Note>
+
+## Why a tool layer
+
+A `.sightmap/` corpus tells an agent what the page contains. It does not tell the agent what the page can *do*, or in what order. An agent still has to decide which components to touch, in which sequence, and how to read the result.
+
+A tool layer answers that. Each tool is one named action at a single point in time: its parameters, the ordered steps that carry it out, and the shape of what comes back. The agent calls the name and gets structured JSON.
+
+WebMCP is an early W3C proposal from Google and Microsoft for how a page declares callable actions to an agent running in the same browser tab. Almost no production app declares any yet. Sightkick compiles that surface from the outside, with no change to your application code.
+
+## How the pieces fit
+
+<Steps>
+  <Step title=".sightmap/ — the corpus">
+    Views, components, and the properties extracted off them, authored against the running app with the Sightmap CLI. This is the only place a CSS selector appears.
+  </Step>
+  <Step title=".sightkick/ — the tool layer">
+    Any number of YAML files, all merged into one manifest. Tools address elements by corpus component name; they never carry selectors of their own.
+  </Step>
+  <Step title="sightkick build — the IR">
+    One self-contained JSON artifact. The compiler resolves every reference against the corpus and reports the ones it cannot find, with candidates. `--verify` additionally checks each `returns` extractor against a captured snapshot.
+  </Step>
+  <Step title="The runtime — the callable surface">
+    A ~19 KB bundle registers the IR on `document.modelContext`. On Chrome for Testing that is the browser's native WebMCP surface, so any WebMCP client reads your tools the same way it reads a site's own.
+  </Step>
+</Steps>
+
+## Install
+
+Sightkick ships as a prebuilt native binary through npm, so no Go toolchain is required. Installing its skills also pulls the supporting Sightmap skills.
+
+```bash
+npm install -g @sightmap/sightmap @sightmap/sightkick
+sightkick skills install
+```
+
+That writes four agent skills into `~/.agents/skills`:
+
+| Skill | Covers |
+|-------|--------|
+| `sightmap-authoring` | Building and maintaining the `.sightmap/` corpus |
+| `sightmap-browser` | Driving a live browser session against the corpus |
+| `sightkick-authoring` | Writing the `.sightkick/` tool layer |
+| `sightkick-debug` | Running compiled tools on a live page |
+
+## A first tool
+
+The corpus already names a `FareCard` component with `price` and `stops` properties. The tool layer turns that into something callable:
+
+```yaml .sightkick/tools.yaml
+version: 1
+name: flights
+
+tools:
+  - name: search_flights
+    description: Search flights for a route and date.
+    ensure_view: FlightSearch
+    params:
+      - { name: origin, type: string, required: true }
+      - { name: destination, type: string, required: true }
+    steps:
+      - fill: { query: OriginInput, value: "{{origin}}" }
+      - fill: { query: DestinationInput, value: "{{destination}}" }
+      - click: { query: SearchButton }
+      - wait_for: { query: 'FareCard#0' }
+    returns:
+      list:
+        rows: FareCard
+        fields: { fare: price, stops: stops }
+```
+
+Compile it, then call it:
+
+```bash
+sightkick build . --verify -o tools.ir.json
+sightkick browser .
+sightkick call . search_flights --param origin=SFO --param destination=JFK
+```
+
+```json
+{
+  "ok": true,
+  "items": [{ "fare": "$214", "stops": "nonstop" }]
+}
+```
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Author the tool layer" icon="file-code" href="/sightkick/tool-layer">
+    The `.sightkick/` grammar: tools, steps, returns, guards, and journeys.
+  </Card>
+  <Card title="CLI reference" icon="terminal" href="/sightkick/cli">
+    Every `sightkick` command and its flags.
+  </Card>
+  <Card title="Run tools on a live page" icon="play" href="/sightkick/running">
+    Injecting the runtime, and the difference between the two execution paths.
+  </Card>
+  <Card title="The front desk, illustrated" icon="building" href="https://sightmap.org/sightkick">
+    The same idea on sightmap.org, with the building metaphor.
+  </Card>
+</CardGroup>

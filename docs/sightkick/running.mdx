@@ -1,0 +1,115 @@
+---
+title: "Running Sightkick Tools on a Live Page"
+sidebarTitle: "Running tools"
+description: "Inject the runtime, confirm what registered, and choose between the CLI and WebMCP execution paths."
+---
+
+A compiled IR does nothing on its own. The runtime bundle registers it on the page as WebMCP tools, and `sightkick call` invokes them.
+
+## The short version
+
+```bash
+sightkick browser .            # build, start a session, inject the runtime
+sightmap browser mcp list      # confirm the tools registered
+sightkick call . search_flights --param origin=SFO --param destination=JFK
+```
+
+`sightkick browser` persists the injection, so the tools re-register on SPA route changes and on full page loads. After editing the corpus or the tool layer, re-run it with `--no-start` to refresh the IR on the running session.
+
+## Two execution paths
+
+`sightkick call` takes `--via`, which decides how a tool's steps actually run. They exercise different things and fail in different ways.
+
+<CardGroup cols={2}>
+  <Card title="--via cli">
+    Translates each step into `sightmap browser` commands, which act through real browser input events.
+  </Card>
+  <Card title="--via webmcp (default)">
+    Asks the page's own registered tool to run itself, which is the contract a real WebMCP client uses.
+  </Card>
+</CardGroup>
+
+### When to use `--via cli`
+
+- **Portal-rendered targets.** The runtime clicks by dispatching synthetic events, which do not reach elements rendered outside the app's own DOM subtree, such as dropdown menu items and modal buttons. The same element takes a real click fine, so a tool that silently no-ops under `--via webmcp` often works here.
+- **Any page you do not control.** A third-party app has no Sightkick runtime on it, so there is nothing for `--via webmcp` to call.
+- **Tools that navigate.** A `goto` step needs to run from wherever you are. `--via cli` works from any URL.
+
+It needs no runtime at all; a plain `sightmap browser start` is enough.
+
+### When to use `--via webmcp`
+
+- **Testing the real contract.** This is the path a WebMCP client takes, so it exercises registration, the input schema, and the result envelope end to end.
+- **Confirming a tool is offered.** A tool only registers on a page whose route matches its `ensure_view`. If it is not there, `--via webmcp` says so rather than quietly doing the work anyway.
+
+<Note>
+On a page no view matches, `sightmap browser mcp list` reporting no tools is correct. Navigate to a matching route and they re-register on their own.
+</Note>
+
+## The native surface
+
+On Chrome for Testing 152 or later, `document.modelContext` is the browser's own WebMCP surface and Sightkick's tools register on it directly, rather than on a polyfill. `sightmap browser mcp list` labels which one it found:
+
+```bash
+$ sightmap browser mcp list
+WebMCP (native) — 2 tool(s):
+```
+
+To drive the tools with Gemini through the bundled WebMCP inspector, start with the blink flags on:
+
+```bash
+sightkick browser . --webmcp
+```
+
+Then open the inspector from Chrome's side panel. It enumerates `document.modelContext.getTools()`, which now includes yours, and calls them through the native surface.
+
+<Warning>
+Do not script `document.modelContext.executeTool` yourself. Its call shape differs by surface: the polyfill takes a bare `{name}`, while a native `document.modelContext` is stricter and returns a stringified envelope. `sightkick call` handles both.
+</Warning>
+
+## Reading a result
+
+```json
+{
+  "ok": true,
+  "items": [{ "fare": "$214", "stops": "nonstop" }],
+  "guidance": [
+    { "tool": "select_fare", "reason": "pick one of the fares you just found", "when": "now" }
+  ]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `ok` | Whether every step and read succeeded. `sightkick call` exits non-zero when false. |
+| `value` / `items` | The `returns` payload: a scalar from `value`, an array from `list`. |
+| `skipped` | An idempotency `guard` matched, so the steps did not run. |
+| `message` | On failure, which step failed and why. |
+| `guidance` | Next-step breadcrumbs from any journey the tool appears in. |
+
+A failing tool names the step that failed:
+
+```json
+{
+  "ok": false,
+  "message": "wait_for: timed out after 15000ms waiting for component query \"FareCard\""
+}
+```
+
+If a `wait_for` times out on a component you can see on the page, the query is probably matching many nodes rather than none. Narrow it to `'FareCard#0'`. See the warning in [Tool layer](/sightkick/tool-layer).
+
+## Injecting it yourself
+
+`sightkick browser` is a convenience. To put the tools on a page you serve, emit the two artifacts and load them:
+
+```bash
+sightkick runtime -o sightkick-runtime.js
+sightkick build . -o tools.ir.json
+```
+
+```js
+// after sightkick-runtime.js has loaded
+window.__sightkick.load(ir)
+```
+
+`load(ir)` registers the tools whose view route matches the current URL, and re-registers on route changes.

@@ -102,6 +102,23 @@
         ]
       },
       {
+        "tab": "Sightkick",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["sightkick"]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "sightkick/tool-layer",
+              "sightkick/cli",
+              "sightkick/running"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Specification",
         "groups": [
           {
