@@ -143,7 +143,7 @@ A component may declare `properties: Property[]` — named values surfaced along
 
 | `from` | `path` | Resolves to |
 |---|---|---|
-| `dom.text` | none | the node's accessible text (implementation-defined accessible name) |
+| `dom.text` | none | the node's accessible text (implementation-defined accessible name), or its rendered text when it has no accessible name |
 | `dom.raw_text` | none | the node's own literal text: its direct text-node children, whitespace-normalized. Excludes descendant-element text and CSS `::before`/`::after` (which are not child nodes). See [SEP-0013](../seps/0013-richer-node-data.md). |
 | `dom.attr` | attribute name | the value of that attribute as carried on the node's observed attribute set; omitted if the node does not carry it |
 | `dom.state` | `checked`, `selected`, `disabled` or `expanded` | the node's current interactive state, `"true"`/`"false"` (`"mixed"` for an indeterminate checkbox); omitted on a node that cannot have that state. See [Interactive state](#component-properties) and [SEP-0013](../seps/0013-richer-node-data.md). |
@@ -176,7 +176,7 @@ A component may declare `properties: Property[]` — named values surfaced along
 
 `[` and `]` are flow indicators in YAML, so quote a path containing `[]` inside a flow mapping: `{ from: component, path: 'Tag[].value', join: ',' }`.
 
-The observed attribute set read by `dom.attr` is implementation-defined: which attributes a node carries depends on the consumer (a web SDK may carry a fixed allowlist plus `aria-*`/`data-*`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
+The observed attribute set read by `dom.attr` is implementation-defined: which attributes a node carries depends on the consumer (the reference web SDK carries every attribute the live DOM carries, minus injected sightmap ids and framework-internal `_`-scoping attributes like Angular's `_nghost`/`_ngcontent`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
 
 **Interactive state.** Whatever else it carries, a node MUST carry its current interactive state under four names, read with `from: dom.state`: `checked`, `selected`, `disabled`, `expanded`. Each is `"true"` or `"false"` (`checked` may also be `"mixed"`) and reflects the control's *current* state, not its markup: an unchecked checkbox whose HTML carries a `checked` attribute reads `"false"`, and `<button disabled>` reads `"true"`. A name is carried only on a node that can have that state. A control's current *value* is not one of these: it remains the reserved `value` property. See [SEP-0013](../seps/0013-richer-node-data.md).
 
