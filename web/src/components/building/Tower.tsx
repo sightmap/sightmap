@@ -86,7 +86,12 @@ function useMaterials(): Mats {
     }
     return {
       kinds,
-      slab: new THREE.MeshStandardMaterial({ color: '#f2ece3', roughness: 0.92 }),
+      slab: new THREE.MeshStandardMaterial({
+        color: '#f2ece3',
+        roughness: 0.92,
+        emissive: new THREE.Color('#ffc36a'),
+        emissiveIntensity: 0,
+      }),
       steel: new THREE.MeshStandardMaterial({ color: STEEL, roughness: 0.55, metalness: 0.2 }),
       glass: new THREE.MeshStandardMaterial({
         color: '#cfe3f5',
@@ -120,10 +125,11 @@ function useMaterials(): Mats {
     mats.spandrel.color.copy(col.spDay).lerp(col.spNight, n)
     mats.glass.color.copy(col.glassDay).lerp(col.glassNight, n)
     mats.glass.emissiveIntensity = n * 0.9
-    mats.glass.opacity = THREE.MathUtils.lerp(0.22, 0.5, n)
-    mats.furniture.monitor.emissiveIntensity = THREE.MathUtils.lerp(0.25, 1.3, n)
-    mats.furniture.screen.emissiveIntensity = THREE.MathUtils.lerp(0.3, 1.2, n)
-    for (const k of Object.keys(mats.kinds) as Kind[]) mats.kinds[k].emissiveIntensity = n * 0.35
+    mats.glass.opacity = THREE.MathUtils.lerp(0.22, 0.42, n)
+    mats.slab.emissiveIntensity = n * 0.14
+    mats.furniture.monitor.emissiveIntensity = THREE.MathUtils.lerp(0.25, 1.55, n)
+    mats.furniture.screen.emissiveIntensity = THREE.MathUtils.lerp(0.3, 1.45, n)
+    for (const k of Object.keys(mats.kinds) as Kind[]) mats.kinds[k].emissiveIntensity = n * 0.5
   })
   return mats
 }

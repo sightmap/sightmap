@@ -9,7 +9,7 @@ import { useShared } from './state'
 
 // The people: one walker per journey, looping through its stops, riding the
 // core between floors. Users are pink, coding agents green, tests gold.
-const WALK = 1.75
+const WALK = 2.0
 const DWELL = 0.9
 const RESET = 1.4
 
@@ -19,6 +19,7 @@ interface Runner {
   next: number
   wait: number
   fade: number
+  focus: number
 }
 
 export function Walker({
@@ -50,8 +51,8 @@ export function Walker({
           <sphereGeometry args={[0.12, 14, 14]} />
           <meshStandardMaterial color="#fbf8f2" roughness={0.6} />
         </mesh>
-        <mesh position={[0, 0.012, 0]} rotation-x={-Math.PI / 2}>
-          <ringGeometry args={[0.18, 0.28, 24]} />
+        <mesh position={[0, 0.03, 0]} rotation-x={-Math.PI / 2}>
+          <ringGeometry args={[0.15, 0.22, 24]} />
           <meshBasicMaterial color={color} transparent opacity={0.55} depthWrite={false} />
         </mesh>
         </group>
@@ -76,7 +77,7 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
   const tg = useRef<THREE.Mesh>(null)
-  const run = useRef<Runner>({ d: 0, dwell: DWELL, next: 1, wait: journey.delay, fade: 0 })
+  const run = useRef<Runner>({ d: 0, dwell: DWELL, next: 1, wait: journey.delay, fade: 0, focus: 1 })
   const tmp = useMemo(() => new THREE.Vector3(), [])
   const color = TRAVELLER_COLORS[journey.who]
 
@@ -114,9 +115,10 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
     if (!g.current) return
     pointAt(path, r.d, tmp)
     g.current.position.copy(tmp)
-    const focus = s.focus && s.focus !== journey.name ? 0.3 : 1
+    const focusTarget = s.focus && s.focus !== journey.name ? 0.55 : 1
+    r.focus = THREE.MathUtils.damp(r.focus, focusTarget, 5, d)
     const rise = smoothstep(Math.min(1, c.rise * 1.3 - 0.3))
-    const sc = c.agents * focus * smoothstep(r.fade) * rise
+    const sc = c.agents * r.focus * smoothstep(r.fade) * rise
     g.current.scale.setScalar(Math.max(sc, 0.001))
     g.current.visible = sc > 0.02
     if (tg.current) tg.current.visible = sc > 0.4 && r.fade > 0.5 && r.dwell <= 0

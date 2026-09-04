@@ -30,7 +30,7 @@ export default function FrontDesk() {
     }
     if (visitor.current) {
       const t = clock.getElapsedTime()
-      visitor.current.position.set(6.1 + (s.reduced ? 0 : Math.sin(t * 0.8) * 0.05), 0, -1.2)
+      visitor.current.position.set(6.1 + (s.reduced ? 0 : Math.sin(t * 0.8) * 0.05), 0.06, -1.2)
       visitor.current.scale.setScalar(Math.max(o, 0.001))
       visitor.current.visible = o > 0.01
     }
@@ -69,12 +69,12 @@ export default function FrontDesk() {
         </mesh>
       </group>
       <group ref={g} position={DESK}>
-        <mesh position={[0, 1.45, 0]}>
-          <cylinderGeometry args={[0.03, 0.03, 1.2, 8]} />
+        <mesh position={[0, 2.05, 0]}>
+          <cylinderGeometry args={[0.03, 0.03, 2.4, 8]} />
           <meshStandardMaterial color="#8a8272" roughness={0.6} />
         </mesh>
         {TOOLS.map((tool, k) => (
-          <Html key={tool.name} position={[1.0, 0.9 + k * 0.7, -1.4]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
+          <Html key={tool.name} position={[1.0, 0.9 + k * 1.05, -1.4]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
             <div
               ref={(el) => {
                 cards.current[k] = el

@@ -35,7 +35,7 @@ export default function Table() {
       </RoundedBox>
       <Line points={grid} segments color="#2f62b8" lineWidth={1} transparent opacity={0.5} depthWrite={false} />
       <Html
-        position={[-TABLE.w / 2 + 0.6, 0.02, TABLE.d / 2 - 0.6]}
+        position={[-TABLE.w / 2 + 2.8, 0.02, TABLE.d / 2 - 2.3]}
         zIndexRange={[4, 0]}
         style={{ pointerEvents: 'none' }}
       >

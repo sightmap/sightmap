@@ -38,6 +38,8 @@ export interface Room {
   memory?: string
   /** Where the room moves to in the self-healing chapter. */
   alt?: { x: number; z: number }
+  /** Override the walker's stand [x, z] when the geometric front is blocked. */
+  stand?: [number, number]
 }
 
 export interface Floor {
@@ -80,7 +82,48 @@ export const KIOSK_H = 1.0
 /** Service core: elevator shaft + risers, in the back corner. */
 export const CORE = { x: -3.9, z: -2.9, w: 1.6, d: 1.5 }
 /** Where a walker steps out of the core onto a floor. */
-export const CORE_DOOR = { x: -2.65, z: -2.9 }
+export const CORE_DOOR = { x: -2.65, z: -2.5 }
+/** Open +Z dollhouse face — the shared front aisle on every floor. */
+export const AISLE_Z = FLOOR_D / 2 - 0.3
+
+/**
+ * Per-floor circulation: axis-aligned polylines. Walkers project onto the
+ * nearest lane and route along the graph rather than cutting through rooms.
+ * First vertex of the trunk is CORE_DOOR so elevator hops connect cleanly.
+ */
+export const LANES: [number, number][][][] = [
+  [
+    [[-2.65, -2.5], [-1.9, -2.5], [-1.9, 0.85], [-1.9, 3.45]],
+    [[-4.4, 0.85], [4.4, 0.85]],
+    [[-4.4, 3.45], [4.4, 3.45]],
+  ],
+  [
+    [[-2.65, -2.5], [-2.85, -2.5], [-2.85, 0.3], [-0.4, 0.3], [-0.4, 3.45]],
+    [[-4.4, 0.3], [4.4, 0.3]],
+    [[-4.4, 3.45], [4.4, 3.45]],
+  ],
+  [
+    [[-2.65, -2.5], [-2.75, -2.5], [-2.75, 3.45]],
+    [[-2.75, -2.5], [3.0, -2.5]],
+    [[-2.75, 1.24], [4.4, 1.24]],
+    [[-4.4, 3.45], [4.4, 3.45]],
+  ],
+  [
+    [[-2.65, -2.5], [-2.2, -2.5], [-2.2, 1.35], [3.0, 1.35], [3.0, 3.45]],
+    [[-4.4, 1.35], [4.4, 1.35]],
+    [[-4.4, 3.45], [4.4, 3.45]],
+  ],
+  [
+    [[-2.65, -2.5], [-2.3, -2.5], [-2.3, 0.75], [1.7, 0.75], [1.7, 3.45]],
+    [[-3.0, 0.75], [4.4, 0.75]],
+    [[-4.4, 3.45], [4.4, 3.45]],
+  ],
+  [
+    [[-2.65, -2.5], [3.7, -2.5], [3.7, 3.45]],
+    [[-4.4, 0.85], [0.12, 0.85], [0.12, 3.45]],
+    [[-4.4, 3.45], [4.4, 3.45]],
+  ],
+]
 
 export const TABLE = { w: 17.5, d: 14.5, t: 0.36 }
 export const SHEET = { w: 10.9, d: 8.4 }
@@ -152,6 +195,7 @@ export const FLOORS: Floor[] = [
         h: 0.6,
         kind: 'content',
         base: 0.2,
+        stand: [0.6, 1.24],
         blocks: [
           { x: 0.6, z: -1.2, w: 5.2, d: 1.25 },
           { x: 0.6, z: 0.4, w: 5.2, d: 1.25 },
@@ -329,13 +373,26 @@ export function findRoom(floor: number, name: string): Room {
   return room
 }
 
-/** Where a walker stands when visiting a room: on its floor zone, at the
- *  front edge so it is not inside the furniture. */
+/** Deck height at a point: slab plus the tallest zone carpet covering it. */
+export function surfaceAt(floor: number, x: number, z: number): number {
+  let lift = 0
+  for (const room of FLOORS[floor].rooms) {
+    const blocks = room.blocks ?? [{ x: room.x, z: room.z, w: room.w, d: room.d }]
+    if (!blocks.some((b) => Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2)) continue
+    const top = (room.base ? PLATE : 0) + PLATE
+    if (top > lift) lift = top
+  }
+  return floorY(floor) + SLAB_T + lift
+}
+
+/** Where a walker stands when visiting a room: just outside the front of
+ *  its zone, on whatever carpet is actually underfoot. */
 export function roomStand(floor: number, room: Room, shift = 0): [number, number, number] {
-  const x = room.alt ? room.x + (room.alt.x - room.x) * shift : room.x
-  const z = room.alt ? room.z + (room.alt.z - room.z) * shift : room.z
-  const front = room.kind === 'action' ? room.d / 2 + 0.35 : Math.max(0, room.d / 2 - 0.35)
-  return [x, floorY(floor) + SLAB_T + (room.base ? PLATE : 0) + PLATE, z + front]
+  const rx = room.alt ? room.x + (room.alt.x - room.x) * shift : room.x
+  const rz = room.alt ? room.z + (room.alt.z - room.z) * shift : room.z
+  const x = room.stand ? room.stand[0] : rx
+  const z = room.stand ? room.stand[1] : Math.min(rz + room.d / 2 + (room.kind === 'action' ? 0.35 : 0.25), AISLE_Z)
+  return [x, surfaceAt(floor, x, z), z]
 }
 
 /** Top of a room's tallest element, for hanging a label over it. */
