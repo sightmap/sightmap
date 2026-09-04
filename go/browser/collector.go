@@ -508,17 +508,6 @@ func contentTypeFromHeaders(hs []sightmap.Header) string {
 	return ""
 }
 
-func (c *Collector) lookupRequest(index int) (string, *CDPConn, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for _, e := range c.network {
-		if e.Index == index {
-			return e.requestID, e.conn, true
-		}
-	}
-	return "", nil, false
-}
-
 // ── persistent script injection ─────────────────────────────────────────────
 //
 // Scripts registered with Page.addScriptToEvaluateOnNewDocument live only as
