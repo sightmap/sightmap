@@ -135,11 +135,11 @@ The interactive version at ${SITE_URL}/building is a scroll-driven 3D scene. Thi
 - **A sightmap is the wayfinding.** A \`.sightmap/\` directory names every floor, room, and riser, links each back to its source file, and keeps memory notes for the quirks the drawings never recorded.
 - **Users and agents are the people.** Every session is a journey through rooms and floors. Subtext records those journeys against the map, so a replay reads as named components rather than a list of divs.
 
-## Built on top (exploratory)
+## Built on top
 
-- **Self-healing tests.** A test written against the map asks the building where a room went when a selector changes; the name stays stable and the run finishes.
-- **Trajectories.** Codified journeys: the views a flow visits, the components it touches, and the requests it expects on the way.
-- **Web MCP tools.** Tools generated from the map, each backed by a real view and a real request, so an agent walks up to the front desk instead of wandering the halls.
+- **Repairs.** A test written against \`ContinueButton\` survives the day its selector changes: the map holds that selector in one place, and sightkick refuses to compile against a component the map no longer has.
+- **Trajectories (exploratory).** A named route through the app becomes a hint on each tool, and, resolved against a written scenario, a checked-in plan that replays without an agent.
+- **Web MCP tools.** Sightkick compiles the map into WebMCP tools, each backed by a real view and a real request, so an agent walks up to the front desk instead of wandering the halls.
 
 ## Next
 

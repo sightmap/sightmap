@@ -155,18 +155,17 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     id: 'self-healing',
-    short: 'Self-healing',
+    short: 'Repairs',
     eyebrow: '05 · Built on top',
-    badge: 'exploratory',
-    title: 'Tests that find the moved door.',
+    title: 'When a room moves, one line changes.',
     body:
-      'When a room moves, a test written against selectors walks into a wall. A test written against the map asks the building where the room went. The selector changes, the name does not, and the run finishes.',
+      'A test pinned to `div.sc-hKgILt` breaks the day that class is regenerated. Point it at `ContinueButton` and the selector lives in one line of the map. Lose the room and sightkick fails the build by name. Edit that line, and every tool above it keeps working.',
     hud: {
-      title: 'Self-healing run',
+      title: 'The repair',
       rows: [
         ['Room moved', 'ContinueButton'],
-        ['Selectors updated', '1'],
-        ['Runs passed', '128 / 128'],
+        ['Lines changed', '1'],
+        ['Call sites touched', '0'],
       ],
     },
     focus: 'Regression',
@@ -179,13 +178,13 @@ export const CHAPTERS: Chapter[] = [
     badge: 'exploratory',
     title: 'Journeys you can name and rerun.',
     body:
-      'Codify a journey on top of the primitives: the floors it visits, the rooms it touches, the requests it expects on the way. A trajectory is a route through the building any agent can follow, and any run can be checked against.',
+      'Name the route once: log in, open an item, cart it, check out. Each step becomes a hint on the one before it, so an agent mid-run knows what comes next. Written against a scenario, the route becomes a plan that replays with no agent, and refuses to run once the map moves under it.',
     hud: {
       title: 'Trajectory',
       rows: [
         ['Route', 'BookFlight'],
         ['Stops', String(JOURNEYS[0].stops.length)],
-        ['Requests expected', '3'],
+        ['Replay cost', 'no agent'],
       ],
     },
     focus: 'BookFlight',
