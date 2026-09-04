@@ -1,0 +1,478 @@
+/* /sightkick — the WebMCP tool layer page.
+   Reuses the site tokens and the shared .container / .btn-* / .code-block
+   primitives from index.css; everything here is page-local. The 3D plates are
+   stills captured from the /building scene, so the two pages share one visual
+   world without this page paying for three.js. */
+
+/* ---- HERO ---- */
+/* The two plate sections run on the /building page's night palette, so the
+   stills sit in the world they were captured from. The plates themselves stay
+   day-lit and are dimmed into the dark ground by opacity + a mask, which reads
+   better than re-capturing them at night. */
+.sk-dark {
+  /* Bright, faintly blue-tinted rather than the /building night palette's
+     warm cream + muted slate: those sit at ~4:1 on this ground, which is not
+     enough for body copy. These run 12:1 (ink/body) and 8:1 (dim). */
+  --sk-ink: #f8faff;
+  --sk-body: #e4eafa;
+  --sk-dim: #b7c2db;
+  --sk-hair: rgba(255, 255, 255, 0.14);
+  color: var(--sk-body);
+  background:
+    radial-gradient(120% 90% at 72% 8%, #22346b 0%, rgba(9, 16, 38, 0) 60%),
+    linear-gradient(180deg, #0c1531 0%, #070d22 100%);
+}
+
+.sk-dark.sk-dark h1,
+.sk-dark.sk-dark h2,
+.sk-dark.sk-dark h3 { color: var(--sk-ink); }
+.sk-dark.sk-dark p { color: var(--sk-body); }
+.sk-dark.sk-dark .sk-hero__sub { color: var(--sk-body); }
+.sk-dark.sk-dark .sk-hero__note,
+.sk-dark.sk-dark .section-desc { color: var(--sk-dim); }
+.sk-dark .section-label { color: #ec6b8e; }
+.sk-dark code {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: var(--sk-ink);
+}
+.sk-dark a { color: #9fc0f5; text-decoration-color: rgba(159, 192, 245, 0.4); }
+.sk-dark a:hover { text-decoration-color: #9fc0f5; }
+
+.sk-hero {
+  position: relative;
+  padding-top: 9rem;
+  padding-bottom: 5.5rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The plate is a backdrop, not an illustration to read: it sits behind the
+   copy, bleeds off the right edge, and fades out before it reaches the text. */
+.sk-hero__plate {
+  position: absolute;
+  inset: 0 0 -90px 58%;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.sk-hero__plate img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 56% 46%;
+  opacity: 0.9;
+}
+
+/* The plate is a backdrop, so it never decides whether text is readable: this
+   overlay fades it into the page ground on all four sides, in the page's own
+   background colour rather than a transparency the nav's blur would reveal. */
+/* The plates are captured with a transparent background (the model cut out of
+   the /building canvas), so the section's own gradient is the backdrop and no
+   scrim or mask is involved — an opaque plate needed one and produced a seam
+   where its edge met the section. A short left-edge fade is all that is left,
+   so the model does not collide with the text column on narrow desktops. */
+.sk-hero__plate img,
+.sk-stack__plate img {
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 22%, #000 44%),
+    linear-gradient(to bottom, #000 68%, transparent 98%);
+  mask-image:
+    linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.5) 22%, #000 44%),
+    linear-gradient(to bottom, #000 68%, transparent 98%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.sk-hero__body {
+  position: relative;
+  max-width: 600px;
+  margin-left: max(2rem, calc(50vw - 570px));
+  margin-right: auto;
+}
+
+.sk-hero__logo {
+  display: block;
+  width: 150px;
+  height: auto;
+  color: #ffffff;
+  margin-bottom: 1.5rem;
+}
+
+.sk-hero h1 {
+  max-width: 15ch;
+  font-size: clamp(2.4rem, 5.5vw, 3.6rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--text-bright);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.sk-hero__sub {
+  margin-top: 1.4rem;
+  font-size: 1.08rem;
+  color: var(--sk-body);
+  max-width: 30em;
+}
+
+.sk-hero__sub code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+}
+
+.sk-hero__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.sk-hero__note {
+  margin-top: 1.1rem;
+  font-size: 0.85rem;
+  color: var(--sk-dim);
+  max-width: 32em;
+}
+
+/* ---- the install command, as a copy button ---- */
+.sk-copycmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.62rem 0.8rem;
+  background: var(--bg-code);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--code-text);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.sk-copycmd { border-color: rgba(255, 255, 255, 0.18); }
+.sk-copycmd:hover { border-color: rgba(255, 255, 255, 0.42); }
+.sk-copycmd:focus-visible { outline: 2px solid #9fc0f5; outline-offset: 2px; }
+.sk-copycmd__prompt { color: var(--code-com); }
+/* Plain white, not the terminal green: on the blue ground the green plus the
+   accent read as a colour scheme of their own. */
+.sk-copycmd__text { color: #f5f1ea; }
+
+.sk-copycmd__hint {
+  display: inline-flex;
+  align-items: center;
+  color: var(--code-com);
+  border-left: 1px solid var(--code-border);
+  padding-left: 0.6rem;
+  margin-left: 0.15rem;
+}
+
+/* Sized in em so the glyph tracks the command text when the type shrinks. */
+.sk-copycmd__hint svg { width: 1.15em; height: 1.15em; }
+.sk-copycmd:hover .sk-copycmd__hint { color: var(--code-text); }
+/* Beats the :hover rule above it, which is otherwise more specific and would
+   swallow the copied state (the pointer is still over the field). */
+.sk-copycmd .sk-copycmd__hint[data-copied='true'] { color: #f5f1ea; }
+
+/* On the dark hero the primary button's near-black ground disappears into the
+   section, so it inverts to white-on-black to stay the loudest thing there. */
+.sk-promptbtn { cursor: pointer; }
+.sk-dark .sk-promptbtn {
+  background: #ffffff;
+  color: #0c1531;
+}
+.sk-dark .sk-promptbtn:hover { background: #e8ecf7; opacity: 1; }
+.sk-dark .sk-promptbtn:focus-visible { outline: 2px solid #9fc0f5; outline-offset: 2px; }
+
+/* ---- OVERVIEW ---- */
+.sk-overview h2,
+.sk-cases h2,
+.sk-stack h2,
+.sk-start h2,
+.sk-ref h2 {
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--text-bright);
+  font-weight: 600;
+  margin-bottom: 1rem;
+  text-wrap: balance;
+}
+
+.sk-overview .section-desc { max-width: 44em; }
+
+/* The two transcripts are a comparison, so they read as one object: same top
+   edge, same bottom edge, whichever one happens to have more lines. */
+.sk-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-top: 2.5rem;
+  align-items: stretch;
+}
+
+/* min-width:0 or the grid track is sized by the <pre>'s min-content width and
+   the column pushes the whole page sideways instead of the code scrolling. */
+.sk-pair__col { display: flex; flex-direction: column; min-width: 0; }
+.sk-pair__col .code-block { flex: 1; display: flex; flex-direction: column; }
+.sk-pair__col .code-block pre { flex: 1; }
+
+.sk-pair__label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.6rem;
+}
+
+.sk-pair__label--good { color: var(--accent); }
+
+/* ---- USE CASES ---- */
+.sk-cases { background: var(--bg-subtle); }
+
+.sk-cases__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 2.25rem;
+}
+
+.sk-case {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.4rem 1.5rem 1.5rem;
+}
+
+.sk-case__tag {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.7rem;
+}
+
+.sk-case h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+.sk-case p {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.sk-case code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--text);
+  word-break: break-word;
+}
+
+/* ---- HOW IT IS BUILT ---- */
+.sk-stack {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding-top: 6rem;
+  padding-bottom: 6rem;
+}
+
+.sk-dark.sk-dark .sk-layers p { color: var(--sk-body); font-size: 0.95rem; }
+.sk-dark .sk-layers__num { color: #ec6b8e; }
+
+.sk-stack__plate {
+  position: absolute;
+  inset: 0 -22% 0 47%;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.sk-stack__plate img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 40% center;
+  opacity: 0.82;
+  min-width: 1000px;
+}
+
+.sk-stack__body { max-width: 620px; margin-left: max(2rem, calc(50vw - 430px)); }
+.sk-stack .section-desc { max-width: 34em; }
+.sk-stack h2 { max-width: 20ch; }
+.sk-stack .sk-layers p { max-width: 58ch; }
+
+.sk-layers {
+  list-style: none;
+  margin: 2.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.sk-layers li {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.sk-layers__num {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  padding-top: 0.15rem;
+}
+
+.sk-layers h3 {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 0.35rem;
+}
+
+.sk-layers h3 code { font-family: var(--mono); font-size: 0.92em; }
+
+.sk-layers p {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+  max-width: 46em;
+}
+
+.sk-layers code { font-family: var(--mono); }
+
+/* ---- GET STARTED ---- */
+.sk-start { background: var(--bg-subtle); }
+.sk-start .section-desc { max-width: 44em; }
+
+.sk-promptcard {
+  margin-top: 3rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.6rem;
+}
+
+.sk-promptcard__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.sk-promptcard__head h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-top: 0.25rem;
+}
+
+/* The prompt is plain text, not tokenised markup, so it needs the wrapping the
+   syntax-highlighted blocks get from their own spans. */
+.sk-promptcard__pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+/* ---- REFERENCE ---- */
+.sk-ref__table {
+  margin-top: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-raised);
+}
+
+.sk-ref__row {
+  display: grid;
+  grid-template-columns: minmax(14rem, 22rem) 1fr;
+  gap: 1.5rem;
+  padding: 1rem 1.4rem;
+  border-bottom: 1px solid var(--border);
+  align-items: baseline;
+}
+
+.sk-ref__row:last-child { border-bottom: none; }
+
+.sk-ref__row code {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--text-bright);
+  white-space: nowrap;
+}
+
+.sk-ref__row span {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.sk-ref__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 1024px) {
+  .sk-cases__grid { grid-template-columns: repeat(2, 1fr); }
+  .sk-hero__plate { inset: 0 0 0 52%; }
+  .sk-stack__plate { inset: 0 0 0 54%; }
+  /* The 1000px floor is sized for the wide layout; below it the plate track
+     is narrower than the floor, which shoves the building off-frame. */
+  .sk-stack__plate img { min-width: 0; }
+}
+
+@media (max-width: 820px) {
+  .sk-hero { padding-top: 7.5rem; }
+  .sk-hero__body,
+  .sk-stack__body { margin-left: auto; margin-right: auto; max-width: none; }
+  .sk-pair { grid-template-columns: 1fr; }
+  .sk-cases__grid { grid-template-columns: 1fr; }
+  .sk-ref__row { grid-template-columns: 1fr; gap: 0.4rem; }
+  .sk-ref__row code { white-space: pre-wrap; }
+  /* Behind text on a narrow screen the plates cost legibility and bandwidth
+     for nothing, so they drop out rather than being faded further. */
+  .sk-hero__plate,
+  .sk-stack__plate { display: none; }
+}
+
+/* The install command is 34 characters and has to stay on one line. On a phone
+   the field gives up type size and padding rather than wrapping mid-command. */
+@media (max-width: 560px) {
+  .sk-copycmd {
+    gap: 0.4rem;
+    padding: 0.55rem 0.55rem;
+    font-size: clamp(0.64rem, 3.2vw, 0.78rem);
+  }
+  /* Pinned right so the glyph keeps the same edge as the field once it is full
+     width, instead of trailing the command text. */
+  .sk-copycmd__hint { padding-left: 0.4rem; margin-left: auto; }
+
+  /* Both CTAs go edge to edge so they share a left and right edge when stacked. */
+  .sk-copycmd,
+  .sk-hero__ctas .sk-promptbtn {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-copycmd { transition: none; }
+}

@@ -28,6 +28,8 @@ import {
   DEVELOPERS_TITLE,
   DEVELOPERS_DESCRIPTION,
   BUILDING_TITLE,
+  SIGHTKICK_TITLE,
+  SIGHTKICK_DESCRIPTION,
   BUILDING_DESCRIPTION,
   postTitle,
   atlasTitle,
@@ -578,8 +580,28 @@ async function main() {
     )
   )
 
+  write(
+    'sightkick',
+    renderRoute(
+      shell,
+      '/sightkick',
+      {
+        url: `${SITE_URL}/sightkick`,
+        ogUrl: `${DEPLOY_URL}/sightkick`,
+        title: SIGHTKICK_TITLE,
+        description: SIGHTKICK_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      [mdAlternate(`${SITE_URL}/sightkick.md`), siteJsonLd].join('\n    ')
+    )
+  )
+
   console.log(
-    `\n  prerender complete: ${posts.length + atlas.entries.length + 6} page(s)`
+    `\n  prerender complete: ${posts.length + atlas.entries.length + 7} page(s)`
   )
 }
 

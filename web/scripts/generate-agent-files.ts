@@ -20,6 +20,7 @@ import {
   buildBlogIndexMarkdown,
   buildBlogPostMarkdown,
   buildBuildingMarkdown,
+  buildSightkickMarkdown,
   buildDevelopersMarkdown,
   buildHomeMarkdown,
   buildNotFoundMarkdown,
@@ -84,6 +85,7 @@ async function main() {
   write('atlas.md', buildAtlasIndexMarkdown(atlas))
   write('developers.md', buildDevelopersMarkdown())
   write('building.md', buildBuildingMarkdown())
+  write('sightkick.md', buildSightkickMarkdown())
 
   for (const post of loaded) {
     write(

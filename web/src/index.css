@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./building.css";
+@import "./sightkick.css";
 
 :root {
   --bg: #faf8f6;

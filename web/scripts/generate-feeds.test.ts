@@ -104,7 +104,8 @@ describe('buildSitemap', () => {
     expect(xml).toContain('<loc>https://sightmap.org/atlas/example-shop</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/developers</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/building</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(9)
+    expect(xml).toContain('<loc>https://sightmap.org/sightkick</loc>')
+    expect(xml.match(/<url>/g)).toHaveLength(10)
   })
 
   it('uses the post date as lastmod for post URLs', () => {
@@ -126,7 +127,8 @@ describe('buildSitemap', () => {
     expect(xml).toContain('<loc>https://sightmap.org/atlas</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/developers</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/building</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(5)
+    expect(xml).toContain('<loc>https://sightmap.org/sightkick</loc>')
+    expect(xml.match(/<url>/g)).toHaveLength(6)
     expect(xml).not.toContain('undefined')
     expect(xml).toContain('<lastmod>2026-07-28</lastmod>')
   })
