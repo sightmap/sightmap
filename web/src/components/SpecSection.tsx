@@ -5,7 +5,7 @@ export default function SpecSection() {
         <div className="section-label">The Spec</div>
         <h2>Views, components, requests.</h2>
         <p className="section-desc">
-          <strong>Views</strong> name your app's screens and routes. <strong>Components</strong> name the parts of each screen. <strong>Requests</strong> name the API routes your app calls. Define all three in YAML under <code>.sightmap/</code>. Sightmap-enabled tooling adds them to the agent's accessibility snapshot automatically.
+          <a href="https://docs.sightmap.org/spec/views"><strong>Views</strong></a> name your app's screens and routes. <a href="https://docs.sightmap.org/spec/components"><strong>Components</strong></a> name the parts of each screen. <a href="https://docs.sightmap.org/spec/requests"><strong>Requests</strong></a> name the API routes your app calls. Define all three in YAML under <code>.sightmap/</code>. Sightmap-enabled tooling adds them to the agent's accessibility snapshot automatically.
         </p>
 
         {/* -------------------- VIEWS -------------------- */}

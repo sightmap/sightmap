@@ -5,7 +5,7 @@ export default function AgentSection() {
         <div className="section-label">Memory</div>
         <h2>What agents learn, checked in.</h2>
         <p className="section-desc">
-          Sightmap names views, components, and API routes. Agents add <strong>memory</strong> notes for quirks, invariants, and shortcuts that source code does not explain. Sightmap-enabled tooling puts those notes in a <code>[Guide]</code> at the top of each snapshot. The next agent starts with the context the last one recorded.
+          Sightmap names views, components, and API routes. Agents add <a href="https://docs.sightmap.org/spec/memory"><strong>memory</strong></a> notes for quirks, invariants, and shortcuts that source code does not explain. Sightmap-enabled tooling puts those notes in a <code>[Guide]</code> at the top of each snapshot. The next agent starts with the context the last one recorded.
         </p>
 
         <div className="memory-grid">

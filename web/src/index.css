@@ -60,7 +60,7 @@ nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(250, 248, 246, 0.88);
+  background: rgba(250, 248, 246, 0.94);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
@@ -127,6 +127,81 @@ nav {
 }
 
 section { padding: 5rem 0; }
+
+/* ---- MOBILE NAV ----
+   Below 820px the inline links collapse into a toggle and a full-width panel,
+   so the key destinations are one tap away instead of a scroll to the footer. */
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.nav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A whole 2px, not 1.5: a fractional height lands on a half device pixel, so
+   the two bars snap to different weights and the top one renders thinner. */
+.nav-toggle__bar {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background: var(--text-bright);
+  border-radius: 1px;
+  transition: transform 0.2s ease;
+}
+
+.nav-toggle__bar[data-x='true']:first-child { transform: translateY(3.5px) rotate(45deg); }
+.nav-toggle__bar[data-x='true']:last-child { transform: translateY(-3.5px) rotate(-45deg); }
+
+.nav-menu {
+  display: none;
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  z-index: 99;
+  flex-direction: column;
+  padding: 0.5rem 1.25rem 1.25rem;
+  /* Opaque: the panel can sit over a dark hero, and a translucent one ghosts
+     the headline through the links. */
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 12px 30px rgba(20, 26, 36, 0.08);
+}
+
+.nav-menu a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.95rem 0.25rem;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text-bright);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-menu a:last-child { border-bottom: none; }
+.nav-menu a svg { width: 15px; height: 15px; fill: currentColor; }
+
+@media (max-width: 820px) {
+  nav { padding: 0 1.25rem; }
+  .nav-links { display: none; }
+  .nav-toggle { display: flex; }
+  .nav-menu[data-open='true'] { display: flex; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-toggle__bar { transition: none; }
+}
 
 /* ---- HERO ---- */
 .hero {
@@ -1235,7 +1310,7 @@ footer {
   .container { padding: 0 1.25rem; }
   .hero { padding-top: 7rem; }
   section { padding: 3.5rem 0; }
-  .nav-links a:not(.nav-gh) { display: none; }
+  /* replaced by the .nav-toggle menu — see MOBILE NAV above */
 }
 
 /* ---- BLOG ---- */
