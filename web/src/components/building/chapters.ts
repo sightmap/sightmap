@@ -159,7 +159,7 @@ export const CHAPTERS: Chapter[] = [
     eyebrow: '05 · Built on top',
     title: 'When a room moves, one line changes.',
     body:
-      'Point a test at `div.sc-hKgILt` and it breaks the day that class is regenerated. Point it at `ContinueButton` and the selector lives in the map instead. Move the room, edit that one line, and every tool and test above it keeps working. Sightkick refuses to compile against a room the map no longer has, so a break arrives at build time with a name on it.',
+      'A test pinned to `div.sc-hKgILt` breaks the day that class is regenerated. Point it at `ContinueButton` and the selector lives in one line of the map. Lose the room and sightkick fails the build by name. Edit that line, and every tool above it keeps working.',
     hud: {
       title: 'The repair',
       rows: [
@@ -178,7 +178,7 @@ export const CHAPTERS: Chapter[] = [
     badge: 'exploratory',
     title: 'Journeys you can name and rerun.',
     body:
-      'Name the route once: log in, open an item, cart it, check out. Sightkick turns each pair of steps into a hint on the tool before it, so an agent mid-run is told what tends to come next. Resolve that route against a written scenario and it becomes a plan you check in. Replaying it costs no agent, and it refuses to run once the map or the scenario has moved underneath it.',
+      'Name the route once: log in, open an item, cart it, check out. Each step becomes a hint on the one before it, so an agent mid-run knows what comes next. Written against a scenario, the route becomes a plan that replays with no agent, and refuses to run once the map moves under it.',
     hud: {
       title: 'Trajectory',
       rows: [
