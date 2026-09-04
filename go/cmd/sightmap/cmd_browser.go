@@ -417,18 +417,6 @@ func resolveTab(args []string) (tabID string, rest []string) {
 	return "", args
 }
 
-func dial(addr string) (*browser.CDPConn, error) {
-	ctx := context.Background()
-	conn, err := browser.DialCDP(ctx, addr)
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to Chrome at %s\n"+
-			"Start a session first:\n"+
-			"  sightmap browser start\n"+
-			"  sightmap browser start --url https://...\n", addr)
-	}
-	return conn, nil
-}
-
 func runNavigate(args []string) error {
 	sightmapDir, args := resolveSightmapDir(args)
 	addr, args := resolveAddr(args, sightmapDir)
