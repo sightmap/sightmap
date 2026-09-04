@@ -657,7 +657,7 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
   const pts = useMemo(() => sheetLinePoints(i), [i])
   // People are not here: the crowd is drawn by People.tsx, which places the
   // occupants of every floor into one set of instanced meshes.
-  const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r).items), [floor])
+  const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r, i).items), [floor, i])
   const place = useMemo(() => makeFloorPlace(), [])
   const carpets = useMemo(() => floorCarpets(floor, i), [floor, i])
   // The deck is the other half of the floor plane, and the half the contact

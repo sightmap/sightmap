@@ -149,7 +149,7 @@ function main(): void {
 
   const report: string[] = []
   FLOORS.forEach((floor, i) => {
-    const occluders = [CORE_OCCLUDER, ...floor.rooms.flatMap((r) => furnish(r).items.map(occluderFromItem))]
+    const occluders = [CORE_OCCLUDER, ...floor.rooms.flatMap((r) => furnish(r, i).items.map(occluderFromItem))]
     const cell = bakeCell(occluders)
     const col = i % AO_ATLAS.cols
     const row = Math.floor(i / AO_ATLAS.cols)

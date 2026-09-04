@@ -98,7 +98,7 @@ interface Resident {
 function residents(): Resident[] {
   const byFloor = FLOORS.map((f, floor) =>
     f.rooms.flatMap((room) =>
-      furnish(room).people.map((p) => ({
+      furnish(room, floor).people.map((p) => ({
         floor,
         x: p.x,
         y: p.y,
