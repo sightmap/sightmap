@@ -1,4 +1,8 @@
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
+import { DRAWN, furnish, type Item } from './furnish'
+import { FLOORS, FLOOR_H, JOURNEYS } from './model'
+import { buildPath, pointAt } from './path'
 import {
   ARM_LEN,
   LEG_LEN,
@@ -144,5 +148,58 @@ describe('stepGait', () => {
       stepGait(slow, i * 0.01, 0, dt, false)
     }
     expect(fast.phase).toBeCloseTo(slow.phase * 2, 6)
+  })
+})
+
+
+// Furniture placement (furnish.ts) and walk-path construction (path.ts) used
+// to be generated independently and never consulted each other, so a desk or
+// sofa could land squarely in someone's route (#371/#370 gave walkers real,
+// forward-facing bodies, which made the pre-existing clipping obvious).
+// furnish() now steers furniture clear of the corridor every JOURNEYS path
+// actually walks. This test samples every walk path densely and asserts no
+// sample point ever lands inside a DRAWN item's footprint, on any floor —
+// the permanent guarantee, not a one-time visual check.
+const SAMPLE_STEP = 0.1 // finer than any DRAWN item's smallest half-extent
+
+/** Point-in-rotated-rectangle test, matching the footprint geometry.ts draws
+ *  on the blueprint sheet: half-extents sx/2, sz/2 rotated by ry about the
+ *  item's own centre. Zero padding — this checks the literal invariant (no
+ *  walker inside the furniture), independent of furnish.ts's own keep-clear
+ *  margin, so the test can't be satisfied by shrinking that margin. */
+function insideFootprint(px: number, pz: number, it: Item): boolean {
+  const dx = px - it.x
+  const dz = pz - it.z
+  const c = Math.cos(-it.ry)
+  const s = Math.sin(-it.ry)
+  const lx = dx * c - dz * s
+  const lz = dx * s + dz * c
+  return Math.abs(lx) <= it.sx / 2 && Math.abs(lz) <= it.sz / 2
+}
+
+describe('walk paths vs furniture', () => {
+  it('never routes a walked sample through a drawn item, on any floor', () => {
+    const drawnByFloor: Item[][] = FLOORS.map((f, i) =>
+      f.rooms.flatMap((room) => furnish(room, i).items.filter((it) => DRAWN.includes(it.type)))
+    )
+
+    const offenders: string[] = []
+    const v = new THREE.Vector3()
+    for (const journey of JOURNEYS) {
+      const path = buildPath(journey)
+      const sampleAt = (d: number) => {
+        pointAt(path, d, v)
+        const floorIndex = Math.round(v.y / FLOOR_H)
+        for (const it of drawnByFloor[floorIndex] ?? []) {
+          if (insideFootprint(v.x, v.z, it)) {
+            offenders.push(`${journey.name} @ d=${d.toFixed(2)} clips ${it.type} on floor ${floorIndex}`)
+          }
+        }
+      }
+      for (let d = 0; d < path.length; d += SAMPLE_STEP) sampleAt(d)
+      sampleAt(path.length)
+    }
+
+    expect(offenders).toEqual([])
   })
 })
