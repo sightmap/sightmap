@@ -126,12 +126,20 @@ views:
         description: One post summary — topic, date, title, excerpt
         properties:
           - name: title
-            extract: '.blog-card__title'
+            extract: blog-card-title.text
           - name: topic
-            extract: '.blog-card__meta span'
+            extract: blog-card-topic.text
         children:
           - name: blog-card-title
             selector: '.blog-card__title'
+            properties:
+              - name: text
+                extract: text
+          - name: blog-card-topic
+            selector: '.blog-card__meta span'
+            properties:
+              - name: text
+                extract: text
           - name: blog-card-excerpt
             selector: '.blog-card__excerpt'
 
@@ -201,9 +209,9 @@ views:
         description: One entry summary — screenshot, mark, name, method pill, stats, author, updated
         properties:
           - name: site
-            extract: '.atlas-card__name'
+            extract: atlas-card-name.text
           - name: method
-            extract: '.atlas-card__method'
+            extract: atlas-card-method.text
         memory:
           - The whole card is the link to /atlas/<slug>; there is no inner call to action
           - An entry with no screenshots renders a typographic fallback panel in place of the image
@@ -211,6 +219,14 @@ views:
         children:
           - name: atlas-card-name
             selector: '.atlas-card__name'
+            properties:
+              - name: text
+                extract: text
+          - name: atlas-card-method
+            selector: '.atlas-card__method'
+            properties:
+              - name: text
+                extract: text
           - name: atlas-card-stats
             selector: '.atlas-card__stats'
 
@@ -243,12 +259,15 @@ views:
         description: The `sightmap atlas add <slug>` command with a copy button
         properties:
           - name: command
-            extract: '.atlas-install__cmd'
+            extract: atlas-install-cmd.text
         memory:
           - The button label toggles to "Copied" for 2s and only on a copy that actually succeeded
         children:
           - name: atlas-install-cmd
             selector: '.atlas-install__cmd'
+            properties:
+              - name: text
+                extract: text
           - name: atlas-install-copy
             selector: '.atlas-install__copy'
 
@@ -258,12 +277,22 @@ views:
         description: Provenance rail for the entry — how and when it was captured, by whom, against which CLI and spec version
         properties:
           - name: lastVerified
-            extract: 'time'
+            extract: atlas-meta-verified.text
           - name: commit
-            extract: 'code'
+            extract: atlas-meta-commit.text
         memory:
           - A row is omitted entirely rather than left blank when its value is absent, so the rail's row count varies by entry
         children:
+          - name: atlas-meta-verified
+            selector: 'time'
+            properties:
+              - name: text
+                extract: text
+          - name: atlas-meta-commit
+            selector: 'code'
+            properties:
+              - name: text
+                extract: text
           - name: AtlasMetaMachine
             selector: '.atlas-meta__machine'
             description: Links to the machine-readable twins of this entry
