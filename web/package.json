@@ -17,6 +17,7 @@
     "posters": "node scripts/capture-posters.mjs",
     "posters:contrast": "node scripts/poster-contrast.mjs",
     "posters:verify": "node scripts/verify-fallback.mjs",
+    "stacking:verify": "node scripts/verify-story-card-stacking.mjs",
     "og": "node og/render.mjs",
     "og:card": "node og/render.mjs --post",
     "build:basis": "tsx scripts/copy-basis-transcoder.ts",
