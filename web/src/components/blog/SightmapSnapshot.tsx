@@ -56,42 +56,6 @@ const FIGURES: Record<string, FigureData> = {
       ],
     },
   },
-  datepicker: {
-    view: '/checkout/delivery',
-    defaultMode: 'sightmap',
-    raw: {
-      tokens: 'DOM roles',
-      tree: `[generic]
-  [textbox] "12/28/2026"
-  [generic]
-    [generic]
-      [button] "Previous month"
-      [generic] "December 2026"
-      [button] "Next month"
-    [gridcell] "1"
-    [gridcell] "2"
-    [gridcell] "3"
-    …24 more gridcells…`,
-    },
-    sightmap: {
-      tokens: 'names + memory',
-      tree: `[View: Delivery "/checkout/delivery"]
-[DeliveryDatePicker]
-  [DateTrigger] "12/28/2026"
-  [CalendarDialog]
-    [PrevMonthButton]
-    [MonthLabel] "December 2026"
-    [NextMonthButton]
-    [Day] "1"
-    [Day] "2"
-    [Day] "3"
-    …24 more days…`,
-      guide: [
-        'DateTrigger accepts a typed date (e.g. 12/28/2026). Skip the calendar.',
-        'src: src/components/DeliveryDatePicker.tsx',
-      ],
-    },
-  },
 }
 
 export default function SightmapSnapshot({ figure = 'checkout' }: { figure?: string }) {
