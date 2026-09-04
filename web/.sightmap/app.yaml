@@ -326,7 +326,7 @@ views:
       - The WebGL scene (src/components/building/Scene.tsx) mounts only after a client effect and is code-split; the prerendered HTML carries the SVG poster and the full chapter text, so the page reads without JS or WebGL
       - Scroll position drives the scene — each `.bld-chapter` section is one chapter and the active one carries `data-active="true"`; the canvas itself is aria-hidden and has no interactive nodes
       - Chapter copy lives in src/components/building/chapters.ts, not in the page component
-      - "Chapters 05–07 (self-healing tests, trajectories, Web MCP tools) describe exploratory work and carry the `exploratory` badge; they are not shipped features"
+      - "Chapter 06 (trajectories) is the only chapter carrying the `exploratory` badge; 05 (repairs) and 07 (sightkick) describe behaviour that ships today"
     components:
       - name: BuildingNav
         selector: '[data-component="BuildingNav"]'

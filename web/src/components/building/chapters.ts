@@ -155,18 +155,17 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     id: 'self-healing',
-    short: 'Self-healing',
+    short: 'Repairs',
     eyebrow: '05 · Built on top',
-    badge: 'exploratory',
-    title: 'Tests that find the moved door.',
+    title: 'When a room moves, one line changes.',
     body:
-      'When a room moves, a test written against selectors walks into a wall. A test written against the map asks the building where the room went. The selector changes, the name does not, and the run finishes.',
+      'Point a test at `div.sc-hKgILt` and it breaks the day that class is regenerated. Point it at `ContinueButton` and the selector lives in the map instead. Move the room, edit that one line, and every tool and test above it keeps working. Sightkick refuses to compile against a room the map no longer has, so a break arrives at build time with a name on it.',
     hud: {
-      title: 'Self-healing run',
+      title: 'The repair',
       rows: [
         ['Room moved', 'ContinueButton'],
-        ['Selectors updated', '1'],
-        ['Runs passed', '128 / 128'],
+        ['Lines changed', '1'],
+        ['Call sites touched', '0'],
       ],
     },
     focus: 'Regression',
@@ -179,13 +178,13 @@ export const CHAPTERS: Chapter[] = [
     badge: 'exploratory',
     title: 'Journeys you can name and rerun.',
     body:
-      'Codify a journey on top of the primitives: the floors it visits, the rooms it touches, the requests it expects on the way. A trajectory is a route through the building any agent can follow, and any run can be checked against.',
+      'Name the route once: log in, open an item, cart it, check out. Sightkick turns each pair of steps into a hint on the tool before it, so an agent mid-run is told what tends to come next. Resolve that route against a written scenario and it becomes a plan you check in. Replaying it costs no agent, and it refuses to run once the map or the scenario has moved underneath it.',
     hud: {
       title: 'Trajectory',
       rows: [
         ['Route', 'BookFlight'],
         ['Stops', String(JOURNEYS[0].stops.length)],
-        ['Requests expected', '3'],
+        ['Replay cost', 'no agent'],
       ],
     },
     focus: 'BookFlight',
