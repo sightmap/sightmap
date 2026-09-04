@@ -194,11 +194,11 @@ export const CHAPTERS: Chapter[] = [
   {
     id: 'web-mcp',
     short: 'Web MCP',
-    eyebrow: '07 · Built on top',
-    badge: 'exploratory',
+    eyebrow: '07 · Sightkick',
     title: 'A front desk for agents.',
     body:
-      'Once the building knows its own rooms, it can offer services at the door. Generate MCP tools from the map: `search_flights`, `select_fare`, `create_booking`, each backed by a real view and a real request. An agent walks up to the counter instead of wandering the halls.',
+      'Once the building knows its own rooms, it can offer services at the door. Sightkick compiles the map into WebMCP tools — `search_flights`, `select_fare`, `create_booking` — each backed by a real view and a real request. An agent walks up to the counter and asks, instead of wandering the halls.',
+    ctas: [{ label: 'Meet sightkick →', href: '/sightkick' }],
     hud: {
       title: 'Front desk',
       rows: [

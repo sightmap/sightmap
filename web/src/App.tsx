@@ -6,6 +6,7 @@ import AtlasIndex from '@/pages/AtlasIndex'
 import AtlasEntry from '@/pages/AtlasEntry'
 import Developers from '@/pages/Developers'
 import Building from '@/pages/Building'
+import Sightkick from '@/pages/Sightkick'
 import NotFound from '@/pages/NotFound'
 import { ConsentProvider } from '@/components/consent/ConsentContext'
 import ConsentUI from '@/components/consent/ConsentUI'
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/atlas/:slug" element={<AtlasEntry />} />
         <Route path="/developers" element={<Developers />} />
         <Route path="/building" element={<Building />} />
+        <Route path="/sightkick" element={<Sightkick />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <ConsentUI />

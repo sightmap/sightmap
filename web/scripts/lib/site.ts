@@ -55,6 +55,12 @@ export const DEVELOPERS_DESCRIPTION =
 export const BUILDING_TITLE = `The Building — how ${SITE_NAME} works`
 export const BUILDING_DESCRIPTION =
   'An interactive tour of how Sightmap works: code is the blueprint, the running app is the building, a sightmap is its wayfinding, and agents are the people moving through it.'
+// The /sightkick companion page: the WebMCP tool layer compiled from a corpus.
+// Read by scripts/prerender.tsx, src/pages/Sightkick.tsx, and the sitemap /
+// llms.txt generators.
+export const SIGHTKICK_TITLE = `Sightkick — WebMCP tools for your web app`
+export const SIGHTKICK_DESCRIPTION =
+  'Sightkick compiles a .sightmap/ corpus and a YAML tool layer into WebMCP tools, so an agent calls a named action on your app instead of guessing at selectors.'
 export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`
 // An atlas entry's own title carries the mapped site's name, so the suffix
 // says which gallery it came from rather than repeating the site name twice.

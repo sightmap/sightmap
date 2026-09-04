@@ -1,0 +1,132 @@
+---
+title: "Sightkick CLI Reference: build, browser, call, runtime, and skills"
+sidebarTitle: "CLI reference"
+description: "Every sightkick command, its flags, and what it writes, for compiling and running a WebMCP tool layer."
+---
+
+The `sightkick` CLI compiles a `.sightkick/` tool layer against a `.sightmap/` corpus, and drives the compiled tools on a live page. It shells out to the `sightmap` CLI for browser work, so both need to be on your `PATH`.
+
+```bash
+npm install -g @sightmap/sightmap @sightmap/sightkick
+```
+
+Commands that take an app directory expect one holding both `.sightkick/` and `.sightmap/`. In the examples below that is `.`, the current directory.
+
+## `sightkick build`
+
+Compiles the corpus and the tool layer into a single self-contained IR document.
+
+```bash
+sightkick build <app-dir | .sightkick-dir> [-o out.json] [--verify]
+```
+
+| Flag | Description |
+|------|-------------|
+| `-o`, `--out` | Write the IR to a file. Defaults to stdout. |
+| `--verify` | Also check each tool's `returns` extractors against the view's captured snapshots, and warn on fields that resolve empty on every row. |
+
+Every component, property, and view reference is resolved against the corpus. Unresolved names fail the build and print candidates. `--verify` needs a captured snapshot, so run `sightmap capture` on the view first; without one it warns that there is nothing to check against.
+
+```bash
+$ sightkick build . --verify -o tools.ir.json
+✓ wrote 2 tool(s) to tools.ir.json
+```
+
+## `sightkick browser`
+
+Builds the IR, starts a Sightmap browser session, and injects the runtime so the tools register on the page.
+
+```bash
+sightkick browser <app-dir> [--url URL] [--webmcp] [--no-inspector]
+                            [--extensions PATHS] [--profile DIR]
+                            [--cdp-port N] [--no-start]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--url` | Page to open. Defaults to the corpus's home view URL. |
+| `--webmcp` | Enable the blink flags that expose the native `document.modelContext`, and load the bundled WebMCP inspector for driving tools with Gemini from Chrome's side panel. |
+| `--no-inspector` | With `--webmcp`, use the native surface without the inspector. |
+| `--extensions` | Load extra unpacked extensions, merged with the defaults. |
+| `--profile`, `--cdp-port`, `--chrome-flag` | Passed through to `sightmap browser start`. |
+| `--no-start` | Inject into an already-running session instead of starting one. Use this after editing the corpus. |
+
+The injection is persisted, so the tools re-register on SPA route changes and on full page loads. Re-run with `--no-start` to refresh the injected IR after a corpus or manifest change.
+
+It runs Sightmap from the app directory, so the session lives in that directory's `.sightmap/`. Drive it from there.
+
+```bash
+$ sightkick browser .
+→ injecting runtime + IR (2 tool(s), persisted) …
+✓ sightkick tools are live on the page.
+```
+
+Confirm what registered with the Sightmap CLI:
+
+```bash
+$ sightmap browser mcp list
+WebMCP (native) — 2 tool(s):
+  search_flights — Search flights for a route and date.
+  select_fare — Choose a fare from the results.
+```
+
+## `sightkick call`
+
+Invokes one tool by name against a live browser session and prints its `ToolResult` as JSON. Exits non-zero when the tool reports `ok:false`.
+
+```bash
+sightkick call <app-dir> <tool> [--param k=v ...] [--via webmcp|cli] [--timeout-ms N]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--param k=v` | One tool parameter. Repeat for each. |
+| `--via` | How the tool runs. `webmcp` (default) or `cli`. |
+| `--timeout-ms` | Overall timeout for the call. |
+
+See [Running tools](/sightkick/running) for how the two paths differ and when to pick each.
+
+```bash
+$ sightkick call . search_flights --param origin=SFO --param destination=JFK
+{
+  "ok": true,
+  "items": [{ "fare": "$214", "stops": "nonstop" }],
+  "guidance": [{ "tool": "select_fare", "reason": "pick one of the fares you just found" }]
+}
+```
+
+The result carries `ok`, `value` or `items`, `skipped` when an idempotency guard fired, and `guidance` from any journey the tool appears in.
+
+## `sightkick runtime`
+
+Emits the runtime bundle, about 19 KB, for injecting into a page you serve yourself.
+
+```bash
+sightkick runtime [-o out.js]
+```
+
+Load the bundle, then register an IR with it:
+
+```js
+window.__sightkick.load(ir)
+```
+
+The bundle is embedded in the CLI, so re-emit it after upgrading `sightkick`.
+
+## `sightkick skills install`
+
+Installs the agent skills into `~/.agents/skills`, or a directory you name. It also installs the supporting Sightmap skills, so this one command covers the whole workflow.
+
+```bash
+sightkick skills install [--target DIR]
+```
+
+```bash
+$ sightkick skills install
+installed 2 sightkick skill(s) → ~/.agents/skills
+  sightkick-authoring
+  sightkick-debug
+installing the supporting sightmap skills …
+  sightmap-authoring
+  sightmap-browser
+```

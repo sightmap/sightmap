@@ -7,6 +7,8 @@ import {
   BUILDING_TITLE,
   DEVELOPERS_DESCRIPTION,
   DEVELOPERS_TITLE,
+  SIGHTKICK_DESCRIPTION,
+  SIGHTKICK_TITLE,
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_URL,
@@ -58,6 +60,7 @@ This is the ${SITE_NAME} homepage at ${SITE_URL}. ${SITE_NAME} is an open YAML s
 
 - [Sightmap developer resources](${SITE_URL}${DEVELOPERS_PATH})
 - [The Building — how Sightmap works](${SITE_URL}/building)
+- [Sightkick — WebMCP tools for your web app](${SITE_URL}/sightkick)
 - [OpenAPI specification](${SITE_URL}/openapi.json)
 - [llms.txt](${SITE_URL}/llms.txt)
 - [Documentation](https://docs.sightmap.org)
@@ -144,6 +147,65 @@ The interactive version at ${SITE_URL}/building is a scroll-driven 3D scene. Thi
 - [Quickstart](https://docs.sightmap.org/start/quickstart)
 - [Documentation](https://docs.sightmap.org)
 - [GitHub](https://github.com/sightmap/sightmap)
+`
+}
+
+export function buildSightkickMarkdown(): string {
+  return `# ${SIGHTKICK_TITLE}
+
+${SIGHTKICK_DESCRIPTION}
+
+The page at ${SITE_URL}/sightkick is the same content with the worked example rendered.
+
+## What it is
+
+Sightmap maps a running web app into a \`.sightmap/\` corpus: named views, named
+components, and the properties worth reading off them. Sightkick is its
+companion CLI. It compiles that corpus plus a \`.sightkick/\` tool layer into
+WebMCP tool IR, so an agent calls \`search_flights(origin, destination, date)\`
+instead of guessing which element on the page is the search box.
+
+WebMCP is an early W3C proposal from Google and Microsoft for how a page hands
+the agent in the same browser tab a list of callable actions. Sightkick
+compiles that surface from the outside, for apps that do not declare one.
+
+## How the two fit together
+
+1. \`.sightmap/\` — the corpus. Views, components, extracted properties. The only
+   place a CSS selector appears.
+2. \`.sightkick/\` — the tool layer. Any number of YAML files, merged. Tools name
+   corpus components; they never carry selectors.
+3. \`sightkick build\` — compiles both into one self-contained IR, resolving every
+   reference against the corpus. \`--verify\` checks each returns extractor
+   against a captured snapshot.
+4. The runtime — a ~19 KB bundle that registers the IR on
+   \`document.modelContext\`, the browser's native WebMCP surface on Chrome for
+   Testing.
+
+## Commands
+
+- \`sightkick build <dir>\` — compile \`.sightkick/\` + \`.sightmap/\` into tool IR.
+- \`sightkick browser <dir>\` — build, start a sightmap session, and persist-inject
+  the runtime so tools re-register on every new document.
+- \`sightkick call <dir> <tool> --param k=v\` — invoke one tool and print its
+  ToolResult as JSON. \`--via cli\` drives real browser input from any page;
+  \`--via webmcp\` asks the page's own registered tool to run itself.
+- \`sightkick runtime\` — emit the runtime bundle.
+- \`sightkick skills install\` — install the sightkick and sightmap agent skills.
+
+## Install
+
+\`\`\`sh
+npm install -g @sightmap/sightmap @sightmap/sightkick
+sightkick skills install
+\`\`\`
+
+## Next
+
+- [Homepage](${SITE_URL}/)
+- [The Building](${SITE_URL}/building)
+- [Documentation](https://docs.sightmap.org/sightkick)
+- [GitHub](https://github.com/sightmap/sightkick)
 `
 }
 
