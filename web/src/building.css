@@ -601,21 +601,6 @@
 .bld-tool b span { color: var(--text-dim); font-weight: 400; }
 .bld-tool small { font-size: 0.58rem; color: var(--text-dim); }
 
-.bld-titleblock {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  padding: 0.35rem 0.6rem;
-  white-space: nowrap;
-  transform: translate(0, 8px);
-}
-
 /* Mobile ----------------------------------------------------------------- */
 
 @media (max-width: 899px) {
@@ -655,8 +640,7 @@
 
   .bld-tag { font-size: 0.6rem; }
   .bld-tag--tag,
-  .bld-tag--floor span,
-  .bld-titleblock { display: none; }
+  .bld-tag--floor span { display: none; }
   .bld-tag--memory { width: 118px; font-size: 0.56rem; padding: 0.35rem 0.45rem; }
   .bld-tag--floor { font-size: 0.56rem; margin-left: 16px; }
   .bld-tag--floor::before { left: -16px; width: 12px; }
@@ -814,7 +798,6 @@
   filter: drop-shadow(0 20px 30px rgba(20, 40, 90, 0.22));
 }
 
-.billboard__frame .bld-titleblock { display: none; }
 /* Belt-and-suspenders: drei Html writes its own z-index, so hide every
  * in-scene tag in this crop even if a portal still mounts. */
 .billboard__frame .bld-tag { display: none; }
