@@ -113,7 +113,7 @@ export function Rig() {
 
     // Desktop: the story card sits on the left, so push the model right.
     // Mobile: the card sits at the bottom, so push the model up.
-    // Billboard: nudge the tower left so the floor directory fits in the frame.
+    // Billboard: nudge the tower slightly left in the tight crop.
     const shiftRight = billboard ? (-size.width * 0.07) / zoom : s.mobile ? (-size.width * 0.12) / zoom : (size.width * 0.13) / zoom
     const shiftUp = billboard || !s.mobile ? 0 : (size.height * 0.11) / zoom
     v.target.set(0, c.lookY, 0).addScaledVector(v.right, -shiftRight).addScaledVector(v.up, -shiftUp)
@@ -132,13 +132,17 @@ export function Rig() {
 
 /** Everything on the table. Reads the shared state; needs a driver and a Rig. */
 export function SceneContent() {
+  const s = useShared()
+  // The homepage crop is too tight for the floor directory — those Html
+  // portals stack above the "Enter the building" chip. The tour still shows them.
+  const wayfinding = s.frame !== 'billboard'
   return (
     <>
       <Lights />
       <Table />
       <Tower />
       <Core />
-      <Wayfinding />
+      {wayfinding && <Wayfinding />}
       <Agents />
       <HealDemo />
       <Trajectory />

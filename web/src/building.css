@@ -815,7 +815,12 @@
 }
 
 .billboard__frame .bld-titleblock { display: none; }
-.billboard__frame .bld-tag--floor span { display: none; }
+/* Belt-and-suspenders: drei Html writes its own z-index, so hide every
+ * in-scene tag in this crop even if a portal still mounts. */
+.billboard__frame .bld-tag { display: none; }
+.billboard__enter {
+  isolation: isolate;
+}
 
 .billboard__chip {
   position: absolute;
@@ -852,7 +857,7 @@
   position: absolute;
   right: 0.9rem;
   bottom: 0.9rem;
-  z-index: 4;
+  z-index: 20;
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   background: #f5f1ea;
