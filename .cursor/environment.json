@@ -1,0 +1,20 @@
+{
+  "name": "Sightmap monorepo",
+  "install": "./.cursor/install.sh",
+  "ports": [
+    { "name": "web (sightmap.org)", "port": 5173 },
+    { "name": "docs (docs.sightmap.org)", "port": 3000 }
+  ],
+  "terminals": [
+    {
+      "name": "web (sightmap.org)",
+      "command": "cd web && pnpm dev",
+      "description": "Vite dev server for the marketing site on http://localhost:5173"
+    },
+    {
+      "name": "docs (docs.sightmap.org)",
+      "command": "cd docs && PATH=\"$HOME/.npm-global/bin:$PATH\" mint dev",
+      "description": "Mintlify docs preview on http://localhost:3000"
+    }
+  ]
+}
