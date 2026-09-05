@@ -17,8 +17,9 @@ function Driver({ onNight }: { onNight: (night: boolean) => void }) {
   useFrame(({ clock }) => {
     const t = s.reduced ? 0 : clock.getElapsedTime()
     const c = s.cur
-    Object.assign(c, CHAPTERS[4].scene) // "The people": built, labelled, populated
-    c.labels = 0.75
+    Object.assign(c, CHAPTERS[4].scene) // "The people": built, populated
+    // Floor directory labels collide with the enter chip on this tight crop.
+    c.labels = 0
     c.agents = 1
     c.az = 42 + Math.sin(t * 0.085) * 9
     c.el = 25 + Math.sin(t * 0.05) * 1.5

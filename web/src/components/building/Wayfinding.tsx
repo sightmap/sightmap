@@ -76,6 +76,7 @@ export default function Wayfinding() {
           key={k}
           position={a.pos}
           center={a.kind === 'tag'}
+          transform={false}
           zIndexRange={[6, 0]}
           style={{ pointerEvents: 'none' }}
         >

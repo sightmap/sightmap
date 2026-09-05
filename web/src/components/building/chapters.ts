@@ -169,8 +169,7 @@ export const CHAPTERS: Chapter[] = [
         ['Runs passed', '128 / 128'],
       ],
     },
-    focus: 'Regression',
-    scene: { ...base, labels: 0.4, agents: 0.35, heal: 1, az: 50, el: 22, zoom: 1.22, lookY: 8.2 },
+    scene: { ...base, labels: 0.4, agents: 0, heal: 1, az: 50, el: 22, zoom: 1.22, lookY: 8.2 },
   },
   {
     id: 'trajectories',
@@ -189,7 +188,7 @@ export const CHAPTERS: Chapter[] = [
       ],
     },
     focus: 'BookFlight',
-    scene: { ...base, labels: 0.5, agents: 0.35, trajectory: 1, az: 44, el: 26, zoom: 1.05, lookY: 5.8 },
+    scene: { ...base, labels: 0.5, agents: 0.6, trajectory: 1, az: 44, el: 26, zoom: 1.05, lookY: 5.8 },
   },
   {
     id: 'web-mcp',

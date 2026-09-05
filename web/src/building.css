@@ -368,7 +368,7 @@
   z-index: 15;
   transform: translateX(-50%);
   width: min(880px, calc(100vw - 2.5rem));
-  padding: 0.8rem 1.4rem 1.7rem;
+  padding: 0.8rem 2.8rem 1.7rem;
   border-radius: 100px;
   background: var(--bld-chrome-bg);
   border: 1px solid var(--bld-chrome-border);
@@ -395,8 +395,8 @@
 
 .bld-rail__dots {
   position: absolute;
-  left: 1.4rem;
-  right: 1.4rem;
+  left: 2.8rem;
+  right: 2.8rem;
   top: calc(0.8rem + 0.4rem + 1px);
   display: flex;
   justify-content: space-between;
@@ -523,8 +523,6 @@
   background: #ffe27a;
   color: #3d3929;
   border-radius: 3px;
-  transform-origin: top left;
-  rotate: -3deg;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
   font-size: 0.64rem;
   line-height: 1.35;
@@ -603,21 +601,6 @@
 .bld-tool b span { color: var(--text-dim); font-weight: 400; }
 .bld-tool small { font-size: 0.58rem; color: var(--text-dim); }
 
-.bld-titleblock {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  padding: 0.35rem 0.6rem;
-  white-space: nowrap;
-  transform: translate(-50%, 8px);
-}
-
 /* Mobile ----------------------------------------------------------------- */
 
 @media (max-width: 899px) {
@@ -647,18 +630,17 @@
   .bld-rail {
     bottom: 0.7rem;
     width: calc(100vw - 1.8rem);
-    padding: 0.7rem 1rem 1.5rem;
+    padding: 0.7rem 1.4rem 1.5rem;
   }
 
-  .bld-rail__dots { left: 1rem; right: 1rem; top: calc(0.7rem + 0.4rem + 1px); }
+  .bld-rail__dots { left: 1.4rem; right: 1.4rem; top: calc(0.7rem + 0.4rem + 1px); }
   .bld-rail__dot { width: 12px; height: 12px; }
   .bld-rail__label { display: none; }
   .bld-rail__dot[aria-pressed='true'] .bld-rail__label { display: block; }
 
   .bld-tag { font-size: 0.6rem; }
   .bld-tag--tag,
-  .bld-tag--floor span,
-  .bld-titleblock { display: none; }
+  .bld-tag--floor span { display: none; }
   .bld-tag--memory { width: 118px; font-size: 0.56rem; padding: 0.35rem 0.45rem; }
   .bld-tag--floor { font-size: 0.56rem; margin-left: 16px; }
   .bld-tag--floor::before { left: -16px; width: 12px; }
@@ -808,6 +790,7 @@
 .billboard__frame canvas {
   position: absolute;
   inset: 0;
+  z-index: 0;
 }
 
 .billboard__frame .bld-poster {
@@ -815,14 +798,18 @@
   filter: drop-shadow(0 20px 30px rgba(20, 40, 90, 0.22));
 }
 
-.billboard__frame .bld-titleblock { display: none; }
-.billboard__frame .bld-tag--floor span { display: none; }
+/* Belt-and-suspenders: drei Html writes its own z-index, so hide every
+ * in-scene tag in this crop even if a portal still mounts. */
+.billboard__frame .bld-tag { display: none; }
+.billboard__enter {
+  isolation: isolate;
+}
 
 .billboard__chip {
   position: absolute;
   top: 0.9rem;
   left: 0.9rem;
-  z-index: 2;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -853,7 +840,7 @@
   position: absolute;
   right: 0.9rem;
   bottom: 0.9rem;
-  z-index: 2;
+  z-index: 20;
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   background: #f5f1ea;

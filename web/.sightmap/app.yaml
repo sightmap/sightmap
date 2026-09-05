@@ -46,6 +46,7 @@ views:
           - A full-bleed dark band (always dark, unlike /building which only darkens at nightfall); text inside uses light colours regardless of the slice's day/night phase
           - The WebGL slice mounts only once the frame has scrolled near the viewport and pauses while off-screen; the SVG poster covers the frame before that and for no-WebGL visitors
           - The whole frame is one link to /building and carries `data-night` on the section while the slice is in its night phase; there are no interactive nodes inside the frame
+          - Floor-directory labels (and other in-scene Html tags) are not mounted in this slice so they cannot cover the "Enter the building" chip; the tour at /building still shows them
         children:
           - name: billboard-copy
             selector: '.billboard__copy'

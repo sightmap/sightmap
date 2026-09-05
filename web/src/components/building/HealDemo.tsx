@@ -2,10 +2,19 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { KIOSK_H, PLATE, SLAB_T, TRAVELLER_COLORS, findRoom, floorY, roomStand } from './model'
+import { KIOSK_H, PLATE, SLAB_T, TRAVELLER_COLORS, findRoom, floorY, roomStand, surfaceAt } from './model'
+import { pointAt, routeOnFloor, type Path } from './geometry'
 import { smoothstep } from './chapters'
 import { useShared } from './state'
 import { Walker } from './Agents'
+
+function pathFromStands(floor: number, a: THREE.Vector3, b: THREE.Vector3): Path {
+  const route = routeOnFloor(floor, a.x, a.z, b.x, b.z)
+  const points = route.map((p) => new THREE.Vector3(p.x, surfaceAt(floor, p.x, p.z), p.z))
+  const cum = [0]
+  for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + points[i].distanceTo(points[i - 1]))
+  return { points, cum, stops: [0, points.length - 1], length: cum[cum.length - 1] }
+}
 
 // Chapter 05. A looping vignette on the Checkout floor: the ContinueButton
 // room slides to a new position (a redesign), a test walks to where the room
@@ -54,6 +63,8 @@ export default function HealDemo() {
   const from = useMemo(() => new THREE.Vector3(...roomStand(FLOOR, findRoom(FLOOR, 'PaymentForm'))), [])
   const oldPos = useMemo(() => new THREE.Vector3(...roomStand(FLOOR, room, 0)), [room])
   const newPos = useMemo(() => new THREE.Vector3(...roomStand(FLOOR, room, 1)), [room])
+  const walk1 = useMemo(() => pathFromStands(FLOOR, from, oldPos), [from, oldPos])
+  const walk2 = useMemo(() => pathFromStands(FLOOR, oldPos, newPos), [oldPos, newPos])
   const tmp = useMemo(() => new THREE.Vector3(), [])
   const start = useRef<number | null>(null)
   const lastPhase = useRef<Phase>('reset')
@@ -78,11 +89,11 @@ export default function HealDemo() {
     if (walker.current) {
       let p = from
       if (phase === 'walk') {
-        p = tmp.copy(from).lerp(oldPos, smoothstep((t - T.slideStart) / (T.walkEnd - T.slideStart)))
+        p = pointAt(walk1, walk1.length * smoothstep((t - T.slideStart) / (T.walkEnd - T.slideStart)), tmp)
       } else if (phase === 'fail' || phase === 'update') {
         p = oldPos
       } else if (phase === 'walk2') {
-        p = tmp.copy(oldPos).lerp(newPos, smoothstep((t - T.updateEnd) / (T.walk2End - T.updateEnd)))
+        p = pointAt(walk2, walk2.length * smoothstep((t - T.updateEnd) / (T.walk2End - T.updateEnd)), tmp)
       } else if (phase === 'pass') {
         p = newPos
       }
