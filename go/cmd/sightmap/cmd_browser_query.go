@@ -48,32 +48,64 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	if err != nil {
 		return nil, err
 	}
+	root, matches, props, err := extractMatchedComponents(ctx, conn, sightmapDir)
+	if err != nil {
+		return nil, err
+	}
+	return compquery.Resolve(root, matches, props, q)
+}
 
+// componentPresent reports whether queryStr matches at least one node on the
+// live page. It shares resolveComponentQuery's extract→match→project pipeline
+// but decides presence with compquery.Present instead of the single-node
+// Resolve, so a query that matches several nodes counts as present rather than
+// failing with an ambiguity error. This is what `wait-for --component` needs
+// (presence, not a single target); the interaction commands keep the strict
+// Resolve via resolveComponentQuery.
+func componentPresent(ctx context.Context, conn *browser.CDPConn, sightmapDir string, q *compquery.Query) (bool, error) {
+	root, matches, props, err := extractMatchedComponents(ctx, conn, sightmapDir)
+	if err != nil {
+		return false, err
+	}
+	return compquery.Present(root, matches, props, q), nil
+}
+
+// extractMatchedComponents pulls the live component tree, applies the corpus at
+// sightmapDir, and projects the matches' resolved properties — the shared front
+// half of every component-query resolution (the interaction commands' strict
+// resolve and wait-for's presence check). It returns everything the compquery
+// engine consumes: the tree root, the node→match map, and the id-keyed property
+// values.
+func extractMatchedComponents(ctx context.Context, conn *browser.CDPConn, sightmapDir string) (
+	*sightmap.ComponentNode,
+	map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	map[string]map[string]string,
+	error,
+) {
 	page, err := conn.DefaultPage()
 	if err != nil {
-		return nil, fmt.Errorf("resolve query: %w", err)
+		return nil, nil, nil, fmt.Errorf("resolve query: %w", err)
 	}
 	root, err := browser.ExtractComponents(ctx, page)
 	if err != nil {
-		return nil, fmt.Errorf("resolve query: extract: %w", err)
+		return nil, nil, nil, fmt.Errorf("resolve query: extract: %w", err)
 	}
 	pageURL, err := browser.GetURL(ctx, conn)
 	if err != nil {
-		return nil, fmt.Errorf("resolve query: get URL: %w", err)
+		return nil, nil, nil, fmt.Errorf("resolve query: get URL: %w", err)
 	}
 
 	corpus, err := sightmap.Load(sightmapDir)
 	if err != nil {
-		return nil, fmt.Errorf("resolve query: load corpus: %w", err)
+		return nil, nil, nil, fmt.Errorf("resolve query: load corpus: %w", err)
 	}
 	matcher := match.NewMatcher(corpus)
 	matches := matcher.Match(root, pageURL)
 	if len(matches) == 0 {
-		return nil, fmt.Errorf(
+		return nil, nil, nil, fmt.Errorf(
 			"resolve query: no sightmap components matched the page (need a corpus in %s)", sightmapDir)
 	}
-
-	return compquery.Resolve(root, matches, queryPropertyValues(matches), q)
+	return root, matches, queryPropertyValues(matches), nil
 }
 
 // queryPropertyValues projects each match's resolved properties (populated
