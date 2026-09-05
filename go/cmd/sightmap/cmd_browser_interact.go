@@ -407,13 +407,17 @@ func waitForView(ctx context.Context, conn *browser.CDPConn, sightmapDir, viewNa
 	}
 }
 
-// waitForComponent polls until the component query matches at least one node on
-// the live page, or ctx expires. The query syntax is validated up front so a
-// typo fails immediately instead of silently timing out. Each poll re-extracts
-// the live tree (so property-filtered queries like `Row[state="Done"]` are
-// honored), which is the same resolve path a `click 'Query'` uses.
+// waitForComponent polls until the component query is present on the live page
+// (matches at least one node), or ctx expires. The query syntax is validated up
+// front so a typo fails immediately instead of silently timing out. Each poll
+// re-extracts the live tree (so property-filtered queries like `Row[state="Done"]`
+// are honored). Presence — not single-node resolution — is the right predicate
+// here: a query matching several nodes proves the component is on the page, so
+// it counts as satisfied, whereas `click 'Query'` still needs the strict
+// single-target Resolve.
 func waitForComponent(ctx context.Context, conn *browser.CDPConn, sightmapDir, query string) error {
-	if _, err := compquery.ParseQuery(query); err != nil {
+	q, err := compquery.ParseQuery(query)
+	if err != nil {
 		return err
 	}
 	for {
@@ -422,7 +426,7 @@ func waitForComponent(ctx context.Context, conn *browser.CDPConn, sightmapDir, q
 			return ctx.Err()
 		default:
 		}
-		if node, err := resolveComponentQuery(ctx, conn, sightmapDir, query); err == nil && node != nil {
+		if present, err := componentPresent(ctx, conn, sightmapDir, q); err == nil && present {
 			return nil
 		}
 		time.Sleep(300 * time.Millisecond)

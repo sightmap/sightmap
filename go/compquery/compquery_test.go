@@ -1,9 +1,10 @@
 package compquery
 
 import (
-	"github.com/sightmap/sightmap/go/sightmap"
 	"strings"
 	"testing"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -240,6 +241,60 @@ func TestResolve_AmbiguityError(t *testing.T) {
 		if !strings.Contains(msg, want) {
 			t.Errorf("ambiguity error missing %q; got:\n%s", want, msg)
 		}
+	}
+}
+
+// TestPresent is the wait-for --component predicate: presence, not single-node
+// resolution. A query matching several nodes must count as PRESENT (the whole
+// point of waiting for a component is that it has appeared), even though the
+// very same query is an ambiguity ERROR for Resolve, which the interaction
+// commands use because they need one target. This is the regression guard for
+// issue #387, where multi-match was mistaken for "not matched yet" and polled to
+// a timeout.
+func TestPresent(t *testing.T) {
+	root, matches, props := buildFixture()
+
+	// Multi-match: Resolve errors (ambiguous), but Present is true.
+	multi, _ := ParseQuery("FulfillmentTileButton")
+	if _, err := Resolve(root, matches, props, multi); err == nil {
+		t.Fatal("precondition: expected FulfillmentTileButton to be ambiguous for Resolve")
+	}
+	if !Present(root, matches, props, multi) {
+		t.Error("Present(FulfillmentTileButton) = false; multiple matches must count as present")
+	}
+
+	// Single match and predicate-narrowed queries are present too.
+	for _, qs := range []string{
+		"UserNameInput",
+		`FulfillmentTileButton[label=Delivery]`,
+		"LoginForm UserNameInput",
+	} {
+		q, _ := ParseQuery(qs)
+		if !Present(root, matches, props, q) {
+			t.Errorf("Present(%q) = false, want true", qs)
+		}
+	}
+
+	// Absent queries are not present (so wait-for keeps polling / times out).
+	for _, qs := range []string{
+		"NoSuchComponent",
+		`FulfillmentTileButton[label=Nope]`,
+	} {
+		q, _ := ParseQuery(qs)
+		if Present(root, matches, props, q) {
+			t.Errorf("Present(%q) = true, want false", qs)
+		}
+	}
+
+	// An occurrence index is present only when that occurrence exists (mirrors
+	// Resolve's bounds check, without erroring on an as-yet-unreached index).
+	in0, _ := ParseQuery("FulfillmentTileButton#0")
+	if !Present(root, matches, props, in0) {
+		t.Error("Present(FulfillmentTileButton#0) = false, want true")
+	}
+	oob, _ := ParseQuery("FulfillmentTileButton#5")
+	if Present(root, matches, props, oob) {
+		t.Error("Present(FulfillmentTileButton#5) = true, want false (occurrence out of range)")
 	}
 }
 

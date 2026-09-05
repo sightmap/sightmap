@@ -129,6 +129,27 @@ func Resolve(
 	return nil, ambiguityError(q, cands, matches, props)
 }
 
+// Present reports whether q matches at least one node in the tree — the
+// existence predicate behind `wait-for --component`. Unlike Resolve, several
+// matches count as present rather than an ambiguity error: multiple matches are
+// proof the component is on the page, which is exactly what a caller waiting for
+// it wants. When q carries an occurrence index (#N), Present holds only once
+// that occurrence exists (N in range), mirroring Resolve's bounds check without
+// treating an as-yet-unreached occurrence as an error. Resolve stays strict for
+// the interaction commands (click/fill/hover), which need a single target.
+func Present(
+	root *sightmap.ComponentNode,
+	matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
+	props map[string]map[string]string,
+	q *Query,
+) bool {
+	cands := FindCandidates(root, matches, props, q)
+	if q.Index >= 0 {
+		return q.Index < len(cands)
+	}
+	return len(cands) > 0
+}
+
 // FindCandidates returns every node satisfying q's target part whose matched
 // ancestors satisfy the preceding chain parts as an ordered subsequence
 // (descendant semantics). Results are in document (pre-order) order.
