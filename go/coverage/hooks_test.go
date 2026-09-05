@@ -176,6 +176,87 @@ func TestViewScopedMatchCount(t *testing.T) {
 	}
 }
 
+func TestHrefSuffix(t *testing.T) {
+	// hrefSuffix's documented contract: returns "" for hrefs whose tail is
+	// dynamic (numeric or hashed) or that carry no usable path; otherwise the
+	// portable trailing segment "/seg".
+	tests := []struct {
+		name string
+		href string
+		want string
+	}{
+		// Numeric tails — per-instance record ids, dropped per the contract.
+		{"single digit", "/s/detail/1", ""},
+		{"two digit", "/orders/42", ""},
+		{"three digit", "/users/123", ""},
+		{"four digit", "/items/9999", ""},
+		{"date day last segment", "/blog/2023/06/15", ""},
+		{"numeric with query stripped", "/orders/42?print=1", ""},
+		{"numeric with hash stripped", "/orders/42#notes", ""},
+		{"numeric with trailing slash", "/orders/42/", ""},
+		{"long numeric id", "/lightning/r/Account/001A000001abcdefg", ""},
+
+		// Hashed / machine-generated tails — dropped by looksHashed.
+		{"aura id", "/x/1:1;a", ""},
+		{"hex run", "/u/abc123def456", ""},
+
+		// Stable, non-numeric tails — kept.
+		{"word segment", "/lightning/page/home", "/home"},
+		{"versioned route", "/products/v2", "/v2"},
+		{"api version", "/api/v2/users", "/users"},
+		{"mixed alpha slug", "/p/some-detail", "/some-detail"},
+		{"word with query", "/home?foo=1", "/home"},
+		{"word with hash", "/about#top", "/about"},
+
+		// No usable path.
+		{"empty", "", ""},
+		{"root", "/", ""},
+		{"bare segment no slash", "home", ""},
+		{"query only no slash", "?foo=1", ""},
+		{"hash only no slash", "#top", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hrefSuffix(tt.href); got != tt.want {
+				t.Errorf("hrefSuffix(%q) = %q, want %q", tt.href, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsNumeric(t *testing.T) {
+	trues := []string{"0", "1", "9", "42", "123", "9999", "2023", "15", "0012300", "0123456789"}
+	for _, s := range trues {
+		if !isNumeric(s) {
+			t.Errorf("isNumeric(%q) = false, want true", s)
+		}
+	}
+	falses := []string{"", "v2", "item42", "1:1;a", "abc", "12-34", "12.5", "1a", "a1", "0x1", "001A000001", "0012300abcdefg"}
+	for _, s := range falses {
+		if isNumeric(s) {
+			t.Errorf("isNumeric(%q) = true, want false", s)
+		}
+	}
+}
+
+func TestSelectorCandidatesRecordLinkNoNumericHint(t *testing.T) {
+	// A hook-poor link to a numeric record id: no id/class/data-* compete with
+	// the href suffix. Before the fix, hrefSuffix returned "/42" and the only
+	// candidate surfaced was the per-instance a[href$="/42"]. Ensure no numeric
+	// suffix candidate appears, and that a non-numeric adjacent link still
+	// offers its portable suffix.
+	numericEl := &sightmap.Element{Tag: "a", Attrs: map[string]string{"href": "/orders/42"}}
+	for _, c := range SelectorCandidates(numericEl) {
+		if c == `a[href$="/42"]` {
+			t.Errorf("numeric per-instance suffix surfaced as stable hint: %v", SelectorCandidates(numericEl))
+		}
+	}
+	stableEl := &sightmap.Element{Tag: "a", Attrs: map[string]string{"href": "/orders/v2"}}
+	if !contains(SelectorCandidates(stableEl), `a[href$="/v2"]`) {
+		t.Errorf("stable versioned suffix dropped: %v", SelectorCandidates(stableEl))
+	}
+}
+
 func TestNearestHookAncestor(t *testing.T) {
 	leaf := &sightmap.ComponentNode{Id: "leaf", Role: "button", Element: &sightmap.Element{Tag: "button"}}
 	mid := &sightmap.ComponentNode{Id: "mid", Element: &sightmap.Element{Tag: "div"}, Children: []*sightmap.ComponentNode{leaf}}
