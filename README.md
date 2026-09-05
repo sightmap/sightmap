@@ -25,6 +25,7 @@ implementation, and both websites in one place:
 | [`skills/`](skills/) | The **agent skills** — `sightmap-authoring` and `sightmap-browser`. This is the canonical, standalone skills directory; the CLI embeds a committed copy under `go/skills/` (regenerated via `go generate`). |
 | [`docs/`](docs/) | The documentation site at [docs.sightmap.org](https://docs.sightmap.org) (Mintlify). |
 | [`web/`](web/) | The marketing landing page at [sightmap.org](https://sightmap.org) (React + Vite). |
+| [`integrations/`](integrations/) | Framework and tooling integrations. `integrations/next/` is a proof of concept for Next.js + Vercel's agent-browser: seed a corpus from the App Router, publish it and the compiled [Sightkick](https://docs.sightmap.org/sightkick) WebMCP tool layer at `/.well-known/`, replay natural-language plans through `agent-browser`. |
 
 Each area has its own README with build and contribution details.
 

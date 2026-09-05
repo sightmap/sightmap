@@ -16,6 +16,7 @@ both websites.
 | `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
 | `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
+| `integrations/next/` | Node (ESM) + Next.js | Proof of concept: `@sightmap/next` (seed / build / run-plan + `<SightkickTools/>`) and an example app. Not wired into CI or changesets; `npm test` in `packages/next`. See its `README.md`. |
 
 Each area is self-contained. `go.mod` lives only under `go/`; `web/` has its own
 `package.json` and `netlify.toml`; `docs/` is configured by `docs.json`.
