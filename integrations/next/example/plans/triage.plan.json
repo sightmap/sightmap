@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "app": "..",
+  "start": "/",
+  "scenario": {
+    "feature": "features/triage.feature",
+    "name": "Complete a task from its detail page",
+    "hash": "sha256:5641ab00fd588f8680d8dcb23e6adfdb388248273369a1fdded45274c42dd2e2"
+  },
+  "steps": [
+    {
+      "gherkin": "When I open \"Write the sightmap\"",
+      "tool": "open_task",
+      "params": {
+        "title": "Write the sightmap"
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "gherkin": "Then the task page shows it as \"Active\"",
+      "tool": "read_task",
+      "expect": {
+        "ok": true,
+        "value": {
+          "equals": "Active"
+        }
+      }
+    },
+    {
+      "gherkin": "When I mark it done",
+      "tool": "mark_done",
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "gherkin": "Then the task page shows it as \"Done\"",
+      "tool": "read_task",
+      "expect": {
+        "ok": true,
+        "value": {
+          "equals": "Done"
+        }
+      }
+    },
+    {
+      "gherkin": "When I go back to the board",
+      "tool": "back_to_board",
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "gherkin": "And I show only Done tasks / Then \"Write the sightmap\" is listed as done",
+      "tool": "set_filter",
+      "params": {
+        "filter": "Done"
+      },
+      "expect": {
+        "ok": true,
+        "list": {
+          "contains": {
+            "title": "Write the sightmap",
+            "done": "true"
+          }
+        }
+      }
+    }
+  ],
+  "irHash": "sha256:ba78eddf61adb6c70b63a9638c2ed91cc659fac8e4bd84d92d22223df9ec1ebb",
+  "generatedAt": "2026-09-05T13:23:22.081Z"
+}

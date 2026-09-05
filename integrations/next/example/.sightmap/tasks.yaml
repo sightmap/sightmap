@@ -1,0 +1,44 @@
+version: 1
+
+views:
+  - name: TaskDetail
+    route: /tasks/:id
+    source: app/tasks/[id]/page.tsx
+    dependencies:
+      - app/layout.tsx
+      - components/TaskDetail.tsx
+      - lib/store.ts
+    description: One task's page — title, status badge, mark-done, back link.
+    memory:
+      - Reached by client-side navigation from the board; a full load of /tasks/:id shows the seed state, so ids above 3 render TaskMissing
+      - The Mark done button is disabled once the task is done, so a second click is a no-op rather than a toggle
+    components:
+      - name: TaskDetail
+        selector: '[data-component="TaskDetail"]'
+        source: components/TaskDetail.tsx
+        properties:
+          - name: title
+            extract: TaskTitle.text
+          - name: status
+            extract: attr=data-status
+        children:
+          - name: BackToBoardLink
+            selector: '[data-component="BackToBoardLink"]'
+          - name: TaskTitle
+            selector: '[data-component="TaskTitle"]'
+            properties:
+              - name: text
+                extract: text
+          - name: StatusBadge
+            selector: '[data-component="StatusBadge"]'
+            properties:
+              - name: label
+                extract: text
+          - name: MarkDoneButton
+            selector: '[data-component="MarkDoneButton"]'
+      - name: TaskMissing
+        selector: '[data-component="TaskMissing"]'
+        description: Shown for an id the store does not have
+        children:
+          - name: BackToBoardLink
+            selector: '[data-component="BackToBoardLink"]'

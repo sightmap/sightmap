@@ -1,0 +1,69 @@
+version: 1
+
+# Seeded by `sightmap-next seed`, then curated against `next dev` with the
+# sightmap-authoring skill (snapshot --coverage until 0 orphaned nodes).
+
+views:
+  - name: TaskBoard
+    route: /
+    url: http://localhost:3000/
+    source: app/page.tsx
+    dependencies:
+      - app/layout.tsx
+      - components/TaskBoard.tsx
+      - lib/store.ts
+    description: The board — add a task, filter, toggle, delete, or open one.
+    memory:
+      - State is in-memory per tab and resets on a full page load; every fresh open shows the same three seed tasks
+      - Adding submits a form, so Enter in the input works as well as the button
+      - Filter labels are All / Active / Done (not "Completed")
+    components:
+      - name: TaskBoard
+        selector: '[data-component="TaskBoard"]'
+        source: components/TaskBoard.tsx
+        children:
+          - name: NewTaskInput
+            selector: '[data-component="NewTaskInput"]'
+            description: Controlled React input; the runtime fills it through the native value setter
+          - name: AddTaskButton
+            selector: '[data-component="AddTaskButton"]'
+          - name: FilterBar
+            selector: '[data-component="FilterBar"]'
+            children:
+              - name: FilterButton
+                selector: '[data-component="FilterButton"]'
+                properties:
+                  - name: label
+                    extract: text
+                  - name: active
+                    extract: attr=aria-pressed
+          - name: TaskList
+            selector: '[data-component="TaskList"]'
+          - name: TaskRow
+            selector: '[data-component="TaskRow"]'
+            description: One task. Title lives in the link; done state is mirrored onto data-done so it is filterable
+            properties:
+              - name: title
+                extract: TaskLink.text
+              - name: done
+                extract: attr=data-done
+              - name: id
+                extract: attr=data-id
+            children:
+              - name: TaskToggle
+                selector: '[data-component="TaskToggle"]'
+                description: Reads "Done" on an active task and "Undo" on a done one
+                properties:
+                  - name: label
+                    extract: text
+              - name: TaskLink
+                selector: '[data-component="TaskLink"]'
+                description: Client-side navigation to /tasks/:id
+                properties:
+                  - name: text
+                    extract: text
+              - name: DeleteTaskButton
+                selector: '[data-component="DeleteTaskButton"]'
+          - name: EmptyState
+            selector: '[data-component="EmptyState"]'
+            description: Rendered only when the current filter shows no rows

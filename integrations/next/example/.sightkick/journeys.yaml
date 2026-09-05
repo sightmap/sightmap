@@ -1,0 +1,28 @@
+version: 1
+
+# Journeys are compile-time orderings over tools. They never execute; they
+# become `guidance` breadcrumbs on each tool's result so a turn-by-turn agent
+# knows what tends to come next. Which journeys matter is the second human
+# decision in this layer: it comes from how people actually use the app —
+# analytics, session replay, support tickets — not from the corpus.
+
+journeys:
+  - name: add_and_review
+    description: Add a task, then confirm it on the board.
+    steps:
+      - add_task
+      - tool: list_tasks
+        reason: confirm the task you just added is listed
+
+  - name: triage
+    description: Open a task, finish it from its page, come back, check the board.
+    steps:
+      - open_task
+      - tool: read_task
+        reason: confirm you opened the right task
+      - tool: mark_done
+        reason: finish it
+      - tool: back_to_board
+        reason: return to the board
+      - tool: set_filter
+        reason: switch to Done to see it moved

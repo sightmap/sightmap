@@ -1,0 +1,284 @@
+{
+  "globals": [
+    {
+      "name": "SiteNav",
+      "selectors": [
+        "[data-component=\"SiteNav\"]"
+      ],
+      "source": "app/layout.tsx"
+    },
+    {
+      "name": "NavLink",
+      "selectors": [
+        "[data-component=\"SiteNav\"] [data-component=\"NavLink\"]"
+      ],
+      "properties": [
+        {
+          "name": "label",
+          "extract": "text"
+        }
+      ],
+      "parentChain": [
+        "SiteNav"
+      ]
+    },
+    {
+      "name": "RouteAnnouncer",
+      "selectors": [
+        "#__next-route-announcer__"
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "About",
+      "route": "/about",
+      "components": [
+        {
+          "name": "AboutText",
+          "selectors": [
+            "[data-component=\"AboutText\"]"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TaskBoard",
+      "route": "/",
+      "memory": [
+        "State is in-memory per tab and resets on a full page load; every fresh open shows the same three seed tasks",
+        "Adding submits a form, so Enter in the input works as well as the button",
+        "Filter labels are All / Active / Done (not \"Completed\")"
+      ],
+      "components": [
+        {
+          "name": "TaskBoard",
+          "selectors": [
+            "[data-component=\"TaskBoard\"]"
+          ],
+          "source": "components/TaskBoard.tsx"
+        },
+        {
+          "name": "NewTaskInput",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"NewTaskInput\"]"
+          ],
+          "parentChain": [
+            "TaskBoard"
+          ]
+        },
+        {
+          "name": "AddTaskButton",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"AddTaskButton\"]"
+          ],
+          "parentChain": [
+            "TaskBoard"
+          ]
+        },
+        {
+          "name": "FilterBar",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"FilterBar\"]"
+          ],
+          "parentChain": [
+            "TaskBoard"
+          ]
+        },
+        {
+          "name": "FilterButton",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"FilterBar\"] [data-component=\"FilterButton\"]"
+          ],
+          "properties": [
+            {
+              "name": "label",
+              "extract": "text"
+            },
+            {
+              "name": "active",
+              "extract": "attr=aria-pressed"
+            }
+          ],
+          "parentChain": [
+            "TaskBoard",
+            "FilterBar"
+          ]
+        },
+        {
+          "name": "TaskList",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"TaskList\"]"
+          ],
+          "parentChain": [
+            "TaskBoard"
+          ]
+        },
+        {
+          "name": "TaskRow",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+          ],
+          "properties": [
+            {
+              "name": "title",
+              "extract": "TaskLink.text"
+            },
+            {
+              "name": "done",
+              "extract": "attr=data-done"
+            },
+            {
+              "name": "id",
+              "extract": "attr=data-id"
+            }
+          ],
+          "parentChain": [
+            "TaskBoard"
+          ]
+        },
+        {
+          "name": "TaskToggle",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"] [data-component=\"TaskToggle\"]"
+          ],
+          "properties": [
+            {
+              "name": "label",
+              "extract": "text"
+            }
+          ],
+          "parentChain": [
+            "TaskBoard",
+            "TaskRow"
+          ]
+        },
+        {
+          "name": "TaskLink",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"] [data-component=\"TaskLink\"]"
+          ],
+          "properties": [
+            {
+              "name": "text",
+              "extract": "text"
+            }
+          ],
+          "parentChain": [
+            "TaskBoard",
+            "TaskRow"
+          ]
+        },
+        {
+          "name": "DeleteTaskButton",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"] [data-component=\"DeleteTaskButton\"]"
+          ],
+          "parentChain": [
+            "TaskBoard",
+            "TaskRow"
+          ]
+        },
+        {
+          "name": "EmptyState",
+          "selectors": [
+            "[data-component=\"TaskBoard\"] [data-component=\"EmptyState\"]"
+          ],
+          "parentChain": [
+            "TaskBoard"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TaskDetail",
+      "route": "/tasks/:id",
+      "memory": [
+        "Reached by client-side navigation from the board; a full load of /tasks/:id shows the seed state, so ids above 3 render TaskMissing",
+        "The Mark done button is disabled once the task is done, so a second click is a no-op rather than a toggle"
+      ],
+      "components": [
+        {
+          "name": "TaskDetail",
+          "selectors": [
+            "[data-component=\"TaskDetail\"]"
+          ],
+          "source": "components/TaskDetail.tsx",
+          "properties": [
+            {
+              "name": "title",
+              "extract": "TaskTitle.text"
+            },
+            {
+              "name": "status",
+              "extract": "attr=data-status"
+            }
+          ]
+        },
+        {
+          "name": "BackToBoardLink",
+          "selectors": [
+            "[data-component=\"TaskDetail\"] [data-component=\"BackToBoardLink\"]"
+          ],
+          "parentChain": [
+            "TaskDetail"
+          ]
+        },
+        {
+          "name": "TaskTitle",
+          "selectors": [
+            "[data-component=\"TaskDetail\"] [data-component=\"TaskTitle\"]"
+          ],
+          "properties": [
+            {
+              "name": "text",
+              "extract": "text"
+            }
+          ],
+          "parentChain": [
+            "TaskDetail"
+          ]
+        },
+        {
+          "name": "StatusBadge",
+          "selectors": [
+            "[data-component=\"TaskDetail\"] [data-component=\"StatusBadge\"]"
+          ],
+          "properties": [
+            {
+              "name": "label",
+              "extract": "text"
+            }
+          ],
+          "parentChain": [
+            "TaskDetail"
+          ]
+        },
+        {
+          "name": "MarkDoneButton",
+          "selectors": [
+            "[data-component=\"TaskDetail\"] [data-component=\"MarkDoneButton\"]"
+          ],
+          "parentChain": [
+            "TaskDetail"
+          ]
+        },
+        {
+          "name": "TaskMissing",
+          "selectors": [
+            "[data-component=\"TaskMissing\"]"
+          ]
+        },
+        {
+          "name": "BackToBoardLink",
+          "selectors": [
+            "[data-component=\"TaskMissing\"] [data-component=\"BackToBoardLink\"]"
+          ],
+          "parentChain": [
+            "TaskMissing"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+version: 1
+
+views:
+  - name: About
+    route: /about
+    url: http://localhost:3000/about
+    source: app/about/page.tsx
+    dependencies:
+      - app/layout.tsx
+    description: Static explainer. No tools are registered here; that is correct, not a failure.
+    components:
+      - name: AboutText
+        selector: '[data-component="AboutText"]'

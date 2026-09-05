@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "app": "..",
+  "start": "/",
+  "scenario": {
+    "feature": "features/filter.feature",
+    "name": "Only done tasks under the Done filter",
+    "hash": "sha256:5010331843e77346d6460960535721287ebcd5cc08be4a21e76565774bba3dbe"
+  },
+  "steps": [
+    {
+      "gherkin": "When I show only Done tasks / Then \"Ship to Vercel\" is listed / And \"Write the sightmap\" is not listed",
+      "tool": "set_filter",
+      "params": {
+        "filter": "Done"
+      },
+      "expect": {
+        "ok": true,
+        "list": {
+          "length": 1,
+          "contains": {
+            "title": "Ship to Vercel"
+          },
+          "excludes": {
+            "title": "Write the sightmap"
+          }
+        }
+      }
+    },
+    {
+      "gherkin": "When I show only Active tasks / Then \"Write the sightmap\" is listed / And \"Ship to Vercel\" is not listed",
+      "tool": "set_filter",
+      "params": {
+        "filter": "Active"
+      },
+      "expect": {
+        "ok": true,
+        "list": {
+          "length": 2,
+          "contains": {
+            "title": "Write the sightmap"
+          },
+          "excludes": {
+            "title": "Ship to Vercel"
+          }
+        }
+      }
+    }
+  ],
+  "irHash": "sha256:ba78eddf61adb6c70b63a9638c2ed91cc659fac8e4bd84d92d22223df9ec1ebb",
+  "generatedAt": "2026-09-05T13:23:22.081Z"
+}

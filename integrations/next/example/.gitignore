@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+# Local sightmap browser session state
+.sightmap/.session
+.sightmap/snapshots/
+# Not committed for the same reason as web/: the example pins its versions in package.json
+package-lock.json

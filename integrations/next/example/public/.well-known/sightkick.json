@@ -1,0 +1,768 @@
+{
+  "version": 1,
+  "name": "tasks",
+  "views": [
+    {
+      "name": "About",
+      "route": "/about"
+    },
+    {
+      "name": "TaskBoard",
+      "route": "/"
+    },
+    {
+      "name": "TaskDetail",
+      "route": "/tasks/:id"
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_tasks",
+      "description": "List the tasks currently shown on the board, with their done state. Returns `items`: a list of objects with keys {done, title}. One row per visible task.",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "ensureView": {
+        "view": "TaskBoard",
+        "route": "/"
+      },
+      "steps": [],
+      "returns": {
+        "description": "One row per visible task.",
+        "kind": "list",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+              ]
+            }
+          ]
+        },
+        "fields": {
+          "done": {
+            "property": "done",
+            "extractor": {
+              "kind": "attr",
+              "attr": "data-done"
+            }
+          },
+          "title": {
+            "property": "title",
+            "extractor": {
+              "kind": "text",
+              "within": "[data-component=\"TaskLink\"]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "add_task",
+      "description": "Add a task to the board by title. Idempotent — an existing title is left alone. Returns `value` (string): The done state of the row just added (\"false\").",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The task title."
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "ensureView": {
+        "view": "TaskBoard",
+        "route": "/"
+      },
+      "guard": {
+        "kind": "present",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+              ],
+              "preds": [
+                {
+                  "property": "title",
+                  "extractor": {
+                    "kind": "text",
+                    "within": "[data-component=\"TaskLink\"]"
+                  },
+                  "op": "=",
+                  "value": "{{title}}"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "op": "fill",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"NewTaskInput\"]"
+                ]
+              }
+            ]
+          },
+          "value": "{{title}}"
+        },
+        {
+          "op": "click",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"AddTaskButton\"]"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "waitFor",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "title",
+                    "extractor": {
+                      "kind": "text",
+                      "within": "[data-component=\"TaskLink\"]"
+                    },
+                    "op": "=",
+                    "value": "{{title}}"
+                  }
+                ]
+              }
+            ]
+          },
+          "timeoutMs": 5000
+        }
+      ],
+      "returns": {
+        "description": "The done state of the row just added (\"false\").",
+        "kind": "value",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+              ],
+              "preds": [
+                {
+                  "property": "title",
+                  "extractor": {
+                    "kind": "text",
+                    "within": "[data-component=\"TaskLink\"]"
+                  },
+                  "op": "=",
+                  "value": "{{title}}"
+                }
+              ]
+            }
+          ]
+        },
+        "extractor": {
+          "kind": "attr",
+          "attr": "data-done"
+        }
+      },
+      "guidance": [
+        {
+          "tool": "list_tasks",
+          "reason": "confirm the task you just added is listed",
+          "when": "now"
+        }
+      ]
+    },
+    {
+      "name": "complete_task",
+      "description": "Mark a task done from the board by clicking its toggle. Idempotent. Returns `value`: a single string.",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "ensureView": {
+        "view": "TaskBoard",
+        "route": "/"
+      },
+      "guard": {
+        "kind": "present",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+              ],
+              "preds": [
+                {
+                  "property": "title",
+                  "extractor": {
+                    "kind": "text",
+                    "within": "[data-component=\"TaskLink\"]"
+                  },
+                  "op": "=",
+                  "value": "{{title}}"
+                },
+                {
+                  "property": "done",
+                  "extractor": {
+                    "kind": "attr",
+                    "attr": "data-done"
+                  },
+                  "op": "=",
+                  "value": "true"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "op": "click",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "title",
+                    "extractor": {
+                      "kind": "text",
+                      "within": "[data-component=\"TaskLink\"]"
+                    },
+                    "op": "=",
+                    "value": "{{title}}"
+                  }
+                ]
+              },
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"] [data-component=\"TaskToggle\"]"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "waitFor",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "title",
+                    "extractor": {
+                      "kind": "text",
+                      "within": "[data-component=\"TaskLink\"]"
+                    },
+                    "op": "=",
+                    "value": "{{title}}"
+                  },
+                  {
+                    "property": "done",
+                    "extractor": {
+                      "kind": "attr",
+                      "attr": "data-done"
+                    },
+                    "op": "=",
+                    "value": "true"
+                  }
+                ]
+              }
+            ]
+          },
+          "timeoutMs": 5000
+        }
+      ],
+      "returns": {
+        "kind": "value",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+              ],
+              "preds": [
+                {
+                  "property": "title",
+                  "extractor": {
+                    "kind": "text",
+                    "within": "[data-component=\"TaskLink\"]"
+                  },
+                  "op": "=",
+                  "value": "{{title}}"
+                }
+              ]
+            }
+          ]
+        },
+        "extractor": {
+          "kind": "attr",
+          "attr": "data-done"
+        }
+      }
+    },
+    {
+      "name": "delete_task",
+      "description": "Delete a task from the board by title, then return the remaining rows. Returns `items`: a list of objects with keys {done, title}. The rows left on the board.",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "ensureView": {
+        "view": "TaskBoard",
+        "route": "/"
+      },
+      "steps": [
+        {
+          "op": "click",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "title",
+                    "extractor": {
+                      "kind": "text",
+                      "within": "[data-component=\"TaskLink\"]"
+                    },
+                    "op": "=",
+                    "value": "{{title}}"
+                  }
+                ]
+              },
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"] [data-component=\"DeleteTaskButton\"]"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "returns": {
+        "description": "The rows left on the board.",
+        "kind": "list",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+              ]
+            }
+          ]
+        },
+        "fields": {
+          "done": {
+            "property": "done",
+            "extractor": {
+              "kind": "attr",
+              "attr": "data-done"
+            }
+          },
+          "title": {
+            "property": "title",
+            "extractor": {
+              "kind": "text",
+              "within": "[data-component=\"TaskLink\"]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "set_filter",
+      "description": "Show All, Active, or Done tasks, and return the rows now visible. Returns `items`: a list of objects with keys {done, title}.",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filter": {
+            "type": "string",
+            "enum": [
+              "All",
+              "Active",
+              "Done"
+            ]
+          }
+        },
+        "required": [
+          "filter"
+        ]
+      },
+      "ensureView": {
+        "view": "TaskBoard",
+        "route": "/"
+      },
+      "steps": [
+        {
+          "op": "click",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"FilterBar\"] [data-component=\"FilterButton\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "label",
+                    "extractor": {
+                      "kind": "text"
+                    },
+                    "op": "=",
+                    "value": "{{filter}}"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "waitFor",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"FilterBar\"] [data-component=\"FilterButton\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "label",
+                    "extractor": {
+                      "kind": "text"
+                    },
+                    "op": "=",
+                    "value": "{{filter}}"
+                  },
+                  {
+                    "property": "active",
+                    "extractor": {
+                      "kind": "attr",
+                      "attr": "aria-pressed"
+                    },
+                    "op": "=",
+                    "value": "true"
+                  }
+                ]
+              }
+            ]
+          },
+          "timeoutMs": 5000
+        }
+      ],
+      "returns": {
+        "kind": "list",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+              ]
+            }
+          ]
+        },
+        "fields": {
+          "done": {
+            "property": "done",
+            "extractor": {
+              "kind": "attr",
+              "attr": "data-done"
+            }
+          },
+          "title": {
+            "property": "title",
+            "extractor": {
+              "kind": "text",
+              "within": "[data-component=\"TaskLink\"]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "open_task",
+      "description": "Open a task's detail page from the board. Navigates to /tasks/:id.",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "ensureView": {
+        "view": "TaskBoard",
+        "route": "/"
+      },
+      "steps": [
+        {
+          "op": "click",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "title",
+                    "extractor": {
+                      "kind": "text",
+                      "within": "[data-component=\"TaskLink\"]"
+                    },
+                    "op": "=",
+                    "value": "{{title}}"
+                  }
+                ]
+              },
+              {
+                "locators": [
+                  "[data-component=\"TaskBoard\"] [data-component=\"TaskRow\"] [data-component=\"TaskLink\"]"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "waitFor",
+          "view": "TaskDetail",
+          "route": "/tasks/:id",
+          "timeoutMs": 5000
+        }
+      ],
+      "guidance": [
+        {
+          "tool": "read_task",
+          "reason": "confirm you opened the right task",
+          "when": "after_navigation",
+          "view": "TaskDetail"
+        }
+      ]
+    },
+    {
+      "name": "read_task",
+      "description": "Read the open task's title and status from its detail page. Returns `value` (string): The status shown on the page (\"Active\" or \"Done\").",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "ensureView": {
+        "view": "TaskDetail",
+        "route": "/tasks/:id"
+      },
+      "steps": [],
+      "returns": {
+        "description": "The status shown on the page (\"Active\" or \"Done\").",
+        "kind": "value",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskDetail\"]"
+              ]
+            }
+          ]
+        },
+        "extractor": {
+          "kind": "attr",
+          "attr": "data-status"
+        }
+      },
+      "guidance": [
+        {
+          "tool": "mark_done",
+          "reason": "finish it",
+          "when": "now"
+        }
+      ]
+    },
+    {
+      "name": "mark_done",
+      "description": "Mark the open task done from its detail page. Idempotent. Returns `value`: a single string.",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "ensureView": {
+        "view": "TaskDetail",
+        "route": "/tasks/:id"
+      },
+      "guard": {
+        "kind": "present",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskDetail\"]"
+              ],
+              "preds": [
+                {
+                  "property": "status",
+                  "extractor": {
+                    "kind": "attr",
+                    "attr": "data-status"
+                  },
+                  "op": "=",
+                  "value": "Done"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "steps": [
+        {
+          "op": "click",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskDetail\"] [data-component=\"MarkDoneButton\"]"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "waitFor",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskDetail\"]"
+                ],
+                "preds": [
+                  {
+                    "property": "status",
+                    "extractor": {
+                      "kind": "attr",
+                      "attr": "data-status"
+                    },
+                    "op": "=",
+                    "value": "Done"
+                  }
+                ]
+              }
+            ]
+          },
+          "timeoutMs": 5000
+        }
+      ],
+      "returns": {
+        "kind": "value",
+        "query": {
+          "parts": [
+            {
+              "locators": [
+                "[data-component=\"TaskDetail\"]"
+              ]
+            }
+          ]
+        },
+        "extractor": {
+          "kind": "attr",
+          "attr": "data-status"
+        }
+      },
+      "guidance": [
+        {
+          "tool": "back_to_board",
+          "reason": "return to the board",
+          "when": "now"
+        }
+      ]
+    },
+    {
+      "name": "back_to_board",
+      "description": "Return from a task's detail page to the board.",
+      "mode": "live",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "ensureView": {
+        "view": "TaskDetail",
+        "route": "/tasks/:id"
+      },
+      "steps": [
+        {
+          "op": "click",
+          "query": {
+            "parts": [
+              {
+                "locators": [
+                  "[data-component=\"TaskDetail\"]"
+                ]
+              },
+              {
+                "locators": [
+                  "[data-component=\"TaskDetail\"] [data-component=\"BackToBoardLink\"]"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "waitFor",
+          "view": "TaskBoard",
+          "route": "/",
+          "timeoutMs": 5000
+        }
+      ],
+      "guidance": [
+        {
+          "tool": "set_filter",
+          "reason": "switch to Done to see it moved",
+          "when": "after_navigation",
+          "view": "TaskBoard"
+        }
+      ]
+    }
+  ]
+}

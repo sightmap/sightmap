@@ -1,0 +1,124 @@
+version: 1
+name: tasks
+
+# The tool layer: named, atomic actions over the corpus in ../.sightmap/.
+# Tools never carry selectors — they address the app by component name and
+# extracted property, and `sightkick build` refuses any name the corpus
+# doesn't have. Human review happens here: which actions deserve to be tools
+# is a product decision, not something to derive mechanically.
+
+tools:
+  - name: list_tasks
+    description: List the tasks currently shown on the board, with their done state.
+    ensure_view: TaskBoard
+    returns:
+      description: One row per visible task.
+      list:
+        rows: TaskRow
+        fields:
+          title: title
+          done: done
+
+  - name: add_task
+    description: Add a task to the board by title. Idempotent — an existing title is left alone.
+    ensure_view: TaskBoard
+    params:
+      - name: title
+        type: string
+        required: true
+        description: The task title.
+    guard:
+      present: { query: 'TaskRow[title="{{title}}"]' }
+    steps:
+      - fill: { query: NewTaskInput, value: "{{title}}" }
+      - click: { query: AddTaskButton }
+      - wait_for: { query: 'TaskRow[title="{{title}}"]' }
+    returns:
+      description: The done state of the row just added ("false").
+      value: { query: 'TaskRow[title="{{title}}"]', property: done }
+
+  - name: complete_task
+    description: Mark a task done from the board by clicking its toggle. Idempotent.
+    ensure_view: TaskBoard
+    params:
+      - name: title
+        type: string
+        required: true
+    guard:
+      present: { query: 'TaskRow[title="{{title}}"][done="true"]' }
+    steps:
+      - click: { query: 'TaskRow[title="{{title}}"] TaskToggle' }
+      - wait_for: { query: 'TaskRow[title="{{title}}"][done="true"]' }
+    returns:
+      value: { query: 'TaskRow[title="{{title}}"]', property: done }
+
+  - name: delete_task
+    description: Delete a task from the board by title, then return the remaining rows.
+    ensure_view: TaskBoard
+    params:
+      - name: title
+        type: string
+        required: true
+    steps:
+      - click: { query: 'TaskRow[title="{{title}}"] DeleteTaskButton' }
+    returns:
+      description: The rows left on the board.
+      list:
+        rows: TaskRow
+        fields:
+          title: title
+          done: done
+
+  - name: set_filter
+    description: Show All, Active, or Done tasks, and return the rows now visible.
+    ensure_view: TaskBoard
+    params:
+      - name: filter
+        type: enum
+        required: true
+        values: [All, Active, Done]
+    steps:
+      - click: { query: 'FilterButton[label="{{filter}}"]' }
+      - wait_for: { query: 'FilterButton[label="{{filter}}"][active="true"]' }
+    returns:
+      list:
+        rows: TaskRow
+        fields:
+          title: title
+          done: done
+
+  - name: open_task
+    description: Open a task's detail page from the board. Navigates to /tasks/:id.
+    ensure_view: TaskBoard
+    params:
+      - name: title
+        type: string
+        required: true
+    steps:
+      - click: { query: 'TaskRow[title="{{title}}"] TaskLink' }
+      - wait_for: { view: TaskDetail }
+
+  - name: read_task
+    description: Read the open task's title and status from its detail page.
+    ensure_view: TaskDetail
+    returns:
+      description: The status shown on the page ("Active" or "Done").
+      value: { query: TaskDetail, property: status }
+
+  - name: mark_done
+    description: Mark the open task done from its detail page. Idempotent.
+    ensure_view: TaskDetail
+    guard:
+      present: { query: 'TaskDetail[status="Done"]' }
+    steps:
+      - click: { query: MarkDoneButton }
+      - wait_for: { query: 'TaskDetail[status="Done"]' }
+    returns:
+      value: { query: TaskDetail, property: status }
+
+  - name: back_to_board
+    description: Return from a task's detail page to the board.
+    ensure_view: TaskDetail
+    steps:
+      - click: { query: TaskDetail BackToBoardLink }
+      - wait_for: { view: TaskBoard }

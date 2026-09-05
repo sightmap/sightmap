@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "app": "..",
+  "start": "/",
+  "scenario": {
+    "feature": "features/add-task.feature",
+    "name": "A new task appears on the board, not yet done",
+    "hash": "sha256:7b2be2807bdf5b8dd2c021a9389adaf0dd9544f9ed9ec0124329c2a488157dd4"
+  },
+  "steps": [
+    {
+      "gherkin": "When I add a task \"Ship the proof of concept\"",
+      "tool": "add_task",
+      "params": {
+        "title": "Ship the proof of concept"
+      },
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "gherkin": "Then the board lists \"Ship the proof of concept\" / And it is not done",
+      "tool": "list_tasks",
+      "expect": {
+        "ok": true,
+        "list": {
+          "contains": {
+            "title": "Ship the proof of concept",
+            "done": "false"
+          }
+        }
+      }
+    }
+  ],
+  "irHash": "sha256:ba78eddf61adb6c70b63a9638c2ed91cc659fac8e4bd84d92d22223df9ec1ebb",
+  "generatedAt": "2026-09-05T13:23:22.079Z"
+}

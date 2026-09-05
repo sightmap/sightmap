@@ -1,0 +1,16 @@
+version: 1
+
+# Content reachable from every route (the spec's shared.yaml convention).
+components:
+  - name: SiteNav
+    selector: '[data-component="SiteNav"]'
+    source: app/layout.tsx
+    children:
+      - name: NavLink
+        selector: '[data-component="NavLink"]'
+        properties:
+          - name: label
+            extract: text
+  - name: RouteAnnouncer
+    selector: '#__next-route-announcer__'
+    description: Next.js client-navigation announcer for screen readers; empty until a navigation, never a target
