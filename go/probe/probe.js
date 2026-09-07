@@ -181,79 +181,6 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
     }
 
     /**
-     * Computes whether an element is "on top" using elementFromPoint
-     */
-    function computeOnTop(element, bounds, scaleX, scaleY) {
-        try {
-            if (bounds.width <= 0 || bounds.height <= 0) return false;
-
-            // Convert bounds back to viewport coordinates for elementFromPoint().
-            // If scroll offset was applied, subtract it to get back to viewport coords.
-            const scrollX = useScrollOffset ? window.pageXOffset : 0;
-            const scrollY = useScrollOffset ? window.pageYOffset : 0;
-            const viewportX = bounds.x / scaleX - scrollX;
-            const viewportY = bounds.y / scaleY - scrollY;
-            const viewportWidth = bounds.width / scaleX;
-            const viewportHeight = bounds.height / scaleY;
-
-            // Test center point first
-            const centerX = viewportX + viewportWidth / 2;
-            const centerY = viewportY + viewportHeight / 2;
-
-            const elementAtCenter = document.elementFromPoint(centerX, centerY);
-            if (elementAtCenter === element || element.contains(elementAtCenter)) {
-                return true;
-            }
-
-            // Test corner points if center fails
-            const points = [
-                [viewportX, viewportY],
-                [viewportX + viewportWidth, viewportY],
-                [viewportX, viewportY + viewportHeight],
-                [viewportX + viewportWidth, viewportY + viewportHeight]
-            ];
-
-            for (const [x, y] of points) {
-                const elementAtPoint = document.elementFromPoint(x, y);
-                if (elementAtPoint === element || element.contains(elementAtPoint)) {
-                    return true;
-                }
-            }
-
-            return false;
-        } catch (e) {
-            return false;
-        }
-    }
-
-    /**
-     * Extracts metadata for specific element types
-     */
-    function extractMetadata(element) {
-        const metadata = {};
-        const tagName = element.tagName.toLowerCase();
-
-        try {
-            switch (tagName) {
-                case 'input':
-                    metadata.type = element.type || '';
-                    metadata.value = element.value || '';
-                    metadata.placeholder = element.placeholder || '';
-                    break;
-
-                case 'img':
-                    metadata.alt = element.alt || '';
-                    metadata.src = element.src || '';
-                    break;
-            }
-        } catch (e) {
-            // Ignore metadata extraction errors
-        }
-
-        return metadata;
-    }
-
-    /**
      * Generates a CSS selector string for an element
      * Updated to include more attributes (aria-*, data-*) while maintaining string format
      */
@@ -321,8 +248,6 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
         const isVisible = computeVisibility(element, bounds);
         const inViewport = computeInViewport(bounds);
         const isInteractive = computeInteractivity(element);
-        const onTop = computeOnTop(element, bounds, scaleX, scaleY);
-        const metadata = extractMetadata(element);
         const selector = generateSelector(element);
 
         // Capture the full attribute set (minus our own injected ids) so the
@@ -379,12 +304,10 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
             bounds: bounds,
             selector: selector,
             attributes: attributes,
-            onTop: onTop,
             isVisible: isVisible,
             inViewport: inViewport,
             isInteractive: isInteractive,
             isIgnored: false,                                          // Will be filled by accessibility data
-            metadata: metadata,
             nthChild: 0,                                               // Will be filled during tree building
             children: [],                                              // Will be filled during tree building
             tagName: element.tagName || '',
@@ -439,12 +362,10 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
             properties: {},
             bounds: bounds,
             selector: '',
-            onTop: false,                              // Text nodes don't block other elements
             isVisible: textContent.trim().length > 0,
             inViewport: computeInViewport(bounds),     // Use computed bounds for viewport check
             isInteractive: false,                      // Text nodes are not interactive
             isIgnored: false,
-            metadata: {},
             nthChild: 0,                               // Will be filled during tree building
             children: [],
             tagName: '#text',

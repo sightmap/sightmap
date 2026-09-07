@@ -23,12 +23,10 @@ type ProbeComponent struct {
 	Bounds        *sightmap.Bounds  `json:"bounds"`
 	Selector      string            `json:"selector"`   // CSS selector string
 	Attributes    map[string]string `json:"attributes"` // full attribute set (minus data-sightmap-*)
-	OnTop         bool              `json:"onTop"`
 	IsVisible     bool              `json:"isVisible"`
 	InViewport    bool              `json:"inViewport"`
 	IsInteractive bool              `json:"isInteractive"`
 	IsIgnored     bool              `json:"isIgnored"`
-	Metadata      map[string]string `json:"metadata"`
 	NthChild      int               `json:"nthChild"`
 	TagName       string            `json:"tagName"`
 }
