@@ -352,10 +352,22 @@ components:
 
 ## Property extraction principles
 
+A property earns its place two ways: it **discriminates** an otherwise ambiguous
+instance so a query can address one (`Card[title^="Today"]`), or it carries
+**signal** a downstream event or agent needs (`price`, `status`, `sku`). A
+property that does neither is noise: a `text`/`label` that just restates the
+node's accessible name (the snapshot prints that anyway), or a `text` on a
+container with no accessible name (it resolves to the whole innerText — a subtree
+dump, not a value; promote the real value to a child instead).
+
 Two property rules are **mandatory**:
 
-1. Every child component that is a link or button **must** have at least one
-   property.
+1. Every child component that is a link or button must be **identifiable** — by
+   its accessible name (a self-naming `Give Feedback` button needs no property),
+   or, when the name is absent, ambiguous, or repeated, a *useful* property (a
+   discriminator or signal). Never add a property that just restates the name —
+   unless it is a repeated component's per-instance discriminator (rule 2),
+   which is legitimate even when each value equals its own instance's name.
 2. Every component whose selector matches **more than one instance** — a
    repeated container or control (cards, list rows, nav tabs, feed items) —
    **must** carry a property that *varies per instance* (a title, label, key, or
@@ -366,7 +378,10 @@ Two property rules are **mandatory**:
    wherever it lives — a header title, an `aria-label`, a stable `data-*`. When
    the repeated node is an *identical leaf* that has no discriminator of its own
    (every row's identical Rescue button), put the discriminator on its container
-   and nest the leaf beneath it — see **Component hierarchy** above.
+   and nest the leaf beneath it — see **Component hierarchy** above. But when the
+   matches are *responsive duplicates* of one control (the **same** value on every
+   match, only one visible), there is nothing to discriminate — narrow the
+   selector to the visible instance rather than adding a property.
 
 ```yaml
 - name: FooterLink
