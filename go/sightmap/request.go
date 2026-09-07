@@ -50,8 +50,9 @@ type RequestPropertyDef struct {
 	Source string `json:"source"`
 	// Field selects a value within Source. For a body source it is a
 	// dot-separated object-key path (a numeric segment indexes an array when the
-	// value at that level is one). For a headers source it is a header name,
-	// matched case-insensitively, and is required.
+	// value at that level is one); a literal dot or backslash within a key is
+	// backslash-escaped ("\." / "\\") — see SplitFieldPath. For a headers source
+	// it is a header name, matched case-insensitively, and is required.
 	Field string `json:"field,omitempty"`
 	// Pattern is an RE2 regex (Go's regexp; no backreferences or lookaround)
 	// applied to what Field resolved, or to the raw source text when Field is
