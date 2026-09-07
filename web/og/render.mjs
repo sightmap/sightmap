@@ -1,11 +1,13 @@
-// Renders og/card.html (the site card) and og/post-card.html (per-post blog
-// cards) to PNG at exactly 1200x630, using the system Chrome rather than
+// Renders og/card.html (the site card), og/sightkick-card.html (the /sightkick
+// page card) and og/post-card.html (per-post blog cards) to PNG at exactly
+// 1200x630, using the system Chrome rather than
 // Playwright/Puppeteer so this adds no dependency. The font-loading guard
 // inlined in both HTML files (see font-guard.js) is what makes that safe:
 // a blocked or slow Google Fonts fetch stamps a red banner into the output
 // instead of silently shipping a wrong-typeface PNG.
 //
 //   node og/render.mjs                # site card -> public/og-image.png
+//   node og/render.mjs --sightkick    # /sightkick card -> public/sightkick/og-image.png
 //   node og/render.mjs --post <slug>  # blog card -> public/blog/og/<slug>.png
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -45,7 +47,7 @@ function screenshot(chrome, url, out) {
     '--force-device-scale-factor=1',      // 1200x630 exactly, not a retina multiple
     '--window-size=1200,630',
     '--virtual-time-budget=10000',        // gives the font-loading guard time to settle (success or failure) before the screenshot
-    '--allow-file-access-from-files',     // cards load lockup.svg (and post-card.html loads font-guard.js) from disk
+    '--allow-file-access-from-files',     // cards load their lockup SVG and font-guard.js from disk
     `--screenshot=${out}`,
     url,
   ], { stdio: 'inherit' });
@@ -54,6 +56,14 @@ function screenshot(chrome, url, out) {
 function renderSiteCard(chrome) {
   const out = resolve(here, '../public/og-image.png');
   screenshot(chrome, `file://${resolve(here, 'card.html')}`, out);
+  console.log(`wrote ${out}`);
+}
+
+function renderSightkickCard(chrome) {
+  const outDir = resolve(here, '../public/sightkick');
+  mkdirSync(outDir, { recursive: true });
+  const out = resolve(outDir, 'og-image.png');
+  screenshot(chrome, `file://${resolve(here, 'sightkick-card.html')}`, out);
   console.log(`wrote ${out}`);
 }
 
@@ -95,6 +105,11 @@ function main() {
   }
 
   const args = process.argv.slice(2);
+  if (args.includes('--sightkick')) {
+    renderSightkickCard(chrome);
+    return;
+  }
+
   const postFlagIndex = args.indexOf('--post');
   if (postFlagIndex === -1) {
     renderSiteCard(chrome);

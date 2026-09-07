@@ -1,0 +1,61 @@
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; }
+  /* The /sightkick hero's night ground (src/sightkick.css .sk-dark), so the
+     card and the page it unfurls to read as one surface. */
+  body {
+    width: 1200px; height: 630px; overflow: hidden;
+    position: relative;
+    background:
+      radial-gradient(120% 90% at 72% 8%, #22346b 0%, rgba(9, 16, 38, 0) 60%),
+      linear-gradient(180deg, #0c1531 0%, #070d22 100%);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .logo { position: absolute; left: 76px; top: 70px; height: 50px; }
+  h1 {
+    position: absolute; left: 76px; top: 168px; margin: 0;
+    font-size: 92px; font-weight: 700; line-height: 1.08;
+    letter-spacing: -0.03em; color: #f8faff;
+  }
+  .footer {
+    position: absolute; left: 76px; bottom: 58px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 26px; color: #b7c2db;
+  }
+  .footer .label { font-family: 'DM Sans', system-ui, sans-serif; font-size: 29px; }
+  .footer .site { color: #f8faff; }
+  /* Same chip as the site card, restyled for the dark ground the way
+     .sk-dark code is: a translucent plate and hairline, not a second colour. */
+  .chip {
+    box-sizing: border-box;
+    position: absolute; right: 70px; bottom: 55px;
+    width: 350px; padding: 22px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 17px;
+    line-height: 1.75; white-space: pre;
+  }
+  .c-com { color: #7f8aa8; } .c-key { color: #9fc0f5; }
+  .c-str { color: #7ee8a8; } .c-text { color: #e4eafa; }
+</style>
+<img class="logo" src="sightkick-lockup.svg" alt="sightkick">
+<h1>The front desk<br>for your web app.</h1>
+<div class="footer"><span class="label">WebMCP tool layer</span> · <span class="site">sightmap.org/sightkick</span></div>
+<div class="chip"><span class="c-com"># .sightkick/tools.yaml</span>
+<span class="c-key">tools:</span>
+<span class="c-text">  - </span><span class="c-key">name</span><span class="c-text">: </span><span class="c-str">search_flights</span>
+<span class="c-text">    </span><span class="c-key">ensure_view</span><span class="c-text">: </span><span class="c-str">FlightSearch</span></div>
+<script src="font-guard.js"></script>
+<script>
+  // Every distinct family/weight/size this card actually sets, so load()
+  // verifies real availability rather than just asking whether the network
+  // requests finished.
+  assertFontsLoaded([
+    "700 92px 'DM Sans'",
+    "700 26px 'JetBrains Mono'",
+    "400 17px 'JetBrains Mono'",
+  ]);
+</script>

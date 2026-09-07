@@ -236,6 +236,10 @@ function write(routeDir: string, html: string) {
 // page has no image of its own.
 const DEFAULT_IMAGE_ALT = `${SITE_NAME}: Runtime context for agents using your web app.`
 
+// Alt text for the /sightkick card (public/sightkick/og-image.png, rendered
+// from og/sightkick-card.html), which carries that page's own headline.
+const SIGHTKICK_IMAGE_ALT = 'Sightkick: The front desk for your web app.'
+
 // Builds the `<script id="__SIGHTMAP_POST__">` tag that inlines a post's
 // rendered HTML as JSON so the client can seed hydration from it (see
 // src/lib/postHtml.ts). The `<` escape is the only thing standing between a
@@ -590,9 +594,11 @@ async function main() {
         ogUrl: `${DEPLOY_URL}/sightkick`,
         title: SIGHTKICK_TITLE,
         description: SIGHTKICK_DESCRIPTION,
-        image: `${SITE_URL}/og-image.png`,
-        ogImage: `${DEPLOY_URL}/og-image.png`,
-        imageAlt: DEFAULT_IMAGE_ALT,
+        image: `${SITE_URL}/sightkick/og-image.png`,
+        ogImage: `${DEPLOY_URL}/sightkick/og-image.png`,
+        imageAlt: SIGHTKICK_IMAGE_ALT,
+        // Rendered by og/render.mjs --sightkick at the same 1200x630 as the
+        // site card, so the type/width/height tags are as safe here as there.
         imageDimensionsKnown: true,
         type: 'website',
       },
