@@ -158,7 +158,7 @@ Journeys don't run anything or restrict what an agent can do. Instead, the compi
 }
 ```
 
-Look at the hint after `add_item_to_cart`: "commit the item — this lands you on the cart, not back on the menu".
+That came back from `add_item_to_cart`, and it answers the question the agent would otherwise burn a snapshot on. Adding an item navigates: you land on the cart, not back on the menu. The envelope says so and names `read_cart` as the next call.
 
 Without that breadcrumb, an agent clicks the button, pauses, takes another DOM snapshot to figure out where it ended up, and debates whether it needs to navigate. With the breadcrumb, it immediately calls `read_cart`. No wasted round trips.
 
