@@ -352,10 +352,25 @@ components:
 
 ## Property extraction principles
 
+A property earns its place two ways: it **discriminates** an otherwise ambiguous
+instance so a query can address one (`Card[title^="Today"]`), or it carries
+**signal** a downstream event or agent needs (`price`, `status`, `sku`) —
+including a control's current **state** (a sort's active option, a passenger
+count, a field's value), which counts even when it equals the accessible name;
+the test is whether the value would read differently in another capture, not
+whether it matches the name. A property that does neither is noise: a
+`text`/`label` restating a control's fixed **affordance** (its unchanging name —
+`Search`, `Give Feedback`), or a `text` on a nameless container (a whole-innerText
+subtree dump — promote the real value to a child instead).
+
 Two property rules are **mandatory**:
 
-1. Every child component that is a link or button **must** have at least one
-   property.
+1. Every child component that is a link or button must be **identifiable** — by
+   its accessible name (a self-naming `Give Feedback` button needs no property),
+   or, when the name is absent, ambiguous, or repeated, a *useful* property (a
+   discriminator or signal). Never add a property that just restates the name —
+   unless it is a repeated component's per-instance discriminator (rule 2),
+   which is legitimate even when each value equals its own instance's name.
 2. Every component whose selector matches **more than one instance** — a
    repeated container or control (cards, list rows, nav tabs, feed items) —
    **must** carry a property that *varies per instance* (a title, label, key, or
@@ -366,7 +381,10 @@ Two property rules are **mandatory**:
    wherever it lives — a header title, an `aria-label`, a stable `data-*`. When
    the repeated node is an *identical leaf* that has no discriminator of its own
    (every row's identical Rescue button), put the discriminator on its container
-   and nest the leaf beneath it — see **Component hierarchy** above.
+   and nest the leaf beneath it — see **Component hierarchy** above. But when the
+   matches are *responsive duplicates* of one control (the **same** value on every
+   match, only one visible), there is nothing to discriminate — narrow the
+   selector to the visible instance rather than adding a property.
 
 ```yaml
 - name: FooterLink
@@ -383,6 +401,15 @@ Two property rules are **mandatory**:
     - name: title
       extract: attr=aria-label
 ```
+
+A `label` restating the accessible name is noise **only when the component's
+selector specifically identifies that control**. If the selector is generic (a
+utility class matching a category), the component is effectively generic and the
+label is its discriminator — keep it, but name the component for what the
+selector actually matches (`Button[label=…]`), not a specific thing the selector
+can't back up (`ExploreMoreFlights` on `a.rounded-button`). Fixing the selector
+to a stable, specific hook is the better end state; until then, an honest generic
+name + label discriminator beats a false-specific name.
 
 **Extract modes** — exactly one of four forms:
 
