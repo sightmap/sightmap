@@ -5,7 +5,6 @@ topic: 'research'
 date: '2026-09-08'
 author: 'Clint Ayres'
 slug: 'sightkick'
-draft: true
 image: '/blog/og/sightkick.png'
 ---
 
