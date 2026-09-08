@@ -402,6 +402,15 @@ Two property rules are **mandatory**:
       extract: attr=aria-label
 ```
 
+A `label` restating the accessible name is noise **only when the component's
+selector specifically identifies that control**. If the selector is generic (a
+utility class matching a category), the component is effectively generic and the
+label is its discriminator — keep it, but name the component for what the
+selector actually matches (`Button[label=…]`), not a specific thing the selector
+can't back up (`ExploreMoreFlights` on `a.rounded-button`). Fixing the selector
+to a stable, specific hook is the better end state; until then, an honest generic
+name + label discriminator beats a false-specific name.
+
 **Extract modes** — exactly one of four forms:
 
 | Mode | Resolves to |
