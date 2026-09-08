@@ -354,11 +354,14 @@ components:
 
 A property earns its place two ways: it **discriminates** an otherwise ambiguous
 instance so a query can address one (`Card[title^="Today"]`), or it carries
-**signal** a downstream event or agent needs (`price`, `status`, `sku`). A
-property that does neither is noise: a `text`/`label` that just restates the
-node's accessible name (the snapshot prints that anyway), or a `text` on a
-container with no accessible name (it resolves to the whole innerText — a subtree
-dump, not a value; promote the real value to a child instead).
+**signal** a downstream event or agent needs (`price`, `status`, `sku`) —
+including a control's current **state** (a sort's active option, a passenger
+count, a field's value), which counts even when it equals the accessible name;
+the test is whether the value would read differently in another capture, not
+whether it matches the name. A property that does neither is noise: a
+`text`/`label` restating a control's fixed **affordance** (its unchanging name —
+`Search`, `Give Feedback`), or a `text` on a nameless container (a whole-innerText
+subtree dump — promote the real value to a child instead).
 
 Two property rules are **mandatory**:
 
