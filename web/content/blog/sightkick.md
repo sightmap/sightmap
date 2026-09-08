@@ -30,7 +30,7 @@ await document.modelContext.executeTool({ name: 'apply_promo' }, { code: 'BURRIT
 
 Here is what we learned building it, dogfooding it on our demo app ([Burrito Co.](https://github.com/sightmap/sightkick/tree/main/examples/burrito)), and watching where our initial assumptions failed.
 
-## 1. Make tools atomic, typed, and idempotent
+## Make tools atomic, typed, and idempotent
 
 When we started writing tool definitions, the temptation was to make them smart, letting a tool handle multi-step flows or cross route boundaries. That turned out to be a mistake.
 
@@ -68,7 +68,7 @@ A few small details here save hours of debugging:
 - **Names instead of CSS:** `PromoField` and `ApplyPromoButton` aren't CSS selectors. They are semantic names from our sightmap. If the front-end team updates the checkout markup tomorrow, we update the selector in one place in the sightmap, and every tool keeps working.
 - **Handling retries with guards:** Autonomous agents get nervous when network latency spikes and love to retry calls. The `guard` directive checks the page state first. Once the promo is applied, Burrito Co. removes the input box and shows a confirmation badge. Because `PromoField` is gone, the guard catches it, skips the steps, and returns `skipped: true` with the current total rather than blowing up.
 
-That second one is easier to see than to describe. `customize_item` sets one option in one group on the open item:
+A guard just describes the finished state, in whichever direction the app happens to express it. `apply_promo` guards on `absent`, because a successful apply removes the input. Over on the item page, `customize_item` guards on `present`: picking an option leaves that button in a selected state, so a repeat call sees it already selected and stops there. That one is easier to look at than to describe.
 
 <figure class="shot shot-wide">
 <img src="/blog/images/sightkick/tool-02-item-before.png" alt="The Classic Burrito detail page before the call: the PROTEIN group has chicken selected, quantity 1, and the button reads Add 1 to Cart, $10.95." />
@@ -80,7 +80,7 @@ That second one is easier to see than to describe. `customize_item` sets one opt
 <figcaption>After. Call it again and the guard already matches, so nothing clicks twice and the envelope comes back `skipped: true`.</figcaption>
 </figure>
 
-## 2. A tool is only as honest as what it waits on
+## A tool is only as honest as what it waits on
 
 This was an embarrassing lesson from our early test runs.
 
@@ -105,7 +105,7 @@ Here is the same call on a code that works, stepped through what the tool actual
 <img src="/blog/images/sightkick/tool-04-promo-before.png" alt="The Checkout Review step before the promo call, with an empty promo code field and a total of $23.65." />
 </div>
 
-## 3. Don't drown the model with global tools
+## Don't drown the model with global tools
 
 Burrito Co. has 30 tools across its entire flow. If you dump 30 tools into an agent's prompt on every page, decision quality plummets. The model spends context tokens wondering if it should call `place_order` while looking at the home menu.
 
@@ -117,7 +117,7 @@ Sightkick scopes tools dynamically by route. The browser runtime listens for nav
 
 The agent doesn't have to guess what's legal; the page only offers what is actually callable right now.
 
-## 4. Breadcrumbs beat complex workflow engines
+## Breadcrumbs beat complex workflow engines
 
 Once you have atomic tools, how does an agent know what sequence makes sense?
 
@@ -174,7 +174,7 @@ Here is the whole purchase run, one frame per stage, each carrying the breadcrum
 <img src="/blog/images/sightkick/tool-01-menu.png" alt="The Burrito Co. menu, five items with prices, at the start of the purchase journey." />
 </div>
 
-## 5. The accidental superpower: zero-token CI testing
+## The accidental superpower: zero-token CI testing
 
 The best thing about building a typed tool surface is what it does for testing.
 
