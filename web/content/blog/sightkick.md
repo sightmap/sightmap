@@ -66,6 +66,7 @@ Tools work best when they do exactly one thing at a single point in time. Here i
 A few small details here save hours of debugging:
 
 - **Names instead of CSS:** `PromoField` and `ApplyPromoButton` aren't CSS selectors. They are semantic names from our sightmap. If the front-end team updates the checkout markup tomorrow, we update the selector in one place in the sightmap, and every tool keeps working.
+- **Typed in and typed out:** `params` becomes the tool's input schema, so the agent gets `code` validated as a required string before a single step runs, and `{{code}}` interpolates it into the query. `returns` declares what to read back out: `total`, a property the sightmap declares on `ReviewTotals`.
 - **Handling retries with guards:** Autonomous agents get nervous when network latency spikes and love to retry calls. The `guard` directive checks the page state first. Once the promo is applied, Burrito Co. removes the input box and shows a confirmation badge. Because `PromoField` is gone, the guard catches it, skips the steps, and returns `skipped: true` with the current total rather than blowing up.
 
 The guard is easier to look at than to describe. Here is the tool above running on a code that works, and the state change the guard keys off:
@@ -82,7 +83,7 @@ In our first pass at `apply_promo`, we set the `wait_for` step to watch `ReviewT
 
 When the agent passed an invalid promo code, the tool filled the input, clicked apply, checked if `ReviewTotals` was on the screen (it was!), and happily returned `ok: true`, even though the order total hadn't budged and the promo was rejected. The tool was lying.
 
-We fixed it by creating a dedicated component in the sightmap (`PromoAppliedLabel`) that only mounts when a discount successfully applies, and pointed `wait_for` at that. A bad code now fails out loud:
+We fixed it by creating a dedicated component in the sightmap (`PromoAppliedLabel`) that only mounts when a discount successfully applies, and pointed `wait_for` at that. A bad code now fails out loud, naming the selector the compiler resolved that component to:
 
 ```json
 {
@@ -103,7 +104,7 @@ If your tool finishes a mutation and immediately returns without waiting for spe
 
 Burrito Co. has 30 tools across its entire flow. If you dump 30 tools into an agent's prompt on every page, decision quality plummets. The model spends context tokens wondering if it should call `place_order` while looking at the home menu.
 
-Sightkick scopes tools dynamically by route. The browser runtime listens for navigation and uses `AbortController` to tear down old tools and register new ones right on `document.modelContext`:
+Sightkick scopes tools dynamically by route. That is what the `ensure_view: Checkout` line in the YAML above is for: the browser runtime listens for navigation and uses `AbortController` to tear down the tools that no longer apply and register the ones that do, right on `document.modelContext`.
 
 - **On the Menu** (`/apps/burrito/`): the agent only sees 7 tools (`read_menu`, `open_item`, basic nav). Checkout actions don't exist.
 - **On Checkout** (`/apps/burrito/checkout/`): menu actions disappear. Now `apply_promo`, `submit_payment_details`, and `place_order` light up.
@@ -194,13 +195,26 @@ Feature: Order a burrito
     Then I get an order id
 ```
 
-An agent translates this into a static plan (`purchase.plan.json`) just once.
+An agent translates this into a static plan (`purchase.plan.json`) just once. Each Gherkin line becomes a tool call and an assertion:
+
+```json
+{
+  "gherkin": "And I apply the promo code \"BURRITO20\"",
+  "tool": "apply_promo",
+  "params": { "code": "BURRITO20" },
+  "expect": { "value": { "contains": "$18.92" } }
+}
+```
 
 Every run after that runs via a tiny Node script in CI. It hits the browser, calls the tools directly, and runs assertions. It uses zero LLM tokens and makes zero model API calls.
 
-To keep things honest, the runner checks two hashes before executing: one for the feature file and one for the compiled tool manifest. If an engineer changes a tool definition or breaks an extractor, the hash check halts the build right away instead of running stale plans:
+To keep things honest, the runner checks two hashes before executing: one for the feature file and one for the compiled tool manifest. Editing a single tool's description is enough to trip it, so a changed selector or a broken extractor halts the build right away instead of running stale plans:
 
 ```
+$ sed -i '' 's/List the menu items with their prices\./List the current menu items and their prices./' examples/burrito/.sightkick/menu.yaml
+$ sightkick build examples/burrito -o /tmp/burrito-drift.ir.json
+✓ wrote 30 tool(s) to /tmp/burrito-drift.ir.json
+
 $ node scripts/run-plan.mjs examples/burrito/plans/purchase.plan.json
 ✗ examples/burrito's compiled manifest has changed since this plan was stamped — re-plan (or pass --stale-ok).
 ```
