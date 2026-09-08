@@ -16,9 +16,10 @@ type ProbeResult struct {
 // the string using sightmap.ParseSightmapSelector.
 type ProbeComponent struct {
 	Id            string            `json:"id"`
-	Role          string            `json:"role"`  // empty pre-merge
-	Text          string            `json:"text"`  // raw textContent
-	Value         string            `json:"value"` // empty pre-merge
+	Role          string            `json:"role"`    // empty pre-merge
+	Text          string            `json:"text"`    // rendered innerText
+	RawText       string            `json:"rawText"` // own direct-text-node content (SEP-0013 raw_text)
+	Value         string            `json:"value"`   // empty pre-merge
 	Properties    map[string]string `json:"properties"`
 	Bounds        *sightmap.Bounds  `json:"bounds"`
 	Selector      string            `json:"selector"`   // CSS selector string

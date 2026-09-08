@@ -374,6 +374,21 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
             // returns its <style> text). Go-side normalizeText collapses any
             // residual whitespace.
             text: (noTextTags.has(tag) || !isVisible) ? '' : ((element.innerText || '').substring(0, 100)),
+            // Raw own text: the element's OWN direct text-node children, verbatim.
+            // Unlike `text` (innerText) it is layout-independent and deterministic,
+            // and unlike textContent it excludes descendant element text (no
+            // <style>/<script> bleed, no subtree concatenation) and CSS pseudo
+            // content (::before/::after are not child nodes). This is the pinned
+            // source for `extract: raw_text` (SEP-0013) — the literal author text
+            // of the node, distinct from its (possibly welded) accessible name.
+            rawText: noTextTags.has(tag) ? '' : (function () {
+                var s = '';
+                var kids = element.childNodes;
+                for (var i = 0; i < kids.length; i++) {
+                    if (kids[i].nodeType === 3) s += kids[i].data;
+                }
+                return s.substring(0, 100);
+            })(),
             value: '',                                                 // Will be filled by accessibility data
             properties: {},                                            // Will be filled by accessibility data
             bounds: bounds,

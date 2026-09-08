@@ -190,7 +190,7 @@
         "extract": {
           "type": "string",
           "minLength": 1,
-          "description": "Extraction directive, one of: text | attr=NAME | PATH.prop | exists:PATH. The grammar is validated by the SDK. See SEP-0010 Extract grammar."
+          "description": "Extraction directive, one of: text | raw_text | attr=NAME | PATH.prop | exists:PATH. The grammar is validated by the SDK. See SEP-0010 Extract grammar (raw_text added by SEP-0013)."
         }
       }
     },

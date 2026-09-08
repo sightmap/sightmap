@@ -15,10 +15,11 @@ var (
 	pathSegmentRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 )
 
-// checkComponentProperties validates every component's properties[] (SEP-0010):
-// names must be unique within a component, and each extract directive must be one
-// of the four forms text | attr=NAME | PATH.prop | exists:PATH. Anything else —
-// the removed DOM modes (inner_text, text_only, inner_html), a bare CSS
+// checkComponentProperties validates every component's properties[] (SEP-0010,
+// extended by SEP-0013): names must be unique within a component, and each
+// extract directive must be one of the forms
+// text | raw_text | attr=NAME | PATH.prop | exists:PATH. Anything else — the
+// removed DOM modes (inner_text, text_only, inner_html), a bare CSS
 // sub-selector, or a mistyped attr/exists prefix — is an error.
 func checkComponentProperties(c *Corpus) []ValidationError {
 	var errs []ValidationError
@@ -55,6 +56,8 @@ func checkExtractMode(extract string) string {
 	switch {
 	case extract == "text":
 		return ""
+	case extract == "raw_text":
+		return ""
 	case strings.HasPrefix(extract, "attr="):
 		if extract == "attr=" {
 			return "attr= requires an attribute name"
@@ -65,7 +68,7 @@ func checkExtractMode(extract string) string {
 	default: // PATH.prop
 		dot := strings.LastIndex(extract, ".")
 		if dot <= 0 || dot == len(extract)-1 {
-			return fmt.Sprintf("unrecognized extract mode %q (expected text, attr=NAME, PATH.prop, or exists:PATH)", extract)
+			return fmt.Sprintf("unrecognized extract mode %q (expected text, raw_text, attr=NAME, PATH.prop, or exists:PATH)", extract)
 		}
 		if msg := checkComponentPath(extract[:dot]); msg != "" {
 			return msg

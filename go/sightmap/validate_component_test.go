@@ -28,6 +28,7 @@ func TestCheckComponentProperties(t *testing.T) {
 			name: "valid forms",
 			props: []ComponentPropertyDef{
 				{Name: "label", Extract: "text"},
+				{Name: "tier", Extract: "raw_text"},
 				{Name: "href", Extract: "attr=href"},
 				{Name: "price", Extract: "Price.text"},
 				{Name: "sold_out", Extract: "exists:SoldOutBadge"},
