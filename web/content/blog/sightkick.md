@@ -95,15 +95,9 @@ If your tool finishes a mutation and immediately returns without waiting for spe
 
 `customize_item`, on the item page, is the shape to copy. Its `wait_for` watches for the option button to come back with a `selected` class, a state that only exists once the click has actually landed, and its `guard` checks that same thing up front:
 
-<figure class="shot shot-wide">
-<img src="/blog/images/sightkick/tool-02-item-before.png" alt="The Classic Burrito detail page before the call: the PROTEIN group has chicken selected, quantity 1, and the button reads Add 1 to Cart, $10.95." />
-<figcaption>Before <code>customize_item(group: "protein", option: "steak")</code>. Chicken is the default.</figcaption>
-</figure>
-
-<figure class="shot shot-wide">
-<img src="/blog/images/sightkick/tool-03-item-after.png" alt="The same page after the call: steak is now the selected option in the PROTEIN group." />
-<figcaption>After. Call it again and the guard already matches, so nothing clicks twice and the envelope comes back <code>skipped: true</code>.</figcaption>
-</figure>
+<div data-widget="sightkick-frames" data-figure="customize">
+<img src="/blog/images/sightkick/tool-02-item-before.png" alt="The Classic Burrito detail page with chicken selected in the PROTEIN group." />
+</div>
 
 ## Don't drown the model with global tools
 

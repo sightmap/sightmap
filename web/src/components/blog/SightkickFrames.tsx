@@ -43,6 +43,21 @@ const FIGURES: Record<string, FigureData> = {
       },
     ],
   },
+  customize: {
+    frames: [
+      {
+        src: `${IMG}/tool-02-item-before.png`,
+        alt: 'Classic Burrito detail page, PROTEIN group with chicken selected, quantity 1',
+        caption: 'Before: customize_item(group: "protein", option: "steak") has not run yet.',
+      },
+      {
+        src: `${IMG}/tool-03-item-after.png`,
+        alt: 'The same page with steak now selected in the PROTEIN group',
+        caption:
+          'After: the option came back with a selected class, which is exactly what wait_for watches for. Call it again and the guard matches that same state, so nothing clicks twice.',
+      },
+    ],
+  },
   journey: {
     frames: [
       {
