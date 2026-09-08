@@ -1,0 +1,3 @@
+- name: FormField
+  selectors:
+    - 'jb-form-field-container:not(:has(jb-form-field-container))'

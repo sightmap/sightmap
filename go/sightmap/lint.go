@@ -346,7 +346,7 @@ func lintComponentWithCounts(comp ComponentDef, global bool, counts map[string]i
 		if global {
 			if ps, err := ParseSightmapSelector(selStr); err == nil && len(ps.Parts) == 1 {
 				p := ps.Parts[0]
-				if p.Tag != "" && p.Id == "" && len(p.Classes) == 0 && len(p.Attrs) == 0 && p.Not == nil {
+				if p.Tag != "" && p.Id == "" && len(p.Classes) == 0 && len(p.Attrs) == 0 && len(p.Not) == 0 {
 					warnings = append(warnings, LintWarning{
 						Component: name,
 						Selector:  selStr,

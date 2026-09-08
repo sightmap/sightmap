@@ -1,0 +1,80 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "element": { "tag": "div" },
+  "children": [
+    {
+      "id": "fieldA",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "element": { "tag": "jb-form-field-container" },
+      "children": [
+        {
+          "id": "inputA",
+          "role": "textbox",
+          "name": "",
+          "value": "",
+          "isVisible": true,
+          "isInteractive": true,
+          "inViewport": true,
+          "isIgnored": false,
+          "nthChild": 1,
+          "element": { "tag": "input" }
+        }
+      ]
+    },
+    {
+      "id": "wrapper",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 2,
+      "element": { "tag": "jb-form-field-container" },
+      "children": [
+        {
+          "id": "fieldB",
+          "role": "generic",
+          "name": "",
+          "value": "",
+          "isVisible": true,
+          "isInteractive": false,
+          "inViewport": true,
+          "isIgnored": false,
+          "nthChild": 1,
+          "element": { "tag": "jb-form-field-container" },
+          "children": [
+            {
+              "id": "inputB",
+              "role": "textbox",
+              "name": "",
+              "value": "",
+              "isVisible": true,
+              "isInteractive": true,
+              "inViewport": true,
+              "isIgnored": false,
+              "nthChild": 1,
+              "element": { "tag": "input" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,8 +1,9 @@
 package sightmap_test
 
 import (
-	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // parseOK parses s and fails t if there's an error.
@@ -157,22 +158,69 @@ func TestParse_NotPseudo(t *testing.T) {
 	if part.Tag != "button" {
 		t.Errorf("tag: got %q, want button", part.Tag)
 	}
-	if part.Not == nil {
-		t.Fatal("Not is nil")
+	if len(part.Not) != 1 || len(part.Not[0].Parts) != 1 {
+		t.Fatalf("Not: got %d entries, want 1 single-part", len(part.Not))
 	}
-	if len(part.Not.Classes) != 1 || part.Not.Classes[0] != "disabled" {
-		t.Errorf("Not.Classes: got %v, want [disabled]", part.Not.Classes)
+	notArg := part.Not[0].Parts[0]
+	if len(notArg.Classes) != 1 || notArg.Classes[0] != "disabled" {
+		t.Errorf("Not.Classes: got %v, want [disabled]", notArg.Classes)
 	}
 }
 
 func TestParse_NotWithAttr(t *testing.T) {
 	ps := parseOK(t, `div:not([hidden])`)
-	if ps.Parts[0].Not == nil {
-		t.Fatal("Not is nil")
+	if len(ps.Parts[0].Not) != 1 || len(ps.Parts[0].Not[0].Parts) != 1 {
+		t.Fatalf("Not: got %d entries, want 1 single-part", len(ps.Parts[0].Not))
 	}
-	if ps.Parts[0].Not.AttrOps["hidden"] != "[]" {
-		t.Errorf("Not attr presence: got %q", ps.Parts[0].Not.AttrOps["hidden"])
+	if ps.Parts[0].Not[0].Parts[0].AttrOps["hidden"] != "[]" {
+		t.Errorf("Not attr presence: got %q", ps.Parts[0].Not[0].Parts[0].AttrOps["hidden"])
 	}
+}
+
+func TestParse_NotComplexDescendant(t *testing.T) {
+	// A descendant combinator inside :not() (CSS L4 complex-selector argument):
+	// the argument parses into a 2-part complex selector, subject last.
+	ps := parseOK(t, `button.jb-button-primary:not(jb-sign-in button)`)
+	if len(ps.Parts) != 1 {
+		t.Fatalf("outer parts: got %d, want 1", len(ps.Parts))
+	}
+	not := ps.Parts[0].Not
+	if len(not) != 1 {
+		t.Fatalf("Not entries: got %d, want 1", len(not))
+	}
+	if len(not[0].Parts) != 2 {
+		t.Fatalf(":not() arg parts: got %d, want 2", len(not[0].Parts))
+	}
+	if not[0].Parts[0].Tag != "jb-sign-in" || not[0].Parts[1].Tag != "button" {
+		t.Errorf(":not() arg tags: got [%q %q], want [jb-sign-in button]", not[0].Parts[0].Tag, not[0].Parts[1].Tag)
+	}
+	if not[0].Combinators[1] != " " {
+		t.Errorf(":not() arg combinator[1]: got %q, want descendant", not[0].Combinators[1])
+	}
+}
+
+func TestParse_NotList(t *testing.T) {
+	// A comma-separated list inside one :not() flattens into two entries.
+	ps := parseOK(t, `div:not(.a, .b)`)
+	if got := len(ps.Parts[0].Not); got != 2 {
+		t.Fatalf("Not entries: got %d, want 2", got)
+	}
+}
+
+func TestParse_NotDirectChild(t *testing.T) {
+	ps := parseOK(t, `button:not(toolbar > button)`)
+	not := ps.Parts[0].Not
+	if len(not) != 1 || len(not[0].Parts) != 2 {
+		t.Fatalf(":not() arg: got %d entries", len(not))
+	}
+	if not[0].Combinators[1] != ">" {
+		t.Errorf(":not() arg combinator[1]: got %q, want >", not[0].Combinators[1])
+	}
+}
+
+func TestParse_NotSiblingRejected(t *testing.T) {
+	// Sibling combinators remain unsupported, including inside :not() — reject loudly.
+	parseErr(t, `button:not(span + button)`)
 }
 
 func TestParse_DescendantCombinator(t *testing.T) {
