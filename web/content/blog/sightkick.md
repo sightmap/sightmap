@@ -9,26 +9,20 @@ draft: true
 image: '/blog/og/sightkick.png'
 ---
 
-Watching an autonomous AI agent try to use a modern web app is equal parts magical and painful.
+Browser agents can do remarkable things. They just spend most of their effort on the wrong problem.
 
-If you've played with browser agents at all, you know the dance. The model takes a screenshot or grabs an enormous dump of the accessibility tree, burns tens of thousands of tokens trying to guess which `<div>` is the submit button, dispatches a click, and prays the single-page app doesn't hit a re-render race condition. It's slow, it burns through API credits, and the whole thing falls apart the moment someone changes a Tailwind class name.
+To click one button, a model reads a screenshot or a full accessibility tree, works out which node is the button, clicks it, then reads the page again to see what happened. That loop runs on every step, it costs tokens and seconds each time, and the next run starts over from scratch.
 
-A while back, we built [Sightmap](/blog/sightmap) to solve the first half of this mess by giving views, components, and network requests stable, semantic names. But naming things only gets you so far.
+We built [Sightmap](/blog/sightmap) to handle the semantic naming of every view, component, and network request in an app. Naming orients an agent, but knowing a button is called `ApplyPromoButton` doesn't tell it when to click, what to pass, or whether the click landed. That part still happens in the model, every run.
 
-Even if an agent knows a button is called `ApplyPromoButton`, it still has to decide when to click it, what to pass to it, and whether the click actually did anything. Forcing an LLM to reason through DOM mechanics on every single step is the slowest, most expensive place to put that logic.
-
-We wanted to see what happens if you move that execution layer directly into the browser.
-
-That experiment became [Sightkick](https://github.com/sightmap/sightkick). You declare a `.sightkick/` folder of tools next to your sightmap, run a compiler to wire them up, and let the browser expose them directly via [WebMCP](https://webmachinelearning.github.io/webmcp/) on `document.modelContext`.
-
-Instead of an agent flailing against raw markup, it makes a typed function call and gets back a clean result:
+[Sightkick](https://github.com/sightmap/sightkick) moves it into the browser. You declare a `.sightkick/` folder of tools next to your sightmap, run a compiler to resolve them against it, and the browser hands the result to the agent via [WebMCP](https://webmachinelearning.github.io/webmcp/) on `document.modelContext`. Operating your app becomes a typed function call with a structured result:
 
 ```js
 await document.modelContext.executeTool({ name: 'apply_promo' }, { code: 'BURRITO20' })
 // => { ok: true, value: "Total: $18.92", guidance: [ ... ] }
 ```
 
-Here is what we learned building it, dogfooding it on our demo app ([Burrito Co.](https://github.com/sightmap/sightkick/tree/main/examples/burrito)), and watching where our initial assumptions failed.
+Here is what we learned building it and dogfooding it on our demo app, [Burrito Co.](https://github.com/sightmap/sightkick/tree/main/examples/burrito), including the parts we got wrong the first time.
 
 ## Make tools atomic, typed, and idempotent
 
