@@ -2,6 +2,7 @@ import parse, { Element, type HTMLReactParserOptions } from 'html-react-parser'
 import CodeBlock from './CodeBlock'
 import SightmapSnapshot from './SightmapSnapshot'
 import SkillVsSightmap from './SkillVsSightmap'
+import SightkickFrames from './SightkickFrames'
 
 // Interactive figures are authored in markdown as
 //
@@ -17,6 +18,7 @@ import SkillVsSightmap from './SkillVsSightmap'
 const WIDGETS: Record<string, (attribs: Record<string, string>) => React.ReactElement> = {
   'sightmap-snapshot': (a) => <SightmapSnapshot figure={a['data-figure']} />,
   'skill-vs-sightmap': () => <SkillVsSightmap />,
+  'sightkick-frames': (a) => <SightkickFrames figure={a['data-figure']} />,
 }
 
 // Recursively collect the raw text of a parsed <code> element, so a fenced

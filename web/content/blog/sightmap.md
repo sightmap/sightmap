@@ -113,7 +113,7 @@ The open-source [`@sightmap/sightmap`](https://github.com/sightmap/sightmap) pac
 
 <figure class="shot shot-wide">
 <img src="/blog/images/sightmaps/overlay-checkout.png" alt="The sightmap browser extension on the Burrito Co. checkout: a component-path tooltip over the page, and a side panel listing the hovering path and an event log." />
-<figcaption>The `sightmap browser` extension: a live, interactive view of the coverage and event stream the sightmap tools see.</figcaption>
+<figcaption>The <code>sightmap browser</code> extension: a live, interactive view of the coverage and event stream the sightmap tools see.</figcaption>
 </figure>
 
 ### Install
