@@ -68,17 +68,11 @@ A few small details here save hours of debugging:
 - **Names instead of CSS:** `PromoField` and `ApplyPromoButton` aren't CSS selectors. They are semantic names from our sightmap. If the front-end team updates the checkout markup tomorrow, we update the selector in one place in the sightmap, and every tool keeps working.
 - **Handling retries with guards:** Autonomous agents get nervous when network latency spikes and love to retry calls. The `guard` directive checks the page state first. Once the promo is applied, Burrito Co. removes the input box and shows a confirmation badge. Because `PromoField` is gone, the guard catches it, skips the steps, and returns `skipped: true` with the current total rather than blowing up.
 
-A guard just describes the finished state, in whichever direction the app happens to express it. `apply_promo` guards on `absent`, because a successful apply removes the input. Over on the item page, `customize_item` guards on `present`: picking an option leaves that button in a selected state, so a repeat call sees it already selected and stops there. That one is easier to look at than to describe.
+The guard is easier to look at than to describe. Here is the tool above running on a code that works, and the state change the guard keys off:
 
-<figure class="shot shot-wide">
-<img src="/blog/images/sightkick/tool-02-item-before.png" alt="The Classic Burrito detail page before the call: the PROTEIN group has chicken selected, quantity 1, and the button reads Add 1 to Cart, $10.95." />
-<figcaption>Before `customize_item(group: "protein", option: "steak")`. Chicken is the default.</figcaption>
-</figure>
-
-<figure class="shot shot-wide">
-<img src="/blog/images/sightkick/tool-03-item-after.png" alt="The same page after the call: steak is now the selected option in the PROTEIN group." />
-<figcaption>After. Call it again and the guard already matches, so nothing clicks twice and the envelope comes back `skipped: true`.</figcaption>
-</figure>
+<div data-widget="sightkick-frames" data-figure="tool">
+<img src="/blog/images/sightkick/tool-04-promo-before.png" alt="The Checkout Review step before the promo call, with an empty promo code field and a total of $23.65." />
+</div>
 
 ## A tool is only as honest as what it waits on
 
@@ -99,11 +93,17 @@ We fixed it by creating a dedicated component in the sightmap (`PromoAppliedLabe
 
 If your tool finishes a mutation and immediately returns without waiting for specific, unambiguous feedback, you've built a race condition machine.
 
-Here is the same call on a code that works, stepped through what the tool actually waits for:
+`customize_item`, on the item page, is the shape to copy. Its `wait_for` watches for the option button to come back with a `selected` class, a state that only exists once the click has actually landed, and its `guard` checks that same thing up front:
 
-<div data-widget="sightkick-frames" data-figure="tool">
-<img src="/blog/images/sightkick/tool-04-promo-before.png" alt="The Checkout Review step before the promo call, with an empty promo code field and a total of $23.65." />
-</div>
+<figure class="shot shot-wide">
+<img src="/blog/images/sightkick/tool-02-item-before.png" alt="The Classic Burrito detail page before the call: the PROTEIN group has chicken selected, quantity 1, and the button reads Add 1 to Cart, $10.95." />
+<figcaption>Before <code>customize_item(group: "protein", option: "steak")</code>. Chicken is the default.</figcaption>
+</figure>
+
+<figure class="shot shot-wide">
+<img src="/blog/images/sightkick/tool-03-item-after.png" alt="The same page after the call: steak is now the selected option in the PROTEIN group." />
+<figcaption>After. Call it again and the guard already matches, so nothing clicks twice and the envelope comes back <code>skipped: true</code>.</figcaption>
+</figure>
 
 ## Don't drown the model with global tools
 
