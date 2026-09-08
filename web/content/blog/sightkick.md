@@ -219,16 +219,6 @@ $ node scripts/run-plan.mjs examples/burrito/plans/purchase.plan.json
 ✗ examples/burrito's compiled manifest has changed since this plan was stamped — re-plan (or pass --stale-ok).
 ```
 
-## Catching the bug humans click past
-
-Running this deterministic plan caught a legitimate bug in Burrito Co. that we completely missed when clicking around manually.
-
-On the Review screen, `apply_promo` fired, the coupon took, and the total dropped to $18.92. We called `place_order`, the app transitioned to the confirmation screen, and a green success banner popped up.
-
-When humans test that flow, we see the success screen, assume it worked, and close the tab.
-
-But our stored plan asserted on the final receipt. The confirmation screen read **Total Charged: $23.65**, the last frame of the journey above. The client UI had applied the coupon visually, but the backend checkout endpoint silently dropped the discount before charging the card. The runner flagged it immediately.
-
 ## Where to poke around
 
 Treating web pages like computer vision puzzles for language models is a brute-force band-aid. If we want autonomous agents that don't flake out or run up massive bills, applications need clear, callable interfaces.
