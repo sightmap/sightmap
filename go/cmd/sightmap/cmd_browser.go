@@ -395,15 +395,18 @@ func resolveSightmapDir(args []string) (dir string, rest []string) {
 }
 
 // resolveAddr extracts the --addr flag value from args if present, returning the
-// address and the remaining args. When --addr is absent it falls back to the
-// CDP port recorded in the session file for the corpus at sightmapDir.
+// address and the remaining args. When --addr is absent it resolves the CDP
+// address via resolveCDPAddr, which warns on stderr when it has to fall back to
+// the default CDP port because no usable session file exists for the corpus at
+// sightmapDir — so navigate/eval surface a missing session file rather than
+// silently attaching to a foreign session on the default port.
 func resolveAddr(args []string, sightmapDir string) (addr string, rest []string) {
 	for i, a := range args {
 		if a == "--addr" && i+1 < len(args) {
 			return args[i+1], append(args[:i:i], args[i+2:]...)
 		}
 	}
-	return browser.DefaultAddr(sightmapDir), args
+	return resolveCDPAddr("", sightmapDir), args
 }
 
 // resolveTab extracts the --tab flag value from args, returning the tabID and

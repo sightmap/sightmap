@@ -674,12 +674,13 @@ Subcommands:
 `)
 }
 
+// sessionAddr resolves the CDP address for the tabs subcommands via
+// resolveCDPAddr, which warns on stderr when it has to fall back to the default
+// CDP port because no usable session file exists for sightmapDir — so the tabs
+// commands surface a missing session file rather than silently driving a
+// foreign session on the default port.
 func sessionAddr(sightmapDir string) string {
-	info, err := browser.ReadSessionInfo(sightmapDir)
-	if err != nil || info.Port <= 0 {
-		return fmt.Sprintf("localhost:%d", browser.DefaultCDPPort)
-	}
-	return fmt.Sprintf("localhost:%d", info.Port)
+	return resolveCDPAddr("", sightmapDir)
 }
 
 func runTabsList(args []string) error {
