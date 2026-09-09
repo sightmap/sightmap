@@ -704,10 +704,10 @@ and re-snap.
 ### Step 1d — Quality self-review (after 0 orphaned ✓)
 
 **1. Properties completeness**
-Every `[ComponentName]` that is a link or button should have at least one
-`prop="value"`. Scan the snap for bare `[ComponentName]` on interactive nodes.
-Check `textbox`, `combobox` nodes — if scoped inside a component but unlabeled,
-add a named child for them.
+Every link or button must be **identifiable** — by its accessible name, or by a
+*useful* property (a discriminator or signal). Scan the snap for bare
+`[ComponentName]` on interactive nodes. Check `textbox`, `combobox` nodes — if
+scoped inside a component but unlabeled, add a named child for them.
 
 **2. Structured data in cards**
 If a card mixes several values (date, venue, price) into one blob, promote each
