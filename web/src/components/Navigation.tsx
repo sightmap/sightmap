@@ -37,6 +37,19 @@ export default function Navigation() {
     }
   }, [open])
 
+  // The panel and toggle are hidden by a `@media (max-width: 820px)` rule in
+  // index.css, so a desktop resize wider while the menu is open removes them
+  // from view without touching React state. Without this listener the body
+  // scroll lock above would outlive the visible menu. Closing the menu when
+  // the viewport leaves the mobile range runs the cleanup above and keeps the
+  // toggle's aria-expanded state honest.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 820px)')
+    const onChange = (e: MediaQueryListEvent) => { if (!e.matches) setOpen(false) }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
   return (
     <nav data-component="Navigation">
       <a href="/" className="nav-logo" aria-label="sightmap home"><Logo /></a>
