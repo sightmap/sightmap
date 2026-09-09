@@ -407,6 +407,6 @@ export const COUNTS = {
   views: FLOORS.length,
   components: FLOORS.reduce((n, f) => n + f.rooms.length, 0),
   requests: RISERS.length,
-  memory: FLOORS.reduce((n, f) => n + f.rooms.filter((r) => r.memory).length, 0) + 5,
+  memory: FLOORS.reduce((n, f) => n + f.rooms.filter((r) => r.memory).length, 0),
   journeys: JOURNEYS.length,
 }
