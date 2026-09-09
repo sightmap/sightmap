@@ -72,6 +72,34 @@ export default function HealDemo() {
   useFrame(({ clock }) => {
     const c = s.cur
     const active = c.heal > 0.5
+    if (active && s.reduced) {
+      start.current = null
+      s.healShift = 1
+      if (walker.current) {
+        walker.current.position.copy(newPos)
+        const sc = c.heal
+        walker.current.scale.setScalar(Math.max(sc, 0.001))
+        walker.current.visible = sc > 0.02
+      }
+      if (ghost.current) {
+        const m = ghost.current.material as THREE.MeshStandardMaterial
+        m.opacity = 0
+        ghost.current.visible = false
+        m.color.set('#ffffff')
+        m.emissive.set('#ffffff')
+      }
+      if (status.current) {
+        if (lastPhase.current !== 'pass') {
+          status.current.textContent = STATUS.pass.text
+          status.current.className = 'bld-status bld-status--pass'
+          lastPhase.current = 'pass'
+        }
+        const o = c.heal
+        status.current.style.opacity = o.toFixed(2)
+        status.current.style.visibility = o > 0.02 ? 'visible' : 'hidden'
+      }
+      return
+    }
     const now = clock.getElapsedTime()
     if (!active) {
       start.current = null
