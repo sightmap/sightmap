@@ -13,7 +13,7 @@ related-discussions: []
 ## Summary
 
 Make two kinds of node data deterministically available to extraction. Add a
-`raw_text` extract mode — the node's raw text content, distinct from its
+`raw_text` extract mode — the node's own literal text, distinct from its
 accessibility name — and **pin** both `text` and `raw_text` so every consumer
 computes them identically. And mandate that a small set of **interactive-state**
 attributes (`checked`, `selected`, `disabled`, `expanded`) be carried on the node,
@@ -28,8 +28,30 @@ Two gaps, both about what the abstract node exposes:
   node's accessibility name and leaves it "implementation-defined." So the *same*
   `extract: text` yields the computed accessibility name in one consumer and the
   raw visible text in another — an on-/off-line divergence. And an accessibility
-  name can legitimately weld in extra text (an `aria-labelledby` that appends a
-  role phrase), so even the correct name is not always the literal value wanted.
+  name can legitimately weld in extra text, so even the correct name is not always
+  the literal value wanted.
+
+  A live example makes it concrete. A JetBlue fare-tile heading is `<h3>Main</h3>`
+  with `::after { content: "Most popular" }`. That injected text is user-visible
+  but absent from `textContent`, so the accessibility name is "Main Most popular"
+  while the author-written text is just "Main". An offline consumer reads the CDP
+  accessibility tree and gets "Main Most popular"; a runtime consumer that
+  approximates the name from the DOM gets "Main". Same `extract: text`, two values,
+  neither wrong — they answer *different questions*.
+
+  There are really **three** text notions, not equally computable everywhere:
+
+  | notion | value here | offline (CDP + AX tree) | runtime (DOM only) |
+  |---|---|---|---|
+  | DOM text (`textContent`) | "Main" | yes | yes |
+  | rendered visible text (DOM + `::before`/`::after`) | "Main Most popular" | needs pseudo capture | yes (`getComputedStyle`) |
+  | accessibility name (aria + alt + content + pseudo) | "Main Most popular" | yes | not from any DOM API — must reimplement accname |
+
+  The runtime is the **constrained consumer**: it has no accessibility tree, so a
+  `text` pinned to "the accessibility name" is satisfiable only if the runtime
+  computes accname itself. Any pin must therefore be an *algorithm over the DOM*
+  that both consumers can run — not "whatever the capture's AX tree says."
+
 - **State is unreachable.** A control's interactive state — checked, selected,
   disabled, expanded — is a native property, not an attribute, so no `extract`
   form can read it, even though "is this toggle on?" is exactly the signal a
@@ -37,25 +59,55 @@ Two gaps, both about what the abstract node exposes:
 
 ## Proposal
 
-### `raw_text`, and pinned text
+### `text` — the pinned accessible name
 
-Add `raw_text` to the extract grammar: the node's **raw text content** (its
-literal visible text), distinct from `text` (its accessibility name). Both are
-**pinned** — every conforming consumer MUST compute `text` as the accessibility
-name and `raw_text` as the raw text content by the same rules — so a value never
-depends on which tool read it.
+`text` stays the default and keeps its meaning — the node's **accessibility
+name** — but is now **pinned to the accname computation run over the DOM** (the
+standard algorithm: `aria-labelledby` / `aria-label` / native labels / `alt` /
+name-from-content, the last of which includes CSS `::before`/`::after`), not
+"whatever the capture's AX tree returns." Both consumers MUST compute the same
+value:
+
+- Offline this matches the CDP accessibility name (Chrome implements accname).
+- The runtime MUST compute accname over the DOM — crucially **including pseudo
+  content** — rather than approximating it with `innerText` (which silently drops
+  `::after`, the divergence above).
+
+`text` is the right choice when the accessibility name *is* the value — e.g. an
+icon button whose only label is `aria-label`.
+
+> Faithful runtime accname is the substantive, deferrable half of this SEP: the
+> mode and its meaning are fixed here, but an SDK MAY ship an approximation first
+> and tighten it toward accname parity, tracked separately. `raw_text` (below)
+> lands independently and does not wait on it.
+
+### `raw_text` — the node's own literal text
+
+Add `raw_text` to the extract grammar: the concatenation of the node's **direct
+text-node children**, whitespace-normalized. It is pinned to this
+`textContent`-style data — explicitly **not** `innerText` (layout-dependent and
+historically under-specified) — and it excludes:
+
+- **descendant element text** — it is the node's *own* text, not a subtree
+  concatenation, so no `<style>`/`<script>` bleed and no swallowing of nested
+  labels; and
+- **CSS pseudo content** — `::before`/`::after` are not child nodes.
 
 ```yaml
-- name: LanguageSelect
-  selector: '[data-testid="language-select"]'
+- name: SubFare                        # a JetBlue fare tile
+  selector: '.cb-fare-tile__section'
   properties:
-    - name: choice
-      extract: raw_text        # "English" — not the AX name "Language: English"
+    - name: tier
+      extract: raw_text               # "Main" — not the AX name "Main Most popular"
 ```
 
-`text` stays the default and the right choice when the accessibility name *is* the
-value; `raw_text` is the deterministic escape when the name is polluted, or when
-you want the literal visible text.
+`raw_text` is the deterministic escape when the accessible name is polluted, or
+when you specifically want the author-written text. `text` and `raw_text` are the
+two *ends* — everything a human perceives, versus the literal author text.
+Addressing a *single* injected fragment (just the `::after`, or one of a
+`::before`/`::after` pair) is a **non-goal**: pseudo/badge content is
+presentational and i18n-varying, so a corpus that must key on it should reach for
+a narrower selector, not a text primitive.
 
 ### Interactive-state attributes
 
@@ -88,7 +140,8 @@ duplicated here: a control's current value stays the node's accessibility value
 - **Tree-closed / offline (unchanged).** Both `raw_text` and the state attributes
   are carried on the abstract node at capture; extraction reads them offline.
 - **`text` / `raw_text` are pinned**, not implementation-defined — the same
-  computation on every consumer, live or offline.
+  computation on every consumer, live or offline: `text` = accname over the DOM
+  (pseudo-inclusive), `raw_text` = the node's own direct-text-node content.
 - **Omission (unchanged).** An empty `raw_text`, or a state attribute the node
   does not carry (it has no such state), omits the property.
 
@@ -96,8 +149,11 @@ duplicated here: a control's current value stays the node's accessibility value
 
 A conforming SDK:
 
-- MUST compute `text` (accessibility name) and `raw_text` (raw text content) by
-  the pinned rules, identically live and offline.
+- MUST compute `raw_text` as the node's own direct-text-node content,
+  whitespace-normalized, identically live and offline.
+- MUST compute `text` as the accessibility name over the DOM, including CSS
+  `::before`/`::after` content, identically live and offline. (An SDK MAY ship a
+  partial accname and tighten it over time; the value's *definition* is fixed.)
 - MUST carry `checked`, `selected`, `disabled`, and `expanded` on a node that has
   that state, readable via `attr=`.
 - MUST NOT expose a control's current value as a carried state attribute; it
@@ -105,10 +161,11 @@ A conforming SDK:
 
 ## Open questions
 
-- **The precise `raw_text` rule** — whitespace normalization, and whether it is the
-  node's own text or its subtree's — so "pinned" is well-defined.
 - **The state set** — is `checked`/`selected`/`disabled`/`expanded` the right
   minimal set, or do we also carry `pressed`/`readonly`/`required`?
+- **Accname parity scope** — how close must a runtime's DOM accname come to the
+  full spec algorithm to conform (which steps are MUST vs SHOULD), and is that a
+  gate for this SEP or a follow-up? (`raw_text` lands independently of it.)
 
 ## References
 
