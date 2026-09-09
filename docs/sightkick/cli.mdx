@@ -45,7 +45,7 @@ sightkick browser <app-dir> [--url URL] [--webmcp] [--no-inspector]
 | Flag | Description |
 |------|-------------|
 | `--url` | Page to open. Defaults to the corpus's home view URL. |
-| `--webmcp` | Enable the blink flags that expose the native `document.modelContext`, and load the bundled WebMCP inspector for driving tools with Gemini from Chrome's side panel. |
+| `--webmcp` | Enable the Chrome flag (`--enable-features=WebMCPTesting`) that exposes the native `document.modelContext`, and load the bundled WebMCP inspector for driving tools with Gemini from Chrome's side panel. |
 | `--no-inspector` | With `--webmcp`, use the native surface without the inspector. |
 | `--extensions` | Load extra unpacked extensions, merged with the defaults. |
 | `--profile`, `--cdp-port`, `--chrome-flag` | Passed through to `sightmap browser start`. |
