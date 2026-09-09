@@ -147,3 +147,26 @@ func TestRenderCallResult(t *testing.T) {
 		}
 	})
 }
+
+// The absent-arm error names the Chrome flag that turns on native WebMCP.
+// Google Chrome stable ships it off; `WebMCPTesting` is the feature behind
+// chrome://flags/#enable-webmcp-testing (webmachinelearning/webmcp,
+// implementation-status.md). The names it used to suggest — ModelContext,
+// ModelContextTesting, DevToolsWebMCPSupport — are not Chromium features and
+// were silently ignored (sightmap/sightmap#413).
+func TestMCPAbsentErrorNamesRealChromeFlag(t *testing.T) {
+	msg := mcpAbsentError().Error()
+	for _, want := range []string{
+		"--chrome-flag=--enable-features=WebMCPTesting",
+		"chrome://flags/#enable-webmcp-testing",
+	} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("mcpAbsentError missing %q in:\n%s", want, msg)
+		}
+	}
+	for _, stale := range []string{"ModelContext,ModelContextTesting", "DevToolsWebMCPSupport"} {
+		if strings.Contains(msg, stale) {
+			t.Errorf("mcpAbsentError still suggests non-existent feature %q in:\n%s", stale, msg)
+		}
+	}
+}

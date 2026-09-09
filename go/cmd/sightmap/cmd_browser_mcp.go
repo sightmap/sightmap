@@ -55,15 +55,16 @@ type mcpCallResult struct {
 }
 
 // mcpAbsentError is the loud, actionable message for a page with no WebMCP
-// surface — the "absent" arm of the native/polyfilled/absent detection. Native
-// WebMCP is behind Chrome flags, so it names them; a page can also register
-// tools via its own script.
+// surface — the "absent" arm of the native/polyfilled/absent detection. Google
+// Chrome ships native WebMCP off, behind chrome://flags/#enable-webmcp-testing
+// (the WebMCPTesting feature), so the message names that flag; Chrome for
+// Testing has it on by default via the field-trial testing config. A page can
+// also register tools via its own script.
 func mcpAbsentError() error {
 	return fmt.Errorf("no WebMCP tools here: document.modelContext is not available on this page.\n" +
-		"  Native WebMCP needs Chrome flags — start the session with:\n" +
-		"    sightmap browser start \\\n" +
-		"      --chrome-flag=--enable-blink-features=ModelContext,ModelContextTesting \\\n" +
-		"      --chrome-flag=--enable-features=DevToolsWebMCPSupport\n" +
+		"  Google Chrome ships native WebMCP off — start the session with:\n" +
+		"    sightmap browser start --chrome-flag=--enable-features=WebMCPTesting\n" +
+		"  (the same switch as chrome://flags/#enable-webmcp-testing).\n" +
 		"  A page can also register tools via its own script; if you expect tools here, confirm it ran.")
 }
 
