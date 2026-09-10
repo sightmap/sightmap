@@ -202,14 +202,12 @@ sightmap browser inject --remove inj-1
 
 Enumerate and call the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools a page exposes. A page can declare callable actions to an in-browser agent through `document.modelContext` (`getTools()` / `executeTool()`); `mcp list` reads them and `mcp call` invokes one — so you can call a named action instead of driving the UI blind.
 
-`mcp list` distinguishes three states: **native** WebMCP (a browser-provided `document.modelContext`), a **polyfilled** one (provided by a page script), and **absent**. When absent it fails loudly with the Chrome flags that enable native WebMCP. One tool runs at a single point in time; WebMCP has no cross-navigation tool responses, so if a tool triggers a client-side navigation, re-run `mcp list` on the new view. Any guidance the tool returns (e.g. a hint toward the next tool) is part of its result.
+`mcp list` distinguishes three states: **native** WebMCP (a browser-provided `document.modelContext`), a **polyfilled** one (provided by a page script), and **absent**. When absent it fails loudly with the Chrome flag that enables native WebMCP. One tool runs at a single point in time; WebMCP has no cross-navigation tool responses, so if a tool triggers a client-side navigation, re-run `mcp list` on the new view. Any guidance the tool returns (e.g. a hint toward the next tool) is part of its result.
 
-Native WebMCP is behind Chrome flags; start the session with them:
+Google Chrome ships native WebMCP off, behind `chrome://flags/#enable-webmcp-testing`. Start the session with the equivalent switch (the managed Chrome for Testing from `browser install` has it on by default):
 
 ```bash
-sightmap browser start \
-  --chrome-flag=--enable-blink-features=ModelContext,ModelContextTesting \
-  --chrome-flag=--enable-features=DevToolsWebMCPSupport
+sightmap browser start --chrome-flag=--enable-features=WebMCPTesting
 ```
 
 | Command | Flags | Description |
