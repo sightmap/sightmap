@@ -11,7 +11,7 @@ From `go/`, with an explicit installed Chrome executable:
 
 ```sh
 SIGHTMAP_EVAL_CHROME='/path/to/chrome' \
-SIGHTMAP_EVAL_OUT='../evals/results/local' \
+SIGHTMAP_EVAL_OUT="$(pwd)/../evals/results/local" \
 go test ./evals -run TestMatrix -count=1 -v
 ```
 

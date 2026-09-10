@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "precondition",
+    "content": "location.hash === '#report' \u0026\u0026 !document.querySelector('#report').hidden \u0026\u0026 document.querySelector('#report').textContent === 'Quarter total: 42' =\u003e false",
+    "wall_ms": 0
+  },
+  {
+    "kind": "observation",
+    "content": "[View: Office]\nroute: /\n\n[Guide]\nSelectPerson     2\nContactName      1\nContactResult    1\nDirectoryFilter  1\nReportLink       1\nReportValue      1\nSaveContact      1\nSelectionResult  1\n\n--- component tree ---\n\ndocument\n  8 heading \"Office\"\n  10 generic\n    11 heading \"Save contact\"\n    13 form\n      14 LabelText\n        16 [ContactName \"Name \"]\n      17 [SaveContact \"Save contact\"]\n  20 generic\n    21 heading \"Directory\"\n    23 LabelText\n      25 [DirectoryFilter \"Filter \"]\n    26 LayoutTable\n      28 LayoutTableRow\n        29 LayoutTableCell \"Ada\"\n        31 LayoutTableCell\n          32 [SelectPerson person=\"Ada\" \"Select Ada\"]\n      34 LayoutTableRow\n        35 LayoutTableCell \"Grace\"\n        37 LayoutTableCell\n          38 [SelectPerson person=\"Grace\" \"Select Grace\"]\n  41 generic\n    42 heading \"Report\"\n    44 [ReportLink \"Open report\"]\n\n[Coverage] (visible only)\n6 interactive · 6 direct T1 (100%) · 0 scoped T2 (0%) · 0 orphaned T3 ✓\n",
+    "wall_ms": 6.23
+  },
+  {
+    "kind": "scripted_action",
+    "content": "document.querySelector('a').click(); new Promise(resolve =\u003e setTimeout(() =\u003e resolve(true), 20))",
+    "wall_ms": 22.558
+  },
+  {
+    "kind": "oracle",
+    "content": "location.hash === '#report' \u0026\u0026 !document.querySelector('#report').hidden \u0026\u0026 document.querySelector('#report').textContent === 'Quarter total: 42' =\u003e true",
+    "wall_ms": 0
+  }
+]
