@@ -121,7 +121,8 @@ tools:
           Optional — the 32 hex characters published as "# sightmap-claim:
           <token>" in https://<host>/webmcp.txt. Sending one that the host
           carries returns a shareable card at /try/<host> straight away; a
-          token the host does not carry is refused and stores nothing.
+          token the host does not carry is refused and nothing is recorded
+          for the host.
     # Re-running with the same input must not post twice: if the confirmation is
     # already on screen, return it instead of filling a form that is not there.
     guard:
