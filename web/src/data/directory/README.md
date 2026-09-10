@@ -29,12 +29,12 @@ slug: example                      # lowercase kebab-case; == file name; unique 
 name: Example
 url: https://example.com/
 host: example.com
-description: Example does something useful.     # one sentence, maintainer-approved
+description: Example does something useful.     # one sentence, written on review
 category: devtools                 # lowercase id; free vocabulary, keep it small
 type: live                         # live | demo
 built_with_sightkick: false
 submitted_by: owner                # owner | nominator | maintainer  (never an email)
-labels: []                         # editorial: promising | verified | featured
+labels: []                         # editorial: promising | featured
 collections: []                    # editorial: e.g. competition-demos, built-with-sightkick, new-this-week
 added: 2026-09-09
 updated: 2026-09-09
@@ -113,7 +113,7 @@ emits:
 | `public/atlas/scans/<slug>.json` | the latest scan report, verbatim |
 | `public/atlas/scans/<slug>/<date>.json` | every scan on file |
 | `public/atlas/<slug>.md` | markdown twin of the listing page |
-| `public/atlas/<slug>/badge.svg` | "N WebMCP tools · scanned by Sightmap Atlas" badge |
+| `public/atlas/<slug>/badge.svg` | "Sightmap · N tools detected · <date>" badge |
 | `public/atlas/hosts/<host>.json` | host lookup: `{ slug, url, tool_count, last_scanned }`; served at `/api/atlas/lookup/<host>` by a netlify.toml rewrite |
 
 Pages: `/atlas` lists community maps and directory listings together with a

@@ -125,7 +125,7 @@ export const ListingSchema = z.object({
   type: z.enum(['live', 'demo']),
   built_with_sightkick: z.boolean().default(false),
   submitted_by: z.enum(['owner', 'nominator', 'maintainer']).default('maintainer'),
-  labels: z.array(z.enum(['promising', 'verified', 'featured'])).default([]),
+  labels: z.array(z.enum(['promising', 'featured'])).default([]),
   collections: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
   added: z.string().regex(DATE, 'must be YYYY-MM-DD'),
   updated: z.string().regex(DATE, 'must be YYYY-MM-DD'),

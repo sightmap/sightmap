@@ -29,13 +29,13 @@ export function scanReportMarkdown(r: ScanReport): string {
   const notes = r.notes.length ? `\n## Notes\n\n${r.notes.map((n) => `- ${plain(n)}`).join('\n')}\n` : ''
   return `# Atlas scan: ${plain(r.host)}
 
-Scanned ${r.scannedAt.slice(0, 10)} by ${r.scanner.name} ${r.scanner.version}. Discovery only: tools were enumerated, none were executed.
+Scanned ${r.scannedAt.slice(0, 10)} by ${r.scanner.name} ${r.scanner.version}. Discovery only: tools were enumerated from the pages, none were called.
 
 - WebMCP detected: ${r.status === 'tools-found' || r.status === 'needs-review' ? 'yes' : 'no'}
 - Surface: ${r.surface}
 - Status: ${r.status}
 - Pages checked: ${r.counts.pages}
-- Tools discovered: ${r.counts.tools} (${r.counts.read} read, ${r.counts.action} action, ${r.counts.sensitive} sensitive; ${r.counts.declarative} declarative)
+- Tools detected: ${r.counts.tools} (${r.counts.read} read, ${r.counts.action} action, ${r.counts.sensitive} sensitive; ${r.counts.declarative} declarative)
 ${r.intent ? `- Submitted intent: ${plain(r.intent)}\n` : ''}
 ## Checks
 
@@ -51,7 +51,7 @@ ${tools}
 
 ${pages}
 ${notes}
-This scan is evidence, not a safety certification. See ${SITE_URL}/atlas for how listings are reviewed.
+This scan records what the pages above registered on ${r.scannedAt.slice(0, 10)}. No tool was called, and nothing here is a review of the site. A listing appears in the Atlas only after a maintainer reviews it: ${SITE_URL}/atlas.
 `
 }
 
@@ -75,7 +75,7 @@ ${plain(l.description)}
 - Type: ${l.type}${l.built_with_sightkick ? ' · built with Sightkick' : ''}
 - Category: ${l.category}
 - WebMCP surface: ${l.surface} (${l.status})
-- Tools: ${l.counts.tools} (${l.counts.read} read, ${l.counts.action} action, ${l.counts.sensitive} sensitive)
+- Tools detected: ${l.counts.tools} (${l.counts.read} read, ${l.counts.action} action, ${l.counts.sensitive} sensitive)
 - Pages checked: ${l.counts.pages}
 - Last scanned: ${l.scannedAt.slice(0, 10)}
 - Listed: ${l.added}, updated ${l.updated}
@@ -95,6 +95,6 @@ ${l.strengths.length ? `\n## Strong\n\n${l.strengths.map((s) => `- ${plain(s)}`)
 - ${SITE_URL}/atlas/scans/${l.slug}.json
 - ${SITE_URL}/atlas/directory.json
 
-Classification is Atlas's own, corrected on review. A listing is evidence a scan found these tools on the date shown; it is not a safety certification.
+Classification is Atlas's own, corrected by a maintainer on review. A listing records the tools a scan detected on the date shown, and says nothing about the site beyond that.
 `
 }
