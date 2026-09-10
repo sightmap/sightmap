@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { SUBMIT_ENDPOINT } from '@/lib/submit-types'
+import { CLAIM_TOKEN_LENGTH, CLAIM_TOKEN_PATTERN, SUBMIT_ENDPOINT } from '@/lib/submit-types'
 import type { SubmitRequest, SubmitResponse } from '@/lib/submit-types'
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   rescan?: boolean
   /** From `?submitted=<id>` — the no-JS redirect target. */
   submittedId?: string
+  /** From `?card=<url>` — the card a verified claim earned, on the no-JS path. */
+  cardUrl?: string
   /** From `?error=<code>` — where a no-JS post that failed validation lands. */
   errorCode?: string
 }
@@ -16,7 +18,7 @@ interface Props {
 type State =
   | { name: 'idle' }
   | { name: 'sending' }
-  | { name: 'received'; id?: string }
+  | { name: 'received'; id?: string; card?: string }
   | { name: 'error'; message: string }
 
 const RECEIVED_MESSAGE =
@@ -43,17 +45,24 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_email: 'That email address does not look valid.',
   intent_too_long: 'The intent is too long; keep it under 500 characters.',
   rate_limited: 'Too many submissions from this network today. Try again tomorrow.',
+  'claim-invalid': 'A claim token is 32 hex characters. Leave the field empty if you do not have one.',
+  'claim-unreachable':
+    'We could not read https://<your host>/webmcp.txt. Publish it, then submit again — nothing was stored.',
+  'claim-mismatch':
+    'The claim line in your webmcp.txt does not match that token. Fix either one and submit again — nothing was stored.',
+  quarantined: 'Submissions for that site are not being accepted. Email hello@sightmap.org if that looks wrong.',
 }
 const errorMessage = (code: string): string =>
   ERROR_MESSAGES[code] ?? 'The submission could not be recorded. Check the fields and try again.'
 
-export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submittedId, errorCode }: Props) {
+export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submittedId, cardUrl, errorCode }: Props) {
   const [url, setUrl] = useState('')
   const [email, setEmail] = useState('')
   const [owner, setOwner] = useState(false)
   const [sightkick, setSightkick] = useState(false)
   const [nominate, setNominate] = useState(false)
   const [intent, setIntent] = useState('')
+  const [claim, setClaim] = useState('')
   const [state, setState] = useState<State>({ name: 'idle' })
 
   // Both of these arrive one commit after mount, because the page only reads
@@ -64,9 +73,9 @@ export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submi
   }, [initialUrl])
 
   useEffect(() => {
-    if (submittedId) setState({ name: 'received', id: submittedId })
+    if (submittedId) setState({ name: 'received', id: submittedId, card: cardUrl })
     else if (errorCode) setState({ name: 'error', message: errorMessage(errorCode) })
-  }, [submittedId, errorCode])
+  }, [submittedId, cardUrl, errorCode])
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     // Only intercept once we know we can do better than the native post.
@@ -83,6 +92,7 @@ export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submi
       nominate,
       intent,
       rescan,
+      claim,
       website: typeof honeypot === 'string' ? honeypot : '',
     }
 
@@ -102,7 +112,7 @@ export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submi
         })
         return
       }
-      setState({ name: 'received', id: data.id })
+      setState({ name: 'received', id: data.id, card: data.card })
     } catch {
       setState({ name: 'error', message: 'The submission could not be sent. Check your connection and try again.' })
     }
@@ -121,6 +131,15 @@ export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submi
             </p>
           )}
           <p>{RECEIVED_MESSAGE}</p>
+          {state.card && (
+            <p className="atlas-submit-form__card">
+              Your card is at{' '}
+              <a href={state.card} data-component="SubmitCardLink">
+                {state.card}
+              </a>
+              . It is unlisted and not indexed; the Atlas listing itself follows a maintainer review.
+            </p>
+          )}
         </div>
       </section>
     )
@@ -218,6 +237,25 @@ export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submi
           <span className="atlas-submit-form__hint">
             Optional, 500 characters. Stored with the scan and read by the review agent; nothing is
             executed on your site.
+          </span>
+        </label>
+
+        <label className="atlas-submit-form__field">
+          <span className="atlas-submit-form__label">Claim token</span>
+          <input
+            type="text"
+            name="claim"
+            autoComplete="off"
+            spellCheck={false}
+            pattern={CLAIM_TOKEN_PATTERN}
+            maxLength={CLAIM_TOKEN_LENGTH}
+            placeholder="0123456789abcdef0123456789abcdef"
+            value={claim}
+            onChange={(e) => setClaim(e.target.value.trim().toLowerCase())}
+            data-component="SubmitClaim"
+          />
+          <span className="atlas-submit-form__hint">
+            The token in your <code>webmcp.txt</code>; optional, gives you a shareable card right away.
           </span>
         </label>
 

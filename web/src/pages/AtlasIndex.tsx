@@ -42,7 +42,7 @@ const HOW = [
   {
     n: '02',
     title: 'Review',
-    body: 'A review agent drafts the listing — description, category, tool classification, journeys worth trying — and a maintainer approves or corrects it before it ships.',
+    body: 'A review agent drafts the listing — description, category, tool classification, journeys worth trying — and a maintainer reviews and corrects it before it ships.',
   },
   {
     n: '03',
@@ -71,6 +71,7 @@ export default function AtlasIndex() {
   const rescan = hydrated ? params.get('rescan') === '1' : false
   const submittedId = hydrated ? (params.get('submitted') ?? '') : ''
   const errorCode = hydrated ? (params.get('error') ?? '') : ''
+  const cardUrl = hydrated ? (params.get('card') ?? '') : ''
 
   // Empty values are dropped rather than written as `?q=`, so the URL a
   // visitor copies is the shortest one that reproduces what they see.
@@ -254,11 +255,12 @@ export default function AtlasIndex() {
             </ol>
           </section>
 
-          <AtlasSubmitForm initialUrl={prefillUrl} rescan={rescan} submittedId={submittedId || undefined} errorCode={errorCode || undefined} />
+          <AtlasSubmitForm initialUrl={prefillUrl} rescan={rescan} submittedId={submittedId || undefined} cardUrl={cardUrl || undefined} errorCode={errorCode || undefined} />
 
           <p className="atlas-index__note">
-            Tool classification is Atlas&rsquo;s own and is corrected on review. A listing is
-            evidence a scan found these tools on the date shown, not a safety certification.
+            Tool classification is Atlas&rsquo;s own and is corrected by a maintainer on review.
+            A listing records the tools a scan detected on the date shown, and says nothing about
+            the site beyond that.
           </p>
         </div>
       </main>

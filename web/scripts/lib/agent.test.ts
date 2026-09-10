@@ -93,7 +93,7 @@ describe('buildAtlasIndexMarkdown', () => {
       '- [Alpha Tools](https://sightmap.org/atlas/alpha-tools.md) (alpha.example.org): A fixture site with WebMCP tools. 9 WebMCP tools, live. JSON: https://sightmap.org/atlas/sites/alpha-tools.json'
     )
     expect(md).toContain('- [Airbnb](https://sightmap.org/atlas/airbnb.md)')
-    expect(md).toContain('no listing is a safety certification')
+    expect(md).toContain('a listing says nothing about the site beyond that')
   })
 
   it('says so for each half rather than emitting an empty section', () => {
@@ -177,10 +177,23 @@ describe('buildOpenApiSpec — WebMCP directory', () => {
     expect(submit.requestBody).toMatchObject({
       content: { 'application/json': { schema: { $ref: '#/components/schemas/SubmitRequest' } } },
     })
-    expect(Object.keys(submit.responses)).toEqual(['202', '400', '429'])
+    expect(Object.keys(submit.responses)).toEqual(['202', '400', '403', '422', '429'])
     const responses = (spec.components as { responses: Record<string, unknown> }).responses
     expect(responses.BadRequest).toBeDefined()
     expect(responses.TooManyRequests).toBeDefined()
+    // A failed domain claim is 422, not 400: the request was well formed and
+    // nothing was stored, so the same body can be posted again.
+    expect(responses.ClaimFailed).toBeDefined()
+    expect(responses.Quarantined).toBeDefined()
+  })
+
+  it('documents the optional domain claim and the card it earns', () => {
+    const spec = buildOpenApiSpec()
+    const schemas = (spec.components as {
+      schemas: Record<string, { properties: Record<string, { pattern?: string; format?: string }> }>
+    }).schemas
+    expect(schemas.SubmitRequest.properties.claim?.pattern).toBe('^[0-9a-f]{32}$')
+    expect(schemas.SubmitAccepted.properties.card?.format).toBe('uri')
   })
 
   it('adds the directory component schemas', () => {
