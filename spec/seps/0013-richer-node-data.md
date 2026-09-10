@@ -2,11 +2,11 @@
 sep: 0013
 title: Richer node data for extraction — raw_text and interactive state
 author: Joel Webber (@joelgwebber)
-status: Draft
+status: Accepted
 created: 2026-09-08
-updated: 2026-09-08
+updated: 2026-09-10
 spec-version-target: 1
-related-issues: []
+related-issues: [443]  # interactive-state attrs follow-up (the one unshipped surface)
 related-discussions: []
 ---
 
@@ -158,6 +158,33 @@ A conforming SDK:
   that state, readable via `attr=`.
 - MUST NOT expose a control's current value as a carried state attribute; it
   remains the accessibility value / reserved `value` property.
+
+## Implementation status
+
+This SEP is accepted with one of its three surfaces implemented; the other two
+are accepted as direction but land later, so the reference implementation (`go/`)
+and the normative spec ([`spec/v1/schema.md`](../v1/schema.md)) currently reflect
+only what has shipped:
+
+- **`raw_text` — shipped.** The probe computes it from the node's direct
+  text-node children, the matcher resolves `extract: raw_text`, validation accepts
+  it, and both the JSON Schema and `schema.md`'s extract grammar document it.
+- **Faithful runtime accname (`text` pin) — pending.** The runtime still
+  approximates the accessible name (the AX tree's name offline, an `innerText`
+  fallback) rather than computing pseudo-inclusive accname over the DOM. This is
+  the deferrable half called out under [`text`](#text--the-pinned-accessible-name)
+  above: the *definition* is fixed here, an SDK MAY tighten toward it over time.
+- **Interactive-state attributes — pending.** `checked` / `selected` / `disabled`
+  / `expanded` are **not yet carried as `attr=`-readable state**. Capture surfaces
+  them as accessibility *properties*, but they are not exposed on the node's
+  observed attribute set, so `extract: attr=checked` cannot yet read a
+  native-property state. Until it lands, `schema.md` intentionally does **not**
+  require the state set — keeping the normative spec and the reference
+  implementation in agreement — and the MUST under *Conformance* above is the
+  accepted target, not yet a shipped guarantee.
+
+This section is removed once the interactive-state work lands and `schema.md`
+gains the state requirement.
 
 ## Open questions
 
