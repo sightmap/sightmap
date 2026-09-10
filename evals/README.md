@@ -1,9 +1,8 @@
-# Browser evaluation foundation
+# Browser observation measurements
 
-This draft provides **observation-capture smoke measurements**, not a four-way
-agent evaluation. The same predetermined DOM scripts run in both implemented
-modes; observations do not choose the actions. Passing proves the fixture and
-capture pipeline work, not that an agent could solve the task.
+These smoke tests measure browser observation capture while running predetermined
+DOM scripts. Passing verifies the fixture and capture pipeline. Observations do
+not choose actions, so the results do not measure agent task completion.
 
 ## Run
 
@@ -62,7 +61,7 @@ Sightkick and Stagehand-facade cells are explicitly unavailable: their adapters
 are not implemented here. No relative success, cost, speed or capability claim
 about those tools follows from this smoke run.
 
-## Extension protocol for actual model trials
+## Adding model trials
 
 Introduce a separate versioned result type with `execution_kind: model` rather
 than silently changing the meaning of these scripted metrics. Each adapter must:
@@ -85,6 +84,5 @@ than silently changing the meaning of these scripted metrics. Each adapter must:
    never treat an unavailable trial as a pass. Randomize/counterbalance order,
    use multiple independent trials, report sample counts and uncertainty.
 
-Future Sightkick adapters need pinned compiler/runtime and authored tool layers.
-Future Stagehand adapters need a pinned facade/runtime and provider configuration.
-Adding those adapters and actual model trials remains outstanding work.
+Sightkick adapters require pinned compiler/runtime versions and authored tool layers.
+Stagehand adapters require a pinned facade/runtime and provider configuration.
