@@ -1,0 +1,74 @@
+slug: webmcp-com
+name: WebMCP Directory
+url: https://webmcp.com/
+host: webmcp.com
+description: Explore websites and Shopify stores with WebMCP tools for AI agents.
+category: devtools
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-10
+updated: 2026-09-10
+scan: scans/webmcp-com/2026-09-10.json
+tools:
+  - name: about
+    kind: read
+    description: "Returns information about the WebMCP Directory: what it is, who built it, and where to
+      learn more about the Model Context Protocol."
+    page: /
+  - name: request_listing
+    kind: action
+    description: Submit a request to have a WebMCP-enabled site added to the WebMCP Directory at
+      webmcp.com. Provide the requester's email plus the URL of the site to be listed. A human
+      reviews each request before it appears.
+    page: /
+  - name: surprise_me
+    kind: action
+    description: Hatches a pixelated, exotic, not-real animal with dinosaur lineage. Each call returns a
+      brand-new species with a generated Latinate name, classification, geological period, and pixel
+      art (also returned as SVG in structuredContent for visual rendering).
+    page: /
+  - name: share_on_x
+    kind: action
+    description: Open X (Twitter) with a pre-filled tweet recommending the WebMCP Directory at
+      webmcp.com. Picks one of several hand-written messages at random unless `message` is provided.
+      Returns the share URL and the message that was used so an agent can confirm or repost it.
+    page: /
+  - name: share_on_linkedin
+    kind: action
+    description: Open the LinkedIn share composer for webmcp.com in a new tab. LinkedIn does not accept
+      pre-filled post text via URL, so the composer opens with the URL attached and an empty body —
+      the user writes their own post.
+    page: /
+  - name: record_unsupported_request
+    kind: action
+    description: "Last-resort fallback. Call this ONLY when the user wants to DO something on webmcp.com
+      that none of the other registered tools can accomplish. Do NOT call this if `about`,
+      `request_listing`, `surprise_me`, `share_on_x`, or `share_on_linkedin` already fits the
+      request — use the fitting tool instead. Examples that belong here: editing or removing an
+      existing directory entry, filtering the directory by something it does not expose, exporting
+      data, or any action this site has no tool for. Recording the request helps the maintainers
+      decide which tool to build next. After calling, tell the user their request was noted and that
+      no tool exists for it yet."
+    page: /
+  - name: suggest_resource
+    kind: action
+    description: Suggest a new WebMCP resource (article, doc, tool, talk, or community) to be considered
+      for the webmcp.com resources list. Provide the resource URL and a contact email; a human
+      reviews each suggestion. Returns confirmation, or an error if the URL/email is invalid.
+    page: /resources
+suggested_journeys:
+  - intent: Call about and read what it returns.
+    tools:
+      - about
+strengths:
+  - Every tool has a name (7/7).
+  - Every tool has a description (7/7).
+  - Every tool has an input schema (7/7).
+  - Tool names are snake_case (7/7).
+  - Tool names are unique (7 distinct).
+  - No suspicious wording in tool metadata (none flagged).
+  - Tool set changes with the page (3 distinct tool sets across 3 pages).
+improvements: []

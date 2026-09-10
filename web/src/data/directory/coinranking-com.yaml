@@ -1,0 +1,201 @@
+slug: coinranking-com
+name: Coinranking
+url: https://coinranking.com/
+host: coinranking.com
+description: Track live cryptocurrency prices and market data.
+category: data
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-10
+updated: 2026-09-10
+scan: scans/coinranking-com/2026-09-10.json
+tools:
+  - name: coinranking_prochart_list_slots
+    kind: read
+    description: "Read the whole page rather than one chart: how the charts are arranged, which of them
+      is active, whether asset and time sync are on, and for each chart its number, its subject, the
+      kind it plots and the options set on it. Every other tool acts on the active chart only, so
+      call this to find the chart you want and set_active_slot to move to it, then get_view for that
+      chart's full options and availability. A single-chart page reports one slot, which is the
+      normal case."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_set_active_slot
+    kind: action
+    description: "Point the interface — and every other tool here — at a different chart in the layout.
+      Only one chart is active at a time: get_view, configure, navigate, draw, set_viewport and the
+      rest all read and write whichever one this selects, so switching the active chart before
+      acting is how you reach the others. In a single-chart page there is only slot 0. This changes
+      nothing about the charts themselves."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_set_layout
+    kind: action
+    description: "Arrange the page as one chart, two side by side, two stacked, or a 2x2 grid. Growing
+      the layout fills the new slots with copies of the active chart, so the usual next step is
+      set_active_slot plus navigate to point each one somewhere else; shrinking drops the
+      highest-numbered charts. Not every arrangement is available to every viewer: one that isn't is
+      refused with the page left exactly as it was, so read the result rather than assuming it
+      applied. Call list_slots to see the arrangement you ended up with."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_set_sync
+    kind: action
+    description: Turn the layout's two sync toggles on or off. With asset sync on, every chart follows
+      the active chart's asset while keeping its own kind — BTC price next to BTC market cap. With
+      time sync on, they share the time period, interval and timezone, and pan and zoom together.
+      Turning either on immediately adopts the active chart's settings everywhere, so it is not a
+      no-op. The crosshair is mirrored across charts either way and is not a toggle. Pass one or
+      both; anything you leave out is untouched.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_get_view
+    kind: read
+    description: "Read what the *active* chart is currently showing: its kind and subject, the other
+      kinds this subject has with their labels (and the reason any of them can't be switched to),
+      every option's current value and default, which values can be selected right now (and why the
+      rest can't), the viewer's entitlements, the shareable URL, and whether the view is saved to
+      the account and has unsaved work. It also reports how the page is arranged: `layout.slotCount`
+      above 1 means there are other charts this call does not describe — list_slots surveys them and
+      set_active_slot moves to one. Call this first — it grounds every other tool. Availability is a
+      snapshot of the settings as they stand: an interval listed as unsupported may become usable in
+      the same breath as the time period that unblocks it, which configure accepts as one patch."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_get_stats
+    kind: read
+    description: 'Summary numbers for every series on the chart — high, low, average, first and last
+      value, with the timestamps of the high and low. Prefer this over reading the whole series for
+      questions like "what is this asset doing", and use it to anchor drawings: these coordinates
+      are exact, where a downsampled series is not.'
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_get_series
+    kind: read
+    description: The chart's plotted data points as { time, value } pairs in data space — the same
+      coordinates drawings use. Downsampled by default to protect your context; the response says
+      how many points exist and whether it reduced them, and always carries the true high and low so
+      anchoring stays exact. Widen the time period first if you need a range the chart isn't
+      currently showing.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_get_viewport
+    kind: read
+    description: "Read the time window currently on screen, the full range the loaded data covers, the
+      value-axis bounds, and whether anyone has panned or zoomed away from the natural range. Worth
+      calling before reading or drawing: the viewer may have zoomed, in which case get_series and
+      get_stats describe more than they are actually looking at."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_list_drawings
+    kind: read
+    description: The shapes currently drawn on the chart, with their points in data space ({ time, value
+      }) rather than pixels. Positions here are directly comparable with what get_series and
+      get_stats return. Each shape also carries `onScreen`, which distinguishes a drawing that is
+      missing from one that is merely outside the window the chart is zoomed to — use get_viewport
+      or set_viewport to bring it back into view.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_list_history
+    kind: read
+    description: The chart's undo/redo stack, newest first, with a human-readable label for each step.
+      `past` can be undone, `future` can be redone. The stack covers changes since the last
+      navigation, not the whole session.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_list_charts
+    kind: read
+    description: List the charts this viewer has saved, newest first, with each one's uuid, name, kind
+      and subject. No link is returned — pass the kind and subject to navigate to open one. Use it
+      before saving to avoid duplicating a name, or to find a chart the viewer refers to by name.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_resolve_subject
+    kind: sensitive
+    description: "Turn a name, ticker or category into the identifier the other tools take — pass a
+      match's `target` straight to coinranking_prochart_compare, or to
+      coinranking_prochart_navigate's `base`. Call this first whenever the viewer names something in
+      words: no other tool accepts a name, and a guessed identifier plots an unnamed line rather
+      than failing. Matches are ranked, best first, and are not filtered by what this chart can plot
+      — compare and navigate say why if a target doesn't apply here."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_configure
+    kind: sensitive
+    description: "Change one or more chart options — time period, interval, chart type, log scale,
+      indicators, currency, volume, high/low markers. The whole patch applies as a single undoable
+      step. Values that the viewer can't use are refused with a reason rather than partially
+      applied; call get_view to see what's selectable and why. Options that constrain each other are
+      judged as the combination you ask for, not one at a time: send timePeriod and interval
+      together and a pair like 7d + 1day is accepted, even though get_view lists 1day as unavailable
+      while the period is still 24h."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_navigate
+    kind: action
+    description: Switch to a different chart kind for the current asset, or point the chart at a
+      different asset, category or the global market. A kind switch happens immediately; a subject
+      change returns a URL to open, because it needs a fresh page load. Drawings are discarded on a
+      kind switch, so draw after navigating rather than before.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_set_viewport
+    kind: action
+    description: "Zoom or pan the chart to a time window, or reset it to fit all the loaded data. This
+      moves the view only: it is not stored in the URL, so it can't be shared or bookmarked, it does
+      not create an undo step, and the next configure or navigate call clears it — set the time
+      period and options first, then the window. It also cannot show data outside what timePeriod
+      loaded; widen that instead of zooming out past it."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_history
+    kind: action
+    description: Step backwards or forwards through the chart's change history, or jump straight to an
+      entry by index. This is the same stack the undo/redo buttons drive, and it covers changes
+      since the last navigation rather than the whole session. Call list_history for the entries,
+      their labels and their indices.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_compare
+    kind: read
+    description: "Add or remove an overlay plotted alongside this chart — another coin, the global
+      market, or a category. Takes an identifier, not a name: resolve_subject turns \"Ethereum\"
+      into one. One target per call, each its own undoable step. Targets that can't be plotted here
+      are refused with the reason: the wrong chart kind for that overlay, the chart itself, a
+      duplicate, or the account's overlay limit."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_draw
+    kind: action
+    description: "Draw a line, rectangle, circle, text label or pin on the chart, remove, duplicate or
+      restack existing ones, or clear them all. A pin is a labelled guide line spanning the chart:
+      `time-pin` marks a moment (\"halving\", \"listed here\"), `value-pin` marks a level
+      (\"entry\", \"all-time high\"). Anchors are data coordinates (a timestamp and a value), not
+      screen pixels — call get_stats for exact highs and lows to anchor against. Set the chart's
+      kind and time range BEFORE drawing: switching kind discards most annotations, because a shape
+      anchored to price data is meaningless on another scale. A time-pin is the exception and
+      survives, since a date means the same thing on every kind."
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_export
+    kind: action
+    description: Export the chart's data as CSV or the chart itself as a PNG image. CSV can be returned
+      directly in the result; saving a file or copying to the clipboard asks the user first, since
+      browsers only allow those during a user gesture.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_share_link
+    kind: action
+    description: Get a link that reproduces the chart exactly as it looks now — kind, asset, time range,
+      styling and drawings all travel in the URL. Returns the link by default; set `share` to open
+      the device's share sheet instead, which asks the user first.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+  - name: coinranking_prochart_save
+    kind: action
+    description: Save the chart to the viewer's account, save a copy under a new name, rename it, delete
+      it, or discard unsaved edits. Saving needs a name the first time. Deleting asks the viewer to
+      confirm. Call get_view first if you need to know whether the chart is already saved.
+    page: /chart/coin/Qwsogvtv82FCd+bitcoin-btc/price
+suggested_journeys:
+  - intent: Call coinranking_prochart_list_slots and read what it returns.
+    tools:
+      - coinranking_prochart_list_slots
+  - intent: Call coinranking_prochart_get_view and read what it returns.
+    tools:
+      - coinranking_prochart_get_view
+  - intent: Call coinranking_prochart_get_stats and read what it returns.
+    tools:
+      - coinranking_prochart_get_stats
+strengths:
+  - Every tool has a name (21/21).
+  - Every tool has a description (21/21).
+  - Every tool has an input schema (21/21).
+  - Tool names are snake_case (21/21).
+  - Tool names are unique (21 distinct).
+  - No suspicious wording in tool metadata (none flagged).
+  - Tool set changes with the page (2 distinct tool sets across 3 pages).
+improvements: []

@@ -1,0 +1,212 @@
+{
+  "version": 1,
+  "url": "https://attio.com/",
+  "finalUrl": "https://attio.com/",
+  "host": "attio.com",
+  "scannedAt": "2026-09-10T00:49:07.228Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "sightmap dev"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://attio.com/",
+      "path": "/",
+      "title": "Attio: The CRM for agentic revenue",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "view_pricing",
+        "subscribe_newsletter"
+      ]
+    },
+    {
+      "url": "https://attio.com/platform/workflows",
+      "path": "/platform/workflows",
+      "title": "Agents and automations | Attio",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "view_pricing",
+        "subscribe_newsletter"
+      ]
+    },
+    {
+      "url": "https://attio.com/customers",
+      "path": "/customers",
+      "title": "Customers | Attio",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "view_pricing",
+        "subscribe_newsletter"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "view_pricing",
+      "description": "View Attio's pricing plans and compare features across tiers including Free, Plus, Pro, and Enterprise.",
+      "page": "/",
+      "pages": [
+        "/",
+        "/platform/workflows",
+        "/customers"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "name starts with \"view\"",
+      "warnings": [
+        "no input schema"
+      ]
+    },
+    {
+      "name": "subscribe_newsletter",
+      "description": "Subscribe to Attio product updates and newsletters with a work email address",
+      "inputSchema": {
+        "properties": {
+          "email": {
+            "description": "Your email address",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/platform/workflows",
+        "/customers"
+      ],
+      "impl": "declarative",
+      "api": "dom",
+      "risk": "sensitive",
+      "riskReason": "name contains \"subscribe\"",
+      "warnings": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "2/2"
+    },
+    {
+      "id": "described",
+      "label": "Every tool has a description",
+      "ok": true,
+      "detail": "2/2"
+    },
+    {
+      "id": "input-schema",
+      "label": "Every tool has an input schema",
+      "ok": false,
+      "detail": "1/2"
+    },
+    {
+      "id": "snake-case",
+      "label": "Tool names are snake_case",
+      "ok": true,
+      "detail": "2/2"
+    },
+    {
+      "id": "unique",
+      "label": "Tool names are unique",
+      "ok": true,
+      "detail": "2 distinct"
+    },
+    {
+      "id": "no-suspicious",
+      "label": "No suspicious wording in tool metadata",
+      "ok": true,
+      "detail": "none flagged"
+    },
+    {
+      "id": "route-scoped",
+      "label": "Tool set changes with the page",
+      "ok": false,
+      "detail": "same tools on all 3 pages"
+    }
+  ],
+  "counts": {
+    "tools": 2,
+    "pages": 3,
+    "read": 1,
+    "action": 0,
+    "sensitive": 1,
+    "described": 2,
+    "withInputSchema": 1,
+    "declarative": 1
+  },
+  "hints": {
+    "forms": [],
+    "links": [
+      "/platform/workflows",
+      "/",
+      "/customers",
+      "/pricing",
+      "/platform/ask",
+      "/platform/ai",
+      "/platform/data",
+      "/engineering/blog/introducing-universal-context",
+      "/platform/automations",
+      "/platform/sequences",
+      "/platform/call-intelligence",
+      "/platform/reporting",
+      "/platform/developers",
+      "/apps",
+      "/help/reference/attio-101",
+      "https://attio.com/experts",
+      "/startups",
+      "/contact/sales",
+      "/help",
+      "/help/academy",
+      "https://docs.attio.com",
+      "/partners",
+      "/changelog",
+      "/blog",
+      "/engineering/blog",
+      "/careers",
+      "https://app.attio.com/",
+      "https://app.attio.com/welcome/sign-in",
+      "https://atlas.attio.com",
+      "https://app.attio.com/welcome/sign-in",
+      "https://atlas.attio.com",
+      "https://app.attio.com/welcome/sign-in",
+      "/customers/granola",
+      "/customers/modal",
+      "/customers/railway",
+      "/customers/taskrabbit",
+      "#home-2026-generate-pipeline",
+      "#home-2026-convert-leads",
+      "#home-2026-run-sales-motions",
+      "#home-2026-forecast-revenue"
+    ],
+    "title": "Attio: The CRM for agentic revenue",
+    "description": "The system for revenue teams to build pipeline, accelerate deals, and grow accounts around the clock.\t"
+  },
+  "notes": [
+    "operator Chrome flags: --ssl-version-max=tls1.2",
+    "sightmap browser mcp list saw 0 tool(s) on /",
+    "$ sightmap version",
+    "$ sightmap browser start --detach --headless --port 35993 --cdp-port 46123 --profile /tmp/atlas-scan-XYKof9/profile --url about:blank --log-file /tmp/atlas-scan-XYKof9/daemon.log --chrome-flag=--enable-blink-features=ModelContext,ModelC… --chrome-flag=--enable-features=DevToolsWebMCPSupport --chrome-flag=--proxy-server=http://127.0.0.1:41767 --chrome-flag=--proxy-bypass-list=localhost;127.0.0.1;[::1] --chrome-flag=--deny-permission-prompts --chrome-flag=--ssl-version-max=tls1.2 --chrome-binary /opt/pw-browsers/chromium --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap",
+    "$ sightmap browser tabs list --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap ×2",
+    "$ sightmap browser inject --persist --file /tmp/atlas-scan-XYKof9/recorder.js --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap",
+    "$ sightmap browser inject --list --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap ×9",
+    "$ sightmap browser navigate https://attio.com/ --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap ×4",
+    "$ sightmap browser mcp list --json --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap",
+    "$ sightmap browser navigate https://attio.com/platform/workflows --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap ×4",
+    "$ sightmap browser navigate https://attio.com/customers --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab B30754A92914E1A717380A86273958FF --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap ×4",
+    "$ sightmap browser stop --sightmap-dir /tmp/atlas-scan-XYKof9/.sightmap"
+  ]
+}
