@@ -39,15 +39,12 @@ export interface TryRecord {
   scan?: TryScan
 }
 
-export interface QuarantineRecord {
-  at: string
-  reason?: string
-}
-
 export function expiresAfter(fromIso: string, ttlMs = TRY_TTL_MS): string {
   return new Date(new Date(fromIso).getTime() + ttlMs).toISOString()
 }
 
+/** A record whose expiry cannot be read is expired: the card must not outlive a bad write. */
 export function isExpired(record: TryRecord, now = Date.now()): boolean {
-  return new Date(record.expiresAt).getTime() <= now
+  const at = new Date(record.expiresAt).getTime()
+  return !Number.isFinite(at) || at <= now
 }

@@ -115,7 +115,7 @@ jobs:
       # The intake's own stdout. The launch-card step reads the scan report
       # path out of it, because only the intake knows which dated file it
       # wrote. Also in RUNNER_TEMP, for the same reason.
-      ATLAS_INTAKE_LOG: ${{ runner.temp }}/atlas-intake.log
+      ATLAS_SCAN_PATH: ${{ runner.temp }}/atlas-scan-path.txt
 
     steps:
       - uses: actions/checkout@v4
@@ -197,12 +197,11 @@ jobs:
           # test would abort the step.
           args=(--url "$ATLAS_URL" --submission-id "$ATLAS_SUBMISSION_ID"
                 --type "$ATLAS_TYPE" --submitted-by "$ATLAS_SUBMITTED_BY"
-                --max-pages "$ATLAS_MAX_PAGES" --summary "$ATLAS_SUMMARY")
+                --max-pages "$ATLAS_MAX_PAGES" --summary "$ATLAS_SUMMARY"
+                --scan-path-out "$ATLAS_SCAN_PATH")
           if [ -n "${ATLAS_INTENT:-}" ]; then args+=(--intent "$ATLAS_INTENT"); fi
           if [ "$ATLAS_SIGHTKICK" = "true" ]; then args+=(--sightkick); fi
-          # tee, not >: the log is read by the next step and the output still
-          # belongs in this step's own log. `pipefail` keeps intake's exit code.
-          pnpm atlas:intake "${args[@]}" | tee "$ATLAS_INTAKE_LOG"
+          pnpm atlas:intake "${args[@]}"
 
       # Adds what the scan saw to the submitter's unlisted card at /try/<host>.
       # Only a submission whose domain claim verified has a card, so this does
@@ -219,10 +218,10 @@ jobs:
           HOST: ${{ steps.target.outputs.host }}
         run: |
           set -euo pipefail
-          # `atlas:intake` prints `wrote <abs path>` for the report it filed.
-          # A scan that was blocked or found no tools writes none, and there is
-          # then nothing to add to a card.
-          scan=$(grep -oE '[^[:space:]]*/src/data/directory/scans/[^[:space:]]+\.json' "$ATLAS_INTAKE_LOG" | tail -n 1 || true)
+          # `atlas:intake` writes the path of the report it filed to this file,
+          # and an empty file when the scan was blocked or found no tools; the
+          # log is not parsed, because it also carries text the site wrote.
+          scan=$(head -n 1 "$ATLAS_SCAN_PATH" 2>/dev/null || true)
           if [ -z "$scan" ]; then
             echo "no scan report in the intake output; nothing to add to a card"
             exit 0
