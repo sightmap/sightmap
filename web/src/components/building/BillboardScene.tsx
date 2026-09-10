@@ -5,29 +5,17 @@
 // the frame loop while it is off-screen.
 import { Canvas, useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
-import { CHAPTERS, smoothstep } from './chapters'
 import { SharedStateContext, useShared, type SharedState } from './state'
 import { CANVAS_PROPS, Ready, Rig, SceneContent } from './Scene'
-
-const CYCLE = 44 // seconds per day
+import { advanceBillboardTime, billboardStep } from './billboard'
 
 function Driver({ onNight }: { onNight: (night: boolean) => void }) {
   const s = useShared()
   const wasNight = useRef(false)
-  useFrame(({ clock }) => {
-    const t = s.reduced ? 0 : clock.getElapsedTime()
-    const c = s.cur
-    Object.assign(c, CHAPTERS[4].scene) // "The people": built, populated
-    // Floor directory labels collide with the enter chip on this tight crop.
-    c.labels = 0
-    c.agents = 1
-    c.az = 42 + Math.sin(t * 0.085) * 9
-    c.el = 25 + Math.sin(t * 0.05) * 1.5
-    c.zoom = 1
-    c.lookY = 5.4
-    const phase = (Math.sin((t * 2 * Math.PI) / CYCLE - Math.PI / 2) + 1) / 2
-    c.night = smoothstep((phase - 0.4) / 0.25)
-    const night = c.night > 0.5
+  const tRef = useRef(0)
+  useFrame((_, dt) => {
+    tRef.current = advanceBillboardTime(tRef.current, dt, s.reduced)
+    const night = billboardStep(tRef.current, s.cur)
     if (night !== wasNight.current) {
       wasNight.current = night
       onNight(night)
