@@ -169,15 +169,16 @@ WebMCP is an early W3C proposal from Google and Microsoft for how a page hands
 the agent in the same browser tab a list of callable actions. The tools live in
 the site's own pages, so there is no marketplace to apply to: any agent that
 opens the site can use them. Sightkick compiles that surface from the outside,
-for apps that do not declare one. The Atlas at ${SITE_URL}/atlas lists sites
-with WebMCP tools alongside community-mapped sites.
+for apps that do not declare one. The output is a runtime script and a tool
+file you deploy with the app; agents can use the site as soon as they are live.
 
-## Get listed
+## One prompt
 
-One prompt to a coding agent (on the page) runs the whole loop: map the app,
-compile and check the tools, ship the runtime and a \`webmcp.txt\`, and submit
-the deployed URL to \`POST ${SITE_URL}/api/atlas/submit\`. A maintainer reviews
-every listing before it appears.
+The prompt on the page runs the whole loop in a coding agent: map the app,
+compile and check the tools, ship the runtime and a \`webmcp.txt\`. Listing the
+site in the Atlas at ${SITE_URL}/atlas is an optional last step for owners who
+want to show their work (\`POST ${SITE_URL}/api/atlas/submit\`, reviewed by a
+maintainer). Nothing about the tools depends on it.
 
 ## How the two fit together
 

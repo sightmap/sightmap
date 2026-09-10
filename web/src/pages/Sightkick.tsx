@@ -10,9 +10,10 @@ const INSTALL = 'npm install -g @sightmap/sightkick'
 // The one-click prompt. Written to be pasted whole into a coding agent, so it
 // carries the install, the skills, and the shape of the job — not a summary of
 // this page. It ends where the story on this page ends: tools shipped on the
-// site, a webmcp.txt to link to, and a submission to the Atlas. Kept as one
-// string so the copy button and the rendered block can never drift.
-const AGENT_PROMPT = `Make this app usable by agents with sightmap + sightkick, then get it listed in the Sightmap Atlas.
+// site and a webmcp.txt to link to. The Atlas listing is an optional last
+// step, not part of the setup. Kept as one string so the copy button and the
+// rendered block can never drift.
+const AGENT_PROMPT = `Make this app usable by agents with sightmap + sightkick.
 
 1. npm install -g @sightmap/sightmap @sightmap/sightkick
 2. sightmap skills install
@@ -37,14 +38,16 @@ const AGENT_PROMPT = `Make this app usable by agents with sightmap + sightkick, 
 9. Write <public dir>/webmcp.txt: the app URL on the first line, then one line per
    tool, "name — description". Deploy, then confirm on the deployed URL:
    sightmap browser start --url <DEPLOYED_URL> && sightmap browser mcp list
-10. Get listed. POST https://sightmap.org/api/atlas/submit with
+   The app is now usable by any agent that opens it. Nothing else is required.
+10. Report: the tools you built and the JSON each returned, the webmcp.txt URL,
+   and anything that failed with its actual error text.
+11. Optional, only if the owner wants the site shown in the Sightmap Atlas:
+   POST https://sightmap.org/api/atlas/submit with
    {"url": "<DEPLOYED_URL>", "email": "<OWNER_EMAIL>", "owner": true, "sightkick": true}
    or open https://sightmap.org/atlas in a WebMCP-capable session and call its
-   submit_site tool. A maintainer reviews every listing before it appears.
-11. Report: the tools you built and the JSON each returned, the webmcp.txt URL,
-   the submission id, and that the Atlas page will be at
-   https://sightmap.org/atlas/<host with dots as dashes> once reviewed. Include
-   anything that failed with its actual error text.`
+   submit_site tool. A maintainer reviews every listing; the page lands at
+   https://sightmap.org/atlas/<host with dots as dashes>. Add the submission id
+   to the report.`
 
 // Agent browsers and assistants that read WebMCP tools off a page. Names, not
 // logos: a logo row needs each owner's asset and permission, and this list
@@ -92,8 +95,8 @@ const USE_CASES: { tag: string; title: string; body: React.ReactNode }[] = [
       <>
         WebMCP is how a page hands the agent in the same tab a list of callable actions. Almost
         no production app declares any yet. Sightkick compiles them from the outside, so you can
-        offer that surface without waiting for a rewrite, and the Atlas is where agents and
-        people go to find the apps that did.
+        offer that surface without waiting for a rewrite. The Atlas is where apps that did can
+        show their work.
       </>
     ),
   },
@@ -178,9 +181,9 @@ export default function Sightkick() {
             <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noreferrer">
               WebMCP
             </a>{' '}
-            tool layer with Sightkick, checks the tools on the deployed page, and lists your site
-            in the <a href="/atlas">Atlas</a>. No marketplace to apply to: the tools ship with
-            your pages, and every agent that opens your site can call{' '}
+            tool layer with Sightkick, and checks the tools on the deployed page. No marketplace
+            to apply to and no directory to wait on: the tools are a script you deploy with your
+            pages, and from that moment every agent that opens your site can call{' '}
             <code>search_flights(origin, destination, date)</code> instead of hunting for the
             search box.
           </p>
@@ -210,8 +213,8 @@ export default function Sightkick() {
           </div>
           <p className="sk-hero__note">
             Works with Claude Code, Cursor, Codex, or any agent that can run a shell. A small app
-            is a few tools over two mapped pages. You end with a <code>webmcp.txt</code> on your
-            own domain and, once a maintainer has reviewed it, a page in the Atlas.
+            is a few tools over two mapped pages. You end with a runtime and a tool file you
+            serve yourself, plus a <code>webmcp.txt</code> on your own domain.
           </p>
           <div className="sk-hero__clients" data-component="SightkickClients">
             <span className="sk-hero__clients-label">Read by the agents in</span>
@@ -288,8 +291,9 @@ export default function Sightkick() {
               description, readable without a browser session.
             </li>
             <li>
-              <strong>An Atlas page.</strong> Your entry in the directory agents and people read,
-              once a maintainer has reviewed it. <a href="/atlas">See the directory</a>.
+              <strong>Optionally, an Atlas page.</strong> Agents can use the site without it. If
+              you want to show your work, submit the URL and get a page in the directory plus a
+              badge for your README. <a href="/atlas">See the directory</a>.
             </li>
           </ul>
         </div>
@@ -380,7 +384,7 @@ export default function Sightkick() {
       <section id="start" className="sk-start" data-component="SightkickStart">
         <div className="container container--wide">
           <div className="section-label">Get started</div>
-          <h2>From an unmapped app to a listed one.</h2>
+          <h2>From an unmapped app to one agents can use.</h2>
           <p className="section-desc">
             Sightkick needs a corpus to compile against. If the app has no <code>.sightmap/</code>{' '}
             yet, step 01 builds one; if it does, start at step 02.
@@ -508,12 +512,12 @@ WebMCP (native) — 2 tool(s){'\n'}
             <div className="gs-step">
               <span className="gs-step-num">05</span>
               <div className="gs-step-body">
-                <h3>Ship it, then get listed</h3>
+                <h3>Ship it</h3>
                 <p className="gs-step-intro">
-                  The runtime and the IR are two static files. Serve them with the app and load
-                  them on the mapped pages, write the tool list to <code>webmcp.txt</code> so a
-                  person can read the surface without a browser session, and submit the deployed
-                  URL to the Atlas.
+                  The runtime and the IR are two static files. Serve them with the app, load them
+                  on the mapped pages, and write the tool list to <code>webmcp.txt</code> so a
+                  person can read the surface without a browser session. That is the whole
+                  deploy: agents can use the site as soon as it is live.
                 </p>
                 <div className="code-block">
                   <div className="code-header">
@@ -526,18 +530,20 @@ WebMCP (native) — 2 tool(s){'\n'}
 <span className="c-com"># public/webmcp.txt: the app URL, then one line per tool — name and description</span>{'\n'}
 <span className="c-com">$</span> sightmap browser start --url https://yourdomain.com{'\n'}
 <span className="c-com">$</span> sightmap browser mcp list{'\n'}
-WebMCP (polyfilled) — 2 tool(s){'\n'}
-<span className="c-com">$</span> curl -X POST https://sightmap.org/api/atlas/submit \{'\n'}
-{'    '}-d <span className="c-str">&apos;{'{'}&quot;url&quot;: &quot;https://yourdomain.com&quot;, &quot;email&quot;: &quot;you@yourdomain.com&quot;, &quot;owner&quot;: true, &quot;sightkick&quot;: true{'}'}&apos;</span>{'\n'}
-{'{'} <span className="c-key">&quot;ok&quot;</span>: <span className="c-val">true</span>, <span className="c-key">&quot;state&quot;</span>: <span className="c-str">&quot;received&quot;</span> {'}'}</code></pre>
+WebMCP (polyfilled) — 2 tool(s)</code></pre>
                 </div>
                 <p className="gs-followup">
                   On a normal browser the runtime polyfills <code>document.modelContext</code>; on
-                  Chrome for Testing the tools land on the native surface. Once a maintainer has
-                  reviewed the submission, the entry gets a page under{' '}
-                  <code>sightmap.org/atlas/</code> with a badge for your README. An agent in a
-                  WebMCP session can call the Atlas&rsquo;s own <code>submit_site</code> tool
-                  instead of the curl.
+                  Chrome for Testing the tools land on the native surface.
+                </p>
+                <p className="gs-followup">
+                  <strong>Want to show your work?</strong> Submit the deployed URL to the{' '}
+                  <a href="/atlas">Atlas</a> with{' '}
+                  <code>curl -X POST https://sightmap.org/api/atlas/submit -d &apos;{'{'}&quot;url&quot;: &quot;https://yourdomain.com&quot;, &quot;email&quot;: &quot;you@yourdomain.com&quot;, &quot;owner&quot;: true, &quot;sightkick&quot;: true{'}'}&apos;</code>{' '}
+                  or, from a WebMCP session on the Atlas, its <code>submit_site</code> tool. After
+                  review the entry gets a page under <code>sightmap.org/atlas/</code> and a badge
+                  for your README. It is optional: nothing about the tools on your site depends
+                  on it.
                 </p>
               </div>
             </div>
@@ -548,7 +554,7 @@ WebMCP (polyfilled) — 2 tool(s){'\n'}
             <div className="sk-promptcard__head">
               <div>
                 <div className="section-label">Or hand it to an agent</div>
-                <h3>One prompt, from an unmapped app to a listed one.</h3>
+                <h3>One prompt, from an unmapped app to one agents can use.</h3>
               </div>
               <CopyButton
                 className="btn-primary sk-promptbtn"
