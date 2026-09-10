@@ -14,6 +14,7 @@
     "atlas:review": "tsx scripts/atlas-review.ts",
     "atlas:listing": "tsx scripts/atlas-listing.ts",
     "atlas:intake": "tsx scripts/atlas-intake.ts",
+    "atlas:card": "tsx scripts/atlas-card.ts",
     "sourcemaps:upload": "tsx scripts/upload-sourcemaps.ts",
     "preview": "vite preview",
     "test": "vitest run",

@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MAX_INTENT_LENGTH } from '../../src/lib/submit-types.ts'
 import {
+  acceptedBody,
   buildRecord,
+  buildTryRecord,
+  cardUrl,
+  claimRejectedError,
   fieldsFromForm,
   hashEmail,
   hashIp,
@@ -12,6 +16,7 @@ import {
   parseBody,
   parseRateState,
   publicStatus,
+  quarantinedError,
   rateDecision,
   rateLimitedError,
   readFields,
@@ -34,6 +39,7 @@ function fields(overrides: Partial<SubmissionFields> = {}): SubmissionFields {
     intent: '',
     nominate: false,
     rescan: false,
+    claim: '',
     website: '',
     ...overrides,
   }
@@ -350,5 +356,123 @@ describe('hashing', () => {
     // retires every hash already on file.
     expect(await hashEmail(EMAIL, 'atlas')).not.toBe(await hashEmail(EMAIL, 'other-deploy'))
     expect(await hmacSha256Hex('atlas', EMAIL)).toBe(await hashEmail(EMAIL, 'atlas'))
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+const TOKEN = '0123456789abcdef0123456789abcdef'
+
+describe('claim', () => {
+  it('reads the token from either encoding, lowercased', () => {
+    expect(readFields({ claim: TOKEN.toUpperCase() }).claim).toBe(TOKEN)
+    expect(fieldsFromForm(`url=https%3A%2F%2Fa.example&claim=${TOKEN}`).claim).toBe(TOKEN)
+    expect(readFields({}).claim).toBe('')
+  })
+
+  it('accepts a well-formed token and carries it no further than the request', async () => {
+    const result = await validate({ claim: TOKEN })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.claim).toBe(TOKEN)
+
+    // The record keeps the date, never the token.
+    const record = buildRecord(result.value, {
+      id: 'abc',
+      receivedAt: '2026-09-10T00:00:00.000Z',
+      emailHash: 'hash',
+      ipHash: 'ip',
+      userAgent: '',
+      runner: { kind: 'queue' },
+      claim: { verifiedAt: '2026-09-10T00:00:00.000Z' },
+    })
+    expect(record.claim).toEqual({ verifiedAt: '2026-09-10T00:00:00.000Z' })
+    expect(JSON.stringify(record)).not.toContain(TOKEN)
+  })
+
+  it('rejects anything that is not 32 lowercase hex characters', async () => {
+    for (const claim of ['not-a-token', TOKEN.slice(1), `${TOKEN}0`, 'zzzz']) {
+      const result = await validate({ claim })
+      expect(result.ok).toBe(false)
+      if (result.ok) return
+      expect(result.error.error).toMatchObject({ code: 'claim-invalid', status: 400 })
+    }
+  })
+
+  it('leaves a submission without a claim exactly as it was', async () => {
+    const result = await validate()
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.value.claim).toBe('')
+    expect(buildRecord(result.value, {
+      id: 'abc',
+      receivedAt: '2026-09-10T00:00:00.000Z',
+      emailHash: 'hash',
+      ipHash: 'ip',
+      userAgent: '',
+      runner: { kind: 'queue' },
+    })).not.toHaveProperty('claim')
+    expect(acceptedBody('abc')).not.toHaveProperty('card')
+  })
+})
+
+describe('buildTryRecord', () => {
+  const value: ValidSubmission = {
+    url: 'https://www.example.org/pricing',
+    host: 'www.example.org',
+    email: EMAIL,
+    emailNormalized: EMAIL,
+    owner: true,
+    sightkick: false,
+    intent: '',
+    nominate: false,
+    rescan: false,
+    claim: TOKEN,
+  }
+
+  it('keys the card on the canonical host and starts a 30-day life', () => {
+    const record = buildTryRecord(value, { id: 'abc', claimedAt: '2026-09-10T00:00:00.000Z' })
+    expect(record).toEqual({
+      v: 1,
+      // The same string /atlas/hosts/<host>.json is keyed by, so the card can
+      // tell "listed" from "unlisted" with one lookup.
+      host: 'example.org',
+      url: 'https://www.example.org/pricing',
+      submissionId: 'abc',
+      claimedAt: '2026-09-10T00:00:00.000Z',
+      expiresAt: '2026-10-10T00:00:00.000Z',
+    })
+  })
+
+  it('carries nothing about the submitter', () => {
+    const record = buildTryRecord(value, { id: 'abc', claimedAt: '2026-09-10T00:00:00.000Z' })
+    const serialised = JSON.stringify(record)
+    expect(serialised).not.toContain(EMAIL)
+    expect(serialised).not.toContain(TOKEN)
+  })
+
+  it('points the card at the same host', () => {
+    expect(cardUrl('www.example.org')).toBe('https://sightmap.org/try/example.org')
+    expect(acceptedBody('abc', cardUrl('example.org')).card).toBe('https://sightmap.org/try/example.org')
+  })
+})
+
+describe('claim and quarantine errors', () => {
+  it('answers a failed claim 422, in the shared error shape', () => {
+    const body = claimRejectedError('claim-mismatch', 'no matching claim line in /webmcp.txt')
+    expect(body.ok).toBe(false)
+    expect(body.error).toMatchObject({ code: 'claim-mismatch', status: 422 })
+    expect(body.error.hint).toContain('sightmap-claim')
+
+    expect(claimRejectedError('claim-unreachable', 'HTTP 404').error).toMatchObject({
+      code: 'claim-unreachable',
+      status: 422,
+    })
+  })
+
+  it('answers a quarantined host 403 without saying why', () => {
+    const body = quarantinedError('example.org')
+    expect(body.error).toMatchObject({ code: 'quarantined', status: 403 })
+    expect(body.error.message).toContain('example.org')
   })
 })
