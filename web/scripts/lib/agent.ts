@@ -24,6 +24,8 @@ import {
   scanReportSummarySchema,
   statsSchema,
   submitAcceptedSchema,
+  submitClaimFailedDescription,
+  submitQuarantinedDescription,
   submitRequestSchema,
 } from './openapi-schemas'
 import type { FeedAtlasEntry, FeedDirectoryListing, FeedPost } from '../generate-feeds'
@@ -270,7 +272,8 @@ ${SITE_NAME} is an open specification and CLI. The public HTTP API on this site 
 - [Atlas catalog](${SITE_URL}/api/atlas) — \`GET /api/atlas\`
 - [One Atlas entry](${SITE_URL}/api/atlas/{slug}) — \`GET /api/atlas/{slug}\`
 - Host lookup — \`GET /api/atlas/lookup/{host}\`. Reads the stored index; it never fetches the host, so it reports what the last scan found, not what the site does now.
-- Submit a site — \`POST /api/atlas/submit\` with \`{ "url": "…", "email": "…" }\` (optional: \`owner\`, \`sightkick\`, \`intent\`, \`nominate\`, \`rescan\`). Returns \`202\` with a submission id. A scan is queued, not a listing published — a human reviews it first.
+- Submit a site — \`POST /api/atlas/submit\` with \`{ "url": "…", "email": "…" }\` (optional: \`owner\`, \`sightkick\`, \`intent\`, \`nominate\`, \`rescan\`, \`claim\`). Returns \`202\` with a submission id. A scan is queued, not a listing published — a human reviews it first.
+- \`claim\` is the 32 hex characters published as \`# sightmap-claim: <token>\` in \`https://<host>/webmcp.txt\`. With one, the response also carries \`card\`: an unlisted page at \`/try/<host>\` showing what the scan found. Without one, nothing changes.
 
 Errors are JSON objects with \`error.code\`, \`error.message\`, and \`error.hint\`.
 
@@ -682,6 +685,8 @@ export function buildOpenApiSpec(): Record<string, unknown> {
               },
             },
             '400': { $ref: '#/components/responses/BadRequest' },
+            '403': { $ref: '#/components/responses/Quarantined' },
+            '422': { $ref: '#/components/responses/ClaimFailed' },
             '429': { $ref: '#/components/responses/TooManyRequests' },
           },
         },
@@ -713,6 +718,8 @@ export function buildOpenApiSpec(): Record<string, unknown> {
       responses: {
         NotFound: errorResponse('Structured JSON error'),
         BadRequest: errorResponse('The request body is missing or malformed'),
+        Quarantined: errorResponse(submitQuarantinedDescription),
+        ClaimFailed: errorResponse(submitClaimFailedDescription),
         TooManyRequests: errorResponse('Rate limited — retry later'),
       },
     },

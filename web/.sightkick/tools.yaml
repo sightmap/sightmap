@@ -91,8 +91,8 @@ tools:
   - name: submit_site
     description: >-
       Submit a site to the Atlas for a free WebMCP scan, using the same visible
-      form a person uses. Fills the URL, the email the report goes to, and the
-      optional intent, then presses "Scan my site".
+      form a person uses. Fills the URL, the email the report goes to, the
+      optional intent and the optional claim token, then presses "Scan my site".
     mode: live
     ensure_view: AtlasIndex
     params:
@@ -114,6 +114,14 @@ tools:
         description: >-
           Pass true to tick "I own or maintain this site". Omit it otherwise;
           the box starts unticked, so there is nothing to untick.
+      - name: claim
+        type: string
+        required: false
+        description: >-
+          Optional — the 32 hex characters published as "# sightmap-claim:
+          <token>" in https://<host>/webmcp.txt. Sending one that the host
+          carries returns a shareable card at /try/<host> straight away; a
+          token the host does not carry is refused and stores nothing.
     # Re-running with the same input must not post twice: if the confirmation is
     # already on screen, return it instead of filling a form that is not there.
     guard:
@@ -129,6 +137,9 @@ tools:
       - fill:
           query: 'AtlasSubmitForm SubmitIntent'
           value: "{{intent}}"
+      - fill:
+          query: 'AtlasSubmitForm SubmitClaim'
+          value: "{{claim}}"
       - click:
           query: 'AtlasSubmitForm SubmitOwner'
           when: "{{owner}}"
@@ -140,7 +151,9 @@ tools:
           query: 'AtlasSubmitForm AtlasSubmitReceived'
           timeout_ms: 15000
     returns:
-      description: The confirmation text, including the reference id.
+      description: >-
+        The confirmation text: the reference id, and the card URL when a claim
+        was sent and the host carried it.
       value:
         query: 'AtlasSubmitForm AtlasSubmitReceived'
         property: text
