@@ -34,12 +34,21 @@ export function sightkickAgentPrompt(appUrl = '<APP_URL>', pagesHint = ''): stri
    sightkick call . <tool> --param k=v --via webmcp
 8. Report what you built, the JSON each tool returned, and anything that failed
    with its actual error text.
-9. Get listed. Once sightmap browser mcp list confirms the tools on the
-   deployed URL, submit the site to the Sightmap Atlas:
+9. Before the first deploy, generate a claim token: openssl rand -hex 16.
+   Write <public dir>/webmcp.txt: the app URL on the first line, then one line
+   per tool, "name — description", then one comment line:
+   # sightmap-claim: <TOKEN>
+   Lines starting with # are comments and readers ignore them. Deploy with that
+   file in place and report the token; a submission uses it to show the domain
+   is the owner's.
+10. Optional, only if the owner wants the site shown in the Sightmap Atlas.
+   Once sightmap browser mcp list confirms the tools on the deployed URL:
    POST https://sightmap.org/api/atlas/submit
-   {"url": "<DEPLOYED_URL>", "email": "<OWNER_EMAIL>", "owner": true, "sightkick": true}
+   {"url": "<DEPLOYED_URL>", "email": "<OWNER_EMAIL>", "owner": true, "sightkick": true, "claim": "<TOKEN>"}
    Or open https://sightmap.org/atlas in a WebMCP-capable session and call its
-   submit_site tool. A maintainer reviews every listing before it appears.`
+   submit_site tool. A submission that carries the claim comes back with a card
+   URL, https://sightmap.org/try/<host>, which the owner can share immediately.
+   The Atlas listing itself appears only after a maintainer reviews it.`
 }
 
 export const AGENT_PROMPT = sightkickAgentPrompt()

@@ -168,6 +168,17 @@ describe('sightkickStarter', () => {
     expect(s.prompt).toContain('Start with: /, /docs')
   })
 
+  it('carries the claim token through webmcp.txt and into the optional submit', () => {
+    const { listings } = loadDirectory(FIXTURES)
+    const s = sightkickStarter(listings[0].report)
+    expect(s.prompt).toContain('openssl rand -hex 16')
+    expect(s.prompt).toContain('# sightmap-claim: <TOKEN>')
+    expect(s.prompt).toContain('"claim": "<TOKEN>"')
+    expect(s.prompt).toContain('https://sightmap.org/try/<host>')
+    // The token is a placeholder a reader replaces, never data from the scan.
+    expect(s.prompt).toContain('Optional, only if the owner wants the site shown')
+  })
+
   it('leaves a tool whose name is not snake_case out of the copyable transcript', () => {
     const { listings } = loadDirectory(FIXTURES)
     const report = hostile(listings[0].report, {
