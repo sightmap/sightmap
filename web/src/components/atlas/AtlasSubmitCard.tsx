@@ -37,13 +37,11 @@ export default function AtlasSubmitCard() {
               +
             </span>
             <span className="atlas-card__name">Submit a site</span>
-            <span className="atlas-card__method">Free</span>
           </div>
 
           <p className="atlas-card__desc">
-            Send a URL for a free scan. It enumerates the WebMCP tools the pages register without
-            calling any of them, and you get the report plus a Sightkick starter — a replayable
-            check if tools were found, a drafted tool layer if none were.
+            Send a URL for a free scan. It enumerates the WebMCP tools your pages register without
+            calling any of them.
           </p>
 
           <div className="atlas-card__foot">

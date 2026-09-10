@@ -7,7 +7,7 @@
 // writing without an account, and the docs site already publishes a changelog
 // feed. llms.txt is the same idea aimed at agents, which is most of this
 // project's audience: one plain-text table of contents for the whole site,
-// with a line per atlas entry (P4.3) and a line per WebMCP directory listing.
+// with a line per atlas entry and a line per WebMCP directory listing.
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -252,10 +252,6 @@ function directoryLine(listing: FeedDirectoryListing): string {
  * dist/llms.txt, in the llmstxt.org shape: an H1, a blockquote summary, then
  * link sections. Handwritten for the fixed parts of the site and generated for
  * the two that grow — one line per post, one line per atlas entry.
- *
- * No file to append to: the site had no llms.txt before this change, so P4.3's
- * "append a line per entry" is satisfied by creating it with the atlas section
- * already in place rather than by editing something that did not exist.
  */
 export function buildLlmsTxt(
   posts: FeedPost[],

@@ -59,8 +59,7 @@ Manual steps are marked 🖐.
 7. **Deploy.** Netlify builds `web/` on merge; `scripts/build-atlas.ts` reads
    `src/data/directory/` and regenerates the gallery, the JSON API under
    `/atlas/`, the markdown twins, and the badges. No network call at build time.
-8. 🖐 **Email the owner.** By hand, for now — we do not have an automated
-   sender and we are in no hurry to build one.
+8. 🖐 **Email the owner.** By hand, using the template below.
 
 ### Owner email template
 
@@ -93,37 +92,40 @@ we'll correct or remove it. Removal is a deletion, not a flag.
 — {MAINTAINER}, Sightmap
 ```
 
-## Runner options
+## Runner
 
-### Netlify Agent Runners — primary
+Netlify Agent Runners are the runner in use. A run executes a coding agent
+against a checkout of this repository on Netlify's infrastructure, on an
+automated branch off the production branch. `atlas-submit.mts` starts one by
+calling the same REST endpoint the Netlify CLI calls.
 
-Netlify Agent Runners run an AI agent (Claude Code, Codex, Gemini, or OpenCode)
-against the site's repository on Netlify's infrastructure. Verified behaviour:
+Setup:
 
-- The run works on an **automated branch off the production branch** and
-  produces a **Deploy Preview** at `https://agent-<run-id>--<site>.netlify.app`.
-- From the run you can **optionally open a pull request**; merging it publishes.
-- Runs start from the Netlify dashboard, from a deploy's page, from Linear,
-  from the CLI, or from the REST endpoint the CLI uses.
-- **Concurrency is per plan:** Free 1, Personal 3, Pro 10, Enterprise 50.
-- Webhook triggers are **"coming soon"** — which is exactly why
-  `atlas-submit.mts` calls the REST API itself rather than waiting for one.
-
-Configure:
-
-1. Create a Netlify **personal access token** (User settings → Applications).
-2. Set on the site (Site configuration → Environment variables):
-   `ATLAS_RUNNER=netlify`, `NETLIFY_AGENT_TOKEN=<the token>`,
-   `NETLIFY_SITE_ID=<site id>`, `ATLAS_RUNNER_BRANCH_BASE` (the production
-   branch the run branches from), `ATLAS_RUNNER_MODEL` (optional), and
-   `ATLAS_SUBMIT_SALT` for the email hash.
-3. The function POSTs
+1. Create a Netlify personal access token (User settings → Applications).
+2. Set the environment variables below on the site (Site configuration →
+   Environment variables).
+3. On each submission the function POSTs
    `https://api.netlify.com/api/v1/agent_runners?site_id=<site_id>` with
    `Authorization: Bearer <token>` and JSON `{prompt, agent, model?, branch?}`,
    and gets back `{id, state: 'new', …}`. The prompt points the agent at
    `web/ATLAS_PIPELINE.md` and carries the submission fields.
 
-By hand, the same thing from the CLI:
+| Variable | Value |
+|---|---|
+| `ATLAS_RUNNER` | `netlify` |
+| `NETLIFY_AGENT_TOKEN` | The personal access token |
+| `NETLIFY_SITE_ID` | The site id. Falls back to `SITE_ID`, which Netlify injects at runtime |
+| `ATLAS_RUNNER_BRANCH_BASE` | Optional. The branch a run starts from; omitted from the request when unset |
+| `ATLAS_RUNNER_MODEL` | Optional. Omitted from the request when unset |
+| `ATLAS_DAILY_RUNS` | Optional, default 20. Ceiling on runner triggers per UTC day across all submitters. Agent Runner concurrency is capped per plan (Free 1, Personal 3, Pro 10, Enterprise 50); over the ceiling a submission is stored `queued`, with no run |
+| `ATLAS_SUBMIT_SALT` | Per-deploy salt for the email hash |
+
+A run appears in the Netlify dashboard with its state, a log, and a Deploy
+Preview at `https://agent-<run-id>--<site>.netlify.app`. When the agent has
+committed the listing, open the pull request from the run; that PR and its
+Deploy Preview are what a maintainer reviews in step 5.
+
+The same operations from the CLI:
 
 ```sh
 netlify agents:create "<prompt>" --agent claude [--branch <base>] [--model <model>] [--json]
@@ -132,66 +134,37 @@ netlify agents:show <run-id>
 netlify agents:stop <run-id>
 ```
 
-A run appears in the dashboard with its state, a log, and its Deploy Preview.
-When the agent has committed the listing, open the PR from the run — that is
-the artifact a maintainer reviews.
+### Runner requirements
 
-**Known unknowns, to confirm on the first real run.** Note the answers here
-when you have them:
+A runner environment must provide:
 
-- **Can the runner install Chrome?** `sightmap browser install` downloads a
-  Chrome for Testing build. Whether the agent runner environment permits that
-  download is not documented. Treat it as unknown until a run proves it. If it
-  cannot, the playbook has the agent fall back to `ATLAS_CHROME_PATH` and, when
-  there is no browser at all, stop and report — which is the signal to flip
-  `ATLAS_RUNNER` to `github`.
-- **Network egress.** The scan needs to reach an arbitrary third-party site.
-  Confirm that outbound HTTPS to a non-Netlify host works and whether it goes
-  through a proxy (the scanner forwards `HTTPS_PROXY` into Chrome).
-- **Run duration.** A scan is budgeted at roughly two minutes plus install and
-  build. Confirm the runner's own ceiling before assuming a rescan sweep fits.
+- **A Chrome build.** Either `sightmap browser install` can download a Chrome
+  for Testing build, or `ATLAS_CHROME_PATH` points at an existing one. With
+  neither, the agent stops and reports.
+- **Outbound HTTPS to arbitrary hosts.** A scan loads a third-party site, not a
+  Netlify one. Where a proxy is required, `HTTPS_PROXY` must be set; the scanner
+  forwards it into Chrome.
+- **Time for the scan.** Roughly two minutes per scan, plus the CLI install and
+  the build, within the runner's own time ceiling.
 
-### GitHub Actions on a Namespace runner — fallback
+If the Chrome install or the outbound egress fails, set `ATLAS_RUNNER=github`.
 
-Set `ATLAS_RUNNER=github`. The function fires a `repository_dispatch` with
-`event_type: atlas-submission` and `client_payload`
-`{submission_id, url, intent, owner, sightkick, nominate, rescan, email_hash}`,
-which `.github/workflows/atlas-review.yml` picks up. The same workflow has a
+### GitHub Actions fallback
+
+With `ATLAS_RUNNER=github` the function fires a `repository_dispatch`
+(`event_type: atlas-submission`, `client_payload` `{submission_id, url, intent,
+owner, sightkick, nominate, rescan, email_hash}`) that
+`.github/workflows/atlas-review.yml` picks up; that workflow also has a
 `workflow_dispatch` trigger, so a maintainer can run a submission by hand from
-the Actions tab.
-
-- `ATLAS_GITHUB_TOKEN`: a classic PAT with `repo` scope, or a fine-grained
-  token with **contents: write** and **actions: write** on
-  `ATLAS_GITHUB_REPO`.
-- `ATLAS_GITHUB_REPO`: `owner/repo`.
-- `ANTHROPIC_API_KEY` as a repository secret. Without it the review step falls
-  back to heuristics — the listing is still written, but the drafted
-  description and category need more of your attention.
-- Repository variable `ATLAS_RUNNER_LABEL`: leave unset for `ubuntu-latest`;
-  set it to `nscloud-ubuntu-24.04-amd64-4x8-with-cache` to run on a Namespace
-  runner. Namespace labels are `nscloud-<os>-<arch>-<shape>[-with-cache]`, or
-  `namespace-profile-<name>` for a named profile; add
-  `namespacelabs/nscloud-cache-action@v1` for pnpm store caching there.
-
-The workflow always uploads the summary and the scan JSON as an artifact, even
-when the scan fails — a `blocked` or `load-error` result is the case where
-those files matter most.
-
-### LangSmith Managed Deep Agents — an option we have not built
-
-LangSmith's Managed Deep Agents is a hosted, API-first agent runtime: `mda init`
-/ `dev` / `deploy`, then REST calls to create a thread and run it. It is in
-public beta, US-only, and offers a sandbox. It is listed here as the third
-option and nothing more — **no code in this repo targets it.**
-
-What adopting it would take: deploy the agent (`mda deploy`) with the playbook
-as its instructions; add an `ATLAS_RUNNER=mda` branch to `atlas-submit.mts` that
-creates a thread and starts a run; give the sandbox a checkout of this repo plus
-a Chrome build; and replace the "agent opens the PR" step, since there is no
-Netlify branch or Deploy Preview — the run would have to push a branch and open
-the PR through the GitHub API itself, and we would lose the preview that is
-currently the review artifact. Revisit only if the Netlify path runs out of
-concurrency and the Actions path proves too slow.
+the Actions tab. `ATLAS_GITHUB_TOKEN` is a classic PAT with `repo` scope, or a
+fine-grained token with `contents: write` and `actions: write` on
+`ATLAS_GITHUB_REPO` (`owner/repo`, default `sightmap/sightmap`), and
+`ANTHROPIC_API_KEY` is a repository secret — without it the review step falls
+back to heuristics, so the drafted description and category need closer
+attention. The repository variable `ATLAS_RUNNER_LABEL` selects the machine:
+leave it unset for
+`ubuntu-latest`, or set it to a Namespace label such as
+`nscloud-ubuntu-24.04-amd64-4x8-with-cache` to run on a Namespace runner.
 
 ## Safety controls
 
@@ -283,11 +256,9 @@ neither is ever set by the review agent.
 `built-with-sightkick`, `new-this-week`. Keep the vocabulary small; a
 collection nobody browses is a maintenance cost.
 
-If we ever show **"Recommended by N visitors"**, it is maintained by hand: the
-count lives in the listing YAML, a maintainer edits it in a PR, and the diff is
-the audit trail. We do not ship a vote endpoint to find out that vote endpoints
-get gamed. If the number ever appears without a git history behind it, that is
-a bug.
+Any visitor-facing count, such as "Recommended by N visitors", is maintained by
+hand in the listing YAML, so the diff is the audit trail; there is no vote
+endpoint.
 
 ## Takedown
 
@@ -315,17 +286,17 @@ were added and removed since the previous scan, and the PR title is
 `atlas: rescan <host>`.
 
 Trigger one by resubmitting the URL with `rescan`, or by running the workflow
-by hand with the same `url`. Reasonable cadence: on owner request, when a
-listing is more than a couple of months old and we are about to feature it, and
-whenever a `sensitive` tool appears in a drift block — that last one is worth a
-fresh human read of every description, not just the new ones.
+by hand with the same `url`. Reasonable cadence: on owner request, before
+featuring a listing more than a couple of months old, and whenever a `sensitive`
+tool appears in a drift block — that last one is worth a fresh human read of
+every description, not just the new ones.
 
 Do not re-litigate a description a maintainer already approved unless the site
 actually changed.
 
 ## Metrics worth watching
 
-Trimmed to what we would actually act on:
+Limited to numbers a maintainer would act on:
 
 - **Supply** — listings merged per week; share arriving as `owner` vs
   `nominator`; how many submissions never become a listing, and why.
@@ -338,24 +309,5 @@ Trimmed to what we would actually act on:
   Sightkick-built layer; badge fetches from `/atlas/<slug>/badge.svg`; inbound
   links from listed sites.
 
-None of these is a target. They are the numbers that tell us the pipeline is
-still doing what we built it for.
-
-## How this differs from webmcp.com
-
-Both index sites that expose WebMCP tools. The designs differ; this is what
-ours does, stated plainly.
-
-| Dimension | webmcp.com | Sightmap Atlas |
-|---|---|---|
-| Verdict | Assigns a grade | Publishes factual checks — counts, yes/no indicators, no score |
-| Verification | One-shot agent test | Replayable Sightkick verification transcript, plus a stored supervised journey when a maintainer ran one |
-| Tool listing | One flat list per site | Tools grouped by the page or view they register on |
-| Improving a site | A suggestion snippet | A drafted `.sightkick` tool layer plus a full agent prompt |
-| Intake | Live scanner form | Maintainer-approved PR pipeline; the Deploy Preview is the review artifact |
-| Coverage | Platform-derived inventory, broad | Small, legible, inspected directory |
-| Moderation | Happens out of view | Every listing is a git diff; takedown is a deletion in public history |
-
-The trade is deliberate and it cuts both ways: we will always have fewer
-entries, and every entry will have a name attached to the decision to publish
-it.
+None of these is a target. They indicate whether the pipeline is still doing
+what it was built for.

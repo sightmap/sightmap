@@ -2,18 +2,13 @@
 // receives, and the `/atlas/<slug>.md` machine twin of a directory listing.
 // Everything a page registered (names, descriptions) is untrusted text and
 // is rendered inside code spans or escaped, never as markdown.
-import type { DirectoryListing, ScanReport, ToolKind } from '../../src/types/directory'
+import { KIND_LABEL, type DirectoryListing, type ScanReport } from '../../src/types/directory'
 import { SITE_URL } from './site'
 
-export const KIND_LABEL: Record<ToolKind, string> = {
-  read: 'Read',
-  action: 'Action',
-  sensitive: 'Sensitive',
-}
-
-// Backticks would end a code span, and a newline would start a new block.
-const code = (s: string): string => `\`${s.replace(/`/g, "'").replace(/\s+/g, ' ')}\``
-const plain = (s: string): string => s.replace(/[\\`*_{}[\]()#+\-!<>|]/g, (m) => `\\${m}`).replace(/\s+/g, ' ')
+/** Untrusted text as a code span. A backtick would end it; a newline would end the block. */
+export const code = (s: string): string => `\`${s.replace(/`/g, "'").replace(/\s+/g, ' ')}\``
+/** Untrusted text as prose: every markdown metacharacter escaped. */
+export const plain = (s: string): string => s.replace(/[\\`*_{}[\]()#+\-!<>|]/g, (m) => `\\${m}`).replace(/\s+/g, ' ')
 
 export function scanReportMarkdown(r: ScanReport): string {
   const checks = r.checks.map((c) => `- ${c.ok ? '✓' : '!'} ${c.label} (${c.detail})`).join('\n')

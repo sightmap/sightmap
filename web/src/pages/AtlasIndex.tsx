@@ -47,28 +47,17 @@ const HOW = [
   {
     n: '03',
     title: 'Report',
-    body: 'You get the scan report, a share card, and a Sightkick starter: a replayable check if tools were found, a drafted tool layer and an agent prompt if none were.',
+    body: 'You get the scan report, a share card, and a Sightkick starter.',
   },
 ]
 
 export default function AtlasIndex() {
   const [params, setParams] = useSearchParams()
 
-  // The filters live in the URL so a filtered view is linkable, which means a
-  // visitor can arrive at /atlas?category=docs — but scripts/prerender.tsx
-  // renders exactly one static file for this route, unfiltered, and Netlify
-  // serves it for every query string. src/main.tsx compares only the pathname
-  // before hydrating, so it *will* hydrate that unfiltered markup against a
-  // URL that asks for a filter. Reading the params during the first render
-  // would therefore be a guaranteed hydration mismatch.
-  //
-  // So: first render always ignores them, and this effect (which never runs
-  // during renderToString, and runs before paint on the client) switches them
-  // on. The cost is that a deep-linked filter applies one commit late; the
-  // alternative is a mismatch that blows away the whole tree.
-  //
-  // The submit form's prefill (?url=, ?rescan=1, ?submitted=) rides the same
-  // rule for the same reason.
+  // One static file serves every query string for this route, so reading params
+  // on the first render would be a guaranteed hydration mismatch. First render
+  // ignores them; this effect switches them on one commit later. The submit
+  // form's prefill rides the same rule.
   const [hydrated, setHydrated] = useState(false)
   useEffect(() => setHydrated(true), [])
 

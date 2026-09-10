@@ -6,11 +6,7 @@
 // able to delete it by wiping the directory, which is only true if nothing
 // caches it elsewhere.
 //
-// Everything that reaches the SVG is escaped. A badge carries a site's name
-// only indirectly (the left label is one of two fixed strings), but the right
-// side is built from scan counts and a date, and the shared `badgeSvg()` is
-// general enough that a future caller could hand it anything — so it escapes
-// rather than trusting its input.
+// Everything that reaches the SVG is escaped.
 
 /** Colour of the right-hand block, by how the badge should read. */
 export type BadgeTone = 'tools' | 'none'
@@ -75,8 +71,7 @@ export function badgeSvg({ label, value, tone = 'tools' }: BadgeOptions): string
   const rightWidth = textWidth(right) + pad * 2
   const total = leftWidth + rightWidth
 
-  // Text is centred in its block; positions are in tenths so the shadow line
-  // (y+1) lands on a whole pixel at the usual 1x rendering.
+  // Centred in each block; the shadow text sits one pixel below (y+1).
   const leftX = leftWidth / 2
   const rightX = leftWidth + rightWidth / 2
 

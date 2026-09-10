@@ -20,7 +20,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { DirectoryListing, ListingMeta, ListingTool, ListingType, ScanReport } from '../../src/types/directory'
 import { loadAtlas } from './atlas'
-import { ListingSchema, listingToYaml, loadDirectory, slugFromHost, uniqueSlug } from './directory'
+import { ListingSchema, issuesOf, listingToYaml, loadDirectory, slugFromHost, uniqueSlug } from './directory'
 import type { Review } from './review'
 
 export type SubmittedBy = 'owner' | 'nominator' | 'maintainer'
@@ -157,8 +157,7 @@ export async function createListing(input: CreateListingInput): Promise<CreatedL
 
   const parsed = ListingSchema.safeParse(meta)
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => `    - ${i.path.join('.') || '(root)'}: ${i.message}`).join('\n')
-    throw new Error(`refusing to write an invalid listing ${slug}:\n${issues}`)
+    throw new Error(`refusing to write an invalid listing ${slug}:\n${issuesOf(parsed.error)}`)
   }
 
   const listingPath = path.join(dataDir, `${slug}.yaml`)

@@ -33,9 +33,7 @@
   to = "/api/atlas/:slug.json"
   status = 200
 
-# POST /api/atlas/submit is a serverless function (netlify/functions/atlas-submit.mts),
-# not a redirect. Netlify runs functions before redirects, so its config.path wins
-# over both the :slug rewrite above and the /* catch-all below — no rule needed here.
+# POST /api/atlas/submit needs no rule here — see netlify/functions/atlas-submit.mts for the request chain.
 
 # Unknown URLs. Every real route has a prerendered dist/<route>/index.html, and
 # Netlify serves an existing static file before applying a non-forced redirect,

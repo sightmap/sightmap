@@ -5,7 +5,7 @@
 //                     [--type live|demo] [--sightkick]
 //                     [--submitted-by owner|nominator|maintainer]
 //                     [--max-pages 3] [--path /docs] [--heuristic]
-//                     [--allow-local] [--summary summary.md]
+//                     [--allow-local] [--allow-empty] [--summary summary.md]
 //                     [--sightmap-bin ./sightmap] [--data-dir …] [--atlas-dir …]
 //                     [--replace-review]
 //
@@ -23,6 +23,7 @@ import { pathToFileURL } from 'node:url'
 import { scanSite } from './lib/scan'
 import { createListing, type CreatedListing, type SubmittedBy } from './lib/listing'
 import { claudeReview, heuristicReview, type Review } from './lib/review'
+import { code, plain } from './lib/directory-markdown'
 import { DEFAULT_ATLAS_DIR, DEFAULT_DATA_DIR } from './atlas-listing'
 import type { ListingType, ScanReport } from '../src/types/directory'
 
@@ -109,16 +110,8 @@ export function parseArgs(argv: string[]): IntakeArgs {
 }
 
 // --- Markdown helpers -------------------------------------------------------
-//
-// scripts/lib/directory-markdown.ts keeps its own copies of these unexported,
-// on purpose: they are three lines each and both files want to be readable
-// next to the output they produce.
 
-/** Untrusted text as a code span. A backtick would end it; a newline would end the block. */
-export const code = (s: string): string => `\`${s.replace(/`/g, "'").replace(/\s+/g, ' ')}\``
-/** Untrusted text as prose: every markdown metacharacter escaped. */
-export const plain = (s: string): string => s.replace(/[\\`*_{}[\]()#+\-!<>|]/g, (m) => `\\${m}`).replace(/\s+/g, ' ')
-/** Untrusted text in a table cell: as above, plus the pipe that would split it. */
+/** Untrusted text in a table cell: escaped as prose, plus the pipe that would split it. */
 export const cell = (s: string): string => plain(s).replace(/\|/g, '\\|')
 const codeCell = (s: string): string => code(s).replace(/\|/g, '\\|')
 
@@ -130,13 +123,6 @@ const bullets = (lines: string[], empty: string): string =>
  * title: `atlas: list <host>`, `atlas: rescan <host>` or
  * `atlas: needs review — <host>` (em dash), the three forms
  * web/ATLAS_PIPELINE.md defines.
- *
- * .github/workflows/atlas-review.yml can derive the same three titles from
- * markers further down the summary — "(rescan of an existing listing)" under
- * `## Files` and the `Status:` bullet — and takes a first line that already
- * starts with `atlas:` verbatim. Writing the title here keeps both paths on the
- * same answer, so the precedence below matches the workflow's: needs-review
- * wins over rescan, which wins over a first listing.
  *
  * The host goes in unescaped: it comes from `new URL(...).hostname`, and a
  * backslash-escaped hyphen in a PR title would be nonsense.

@@ -5,11 +5,18 @@
 //
 // Field names are snake_case on purpose, the same convention the atlas entry
 // contract uses, so the YAML a maintainer edits and the JSON the site serves
-// carry identical keys. The `_`-free derived fields at the bottom are computed
+// carry identical keys. The camelCase fields on DirectoryListing are derived
 // by scripts/lib/directory.ts from the listing and its scan.
 
 /** How a tool is classified. `classified by Atlas`, never by the site. */
 export type ToolKind = 'read' | 'action' | 'sensitive'
+
+/** Human label for each kind. Sentence case; the chip CSS does not shout. */
+export const KIND_LABEL: Record<ToolKind, string> = {
+  read: 'Read',
+  action: 'Action',
+  sensitive: 'Sensitive',
+}
 
 /** Which WebMCP surface the scanner found the tools on. */
 export type ScanSurface = 'native' | 'polyfilled' | 'declarative' | 'absent'

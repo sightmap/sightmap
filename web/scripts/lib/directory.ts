@@ -145,7 +145,8 @@ export interface LoadedDirectory {
   skipped: string[]
 }
 
-function issuesOf(error: z.ZodError): string {
+/** Zod issues as an indented bullet list, for a "refusing to …" error message. */
+export function issuesOf(error: z.ZodError): string {
   return error.issues.map((i) => `    - ${i.path.join('.') || '(root)'}: ${i.message}`).join('\n')
 }
 

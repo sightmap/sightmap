@@ -204,14 +204,8 @@ jobs:
           pnpm test
           pnpm build
 
-      # The PR title comes from the summary's first line. atlas-intake writes
-      # that as `# Atlas intake: <host>`, so it is normalised here into the
-      # convention web/ATLAS_PIPELINE.md uses — `atlas: list <host>`,
-      # `atlas: rescan <host>`, or `atlas: needs review — <host>` — using two
-      # markers the summary itself carries: "(rescan of an existing listing)"
-      # under ## Files, and the scan status in the header bullet list. A first
-      # line that already starts with `atlas:` is taken verbatim, so a future
-      # change to the summary's h1 wins over this normalisation.
+      # atlas-intake's first line already carries the title; the markers below
+      # are the fallback if that ever changes.
       - name: Read the PR title from the summary
         id: title
         if: always()

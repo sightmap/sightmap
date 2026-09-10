@@ -516,7 +516,7 @@ views:
       - name: ListingChecks
         selector: '[data-component="ListingChecks"]'
         source: src/pages/AtlasListing.tsx
-        description: What the scan could observe, one line each, under the heading "Facts, not grades"
+        description: What the scan could observe, one line each, under the heading "What the scan could check"
         memory:
           - A failed check renders with a "!" glyph and the `.atlas-checks__item--off` modifier; it is a note, not a deduction from a score
         children:
@@ -528,7 +528,7 @@ views:
       - name: ListingJourneys
         selector: '[data-component="ListingJourneys"]'
         source: src/pages/AtlasListing.tsx
-        description: What the review thought an agent could try with these tools — an intent and the tools it would use
+        description: Read-only runs these tools would support — an intent and the tools it would use
         memory:
           - Suggested, not run. The copy says so explicitly so it is not mistaken for the stored journey below it
         children:

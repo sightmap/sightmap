@@ -6,20 +6,13 @@
 // Everything here is presentation: grouping, labelling, formatting and the
 // share/badge strings. Nothing classifies a tool — the `kind` was decided at
 // review time and is Atlas's own classification, corrected on review.
-import type { DirectoryListing, ScanTool, ToolKind } from '@/types/directory'
+import { KIND_LABEL, type DirectoryListing, type ScanTool, type ToolKind } from '@/types/directory'
 
 const SITE_ORIGIN = 'https://sightmap.org'
 
-/** Human label for a tool kind. Sentence case; the chip CSS does not shout. */
+/** Human label for a tool kind. */
 export function kindLabel(kind: ToolKind): string {
-  switch (kind) {
-    case 'read':
-      return 'Read'
-    case 'action':
-      return 'Action'
-    case 'sensitive':
-      return 'Sensitive'
-  }
+  return KIND_LABEL[kind]
 }
 
 /**

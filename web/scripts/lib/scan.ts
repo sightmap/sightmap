@@ -35,23 +35,10 @@ export interface ScanOptions {
   intent?: string | null
   /** Extra same-origin paths the submitter or maintainer wants checked first. */
   paths?: string[]
-  /** Per-page navigation timeout. */
-  pageTimeoutMs?: number
-  /** Whole-scan budget. */
-  totalTimeoutMs?: number
   /** Loopback fixtures only — never set from a submission. */
   allowLocal?: boolean
   /** The sightmap CLI binary; defaults to $SIGHTMAP_BIN, then `sightmap` on PATH. */
   sightmapBin?: string
-  /** A Chrome binary for `browser start --chrome-binary`; defaults to $ATLAS_CHROME_PATH, then the CLI's own install. */
-  chromeBinary?: string
-  /**
-   * Extra `--chrome-flag=…` values for the runner's own network environment —
-   * an egress proxy that will not carry Chrome's TLS 1.3 handshake, say.
-   * Defaults to whitespace-separated $ATLAS_CHROME_FLAGS. Operator input only;
-   * never set this from a submission.
-   */
-  chromeFlags?: string[]
   log?: (line: string) => void
 }
 
@@ -60,13 +47,16 @@ export const MAX_PAGES = 3
 // after its own fetch resolves, and a page that swaps the surface out from
 // under the recorder is only visible once it is enumerated. So instead of one
 // fixed sleep the driver polls a cheap "how many tools can you see" script and
-// stops as soon as the answer holds still — which for an ordinary page is the
-// same 1.5s it used to wait, and for a slow one is up to SETTLE_MAX_MS.
+// stops as soon as the answer holds still, or at SETTLE_MAX_MS.
 const SETTLE_POLL_MS = 500
 const SETTLE_STABLE_MS = 1000
 const SETTLE_MAX_MS = 6000
 const MAX_TOOLS = 200
 const MAX_SCHEMA_BYTES = 20_000
+/** Per-page navigation timeout. */
+const PAGE_TIMEOUT_MS = 20_000
+/** Whole-scan budget. */
+const TOTAL_TIMEOUT_MS = 120_000
 
 // Chrome flags that turn on native WebMCP where the build supports it; the
 // same three `sightmap browser mcp list` names when it reports `absent`.
@@ -177,18 +167,10 @@ interface Exec {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/**
- * Picks a port nothing is listening on, by binding one and letting it go.
- *
- * The CLI documents `--port 0` / `--cdp-port 0` as "auto-allocate", but the
- * allocation is a scan upward from that number, so 0 stays 0: Chrome and the
- * HTTP server get an OS-chosen port and the session file records `serverPort:
- * 0`. Every client command that talks to the daemon rather than to CDP —
- * `inject --persist` above all — resolves the daemon by that recorded port and
- * reports "no running session" when it is 0. Concrete numbers avoid that; if
- * one is taken between here and launch the CLI slides to the next free port
- * and records where it actually landed.
- */
+// Concrete ports, not --port 0: sightmap CLI <= 0.31.2 writes serverPort: 0
+// into its session file for an auto-allocated port, and every later daemon
+// command then fails with "no running session". Fixed in the CLI; harmless
+// once every runner has that build.
 function reservePort(exclude: number[] = []): Promise<number> {
   return new Promise((resolve, reject) => {
     const probe = net.createServer()
@@ -230,11 +212,7 @@ export class SightmapSession {
     fs.mkdirSync(this.sightmapDir, { recursive: true })
   }
 
-  /**
-   * Appends to the replayable transcript, counting an immediate repeat instead
-   * of listing it: the readiness polls below run the same command until it
-   * answers, and a reader wants the command once with its count.
-   */
+  /** Transcript, with an immediate repeat collapsed to `cmd ×n`. */
   private record(cmd: string): void {
     const i = this.transcript.length - 1
     if (i >= 0 && this.transcript[i].replace(/ ×\d+$/, '') === cmd) {
@@ -443,13 +421,50 @@ function surfaceOf(c: Collected): ScanSurface {
   return 'absent'
 }
 
+/**
+ * Folds one page's tools into the scan-wide map: a name already recorded just
+ * gains this page, a new one is classified and warned about, and past
+ * MAX_TOOLS the rest are dropped with a note.
+ */
+function collectTools(toolMap: Map<string, ScanTool>, page: ScanPage, collected: Collected, notes: string[]): void {
+  const seenHere = new Set<string>()
+  const add = (name: string, desc: string, schema: unknown, impl: ScanTool['impl'], api: ScanTool['api']) => {
+    if (!name || seenHere.has(name)) return
+    seenHere.add(name)
+    const existing = toolMap.get(name)
+    if (existing) {
+      if (!existing.pages.includes(page.path)) existing.pages.push(page.path)
+      return
+    }
+    if (toolMap.size >= MAX_TOOLS) {
+      if (!notes.includes('tool cap reached')) notes.push('tool cap reached')
+      return
+    }
+    const { risk, reason } = classifyTool(name, desc)
+    const tool: ScanTool = {
+      name,
+      description: desc,
+      inputSchema: truncateSchema(schema),
+      page: page.path,
+      pages: [page.path],
+      impl,
+      api,
+      risk,
+      riskReason: reason,
+      warnings: [],
+    }
+    tool.warnings = toolWarnings(tool)
+    toolMap.set(name, tool)
+  }
+  for (const r of collected.records) add(r.name, r.description, r.inputSchema, 'imperative', r.api)
+  for (const d of collected.declarative) add(d.name, d.description, d.inputSchema, 'declarative', 'dom')
+}
+
 export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
   const log = opts.log ?? (() => {})
   const startedAt = new Date()
   const maxPages = Math.max(1, Math.min(MAX_PAGES, opts.maxPages ?? MAX_PAGES))
-  const pageTimeoutMs = opts.pageTimeoutMs ?? 20_000
-  const totalTimeoutMs = opts.totalTimeoutMs ?? 120_000
-  const deadline = Date.now() + totalTimeoutMs
+  const deadline = Date.now() + TOTAL_TIMEOUT_MS
 
   const pre = preflightUrl(opts.url, { allowLocal: opts.allowLocal })
   if (!pre.ok) throw new Error(`preflight: ${pre.reason}`)
@@ -493,12 +508,13 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
     // No permission prompts of any kind: a page asking for camera, location,
     // or notifications gets a denial, not a prompt that hangs the scan.
     extra.push('--deny-permission-prompts')
-    const operatorFlags = opts.chromeFlags ?? (process.env.ATLAS_CHROME_FLAGS ?? '').split(/\s+/).filter(Boolean)
+    // Operator input for the runner's own network environment, never from a submission.
+    const operatorFlags = (process.env.ATLAS_CHROME_FLAGS ?? '').split(/\s+/).filter(Boolean)
     if (operatorFlags.length > 0) {
       extra.push(...operatorFlags)
       notes.push(`operator Chrome flags: ${operatorFlags.join(' ')}`)
     }
-    await session.start(opts.chromeBinary || process.env.ATLAS_CHROME_PATH || undefined, extra)
+    await session.start(process.env.ATLAS_CHROME_PATH || undefined, extra)
     await session.injectPersist(RECORDER_SCRIPT)
 
     let origin = new URL(pre.url).origin
@@ -517,7 +533,7 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
 
       let landed: string
       try {
-        landed = await session.navigate(url, pageTimeoutMs)
+        landed = await session.navigate(url, PAGE_TIMEOUT_MS)
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         log(`  ! ${reqPath}: ${msg}`)
@@ -562,8 +578,6 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
         }
       }
 
-      // Give client-side registration a moment: SPAs register after
-      // hydration, and some SDKs register only once a fetch has resolved.
       await session.settle(Math.max(SETTLE_POLL_MS, Math.min(SETTLE_MAX_MS, deadline - Date.now())))
       let collected: Collected
       try {
@@ -639,37 +653,7 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
       for (const f of collected.forms) forms.push({ page: page.path, ...f })
       for (const e of collected.errors) notes.push(`${page.path}: recorder: ${e}`)
 
-      const seenHere = new Set<string>()
-      const add = (name: string, desc: string, schema: unknown, impl: ScanTool['impl'], api: ScanTool['api']) => {
-        if (!name || seenHere.has(name)) return
-        seenHere.add(name)
-        const existing = toolMap.get(name)
-        if (existing) {
-          if (!existing.pages.includes(page.path)) existing.pages.push(page.path)
-          return
-        }
-        if (toolMap.size >= MAX_TOOLS) {
-          if (!notes.includes('tool cap reached')) notes.push('tool cap reached')
-          return
-        }
-        const { risk, reason } = classifyTool(name, desc)
-        const tool: ScanTool = {
-          name,
-          description: desc,
-          inputSchema: truncateSchema(schema),
-          page: page.path,
-          pages: [page.path],
-          impl,
-          api,
-          risk,
-          riskReason: reason,
-          warnings: [],
-        }
-        tool.warnings = toolWarnings(tool)
-        toolMap.set(name, tool)
-      }
-      for (const r of collected.records) add(r.name, r.description, r.inputSchema, 'imperative', r.api)
-      for (const d of collected.declarative) add(d.name, d.description, d.inputSchema, 'declarative', 'dom')
+      collectTools(toolMap, page, collected, notes)
       log(`    ${page.surface}: ${page.tools.length} tool(s)`)
     }
   } finally {

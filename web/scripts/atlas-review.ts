@@ -11,7 +11,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { ScanReportSchema } from './lib/directory'
+import { ScanReportSchema, issuesOf } from './lib/directory'
 import { claudeReview, heuristicReview, type Review } from './lib/review'
 import type { ScanReport } from '../src/types/directory'
 
@@ -34,8 +34,7 @@ export function parseArgs(argv: string[]) {
 export function readScanFile(file: string): ScanReport {
   const parsed = ScanReportSchema.safeParse(JSON.parse(fs.readFileSync(file, 'utf-8')))
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => `    - ${i.path.join('.') || '(root)'}: ${i.message}`).join('\n')
-    throw new Error(`invalid scan report ${file}:\n${issues}`)
+    throw new Error(`invalid scan report ${file}:\n${issuesOf(parsed.error)}`)
   }
   return parsed.data as ScanReport
 }

@@ -1,31 +1,17 @@
-// The review step of the Atlas pipeline: scan report in, `Review` out.
+// The review step of the Atlas pipeline: scan report in, `Review` out. See
+// src/data/directory/README.md for where this sits in the pipeline.
 //
-//   scripts/atlas-scan.ts    → ScanReport   (what the browser saw)
-//   scripts/lib/review.ts    → Review       (what a maintainer needs to decide)
-//   scripts/lib/listing.ts   → <slug>.yaml  (what the site ships)
-//
-// Two implementations of the same shape:
-//
-//   heuristicReview()  pure, offline, deterministic. Always runs — it is both
-//                      the fallback and the floor the model result is merged
-//                      onto, so a missing API key or a rate limit degrades the
-//                      review instead of failing the intake.
-//   claudeReview()     the same job with Claude reading the tool metadata,
-//                      through the official SDK's structured outputs. The model
-//                      may correct a tool's kind and write better prose; it can
-//                      never introduce a tool, and it can never loosen the
-//                      recommendation the heuristic arrived at.
-//
-// The scan report is an *untrusted artifact*: every tool name, description and
-// input schema in it was written by the site being reviewed. It is data. The
-// system prompt says so, the merge refuses anything the scan did not contain,
-// and text that reads like an instruction is reported under `suspicious`
-// rather than followed.
+// Two implementations of one shape: heuristicReview() is pure and offline and
+// always runs; claudeReview() merges a model's reading of the tool metadata
+// onto it, and may correct a kind or write better prose but can never add a
+// tool or loosen the heuristic's recommendation. The report is untrusted —
+// every name and description in it was written by the site under review, so
+// text that reads like an instruction is reported under `suspicious`.
 import Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import type { ListingType, ScanReport, ScanTool, SuggestedJourney, ToolKind } from '../../src/types/directory'
-import { MAX_DESCRIPTION_CHARS } from './tool-risk'
+import { MAX_DESCRIPTION_CHARS, words } from './tool-risk'
 
 export type Recommendation = 'reject' | 'needs-manual-review' | 'read-only-journey-ok'
 
@@ -133,13 +119,6 @@ const DEMO_HOSTS = [
   'example.org',
 ]
 const DEMO_WORDS = ['demo', 'hackathon', 'prototype', 'playground', 'sandbox', 'experiment', 'sample', 'toy', 'proof of concept']
-
-const words = (s: string): string[] =>
-  s
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean)
 
 /**
  * One sentence, no line breaks, at most `max` characters. Used on both the
@@ -270,10 +249,7 @@ export function recommendationFor(report: ScanReport, suspicious: string[]): Rec
   return 'needs-manual-review'
 }
 
-/**
- * The offline review. Pure: same report in, same review out, no clock, no
- * filesystem, no network.
- */
+/** The offline review. Pure. */
 export function heuristicReview(report: ScanReport): Review {
   const suspicious = suspiciousOf(report.tools)
   return {
@@ -331,7 +307,6 @@ export interface ClaudeReviewOptions {
   /** Injected in tests; otherwise a real `Anthropic` client is constructed. */
   client?: ReviewClient
   model?: string
-  apiKey?: string
   log?: (line: string) => void
 }
 
@@ -491,7 +466,6 @@ export function mergeReview(base: Review, output: Partial<ReviewOutput> | null |
   }
 }
 
-/** A suspicious line the model added can only tighten the heuristic verdict. */
 function tightenForSuspicious(base: Recommendation, suspicious: string[]): Recommendation {
   if (suspicious.length > 0 && RANK[base] < RANK['needs-manual-review']) return 'needs-manual-review'
   return base
@@ -512,7 +486,7 @@ export async function claudeReview(report: ScanReport, opts: ClaudeReviewOptions
   const base = heuristicReview(report)
   const log = opts.log ?? (() => {})
 
-  if (!opts.client && !hasApiKey(opts.apiKey)) {
+  if (!opts.client && !hasApiKey()) {
     return {
       ...base,
       notes: 'ANTHROPIC_API_KEY is not set, so the review is heuristic only. Re-run with a key for a model review.',
@@ -520,7 +494,7 @@ export async function claudeReview(report: ScanReport, opts: ClaudeReviewOptions
   }
 
   const model = opts.model || process.env.ATLAS_REVIEW_MODEL || DEFAULT_REVIEW_MODEL
-  const client: ReviewClient = opts.client ?? new Anthropic({ apiKey: opts.apiKey })
+  const client: ReviewClient = opts.client ?? new Anthropic()
 
   try {
     log(`  reviewing with ${model}`)

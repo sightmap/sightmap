@@ -129,7 +129,8 @@ const READ = [
 // (`get_order_status` reads an order, it does not place one).
 const READ_LEADS = ['get', 'list', 'search', 'find', 'lookup', 'check', 'is', 'has']
 
-const words = (s: string): string[] =>
+/** Splits an identifier or sentence into lowercase words, camelCase included. */
+export const words = (s: string): string[] =>
   s
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .toLowerCase()

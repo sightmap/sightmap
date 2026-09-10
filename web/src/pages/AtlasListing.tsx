@@ -176,7 +176,7 @@ export default function AtlasListingPage({ listing }: { listing: DirectoryListin
               {listing.report.checks.length > 0 && (
                 <section className="atlas-checks" aria-labelledby="atlas-checks-h" data-component="ListingChecks">
                   <h2 id="atlas-checks-h" className="atlas-listing__h2">
-                    Facts, not grades
+                    What the scan could check
                   </h2>
                   <p className="atlas-listing__note">
                     Each line is something the scan could observe. A failed check is a note, not a
@@ -202,8 +202,7 @@ export default function AtlasListingPage({ listing }: { listing: DirectoryListin
                     Suggested journeys
                   </h2>
                   <p className="atlas-listing__note">
-                    What the review thought an agent could try with these tools. Nobody has run
-                    them; they are a starting point, not a result.
+                    Read-only runs these tools would support. None has been run yet.
                   </p>
                   <ul className="atlas-listing__journeys">
                     {listing.suggested_journeys.map((journey) => (
