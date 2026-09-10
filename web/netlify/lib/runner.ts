@@ -16,7 +16,13 @@ import type { RunnerKind } from '../../src/lib/submit-types.ts'
 import type { RunnerInfo, SubmissionRecord } from './submit.ts'
 
 export const DEFAULT_DAILY_RUNS = 20
-export const MAX_PROMPT_LENGTH = 2500
+
+/**
+ * Last-resort ceiling on the prompt. Sized so the whole prompt survives a
+ * maximal intent: truncation would drop the closing "never publish this
+ * yourself" paragraph, which is the part that must never be cut.
+ */
+export const MAX_PROMPT_LENGTH = 2800
 
 /**
  * How many times the caller re-reads and re-writes the day's counter when a
@@ -139,11 +145,26 @@ export function intakeCommand(input: RunnerPromptInput): string {
 }
 
 /**
+ * Stands in for the one value only the intake knows: where it filed the scan
+ * report it just wrote. The runner substitutes it from the intake's own output.
+ */
+export const SCAN_PATH_PLACEHOLDER = '<the scan report path intake printed>'
+
+/**
+ * Updating the unlisted card at /try/<host> with what the scan saw. Only a
+ * submission whose claim verified has a card, so this is a no-op for most
+ * runs; it prints one notice and exits 0 rather than failing the intake.
+ */
+export function cardCommand(input: { host: string }, scanPath = SCAN_PATH_PLACEHOLDER): string {
+  return `pnpm atlas:card --host ${shellQuote(input.host)} --scan ${shellQuote(scanPath)}`
+}
+
+/**
  * The prompt handed to the Netlify Agent Runner.
  *
  * It deliberately carries almost no procedure: `web/ATLAS_PIPELINE.md` in the
  * repo is the contract, and the prompt's job is to point at it and pass along
- * one submission. Plain text, under ~2500 characters, and never the email
+ * one submission. Plain text, inside MAX_PROMPT_LENGTH, and never the email
  * address — only its hash.
  */
 export function buildRunnerPrompt(input: RunnerPromptInput): string {
@@ -177,11 +198,13 @@ export function buildRunnerPrompt(input: RunnerPromptInput): string {
     '',
     'Steps, from web/ in a checkout of this repo:',
     `  1. ${intakeCommand(input)}`,
-    '  2. Read the intake summary it writes. Correct anything the review got',
+    `  2. ${cardCommand(input)}`,
+    '     Skip it when the intake wrote no scan report.',
+    '  3. Read the intake summary it writes. Correct anything the review got',
     '     wrong (category, tool risk, description) by editing the listing YAML.',
-    '  3. pnpm test',
-    '  4. pnpm build',
-    `  5. Open a pull request titled: atlas: list ${input.host}`,
+    '  4. pnpm test',
+    '  5. pnpm build',
+    `  6. Open a pull request titled: atlas: list ${input.host}`,
     '     Body: the intake summary, verbatim, plus anything you corrected.',
     '',
     'Never publish the listing yourself: do not merge, do not deploy, do not',
