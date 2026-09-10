@@ -25,8 +25,13 @@ export type ListingType = 'live' | 'demo'
 export interface ScanTool {
   name: string
   description: string
-  /** The tool's input schema exactly as the page registered it. */
-  inputSchema: unknown
+  /**
+   * The tool's input schema exactly as the page registered it. Optional
+   * because a page may register none; JSON drops an undefined value, so a
+   * required key here would make such a scan fail the generated manifest's
+   * typecheck — a listing must never break the build.
+   */
+  inputSchema?: unknown
   /** First page (path) the tool was seen on. */
   page: string
   /** Every page (path) the tool was seen on. */

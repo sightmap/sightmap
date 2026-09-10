@@ -1,0 +1,73 @@
+slug: forter-com
+name: Forter
+url: https://www.forter.com/
+host: forter.com
+description: Forter makes AI-driven fraud, abuse, and payment decisions for online merchants; its tools answer questions about the product and its agent offering.
+  friction, and you leave no revenue behind.
+category: finance
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-10
+updated: 2026-09-10
+scan: scans/forter-com/2026-09-10.json
+tools:
+  - name: list_skills
+    kind: read
+    description: List Forter's agent-skill catalog. Returns the v0.2.0 skill index covering order
+      decisioning, account protection, dispute resolution, agentic commerce, PSP onboarding,
+      tokenization, privacy requests, and contact-sales. Use to find which Forter capability fits a
+      given user need.
+    page: /
+  - name: get_openapi_spec
+    kind: read
+    description: Fetch the canonical Forter REST OpenAPI 3.0.0 spec (info.version 10.2; 33 operations -
+      22 production + 11 public sandbox; 204 schemas). Use to understand request/response shapes for
+      any Forter REST operation before recommending an integration.
+    page: /
+  - name: get_pricing_info
+    kind: read
+    description: Return Forter's machine-readable pricing summary. Forter is enterprise-priced -
+      volume-tiered and ACV-negotiated. Use to answer pricing questions WITHOUT estimating cost -
+      always route the user to https://www.forter.com/contact-us/ for a quote.
+    page: /
+  - name: search_documentation
+    kind: read
+    description: Search Forter's developer documentation index by keyword. Returns matching quickstart /
+      reference / guide URLs from /docs/llms.txt. Use to point a user at the right doc page for an
+      integration topic.
+    page: /
+  - name: contact_sales
+    kind: action
+    description: Submit a sales-lead request via Forter's HubSpot form. AGENT MUST CONFIRM WITH USER
+      BEFORE CALLING - this generates a real CRM lead and constitutes opt-in to sales contact per
+      the Forter privacy policy at https://www.forter.com/privacy-policy/.
+    page: /
+  - name: switch_site_language
+    kind: action
+    description: "Switch the Forter website to another language. Navigates to the localized version of
+      the site. Supported: English, German (Deutsch), Chinese (中文 中国), Japanese (日本語), French
+      (Français)."
+    page: /
+suggested_journeys:
+  - intent: Call search_documentation, then get_openapi_spec on one of its results.
+    tools:
+      - search_documentation
+      - get_openapi_spec
+  - intent: Call list_skills and read what it returns.
+    tools:
+      - list_skills
+  - intent: Call get_openapi_spec and read what it returns.
+    tools:
+      - get_openapi_spec
+strengths:
+  - Every tool has a name (6/6).
+  - Every tool has a description (6/6).
+  - Every tool has an input schema (6/6).
+  - Tool names are snake_case (6/6).
+  - Tool names are unique (6 distinct).
+  - No suspicious wording in tool metadata (none flagged).
+  - Tool set changes with the page (2 distinct tool sets across 3 pages).
+improvements: []

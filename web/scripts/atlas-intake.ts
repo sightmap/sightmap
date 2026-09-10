@@ -39,6 +39,8 @@ export interface IntakeArgs {
   paths: string[]
   heuristic: boolean
   allowLocal: boolean
+  /** Write a listing even when the scan found no tools (default: skip it). */
+  allowEmpty: boolean
   summary: string
   sightmapBin: string
   dataDir: string
@@ -48,7 +50,7 @@ export interface IntakeArgs {
 
 export const USAGE =
   'usage: atlas-intake --url <url> [--intent text] [--submission-id id] [--type live|demo] [--sightkick] ' +
-  '[--submitted-by owner|nominator|maintainer] [--max-pages 3] [--path /p] [--heuristic] [--allow-local] ' +
+  '[--submitted-by owner|nominator|maintainer] [--max-pages 3] [--path /p] [--heuristic] [--allow-local] [--allow-empty] ' +
   '[--summary summary.md] [--sightmap-bin path] [--data-dir dir] [--atlas-dir dir] [--replace-review]'
 
 export function parseArgs(argv: string[]): IntakeArgs {
@@ -63,6 +65,7 @@ export function parseArgs(argv: string[]): IntakeArgs {
     paths: [],
     heuristic: false,
     allowLocal: false,
+    allowEmpty: false,
     summary: '',
     sightmapBin: '',
     dataDir: DEFAULT_DATA_DIR,
@@ -91,6 +94,7 @@ export function parseArgs(argv: string[]): IntakeArgs {
     } else if (a === '--path') out.paths.push(next())
     else if (a === '--heuristic') out.heuristic = true
     else if (a === '--allow-local') out.allowLocal = true
+    else if (a === '--allow-empty') out.allowEmpty = true
     else if (a === '--summary') out.summary = next()
     else if (a === '--sightmap-bin') out.sightmapBin = next()
     else if (a === '--data-dir') out.dataDir = next()
@@ -290,8 +294,13 @@ export async function run(argv: string[]): Promise<IntakeResult> {
   // A scan that never reached the site has nothing to list. The summary still
   // gets written so the runner can report why.
   const failed = report.status === 'blocked' || report.status === 'load-error'
+  // A site with no tools is not a directory entry: the Atlas lists apps with
+  // callable tools, and the submitter's takeaway for an empty scan is the
+  // Sightkick starter in the summary, not a listing that says "0 tools".
+  const empty = report.counts.tools === 0 && !args.allowEmpty
+  if (empty) log('  no tools found: no listing written (pass --allow-empty to write one anyway)')
   let listing: CreatedListing | null = null
-  if (!failed) {
+  if (!failed && !empty) {
     listing = await createListing({
       dataDir: path.resolve(args.dataDir),
       atlasDir: path.resolve(args.atlasDir),

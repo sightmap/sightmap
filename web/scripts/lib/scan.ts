@@ -143,6 +143,32 @@ export function pickLinks(origin: string, startPath: string, hrefs: string[], wa
   return out
 }
 
+/**
+ * Two origins are the same site when they differ only by a leading `www.`
+ * and both are https (or both http, for a loopback fixture). Anything else —
+ * another subdomain, another port, another scheme — is off-origin.
+ */
+export function sameSite(a: string, b: string): boolean {
+  try {
+    const ua = new URL(a)
+    const ub = new URL(b)
+    if (ua.protocol !== ub.protocol || ua.port !== ub.port) return false
+    const strip = (h: string) => h.toLowerCase().replace(/^www\./, '')
+    return strip(ua.hostname) === strip(ub.hostname)
+  } catch {
+    return false
+  }
+}
+
+// Titles that bot-mitigation interstitials use. Matched against the page
+// title only after the page settled, so a site that merely mentions one of
+// these phrases in its copy is not affected.
+const CHALLENGE_TITLE = /^\s*(just a moment|attention required|access denied|checking your browser|verify you are human|please verify|one more step|are you a robot)\b/i
+
+export function isChallengePage(title: string): boolean {
+  return CHALLENGE_TITLE.test(title)
+}
+
 interface Exec {
   code: number
   stdout: string
@@ -475,7 +501,7 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
     await session.start(opts.chromeBinary || process.env.ATLAS_CHROME_PATH || undefined, extra)
     await session.injectPersist(RECORDER_SCRIPT)
 
-    const origin = new URL(pre.url).origin
+    let origin = new URL(pre.url).origin
     const queue: string[] = [pre.url]
     const preferred = (opts.paths ?? []).map((p) => new URL(p, origin).toString())
     let first = true
@@ -503,6 +529,18 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
       if (first) {
         finalUrl = landed
         const landedOrigin = new URL(landed).origin
+        if (landedOrigin !== origin && sameSite(origin, landedOrigin)) {
+          // `example.com` → `www.example.com` (or back) is the same site
+          // wearing its canonical host. Preflight the destination like a
+          // fresh submission and carry on there; the listing's host is the
+          // one the site actually answers on.
+          const re = preflightUrl(landed, { allowLocal: opts.allowLocal })
+          const okThere = re.ok && (opts.allowLocal || (await resolvePublic(re.host)).ok)
+          if (okThere) {
+            notes.push(`first page redirected to ${landedOrigin}; continuing there`)
+            origin = landedOrigin
+          }
+        }
         if (landedOrigin !== origin) {
           // The scanner never follows the page off-origin. Re-run preflight
           // on the destination so the note says whether resubmitting it
@@ -551,6 +589,22 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
         continue
       }
 
+      if (isChallengePage(collected.title)) {
+        // A bot-challenge interstitial (Cloudflare and the like) is not the
+        // site: recording "no tools" here would list a product as having no
+        // WebMCP surface because a robot check got in the way. The scanner
+        // never solves challenges; a maintainer can rescan from a network the
+        // site does not challenge, or ask the owner to allowlist the scanner's
+        // user agent.
+        const msg = `bot-challenge page ("${collected.title.trim()}") instead of the site; the scanner does not solve challenges`
+        log(`  ! ${reqPath}: ${msg}`)
+        pages.push({ url: collected.url || landed, path: pathOf(collected.url || landed), title: collected.title, status: collected.status, surface: 'absent', tools: [], error: msg })
+        if (first) {
+          blocked = true
+          break
+        }
+        continue
+      }
       const surface = surfaceOf(collected)
       const names = [...new Set([...collected.records.map((r) => r.name), ...collected.declarative.map((d) => d.name)])]
       const page: ScanPage = {

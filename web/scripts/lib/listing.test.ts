@@ -158,6 +158,9 @@ describe('listing helpers', () => {
   it('takes the display name from the page title, up to the first separator', () => {
     expect(listingName(fixture({ hints: { forms: [], links: [], title: 'Alpha — docs for robots', description: '' } }))).toBe('Alpha')
     expect(listingName(fixture({ hints: { forms: [], links: [], title: '', description: '' } }))).toBe('alpha.example.org')
+    expect(listingName(fixture({ hints: { forms: [], links: [], title: 'Attio: The CRM for agentic revenue', description: '' } }))).toBe('Attio')
+    expect(listingName(fixture({ hints: { forms: [], links: [], title: 'flatwrite-md editor', description: '' } }))).toBe('flatwrite-md editor')
+    expect(listingName(fixture({ host: 'telnyx.com', hints: { forms: [], links: [], title: 'Infrastructure for realtime agents | Telnyx', description: '' } }))).toBe('Telnyx')
     expect(listingName(fixture({ hints: { forms: [], links: [], title: 'x'.repeat(80), description: '' } }))).toBe('alpha.example.org')
   })
 

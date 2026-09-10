@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { pickLinks, scanSite } from './scan'
+import { isChallengePage, pickLinks, sameSite, scanSite } from './scan'
 
 const FIXTURE = path.resolve(__dirname, '__fixtures__/webmcp-site')
 
@@ -22,6 +22,25 @@ function haveSightmap(): boolean {
 }
 
 const HAVE_CLI = haveSightmap()
+
+describe('sameSite', () => {
+  it('treats a www. redirect as the same site and anything else as off-origin', () => {
+    expect(sameSite('https://acme.io', 'https://www.acme.io')).toBe(true)
+    expect(sameSite('https://www.acme.io', 'https://acme.io')).toBe(true)
+    expect(sameSite('https://acme.io', 'https://shop.acme.io')).toBe(false)
+    expect(sameSite('https://acme.io', 'http://www.acme.io')).toBe(false)
+    expect(sameSite('https://acme.io', 'https://www.acme.io:8443')).toBe(false)
+  })
+})
+
+describe('isChallengePage', () => {
+  it('recognises bot-mitigation interstitial titles only at the start of the title', () => {
+    expect(isChallengePage('Just a moment...')).toBe(true)
+    expect(isChallengePage('Attention Required! | Cloudflare')).toBe(true)
+    expect(isChallengePage('Acme — access denied stories')).toBe(false)
+    expect(isChallengePage('Acme Shop')).toBe(false)
+  })
+})
 
 describe('pickLinks', () => {
   it('keeps same-origin, unseen, non-destructive links in order, preferred paths first', () => {

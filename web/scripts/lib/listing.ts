@@ -61,7 +61,14 @@ export function todayString(d = new Date()): string {
  */
 export function listingName(report: ScanReport): string {
   const title = report.hints.title.replace(/\s+/g, ' ').trim()
-  const head = title.split(/\s+[—–|·:-]\s+/)[0]?.trim() ?? ''
+  // A colon needs no leading space ("Attio: The CRM…"); the dash family does,
+  // so a hyphenated name ("flatwrite-md") survives.
+  const segments = title.split(/\s*:\s+|\s+[—–|·-]\s+/).map((x) => x.trim()).filter(Boolean)
+  // "Tagline | Brand" puts the name last. The host's own label is the one
+  // word we know belongs to the site, so a segment that carries it wins.
+  const label = report.host.replace(/^www\./, '').split('.')[0].toLowerCase()
+  const branded = segments.find((seg) => seg.toLowerCase().replace(/[^a-z0-9]/g, '').includes(label.replace(/[^a-z0-9]/g, '')))
+  const head = (branded && branded.length <= 60 ? branded : segments[0]) ?? ''
   if (!head || head.length > 60) return report.host
   return head
 }
