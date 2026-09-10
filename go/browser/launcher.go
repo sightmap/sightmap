@@ -70,6 +70,12 @@ func ReadSessionInfo(sightmapDir string) (SessionInfo, error) {
 
 // FindFreePort finds the first available TCP port starting from start.
 // It tries up to 100 consecutive ports before giving up.
+//
+// A start of 0 means "auto-allocate": the OS is asked for a free ephemeral
+// port and the port it actually handed out is returned, so callers can bind
+// it, pass it to Chrome, and record it in the session file. (Scanning upward
+// from 0 would "succeed" on port 0 itself — net.Listen treats 0 as a wildcard —
+// and hand back a number nothing can be reached on.)
 func FindFreePort(start int) (int, error) {
 	return FindFreePortExcluding(start)
 }
@@ -87,6 +93,9 @@ func FindFreePortExcluding(start int, exclude ...int) (int, error) {
 	for _, p := range exclude {
 		excluded[p] = true
 	}
+	if start <= 0 {
+		return ephemeralPortExcluding(excluded)
+	}
 	for port := start; port < start+100; port++ {
 		if excluded[port] {
 			continue
@@ -103,6 +112,28 @@ func FindFreePortExcluding(start int, exclude ...int) (int, error) {
 		}
 	}
 	return 0, fmt.Errorf("no free port found in range %d–%d", start, start+99)
+}
+
+// ephemeralPortExcluding asks the OS for a free port on the IPv4 loopback and
+// returns the concrete port number it bound. Like the scanning path it only
+// probes (the listener is closed before returning), so the caller is expected
+// to bind the port promptly. The OS is asked again if it hands back an excluded
+// port; ephemeral allocation cycles through a large range, so a handful of
+// tries is plenty.
+func ephemeralPortExcluding(excluded map[int]bool) (int, error) {
+	const attempts = 16
+	for range attempts {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return 0, fmt.Errorf("auto-allocate port: %w", err)
+		}
+		port := ln.Addr().(*net.TCPAddr).Port
+		ln.Close()
+		if port > 0 && !excluded[port] {
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("auto-allocate port: no free port after %d tries", attempts)
 }
 
 // RemoveSessionFile deletes the session file for the corpus at sightmapDir, if present.
