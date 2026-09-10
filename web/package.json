@@ -6,10 +6,11 @@
   "packageManager": "pnpm@10.32.1",
   "type": "module",
   "scripts": {
-    "dev": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && vite",
+    "dev": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsx scripts/build-sightkick.ts && vite",
     "build:blog": "tsx scripts/build-blog.ts",
     "build:atlas": "tsx scripts/build-atlas.ts",
-    "build": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/check-route-coverage.ts && tsx scripts/generate-feeds.ts && tsx scripts/generate-agent-files.ts && tsx scripts/upload-sourcemaps.ts",
+    "build:sightkick": "tsx scripts/build-sightkick.ts",
+    "build": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsx scripts/build-sightkick.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/check-route-coverage.ts && tsx scripts/generate-feeds.ts && tsx scripts/generate-agent-files.ts && tsx scripts/upload-sourcemaps.ts",
     "atlas:scan": "tsx scripts/atlas-scan.ts",
     "atlas:review": "tsx scripts/atlas-review.ts",
     "atlas:listing": "tsx scripts/atlas-listing.ts",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "0.124.0",
+    "@sightmap/sightkick": "0.6.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^26.1.2",
     "@types/react": "^19.0.0",

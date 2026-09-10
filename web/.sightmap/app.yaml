@@ -199,13 +199,16 @@ views:
       - Typing in the search box replaces the history entry; clicking a type or a category pushes one
       - Site marks are monogram tiles drawn from the domain, never fetched favicons — the page makes no third-party request
       - "Nothing on a card is a grade: counts, a surface and a scan date only. Tool kinds are classified by Atlas and corrected on review"
+      - "The page registers its own WebMCP tools: src/lib/sightkick-boot.ts loads /atlas/sightkick-runtime.js + /atlas/tools.ir.json on any /atlas path, and the runtime registers the four AtlasIndex tools compiled from .sightkick/tools.yaml — search_atlas, list_community_maps, filter_atlas_by_type, submit_site — on document.modelContext (polyfilled unless the browser has a native one)"
+      - "Those tools drive this page's own controls (the search input, the type chips, the submit form) rather than a parallel API, so anything that changes a selector or a declared property here changes what an agent can do — rebuild with `pnpm build:sightkick` and re-run `sightkick build .`"
+      - A build that shipped without the tool layer serves neither file; the loader 404s silently and the page is unchanged
     components:
       - name: AtlasFilters
         selector: '[data-component="AtlasFilters"]'
         source: src/pages/AtlasIndex.tsx
         description: Search input plus the type and category chip rows; the active chip in each row carries aria-pressed
         children:
-          - name: atlas-filters-search
+          - name: AtlasSearchInput
             selector: '.atlas-filters__search input'
           - name: atlas-chip
             selector: '.atlas-chip'
@@ -218,8 +221,21 @@ views:
           - "The chips map to ?type= values: All clears it, Live and Demo filter listings by their `type`, Community maps shows only the vendored atlas entries"
           - Nested inside AtlasFilters in the DOM, so its chips also resolve under that component
         children:
-          - name: atlas-type-chip
+          - name: AtlasTypeChip
             selector: '.atlas-chip'
+            description: One type chip — its label is the visible text, and `pressed` is the aria-pressed attribute that says whether the filter is on
+            properties:
+              - name: label
+                extract: text
+              - name: pressed
+                extract: attr=aria-pressed
+
+      - name: AtlasCardGrid
+        selector: '.atlas-cards'
+        source: src/pages/AtlasIndex.tsx
+        description: The mixed card grid itself — every DirectoryCard and AtlasCard the current filters leave visible, plus the trailing AtlasSubmitCard
+        memory:
+          - Rendered only when at least one card matches; the two empty states (`.atlas-index__empty`) replace it rather than sit inside it, so its presence is the signal a filter or search produced results
 
       - name: AtlasCard
         selector: '[data-component="AtlasCard"]'
@@ -320,24 +336,28 @@ views:
           - "The `website` input is a honeypot: positioned off-canvas, out of the tab order and aria-hidden, so no field is announced or reachable for a person"
           - The section carries id="submit", which is what AtlasSubmitCard and a listing's "Request a rescan" link jump to
         children:
-          - name: atlas-submit-fields
+          - name: AtlasSubmitFields
             selector: '[data-component="AtlasSubmitFields"]'
-          - name: submit-url
+          - name: SubmitUrl
             selector: '[data-component="SubmitUrl"]'
-          - name: submit-email
+          - name: SubmitEmail
             selector: '[data-component="SubmitEmail"]'
-          - name: submit-owner
+          - name: SubmitOwner
             selector: '[data-component="SubmitOwner"]'
-          - name: submit-sightkick
+          - name: SubmitSightkick
             selector: '[data-component="SubmitSightkick"]'
-          - name: submit-nominate
+          - name: SubmitNominate
             selector: '[data-component="SubmitNominate"]'
-          - name: submit-intent
+          - name: SubmitIntent
             selector: '[data-component="SubmitIntent"]'
-          - name: submit-button
+          - name: SubmitButton
             selector: '[data-component="SubmitButton"]'
-          - name: atlas-submit-received
+          - name: AtlasSubmitReceived
             selector: '.atlas-submit-form__received'
+            description: The confirmation that replaces the form once a submission is recorded — reference id and the one-business-day line
+            properties:
+              - name: text
+                extract: text
 
       - name: AtlasMachineHint
         selector: '.atlas-index__machine'
@@ -358,7 +378,47 @@ views:
       - "Machine twins for the same listing live at /atlas/sites/<slug>.json, /atlas/sites/<slug>/tools.json, /atlas/scans/<slug>.json and /atlas/<slug>.md; the share badge image is /atlas/<slug>/badge.svg"
       - AtlasListing reuses the blog's `.blog-post__back` class for its back link and AtlasEntry's `.atlas-meta`, `.atlas-chip`, `.atlas-entry__eyebrow`, `.atlas-entry__desc` and `.atlas-entry__cats` classes, so none of those selectors is unique to this page
       - "\"Request a rescan\" is a plain anchor, not a router link: a full navigation is what makes the browser honour the #submit fragment and land on the form already prefilled from ?url= and ?rescan=1"
+      - "The page registers its own WebMCP tools, loaded by src/lib/sightkick-boot.ts from .sightkick/tools.yaml: get_listing, list_listing_tools and share_listing"
+      - "Those three are view-scoped to this route, and AtlasEntry shares it — so they also register on a community-entry page, where their reads correctly come back empty. Route scoping is per route, not per rendered page"
     components:
+      - name: ListingSummary
+        selector: '[data-component="AtlasListing"]'
+        source: src/pages/AtlasListing.tsx
+        description: The listing in one read — its name, type, the tool count and the last-scanned date, pulled from the header and the facts strip
+        memory:
+          - "An extraction anchor on the page root, not a section of its own: it exists so one read can answer \"what is this listing\" without four. The sections below it still own their own subtrees"
+          - "`type` and `tools` and `scanned` are first-match reads — the first pill in `.atlas-listing__pills` is the type (the second is the surface), the first `.atlas-facts__value` is the tool count, and the first `<time>` in the strip is the scan date (the second is the listed-since date)"
+        properties:
+          - name: name
+            extract: listing-summary-name.text
+          - name: type
+            extract: listing-summary-type.text
+          - name: tools
+            extract: listing-summary-tools.text
+          - name: scanned
+            extract: listing-summary-scanned.text
+        children:
+          - name: listing-summary-name
+            selector: '.atlas-listing__header h1'
+            properties:
+              - name: text
+                extract: text
+          - name: listing-summary-type
+            selector: '.atlas-listing__pills .atlas-type'
+            properties:
+              - name: text
+                extract: text
+          - name: listing-summary-tools
+            selector: '.atlas-facts__item .atlas-facts__value'
+            properties:
+              - name: text
+                extract: text
+          - name: listing-summary-scanned
+            selector: '.atlas-facts__item time'
+            properties:
+              - name: text
+                extract: text
+
       - name: ListingHeader
         selector: '[data-component="ListingHeader"]'
         source: src/pages/AtlasListing.tsx
@@ -396,10 +456,23 @@ views:
         children:
           - name: listing-fact
             selector: '.atlas-facts__item'
-          - name: listing-fact-label
-            selector: '.atlas-facts__label'
-          - name: listing-fact-value
-            selector: '.atlas-facts__value'
+            description: One LABEL / value cell of the strip
+            properties:
+              - name: label
+                extract: listing-fact-label.text
+              - name: value
+                extract: listing-fact-value.text
+            children:
+              - name: listing-fact-label
+                selector: '.atlas-facts__label'
+                properties:
+                  - name: text
+                    extract: text
+              - name: listing-fact-value
+                selector: '.atlas-facts__value'
+                properties:
+                  - name: text
+                    extract: text
 
       - name: ListingTools
         selector: '[data-component="ListingTools"]'
@@ -418,20 +491,27 @@ views:
         children:
           - name: atlas-tools-page
             selector: '.atlas-tools__page'
-          - name: atlas-tool
+          - name: ListingToolRow
             selector: '.atlas-tool'
-          - name: atlas-tool-name
-            selector: '.atlas-tool__name'
+            description: One scanned tool row — its name and the kind chip Atlas classified it with
             properties:
-              - name: text
-                extract: text
-          - name: atlas-tool-kind
-            selector: '.atlas-kind'
-            properties:
-              - name: text
-                extract: text
-          - name: atlas-tool-schema
-            selector: '.atlas-tool__schema'
+              - name: name
+                extract: atlas-tool-name.text
+              - name: kind
+                extract: atlas-tool-kind.text
+            children:
+              - name: atlas-tool-name
+                selector: '.atlas-tool__name'
+                properties:
+                  - name: text
+                    extract: text
+              - name: atlas-tool-kind
+                selector: '.atlas-kind'
+                properties:
+                  - name: text
+                    extract: text
+              - name: atlas-tool-schema
+                selector: '.atlas-tool__schema'
 
       - name: ListingChecks
         selector: '[data-component="ListingChecks"]'
@@ -520,8 +600,12 @@ views:
           - "The share text states a tool count and the scan's provenance and nothing else — no \"verified\", no \"safe\""
           - The badge image is served from /atlas/<slug>/badge.svg and the markdown links it back to the listing, so a badge is always checkable
         children:
-          - name: listing-share-link
+          - name: ListingShareLink
             selector: '.atlas-share__link'
+            description: One share affordance — "Share on X", "Share on LinkedIn", or the "Copy link" button, which shares the class
+            properties:
+              - name: label
+                extract: text
           - name: listing-badge
             selector: '.atlas-share__badge'
           - name: listing-badge-snippet
