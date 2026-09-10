@@ -199,6 +199,9 @@ views:
       - Typing in the search box replaces the history entry; clicking a type or a category pushes one
       - Site marks are monogram tiles drawn from the domain, never fetched favicons — the page makes no third-party request
       - "Nothing on a card is a grade: counts, a surface and a scan date only. Tool kinds are classified by Atlas and corrected on review"
+      - "The page registers its own WebMCP tools: src/lib/sightkick-boot.ts loads /atlas/sightkick-runtime.js + /atlas/tools.ir.json on any /atlas path, and the runtime registers the four AtlasIndex tools compiled from .sightkick/tools.yaml — search_atlas, list_community_maps, filter_atlas_by_type, submit_site — on document.modelContext (polyfilled unless the browser has a native one)"
+      - "Those tools drive this page's own controls (the search input, the type chips, the submit form) rather than a parallel API, so anything that changes a selector or a declared property here changes what an agent can do — rebuild with `pnpm build:sightkick` and re-run `sightkick build .`"
+      - A build that shipped without the tool layer serves neither file; the loader 404s silently and the page is unchanged
     components:
       - name: AtlasFilters
         selector: '[data-component="AtlasFilters"]'
@@ -375,6 +378,8 @@ views:
       - "Machine twins for the same listing live at /atlas/sites/<slug>.json, /atlas/sites/<slug>/tools.json, /atlas/scans/<slug>.json and /atlas/<slug>.md; the share badge image is /atlas/<slug>/badge.svg"
       - AtlasListing reuses the blog's `.blog-post__back` class for its back link and AtlasEntry's `.atlas-meta`, `.atlas-chip`, `.atlas-entry__eyebrow`, `.atlas-entry__desc` and `.atlas-entry__cats` classes, so none of those selectors is unique to this page
       - "\"Request a rescan\" is a plain anchor, not a router link: a full navigation is what makes the browser honour the #submit fragment and land on the form already prefilled from ?url= and ?rescan=1"
+      - "The page registers its own WebMCP tools, loaded by src/lib/sightkick-boot.ts from .sightkick/tools.yaml: get_listing, list_listing_tools and share_listing"
+      - "Those three are view-scoped to this route, and AtlasEntry shares it — so they also register on a community-entry page, where their reads correctly come back empty. Route scoping is per route, not per rendered page"
     components:
       - name: ListingSummary
         selector: '[data-component="AtlasListing"]'

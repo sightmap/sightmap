@@ -1,0 +1,212 @@
+# The WebMCP tool layer sightmap.org registers on its own Atlas pages.
+#
+# Compiled by `sightkick build` against ../.sightmap (the site's real corpus)
+# into public/atlas/tools.ir.json, and booted in the browser by
+# src/lib/sightkick-boot.ts. Every query below names a component declared in
+# that corpus — there is no CSS here, and there is no second, tool-only
+# description of the page.
+#
+# Each tool is `ensure_view`-scoped, so the gallery's tools register only on
+# /atlas and a listing's only on /atlas/<slug>.
+version: 1
+name: sightmap-org
+corpus: ../.sightmap
+
+tools:
+  - name: search_atlas
+    description: >-
+      Search the Atlas gallery by free text and read back the WebMCP listings
+      that match. Drives the page's own search box, so the result is exactly
+      what a visitor sees.
+    mode: live
+    ensure_view: AtlasIndex
+    params:
+      - name: query
+        type: string
+        required: true
+        description: Text to match against site names, descriptions and tool names.
+    steps:
+      - fill:
+          query: 'AtlasFilters AtlasSearchInput'
+          value: "{{query}}"
+      # The grid is only rendered when something matched, so waiting for it is
+      # waiting for results rather than for a repaint.
+      - wait_for:
+          query: AtlasCardGrid
+          timeout_ms: 4000
+    returns:
+      description: The listing cards left visible by the search.
+      list:
+        rows: DirectoryCard
+        fields:
+          name: name
+          type: type
+          tools: tools
+
+  - name: list_community_maps
+    description: >-
+      List the community sightmap cards currently visible in the Atlas gallery —
+      the vendored corpora of sites that expose no WebMCP tools of their own.
+    mode: live
+    ensure_view: AtlasIndex
+    returns:
+      description: The community-map cards on screen (site name + capture method).
+      list:
+        rows: AtlasCard
+        fields:
+          site: site
+          method: method
+
+  - name: filter_atlas_by_type
+    description: >-
+      Narrow the Atlas gallery to one kind of entry — live listings, demo
+      listings, community maps, or all of them — by clicking the type chip.
+    mode: live
+    ensure_view: AtlasIndex
+    params:
+      - name: type
+        type: enum
+        required: true
+        values: [live, demo, community, all]
+        description: Which cut of the gallery to show.
+    steps:
+      # The chip labels are All / Live / Demo / Community maps, so the enum
+      # value is a case-insensitive prefix of the label it selects.
+      - click:
+          query: 'AtlasTypeFilter AtlasTypeChip[label^="{{type}}" i]'
+      # aria-pressed is the page's own "this filter is on" signal, and unlike
+      # the card grid it is there even when the cut is empty.
+      - wait_for:
+          query: 'AtlasTypeFilter AtlasTypeChip[label^="{{type}}" i][pressed="true"]'
+          timeout_ms: 4000
+    returns:
+      description: The listing cards left visible by the filter.
+      list:
+        rows: DirectoryCard
+        fields:
+          name: name
+          type: type
+          tools: tools
+
+  - name: submit_site
+    description: >-
+      Submit a site to the Atlas for a free WebMCP scan, using the same visible
+      form a person uses. Fills the URL, the email the report goes to, and the
+      optional intent, then presses "Scan my site".
+    mode: live
+    ensure_view: AtlasIndex
+    params:
+      - name: url
+        type: string
+        required: true
+        description: The site to scan, e.g. https://example.com/.
+      - name: email
+        type: string
+        required: true
+        description: Where the scan report is sent. Not published.
+      - name: intent
+        type: string
+        required: false
+        description: Optional — what an agent should be able to do on that site.
+      - name: owner
+        type: boolean
+        required: false
+        description: >-
+          Pass true to tick "I own or maintain this site". Omit it otherwise;
+          the box starts unticked, so there is nothing to untick.
+    # Re-running with the same input must not post twice: if the confirmation is
+    # already on screen, return it instead of filling a form that is not there.
+    guard:
+      present:
+        query: 'AtlasSubmitForm AtlasSubmitReceived'
+    steps:
+      - fill:
+          query: 'AtlasSubmitForm SubmitUrl'
+          value: "{{url}}"
+      - fill:
+          query: 'AtlasSubmitForm SubmitEmail'
+          value: "{{email}}"
+      - fill:
+          query: 'AtlasSubmitForm SubmitIntent'
+          value: "{{intent}}"
+      - click:
+          query: 'AtlasSubmitForm SubmitOwner'
+          when: "{{owner}}"
+      - click:
+          query: 'AtlasSubmitForm SubmitButton'
+      # The received state replaces the whole form, so this is the submission
+      # actually being recorded rather than the button having been pressed.
+      - wait_for:
+          query: 'AtlasSubmitForm AtlasSubmitReceived'
+          timeout_ms: 15000
+    returns:
+      description: The confirmation text, including the reference id.
+      value:
+        query: 'AtlasSubmitForm AtlasSubmitReceived'
+        property: text
+
+  - name: get_listing
+    description: >-
+      Read the listing on screen — its name, whether it is a live or demo
+      listing, how many WebMCP tools the last scan found, and when that scan ran.
+    mode: live
+    ensure_view: AtlasListing
+    returns:
+      description: One row — name, type, tool count and last-scanned date.
+      list:
+        rows: ListingSummary
+        fields:
+          name: name
+          type: type
+          tools: tools
+          scanned: scanned
+
+  - name: list_listing_tools
+    description: >-
+      List the WebMCP tools this listing's last scan found, with the kind Atlas
+      classified each as (read, action or sensitive).
+    mode: live
+    ensure_view: AtlasListing
+    returns:
+      description: One row per scanned tool — its name and its kind chip.
+      list:
+        rows: 'ListingTools ListingToolRow'
+        fields:
+          name: name
+          kind: kind
+
+  - name: share_listing
+    description: >-
+      Open a share composer for this listing on X or LinkedIn. It opens the
+      network's own composer in a new tab with the listing prefilled; nothing is
+      posted.
+    mode: live
+    ensure_view: AtlasListing
+    params:
+      - name: network
+        type: enum
+        required: true
+        values: [x, linkedin]
+        description: Which network's composer to open.
+    steps:
+      - click:
+          query: 'ListingShare ListingShareLink[label*="{{network}}" i]'
+    returns:
+      description: >-
+        Nothing is read back — the share composer opens in a new tab and the
+        listing page is unchanged.
+
+journeys:
+  - name: find_and_open
+    description: Find a listed site in the Atlas gallery, then read its listing.
+    steps:
+      - search_atlas
+      - tool: get_listing
+        reason: read the facts of the listing the search turned up, once you open it
+
+  - name: submit_and_confirm
+    description: Put a site forward for a scan and confirm it was recorded.
+    steps:
+      - submit_site
+      - tool: search_atlas
+        reason: check whether the site is already listed before or after submitting
