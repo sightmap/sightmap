@@ -14,6 +14,7 @@ import App from '../src/App'
 import { setServerPostHtml, clearServerPostHtml } from '../src/lib/postHtml'
 import { loadPosts, renderPostHtml } from './lib/posts'
 import { loadAtlas } from './lib/atlas'
+import { loadDirectory } from './lib/directory'
 import {
   SITE_URL,
   SITE_NAME,
@@ -40,6 +41,7 @@ import { buildSiteJsonLd } from './lib/agent'
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
 const ATLAS_DIR = path.resolve('src/data/atlas')
+const DIRECTORY_DIR = path.resolve('src/data/directory')
 
 // Netlify sets DEPLOY_PRIME_URL on deploy previews and branch deploys (and
 // URL, which already equals SITE_URL, on production). Locally and in
@@ -505,6 +507,83 @@ async function main() {
     )
   }
 
+  // ---- WebMCP directory ----
+  //
+  // The other half of /atlas/<slug>: a listing is a scanned site rather than a
+  // vendored corpus, but it renders at the same route, so its pages are
+  // prerendered here alongside the entries. Read with the entry slugs
+  // reserved, and read from the vendored data rather than from
+  // src/generated/atlas-manifest.ts, for the same reason the entries above
+  // are: the manifest is a generated artifact, and depending on it here would
+  // let a stale one silently decide which pages exist.
+  const directory = loadDirectory(DIRECTORY_DIR, atlas.entries.map((e) => e.slug))
+
+  for (const listing of directory.listings) {
+    const url = `${SITE_URL}/atlas/${listing.slug}`
+    const ogUrl = `${DEPLOY_URL}/atlas/${listing.slug}`
+
+    // A scan is a dataset about a website in exactly the sense an entry is —
+    // observations made from the outside, published with the machine twins
+    // that carry them — so it is described the same way, with the site it
+    // describes as `isBasedOn` and the Atlas as its catalog.
+    const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'Dataset',
+      name: `${listing.name} WebMCP scan`,
+      description: listing.description,
+      url,
+      dateCreated: listing.added,
+      dateModified: listing.updated,
+      isBasedOn: listing.url,
+      keywords: [listing.category, ...listing.collections],
+      distribution: [
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'application/json',
+          contentUrl: `${SITE_URL}/atlas/sites/${listing.slug}.json`,
+        },
+        {
+          '@type': 'DataDownload',
+          encodingFormat: 'text/markdown',
+          contentUrl: `${SITE_URL}/atlas/${listing.slug}.md`,
+        },
+      ],
+      includedInDataCatalog: {
+        '@type': 'DataCatalog',
+        name: `${SITE_NAME} Atlas`,
+        url: `${SITE_URL}/atlas`,
+      },
+    }
+
+    const head = [
+      `<link rel="alternate" type="text/markdown" href="${SITE_URL}/atlas/${listing.slug}.md">`,
+      `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`,
+    ].join('\n    ')
+
+    write(
+      `atlas/${listing.slug}`,
+      renderRoute(
+        shell,
+        `/atlas/${listing.slug}`,
+        {
+          url,
+          ogUrl,
+          // Same site-wide card as the entries, for the same reason: listings
+          // arrive by bot PR, and a per-listing image would exist only for
+          // whichever ones someone hand-processed.
+          title: atlasTitle(listing.name),
+          description: listing.description,
+          image: `${SITE_URL}/og-image.png`,
+          ogImage: `${DEPLOY_URL}/og-image.png`,
+          imageAlt: DEFAULT_IMAGE_ALT,
+          imageDimensionsKnown: true,
+          type: 'website',
+        },
+        head
+      )
+    )
+  }
+
   // ---- 404 ----
   //
   // Written to dist/404.html, not dist/404/index.html: netlify.toml's
@@ -607,7 +686,7 @@ async function main() {
   )
 
   console.log(
-    `\n  prerender complete: ${posts.length + atlas.entries.length + 7} page(s)`
+    `\n  prerender complete: ${posts.length + atlas.entries.length + directory.listings.length + 7} page(s)`
   )
 }
 
