@@ -58,9 +58,9 @@ export const BUILDING_DESCRIPTION =
 // The /sightkick companion page: the WebMCP tool layer compiled from a corpus.
 // Read by scripts/prerender.tsx, src/pages/Sightkick.tsx, and the sitemap /
 // llms.txt generators.
-export const SIGHTKICK_TITLE = `Sightkick — WebMCP tools for your web app`
+export const SIGHTKICK_TITLE = `Sightkick — WebMCP tools for your app, on your app`
 export const SIGHTKICK_DESCRIPTION =
-  'Sightkick compiles a .sightmap/ corpus and a YAML tool layer into WebMCP tools, so an agent calls a named action on your app instead of guessing at selectors.'
+  'One prompt maps your app and compiles a WebMCP tool layer with Sightkick, so any agent that opens your site calls a named action instead of guessing.'
 export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`
 // An atlas entry's own title carries the mapped site's name, so the suffix
 // says which gallery it came from rather than repeating the site name twice.

@@ -476,3 +476,35 @@
 @media (prefers-reduced-motion: reduce) {
   .sk-copycmd { transition: none; }
 }
+
+/* The three things a visitor leaves with, under the transcript pair. */
+.sk-artifacts {
+  list-style: none;
+  margin: 2.5rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.sk-artifacts li {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.sk-artifacts strong { display: block; margin-bottom: 0.25rem; color: var(--text-bright); }
+.sk-artifacts code { font-size: 0.85em; }
+@media (max-width: 720px) {
+  .sk-artifacts { grid-template-columns: 1fr; }
+}
+.sk-artifacts__title {
+  margin: 2.5rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sk-artifacts { margin-top: 0.9rem; }

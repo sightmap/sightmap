@@ -238,7 +238,7 @@ const DEFAULT_IMAGE_ALT = `${SITE_NAME}: Runtime context for agents using your w
 
 // Alt text for the /sightkick card (public/sightkick/og-image.png, rendered
 // from og/sightkick-card.html), which carries that page's own headline.
-const SIGHTKICK_IMAGE_ALT = 'Sightkick: The front desk for your web app.'
+const SIGHTKICK_IMAGE_ALT = 'Sightkick: Let agents use your product.'
 
 // Builds the `<script id="__SIGHTMAP_POST__">` tag that inlines a post's
 // rendered HTML as JSON so the client can seed hydration from it (see
