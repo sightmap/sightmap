@@ -71,7 +71,11 @@ export default function AtlasIndex() {
   const rescan = hydrated ? params.get('rescan') === '1' : false
   const submittedId = hydrated ? (params.get('submitted') ?? '') : ''
   const errorCode = hydrated ? (params.get('error') ?? '') : ''
-  const cardUrl = hydrated ? (params.get('card') ?? '') : ''
+  // The no-JS path carries the card URL back in the query. Only a card on
+  // this site is shown: the query is anyone's to write, and a link under
+  // "Submission received" is trusted by the reader.
+  const cardParam = hydrated ? (params.get('card') ?? '') : ''
+  const cardUrl = /^https:\/\/sightmap\.org\/try\/[a-z0-9.-]+$/.test(cardParam) ? cardParam : ''
 
   // Empty values are dropped rather than written as `?q=`, so the URL a
   // visitor copies is the shortest one that reproduces what they see.

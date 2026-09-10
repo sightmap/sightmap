@@ -327,14 +327,8 @@ export const submitAcceptedSchema = {
  * does not carry the line yet — and nothing is stored either way, so the
  * caller can fix the file and post the same body again.
  */
-export const submitErrorCodes = {
-  claimUnreachable: 'claim-unreachable',
-  claimMismatch: 'claim-mismatch',
-  quarantined: 'quarantined',
-} as const
-
 export const submitClaimFailedDescription =
-  'The claim could not be checked: `claim-unreachable` (webmcp.txt did not answer 200, was too large, or redirected off-site) or `claim-mismatch` (the file is there, the line is not). Nothing was stored.'
+  'The claim could not be checked: `claim-unreachable` (webmcp.txt could not be read from the host over https) or `claim-mismatch` (the file was read, the line is not there). Nothing about the submission was stored.'
 
 export const submitQuarantinedDescription =
   'Code `quarantined`: a maintainer has taken this host off the pipeline. Submissions for it are refused with or without a claim.'
