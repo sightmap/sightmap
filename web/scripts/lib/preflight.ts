@@ -97,7 +97,12 @@ export function preflightUrl(input: string, opts: { allowLocal?: boolean } = {})
     }
   }
 
-  const host = u.hostname.toLowerCase()
+  const raw = u.hostname.toLowerCase()
+  // A trailing dot is the same host with the root label spelled out, and
+  // `canonicalHost()` drops it, so drop it here too: otherwise `acme.io.`
+  // would submit and be listed as a second site, and `localhost.` would walk
+  // straight past the reserved-host check below.
+  const host = raw.replace(/\.$/, '')
   const bare = host.replace(/^\[|\]$/g, '')
   if (net.isIP(bare)) {
     if (!opts.allowLocal || !isPrivateAddress(bare)) {
@@ -108,10 +113,17 @@ export function preflightUrl(input: string, opts: { allowLocal?: boolean } = {})
     if (BLOCKED_HOST.test(host) && !opts.allowLocal) {
       return { ok: false, url: '', host, reason: 'hostname is reserved or not public' }
     }
-    if (!/^[a-z0-9.-]+$/.test(host) || host.startsWith('-') || host.includes('..')) {
+    if (!/^[a-z0-9.-]+$/.test(host) || host.startsWith('-') || raw.includes('..')) {
       return { ok: false, url: '', host, reason: 'hostname is malformed' }
     }
+    // `new URL()` has already run IDNA, so a Unicode hostname arrives here as
+    // its punycode form — refusing every `xn--` label is therefore also what
+    // keeps a look-alike domain out, which no ASCII check could do.
+    if (host.split('.').some((label) => label.startsWith('xn--'))) {
+      return { ok: false, url: '', host, reason: 'internationalized hostnames are not supported yet' }
+    }
   }
+  u.hostname = host
 
   if (UNSAFE_URL_CHARS.test(u.pathname) || UNSAFE_URL_CHARS.test(u.search)) {
     return { ok: false, url: '', host, reason: 'URL contains characters the scanner does not accept' }
