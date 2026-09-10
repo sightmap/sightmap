@@ -16,6 +16,7 @@ import { loadAtlas } from './lib/atlas'
 import { loadDirectory } from './lib/directory'
 import { primaryDomain } from '../src/lib/atlas'
 import type { AtlasStats } from '../src/types/atlas'
+import type { DirectoryListing } from '../src/types/directory'
 import {
   SITE_URL,
   SITE_NAME,
@@ -73,6 +74,24 @@ export interface FeedDirectoryListing {
   type: 'live' | 'demo'
   tool_count: number
   updated: string
+}
+
+/**
+ * The projection itself. Both feed generators need exactly these fields from a
+ * loaded listing, and a hand-copied object literal in each is one field-rename
+ * away from the two disagreeing — llms.txt and the markdown twin would then
+ * describe the same listing differently.
+ */
+export function toFeedListing(listing: DirectoryListing): FeedDirectoryListing {
+  return {
+    slug: listing.slug,
+    name: listing.name,
+    host: listing.host,
+    description: listing.description,
+    type: listing.type,
+    tool_count: listing.counts.tools,
+    updated: listing.updated,
+  }
 }
 
 // Feed readers expect RFC 822. Posts carry a date but no time, so they are
@@ -340,15 +359,7 @@ async function main() {
   const listings: FeedDirectoryListing[] = loadDirectory(
     DIRECTORY_DIR,
     atlas.map((e) => e.slug)
-  ).listings.map((l) => ({
-    slug: l.slug,
-    name: l.name,
-    host: l.host,
-    description: l.description,
-    type: l.type,
-    tool_count: l.counts.tools,
-    updated: l.updated,
-  }))
+  ).listings.map(toFeedListing)
 
   // Build time, not post time — only affects lastBuildDate and the homepage
   // lastmod, both of which are meant to move on every deploy.

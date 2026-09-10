@@ -19,7 +19,9 @@ import {
   parseRunCount,
   runnerInput,
   runnerKind,
+  shellQuote,
   shouldTriggerRunner,
+  submittedBy,
   submitSalt,
   triggerRunner,
   type RunnerPromptInput,
@@ -77,10 +79,10 @@ describe('buildRunnerPrompt', () => {
     expect(prompt).toContain('owner=true sightkick=true nominate=false rescan=false')
     expect(prompt).toContain('deadbeef')
     expect(prompt).toContain('pnpm atlas:intake')
-    expect(prompt).toContain('--submission-id abc123')
-    expect(prompt).toContain('--intent "Find the pricing page"')
+    expect(prompt).toContain("--submission-id 'abc123'")
+    expect(prompt).toContain("--intent 'Find the pricing page'")
     expect(prompt).toContain('--sightkick')
-    expect(prompt).toContain('--submitted-by owner')
+    expect(prompt).toContain("--submitted-by 'owner'")
   })
 
   it('asks for tests, a build, and a PR it must not merge', () => {
@@ -111,13 +113,57 @@ describe('buildRunnerPrompt', () => {
 
   it('marks a nominated site as nominator and omits --sightkick when false', () => {
     const command = intakeCommand({ ...PROMPT_INPUT, owner: false, nominate: true, sightkick: false, intent: '' })
-    expect(command).toContain('--submitted-by nominator')
+    expect(command).toContain("--submitted-by 'nominator'")
     expect(command).not.toContain('--sightkick')
     expect(command).not.toContain('--intent')
   })
 })
 
 // ---------------------------------------------------------------------------
+
+describe('intakeCommand shell safety', () => {
+  const HOSTILE: RunnerPromptInput = {
+    ...PROMPT_INPUT,
+    url: 'https://example.org/p?q=$(id)',
+    intent: 'run $(id) `whoami` now',
+  }
+
+  it('leaves no shell metacharacter unquoted', () => {
+    const command = intakeCommand(HOSTILE)
+    // A double-quoted shell word still expands $(...), `...` and \ — the value
+    // has to arrive inside single quotes for the runner to paste it safely.
+    expect(command).not.toContain('"')
+    expect(command).toContain(`--url 'https://example.org/p?q=$(id)'`)
+    expect(command).toContain(`--intent 'run $(id) ` + '`whoami`' + ` now'`)
+  })
+
+  it("closes, escapes and reopens each single quote ('\\'')", () => {
+    // Pasted into sh, each of these is exactly one word.
+    expect(shellQuote("it's")).toBe(String.raw`'it'\''s'`)
+    expect(shellQuote("a'; rm -rf /; echo '")).toBe(String.raw`'a'\''; rm -rf /; echo '\'''`)
+  })
+
+  it('quotes an empty string as an empty word rather than nothing', () => {
+    expect(shellQuote('')).toBe("''")
+  })
+})
+
+describe('submittedBy', () => {
+  it('is nominator unless the owner box was ticked', () => {
+    expect(submittedBy({ owner: true, nominate: false })).toBe('owner')
+    expect(submittedBy({ owner: true, nominate: true })).toBe('owner')
+    expect(submittedBy({ owner: false, nominate: true })).toBe('nominator')
+    // Neither box: the submitter has not claimed the site, so it is a
+    // nomination — never 'maintainer', which is a hand-run intake only.
+    expect(submittedBy({ owner: false, nominate: false })).toBe('nominator')
+  })
+
+  it('never claims ownership on an unticked web submission', () => {
+    const command = intakeCommand({ ...PROMPT_INPUT, owner: false, nominate: false })
+    expect(command).toContain("--submitted-by 'nominator'")
+    expect(command).not.toContain('owner')
+  })
+})
 
 describe('buildNetlifyRunnerRequest', () => {
   it('posts to the agent_runners endpoint the CLI uses', () => {
@@ -276,6 +322,14 @@ describe('daily runner ceiling', () => {
   it('fails open when the counter could not be read', () => {
     expect(shouldTriggerRunner(null, 2)).toBe(true)
     expect(shouldTriggerRunner(Number.NaN, 2)).toBe(true)
+  })
+
+  it('never triggers at a ceiling of 0, counter or no counter', () => {
+    // ATLAS_DAILY_RUNS=0 is how runs are turned off. An unreadable counter is
+    // not a reason to start one anyway.
+    expect(shouldTriggerRunner(null, 0)).toBe(false)
+    expect(shouldTriggerRunner(Number.NaN, 0)).toBe(false)
+    expect(shouldTriggerRunner(0, 0)).toBe(false)
   })
 
   it('defaults the ceiling to 20 when none is passed', () => {

@@ -8,6 +8,10 @@
 // already names their URL and the pages the scan looked at.
 export const SIGHTKICK_INSTALL = 'npm install -g @sightmap/sightkick'
 
+// A URL from a scan is the scanned site's own (its redirect target), so it is
+// quoted as a shell word; the placeholder stays bare for a reader to replace.
+const shellWord = (s: string): string => (s === '<APP_URL>' ? s : `'${s.replace(/'/g, "'\\''")}'`)
+
 export function sightkickAgentPrompt(appUrl = '<APP_URL>', pagesHint = ''): string {
   const pages = pagesHint ? `\n   Start with: ${pagesHint}` : ''
   return `Build a WebMCP tool layer for this app with sightmap + sightkick.
@@ -17,7 +21,7 @@ export function sightkickAgentPrompt(appUrl = '<APP_URL>', pagesHint = ''): stri
    Read sightmap-authoring, sightmap-browser, sightkick-authoring and
    sightkick-debug before you start. They are the source of truth.
 3. Start a session against the running app:
-   sightmap browser start --url ${appUrl}
+   sightmap browser start --url ${shellWord(appUrl)}
 4. Follow sightmap-authoring to map the 1-3 pages the tools need. Verify every
    selector with sel-probe before it goes into YAML, get each page to 0
    orphaned nodes, and run sightmap capture on each view.${pages}

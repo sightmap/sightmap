@@ -82,6 +82,43 @@ describe('handleNegotiate', () => {
     expect(body.error.code).toBe('not_found')
   })
 
+  it('answers a host lookup from the generated index', async () => {
+    const res = await handleNegotiate(
+      request('/api/atlas/lookup/example.com'),
+      deps({
+        files: {
+          '/atlas/hosts/example.com.json': new Response(
+            JSON.stringify({ slug: 'example', url: 'https://example.com/', tool_count: 3 }),
+            { status: 200 }
+          ),
+        },
+      })
+    )
+    expect(res!.status).toBe(200)
+    expect(res!.headers.get('content-type')).toBe(JSON_TYPE)
+    expect(await res!.json()).toMatchObject({ slug: 'example', tool_count: 3 })
+  })
+
+  it('returns the JSON NotFound for an unlisted host, not the HTML 404', async () => {
+    // The hostname's dot used to read as "the client named a representation",
+    // so the path passed through to netlify.toml's 404 catch-all and an agent
+    // got HTML where openapi.json promises NotFound.
+    const res = await handleNegotiate(request('/api/atlas/lookup/nope.example'), deps({ files: {} }))
+    expect(res).toBeDefined()
+    expect(res!.status).toBe(404)
+    expect(res!.headers.get('content-type')).toBe(JSON_TYPE)
+    const body = (await res!.json()) as { error: { code: string; status: number; hint: string } }
+    expect(body.error).toMatchObject({ code: 'not_found', status: 404 })
+    expect(body.error.hint).toContain('llms.txt')
+  })
+
+  it('still passes concrete /api representations through', async () => {
+    // /api/atlas.json and /api/atlas/<slug>.json are static files, and this
+    // handler fetches them itself — negotiating them would loop.
+    expect(await handleNegotiate(request('/api/atlas.json'), deps({}))).toBeUndefined()
+    expect(await handleNegotiate(request('/api/atlas/acme.json'), deps({}))).toBeUndefined()
+  })
+
   it('serves the markdown 404 body for Accept: text/markdown on a missing page', async () => {
     const res = await handleNegotiate(
       request('/no-such-page', { Accept: 'text/markdown' }),

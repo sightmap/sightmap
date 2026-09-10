@@ -35,12 +35,18 @@
 //                              a burst from distinct IPs (which the per-IP
 //                              limit does not catch) must not exhaust it. Over
 //                              the ceiling the submission is still accepted and
-//                              stored, with state 'queued' and no runner.
+//                              stored, with state 'queued' and no runner. 0
+//                              turns runner triggers off entirely.
 //   ATLAS_GITHUB_TOKEN         Token for ATLAS_RUNNER=github (repository_dispatch).
 //   ATLAS_GITHUB_REPO          Optional. Defaults to 'sightmap/sightmap'.
-//   ATLAS_SUBMIT_SALT          Per-deploy salt for the client IP hash. Defaults
-//                              to 'atlas'; set it so hashes are not comparable
-//                              across deploys.
+//   ATLAS_SUBMIT_SALT          Per-deploy key for the client IP hash and the
+//                              HMAC of the submitter's email. Defaults to
+//                              'atlas'; set it so neither hash is comparable
+//                              across deploys or reversible by guessing an
+//                              address. Set it once and leave it: changing it
+//                              changes every hash, so a submitter's emailHash
+//                              no longer matches the ones already on file, and
+//                              cross-deploy "same submitter" matching breaks.
 //
 // Blobs stores: `atlas-submissions` (the records) and `atlas-rate` (one counter
 // per hashed IP, plus one `runs/<yyyy-mm-dd>` counter for the daily ceiling).
@@ -62,6 +68,7 @@ import {
   recordKey,
   submitError,
   validateSubmission,
+  type BodyEncoding,
   type SubmissionRecord,
   type SubmitErrorBody,
 } from '../lib/submit.ts'
@@ -70,6 +77,7 @@ import {
   dailyRunCeiling,
   dailyRunsKey,
   parseRunCount,
+  RUN_CLAIM_ATTEMPTS,
   runnerInput,
   runnerKind,
   shouldTriggerRunner,
@@ -109,6 +117,29 @@ function errorResponse(body: SubmitErrorBody, extra?: HeadersInit): Response {
   return json(body, body.error.status, extra)
 }
 
+/**
+ * Where a no-JS post goes next. Always back to the form it came from — the
+ * fragment is what returns the visitor to the section rather than the top of
+ * a long page — carrying either the new submission id or an error code.
+ */
+function atlasRedirect(query: string): Response {
+  return new Response(null, {
+    status: 303,
+    headers: { Location: `/atlas?${query}#submit`, 'Cache-Control': 'no-store' },
+  })
+}
+
+/**
+ * One failure, answered in the encoding the caller used. A JSON client gets
+ * the error envelope; a plain `<form method="post">` gets a 303 back to the
+ * page, because a browser with scripting off would otherwise render raw JSON
+ * as the whole response.
+ */
+function failure(encoding: BodyEncoding, body: SubmitErrorBody, extra?: HeadersInit): Response {
+  if (encoding === 'form') return atlasRedirect(`error=${encodeURIComponent(body.error.code)}`)
+  return errorResponse(body, extra)
+}
+
 /** Blobs is best-effort everywhere. A failure is a warning, never a 500. */
 async function withStore<T>(
   name: string,
@@ -122,6 +153,40 @@ async function withStore<T>(
     console.warn(`[atlas-submit] blobs ${what} failed on store ${name}: ${message}`)
     return { ok: false, error: message }
   }
+}
+
+/**
+ * Claim one of the day's runs.
+ *
+ * Read-then-write is not enough here: two submissions that land in the same
+ * second both read `count` and both write `count + 1`, so the day's ceiling
+ * leaks one run per collision. `getWithMetadata` hands back the entry's ETag,
+ * and the write is conditional on it (`onlyIfMatch`), or on the key still not
+ * existing (`onlyIfNew`) — a `set` that loses the race comes back
+ * `modified: false` rather than clobbering the winner, and we read and try
+ * again. Three attempts: past that the day is busy enough that the ceiling is
+ * exactly the thing to respect, and the submission is still accepted, stored,
+ * and left for a maintainer.
+ */
+async function claimRun(
+  store: ReturnType<typeof getStore>,
+  key: string,
+  ceiling: number
+): Promise<boolean> {
+  for (let attempt = 0; attempt < RUN_CLAIM_ATTEMPTS; attempt += 1) {
+    const entry = await store.getWithMetadata(key, { type: 'json' })
+    const count = parseRunCount(entry?.data)
+    if (!shouldTriggerRunner(count, ceiling)) return false
+
+    // No entry yet -> create-only. An entry with an ETag -> compare-and-set.
+    // An entry without one (a store that does not report ETags) -> the old
+    // unconditional write, which is no worse than what it replaces.
+    const conditions =
+      entry === null ? { onlyIfNew: true } : entry.etag ? { onlyIfMatch: entry.etag } : undefined
+    const written = await store.setJSON(key, { count: (count ?? 0) + 1 }, conditions)
+    if (written.modified) return true
+  }
+  return false
 }
 
 async function handleGet(url: URL): Promise<Response> {
@@ -166,11 +231,12 @@ export default async (req: Request, context: Context): Promise<Response> => {
   const { fields, encoding } = parsed
 
   const validated = await validateSubmission(fields)
-  if (!validated.ok) return errorResponse(validated.error)
+  if (!validated.ok) return failure(encoding, validated.error)
   const value = validated.value
 
   const env = process.env as RunnerEnv
-  const ipHash = await hashIp(context.ip ?? 'unknown', submitSalt(env))
+  const salt = submitSalt(env)
+  const ipHash = await hashIp(context.ip ?? 'unknown', salt)
 
   // Rate limit. A Blobs failure here fails open: five extra submissions cost
   // far less than one lost one.
@@ -182,31 +248,30 @@ export default async (req: Request, context: Context): Promise<Response> => {
     return decision
   })
   if (rate.ok && !rate.value.allowed) {
-    return errorResponse(rateLimitedError(rate.value.retryAfterSeconds), {
+    return failure(encoding, rateLimitedError(rate.value.retryAfterSeconds), {
       'Retry-After': String(rate.value.retryAfterSeconds),
     })
   }
 
   const id = newSubmissionId()
   const receivedAt = new Date(now).toISOString()
-  const emailHash = await hashEmail(value.email)
+  const emailHash = await hashEmail(value.email, salt)
   const kind = runnerKind(env)
 
   // Global daily ceiling on runner triggers. Claimed only when we are actually
   // about to start a run, so the 'queue' runner (which starts nothing) never
-  // spends a slot. Same fail-open rule as the rate limit: a Blobs failure lets
-  // the run through rather than stalling the pipeline.
+  // spends a slot.
+  const ceiling = dailyRunCeiling(env)
   const runsKey = dailyRunsKey(receivedAt)
   const claim =
     kind === 'queue'
       ? { ok: true as const, value: true }
-      : await withStore(RATE_STORE, 'daily run ceiling', async (store) => {
-          const count = parseRunCount(await store.get(runsKey, { type: 'json' }))
-          const allowed = shouldTriggerRunner(count, dailyRunCeiling(env))
-          if (allowed) await store.setJSON(runsKey, { count: (count ?? 0) + 1 })
-          return allowed
-        })
-  const mayRun = claim.ok ? claim.value : true
+      : await withStore(RATE_STORE, 'daily run ceiling', (store) => claimRun(store, runsKey, ceiling))
+  // A Blobs failure leaves the count unknown. `shouldTriggerRunner(null, …)`
+  // is the fail-open rule the rate limit uses too — a lost counter costs a few
+  // extra runs, where failing closed would stall the pipeline — with the one
+  // exception it encodes: ATLAS_DAILY_RUNS=0 means no runs, blind or not.
+  const mayRun = claim.ok ? claim.value : shouldTriggerRunner(null, ceiling)
 
   const record = buildRecord(value, {
     id,
@@ -230,7 +295,7 @@ export default async (req: Request, context: Context): Promise<Response> => {
     // submitter sees the same 202 and the same message either way.
     record.runner = { kind, skipped: CEILING_SKIP_REASON }
     console.warn(
-      `[atlas-submit] daily runner ceiling (${dailyRunCeiling(env)}) reached; queued ${id} host=${record.host}`
+      `[atlas-submit] daily runner ceiling (${ceiling}) reached; queued ${id} host=${record.host}`
     )
   }
 
@@ -253,10 +318,7 @@ export default async (req: Request, context: Context): Promise<Response> => {
   if (encoding === 'form') {
     // No-JS path: back to the page that posted, with the id in the query so it
     // can render a confirmation.
-    return new Response(null, {
-      status: 303,
-      headers: { Location: `/atlas?submitted=${encodeURIComponent(id)}`, 'Cache-Control': 'no-store' },
-    })
+    return atlasRedirect(`submitted=${encodeURIComponent(id)}`)
   }
 
   return json(acceptedBody(id), 202)

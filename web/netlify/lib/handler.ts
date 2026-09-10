@@ -24,6 +24,9 @@ export const PLAIN_TYPE = 'text/plain; charset=utf-8'
 /** Paths this edge function passes through to a serverless function — see netlify/functions/atlas-submit.mts for the request chain. */
 const FUNCTION_PATHS = new Set(['/api/atlas/submit', '/.netlify/functions/atlas-submit'])
 
+/** `/api/atlas/lookup/<host>` — see the note in `handleNegotiate`. */
+const LOOKUP_PATH = /^\/api\/atlas\/lookup\/([^/]+)$/
+
 const PAGE_TYPES = ['text/html', 'text/markdown'] as const
 const ERROR_TYPES = ['text/html', 'text/markdown', 'application/json'] as const
 const VARY_ACCEPT = ['Accept', 'Accept-Encoding'] as const
@@ -89,6 +92,21 @@ async function handleApi(request: Request, path: string, deps: NegotiateDeps): P
     return jsonResponse(JSON.parse(body), 200)
   }
 
+  // Host lookup. netlify.toml rewrites this to the generated
+  // /atlas/hosts/<host>.json, but only when that file exists: an unlisted host
+  // falls through to the HTML 404 catch-all, and the OpenAPI spec promises the
+  // JSON NotFound here. So the lookup is answered from this side instead — the
+  // same file, and the same error envelope as every other /api/* miss.
+  const lookup = path.match(LOOKUP_PATH)
+  if (lookup) {
+    const host = lookup[1]!.toLowerCase()
+    if (!/^[a-z0-9.-]+$/.test(host)) return errorJson(notFoundError(path))
+    const upstream = await fetchSameOrigin(deps, request, `/atlas/hosts/${host}.json`)
+    if (!upstream.ok) return errorJson(notFoundError(path))
+    const body = await upstream.text()
+    return jsonResponse(JSON.parse(body), 200)
+  }
+
   const entry = path.match(/^\/api\/atlas\/([^/]+)$/)
   if (entry) {
     const slug = entry[1]
@@ -128,8 +146,15 @@ export async function handleNegotiate(
   const url = new URL(request.url)
   const path = normalizePathname(url.pathname)
 
-  if (isPassthroughPath(path)) return undefined
   if (FUNCTION_PATHS.has(path)) return undefined
+
+  // A lookup path ends in a hostname, and every hostname has a dot in it, so
+  // the "client named a representation" rule would otherwise pass
+  // /api/atlas/lookup/example.com straight through to the 404 catch-all and
+  // lose the JSON error the OpenAPI spec promises. The files this handler
+  // fetches (/api/atlas.json, /atlas/hosts/<host>.json) are not lookup paths,
+  // so they still pass through and nothing loops.
+  if (!LOOKUP_PATH.test(path) && isPassthroughPath(path)) return undefined
 
   if (path === '/api' || path.startsWith('/api/')) {
     return handleApi(request, path, deps)

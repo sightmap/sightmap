@@ -176,13 +176,25 @@ export function normalizeEmail(email: string): string {
 }
 
 /**
+ * Characters an intent has no use for and a shell, a prompt, or a quoted
+ * command line does: `$ ` \ " ' ! ( ) | ; & < > { }`. The intent is prose that
+ * ends up inside a single-quoted argument in `runner.ts`'s `intakeCommand`;
+ * that quoting is the real defence, and this is the second layer, so that a
+ * value which escapes one of them is inert in the other.
+ */
+const INTENT_UNSAFE = /[$`\\"'!()|;&<>{}]/g
+
+/**
  * Collapse submitted free text to a single safe line. Control characters and
  * newlines are removed before the intent is ever interpolated into a prompt or
- * a JSON payload, so a submitter cannot inject prompt structure with a newline.
+ * a JSON payload, so a submitter cannot inject prompt structure with a newline,
+ * and shell metacharacters go with them — none of them are needed to say what
+ * an agent should be able to do.
  */
 export function sanitizeIntent(intent: string): string {
   return intent
     .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(INTENT_UNSAFE, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -279,11 +291,27 @@ export async function validateSubmission(
 // Hashing
 // ---------------------------------------------------------------------------
 
+function toHex(buffer: ArrayBuffer): string {
+  return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** WebCrypto SHA-256, hex encoded. Present in Node 20+ and in the Netlify runtime. */
 export async function sha256Hex(input: string): Promise<string> {
   const bytes = new TextEncoder().encode(input)
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+  return toHex(await crypto.subtle.digest('SHA-256', bytes))
+}
+
+/** WebCrypto HMAC-SHA-256, hex encoded. Same availability as `sha256Hex`. */
+export async function hmacSha256Hex(key: string, message: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  return toHex(await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(message)))
 }
 
 /** Per-deploy salted client hash. The raw IP is never stored or logged. */
@@ -292,12 +320,20 @@ export function hashIp(ip: string, salt: string): Promise<string> {
 }
 
 /**
- * Unsalted on purpose: the hash is how a maintainer recognises "same submitter,
- * different site" across deploys, and it is the only submitter identifier the
- * runner ever sees.
+ * Keyed, not just digested. A plain SHA-256 of an address is reversible for
+ * anyone who can guess it — the whole space of "is chip@example.com in your
+ * submissions" is one hash per guess — so the hash is an HMAC keyed with
+ * `ATLAS_SUBMIT_SALT`, which never leaves the deploy's environment.
+ *
+ * The cost is that the key is what makes two hashes comparable: change
+ * `ATLAS_SUBMIT_SALT`, or run two deploys with different values, and the same
+ * mailbox no longer matches itself across them. That is deliberate — it is also
+ * what stops the runner's `email_hash` from being correlated with anything
+ * outside this deploy — but it means the salt should be set once and left
+ * alone, and rotating it retires every hash already on file.
  */
-export function hashEmail(email: string): Promise<string> {
-  return sha256Hex(normalizeEmail(email))
+export function hashEmail(email: string, salt: string): Promise<string> {
+  return hmacSha256Hex(salt, normalizeEmail(email))
 }
 
 // ---------------------------------------------------------------------------

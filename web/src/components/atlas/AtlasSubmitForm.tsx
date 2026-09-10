@@ -9,6 +9,8 @@ interface Props {
   rescan?: boolean
   /** From `?submitted=<id>` — the no-JS redirect target. */
   submittedId?: string
+  /** From `?error=<code>` — where a no-JS post that failed validation lands. */
+  errorCode?: string
 }
 
 type State =
@@ -34,7 +36,18 @@ const RECEIVED_MESSAGE =
  * The `website` input is a honeypot: it is off-screen and out of the tab order,
  * so a person never fills it and a form-filling bot fills everything.
  */
-export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submittedId }: Props) {
+// The no-JS path cannot carry the function's JSON error, only its code.
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_url: 'That URL could not be accepted. Use a public https:// address without credentials.',
+  invalid_host: 'That hostname is not public, so it cannot be scanned.',
+  invalid_email: 'That email address does not look valid.',
+  intent_too_long: 'The intent is too long; keep it under 500 characters.',
+  rate_limited: 'Too many submissions from this network today. Try again tomorrow.',
+}
+const errorMessage = (code: string): string =>
+  ERROR_MESSAGES[code] ?? 'The submission could not be recorded. Check the fields and try again.'
+
+export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submittedId, errorCode }: Props) {
   const [url, setUrl] = useState('')
   const [email, setEmail] = useState('')
   const [owner, setOwner] = useState(false)
@@ -52,7 +65,8 @@ export default function AtlasSubmitForm({ initialUrl = '', rescan = false, submi
 
   useEffect(() => {
     if (submittedId) setState({ name: 'received', id: submittedId })
-  }, [submittedId])
+    else if (errorCode) setState({ name: 'error', message: errorMessage(errorCode) })
+  }, [submittedId, errorCode])
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     // Only intercept once we know we can do better than the native post.

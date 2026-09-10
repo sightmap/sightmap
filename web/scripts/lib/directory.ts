@@ -155,20 +155,29 @@ export function scanDateOf(file: string): string {
   return path.basename(file).replace(/\.json$/, '')
 }
 
+const SCAN_FILE = /^(\d{4}-\d{2}-\d{2})(?:-(\d+))?\.json$/
+
 /**
  * Every scan report on file for a slug, newest first. Only files named like a
  * date are considered, so a stray `review.json` or `.md` next to them is not
  * mistaken for a scan.
+ *
+ * Ordered by (date, same-day suffix), not lexically: the second scan of a day
+ * is `<date>-2.json`, which sorts *before* `<date>.json` as a string, and the
+ * newest report is the one a listing is diffed against.
  */
 export function scanFilesFor(dataDir: string, slug: string): string[] {
   const dir = path.join(dataDir, 'scans', slug)
   if (!fs.existsSync(dir)) return []
   return fs
     .readdirSync(dir)
-    .filter((f) => /^\d{4}-\d{2}-\d{2}(-\d+)?\.json$/.test(f))
-    .sort()
-    .reverse()
-    .map((f) => `scans/${slug}/${f}`)
+    .map((file) => {
+      const m = SCAN_FILE.exec(file)
+      return m ? { file, date: m[1], nth: m[2] ? Number(m[2]) : 1 } : null
+    })
+    .filter((x): x is { file: string; date: string; nth: number } => x !== null)
+    .sort((a, b) => (a.date === b.date ? b.nth - a.nth : b.date.localeCompare(a.date)))
+    .map((x) => `scans/${slug}/${x.file}`)
 }
 
 export function readScan(dataDir: string, rel: string): ScanReport {
@@ -289,11 +298,18 @@ export function directoryCategories(listings: DirectoryListing[]): string[] {
   return [...new Set(listings.map((l) => l.category))].sort()
 }
 
+/**
+ * The identity a host is listed under: lowercase, no trailing dot, no leading
+ * `www.`. `acme.com` and `www.acme.com` are one site — one listing, one slug —
+ * so every host comparison in the pipeline goes through this.
+ */
+export function canonicalHost(host: string): string {
+  return host.trim().toLowerCase().replace(/\.$/, '').replace(/^www\./, '')
+}
+
 /** Turns a host into a candidate slug: `www.example.co.uk` → `example-co-uk`. */
 export function slugFromHost(host: string): string {
-  return host
-    .toLowerCase()
-    .replace(/^www\./, '')
+  return canonicalHost(host)
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 }

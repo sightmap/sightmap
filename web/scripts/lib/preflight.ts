@@ -23,6 +23,20 @@ export interface Preflight {
 
 const BLOCKED_HOST = /(^|\.)(localhost|local|internal|localdomain|home|lan|corp|intranet|test|example|invalid|onion)$/i
 
+/**
+ * Characters we refuse to carry in a path or query string:
+ * `$ ` ' " \ | ; < > ( ) { }` plus whitespace and control characters.
+ *
+ * A submitted URL is echoed into a runner prompt and into a shell command
+ * (`netlify/lib/runner.ts`), and `new URL()` percent-encodes almost none of
+ * these — `?q=$(id)` survives a round trip verbatim. The command builder
+ * single-quotes every value, and this is the other half of that pair: a URL
+ * that needs any of them is not a URL we can scan, and no legitimate
+ * submission has one. Note that `%24` still passes; that is fine, since it is
+ * inert everywhere it is interpolated.
+ */
+const UNSAFE_URL_CHARS = /[$`'"\\|;<>(){}\s\u0000-\u001f\u007f]/
+
 /** True for loopback, private, link-local, multicast, unspecified, and CGNAT v4 addresses. */
 export function isPrivateV4(ip: string): boolean {
   const parts = ip.split('.').map(Number)
@@ -97,6 +111,10 @@ export function preflightUrl(input: string, opts: { allowLocal?: boolean } = {})
     if (!/^[a-z0-9.-]+$/.test(host) || host.startsWith('-') || host.includes('..')) {
       return { ok: false, url: '', host, reason: 'hostname is malformed' }
     }
+  }
+
+  if (UNSAFE_URL_CHARS.test(u.pathname) || UNSAFE_URL_CHARS.test(u.search)) {
+    return { ok: false, url: '', host, reason: 'URL contains characters the scanner does not accept' }
   }
 
   // Fragments never reach the server and a tracking token in the query is not

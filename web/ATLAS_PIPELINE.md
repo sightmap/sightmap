@@ -77,14 +77,21 @@ One command does scan → review → listing:
 
 ```sh
 pnpm atlas:intake \
-  --url "https://example.com/" \
-  --submission-id "<submission_id>" \
-  --intent "<intent>" \
+  --url 'https://example.com/' \
+  --submission-id '<submission_id>' \
+  --intent '<intent>' \
   --type live \
   --sightkick \
-  --submitted-by owner \
+  --submitted-by 'owner' \
   --summary /tmp/atlas-summary.md
 ```
+
+Every submitted value is **single-quoted**, and that is not cosmetic: inside
+double quotes a shell still expands `$(…)`, `` `…` `` and `\`, and both the URL
+and the intent are text a stranger typed into a form. If a run handed you this
+command already assembled, run it **exactly as given** — do not re-quote it, do
+not swap the quotes, do not paste the URL or the intent into a command you
+build yourself.
 
 Drop the flags you were not given. `--sightkick` is a boolean flag: include it
 only when the submission says the site was built with Sightkick.

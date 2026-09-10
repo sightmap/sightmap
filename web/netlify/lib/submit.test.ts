@@ -5,6 +5,7 @@ import {
   fieldsFromForm,
   hashEmail,
   hashIp,
+  hmacSha256Hex,
   indexKey,
   isValidEmail,
   newSubmissionId,
@@ -16,6 +17,7 @@ import {
   readFields,
   recordKey,
   sanitizeIntent,
+  sha256Hex,
   validateSubmission,
   type SubmissionFields,
   type ValidSubmission,
@@ -184,6 +186,18 @@ describe('validateSubmission', () => {
     expect(sanitizeIntent('Book\0 a\n table\x7f')).toBe('Book a table')
   })
 
+  it('strips shell and quoting metacharacters from the intent', () => {
+    // The intent is prose. None of these are needed to say what an agent
+    // should do, and all of them are load-bearing in a shell or a prompt.
+    expect(sanitizeIntent('Book a table $(id) `whoami`')).toBe('Book a table id whoami')
+    expect(sanitizeIntent(`Find "the" 'pricing' page`)).toBe('Find the pricing page')
+    expect(sanitizeIntent('a; rm -rf / && echo b | c')).toBe('a rm -rf / echo b c')
+    expect(sanitizeIntent('a\\b <c> {d} !e')).toBe('a b c d e')
+    for (const ch of ['$', '`', '\\', '"', "'", '!', '(', ')', '|', ';', '&', '<', '>', '{', '}']) {
+      expect(sanitizeIntent(`x${ch}y`), ch).toBe('x y')
+    }
+  })
+
   it('accepts ordinary addresses and rejects an oversize local part', () => {
     expect(isValidEmail('chip.lay+atlas@sub.example.co.uk')).toBe(true)
     expect(isValidEmail(`${'a'.repeat(65)}@example.com`)).toBe(false)
@@ -324,7 +338,17 @@ describe('hashing', () => {
   })
 
   it('hashes the email case-insensitively so one mailbox is one hash', async () => {
-    expect(await hashEmail('Chip@Example.com')).toBe(await hashEmail('chip@example.com'))
-    expect(await hashEmail(EMAIL)).not.toContain('example')
+    expect(await hashEmail('Chip@Example.com', 'atlas')).toBe(await hashEmail('chip@example.com', 'atlas'))
+    expect(await hashEmail(EMAIL, 'atlas')).not.toContain('example')
+    expect(await hashEmail(EMAIL, 'atlas')).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('keys the email hash so a known address cannot be confirmed by digesting it', async () => {
+    // A plain SHA-256 of the address is one guess away from being reversed.
+    expect(await hashEmail(EMAIL, 'atlas')).not.toBe(await sha256Hex(EMAIL))
+    // The key is what makes two hashes comparable — changing ATLAS_SUBMIT_SALT
+    // retires every hash already on file.
+    expect(await hashEmail(EMAIL, 'atlas')).not.toBe(await hashEmail(EMAIL, 'other-deploy'))
+    expect(await hmacSha256Hex('atlas', EMAIL)).toBe(await hashEmail(EMAIL, 'atlas'))
   })
 })

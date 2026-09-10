@@ -40,7 +40,12 @@ const SENSITIVE = [
   'publish',
   'post',
   'upload',
-  'sign',
+  // Signing a *thing* is a commitment; `sign_in` / `sign_out` / `sign_up` are
+  // just session verbs and live in ACTION, so the bare word is not a needle.
+  'sign_contract',
+  'sign_document',
+  'sign_agreement',
+  'e_sign',
   'apply',
   'application',
   'invite',
@@ -78,6 +83,7 @@ const ACTION = [
   'logout',
   'sign_in',
   'sign_out',
+  'sign_up',
   'switch',
   'change',
   'start',

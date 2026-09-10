@@ -20,7 +20,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { DirectoryListing, ListingMeta, ListingTool, ListingType, ScanReport } from '../../src/types/directory'
 import { loadAtlas } from './atlas'
-import { ListingSchema, issuesOf, listingToYaml, loadDirectory, slugFromHost, uniqueSlug } from './directory'
+import { ListingSchema, canonicalHost, issuesOf, listingToYaml, loadDirectory, slugFromHost, uniqueSlug } from './directory'
 import type { Review } from './review'
 
 export type SubmittedBy = 'owner' | 'nominator' | 'maintainer'
@@ -117,7 +117,10 @@ export async function createListing(input: CreateListingInput): Promise<CreatedL
   const reserved = atlas.entries.map((e) => e.slug)
   const { listings } = loadDirectory(dataDir, reserved)
 
-  const existing = listings.find((l) => l.host === report.host)
+  // A rescan matches on the www-stripped host: a site that answers on both
+  // `acme.com` and `www.acme.com` (or that started redirecting to one of them
+  // between scans) is one listing, not two competing for the same slug.
+  const existing = listings.find((l) => canonicalHost(l.host) === canonicalHost(report.host))
   const isRescan = Boolean(existing)
   const slug = existing ? existing.slug : uniqueSlug(slugFromHost(report.host), takenSlugs(dataDir, listings, reserved))
 

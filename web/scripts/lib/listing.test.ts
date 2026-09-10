@@ -125,6 +125,25 @@ describe('createListing', () => {
     expect(loadDirectory(dataDir).listings[0].drift).toEqual({ since: '2026-09-08', added: [], removed: [] })
   })
 
+  it('matches an existing listing across a www. change of host', async () => {
+    seedExisting() // alpha-tools is listed as host alpha.example.org
+    const report = fixture({
+      host: 'www.alpha.example.org',
+      url: 'https://alpha.example.org/',
+      finalUrl: 'https://www.alpha.example.org/',
+      scannedAt: '2026-09-10T09:00:00.000Z',
+    })
+    const result = await createListing({ dataDir, atlasDir: ATLAS, report, review: heuristicReview(report), today: '2026-09-10' })
+
+    // One site, one listing: not a second `alpha-example-org` next to it.
+    expect(result).toMatchObject({ slug: 'alpha-tools', isRescan: true })
+    expect(fs.readdirSync(dataDir).filter((f) => f.endsWith('.yaml'))).toEqual(['alpha-tools.yaml'])
+    const after = readListing('alpha-tools')
+    expect(after.host).toBe('www.alpha.example.org')
+    expect(after.url).toBe('https://www.alpha.example.org/')
+    expect(after.added).toBe('2026-09-01')
+  })
+
   it('overwrites the maintainer prose only with --replace-review', async () => {
     seedExisting()
     const report = fixture({ scannedAt: '2026-09-10T09:00:00.000Z' })

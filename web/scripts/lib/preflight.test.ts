@@ -30,6 +30,46 @@ describe('preflightUrl', () => {
     expect(preflightUrl('https://a'.padEnd(3000, 'a')).ok).toBe(false)
   })
 
+  it('rejects shell metacharacters that survive URL normalisation', () => {
+    // `new URL()` leaves all of these in place, and the URL is interpolated
+    // into a shell command downstream (netlify/lib/runner.ts).
+    for (const url of [
+      'https://acme.io/?q=$(id)',
+      'https://acme.io/$(id)',
+      'https://acme.io/;rm',
+      'https://acme.io/?a=b|c',
+      'https://acme.io/?a={b}',
+      'https://acme.io/?a=`id`',
+    ]) {
+      const r = preflightUrl(url)
+      expect(r.ok, url).toBe(false)
+      expect(r.reason, url).toBe('URL contains characters the scanner does not accept')
+    }
+  })
+
+  it('lets no shell metacharacter through, encoded or rejected', () => {
+    for (const ch of ['$', '`', "'", '"', '\\', '|', ';', '<', '>', '(', ')', '{', '}']) {
+      for (const url of [`https://acme.io/a${ch}b`, `https://acme.io/?q=a${ch}b`]) {
+        const r = preflightUrl(url)
+        // Either we reject it, or WHATWG normalisation already percent-encoded
+        // it (or, for a backslash, rewrote it) — never a raw one in the output.
+        if (r.ok) expect(r.url, url).not.toContain(ch)
+        else expect(r.reason, url).toBe('URL contains characters the scanner does not accept')
+      }
+    }
+  })
+
+  it('still accepts the punctuation a real deep link uses', () => {
+    for (const url of [
+      'https://acme.io/docs/getting-started?utm_source=x&utm_medium=y#top',
+      'https://acme.io/a_b/c.d/e~f/g+h?q=one%20two&n=1,2',
+      'https://acme.io/search?q=caf%C3%A9!',
+      'https://acme.io/@handle/posts',
+    ]) {
+      expect(preflightUrl(url).ok, url).toBe(true)
+    }
+  })
+
   it('lets a test point the scanner at a loopback fixture only when asked', () => {
     expect(preflightUrl('http://127.0.0.1:4173/', { allowLocal: true }).ok).toBe(true)
     expect(preflightUrl('http://127.0.0.1:4173/').ok).toBe(false)

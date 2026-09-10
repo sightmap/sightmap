@@ -18,6 +18,13 @@ import type { RunnerInfo, SubmissionRecord } from './submit.ts'
 export const DEFAULT_DAILY_RUNS = 20
 export const MAX_PROMPT_LENGTH = 2500
 
+/**
+ * How many times the caller re-reads and re-writes the day's counter when a
+ * conditional write loses the race. Three is enough for the traffic this
+ * endpoint sees; past it the day is busy and the ceiling is the point.
+ */
+export const RUN_CLAIM_ATTEMPTS = 3
+
 // ---------------------------------------------------------------------------
 // Global daily runner ceiling
 // ---------------------------------------------------------------------------
@@ -49,8 +56,13 @@ export function dailyRunCeiling(env: RunnerEnv): number {
  * Pure, so the storage layer can be a Blobs read that is allowed to fail: on a
  * read failure the caller passes `null` and we trigger anyway. Failing open
  * risks a few extra runs; failing closed would silently stop the pipeline.
+ *
+ * A ceiling of 0 is the exception, and it is not a failure mode: `ATLAS_DAILY_RUNS=0`
+ * is how an operator turns runs off, so it holds even when the counter is
+ * unknown. Submissions are still accepted and stored; nothing is triggered.
  */
 export function shouldTriggerRunner(count: number | null, ceiling = DEFAULT_DAILY_RUNS): boolean {
+  if (ceiling <= 0) return false
   if (count === null || !Number.isFinite(count)) return true
   return count < ceiling
 }
@@ -82,24 +94,47 @@ export interface RunnerPromptInput {
   emailHash: string
 }
 
-/** `--submitted-by` for `pnpm atlas:intake`. Owner beats nominator. */
-export function submittedBy(input: { owner: boolean; nominate: boolean }): 'owner' | 'nominator' | 'maintainer' {
-  if (input.owner) return 'owner'
-  if (input.nominate) return 'nominator'
-  return 'maintainer'
+/**
+ * `--submitted-by` for `pnpm atlas:intake`.
+ *
+ * Only a ticked owner box makes this `owner`; everything else — including a
+ * submission with neither box ticked — is a `nominator`, because the person at
+ * the form has not claimed the site. `maintainer` is a hand-run intake and is
+ * never inferred from a web submission. The GitHub path
+ * (`.github/workflows/atlas-review.yml`) defaults the same way.
+ */
+export function submittedBy(input: { owner: boolean; nominate: boolean }): 'owner' | 'nominator' {
+  return input.owner ? 'owner' : 'nominator'
 }
 
-/** The exact intake command the runner should execute, ready to paste. */
+/**
+ * Single-quote one value for a POSIX shell.
+ *
+ * `JSON.stringify` is not a shell quote: inside double quotes a shell still
+ * expands `$(…)`, `` `…` `` and `\`. Inside single quotes nothing expands, and
+ * the only character that needs handling is the quote itself — closed, escaped,
+ * reopened (`'\''`). Every interpolated value in `intakeCommand` goes through
+ * this, including ones that were already validated: this is the layer that has
+ * to hold when an earlier one is loosened.
+ */
+export function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`
+}
+
+/**
+ * The exact intake command the runner should execute, ready to paste. Every
+ * value is shell-quoted here, so the runner must run the line verbatim and
+ * never re-quote or re-assemble it (`web/ATLAS_PIPELINE.md` says so too).
+ */
 export function intakeCommand(input: RunnerPromptInput): string {
   const parts = [
     'pnpm atlas:intake',
-    `--url ${JSON.stringify(input.url)}`,
-    `--submission-id ${input.id}`,
+    `--url ${shellQuote(input.url)}`,
+    `--submission-id ${shellQuote(input.id)}`,
   ]
-  if (input.intent) parts.push(`--intent ${JSON.stringify(input.intent)}`)
+  if (input.intent) parts.push(`--intent ${shellQuote(input.intent)}`)
   if (input.sightkick) parts.push('--sightkick')
-  const by = submittedBy(input)
-  if (by !== 'maintainer') parts.push(`--submitted-by ${by}`)
+  parts.push(`--submitted-by ${shellQuote(submittedBy(input))}`)
   return parts.join(' ')
 }
 

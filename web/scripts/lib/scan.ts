@@ -150,6 +150,22 @@ export function sameSite(a: string, b: string): boolean {
   }
 }
 
+/**
+ * The host the report should carry. A same-site `www.` redirect moves the
+ * scan onto the landed origin, and everything after it — the pages, the
+ * links, the URL the listing publishes — belongs to that host, so the report
+ * says so too. Without this the listing's slug (derived from `host`) and its
+ * `url` disagree after every canonical-host redirect.
+ */
+export function landedHost(startHost: string, startOrigin: string, origin: string): string {
+  if (origin === startOrigin) return startHost
+  try {
+    return new URL(origin).host
+  } catch {
+    return startHost
+  }
+}
+
 // Titles that bot-mitigation interstitials use. Matched against the page
 // title only after the page settled, so a site that merely mentions one of
 // these phrases in its copy is not affected.
@@ -484,6 +500,12 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
   let blocked = false
   let cliVersion = 'unknown'
 
+  // The origin the scan is on. A same-site redirect moves it (see below), and
+  // both the report's host and the `--path` list follow it there, so it lives
+  // outside the session block where the report is assembled.
+  const startOrigin = new URL(pre.url).origin
+  let origin = startOrigin
+
   const session = new SightmapSession(sightmapBinary(opts.sightmapBin), log)
   try {
     const v = await session.exec(['version'], 10_000)
@@ -517,9 +539,7 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
     await session.start(process.env.ATLAS_CHROME_PATH || undefined, extra)
     await session.injectPersist(RECORDER_SCRIPT)
 
-    let origin = new URL(pre.url).origin
     const queue: string[] = [pre.url]
-    const preferred = (opts.paths ?? []).map((p) => new URL(p, origin).toString())
     let first = true
 
     while (queue.length > 0 && pages.length < maxPages) {
@@ -635,6 +655,10 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
         title = collected.title
         description = collected.description
         links = collected.links
+        // Resolved here, not before the loop: a same-site redirect may have
+        // moved `origin`, and a `--path` resolved against the origin the
+        // submitter typed would be dropped by pickLinks as off-origin.
+        const preferred = (opts.paths ?? []).map((p) => new URL(p, origin).toString())
         for (const next of pickLinks(origin, page.path, collected.links, maxPages - 1, preferred)) queue.push(next)
         // The product's own enumeration, for the record. It reads
         // getTools() on document.modelContext, which the recorder answers,
@@ -684,7 +708,7 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
     version: 1,
     url: pre.url,
     finalUrl,
-    host: pre.host,
+    host: landedHost(pre.host, startOrigin, origin),
     scannedAt: startedAt.toISOString(),
     scanner: { name: SCANNER_NAME, version: SCANNER_VERSION, browser: `sightmap ${cliVersion}` },
     surface,

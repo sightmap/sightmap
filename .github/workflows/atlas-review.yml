@@ -103,9 +103,11 @@ jobs:
       # way. Compared against 'true' as a string below.
       ATLAS_SIGHTKICK: ${{ github.event.inputs.sightkick || github.event.client_payload.sightkick || 'false' }}
       # client_payload carries `owner: true|false` rather than a role string,
-      # so map it: owner when claimed, nominator when the submission says it is
-      # someone else's site.
-      ATLAS_SUBMITTED_BY: ${{ github.event.inputs.submitted_by || (github.event.client_payload.owner && 'owner') || (github.event.client_payload.nominate && 'nominator') || 'owner' }}
+      # so map it: owner only when the submitter ticked the owner box, and
+      # nominator for everything else. A submission with neither box ticked is
+      # a nomination, not an ownership claim — the Netlify path
+      # (web/netlify/lib/runner.ts `submittedBy`) defaults the same way.
+      ATLAS_SUBMITTED_BY: ${{ github.event.inputs.submitted_by || (github.event.client_payload.owner && 'owner') || 'nominator' }}
       ATLAS_MAX_PAGES: ${{ github.event.inputs.max_pages || github.event.client_payload.max_pages || '3' }}
       # Written by the intake step, read by the PR step. Kept in RUNNER_TEMP so
       # it can never be picked up by the commit.
@@ -209,9 +211,13 @@ jobs:
       - name: Read the PR title from the summary
         id: title
         if: always()
+        env:
+          # Through the environment, not interpolated into the script body: a
+          # step output is data, and expanding one inside a quoted shell word
+          # ends that word on any value that carries a quote.
+          HOST: ${{ steps.target.outputs.host }}
         run: |
           set -euo pipefail
-          host='${{ steps.target.outputs.host }}'
           first=""
           if [ -f "$ATLAS_SUMMARY" ]; then
             first=$(head -n 1 "$ATLAS_SUMMARY" | sed 's/^#\+[[:space:]]*//')
@@ -227,7 +233,7 @@ jobs:
                 # An em dash, matching the playbook's needs-review title.
                 if grep -qF 'Status: `needs-review`' "$ATLAS_SUMMARY"; then verb='needs review —'; fi
               fi
-              title="atlas: $verb $host"
+              title="atlas: $verb $HOST"
               ;;
           esac
           echo "title=$title" >> "$GITHUB_OUTPUT"

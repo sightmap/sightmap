@@ -20,6 +20,7 @@ import { loadAtlas } from './lib/atlas'
 import { loadDirectory } from './lib/directory'
 import { primaryDomain } from '../src/lib/atlas'
 import type { FeedAtlasEntry, FeedDirectoryListing, FeedPost } from './generate-feeds'
+import { toFeedListing } from './generate-feeds'
 import {
   buildAtlasApiIndex,
   buildAtlasIndexMarkdown,
@@ -81,15 +82,7 @@ async function main() {
   const listings: FeedDirectoryListing[] = loadDirectory(
     DIRECTORY_DIR,
     raw.entries.map((e) => e.slug)
-  ).listings.map((l) => ({
-    slug: l.slug,
-    name: l.name,
-    host: l.host,
-    description: l.description,
-    type: l.type,
-    tool_count: l.counts.tools,
-    updated: l.updated,
-  }))
+  ).listings.map(toFeedListing)
 
   const spec = buildOpenApiSpec()
   write('openapi.json', JSON.stringify(spec, null, 2))

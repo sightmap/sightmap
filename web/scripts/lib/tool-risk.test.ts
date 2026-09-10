@@ -29,6 +29,18 @@ describe('classifyTool', () => {
     expect(classifyTool('send_message', 'Send a message to the host.').risk).toBe('sensitive')
   })
 
+  it('separates signing a document from signing in, out, or up', () => {
+    expect(classifyTool('sign_contract', 'Sign the rental contract.').risk).toBe('sensitive')
+    expect(classifyTool('sign_document', 'Sign the uploaded document.').risk).toBe('sensitive')
+    expect(classifyTool('sign_agreement', 'Sign the agreement.').risk).toBe('sensitive')
+    expect(classifyTool('e_sign', 'Apply an electronic signature.').risk).toBe('sensitive')
+    // Session verbs are the same commitment as `login`, which is an action.
+    expect(classifyTool('sign_in', 'Sign in to the account.').risk).toBe('action')
+    expect(classifyTool('sign_out', 'Sign out of the account.').risk).toBe('action')
+    expect(classifyTool('sign_up', 'Sign up for an account.').risk).toBe('action')
+    expect(classifyTool('login', 'Log in to the account.').risk).toBe('action')
+  })
+
   it('lets a read verb win over a sensitive noun in the name', () => {
     expect(classifyTool('get_order_status', 'Read the status of an order.').risk).toBe('read')
   })

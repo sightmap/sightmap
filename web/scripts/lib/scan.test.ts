@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { isChallengePage, pickLinks, sameSite, scanSite } from './scan'
+import { isChallengePage, landedHost, pickLinks, sameSite, scanSite } from './scan'
 
 const FIXTURE = path.resolve(__dirname, '__fixtures__/webmcp-site')
 
@@ -30,6 +30,20 @@ describe('sameSite', () => {
     expect(sameSite('https://acme.io', 'https://shop.acme.io')).toBe(false)
     expect(sameSite('https://acme.io', 'http://www.acme.io')).toBe(false)
     expect(sameSite('https://acme.io', 'https://www.acme.io:8443')).toBe(false)
+  })
+})
+
+describe('landedHost', () => {
+  it('follows the origin the scan settled on, and keeps the submitted host otherwise', () => {
+    // A www. redirect the scan accepted: the report's host is the one the
+    // site answers on, so the listing's slug and its url agree.
+    expect(landedHost('acme.io', 'https://acme.io', 'https://www.acme.io')).toBe('www.acme.io')
+    expect(landedHost('www.acme.io', 'https://www.acme.io', 'https://acme.io')).toBe('acme.io')
+    // No redirect, or one the scan refused to follow: nothing moves.
+    expect(landedHost('acme.io', 'https://acme.io', 'https://acme.io')).toBe('acme.io')
+    expect(landedHost('acme.io', 'https://acme.io', 'not a url')).toBe('acme.io')
+    // A non-default port is part of the host the report should carry.
+    expect(landedHost('acme.io', 'https://acme.io', 'https://www.acme.io:8443')).toBe('www.acme.io:8443')
   })
 })
 
@@ -143,6 +157,13 @@ describe.skipIf(!HAVE_CLI)('scanSite against the fixture site', () => {
     // A script that never loaded is named, not silently missing.
     expect(report.notes.some((n) => n.includes('script failed to load') && n.includes('missing-polyfill.js'))).toBe(true)
     expect(report.notes.some((n) => n.includes('replaced the navigator.modelContext surface'))).toBe(true)
+  }, 60_000)
+
+  it('visits a --path before the links it found', async () => {
+    // The preferred paths are resolved against the origin the scan is on, so
+    // this is also the guard for a --path surviving a same-site redirect.
+    const report = await scanSite({ url: `${base}/`, allowLocal: true, maxPages: 2, paths: ['/polyfilled.html'] })
+    expect(report.pages.map((p) => p.path)).toEqual(['/', '/polyfilled.html'])
   }, 60_000)
 
   it('refuses a loopback URL unless the caller opts in', async () => {
