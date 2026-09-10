@@ -17,10 +17,10 @@
 //      log line, or the status response. Only `emailHash` travels. The claim
 //      token is stricter still: it is compared against the host's webmcp.txt
 //      and then dropped — no record, no log, no response carries it.
-//   3. A submission that sends a claim is answered before anything is spent
-//      on it: the quarantine check and the claim check both run before the
-//      rate-limit counters and before any write, so a failed claim costs the
-//      owner nothing but a retry.
+//   3. A submission that sends a claim is answered before anything is written:
+//      the quarantine check runs first, the claim check right after the
+//      per-IP window is spent, so a failed claim costs the owner one attempt
+//      and a retry, and nobody gets an unmetered fetch of a host they chose.
 //
 // Environment variables
 // ---------------------
@@ -285,19 +285,6 @@ export default async (req: Request, context: Context): Promise<Response> => {
     return failure(encoding, quarantinedError(host))
   }
 
-  // The claim, if there is one, is checked before the rate-limit window is
-  // consumed and before anything is written: a host that has not published the
-  // line yet should be able to fix it and retry, not spend one of five daily
-  // submissions on a typo in a text file.
-  let claimVerifiedAt = ''
-  if (value.claim) {
-    const verified = await verifyClaim(value.url, value.claim)
-    if (!verified.ok) {
-      return failure(encoding, claimRejectedError(verified.code, verified.reason))
-    }
-    claimVerifiedAt = new Date().toISOString()
-  }
-
   const env = process.env as RunnerEnv
   const salt = submitSalt(env)
   const ipHash = await hashIp(context.ip ?? 'unknown', salt)
@@ -315,6 +302,21 @@ export default async (req: Request, context: Context): Promise<Response> => {
     return failure(encoding, rateLimitedError(rate.value.retryAfterSeconds), {
       'Retry-After': String(rate.value.retryAfterSeconds),
     })
+  }
+
+  // The claim, if there is one, is checked after the rate-limit window is
+  // spent and before anything is written. After, because verifying it makes
+  // this function fetch a file from a host the caller chose: unmetered, that
+  // is a way to point our egress at any public site. Before any write, so a
+  // typo in the text file costs the owner one of the window's attempts and
+  // nothing else.
+  let claimVerifiedAt = ''
+  if (value.claim) {
+    const verified = await verifyClaim(value.url, value.claim)
+    if (!verified.ok) {
+      return failure(encoding, claimRejectedError(verified.code, verified.reason))
+    }
+    claimVerifiedAt = new Date().toISOString()
   }
 
   const id = newSubmissionId()

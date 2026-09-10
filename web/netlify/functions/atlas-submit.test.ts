@@ -266,9 +266,9 @@ describe('POST /api/atlas/submit', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Claims. A claim is checked before the rate-limit window is spent and before
-  // anything is written, so a host that has not published the line yet can fix
-  // it and retry at no cost.
+  // Claims. A claim is checked after the rate-limit window is spent (so the
+  // fetch it triggers is metered) and before anything is written, so a host
+  // that has not published the line yet can fix it and retry.
 
   it('verifies a claim, records the date, writes the card record, and answers with the card', async () => {
     const res = await handler(post({ claim: TOKEN }), context)
@@ -307,7 +307,7 @@ describe('POST /api/atlas/submit', () => {
     expect(card.scan).toBeUndefined()
   })
 
-  it('refuses a claim the host does not carry, and spends nothing on it', async () => {
+  it('refuses a claim the host does not carry, and writes nothing but the window', async () => {
     webmcp = () => new Response('https://sightmap.org/\nsearch — Search\n', { status: 200 })
     const res = await handler(post({ claim: TOKEN }), context)
 
@@ -316,9 +316,21 @@ describe('POST /api/atlas/submit', () => {
     expect(body).toMatchObject({ ok: false, error: { code: 'claim-mismatch', status: 422 } })
     expect(submissions()).toHaveLength(0)
     expect(store(TRY_STORE).size).toBe(0)
-    // No rate-limit window, no day counter: a retry costs the owner nothing.
-    expect(store(RATE_STORE).size).toBe(0)
+    // The per-IP window is spent (the check made us fetch a host the caller
+    // chose), but no day counter and no record: a retry costs one attempt.
+    expect([...store(RATE_STORE).keys()].some((k) => k.startsWith('runs/'))).toBe(false)
+    expect(store(RATE_STORE).size).toBe(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not fetch the claim file for a caller already over the window', async () => {
+    webmcp = () => new Response('https://sightmap.org/\nsearch — Search\n', { status: 200 })
+    for (let i = 0; i < 6; i += 1) await handler(post({ claim: TOKEN }), context)
+    const before = fetchMock.mock.calls.length
+    const res = await handler(post({ claim: TOKEN }), context)
+
+    expect(res.status).toBe(429)
+    expect(fetchMock.mock.calls.length).toBe(before)
   })
 
   it('refuses an unreachable claim file the same way', async () => {

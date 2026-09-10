@@ -71,6 +71,7 @@ export default function AtlasIndex() {
   const rescan = hydrated ? params.get('rescan') === '1' : false
   const submittedId = hydrated ? (params.get('submitted') ?? '') : ''
   const errorCode = hydrated ? (params.get('error') ?? '') : ''
+  const cardUrl = hydrated ? (params.get('card') ?? '') : ''
 
   // Empty values are dropped rather than written as `?q=`, so the URL a
   // visitor copies is the shortest one that reproduces what they see.
@@ -254,7 +255,7 @@ export default function AtlasIndex() {
             </ol>
           </section>
 
-          <AtlasSubmitForm initialUrl={prefillUrl} rescan={rescan} submittedId={submittedId || undefined} errorCode={errorCode || undefined} />
+          <AtlasSubmitForm initialUrl={prefillUrl} rescan={rescan} submittedId={submittedId || undefined} cardUrl={cardUrl || undefined} errorCode={errorCode || undefined} />
 
           <p className="atlas-index__note">
             Tool classification is Atlas&rsquo;s own and is corrected by a maintainer on review.
