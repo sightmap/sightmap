@@ -169,7 +169,8 @@ ${body}
 }
 
 function toolItem(tool: TryTool): string {
-  const label = KIND_LABEL[tool.kind] ?? tool.kind
+  // Only a kind the table owns gets its label; anything else is shown as text.
+  const label = Object.hasOwn(KIND_LABEL, tool.kind) ? KIND_LABEL[tool.kind] : String(tool.kind)
   return `<li><span class="tool-name">${escapeHtml(tool.name)}</span><span class="kind">${escapeHtml(label)}</span>
 <p class="desc">${escapeHtml(tool.description)}</p>
 <span class="page">${escapeHtml(tool.page)}</span></li>`
