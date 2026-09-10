@@ -124,7 +124,9 @@ func runBrowserStart(args []string) error {
 
 	// ── New Chrome launch ─────────────────────────────────────────────────────
 
-	// Resolve ports: 0 means auto-allocate starting from default.
+	// Resolve ports: a concrete port is probed and slid upward if busy; 0 means
+	// auto-allocate (the OS picks, and the port it actually chose is what gets
+	// bound, handed to Chrome, and written to the session file).
 	resolvedServerPort, err := browser.FindFreePort(*portFlag)
 	if err != nil {
 		return fmt.Errorf("start: sightmap server: %w", err)
@@ -461,8 +463,12 @@ func startDetached(args []string, sightmapDir, logFile string) error {
 			"  log: %s\n%s", exitErr, logPath, tailFile(logPath, 4000))
 	}
 	if !ready {
+		hint := ""
+		if info.Port > 0 && info.ServerPort == 0 {
+			hint = "  the daemon's session file records no server port (serverPort=0), so client commands could not reach it\n"
+		}
 		return fmt.Errorf("start --detach: daemon did not become ready in time\n"+
-			"  log: %s\n%s", logPath, tailFile(logPath, 4000))
+			"%s  log: %s\n%s", hint, logPath, tailFile(logPath, 4000))
 	}
 
 	fmt.Fprintf(os.Stderr, "● detached  cdp=%d  server=%d  daemon-pid=%d\n", info.Port, info.ServerPort, daemonPID)
@@ -486,11 +492,19 @@ func defaultDaemonLog(sightmapDir string) string {
 }
 
 // waitDetachedReady polls until the daemon for sightmapDir is serving — session
-// file written, CDP answering, and (when its port is known) the HTTP server up —
-// or it returns early if the child process exits first (childDone) or the
-// timeout elapses.
+// file written with both ports, CDP answering, and the HTTP server up — or it
+// returns early if the child process exits first (childDone) or the timeout
+// elapses. On timeout the last session info observed (if any) is returned with
+// ready=false so the caller can say what was missing.
+//
+// A session file without a server port (serverPort=0) is never ready: the
+// daemon we just spawned always records the port it bound, and client commands
+// (inject, devtools queries) refuse a session whose server port is unknown. A
+// legacy plain-port file can only be a stale leftover here, so it is treated
+// the same way — we wait for the daemon to write the real thing.
 func waitDetachedReady(sightmapDir string, childDone <-chan error, timeout time.Duration) (browser.SessionInfo, bool, error) {
 	deadline := time.Now().Add(timeout)
+	var last browser.SessionInfo
 	for time.Now().Before(deadline) {
 		select {
 		case err := <-childDone:
@@ -501,13 +515,15 @@ func waitDetachedReady(sightmapDir string, childDone <-chan error, timeout time.
 		default:
 		}
 		info, err := browser.ReadSessionInfo(sightmapDir)
-		if err == nil && info.Port > 0 && isPortAlive(info.Port) &&
-			(info.ServerPort == 0 || serverAlive(info.ServerPort)) {
-			return info, true, nil
+		if err == nil {
+			last = info
+			if info.Port > 0 && info.ServerPort > 0 && isPortAlive(info.Port) && serverAlive(info.ServerPort) {
+				return info, true, nil
+			}
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
-	return browser.SessionInfo{}, false, nil
+	return last, false, nil
 }
 
 // stripStartFlags removes the named flags (and their `=value` / separate-value
