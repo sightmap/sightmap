@@ -127,9 +127,18 @@ describe('markdown twins', () => {
     const { listings } = loadDirectory(FIXTURES)
     const md = scanReportMarkdown(listings[0].report)
     expect(md).toContain('# Atlas scan: alpha.example.org')
-    expect(md).toContain('- Tools discovered: 2 (1 read, 1 action, 0 sensitive; 0 declarative)')
+    expect(md).toContain('- Tools detected: 2 (1 read, 1 action, 0 sensitive; 0 declarative)')
     expect(md).toContain('- ✓ Tool set changes with the page (2 distinct tool sets across 2 pages)')
     expect(md).toContain('- `/docs` — polyfilled, 1 tool(s)')
+  })
+
+  it('says only what was observed, in both twins', () => {
+    const { listings } = loadDirectory(FIXTURES)
+    for (const md of [listingMarkdown(listings[0]), scanReportMarkdown(listings[0].report)]) {
+      expect(md).not.toMatch(/verified|safe|trusted|approved|certified|endorse/i)
+      expect(md).toContain('maintainer')
+    }
+    expect(scanReportMarkdown(listings[0].report)).toContain('none were called')
   })
 })
 
@@ -157,6 +166,17 @@ describe('sightkickStarter', () => {
     expect(s.code).toContain("sightmap browser start --url 'https://alpha.example.org/' --headless")
     expect(s.prompt).toContain("sightmap browser start --url 'https://alpha.example.org/'")
     expect(s.prompt).toContain('Start with: /, /docs')
+  })
+
+  it('carries the claim token through webmcp.txt and into the optional submit', () => {
+    const { listings } = loadDirectory(FIXTURES)
+    const s = sightkickStarter(listings[0].report)
+    expect(s.prompt).toContain('openssl rand -hex 16')
+    expect(s.prompt).toContain('# sightmap-claim: <TOKEN>')
+    expect(s.prompt).toContain('"claim": "<TOKEN>"')
+    expect(s.prompt).toContain('https://sightmap.org/try/<host>')
+    // The token is a placeholder a reader replaces, never data from the scan.
+    expect(s.prompt).toContain('Optional, only if the owner wants the site shown')
   })
 
   it('leaves a tool whose name is not snake_case out of the copyable transcript', () => {
