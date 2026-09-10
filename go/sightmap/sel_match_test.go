@@ -1,8 +1,9 @@
 package sightmap_test
 
 import (
-	"github.com/sightmap/sightmap/go/sightmap"
 	"testing"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func TestMatches_NilRule(t *testing.T) {
@@ -248,7 +249,10 @@ func TestMatches_Not(t *testing.T) {
 
 	rule := &sightmap.SelectorPart{
 		Tag: "button",
-		Not: &sightmap.SelectorPart{Classes: []string{"disabled"}},
+		Not: []sightmap.ParsedSelector{{
+			Parts:       []*sightmap.SelectorPart{{Classes: []string{"disabled"}}},
+			Combinators: []string{""},
+		}},
 	}
 
 	if !sightmap.Matches(enabled, rule) {

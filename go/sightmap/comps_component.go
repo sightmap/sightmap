@@ -20,9 +20,15 @@ type SelectorPart struct {
 	// operator is not exact equality. Omitted entries default to "=".
 	// Valid operators: "=" (default), "^=", "$=", "*=", "~=", "|=", "[]" (presence-only).
 	AttrOps map[string]string `json:"attrOps,omitempty"`
-	// Not, if non-nil, is a selector that the element must NOT match.
-	// Represents the :not() pseudo-class.
-	Not *SelectorPart `json:"not,omitempty"`
+	// Not, if non-empty, holds the argument(s) of the :not() pseudo-class(es) on
+	// this compound selector as a flat selector list: the element matches only if
+	// it matches NONE of the entries. Each entry is a full complex selector whose
+	// SUBJECT (the element under test) is its last Part; any earlier Part is an
+	// ancestor constraint, evaluated only when ancestor context is available (see
+	// MatchesNodeChain). Multiple :not() on one compound and a comma-separated
+	// list inside one :not() both flatten here (both mean "exclude if ANY match").
+	// A plain :not(.foo) is a single entry whose Parts has length 1.
+	Not []ParsedSelector `json:"not,omitempty"`
 	// Is, if non-empty, contains the alternatives from a :is() or :where()
 	// pseudo-class. The element must match at least one alternative.
 	Is []*SelectorPart `json:"is,omitempty"`

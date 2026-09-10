@@ -1,0 +1,66 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "element": { "tag": "div" },
+  "children": [
+    {
+      "id": "checkout",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "element": { "tag": "jb-checkout" },
+      "children": [
+        {
+          "id": "signin",
+          "role": "generic",
+          "name": "",
+          "value": "",
+          "isVisible": true,
+          "isInteractive": false,
+          "inViewport": true,
+          "isIgnored": false,
+          "nthChild": 1,
+          "element": { "tag": "jb-sign-in" },
+          "children": [
+            {
+              "id": "loginBtn",
+              "role": "button",
+              "name": "Log in",
+              "value": "",
+              "isVisible": true,
+              "isInteractive": true,
+              "inViewport": true,
+              "isIgnored": false,
+              "nthChild": 1,
+              "element": { "tag": "button", "classes": ["jb-button-primary"] }
+            }
+          ]
+        },
+        {
+          "id": "stepBtn",
+          "role": "button",
+          "name": "Next: Seats & Extras",
+          "value": "",
+          "isVisible": true,
+          "isInteractive": true,
+          "inViewport": true,
+          "isIgnored": false,
+          "nthChild": 2,
+          "element": { "tag": "button", "classes": ["jb-button-primary"] }
+        }
+      ]
+    }
+  ]
+}

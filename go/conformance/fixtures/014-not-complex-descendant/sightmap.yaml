@@ -1,0 +1,3 @@
+- name: CheckoutNextButton
+  selectors:
+    - 'jb-checkout button.jb-button-primary:not(jb-sign-in button)'

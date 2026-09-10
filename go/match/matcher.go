@@ -34,7 +34,7 @@ func FindAllMatches(
 	if root == nil || len(queries) == 0 {
 		return
 	}
-	findAllMatchesNFA(root, nil, nil, queries, onMatch)
+	findAllMatchesNFA([]*sightmap.ComponentNode{root}, nil, nil, queries, onMatch)
 }
 
 // ---- NFA internals ----------------------------------------------------------
@@ -52,11 +52,15 @@ type selectorState struct {
 //	direct     – states that must be checked at this node ONLY (direct-child
 //	             combinator consumed one level).
 func findAllMatchesNFA(
-	node *sightmap.ComponentNode,
+	chain []*sightmap.ComponentNode,
 	descendant, direct []selectorState,
 	queries []MatchQuery,
 	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 ) {
+	// chain is root-first, including node as its last element; chain[:len-1] is
+	// node's ancestor path, which MatchesNodeChain needs to evaluate a :not()
+	// argument that carries a combinator (an ancestor constraint on the subject).
+	node := chain[len(chain)-1]
 	// Build de-duplicated set of states to evaluate at this node.
 	// Fresh starts ({q, 0}) are added for every query at every node — this is
 	// what makes "descendant" semantics work without explicit propagation of
@@ -104,9 +108,9 @@ func findAllMatchesNFA(
 
 	for _, state := range toCheck {
 		rule := state.q.Parts[state.idx]
-		// MatchesNode honors :has() (needs node's subtree); falls back to the
-		// flat checks for everything else.
-		if !sightmap.MatchesNode(node, rule) {
+		// MatchesNodeChain honors :has() (node's subtree) and a combinator-bearing
+		// :not() (node's ancestor chain); falls back to the flat checks otherwise.
+		if !sightmap.MatchesNodeChain(chain, rule) {
 			continue
 		}
 
@@ -136,7 +140,10 @@ func findAllMatchesNFA(
 	// is consumed after one hop because those children won't re-include it in
 	// their own nextDescendant when recursing further).
 	for _, child := range node.Children {
-		findAllMatchesNFA(child, nextDescendant, nextDirect, queries, onMatch)
+		// Full-slice expression caps capacity so each child's append allocates a
+		// fresh backing array — siblings never clobber one another's chain.
+		childChain := append(chain[:len(chain):len(chain)], child)
+		findAllMatchesNFA(childChain, nextDescendant, nextDirect, queries, onMatch)
 	}
 }
 

@@ -69,6 +69,30 @@ describe("__smDeepQueryAll", () => {
     expect(__smDeepQueryAll(document, "[")).toEqual([]);
   });
 
+  // A <form> with a control named "children" makes HTMLFormElement's named
+  // getter (which [LegacyOverrideBuiltIns] lets shadow built-ins) return that
+  // control for form.children instead of the HTMLCollection. A naive
+  // `for (const c of node.children)` then throws "children is not iterable" on
+  // that form, aborting the whole walk — so any match AFTER the form silently
+  // vanished (the JetBlue booker-form bug). We simulate the collision directly
+  // so the guard holds regardless of the test DOM's form named-property
+  // fidelity: the cached childNodes getter must bypass the instance override.
+  test("survives a node whose `children` property is shadowed by a non-iterable value", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const decoy = document.createElement("input"); // non-iterable, like form[name=children]
+    const target = document.createElement("span");
+    target.className = "x";
+    container.appendChild(target);
+    // Shadow the built-in `children` accessor on this instance.
+    Object.defineProperty(container, "children", {
+      value: decoy,
+      configurable: true,
+    });
+    expect(container.children).toBe(decoy); // collision is in effect
+    expect(__smDeepQueryAll(document, ".x")).toEqual([target]);
+  });
+
   test("root itself carrying a shadow root is searched too", () => {
     const host = document.createElement("div");
     host.attachShadow({ mode: "open" }).innerHTML =

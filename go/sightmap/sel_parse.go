@@ -22,8 +22,9 @@ type ParsedSelector struct {
 // ParsedSelector. Supports the sightmap subset: tag, #id, .class,
 // [attr], [attr=val], [attr^=val], [attr$=val], [attr*=val], [attr~=val],
 // [attr|=val], :not(), :is(), :where(), :has(), and descendant /
-// direct-child (>) combinators. Sibling combinators (+, ~) are not supported,
-// including inside :has().
+// direct-child (>) combinators. :not() and :has() accept a complex-selector
+// list (combinators and nested :has()/:not() allowed). Sibling combinators
+// (+, ~) are not supported, including inside :not() and :has().
 func ParseSightmapSelector(s string) (ParsedSelector, error) {
 	p := &parser{s: s}
 	result, err := p.parseSelector()
@@ -400,7 +401,37 @@ func (p *parser) parsePseudo(part *SelectorPart) error {
 
 	switch name {
 	case "not":
-		// handled below
+		// :not() takes a complex-selector list (CSS Selectors L4). Each item is a
+		// full complex selector whose subject is the element under test; an earlier
+		// part is an ancestor constraint. parseSelector handles combinators and any
+		// nested :has()/:not(), and stops at ',' or ')'.
+		if p.i >= len(p.s) || p.s[p.i] != '(' {
+			return fmt.Errorf("expected '(' after :not")
+		}
+		p.i++ // consume '('
+		for {
+			inner, innerErr := p.parseSelector()
+			if innerErr != nil {
+				return fmt.Errorf(":not() argument: %w", innerErr)
+			}
+			if len(inner.Parts) == 0 {
+				return fmt.Errorf(":not() argument is empty")
+			}
+			part.Not = append(part.Not, inner)
+			p.skipWhitespace()
+			if p.i >= len(p.s) {
+				return fmt.Errorf("expected ')' or ',' in :not()")
+			}
+			if p.s[p.i] == ')' {
+				p.i++
+				break
+			}
+			if p.s[p.i] != ',' {
+				return fmt.Errorf("expected ')' or ',' in :not(), got %q", p.s[p.i])
+			}
+			p.i++ // consume ','
+		}
+		return nil
 
 	case "has":
 		if p.i >= len(p.s) || p.s[p.i] != '(' {
@@ -464,29 +495,6 @@ func (p *parser) parsePseudo(part *SelectorPart) error {
 			" — to distinguish identical siblings, merge them into one component"+
 			" (e.g. one CardActionButton) or add a distinguishing data-* attribute to the source element", name)
 	}
-
-	// :not() logic
-	// Consume '('
-	if p.i >= len(p.s) || p.s[p.i] != '(' {
-		return fmt.Errorf("expected '(' after :not")
-	}
-	p.i++
-	p.skipWhitespace()
-
-	// Parse the inner simple selector.
-	inner, err := p.parseSimpleSelectors()
-	if err != nil {
-		return fmt.Errorf(":not() argument: %w", err)
-	}
-
-	p.skipWhitespace()
-	if p.i >= len(p.s) || p.s[p.i] != ')' {
-		return fmt.Errorf("expected ')' to close :not()")
-	}
-	p.i++ // consume ')'
-
-	part.Not = inner
-	return nil
 }
 
 // parseRelativeSelector parses one relative selector inside :has(). It allows an
