@@ -347,6 +347,8 @@ views:
             selector: '[data-component="SubmitNominate"]'
           - name: SubmitIntent
             selector: '[data-component="SubmitIntent"]'
+          - name: SubmitClaim
+            selector: '[data-component="SubmitClaim"]'
           - name: SubmitButton
             selector: '[data-component="SubmitButton"]'
           - name: AtlasSubmitReceived
