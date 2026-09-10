@@ -818,6 +818,56 @@ sightmap lint --warn-only   # deep-nesting warnings (see Component hierarchy: pr
 
 ---
 
+## Verified selector repair
+
+Use this workflow when a previously useful component query fails and the intended
+element is visibly present but no longer has its expected annotation. The calling
+agent supplies semantic judgment; the CLI supplies observations and verification.
+A zero-match warning alone does not authorize guessing a replacement.
+
+1. **Establish the failure.** Preserve the failed query, URL/view, and relevant UI
+   state. Use the same corpus throughout and pass the same `--tab` on live commands. Take a fresh
+   snapshot, check loading/hidden states, query predicates and ancestor scope,
+   and `[Conflicts]`. Compare relevant captures: absence in one state is normal.
+2. **Find the definition.** Use `sightmap search --field name 'ComponentName'` and
+   read the YAML, descriptions, properties, and memory. Trace `children:` and
+   `$ref` to the owning definition. The `source:` field points to application
+   code, not the YAML destination. Preserve names and semantic intent.
+3. **Find the intended node.** Read the fresh annotated tree, then use
+   `sightmap explain --grep 'Accessible name'` or `--id N` to inspect facts,
+   stable selector candidates, and ancestor hooks. Probe IDs are temporary
+   inspection handles; never persist them as selectors. If intent remains
+   ambiguous, stop the repair and record the uncertainty.
+4. **Verify before editing.** Run `sightmap sel-probe -- 'old-effective-selector'`
+   and `sightmap sel-probe -- 'proposed-effective-selector'`. For nested children,
+   include the ancestor selectors: a child selector matching elsewhere on the
+   page proves nothing about its intended scope. Inspect node identity, expected
+   cardinality, and both live and offline counts. A successful exit status is
+   insufficient: zero matches exits successfully, and the offline check is best
+   effort. Resolve divergence or an unavailable offline check before treating
+   the repair as verified. Do not broaden a selector merely to get a match.
+5. **Make and verify the smallest edit.** Change the owning YAML definition,
+   preserving unrelated selectors, properties, and notes. Run `sightmap validate`
+   and `sightmap lint --warn-only`, re-snapshot the affected state, and inspect
+   annotations, conflicts, and extracted properties. Check the original query with the read-only command
+   `sightmap browser bounds --include-offscreen 'OriginalQuery'`; inspect the
+   returned count and target identity (zero matches can exit successfully). Do
+   not replay a side-effecting action as a test. For global or referenced components, check other affected views and
+   their saved captures; do not sacrifice existing matches to fix one state.
+6. **Prepare a reviewable repair.** When corpus maintenance is in scope, put the
+   focused YAML change in a branch/draft PR according to the repository's
+   conventions. Describe the failed query and UI state, old and new effective
+   selectors, why the node preserves the component's meaning, verification
+   counts, and affected-view checks. Include only necessary, sanitized evidence;
+   raw captured trees may contain page/user data. If PR publication is not
+   authorized, leave the local diff and verification summary for review.
+
+A verified corpus repair can support continuing the already authorized browser
+task with a freshly resolved component query. It does not grant permission for
+new actions or justify automatic retries of actions whose outcome is uncertain.
+
+---
+
 ## Known limitations
 
 **Async-rendered pages** (React/Next.js): use `--wait 1` or `--wait 2` for pages
