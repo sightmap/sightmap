@@ -2,6 +2,13 @@
   command = "pnpm build"
   publish = "dist"
 
+# Netlify Functions v2 (the Atlas submission endpoint). esbuild bundles each
+# function with its imports, which is what lets netlify/functions/*.mts reuse
+# netlify/lib/ and scripts/lib/preflight.ts instead of copying them.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Pretty API URLs. Static files at these paths win over a non-forced rewrite,
 # so /api/atlas.json and /api/atlas/<slug>.json (written by
 # scripts/generate-agent-files.ts) are the source of truth. Unknown slugs
@@ -12,10 +19,21 @@
   to = "/api/atlas.json"
   status = 200
 
+# Host lookup: /api/atlas/lookup/example.com -> the generated
+# dist/atlas/hosts/example.com.json (scripts/build-atlas.ts writes one file per
+# listed host). Declared before the :slug rule below, which only ever matches a
+# single path segment. An unlisted host falls through to the 404 catch-all.
+[[redirects]]
+  from = "/api/atlas/lookup/:host"
+  to = "/atlas/hosts/:host.json"
+  status = 200
+
 [[redirects]]
   from = "/api/atlas/:slug"
   to = "/api/atlas/:slug.json"
   status = 200
+
+# POST /api/atlas/submit needs no rule here — see netlify/functions/atlas-submit.mts for the request chain.
 
 # Unknown URLs. Every real route has a prerendered dist/<route>/index.html, and
 # Netlify serves an existing static file before applying a non-forced redirect,
