@@ -42,6 +42,16 @@ describe('handleNegotiate', () => {
     expect(res!.headers.get('vary')?.toLowerCase()).toContain('accept')
   })
 
+  it('passes the submission endpoint through to its serverless function', async () => {
+    // Edge functions run before functions, so answering /api/* here would
+    // shadow netlify/functions/atlas-submit.mts on both of its paths.
+    expect(await handleNegotiate(request('/api/atlas/submit', {}, 'POST'), deps({}))).toBeUndefined()
+    expect(await handleNegotiate(request('/api/atlas/submit?id=abc'), deps({}))).toBeUndefined()
+    expect(
+      await handleNegotiate(request('/.netlify/functions/atlas-submit', {}, 'POST'), deps({}))
+    ).toBeUndefined()
+  })
+
   it('rejects non-GET methods on the API with JSON 405', async () => {
     const res = await handleNegotiate(request('/api/atlas', {}, 'POST'), deps({}))
     expect(res!.status).toBe(405)
