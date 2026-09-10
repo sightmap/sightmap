@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "url": "https://alpha.example.org/",
+  "finalUrl": "https://alpha.example.org/",
+  "host": "alpha.example.org",
+  "scannedAt": "2026-09-01T10:00:00.000Z",
+  "scanner": { "name": "sightmap-atlas-scan", "version": "1.0.0", "browser": "chromium" },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [{ "url": "https://alpha.example.org/", "path": "/", "title": "Alpha", "status": 200, "surface": "polyfilled", "tools": ["search", "legacy"] }],
+  "tools": [
+    { "name": "search", "description": "Search the docs.", "inputSchema": { "type": "object", "properties": { "q": { "type": "string" } } }, "page": "/", "pages": ["/"], "impl": "imperative", "api": "navigator", "risk": "read", "riskReason": "name starts with \"search\"", "warnings": [] },
+    { "name": "legacy", "description": "Old thing.", "inputSchema": { "type": "object" }, "page": "/", "pages": ["/"], "impl": "imperative", "api": "navigator", "risk": "action", "riskReason": "unclassified", "warnings": [] }
+  ],
+  "checks": [{ "id": "named", "label": "Every tool has a name", "ok": true, "detail": "2/2" }],
+  "counts": { "tools": 2, "pages": 1, "read": 1, "action": 1, "sensitive": 0, "described": 2, "withInputSchema": 2, "declarative": 0 },
+  "hints": { "forms": [], "links": [], "title": "Alpha", "description": "" },
+  "notes": []
+}
