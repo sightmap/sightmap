@@ -127,9 +127,18 @@ describe('markdown twins', () => {
     const { listings } = loadDirectory(FIXTURES)
     const md = scanReportMarkdown(listings[0].report)
     expect(md).toContain('# Atlas scan: alpha.example.org')
-    expect(md).toContain('- Tools discovered: 2 (1 read, 1 action, 0 sensitive; 0 declarative)')
+    expect(md).toContain('- Tools detected: 2 (1 read, 1 action, 0 sensitive; 0 declarative)')
     expect(md).toContain('- ✓ Tool set changes with the page (2 distinct tool sets across 2 pages)')
     expect(md).toContain('- `/docs` — polyfilled, 1 tool(s)')
+  })
+
+  it('says only what was observed, in both twins', () => {
+    const { listings } = loadDirectory(FIXTURES)
+    for (const md of [listingMarkdown(listings[0]), scanReportMarkdown(listings[0].report)]) {
+      expect(md).not.toMatch(/verified|safe|trusted|approved|certified|endorse/i)
+      expect(md).toContain('maintainer')
+    }
+    expect(scanReportMarkdown(listings[0].report)).toContain('none were called')
   })
 })
 

@@ -113,21 +113,15 @@ export interface BadgeListing {
 /**
  * The badge for one directory listing.
  *
- * With tools, the left label names the thing being claimed — "WebMCP tools" —
- * and the right side is the evidence: how many, and the date they were
- * enumerated. With none, the claim is only that the site is in the Atlas, so
- * the label says exactly that rather than advertising a count of zero as if it
- * were a WebMCP result.
+ * The badge sits in someone else's README, away from the listing that would
+ * qualify it, so it says only who looked and what was seen: the label is the
+ * name of the party making the observation, and the value is the observation
+ * and its date. "Detected" rather than a bare count, so the badge cannot be
+ * read as Sightmap vouching for the site.
  */
 export function listingBadgeSvg(listing: BadgeListing): string {
   const tools = listing.counts.tools
   const date = listing.scannedAt.slice(0, 10)
-  if (tools > 0) {
-    return badgeSvg({
-      label: 'WebMCP tools',
-      value: `${tools} tool${tools === 1 ? '' : 's'} · scanned ${date}`,
-      tone: 'tools',
-    })
-  }
-  return badgeSvg({ label: 'Atlas', value: `no tools · scanned ${date}`, tone: 'none' })
+  const seen = tools === 0 ? 'no tools' : `${tools} tool${tools === 1 ? '' : 's'}`
+  return badgeSvg({ label: 'Sightmap', value: `${seen} detected · ${date}`, tone: tools > 0 ? 'tools' : 'none' })
 }
