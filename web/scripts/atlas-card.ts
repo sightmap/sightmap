@@ -88,12 +88,17 @@ type Store = ReturnType<typeof getStore>
 
 /** Merge the scan into the record on file. False when the host has no card. */
 async function mergeScan(store: Store, host: string, scan: TryScan): Promise<boolean> {
+  let submissionId = ''
   for (let attempt = 0; attempt < CARD_WRITE_ATTEMPTS; attempt += 1) {
     const entry = await store.getWithMetadata(host, { type: 'json' })
     if (entry === null) return false
-    const record = withScan(entry.data as TryRecord, scan)
-    // Same read-then-conditional-write discipline the submit function uses:
-    // a resubmission for this host may have replaced the record since the read.
+    const current = entry.data as TryRecord
+    // A resubmission that replaced the record since the first read carries a
+    // fresh claim, and a fresh claim drops the old scan: this one is old.
+    if (submissionId && current.submissionId !== submissionId) return false
+    submissionId = current.submissionId
+    const record = withScan(current, scan)
+    // Same read-then-conditional-write discipline the submit function uses.
     const written = await store.setJSON(host, record, entry.etag ? { onlyIfMatch: entry.etag } : undefined)
     if (written.modified) return true
   }
@@ -105,6 +110,14 @@ export async function run(argv: string[]): Promise<number> {
   const report = readReport(args.scan)
   const host = canonicalHost(args.host || report.host)
   if (!host) throw new Error(`no host: pass --host, or scan a report that carries one\n${USAGE}`)
+  // The report decides which card this scan may touch. `--host` is typed by
+  // the runner, and the runner reads text the scanned site wrote.
+  if (report.host && canonicalHost(report.host) !== host) {
+    throw new Error(`--host ${host} does not match the report's host ${canonicalHost(report.host)}`)
+  }
+  if (!Number.isFinite(new Date(report.scannedAt).getTime())) {
+    throw new Error(`${args.scan} has no usable scannedAt`)
+  }
 
   const siteID = process.env.NETLIFY_SITE_ID?.trim()
   const token = process.env.NETLIFY_AUTH_TOKEN?.trim()

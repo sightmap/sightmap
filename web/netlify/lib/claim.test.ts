@@ -30,7 +30,16 @@ function fakeFetch(responses: Record<string, Response | (() => Response)>) {
 const redirect = (to: string, status = 301): Response =>
   new Response(null, { status, headers: { location: to } })
 
+/** The public-address check answers yes unless a test says otherwise. */
+const publicHost = async () => ({ ok: true })
+const check = (url: string, token: string, fetchImpl: typeof fetch, opts: Parameters<typeof verifyClaim>[3] = {}) =>
+  verifyClaim(url, token, fetchImpl, { resolve: publicHost, ...opts })
+
 describe('claimUrl', () => {
+  it('drops a port: the card asserts the origin on 443, so that is what is checked', () => {
+    expect(claimUrl('https://example.org:8443/app')).toBe('https://example.org/webmcp.txt')
+  })
+
   it('asks the submitted host for its own webmcp.txt', () => {
     expect(claimUrl('https://example.org/pricing?ref=x')).toBe('https://example.org/webmcp.txt')
     expect(claimUrl('example.org')).toBe('https://example.org/webmcp.txt')
@@ -65,16 +74,40 @@ describe('claimLine', () => {
 })
 
 describe('verifyClaim', () => {
+  it('does not fetch from a host that resolves to a private address', async () => {
+    const fetchImpl = fakeFetch({ 'https://example.org/webmcp.txt': new Response(FILE) })
+    const result = await check('https://example.org/', TOKEN, fetchImpl, {
+      resolve: async () => ({ ok: false, reason: 'address is private or reserved' }),
+    })
+    expect(result).toMatchObject({ ok: false, code: 'claim-unreachable' })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('checks the address again on every redirect hop', async () => {
+    const seen: string[] = []
+    const fetchImpl = fakeFetch({
+      'https://example.org/webmcp.txt': redirect('https://www.example.org/webmcp.txt'),
+      'https://www.example.org/webmcp.txt': new Response(FILE),
+    })
+    await check('https://example.org/', TOKEN, fetchImpl, {
+      resolve: async (host) => {
+        seen.push(host)
+        return { ok: true }
+      },
+    })
+    expect(seen).toEqual(['example.org', 'www.example.org'])
+  })
+
   it('accepts a file that carries the line', async () => {
     const fetchImpl = fakeFetch({ 'https://example.org/webmcp.txt': new Response(FILE, { status: 200 }) })
-    await expect(verifyClaim('https://example.org/pricing', TOKEN, fetchImpl)).resolves.toEqual({ ok: true })
+    await expect(check('https://example.org/pricing', TOKEN, fetchImpl)).resolves.toEqual({ ok: true })
   })
 
   it('reports a mismatch when the file is there but the line is not', async () => {
     const fetchImpl = fakeFetch({
       'https://example.org/webmcp.txt': new Response('https://example.org/\nsearch — Search\n', { status: 200 }),
     })
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl)
+    const result = await check('https://example.org/', TOKEN, fetchImpl)
     expect(result).toMatchObject({ ok: false, code: 'claim-mismatch' })
   })
 
@@ -83,7 +116,7 @@ describe('verifyClaim', () => {
       'https://example.org/webmcp.txt': redirect('https://www.example.org/webmcp.txt'),
       'https://www.example.org/webmcp.txt': new Response(FILE, { status: 200 }),
     })
-    await expect(verifyClaim('https://example.org/', TOKEN, fetchImpl)).resolves.toEqual({ ok: true })
+    await expect(check('https://example.org/', TOKEN, fetchImpl)).resolves.toEqual({ ok: true })
   })
 
   it('refuses a redirect that leaves the site', async () => {
@@ -93,7 +126,7 @@ describe('verifyClaim', () => {
       'https://example.org/webmcp.txt': redirect('https://pages.example.net/webmcp.txt'),
       'https://pages.example.net/webmcp.txt': new Response(FILE, { status: 200 }),
     })
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl)
+    const result = await check('https://example.org/', TOKEN, fetchImpl)
     expect(result).toEqual({ ok: false, code: 'claim-unreachable', reason: 'redirected off-site' })
   })
 
@@ -106,17 +139,17 @@ describe('verifyClaim', () => {
       [hop(3)]: redirect(hop(4)),
       [hop(4)]: new Response(FILE, { status: 200 }),
     })
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl)
+    const result = await check('https://example.org/', TOKEN, fetchImpl)
     expect(result).toMatchObject({ ok: false, code: 'claim-unreachable' })
     expect((result as { reason: string }).reason).toContain('redirects')
   })
 
-  it('refuses a file bigger than the cap, without reading all of it', async () => {
+  it('refuses a file bigger than the cap', async () => {
     const oversized = `${'x'.repeat(200)}\n`.repeat(10)
     const fetchImpl = fakeFetch({
       'https://example.org/webmcp.txt': new Response(oversized, { status: 200 }),
     })
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl, { maxBytes: 128 })
+    const result = await check('https://example.org/', TOKEN, fetchImpl, { maxBytes: 128 })
     expect(result).toMatchObject({ ok: false, code: 'claim-unreachable' })
     expect((result as { reason: string }).reason).toContain('larger than')
   })
@@ -128,7 +161,7 @@ describe('verifyClaim', () => {
         headers: { 'content-length': String(1024 * 1024) },
       }),
     })
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl, { maxBytes: 128 })
+    const result = await check('https://example.org/', TOKEN, fetchImpl, { maxBytes: 128 })
     expect(result).toMatchObject({ ok: false, code: 'claim-unreachable' })
   })
 
@@ -139,7 +172,7 @@ describe('verifyClaim', () => {
           init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
         })
     ) as unknown as typeof fetch
-    const result = await verifyClaim('https://example.org/', TOKEN, hang, { timeoutMs: 5 })
+    const result = await check('https://example.org/', TOKEN, hang, { timeoutMs: 5 })
     expect(result).toMatchObject({ ok: false, code: 'claim-unreachable' })
     expect((result as { reason: string }).reason).toContain('timed out')
   })
@@ -148,13 +181,13 @@ describe('verifyClaim', () => {
     const fetchImpl = fakeFetch({
       'https://example.org/webmcp.txt': new Response('not found', { status: 404 }),
     })
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl)
+    const result = await check('https://example.org/', TOKEN, fetchImpl)
     expect(result).toEqual({ ok: false, code: 'claim-unreachable', reason: 'HTTP 404' })
   })
 
   it('reports a transport failure without throwing', async () => {
     const fetchImpl = fakeFetch({})
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl)
+    const result = await check('https://example.org/', TOKEN, fetchImpl)
     expect(result).toMatchObject({ ok: false, code: 'claim-unreachable' })
   })
 
@@ -162,7 +195,7 @@ describe('verifyClaim', () => {
     const fetchImpl = fakeFetch({
       'https://example.org/webmcp.txt': new Response('nothing here', { status: 200 }),
     })
-    const result = await verifyClaim('https://example.org/', TOKEN, fetchImpl)
+    const result = await check('https://example.org/', TOKEN, fetchImpl)
     expect(JSON.stringify(result)).not.toContain(TOKEN)
   })
 })
