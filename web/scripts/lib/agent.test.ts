@@ -177,10 +177,23 @@ describe('buildOpenApiSpec — WebMCP directory', () => {
     expect(submit.requestBody).toMatchObject({
       content: { 'application/json': { schema: { $ref: '#/components/schemas/SubmitRequest' } } },
     })
-    expect(Object.keys(submit.responses)).toEqual(['202', '400', '429'])
+    expect(Object.keys(submit.responses)).toEqual(['202', '400', '403', '422', '429'])
     const responses = (spec.components as { responses: Record<string, unknown> }).responses
     expect(responses.BadRequest).toBeDefined()
     expect(responses.TooManyRequests).toBeDefined()
+    // A failed domain claim is 422, not 400: the request was well formed and
+    // nothing was stored, so the same body can be posted again.
+    expect(responses.ClaimFailed).toBeDefined()
+    expect(responses.Quarantined).toBeDefined()
+  })
+
+  it('documents the optional domain claim and the card it earns', () => {
+    const spec = buildOpenApiSpec()
+    const schemas = (spec.components as {
+      schemas: Record<string, { properties: Record<string, { pattern?: string; format?: string }> }>
+    }).schemas
+    expect(schemas.SubmitRequest.properties.claim?.pattern).toBe('^[0-9a-f]{32}$')
+    expect(schemas.SubmitAccepted.properties.card?.format).toBe('uri')
   })
 
   it('adds the directory component schemas', () => {

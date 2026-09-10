@@ -327,7 +327,7 @@ export default async (req: Request, context: Context): Promise<Response> => {
   // spends a slot.
   const ceiling = dailyRunCeiling(env)
   const runsKey = dailyRunsKey(receivedAt)
-  const claim =
+  const runClaim =
     kind === 'queue'
       ? { ok: true as const, value: true }
       : await withStore(RATE_STORE, 'daily run ceiling', (store) => claimRun(store, runsKey, ceiling))
@@ -335,7 +335,7 @@ export default async (req: Request, context: Context): Promise<Response> => {
   // is the fail-open rule the rate limit uses too — a lost counter costs a few
   // extra runs, where failing closed would stall the pipeline — with the one
   // exception it encodes: ATLAS_DAILY_RUNS=0 means no runs, blind or not.
-  const mayRun = claim.ok ? claim.value : shouldTriggerRunner(null, ceiling)
+  const mayRun = runClaim.ok ? runClaim.value : shouldTriggerRunner(null, ceiling)
 
   const record = buildRecord(value, {
     id,
