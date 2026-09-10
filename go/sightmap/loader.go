@@ -44,8 +44,15 @@ type rawFile struct {
 	Views      []rawView      `yaml:"views"`
 	Requests   []rawRequest   `yaml:"requests"`
 	Messages   []rawMessage   `yaml:"messages"`
+	Signals    []rawSignal    `yaml:"signals"`
 	URL        string         `yaml:"url"`
 	Snapshots  []rawSnapshot  `yaml:"snapshots"`
+}
+
+type rawSignal struct {
+	Name string   `yaml:"name"`
+	Ref  string   `yaml:"ref"`
+	Tags []string `yaml:"tags"`
 }
 
 type rawMessage struct {
@@ -188,6 +195,7 @@ func loadDir(path string) (*Corpus, error) {
 	var globalRaws []rawComponent
 	var globalRequestRaws []rawRequest
 	var messageRaws []rawMessage
+	var signalRaws []rawSignal
 	type viewFileWithPath struct {
 		rf   rawFile
 		path string
@@ -218,6 +226,9 @@ func loadDir(path string) (*Corpus, error) {
 		}
 		if len(rf.Messages) > 0 {
 			messageRaws = append(messageRaws, rf.Messages...)
+		}
+		if len(rf.Signals) > 0 {
+			signalRaws = append(signalRaws, rf.Signals...)
 		}
 		if len(rf.Views) > 0 {
 			viewFiles = append(viewFiles, viewFileWithPath{rf: rf, path: p})
@@ -298,6 +309,7 @@ func loadDir(path string) (*Corpus, error) {
 		Views:            views,
 		Requests:         globalRequests,
 		Messages:         toMessageDefs(messageRaws),
+		Signals:          toSignalDefs(signalRaws),
 		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),
 	}, nil
 }
@@ -383,6 +395,21 @@ func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 // problems (a missing name, a duplicate, an uncompilable regex) are reported by
 // checkMessages at validation time rather than dropped here, so an author sees
 // every problem at once.
+// toSignalDefs converts raw signal definitions into SignalDefs. Signals are flat
+// (name + ref + tags; no $ref, hierarchy, or selector cascade), so they convert
+// directly; ref resolution and the Component/View restriction are checked by
+// validate_signal.go, not here.
+func toSignalDefs(rss []rawSignal) []SignalDef {
+	if len(rss) == 0 {
+		return nil
+	}
+	out := make([]SignalDef, 0, len(rss))
+	for _, rs := range rss {
+		out = append(out, SignalDef{Name: rs.Name, Ref: rs.Ref, Tags: rs.Tags})
+	}
+	return out
+}
+
 func toMessageDefs(rms []rawMessage) []MessageDef {
 	if len(rms) == 0 {
 		return nil
