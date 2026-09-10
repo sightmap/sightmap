@@ -118,7 +118,11 @@ export default async (req: Request, context: Context): Promise<Response> => {
   // /atlas/hosts/<host>.json by — so /try/www.example.com and
   // /try/example.com are one card, not two.
   const host = canonicalHost(raw)
-  const preflight = preflightUrl(`https://${host}`)
+  // A segment that parses as more than a hostname (a slash, an @, a port)
+  // would key the lookups by one string and preflight another; treat it as
+  // no host at all.
+  const parsed = preflightUrl(`https://${host}`)
+  const preflight = parsed.ok && parsed.host === host ? parsed : { ok: false as const }
 
   // Each lookup is skipped once an earlier check has already decided; see the
   // note on TryDecisionInputs for why the skipped ones are safe to pass empty.

@@ -51,7 +51,8 @@ function day(iso: string): string {
  */
 export function statusLine(record: TryRecord): string {
   if (!record.scan) return `Domain control verified ${day(record.claimedAt)}. Scan pending.`
-  return `${record.scan.tools.length} tools detected on ${day(record.scan.scannedAt)}. Domain control verified. Not reviewed by Sightmap.`
+  const n = record.scan.tools.length
+  return `${n} tool${n === 1 ? '' : 's'} detected on ${day(record.scan.scannedAt)}. Domain control verified. Not reviewed by Sightmap.`
 }
 
 /**
@@ -74,7 +75,7 @@ export function promptFor(record: TryRecord): string | null {
 export function shareText(record: TryRecord, cardUrl: string): string {
   const count = record.scan?.tools.length
   if (count === undefined) return `${record.host} is claimed on Sightmap for WebMCP agents. ${cardUrl}`
-  return `${count} WebMCP tools detected on ${record.host}, callable by WebMCP agents. ${cardUrl}`
+  return `${count} WebMCP tool${count === 1 ? '' : 's'} detected on ${record.host}, callable by WebMCP agents. ${cardUrl}`
 }
 
 const STYLE = `
