@@ -144,8 +144,8 @@ ${ATLAS_DESCRIPTION}
 ## WebMCP listings
 
 Sites whose tools were enumerated by a scan and reviewed by a maintainer.
-A listing records what was found on a date. Nothing was executed, and
-no listing is a safety certification.
+A listing records the tools a scan detected on a date. No tool was called,
+and a listing says nothing about the site beyond that.
 
 Machine index: ${SITE_URL}/atlas/directory.json
 Totals: ${SITE_URL}/atlas/stats.json

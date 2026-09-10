@@ -93,7 +93,7 @@ describe('buildAtlasIndexMarkdown', () => {
       '- [Alpha Tools](https://sightmap.org/atlas/alpha-tools.md) (alpha.example.org): A fixture site with WebMCP tools. 9 WebMCP tools, live. JSON: https://sightmap.org/atlas/sites/alpha-tools.json'
     )
     expect(md).toContain('- [Airbnb](https://sightmap.org/atlas/airbnb.md)')
-    expect(md).toContain('no listing is a safety certification')
+    expect(md).toContain('a listing says nothing about the site beyond that')
   })
 
   it('says so for each half rather than emitting an empty section', () => {
