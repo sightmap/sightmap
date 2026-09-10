@@ -6,6 +6,7 @@
 //                     [--submitted-by owner|nominator|maintainer]
 //                     [--max-pages 3] [--path /docs] [--heuristic]
 //                     [--allow-local] [--allow-empty] [--summary summary.md]
+//                     [--scan-path-out scan-path.txt]
 //                     [--sightmap-bin ./sightmap] [--data-dir …] [--atlas-dir …]
 //                     [--replace-review]
 //
@@ -43,6 +44,8 @@ export interface IntakeArgs {
   /** Write a listing even when the scan found no tools (default: skip it). */
   allowEmpty: boolean
   summary: string
+  /** Where to write the path of the scan report this run filed, if any. */
+  scanPathOut: string
   sightmapBin: string
   dataDir: string
   atlasDir: string
@@ -52,7 +55,7 @@ export interface IntakeArgs {
 export const USAGE =
   'usage: atlas-intake --url <url> [--intent text] [--submission-id id] [--type live|demo] [--sightkick] ' +
   '[--submitted-by owner|nominator|maintainer] [--max-pages 3] [--path /p] [--heuristic] [--allow-local] [--allow-empty] ' +
-  '[--summary summary.md] [--sightmap-bin path] [--data-dir dir] [--atlas-dir dir] [--replace-review]'
+  '[--summary summary.md] [--scan-path-out file] [--sightmap-bin path] [--data-dir dir] [--atlas-dir dir] [--replace-review]'
 
 export function parseArgs(argv: string[]): IntakeArgs {
   const out: IntakeArgs = {
@@ -68,6 +71,7 @@ export function parseArgs(argv: string[]): IntakeArgs {
     allowLocal: false,
     allowEmpty: false,
     summary: '',
+    scanPathOut: '',
     sightmapBin: '',
     dataDir: DEFAULT_DATA_DIR,
     atlasDir: DEFAULT_ATLAS_DIR,
@@ -97,6 +101,7 @@ export function parseArgs(argv: string[]): IntakeArgs {
     else if (a === '--allow-local') out.allowLocal = true
     else if (a === '--allow-empty') out.allowEmpty = true
     else if (a === '--summary') out.summary = next()
+    else if (a === '--scan-path-out') out.scanPathOut = next()
     else if (a === '--sightmap-bin') out.sightmapBin = next()
     else if (a === '--data-dir') out.dataDir = next()
     else if (a === '--atlas-dir') out.atlasDir = next()
@@ -300,6 +305,12 @@ export async function run(argv: string[]): Promise<IntakeResult> {
     log(`  ${listing.isRescan ? 'rescanned' : 'listed'} ${report.host} as ${listing.slug}`)
     log(`  wrote ${listing.listingPath}`)
     log(`  wrote ${listing.scanPath}`)
+  }
+  // A file, not a line to grep out of the log: the log also carries text the
+  // scanned site wrote, and a path is the one thing here worth being exact about.
+  if (args.scanPathOut) {
+    fs.mkdirSync(path.dirname(path.resolve(args.scanPathOut)), { recursive: true })
+    fs.writeFileSync(args.scanPathOut, listing ? `${listing.scanPath}\n` : '')
   }
 
   const summary = intakeSummary({ report, review, listing, submissionId: args.submissionId })
