@@ -1,0 +1,275 @@
+# Atlas review — the fallback path for a WebMCP directory submission.
+#
+# The primary path is a Netlify Agent Runner (ATLAS_RUNNER=netlify), which runs
+# a coding agent against this repo and opens the PR itself; see
+# maintainers/atlas-pipeline.md. This workflow is the same pipeline without an
+# agent: it runs `pnpm atlas:intake`, which scans, reviews, and writes the
+# listing, then opens a PR for a maintainer. Use it when ATLAS_RUNNER=github,
+# when the Netlify runner is out of concurrency, or to re-run a submission by
+# hand from the Actions tab.
+#
+# The playbook a *human or agent* follows on the resulting PR is
+# web/ATLAS_PIPELINE.md. This file automates steps 1, 3, 6 and 7 of it; the
+# judgement steps (2, 4, 5) stay with the maintainer who reviews the PR.
+name: atlas-review
+
+on:
+  # The Netlify submit function fires this when ATLAS_RUNNER=github. Payload:
+  # {submission_id, url, intent, owner, sightkick, nominate, rescan, email_hash}.
+  # email_hash is never read here — no email may reach a commit, branch, or PR.
+  repository_dispatch:
+    types: [atlas-submission]
+
+  # Manual re-runs and maintainer-initiated listings.
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Site to scan (https:// only)'
+        required: true
+        type: string
+      intent:
+        description: 'What the submitter wants an agent to do (stored, never acted on)'
+        required: false
+        type: string
+      submission_id:
+        description: 'Submission id; also names the branch. Defaults to the run id.'
+        required: false
+        type: string
+      type:
+        description: 'live = a real product surface; demo = hackathon/example/experiment'
+        required: false
+        type: choice
+        default: live
+        options: [live, demo]
+      sightkick:
+        description: 'The site was built with Sightkick'
+        required: false
+        type: boolean
+        default: false
+      submitted_by:
+        description: 'Who submitted it (a claim, not a verified fact)'
+        required: false
+        type: choice
+        default: owner
+        options: [owner, nominator, maintainer]
+      max_pages:
+        description: 'Same-origin pages to visit, including the first (scanner caps at 3)'
+        required: false
+        type: string
+        default: '3'
+
+permissions:
+  contents: write # commit the listing + scan on a new branch
+  pull-requests: write # open the PR
+
+# One scan per site at a time. Two submissions for the same URL would race on
+# the same slug and the same dated scan file. Different URLs run in parallel.
+# Not cancel-in-progress: a half-finished scan leaves no useful artifact.
+concurrency:
+  group: atlas-review-${{ github.event.inputs.url || github.event.client_payload.url }}
+
+jobs:
+  review:
+    name: scan + draft listing
+    # ubuntu-latest by default. Set the repository variable ATLAS_RUNNER_LABEL
+    # to `nscloud-ubuntu-24.04-amd64-4x8-with-cache` to move this job onto a
+    # Namespace runner (label shape: nscloud-<os>-<arch>-<shape>[-with-cache],
+    # or namespace-profile-<name> for a named profile). Namespace gives the
+    # scan more CPU for Chrome and a persistent cache volume; on that runner
+    # you can additionally add namespacelabs/nscloud-cache-action@v1 with
+    # `path: ~/.local/share/pnpm/store` in place of setup-node's pnpm cache.
+    runs-on: ${{ vars.ATLAS_RUNNER_LABEL || 'ubuntu-latest' }}
+    # A scan is budgeted at ~2 minutes; 20 covers install + build + a hung
+    # browser, and stops a wedged Chrome from burning an hour of runner time.
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: web
+
+    # Resolve the submission from whichever trigger fired. workflow_dispatch
+    # fills github.event.inputs.*; repository_dispatch fills
+    # github.event.client_payload.*. Exactly one side is ever non-empty, so
+    # `a || b` picks the right one. Everything downstream reads these.
+    env:
+      ATLAS_URL: ${{ github.event.inputs.url || github.event.client_payload.url }}
+      ATLAS_INTENT: ${{ github.event.inputs.intent || github.event.client_payload.intent }}
+      # Branch name and PR identity; falls back to the run id so a dispatch
+      # without an id still gets a unique, collision-free branch.
+      ATLAS_SUBMISSION_ID: ${{ github.event.inputs.submission_id || github.event.client_payload.submission_id || github.run_id }}
+      ATLAS_TYPE: ${{ github.event.inputs.type || github.event.client_payload.type || 'live' }}
+      # workflow_dispatch booleans arrive as the strings 'true'/'false';
+      # client_payload booleans arrive as real booleans and stringify the same
+      # way. Compared against 'true' as a string below.
+      ATLAS_SIGHTKICK: ${{ github.event.inputs.sightkick || github.event.client_payload.sightkick || 'false' }}
+      # client_payload carries `owner: true|false` rather than a role string,
+      # so map it: owner only when the submitter ticked the owner box, and
+      # nominator for everything else. A submission with neither box ticked is
+      # a nomination, not an ownership claim — the Netlify path
+      # (web/netlify/lib/runner.ts `submittedBy`) defaults the same way.
+      ATLAS_SUBMITTED_BY: ${{ github.event.inputs.submitted_by || (github.event.client_payload.owner && 'owner') || 'nominator' }}
+      ATLAS_MAX_PAGES: ${{ github.event.inputs.max_pages || github.event.client_payload.max_pages || '3' }}
+      # Written by the intake step, read by the PR step. Kept in RUNNER_TEMP so
+      # it can never be picked up by the commit.
+      ATLAS_SUMMARY: ${{ runner.temp }}/atlas-summary.md
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Pinned to web/package.json's packageManager field.
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          # The lockfile lives in the subdirectory, not at the repo root.
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install web deps
+        run: pnpm install --frozen-lockfile
+
+      # The scanner shells out to the `sightmap` CLI; it is not a web/ dep.
+      - name: Install the sightmap CLI
+        run: npm i -g @sightmap/sightmap
+
+      # Downloads a Chrome for Testing build for `sightmap browser start`.
+      # If this ever fails on a hosted runner, set ATLAS_CHROME_PATH to the
+      # preinstalled Chrome instead (ubuntu-latest ships one) — the scanner
+      # reads that env var before falling back to the CLI's own install.
+      - name: Install Chrome for Testing
+        run: sightmap browser install
+
+      # Fail loudly and early on a URL the scanner would reject anyway, rather
+      # than spending five minutes to produce a preflight error.
+      - name: Check the URL is present and https
+        run: |
+          set -euo pipefail
+          if [ -z "${ATLAS_URL:-}" ]; then
+            echo "::error::no url in the trigger payload"; exit 1
+          fi
+          case "$ATLAS_URL" in
+            https://*) ;;
+            *) echo "::error::only https:// URLs are scanned"; exit 1 ;;
+          esac
+          # host for the PR title / commit message. Strip scheme, then
+          # everything from the first / or : — no credentials survive because
+          # preflight rejects a URL that carries any.
+          host=${ATLAS_URL#https://}
+          host=${host%%/*}
+          host=${host%%:*}
+          echo "host=$host" >> "$GITHUB_OUTPUT"
+        id: target
+
+      # scan -> review -> listing in one command; writes
+      # web/src/data/directory/<slug>.yaml, the dated scan JSON under
+      # scans/<slug>/, and the human-readable summary at $ATLAS_SUMMARY.
+      # atlas-intake exits 1 when the scan was blocked or the page never
+      # loaded, and still writes the summary. `continue-on-error` keeps that a
+      # reportable outcome rather than a crash: the artifact upload below runs,
+      # and `steps.intake.outcome` (which stays 'failure' even with
+      # continue-on-error, unlike `conclusion`) gates the verify and PR steps
+      # off. On this path a blocked scan produces no PR because there is
+      # nothing to commit — the summary artifact is the deliverable. An agent
+      # on the Netlify path opens a summary-only PR instead; see the
+      # "what to do when" table in web/ATLAS_PIPELINE.md.
+      - name: Intake
+        id: intake
+        continue-on-error: true
+        env:
+          # Present -> Claude reviews the scan artifact. Absent -> the review
+          # step falls back to heuristics; the listing still gets written, but
+          # the description and category need more maintainer attention.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Where scripts/lib/scan.ts looks for the CLI it just installed.
+          SIGHTMAP_BIN: sightmap
+        run: |
+          set -euo pipefail
+          # Build the flag list conditionally: an empty --intent would be a
+          # stored empty string, and --sightkick is a presence flag. Written as
+          # `if` blocks, not `[ … ] && …` — under `set -e` a false one-liner
+          # test would abort the step.
+          args=(--url "$ATLAS_URL" --submission-id "$ATLAS_SUBMISSION_ID"
+                --type "$ATLAS_TYPE" --submitted-by "$ATLAS_SUBMITTED_BY"
+                --max-pages "$ATLAS_MAX_PAGES" --summary "$ATLAS_SUMMARY")
+          if [ -n "${ATLAS_INTENT:-}" ]; then args+=(--intent "$ATLAS_INTENT"); fi
+          if [ "$ATLAS_SIGHTKICK" = "true" ]; then args+=(--sightkick); fi
+          pnpm atlas:intake "${args[@]}"
+
+      # A green build is not proof the YAML parsed — listing validation is
+      # per-file and non-fatal — but a red one means the PR is not openable.
+      - name: Verify
+        if: steps.intake.outcome == 'success'
+        run: |
+          pnpm test
+          pnpm build
+
+      # atlas-intake's first line already carries the title; the markers below
+      # are the fallback if that ever changes.
+      - name: Read the PR title from the summary
+        id: title
+        if: always()
+        env:
+          # Through the environment, not interpolated into the script body: a
+          # step output is data, and expanding one inside a quoted shell word
+          # ends that word on any value that carries a quote.
+          HOST: ${{ steps.target.outputs.host }}
+        run: |
+          set -euo pipefail
+          first=""
+          if [ -f "$ATLAS_SUMMARY" ]; then
+            first=$(head -n 1 "$ATLAS_SUMMARY" | sed 's/^#\+[[:space:]]*//')
+          fi
+          case "$first" in
+            atlas:*)
+              title="$first"
+              ;;
+            *)
+              verb=list
+              if [ -f "$ATLAS_SUMMARY" ]; then
+                if grep -qF 'rescan of an existing listing' "$ATLAS_SUMMARY"; then verb=rescan; fi
+                # An em dash, matching the playbook's needs-review title.
+                if grep -qF 'Status: `needs-review`' "$ATLAS_SUMMARY"; then verb='needs review —'; fi
+              fi
+              title="atlas: $verb $HOST"
+              ;;
+          esac
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+      # Only the listing and its scan are committed — add-paths is what keeps
+      # a stray lockfile or generated file out of the diff. The commit message
+      # names the host and never the submitter; email_hash stays in the
+      # payload and out of git history.
+      - name: Open the pull request
+        if: steps.intake.outcome == 'success'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          # No branch-suffix: the action reuses this exact branch (and updates
+          # the open PR) when the same submission is re-run, rather than
+          # opening a second PR for the same site.
+          branch: atlas/${{ env.ATLAS_SUBMISSION_ID }}
+          add-paths: |
+            web/src/data/directory/*.yaml
+            web/src/data/directory/scans/**
+          commit-message: 'atlas: list ${{ steps.target.outputs.host }}'
+          title: ${{ steps.title.outputs.title }}
+          body-path: ${{ env.ATLAS_SUMMARY }}
+          labels: atlas
+          # A draft would not get a review request; a maintainer merges this.
+          draft: false
+
+      # Always — a blocked, timed-out, or failed scan is the case where the
+      # summary and the partial scan JSON are *most* worth reading, and there
+      # is no PR to attach them to.
+      - name: Upload summary + scan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-${{ env.ATLAS_SUBMISSION_ID }}
+          path: |
+            ${{ runner.temp }}/atlas-summary.md
+            web/src/data/directory/scans/**
+          if-no-files-found: warn
+          retention-days: 14

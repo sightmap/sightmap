@@ -23,6 +23,8 @@
     "og:card": "node og/render.mjs --post"
   },
   "dependencies": {
+    "@netlify/blobs": "11.0.3",
+    "@netlify/functions": "6.0.0",
     "@react-three/drei": "10.7.8",
     "@react-three/fiber": "9.7.0",
     "html-react-parser": "^6.1.5",
