@@ -1,10 +1,10 @@
 // POST /api/atlas/submit — the Atlas submission endpoint.
 //
 // A thin wrapper. Everything worth testing lives in ../lib/submit.ts (parsing,
-// validation, the record) and ../lib/runner.ts (the daily ceiling, the prompt,
-// the two runner payloads), each covered by its own test file; this file only
-// wires them to the Netlify runtime: the Request, two Blobs stores, fetch, and
-// the environment.
+// validation, the record), ../lib/claim.ts (the domain-control check) and
+// ../lib/runner.ts (the daily ceiling, the prompt, the two runner payloads),
+// each covered by its own test file; this file only wires them to the Netlify
+// runtime: the Request, the Blobs stores, fetch, and the environment.
 //
 // Two invariants the code below is built around:
 //
@@ -14,7 +14,13 @@
 //      is recorded on the submission and still answered 202.
 //   2. The email address never leaves this function except into the
 //      `atlas-submissions` record. Not into the prompt, the GitHub payload, a
-//      log line, or the status response. Only `emailHash` travels.
+//      log line, or the status response. Only `emailHash` travels. The claim
+//      token is stricter still: it is compared against the host's webmcp.txt
+//      and then dropped — no record, no log, no response carries it.
+//   3. A submission that sends a claim is answered before anything is spent
+//      on it: the quarantine check and the claim check both run before the
+//      rate-limit counters and before any write, so a failed claim costs the
+//      owner nothing but a retry.
 //
 // Environment variables
 // ---------------------
@@ -48,14 +54,20 @@
 //                              no longer matches the ones already on file, and
 //                              cross-deploy "same submitter" matching breaks.
 //
-// Blobs stores: `atlas-submissions` (the records) and `atlas-rate` (one counter
-// per hashed IP, plus one `runs/<yyyy-mm-dd>` counter for the daily ceiling).
+// Blobs stores: `atlas-submissions` (the records), `atlas-rate` (one counter
+// per hashed IP, plus one `runs/<yyyy-mm-dd>` counter for the daily ceiling),
+// `atlas-try` (one card record per claimed host, read by /try/<host> and
+// updated by the runner after a scan) and `atlas-quarantine` (hosts a
+// maintainer has taken off the pipeline; set and cleared from the Netlify CLI).
 
 import { getStore } from '@netlify/blobs'
 import type { Context } from '@netlify/functions'
 import {
   acceptedBody,
   buildRecord,
+  buildTryRecord,
+  cardUrl,
+  claimRejectedError,
   hashEmail,
   hashIp,
   indexKey,
@@ -63,6 +75,7 @@ import {
   parseBody,
   parseRateState,
   publicStatus,
+  quarantinedError,
   rateDecision,
   rateLimitedError,
   recordKey,
@@ -86,6 +99,9 @@ import {
   type RunnerEnv,
 } from '../lib/runner.ts'
 import { methodNotAllowedError, notFoundError } from '../lib/errors.ts'
+import { verifyClaim } from '../lib/claim.ts'
+import { QUARANTINE_STORE, TRY_STORE, type TryRecord } from '../lib/try-record.ts'
+import { canonicalHost } from '../../scripts/lib/directory.ts'
 
 export const config = {
   // The request chain, in full — netlify.toml, netlify/lib/handler.ts and
@@ -189,6 +205,28 @@ async function claimRun(
   return false
 }
 
+/**
+ * Create or replace the card record for a host.
+ *
+ * Same conditional-write discipline as `claimRun` above, for the same reason:
+ * two submissions for one host in the same second must not interleave a read
+ * and a write. A replacement is deliberate — the record carries the newest
+ * verified claim, and the scan it dropped described the site before it.
+ */
+async function putTryRecord(
+  store: ReturnType<typeof getStore>,
+  record: TryRecord
+): Promise<boolean> {
+  for (let attempt = 0; attempt < RUN_CLAIM_ATTEMPTS; attempt += 1) {
+    const entry = await store.getWithMetadata(record.host, { type: 'json' })
+    const conditions =
+      entry === null ? { onlyIfNew: true } : entry.etag ? { onlyIfMatch: entry.etag } : undefined
+    const written = await store.setJSON(record.host, record, conditions)
+    if (written.modified) return true
+  }
+  return false
+}
+
 async function handleGet(url: URL): Promise<Response> {
   const id = (url.searchParams.get('id') ?? '').trim()
   if (!id || !/^[A-Za-z0-9_-]{1,64}$/.test(id)) {
@@ -233,6 +271,32 @@ export default async (req: Request, context: Context): Promise<Response> => {
   const validated = await validateSubmission(fields)
   if (!validated.ok) return failure(encoding, validated.error)
   const value = validated.value
+
+  const host = canonicalHost(value.host)
+
+  // Before anything is spent on this submission. A quarantined host is refused
+  // whether or not it sent a claim, and a Blobs failure fails open here for the
+  // same reason it does everywhere else in this function: a store that is down
+  // must not turn every submission into an error.
+  const quarantined = await withStore(QUARANTINE_STORE, 'quarantine lookup', (store) =>
+    store.get(host, { type: 'json' })
+  )
+  if (quarantined.ok && quarantined.value) {
+    return failure(encoding, quarantinedError(host))
+  }
+
+  // The claim, if there is one, is checked before the rate-limit window is
+  // consumed and before anything is written: a host that has not published the
+  // line yet should be able to fix it and retry, not spend one of five daily
+  // submissions on a typo in a text file.
+  let claimVerifiedAt = ''
+  if (value.claim) {
+    const verified = await verifyClaim(value.url, value.claim)
+    if (!verified.ok) {
+      return failure(encoding, claimRejectedError(verified.code, verified.reason))
+    }
+    claimVerifiedAt = new Date().toISOString()
+  }
 
   const env = process.env as RunnerEnv
   const salt = submitSalt(env)
@@ -281,6 +345,7 @@ export default async (req: Request, context: Context): Promise<Response> => {
     userAgent: req.headers.get('user-agent') ?? '',
     runner: { kind },
     ...(mayRun ? {} : { state: 'queued' as const }),
+    ...(claimVerifiedAt ? { claim: { verifiedAt: claimVerifiedAt } } : {}),
   })
 
   if (mayRun) {
@@ -315,11 +380,23 @@ export default async (req: Request, context: Context): Promise<Response> => {
     )
   }
 
-  if (encoding === 'form') {
-    // No-JS path: back to the page that posted, with the id in the query so it
-    // can render a confirmation.
-    return atlasRedirect(`submitted=${encodeURIComponent(id)}`)
+  let card = ''
+  if (claimVerifiedAt) {
+    const written = await withStore(TRY_STORE, 'card record', (store) =>
+      putTryRecord(store, buildTryRecord(value, { id, claimedAt: claimVerifiedAt }))
+    )
+    // The card is what the response promises, so an unwritten one is not
+    // promised: the submission itself is unaffected and still answered 202.
+    if (written.ok && written.value) card = cardUrl(value.host)
+    else console.warn(`[atlas-submit] card record not written for ${host} (id=${id})`)
   }
 
-  return json(acceptedBody(id), 202)
+  if (encoding === 'form') {
+    // No-JS path: back to the page that posted, with the id in the query so it
+    // can render a confirmation, and the card when there is one.
+    const query = `submitted=${encodeURIComponent(id)}${card ? `&card=${encodeURIComponent(card)}` : ''}`
+    return atlasRedirect(query)
+  }
+
+  return json(acceptedBody(id, card || undefined), 202)
 }
