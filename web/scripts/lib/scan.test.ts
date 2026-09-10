@@ -95,6 +95,37 @@ describe.skipIf(!HAVE_CLI)('scanSite against the fixture site', () => {
     expect(missing.pages[0].status).toBe(404)
   }, 60_000)
 
+  it('records a page that brings its own polyfill, replaces the surface, and registers late', async () => {
+    const report = await scanSite({ url: `${base}/polyfilled.html`, allowLocal: true, maxPages: 1 })
+
+    expect(report.status).toBe('tools-found')
+    expect(report.surface).toBe('polyfilled')
+    expect(report.pages[0].error).toBeUndefined()
+    expect(report.pages[0].tools.sort()).toEqual(
+      ['check_stock', 'find_warranty', 'list_stores', 'quote_shipping', 'track_package'].sort()
+    )
+
+    const byName = Object.fromEntries(report.tools.map((t) => [t.name, t]))
+    // Registered through `document.modelContext ?? navigator.modelContext`
+    // while the page's own polyfill stood down: recorded on our surface.
+    expect(byName.track_package).toMatchObject({ api: 'document', impl: 'imperative' })
+    // Assigned over the recorder — the accessor's setter adopted it.
+    expect(byName.list_stores).toMatchObject({ api: 'navigator', impl: 'imperative' })
+    // Registered on a surface that was defineProperty'd over ours, so it is
+    // only visible by enumerating the replacement at collect time.
+    expect(byName.quote_shipping).toMatchObject({ api: 'navigator', impl: 'imperative' })
+    expect((byName.quote_shipping.inputSchema as { required: string[] }).required).toEqual(['destination'])
+    // Registered 800ms in — past the old fixed settle window.
+    expect(byName.check_stock).toMatchObject({ api: 'document', impl: 'imperative' })
+    // Late *and* on the replaced surface.
+    expect(byName.find_warranty).toMatchObject({ api: 'navigator', impl: 'imperative' })
+
+    expect(report.counts).toMatchObject({ tools: 5, pages: 1, declarative: 0 })
+    // A script that never loaded is named, not silently missing.
+    expect(report.notes.some((n) => n.includes('script failed to load') && n.includes('missing-polyfill.js'))).toBe(true)
+    expect(report.notes.some((n) => n.includes('replaced the navigator.modelContext surface'))).toBe(true)
+  }, 60_000)
+
   it('refuses a loopback URL unless the caller opts in', async () => {
     await expect(scanSite({ url: `${base}/` })).rejects.toThrow(/preflight/)
   })

@@ -21,7 +21,7 @@ import os from 'node:os'
 import path from 'node:path'
 import type { ScanFormHint, ScanPage, ScanReport, ScanSurface, ScanStatus, ScanTool } from '../../src/types/directory'
 import { preflightUrl, resolvePublic } from './preflight'
-import { COLLECT_SCRIPT, RECORDER_SCRIPT } from './scan-recorder'
+import { COLLECT_SCRIPT, COUNT_SCRIPT, RECORDER_SCRIPT } from './scan-recorder'
 import { classifyTool, countTools, runChecks, toolWarnings } from './tool-risk'
 
 export const SCANNER_NAME = 'sightmap-atlas-scan'
@@ -45,11 +45,26 @@ export interface ScanOptions {
   sightmapBin?: string
   /** A Chrome binary for `browser start --chrome-binary`; defaults to $ATLAS_CHROME_PATH, then the CLI's own install. */
   chromeBinary?: string
+  /**
+   * Extra `--chrome-flag=…` values for the runner's own network environment —
+   * an egress proxy that will not carry Chrome's TLS 1.3 handshake, say.
+   * Defaults to whitespace-separated $ATLAS_CHROME_FLAGS. Operator input only;
+   * never set this from a submission.
+   */
+  chromeFlags?: string[]
   log?: (line: string) => void
 }
 
 export const MAX_PAGES = 3
-const SETTLE_MS = 1500
+// Client-side registration is not tied to `load`: an SDK may register only
+// after its own fetch resolves, and a page that swaps the surface out from
+// under the recorder is only visible once it is enumerated. So instead of one
+// fixed sleep the driver polls a cheap "how many tools can you see" script and
+// stops as soon as the answer holds still — which for an ordinary page is the
+// same 1.5s it used to wait, and for a slow one is up to SETTLE_MAX_MS.
+const SETTLE_POLL_MS = 500
+const SETTLE_STABLE_MS = 1000
+const SETTLE_MAX_MS = 6000
 const MAX_TOOLS = 200
 const MAX_SCHEMA_BYTES = 20_000
 
@@ -340,6 +355,35 @@ export class SightmapSession {
     return JSON.parse(r.stdout) as T
   }
 
+  /**
+   * Waits for the page's tool set to stop changing. Polls COUNT_SCRIPT, which
+   * also reconciles the recorder with any surface the page installed over it,
+   * and returns once the count has been unchanged for SETTLE_STABLE_MS or the
+   * budget runs out.
+   */
+  async settle(budgetMs = SETTLE_MAX_MS): Promise<void> {
+    const start = Date.now()
+    let last = Number.NaN
+    let stableSince = start
+    for (;;) {
+      await sleep(SETTLE_POLL_MS)
+      let n: number
+      try {
+        n = await this.eval<number>(COUNT_SCRIPT, 15_000)
+      } catch {
+        return
+      }
+      const now = Date.now()
+      if (n !== last) {
+        last = n
+        stableSince = now
+      } else if (now - stableSince >= SETTLE_STABLE_MS) {
+        return
+      }
+      if (now - start >= budgetMs) return
+    }
+  }
+
   /** `browser mcp list --json`: the product's own enumeration, as a cross-check. */
   async mcpList(): Promise<{ present: boolean; names: string[] }> {
     const r = await this.page(['mcp', 'list', '--json'], 35_000)
@@ -423,6 +467,11 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
     // No permission prompts of any kind: a page asking for camera, location,
     // or notifications gets a denial, not a prompt that hangs the scan.
     extra.push('--deny-permission-prompts')
+    const operatorFlags = opts.chromeFlags ?? (process.env.ATLAS_CHROME_FLAGS ?? '').split(/\s+/).filter(Boolean)
+    if (operatorFlags.length > 0) {
+      extra.push(...operatorFlags)
+      notes.push(`operator Chrome flags: ${operatorFlags.join(' ')}`)
+    }
     await session.start(opts.chromeBinary || process.env.ATLAS_CHROME_PATH || undefined, extra)
     await session.injectPersist(RECORDER_SCRIPT)
 
@@ -475,8 +524,9 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
         }
       }
 
-      // Give client-side registration a moment: SPAs register after hydration.
-      await sleep(SETTLE_MS)
+      // Give client-side registration a moment: SPAs register after
+      // hydration, and some SDKs register only once a fetch has resolved.
+      await session.settle(Math.max(SETTLE_POLL_MS, Math.min(SETTLE_MAX_MS, deadline - Date.now())))
       let collected: Collected
       try {
         collected = await session.eval<Collected>(COLLECT_SCRIPT)
@@ -484,6 +534,19 @@ export async function scanSite(opts: ScanOptions): Promise<ScanReport> {
         const msg = err instanceof Error ? err.message.split('\n').pop() ?? err.message : String(err)
         log(`  ! ${reqPath}: ${msg}`)
         pages.push({ url: landed, path: pathOf(landed), title: '', status: null, surface: 'absent', tools: [], error: msg })
+        first = false
+        continue
+      }
+
+      // Chrome answers a failed navigation with its own error document, which
+      // `browser navigate` reports as a success. Left alone it reads as a real
+      // page that simply has no WebMCP surface — the most misleading result
+      // the scanner can produce — so name it for what it is.
+      if (/^chrome-error:/i.test(collected.url || landed)) {
+        const why = 'the browser could not load this page (it showed an error page instead)'
+        log(`  ! ${reqPath}: ${why}`)
+        pages.push({ url: landed, path: reqPath, title: '', status: null, surface: 'absent', tools: [], error: why })
+        for (const e of collected.errors) notes.push(`${reqPath}: recorder: ${e}`)
         first = false
         continue
       }
