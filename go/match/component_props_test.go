@@ -42,6 +42,49 @@ func productCardDefs() []sightmap.ComponentDef {
 	}
 }
 
+// TestResolveRawText covers the SEP-0013 raw_text extractor: it always returns
+// the node's raw rendered Text, never the accessibility Name — the deterministic
+// escape when the AX name welds in extra text. Mirrors the JetBlue sub-fare tile,
+// whose heading AX name is "Main Most popular" but whose raw text is "Main", so
+// SubFare[tier="Main"] can only match via raw_text.
+func TestResolveRawText(t *testing.T) {
+	defs := []sightmap.ComponentDef{{
+		Name:      "SubFare",
+		Selectors: []string{"[data-testid=tile]"},
+		Properties: []sightmap.ComponentPropertyDef{
+			{Name: "welded", Extract: "text"},   // AX name (welded)
+			{Name: "tier", Extract: "raw_text"}, // raw text (clean)
+		},
+	}}
+	tile := &sightmap.ComponentNode{
+		Id:      "tile",
+		Name:    "Main Most popular", // welded accessibility name (Name)
+		RawText: "Main",              // clean own text (RawText)
+		Element: &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "tile"}},
+	}
+	// A node with no own text at all: raw_text omits (per SEP-0013). Name is
+	// non-empty to prove raw_text never falls back to the accessibility name.
+	noText := &sightmap.ComponentNode{
+		Id:      "tile",
+		Name:    "Only a name",
+		RawText: "",
+		Element: &sightmap.Element{Tag: "div", Attrs: map[string]string{"data-testid": "tile"}},
+	}
+
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(tile, "")
+	if v, ok := propVal(res[tile], "welded"); !ok || v != "Main Most popular" {
+		t.Errorf("welded (text) = %q, %v; want \"Main Most popular\", true", v, ok)
+	}
+	if v, ok := propVal(res[tile], "tier"); !ok || v != "Main" {
+		t.Errorf("tier (raw_text) = %q, %v; want \"Main\", true", v, ok)
+	}
+
+	res2 := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(noText, "")
+	if v, ok := propVal(res2[noText], "tier"); ok {
+		t.Errorf("tier (raw_text) on empty Text = %q, %v; want omitted", v, ok)
+	}
+}
+
 func propVal(cm *sightmap.ComponentMatch, name string) (string, bool) {
 	if cm == nil {
 		return "", false

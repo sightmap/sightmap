@@ -111,6 +111,7 @@ func walkDOMNode(
 		Role:          role,
 		Name:          name,
 		Text:          normalizeText(pc.Text),
+		RawText:       normalizeText(pc.RawText),
 		Value:         value,
 		Properties:    props,
 		Element:       el,

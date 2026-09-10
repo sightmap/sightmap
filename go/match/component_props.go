@@ -52,6 +52,14 @@ func resolveExtract(
 		}
 		return node.Text, node.Text != ""
 
+	case extract == "raw_text":
+		// The node's own literal text (direct text nodes, normalized) — never the
+		// accessibility name, and pinned to textContent-style data rather than the
+		// layout-dependent innerText (SEP-0013). The deterministic escape when the
+		// accessible name welds in extra text (e.g. a heading whose AX name appends
+		// a CSS ::after badge: `text` -> "Main Most popular" but `raw_text` -> "Main").
+		return node.RawText, node.RawText != ""
+
 	case strings.HasPrefix(extract, "attr="):
 		name := extract[len("attr="):]
 		if name == "" || node.Element == nil {
