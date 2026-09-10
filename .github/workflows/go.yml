@@ -3,9 +3,9 @@ name: go
 on:
   push:
     branches: [main]
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'evals/**', '.github/workflows/go.yml']
   pull_request:
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths: ['go/**', 'skills/**', 'evals/**', '.github/workflows/go.yml']
 
 permissions:
   contents: read
