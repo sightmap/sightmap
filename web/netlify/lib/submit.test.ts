@@ -459,15 +459,20 @@ describe('buildTryRecord', () => {
 
 describe('claim and quarantine errors', () => {
   it('answers a failed claim 422, in the shared error shape', () => {
-    const body = claimRejectedError('claim-mismatch', 'no matching claim line in /webmcp.txt')
+    const body = claimRejectedError('claim-mismatch')
     expect(body.ok).toBe(false)
     expect(body.error).toMatchObject({ code: 'claim-mismatch', status: 422 })
     expect(body.error.hint).toContain('sightmap-claim')
 
-    expect(claimRejectedError('claim-unreachable', 'HTTP 404').error).toMatchObject({
+    expect(claimRejectedError('claim-unreachable').error).toMatchObject({
       code: 'claim-unreachable',
       status: 422,
     })
+  })
+
+  it('never says why the host could not be read: the check is not a probe', () => {
+    const message = claimRejectedError('claim-unreachable').error.message
+    expect(message).not.toMatch(/HTTP|\d{3}|timed out|redirect/)
   })
 
   it('answers a quarantined host 403 without saying why', () => {

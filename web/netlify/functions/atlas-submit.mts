@@ -314,7 +314,8 @@ export default async (req: Request, context: Context): Promise<Response> => {
   if (value.claim) {
     const verified = await verifyClaim(value.url, value.claim)
     if (!verified.ok) {
-      return failure(encoding, claimRejectedError(verified.code, verified.reason))
+      console.warn(`[atlas-submit] claim ${verified.code} for ${host}: ${verified.reason}`)
+      return failure(encoding, claimRejectedError(verified.code))
     }
     claimVerifiedAt = new Date().toISOString()
   }
