@@ -35,19 +35,23 @@ const AGENT_PROMPT = `Make this app usable by agents with sightmap + sightkick.
 8. Ship the tools with the app: sightkick runtime -o <public dir>/sightkick-runtime.js,
    copy tools.ir.json next to it, and load both on the mapped pages (a <script src>
    for the runtime, then window.__sightkick.load(ir)).
-9. Write <public dir>/webmcp.txt: the app URL on the first line, then one line per
-   tool, "name — description". Deploy, then confirm on the deployed URL:
+9. Generate a claim token: openssl rand -hex 16. Write <public dir>/webmcp.txt: the
+   app URL on the first line, then one line per tool, "name — description", then one
+   comment line, "# sightmap-claim: <TOKEN>". Lines starting with # are comments and
+   readers ignore them. Deploy, then confirm on the deployed URL:
    sightmap browser start --url <DEPLOYED_URL> && sightmap browser mcp list
    The app is now usable by any agent that opens it. Nothing else is required.
-10. Report: the tools you built and the JSON each returned, the webmcp.txt URL,
-   and anything that failed with its actual error text.
+10. Report: the tools you built and the JSON each returned, the webmcp.txt URL and
+   the claim token, and anything that failed with its actual error text.
 11. Optional, only if the owner wants the site shown in the Sightmap Atlas:
    POST https://sightmap.org/api/atlas/submit with
-   {"url": "<DEPLOYED_URL>", "email": "<OWNER_EMAIL>", "owner": true, "sightkick": true}
+   {"url": "<DEPLOYED_URL>", "email": "<OWNER_EMAIL>", "owner": true, "sightkick": true, "claim": "<TOKEN>"}
    or open https://sightmap.org/atlas in a WebMCP-capable session and call its
-   submit_site tool. A maintainer reviews every listing; the page lands at
-   https://sightmap.org/atlas/<host with dots as dashes>. Add the submission id
-   to the report.`
+   submit_site tool. A submission that carries the claim answers with a card URL,
+   https://sightmap.org/try/<host>, which the owner can share immediately. The Atlas
+   listing itself appears only after a maintainer reviews it; the page lands at
+   https://sightmap.org/atlas/<host with dots as dashes>. Add the submission id and
+   the card URL to the report.`
 
 // Agent browsers and assistants that read WebMCP tools off a page. Names, not
 // logos: a logo row needs each owner's asset and permission, and this list
@@ -539,8 +543,12 @@ WebMCP (polyfilled) — 2 tool(s)</code></pre>
                 <p className="gs-followup">
                   <strong>Want to show your work?</strong> Submit the deployed URL to the{' '}
                   <a href="/atlas">Atlas</a> with{' '}
-                  <code>curl -X POST https://sightmap.org/api/atlas/submit -d &apos;{'{'}&quot;url&quot;: &quot;https://yourdomain.com&quot;, &quot;email&quot;: &quot;you@yourdomain.com&quot;, &quot;owner&quot;: true, &quot;sightkick&quot;: true{'}'}&apos;</code>{' '}
-                  or, from a WebMCP session on the Atlas, its <code>submit_site</code> tool. After
+                  <code>curl -X POST https://sightmap.org/api/atlas/submit -d &apos;{'{'}&quot;url&quot;: &quot;https://yourdomain.com&quot;, &quot;email&quot;: &quot;you@yourdomain.com&quot;, &quot;owner&quot;: true, &quot;sightkick&quot;: true, &quot;claim&quot;: &quot;&lt;token&gt;&quot;{'}'}&apos;</code>{' '}
+                  or, from a WebMCP session on the Atlas, its <code>submit_site</code> tool. The
+                  claim is a token you generate with <code>openssl rand -hex 16</code> and write
+                  into <code>webmcp.txt</code> as <code># sightmap-claim: &lt;token&gt;</code> before
+                  you deploy, and a submission that carries it answers with a card at{' '}
+                  <code>sightmap.org/try/yourdomain.com</code> you can share immediately. After
                   review the entry gets a page under <code>sightmap.org/atlas/</code> and a badge
                   for your README. It is optional: nothing about the tools on your site depends
                   on it.

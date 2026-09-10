@@ -175,10 +175,15 @@ file you deploy with the app; agents can use the site as soon as they are live.
 ## One prompt
 
 The prompt on the page runs the whole loop in a coding agent: map the app,
-compile and check the tools, ship the runtime and a \`webmcp.txt\`. Listing the
-site in the Atlas at ${SITE_URL}/atlas is an optional last step for owners who
-want to show their work (\`POST ${SITE_URL}/api/atlas/submit\`, reviewed by a
-maintainer). Nothing about the tools depends on it.
+compile and check the tools, ship the runtime and a \`webmcp.txt\`. Before the
+first deploy it generates a claim token (\`openssl rand -hex 16\`) and writes it
+into that file as \`# sightmap-claim: <token>\`. Listing the site in the Atlas at
+${SITE_URL}/atlas is an optional last step for owners who want to show their
+work (\`POST ${SITE_URL}/api/atlas/submit\` with the same token as \`claim\`). A
+submission that carries the claim answers with a card URL,
+\`${SITE_URL}/try/<host>\`, the owner can share immediately; the Atlas listing
+itself appears only after a maintainer reviews it. Nothing about the tools on
+the site depends on either.
 
 ## How the two fit together
 
