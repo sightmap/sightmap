@@ -242,6 +242,11 @@ describe('decideTryCard', () => {
     now: Date.parse('2026-09-10T00:00:00.000Z'),
   }
 
+  it('treats a record whose expiry cannot be read as expired', () => {
+    const broken = { ...record(), expiresAt: 'not-a-date' }
+    expect(decideTryCard({ ...base, record: broken })).toEqual({ kind: 'not-found' })
+  })
+
   it('404s a host that fails the shape rules before looking anything up', () => {
     expect(decideTryCard({ ...base, preflightOk: false, record: record() })).toEqual({ kind: 'not-found' })
   })

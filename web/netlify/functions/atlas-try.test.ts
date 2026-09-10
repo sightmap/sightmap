@@ -103,9 +103,16 @@ describe('GET /try/<host>', () => {
     ])
   })
 
-  it('falls back to the request origin', async () => {
-    await handler(request('example.dev'), context('example.dev'))
+  it('falls back to the site URL, never to the request origin', async () => {
+    const req = new Request('https://attacker.example/try/example.dev')
+    await handler(req, context('example.dev'))
     expect(fetched).toEqual(['https://sightmap.org/atlas/hosts/example.dev.json'])
+  })
+
+  it('404s a segment that parses as more than a hostname, without any lookup', async () => {
+    const res = await handler(request('example.dev:8443'), context('example.dev:8443'))
+    expect(res.status).toBe(404)
+    expect(fetched).toEqual([])
   })
 
   it('answers 410 for a quarantined host', async () => {

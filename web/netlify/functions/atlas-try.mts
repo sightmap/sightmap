@@ -18,6 +18,7 @@ import { getStore } from '@netlify/blobs'
 import type { Context } from '@netlify/functions'
 import { canonicalHost } from '../../scripts/lib/directory.ts'
 import { preflightUrl } from '../../scripts/lib/preflight.ts'
+import { SITE_URL } from '../../scripts/lib/site.ts'
 import { decideTryCard, renderGone, renderNotFound, renderTryCard } from '../lib/try-card.ts'
 import { QUARANTINE_STORE, TRY_STORE, type TryRecord } from '../lib/try-record.ts'
 
@@ -57,7 +58,9 @@ function html(body: string, status: number): Response {
  */
 async function listedSlug(origin: string, host: string): Promise<string | null> {
   try {
-    const res = await fetch(`${origin}/atlas/hosts/${encodeURIComponent(host)}.json`)
+    const res = await fetch(`${origin}/atlas/hosts/${encodeURIComponent(host)}.json`, {
+      signal: AbortSignal.timeout(3000),
+    })
     if (!res.ok) return null
     const doc = (await res.json()) as { slug?: unknown }
     const slug = typeof doc.slug === 'string' ? doc.slug : ''
@@ -126,7 +129,9 @@ export default async (req: Request, context: Context): Promise<Response> => {
 
   // Each lookup is skipped once an earlier check has already decided; see the
   // note on TryDecisionInputs for why the skipped ones are safe to pass empty.
-  const origin = process.env.URL?.replace(/\/+$/, '') || url.origin
+  // The deploy's own URL, never the request's: the Host header is the
+  // caller's to set, and this lookup is a fetch.
+  const origin = process.env.URL?.replace(/\/+$/, '') || SITE_URL
   const slug = preflight.ok ? await listedSlug(origin, host) : null
   const stored = preflight.ok && !slug ? await loadRecord(host) : { quarantined: false, record: null }
 
