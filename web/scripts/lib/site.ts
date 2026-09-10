@@ -58,7 +58,7 @@ export const BUILDING_DESCRIPTION =
 // The /sightkick companion page: the WebMCP tool layer compiled from a corpus.
 // Read by scripts/prerender.tsx, src/pages/Sightkick.tsx, and the sitemap /
 // llms.txt generators.
-export const SIGHTKICK_TITLE = `Sightkick — WebMCP tools for your app, on your app`
+export const SIGHTKICK_TITLE = `Sightkick — millions of agents can use your app`
 export const SIGHTKICK_DESCRIPTION =
   'One prompt maps your app and compiles a WebMCP tool layer with Sightkick, so any agent that opens your site calls a named action instead of guessing.'
 export const postTitle = (title: string): string => `${title} — ${SITE_NAME}`

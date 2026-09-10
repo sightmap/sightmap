@@ -46,6 +46,11 @@ const AGENT_PROMPT = `Make this app usable by agents with sightmap + sightkick, 
    https://sightmap.org/atlas/<host with dots as dashes> once reviewed. Include
    anything that failed with its actual error text.`
 
+// Agent browsers and assistants that read WebMCP tools off a page. Names, not
+// logos: a logo row needs each owner's asset and permission, and this list
+// changes faster than either.
+const AGENT_CLIENTS = ['Chrome', 'Edge', 'ChatGPT', 'Instinct', 'Town', 'Muse', 'Grok']
+
 const USE_CASES: { tag: string; title: string; body: React.ReactNode }[] = [
   {
     tag: 'testing',
@@ -165,17 +170,17 @@ export default function Sightkick() {
         <div className="container sk-hero__body">
           <SightkickLogo className="sk-hero__logo" />
           <h1>
-            Let agents use your product.<br className="hidden md:inline" />{' '}
-            Then list it in the Atlas.
+            Millions of agents can use<br className="hidden md:inline" />{' '}
+            your app. Starting now.
           </h1>
           <p className="sk-hero__sub">
             One prompt to your coding agent. It maps your app, compiles a{' '}
             <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noreferrer">
               WebMCP
             </a>{' '}
-            tool layer with Sightkick, and checks the tools on the deployed page. Then it submits
-            your site to the <a href="/atlas">Atlas</a>. There is no marketplace to apply to: the
-            tools ship with your pages, and any agent that opens your site can call{' '}
+            tool layer with Sightkick, checks the tools on the deployed page, and lists your site
+            in the <a href="/atlas">Atlas</a>. No marketplace to apply to: the tools ship with
+            your pages, and every agent that opens your site can call{' '}
             <code>search_flights(origin, destination, date)</code> instead of hunting for the
             search box.
           </p>
@@ -208,6 +213,14 @@ export default function Sightkick() {
             is a few tools over two mapped pages. You end with a <code>webmcp.txt</code> on your
             own domain and, once a maintainer has reviewed it, a page in the Atlas.
           </p>
+          <div className="sk-hero__clients" data-component="SightkickClients">
+            <span className="sk-hero__clients-label">Read by the agents in</span>
+            <ul>
+              {AGENT_CLIENTS.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       </section>
 

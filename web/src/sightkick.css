@@ -508,3 +508,38 @@
   color: var(--text-dim);
 }
 .sk-artifacts { margin-top: 0.9rem; }
+
+/* The clients row under the hero note: text marks, one per agent that reads
+   WebMCP, in the same mono the rest of the page uses for names. */
+.sk-hero__clients {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.9rem;
+  margin-top: 1.75rem;
+}
+.sk-hero__clients-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sk-body, var(--text-dim));
+  opacity: 0.8;
+}
+.sk-hero__clients ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.sk-hero__clients li {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 100px;
+  color: #e4eafa;
+}
