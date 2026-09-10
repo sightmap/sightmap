@@ -112,6 +112,10 @@ jobs:
       # Written by the intake step, read by the PR step. Kept in RUNNER_TEMP so
       # it can never be picked up by the commit.
       ATLAS_SUMMARY: ${{ runner.temp }}/atlas-summary.md
+      # The intake's own stdout. The launch-card step reads the scan report
+      # path out of it, because only the intake knows which dated file it
+      # wrote. Also in RUNNER_TEMP, for the same reason.
+      ATLAS_INTAKE_LOG: ${{ runner.temp }}/atlas-intake.log
 
     steps:
       - uses: actions/checkout@v4
@@ -196,7 +200,34 @@ jobs:
                 --max-pages "$ATLAS_MAX_PAGES" --summary "$ATLAS_SUMMARY")
           if [ -n "${ATLAS_INTENT:-}" ]; then args+=(--intent "$ATLAS_INTENT"); fi
           if [ "$ATLAS_SIGHTKICK" = "true" ]; then args+=(--sightkick); fi
-          pnpm atlas:intake "${args[@]}"
+          # tee, not >: the log is read by the next step and the output still
+          # belongs in this step's own log. `pipefail` keeps intake's exit code.
+          pnpm atlas:intake "${args[@]}" | tee "$ATLAS_INTAKE_LOG"
+
+      # Adds what the scan saw to the submitter's unlisted card at /try/<host>.
+      # Only a submission whose domain claim verified has a card, so this does
+      # nothing for most runs and says so; it is never a reason to fail a run
+      # that already produced a listing, hence continue-on-error.
+      - name: Update the launch card
+        if: steps.intake.outcome == 'success'
+        continue-on-error: true
+        env:
+          # Blobs credentials for the atlas-try store. Both are repository
+          # secrets; without them the script prints one notice and exits 0.
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          HOST: ${{ steps.target.outputs.host }}
+        run: |
+          set -euo pipefail
+          # `atlas:intake` prints `wrote <abs path>` for the report it filed.
+          # A scan that was blocked or found no tools writes none, and there is
+          # then nothing to add to a card.
+          scan=$(grep -oE '[^[:space:]]*/src/data/directory/scans/[^[:space:]]+\.json' "$ATLAS_INTAKE_LOG" | tail -n 1 || true)
+          if [ -z "$scan" ]; then
+            echo "no scan report in the intake output; nothing to add to a card"
+            exit 0
+          fi
+          pnpm atlas:card --host "$HOST" --scan "$scan"
 
       # A green build is not proof the YAML parsed — listing validation is
       # per-file and non-fatal — but a red one means the PR is not openable.
