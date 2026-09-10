@@ -2,9 +2,9 @@
 sep: 0006
 title: A console/exception message entity (`messages[]`)
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Accepted
 created: 2026-07-31
-updated: 2026-08-10
+updated: 2026-09-10
 spec-version-target: 1
 related-issues: [158]
 related-discussions: []
