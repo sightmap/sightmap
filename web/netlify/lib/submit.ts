@@ -70,14 +70,16 @@ const CLAIM_HINT =
 
 /**
  * A claim that could not be checked. 422, not 400: the request was well
- * formed, the host just does not (yet) carry the line. Nothing is stored, so
- * the owner fixes the file and retries at no cost.
+ * formed, the host just does not (yet) carry the line. The message is fixed
+ * per code and never carries the reason: the check makes this site fetch a
+ * URL the caller chose, and echoing the upstream status or the failure mode
+ * would turn it into a probe of that host. The reason goes to the log.
  */
-export function claimRejectedError(code: ClaimFailure, reason: string): SubmitErrorBody {
+export function claimRejectedError(code: ClaimFailure): SubmitErrorBody {
   const message =
     code === 'claim-mismatch'
-      ? `The claim line in webmcp.txt does not match the token you sent (${reason}).`
-      : `webmcp.txt could not be read from that host (${reason}).`
+      ? 'webmcp.txt was read but does not carry a matching claim line.'
+      : 'webmcp.txt could not be read from that host over https.'
   return submitError(code, message, CLAIM_HINT, 422)
 }
 

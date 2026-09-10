@@ -2,9 +2,10 @@
 // write. The Blobs call itself is a five-line wrapper and is not tested here.
 
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { parseArgs, readReport, scanFromReport, withScan } from './atlas-card'
+import { parseArgs, readReport, run, scanFromReport, withScan } from './atlas-card'
 import { TRY_TTL_MS, type TryRecord } from '../netlify/lib/try-record'
 import type { ScanReport } from '../src/types/directory'
 
@@ -85,5 +86,22 @@ describe('readReport', () => {
     const notAReport = path.resolve(__dirname, '../package.json')
     expect(fs.existsSync(notAReport)).toBe(true)
     expect(() => readReport(notAReport)).toThrow(/not a scan report/)
+  })
+})
+
+describe('run', () => {
+  it('refuses a --host that is not the host the report describes', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-card-'))
+    const file = path.join(dir, 'scan.json')
+    fs.writeFileSync(file, JSON.stringify({ ...report(), host: 'example.org' }))
+    await expect(run(['--host', 'victim.example', '--scan', file])).rejects.toThrow(/does not match/)
+  })
+
+  it('refuses a report without a usable scan date', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-card-'))
+    const file = path.join(dir, 'scan.json')
+    const bad = { ...report(), scannedAt: 'never' }
+    fs.writeFileSync(file, JSON.stringify(bad))
+    await expect(run(['--host', bad.host, '--scan', file])).rejects.toThrow(/scannedAt/)
   })
 })

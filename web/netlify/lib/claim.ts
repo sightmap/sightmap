@@ -16,6 +16,7 @@
 // scanned. It is not a statement that the site is safe, reviewed, or endorsed;
 // admission to the Atlas is a separate step a maintainer performs.
 
+import { resolvePublic } from '../../scripts/lib/preflight.ts'
 import { sameSite } from '../../scripts/lib/scan.ts'
 import { CLAIM_TOKEN_PATTERN } from '../../src/lib/submit-types.ts'
 
@@ -24,7 +25,7 @@ export const CLAIM_TOKEN_RE = new RegExp(`^${CLAIM_TOKEN_PATTERN}$`)
 
 export const CLAIM_FILE = '/webmcp.txt'
 
-/** A canonical-host or protocol redirect is normal; a chain of four is not. */
+/** A redirect to the canonical host is normal; a chain of four is not. */
 export const CLAIM_MAX_REDIRECTS = 3
 
 /** The submitter is waiting on this request, so the whole check is budgeted. */
@@ -43,16 +44,23 @@ export interface ClaimOptions {
   timeoutMs?: number
   maxBytes?: number
   maxRedirects?: number
+  /** The public-address check run before every hop; tests stub it. */
+  resolve?: (host: string) => Promise<{ ok: boolean; reason?: string }>
 }
 
 const unreachable = (reason: string): ClaimResult => ({ ok: false, code: 'claim-unreachable', reason })
 const mismatch = (reason: string): ClaimResult => ({ ok: false, code: 'claim-mismatch', reason })
 
-/** Where the claim file lives for a submitted URL. Port is kept; path is not. */
+/**
+ * Where the claim file lives for a submitted URL: the site root on 443. The
+ * port is dropped on purpose, because the card that a verified claim earns
+ * asserts `https://<host>`, and control of one high port on a shared host
+ * proves nothing about that origin.
+ */
 export function claimUrl(input: string): string {
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(input) ? input : `https://${input}`
   const u = new URL(withScheme)
-  return `https://${u.host}${CLAIM_FILE}`
+  return `https://${u.hostname}${CLAIM_FILE}`
 }
 
 /**
@@ -112,6 +120,14 @@ async function readCapped(res: Response, maxBytes: number): Promise<string | nul
  * host: a claim that can be satisfied by redirecting to a file on someone
  * else's server is not a claim on this host. Each hop is checked with the same
  * `www.` rule the scanner applies to a first-load redirect.
+ *
+ * Before every hop the hostname is resolved again and refused if it lands on
+ * a private or reserved address. Preflight did the same check moments
+ * earlier, but nothing carries that answer into the fetch: a name with a
+ * zero TTL can answer the two lookups differently. The check here narrows
+ * that window to the gap between this lookup and the connect; it does not
+ * close it, so the response body never reaches the caller and the failure
+ * reasons stay generic (see claimRejectedError).
  */
 export async function verifyClaim(
   url: string,
@@ -122,6 +138,7 @@ export async function verifyClaim(
   const maxBytes = opts.maxBytes ?? CLAIM_MAX_BYTES
   const maxRedirects = opts.maxRedirects ?? CLAIM_MAX_REDIRECTS
   const timeoutMs = opts.timeoutMs ?? CLAIM_TIMEOUT_MS
+  const resolve = opts.resolve ?? resolvePublic
 
   if (!CLAIM_TOKEN_RE.test(token)) return mismatch('claim token is malformed')
 
@@ -136,6 +153,8 @@ export async function verifyClaim(
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     for (let hop = 0; hop <= maxRedirects; hop += 1) {
+      const address = await resolve(new URL(target).hostname)
+      if (!address.ok) return unreachable(address.reason ?? 'host does not resolve to a public address')
       const res = await fetchImpl(target, {
         method: 'GET',
         redirect: 'manual',
