@@ -21,13 +21,7 @@ export const MARKDOWN_TYPE = 'text/markdown; charset=utf-8'
 export const JSON_TYPE = 'application/json; charset=utf-8'
 export const PLAIN_TYPE = 'text/plain; charset=utf-8'
 
-/**
- * Paths owned by a serverless function. Edge functions run *before* functions
- * in the request chain, so without this list the /api/* branch below would
- * answer the submission endpoint itself — 405 on the POST, 404 on the status
- * GET. Returning undefined hands the request back to the chain, which reaches
- * the function (netlify/functions/atlas-submit.mts declares both paths).
- */
+/** Paths this edge function passes through to a serverless function — see netlify/functions/atlas-submit.mts for the request chain. */
 const FUNCTION_PATHS = new Set(['/api/atlas/submit', '/.netlify/functions/atlas-submit'])
 
 const PAGE_TYPES = ['text/html', 'text/markdown'] as const

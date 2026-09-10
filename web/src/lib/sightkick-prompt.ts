@@ -29,7 +29,13 @@ export function sightkickAgentPrompt(appUrl = '<APP_URL>', pagesHint = ''): stri
    sightkick call . <tool> --param k=v --via cli
    sightkick call . <tool> --param k=v --via webmcp
 8. Report what you built, the JSON each tool returned, and anything that failed
-   with its actual error text.`
+   with its actual error text.
+9. Get listed. Once sightmap browser mcp list confirms the tools on the
+   deployed URL, submit the site to the Sightmap Atlas:
+   POST https://sightmap.org/api/atlas/submit
+   {"url": "<DEPLOYED_URL>", "email": "<OWNER_EMAIL>", "owner": true, "sightkick": true}
+   Or open https://sightmap.org/atlas in a WebMCP-capable session and call its
+   submit_site tool. A maintainer reviews every listing before it appears.`
 }
 
 export const AGENT_PROMPT = sightkickAgentPrompt()

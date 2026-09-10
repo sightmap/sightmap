@@ -1,9 +1,10 @@
 // POST /api/atlas/submit — the Atlas submission endpoint.
 //
-// A thin wrapper. Everything worth testing (parsing, validation, the record,
-// the runner prompt, the two runner payloads) lives in ../lib/submit.ts and is
-// covered by ../lib/submit.test.ts; this file only wires it to the Netlify
-// runtime: the Request, two Blobs stores, fetch, and the environment.
+// A thin wrapper. Everything worth testing lives in ../lib/submit.ts (parsing,
+// validation, the record) and ../lib/runner.ts (the daily ceiling, the prompt,
+// the two runner payloads), each covered by its own test file; this file only
+// wires them to the Netlify runtime: the Request, two Blobs stores, fetch, and
+// the environment.
 //
 // Two invariants the code below is built around:
 //
@@ -28,6 +29,13 @@
 //   ATLAS_RUNNER_BRANCH_BASE   Optional. Branch the runner starts from; omitted
 //                              from the request body when unset.
 //   ATLAS_RUNNER_MODEL         Optional. Model for the runner; omitted when unset.
+//   ATLAS_DAILY_RUNS           Optional, default 20. Global ceiling on runner
+//                              triggers per UTC day, across every submitter.
+//                              Agent Runner concurrency is capped per plan, so
+//                              a burst from distinct IPs (which the per-IP
+//                              limit does not catch) must not exhaust it. Over
+//                              the ceiling the submission is still accepted and
+//                              stored, with state 'queued' and no runner.
 //   ATLAS_GITHUB_TOKEN         Token for ATLAS_RUNNER=github (repository_dispatch).
 //   ATLAS_GITHUB_REPO          Optional. Defaults to 'sightmap/sightmap'.
 //   ATLAS_SUBMIT_SALT          Per-deploy salt for the client IP hash. Defaults
@@ -35,7 +43,7 @@
 //                              across deploys.
 //
 // Blobs stores: `atlas-submissions` (the records) and `atlas-rate` (one counter
-// per hashed IP).
+// per hashed IP, plus one `runs/<yyyy-mm-dd>` counter for the daily ceiling).
 
 import { getStore } from '@netlify/blobs'
 import type { Context } from '@netlify/functions'
@@ -52,24 +60,33 @@ import {
   rateDecision,
   rateLimitedError,
   recordKey,
-  runnerInput,
-  runnerKind,
   submitError,
-  submitSalt,
-  triggerRunner,
   validateSubmission,
-  type RunnerEnv,
   type SubmissionRecord,
   type SubmitErrorBody,
 } from '../lib/submit.ts'
+import {
+  CEILING_SKIP_REASON,
+  dailyRunCeiling,
+  dailyRunsKey,
+  parseRunCount,
+  runnerInput,
+  runnerKind,
+  shouldTriggerRunner,
+  submitSalt,
+  triggerRunner,
+  type RunnerEnv,
+} from '../lib/runner.ts'
 import { methodNotAllowedError, notFoundError } from '../lib/errors.ts'
 
 export const config = {
-  // The pretty path is what the UI posts to; Netlify evaluates functions before
-  // redirects, so it wins over the /api/atlas/:slug rewrite and the /* → 404
-  // catch-all in netlify.toml. Setting a custom path normally *removes* the
-  // default /.netlify/functions/<name> URL, so it is declared here too and
-  // stays available as an alias (SUBMIT_ENDPOINT_DIRECT in src/lib/submit-types.ts).
+  // The request chain, in full — netlify.toml, netlify/lib/handler.ts and
+  // src/lib/submit-types.ts all point here rather than repeat it. Netlify
+  // evaluates functions before redirects, so a function path wins over both the
+  // /api/atlas/:slug rewrite and the /* → 404 catch-all in netlify.toml, and
+  // /api/atlas/submit reaches this handler with no rule of its own. Declaring a
+  // custom path normally *removes* the default /.netlify/functions/<name> URL,
+  // so that one is listed too and stays available as an alias.
   path: ['/api/atlas/submit', '/.netlify/functions/atlas-submit'],
 }
 
@@ -173,20 +190,48 @@ export default async (req: Request, context: Context): Promise<Response> => {
   const id = newSubmissionId()
   const receivedAt = new Date(now).toISOString()
   const emailHash = await hashEmail(value.email)
+  const kind = runnerKind(env)
+
+  // Global daily ceiling on runner triggers. Claimed only when we are actually
+  // about to start a run, so the 'queue' runner (which starts nothing) never
+  // spends a slot. Same fail-open rule as the rate limit: a Blobs failure lets
+  // the run through rather than stalling the pipeline.
+  const runsKey = dailyRunsKey(receivedAt)
+  const claim =
+    kind === 'queue'
+      ? { ok: true as const, value: true }
+      : await withStore(RATE_STORE, 'daily run ceiling', async (store) => {
+          const count = parseRunCount(await store.get(runsKey, { type: 'json' }))
+          const allowed = shouldTriggerRunner(count, dailyRunCeiling(env))
+          if (allowed) await store.setJSON(runsKey, { count: (count ?? 0) + 1 })
+          return allowed
+        })
+  const mayRun = claim.ok ? claim.value : true
+
   const record = buildRecord(value, {
     id,
     receivedAt,
     emailHash,
     ipHash,
     userAgent: req.headers.get('user-agent') ?? '',
-    runner: { kind: runnerKind(env) },
+    runner: { kind },
+    ...(mayRun ? {} : { state: 'queued' as const }),
   })
 
-  // Trigger before the write so the runner id lands in the stored record. Never
-  // throws: a failure comes back as runner.error.
-  record.runner = await triggerRunner(runnerInput(record), env)
-  if (record.runner.error) {
-    console.warn(`[atlas-submit] runner ${record.runner.kind} failed for ${id}: ${record.runner.error}`)
+  if (mayRun) {
+    // Trigger before the write so the runner id lands in the stored record.
+    // Never throws: a failure comes back as runner.error.
+    record.runner = await triggerRunner(runnerInput(record), env)
+    if (record.runner.error) {
+      console.warn(`[atlas-submit] runner ${record.runner.kind} failed for ${id}: ${record.runner.error}`)
+    }
+  } else {
+    // Accepted, stored, and left for a maintainer or for tomorrow. The
+    // submitter sees the same 202 and the same message either way.
+    record.runner = { kind, skipped: CEILING_SKIP_REASON }
+    console.warn(
+      `[atlas-submit] daily runner ceiling (${dailyRunCeiling(env)}) reached; queued ${id} host=${record.host}`
+    )
   }
 
   const key = recordKey(receivedAt, id)

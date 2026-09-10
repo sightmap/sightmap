@@ -6,30 +6,11 @@
 // Browser-safe: no node: imports, no side effects.
 
 /**
- * POST target. Also the `action` of the no-JS <form>, so it must be a path.
- *
- * Netlify's request chain runs serverless functions *before* redirects and
- * rewrites (edge functions → cache → functions → redirects → static files →
- * 404 handler), so this function's `config.path` wins over both the
- * `/api/atlas/:slug` rewrite and the `/*` → `/404.html` catch-all in
- * netlify.toml. Two things do run earlier and are handled explicitly:
- * the `negotiate` edge function, which answers `/api/*` itself and passes
- * this path through (`FUNCTION_PATHS` in netlify/lib/handler.ts).
- *
- * Setting a custom `path` normally *removes* the default function URL
- * ("the function is only available at that path"), so the function declares
- * both paths and SUBMIT_ENDPOINT_DIRECT below stays live as an alias.
+ * POST target, and the action of the no-JS <form>, so it must be a path.
+ * Netlify runs functions before redirects, so this wins over netlify.toml's
+ * rules — see netlify/functions/atlas-submit.mts for the full chain.
  */
 export const SUBMIT_ENDPOINT = '/api/atlas/submit'
-
-/** The default function URL, declared alongside the pretty one. Same handler. */
-export const SUBMIT_ENDPOINT_DIRECT = '/.netlify/functions/atlas-submit'
-
-/** Host lookup for a scanned site: `/api/atlas/lookup/<host>` → static JSON. */
-export const LOOKUP_ENDPOINT_PREFIX = '/api/atlas/lookup/'
-
-/** Where a no-JS form post lands on success: `/atlas?submitted=<id>`. */
-export const SUBMITTED_QUERY_PARAM = 'submitted'
 
 export interface SubmitRequest {
   url: string
@@ -61,18 +42,6 @@ export interface SubmitResponse {
   error?: { code: string; message: string; hint?: string; status?: number }
 }
 
-/** Field names, so the form markup and the handler cannot drift apart. */
-export const SUBMIT_FIELDS = [
-  'url',
-  'email',
-  'owner',
-  'sightkick',
-  'intent',
-  'nominate',
-  'rescan',
-  'website',
-] as const
-
 export const MAX_EMAIL_LENGTH = 254
 export const MAX_INTENT_LENGTH = 500
 
@@ -80,8 +49,12 @@ export const MAX_INTENT_LENGTH = 500
 export const RATE_LIMIT_MAX = 5
 export const RATE_LIMIT_WINDOW_MS = 24 * 60 * 60 * 1000
 
-/** Lifecycle of a submission, as far as the public API exposes it. */
-export type SubmitState = 'new' | 'scanning' | 'in-review' | 'listed' | 'rejected'
+/**
+ * Lifecycle of a submission, as far as the public API exposes it. `queued`
+ * means it was accepted and stored but no runner was triggered for it — the
+ * global daily ceiling was reached, so a maintainer runs the intake by hand.
+ */
+export type SubmitState = 'new' | 'queued' | 'scanning' | 'in-review' | 'listed' | 'rejected'
 
 /** Which runner picked the submission up. `queue` means "a maintainer will". */
 export type RunnerKind = 'netlify' | 'github' | 'queue'
@@ -114,5 +87,3 @@ export interface SubmitError {
     status: number
   }
 }
-
-export type SubmitResult = SubmitAccepted | SubmitError
