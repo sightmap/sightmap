@@ -3009,3 +3009,918 @@ footer {
   .atlas-filters__search input { width: 100%; }
   .atlas-filters__search { width: 100%; }
 }
+
+/* ---- ATLAS DIRECTORY: SHARED PIECES ---- */
+/* Used on both the gallery card and the listing page, so they live above the
+   two blocks that consume them. Everything is built from the tokens at the top
+   of this file; the site is light-only, so there is no dark variant. */
+
+/* Type / surface pill. Three colours by meaning, never by rank: live and demo
+   are different kinds of thing, not better and worse. */
+.atlas-type {
+  flex: none;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 100px;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.atlas-type--live {
+  border-color: color-mix(in srgb, var(--green) 45%, transparent);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  color: var(--green);
+}
+
+.atlas-type--demo {
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+  background: color-mix(in srgb, var(--blue) 10%, transparent);
+  color: var(--blue);
+}
+
+/* Factual badge — "Built with Sightkick", "Journey passed", an editorial
+   label. Square-ish so it never reads as a rating chip. */
+.atlas-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--purple) 40%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--purple) 9%, transparent);
+  color: var(--purple);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.atlas-badge--journey {
+  border-color: color-mix(in srgb, var(--green) 40%, transparent);
+  background: color-mix(in srgb, var(--green) 9%, transparent);
+  color: var(--green);
+}
+
+.atlas-badge--label {
+  border-color: var(--border-bright);
+  background: transparent;
+  color: var(--text-dim);
+}
+
+/* Tool-kind chip. read / action / sensitive are categories, and the three
+   colours only have to be *distinct* — a sensitive tool is not a worse tool,
+   it is one whose call is harder to undo. */
+.atlas-kind {
+  flex: none;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-bright);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.atlas-kind--read {
+  border-color: color-mix(in srgb, var(--green) 45%, transparent);
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+  color: var(--green);
+}
+
+.atlas-kind--action {
+  border-color: color-mix(in srgb, var(--yellow) 50%, transparent);
+  background: color-mix(in srgb, var(--yellow) 12%, transparent);
+  color: var(--yellow);
+}
+
+.atlas-kind--sensitive {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* ---- DIRECTORY CARD ---- */
+/* An override layer on `.atlas-card`, which it shares so the mixed grid keeps
+   one card shape. A listing has no screenshot, so the band at the top carries
+   the number a visitor came for instead. */
+.atlas-card--listing .atlas-card__strip {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.atlas-card__toolcount {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.atlas-card__toolcount strong {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.atlas-card__kinds { overflow-wrap: anywhere; }
+
+.atlas-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+/* The submit card carries two destinations, so the card itself is a wrapper
+   and the primary jump is this inner link. */
+.atlas-card__submit-link {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  text-decoration: none;
+  color: inherit;
+}
+
+.atlas-card__submit-aside {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px dashed var(--border);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.atlas-card__submit-aside a { color: var(--accent); }
+
+/* ---- ATLAS INDEX: TYPE FILTER, HOW, NOTE ---- */
+.atlas-filters__types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* A hairline between the coarse cut (kind) and the fine one (category), so the
+   two chip rows do not read as one long row of equal choices. */
+.atlas-filters__cats {
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
+}
+
+.atlas-index__note {
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+  max-width: 46rem;
+}
+
+.atlas-how {
+  margin-top: 4rem;
+}
+
+.atlas-how__steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-how__step {
+  min-width: 0;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.atlas-how__n {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+.atlas-how__title {
+  display: block;
+  margin-top: 0.35rem;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.atlas-how__body {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+/* ---- ATLAS SUBMIT FORM ---- */
+.atlas-submit-form {
+  margin-top: 4rem;
+  scroll-margin-top: 6rem; /* clears the fixed nav when #submit is jumped to */
+}
+
+.atlas-submit-form__intro {
+  max-width: 46rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.atlas-submit-form__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 34rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.atlas-submit-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.atlas-submit-form__label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.atlas-submit-form__field input,
+.atlas-submit-form__field textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+.atlas-submit-form__field input:focus-visible,
+.atlas-submit-form__field textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.atlas-submit-form__hint {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.atlas-submit-form__checks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.atlas-submit-form__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.875rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.atlas-submit-form__check input {
+  margin: 0.15rem 0 0;
+  accent-color: var(--accent);
+}
+
+/* Honeypot: off-canvas rather than display:none, which some form fillers skip. */
+.atlas-submit-form__hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.atlas-submit-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.atlas-submit-form__error {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--accent);
+}
+
+.atlas-submit-form__received {
+  max-width: 34rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--green) 40%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--green) 7%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.atlas-submit-form__id {
+  margin-bottom: 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.atlas-submit-form__id code { color: var(--text-bright); }
+
+/* ---- ATLAS LISTING ---- */
+.atlas-listing {
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+}
+
+/* Same reason as `.atlas-entry section`: the global full-bleed section padding
+   only opens holes between the stacked blocks of a spec sheet. */
+.atlas-listing section {
+  padding: 0;
+}
+
+.atlas-listing__header {
+  margin-bottom: 3rem;
+  padding-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.atlas-listing__pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.atlas-listing__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15rem;
+  gap: 3rem;
+  align-items: start;
+}
+
+.atlas-listing__main { min-width: 0; }
+
+.atlas-listing__h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.75rem;
+}
+
+.atlas-listing__note {
+  font-size: 0.85rem;
+  line-height: 1.65;
+  color: var(--text-dim);
+  max-width: 46rem;
+}
+
+.atlas-listing__block { margin-top: 3rem; }
+
+.atlas-listing__footnote {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+/* ---- LISTING FACTS STRIP ---- */
+.atlas-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+  gap: 1px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.atlas-facts__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  background: var(--bg-raised);
+}
+
+.atlas-facts__label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.atlas-facts__value {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text-bright);
+  overflow-wrap: anywhere;
+}
+
+/* ---- LISTING TOOLS ---- */
+.atlas-tools { margin-top: 3rem; }
+
+.atlas-tools__group { margin-top: 1.5rem; }
+
+.atlas-tools__page {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.atlas-tools__page code {
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.atlas-tools__page-count { flex: none; }
+
+.atlas-tools__list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.atlas-tool {
+  min-width: 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.atlas-tool__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.atlas-tool__name {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  overflow-wrap: anywhere;
+}
+
+.atlas-tool__desc {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.atlas-tool__why {
+  margin-top: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+
+.atlas-tool__warnings {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--yellow);
+  overflow-wrap: anywhere;
+}
+
+.atlas-tool__schema {
+  margin-top: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+.atlas-tool__schema summary {
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.atlas-tool__schema summary:hover { color: var(--accent); }
+
+/* The schema is third-party JSON of unknown width, so it scrolls inside its
+   own box rather than widening the page. */
+.atlas-tool__schema pre {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  max-width: 100%;
+  max-height: 22rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  color: var(--text);
+  line-height: 1.55;
+}
+
+/* ---- LISTING CHECKS ---- */
+.atlas-checks { margin-top: 3rem; }
+
+.atlas-checks__list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  overflow: hidden;
+}
+
+.atlas-checks__item {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.atlas-checks__glyph {
+  font-family: var(--mono);
+  color: var(--green);
+}
+
+.atlas-checks__item--off .atlas-checks__glyph { color: var(--yellow); }
+
+.atlas-checks__detail {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/* ---- LISTING JOURNEYS, DRIFT, REVIEW ---- */
+.atlas-listing__journeys {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.atlas-listing__journeys li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+  font-size: 0.875rem;
+}
+
+.atlas-listing__journey-intent { color: var(--text-bright); }
+
+.atlas-listing__journey-tools code,
+.atlas-listing__journey-facts code {
+  display: inline-block;
+  margin-left: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.atlas-listing__journey {
+  margin-top: 1rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.atlas-listing__journey--passed { border-left: 3px solid var(--green); }
+.atlas-listing__journey--failed { border-left: 3px solid var(--yellow); }
+
+.atlas-listing__journey-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.atlas-listing__journey-facts dt {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.atlas-listing__journey-facts dd {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-bright);
+  overflow-wrap: anywhere;
+}
+
+.atlas-listing__journey-notes {
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.atlas-listing__drift {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.atlas-listing__drift-side {
+  min-width: 0;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-raised);
+}
+
+.atlas-listing__drift-side--added { border-left: 3px solid var(--green); }
+.atlas-listing__drift-side--removed { border-left: 3px solid var(--accent); }
+
+.atlas-listing__drift-label,
+.atlas-listing__col-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+.atlas-listing__drift-side ul {
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.atlas-listing__drift-side code {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-bright);
+  overflow-wrap: anywhere;
+}
+
+.atlas-listing__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.atlas-listing__bullets {
+  margin: 0.6rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+/* ---- SIGHTKICK STARTER ---- */
+.atlas-starter { margin-top: 3rem; }
+
+.atlas-starter__code {
+  margin-top: 1rem;
+  max-width: 100%;
+  border: 1px solid var(--code-border);
+  border-radius: 10px;
+  background: var(--bg-code);
+  overflow: hidden;
+}
+
+.atlas-starter__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.9rem;
+  border-bottom: 1px solid var(--code-border);
+  background: var(--code-header-bg);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--code-caption);
+}
+
+.atlas-starter__lang {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.atlas-starter__copy {
+  flex: none;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--code-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--code-caption);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.atlas-starter__copy:hover {
+  color: var(--code-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.atlas-starter__code pre {
+  margin: 0;
+  padding: 1rem;
+  max-width: 100%;
+  max-height: 28rem;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--code-text);
+}
+
+.atlas-starter__prompt {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.atlas-starter__prompt summary {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.atlas-starter__prompt summary:hover { color: var(--accent); }
+
+/* ---- SHARE ---- */
+.atlas-share { margin-top: 3rem; }
+
+.atlas-share__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.atlas-share__link {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--border-bright);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.atlas-share__link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.atlas-share__badge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.atlas-share__badge img {
+  align-self: flex-start;
+  max-width: 100%;
+  height: auto;
+}
+
+.atlas-share__snippet {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.atlas-share__snippet pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text);
+  white-space: pre;
+}
+
+.atlas-share__snippet .atlas-starter__copy {
+  border-color: var(--border-bright);
+  color: var(--text-dim);
+}
+
+.atlas-share__snippet .atlas-starter__copy:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* ---- LISTING META RAIL EXTRAS ---- */
+.atlas-listing__actions a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.atlas-listing__actions a:hover { text-decoration: underline; }
+
+@media (max-width: 900px) {
+  .atlas-listing__layout {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .atlas-facts,
+  .atlas-how__steps,
+  .atlas-listing__cols,
+  .atlas-listing__drift,
+  .atlas-listing__journey-facts {
+    grid-template-columns: 1fr;
+  }
+  .atlas-checks__item {
+    grid-template-columns: 1.25rem minmax(0, 1fr);
+  }
+  /* The detail wraps under the label instead of fighting it for the row. */
+  .atlas-checks__detail {
+    grid-column: 2;
+    text-align: left;
+  }
+  .atlas-filters__cats {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .atlas-share__snippet {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 560px) {
+  .atlas-listing { padding-top: 7rem; }
+}
