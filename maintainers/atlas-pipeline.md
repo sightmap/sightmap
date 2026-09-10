@@ -38,15 +38,18 @@ Manual steps are marked 🖐.
 
 1. **Submission.** The form at `/atlas/submit` POSTs to
    `/.netlify/functions/atlas-submit`: `url`, `email`, and the flags `owner`,
-   `sightkick`, `intent`, `nominate`, `rescan` (see
+   `sightkick`, `intent`, `nominate`, `rescan`, plus the optional `claim` (see
    `web/src/lib/submit-types.ts`). The email is hashed with `ATLAS_SUBMIT_SALT`
    and never leaves the function as plaintext.
 2. **Function.** `web/netlify/functions/atlas-submit.mts` preflights the URL
-   (`web/scripts/lib/preflight.ts`), rate-limits, and hands the submission to
-   whichever runner `ATLAS_RUNNER` names — `netlify`, `github`, or `queue`.
+   (`web/scripts/lib/preflight.ts`), refuses a quarantined host, checks the
+   claim if one was sent, rate-limits, and hands the submission to whichever
+   runner `ATLAS_RUNNER` names — `netlify`, `github`, or `queue`.
 3. **Runner.** A coding agent (or, on the GitHub path, the workflow) installs
    the sightmap CLI and a Chrome build, runs `pnpm atlas:intake`, and gets a
-   listing YAML, a dated scan JSON, and a summary.
+   listing YAML, a dated scan JSON, and a summary. It then runs
+   `pnpm atlas:card` to add what the scan saw to the submitter's card, if the
+   host has one.
 4. **PR.** The runner opens `atlas: list <host>` (or `atlas: rescan <host>`, or
    `atlas: needs review — <host>`) with the summary as the body and a maintainer
    checklist. The agent never merges.
@@ -119,6 +122,10 @@ Setup:
 | `ATLAS_RUNNER_MODEL` | Optional. Omitted from the request when unset |
 | `ATLAS_DAILY_RUNS` | Optional, default 20. Ceiling on runner triggers per UTC day across all submitters. Agent Runner concurrency is capped per plan (Free 1, Personal 3, Pro 10, Enterprise 50); over the ceiling a submission is stored `queued`, with no run |
 | `ATLAS_SUBMIT_SALT` | Per-deploy salt for the email hash |
+| `NETLIFY_AUTH_TOKEN` | Personal access token the runner uses to write the `atlas-try` store from `pnpm atlas:card`. Without it (or without `NETLIFY_SITE_ID`) the card step prints one notice and exits 0 |
+
+`NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` are also the two repository secrets
+the GitHub fallback workflow needs, for the same step.
 
 A run appears in the Netlify dashboard with its state, a log, and a Deploy
 Preview at `https://agent-<run-id>--<site>.netlify.app`. When the agent has
@@ -161,10 +168,60 @@ fine-grained token with `contents: write` and `actions: write` on
 `ATLAS_GITHUB_REPO` (`owner/repo`, default `sightmap/sightmap`), and
 `ANTHROPIC_API_KEY` is a repository secret — without it the review step falls
 back to heuristics, so the drafted description and category need closer
-attention. The repository variable `ATLAS_RUNNER_LABEL` selects the machine:
+attention. `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` are two more repository
+secrets, read only by the launch-card step; without them that step prints a
+notice and the run carries on. The repository variable `ATLAS_RUNNER_LABEL` selects the machine:
 leave it unset for
 `ubuntu-latest`, or set it to a Namespace label such as
 `nscloud-ubuntu-24.04-amd64-4x8-with-cache` to run on a Namespace runner.
+
+## Blob stores
+
+Four, all on the site's own Netlify Blobs. Two are the submission pipeline's
+own bookkeeping; two back the unlisted cards.
+
+| Store | Key | Value |
+|---|---|---|
+| `atlas-submissions` | `<yyyy-mm-dd>/<id>`, plus `index/<id>` pointers | One submission record. The only copy of a submitter's email address anywhere |
+| `atlas-rate` | hashed client IP, plus `runs/<yyyy-mm-dd>` | The per-IP window and the global daily runner ceiling |
+| `atlas-try` | `<host>` | The record behind `/try/<host>`: the claim date, the submitted URL, and the scan once the runner adds one. Written by the submit function on a verified claim, updated by `pnpm atlas:card`, and expired 30 days after the last scan |
+| `atlas-quarantine` | `<host>` | `{ at, reason? }`. Presence is the whole signal |
+
+The host key is the canonical host everywhere — lowercase, no port, no leading
+`www.` — the same string `canonicalHost()` in `web/scripts/lib/directory.ts`
+produces and that `/atlas/hosts/<host>.json` is keyed by.
+
+### Quarantine
+
+Refuses a host without deleting anything. `/try/<host>` answers 410 and the
+submit endpoint answers 403 `quarantined`, with or without a claim.
+
+```sh
+netlify blobs:set atlas-quarantine example.com '{"at":"2026-09-10T00:00:00Z","reason":"owner request"}'
+netlify blobs:get atlas-quarantine example.com
+netlify blobs:delete atlas-quarantine example.com   # lifts it
+```
+
+Use it for a host that must stop being served now — an owner's removal request
+that arrives before a card expires, a site that turned into something else
+after its scan. It does not touch a merged Atlas listing: that is a takedown,
+below.
+
+### Domain claims
+
+A submission may carry a `claim`: the 32 hex characters the owner published as
+a comment line `# sightmap-claim: <token>` in `https://<host>/webmcp.txt`. The
+function fetches that file (at most three same-site redirects, 5 s, 64 KiB) and
+compares. A match stores `claim: { verifiedAt }` on the submission, writes the
+`atlas-try` record, and returns the card URL. A failure is 422
+(`claim-unreachable` or `claim-mismatch`) and stores nothing at all, so the
+owner can fix the file and retry without spending one of their five daily
+submissions.
+
+The token is generated by the owner and only ever compared. Sightmap does not
+issue it, store it, or log it, so there is nothing to rotate and nothing to
+leak — and a claim is domain control, not a review. Nothing about a card says
+a site is safe, endorsed, or listed.
 
 ## Safety controls
 
@@ -267,6 +324,13 @@ Delete the listing and its scans, then rebuild:
 ```sh
 git rm web/src/data/directory/<slug>.yaml
 git rm -r web/src/data/directory/scans/<slug>
+```
+
+If the site also has an unlisted card, delete its record, or quarantine the
+host when you want the URL to keep answering with a removal notice:
+
+```sh
+netlify blobs:delete atlas-try <host>
 ```
 
 Merge. `scripts/build-atlas.ts` regenerates the gallery, the JSON API, the

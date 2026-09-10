@@ -65,21 +65,27 @@ describe('badgeSvg', () => {
 })
 
 describe('listingBadgeSvg', () => {
-  it('claims WebMCP tools with a count and the scan date', () => {
+  it('states what was detected and when, under the Sightmap label', () => {
     const svg = listingBadgeSvg({ counts: { tools: 9 }, scannedAt: '2026-09-09T20:00:00.000Z' })
-    expect(svg).toContain('>WebMCP tools<')
-    expect(svg).toContain('>9 tools · scanned 2026-09-09<')
+    expect(svg).toContain('>Sightmap<')
+    expect(svg).toContain('>9 tools detected · 2026-09-09<')
   })
 
   it('says "1 tool", not "1 tools"', () => {
     const svg = listingBadgeSvg({ counts: { tools: 1 }, scannedAt: '2026-09-09T20:00:00.000Z' })
-    expect(svg).toContain('>1 tool · scanned 2026-09-09<')
+    expect(svg).toContain('>1 tool detected · 2026-09-09<')
   })
 
-  it('does not advertise WebMCP when the scan found no tools', () => {
+  it('states the empty result rather than dropping to a bare label', () => {
     const svg = listingBadgeSvg({ counts: { tools: 0 }, scannedAt: '2026-09-09T20:00:00.000Z' })
-    expect(svg).toContain('>Atlas<')
-    expect(svg).toContain('>no tools · scanned 2026-09-09<')
-    expect(svg).not.toContain('WebMCP')
+    expect(svg).toContain('>Sightmap<')
+    expect(svg).toContain('>no tools detected · 2026-09-09<')
+  })
+
+  it('never claims more than a detection', () => {
+    for (const tools of [0, 1, 9]) {
+      const svg = listingBadgeSvg({ counts: { tools }, scannedAt: '2026-09-09T20:00:00.000Z' })
+      expect(svg, String(tools)).not.toMatch(/verified|safe|trusted|approved|certified/i)
+    }
   })
 })

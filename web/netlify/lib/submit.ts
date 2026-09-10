@@ -14,7 +14,11 @@
 // line. Only `emailHash` travels.
 
 import { apiError, type ApiErrorBody } from './errors.ts'
+import { CLAIM_TOKEN_RE, type ClaimFailure } from './claim.ts'
+import { expiresAfter, type TryRecord } from './try-record.ts'
 import { preflightUrl, resolvePublic } from '../../scripts/lib/preflight.ts'
+import { canonicalHost } from '../../scripts/lib/directory.ts'
+import { SITE_URL } from '../../scripts/lib/site.ts'
 import {
   MAX_EMAIL_LENGTH,
   MAX_INTENT_LENGTH,
@@ -32,7 +36,7 @@ export const ACCEPTED_MESSAGE =
   'Request received. We normally scan submissions within one business day and email the report.'
 
 const SUBMIT_HINT =
-  'POST JSON or form fields { url, email, owner?, sightkick?, intent?, nominate?, rescan? } to /api/atlas/submit. See https://sightmap.org/atlas.'
+  'POST JSON or form fields { url, email, owner?, sightkick?, intent?, nominate?, rescan?, claim? } to /api/atlas/submit. See https://sightmap.org/atlas.'
 
 // ---------------------------------------------------------------------------
 // Errors
@@ -61,6 +65,37 @@ export function badRequest(code: string, message: string, hint = SUBMIT_HINT): S
   return submitError(code, message, hint, 400)
 }
 
+const CLAIM_HINT =
+  'Serve https://<host>/webmcp.txt with a line `# sightmap-claim: <token>`, where <token> is the 32 hex characters you sent as `claim`, then submit again.'
+
+/**
+ * A claim that could not be checked. 422, not 400: the request was well
+ * formed, the host just does not (yet) carry the line. Nothing is stored, so
+ * the owner fixes the file and retries at no cost.
+ */
+export function claimRejectedError(code: ClaimFailure, reason: string): SubmitErrorBody {
+  const message =
+    code === 'claim-mismatch'
+      ? `The claim line in webmcp.txt does not match the token you sent (${reason}).`
+      : `webmcp.txt could not be read from that host (${reason}).`
+  return submitError(code, message, CLAIM_HINT, 422)
+}
+
+/** A host a maintainer has taken off the pipeline. Same answer with or without a claim. */
+export function quarantinedError(host: string): SubmitErrorBody {
+  return submitError(
+    'quarantined',
+    `Submissions for ${host} are not being accepted.`,
+    'Email hello@sightmap.org if you think this is a mistake.',
+    403
+  )
+}
+
+/** Where a verified claim gets its unlisted card. Not a listing, and not indexed. */
+export function cardUrl(host: string): string {
+  return `${SITE_URL}/try/${canonicalHost(host)}`
+}
+
 // ---------------------------------------------------------------------------
 // Parsing
 // ---------------------------------------------------------------------------
@@ -73,6 +108,8 @@ export interface SubmissionFields {
   intent: string
   nominate: boolean
   rescan: boolean
+  /** Optional domain-control token; see `claim.ts`. Never stored. */
+  claim: string
   website: string
 }
 
@@ -104,6 +141,7 @@ export function readFields(input: Record<string, unknown>): SubmissionFields {
     intent: asString(input.intent),
     nominate: asBoolean(input.nominate),
     rescan: asBoolean(input.rescan),
+    claim: asString(input.claim).toLowerCase(),
     website: asString(input.website),
   }
 }
@@ -209,6 +247,8 @@ export interface ValidSubmission {
   intent: string
   nominate: boolean
   rescan: boolean
+  /** '' when the submitter did not claim the host. */
+  claim: string
 }
 
 export interface ValidateDeps {
@@ -271,6 +311,19 @@ export async function validateSubmission(
     }
   }
 
+  // Shape only. Whether the host actually carries the token is a network
+  // check the caller makes after this, so that a typo costs a 400 and not a
+  // request to someone else's server.
+  if (fields.claim && !CLAIM_TOKEN_RE.test(fields.claim)) {
+    return {
+      ok: false,
+      error: badRequest(
+        'claim-invalid',
+        'A claim token is 32 lowercase hex characters, the same value as the one in webmcp.txt.'
+      ),
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -283,6 +336,7 @@ export async function validateSubmission(
       intent,
       nominate: fields.nominate,
       rescan: fields.rescan,
+      claim: fields.claim,
     },
   }
 }
@@ -366,6 +420,12 @@ export interface SubmissionRecord {
   userAgent: string
   state: SubmitState
   runner: RunnerInfo
+  /**
+   * Present only when the submitter proved control of the host. The token
+   * itself is deliberately absent: it is compared during the request and
+   * never written anywhere.
+   */
+  claim?: { verifiedAt: string }
 }
 
 export interface RecordMeta {
@@ -377,6 +437,7 @@ export interface RecordMeta {
   runner: RunnerInfo
   /** Defaults to 'new'. `queued` means no runner was triggered for it. */
   state?: SubmitState
+  claim?: { verifiedAt: string }
 }
 
 export function buildRecord(value: ValidSubmission, meta: RecordMeta): SubmissionRecord {
@@ -396,6 +457,23 @@ export function buildRecord(value: ValidSubmission, meta: RecordMeta): Submissio
     userAgent: meta.userAgent.slice(0, 300),
     state: meta.state ?? 'new',
     runner: meta.runner,
+    ...(meta.claim ? { claim: meta.claim } : {}),
+  }
+}
+
+/**
+ * The record behind the card at /try/<host>. Written on every verified claim,
+ * replacing whatever was there: a fresh claim starts a fresh 30 days and drops
+ * the previous scan, which described a site as it was before this submission.
+ */
+export function buildTryRecord(value: ValidSubmission, meta: { id: string; claimedAt: string }): TryRecord {
+  return {
+    v: 1,
+    host: canonicalHost(value.host),
+    url: value.url,
+    submissionId: meta.id,
+    claimedAt: meta.claimedAt,
+    expiresAt: expiresAfter(meta.claimedAt),
   }
 }
 
@@ -430,8 +508,8 @@ export function publicStatus(record: SubmissionRecord): SubmitStatus {
   }
 }
 
-export function acceptedBody(id: string): SubmitAccepted {
-  return { ok: true, id, state: 'received', message: ACCEPTED_MESSAGE }
+export function acceptedBody(id: string, card?: string): SubmitAccepted {
+  return { ok: true, id, state: 'received', message: ACCEPTED_MESSAGE, ...(card ? { card } : {}) }
 }
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ import {
   dailyRunCeiling,
   dailyRunsKey,
   DEFAULT_DAILY_RUNS,
+  cardCommand,
   intakeCommand,
   MAX_PROMPT_LENGTH,
   parseRunCount,
@@ -85,6 +86,15 @@ describe('buildRunnerPrompt', () => {
     expect(prompt).toContain("--submitted-by 'owner'")
   })
 
+  it('updates the launch card straight after the intake', () => {
+    expect(prompt).toContain("pnpm atlas:card --host 'example.org'")
+    // Only the intake knows where it filed the report, so the prompt says so
+    // rather than guessing a path.
+    expect(prompt).toContain('the scan report path intake printed')
+    expect(prompt).toContain('Skip it when the intake wrote no scan report.')
+    expect(prompt.indexOf('atlas:card')).toBeGreaterThan(prompt.indexOf('atlas:intake'))
+  })
+
   it('asks for tests, a build, and a PR it must not merge', () => {
     expect(prompt).toContain('pnpm test')
     expect(prompt).toContain('pnpm build')
@@ -92,6 +102,11 @@ describe('buildRunnerPrompt', () => {
     expect(prompt).toContain('intake summary')
     expect(prompt).toMatch(/never publish|Never publish/)
     expect(prompt).toContain('do not merge')
+  })
+
+  it('shell-quotes the card command the same way', () => {
+    const command = cardCommand({ host: "ex'ample.org" }, "/tmp/a b/scan'.json")
+    expect(command).toBe("pnpm atlas:card --host 'ex'\\''ample.org' --scan '/tmp/a b/scan'\\''.json'")
   })
 
   it('never contains the email address', () => {
@@ -104,6 +119,10 @@ describe('buildRunnerPrompt', () => {
     const big = buildRunnerPrompt({ ...PROMPT_INPUT, intent: 'x'.repeat(MAX_INTENT_LENGTH) })
     expect(big.length).toBeLessThanOrEqual(MAX_PROMPT_LENGTH)
     expect(big).not.toContain('```')
+    // The budget exists to bound the prompt, not to trim the paragraph that
+    // keeps the agent from publishing.
+    expect(big).not.toContain('[truncated]')
+    expect(big).toContain('do not merge')
   })
 
   it('clamps a prompt that outgrows the budget', () => {

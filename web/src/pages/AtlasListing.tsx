@@ -110,7 +110,7 @@ export default function AtlasListingPage({ listing }: { listing: DirectoryListin
           <div className="atlas-listing__layout">
             <div className="atlas-listing__main">
               <div className="atlas-facts" data-component="ListingFacts">
-                <Fact label="Tools found" value={listing.counts.tools} />
+                <Fact label="Tools detected" value={listing.counts.tools} />
                 <Fact label="Pages checked" value={listing.counts.pages} />
                 <Fact label="Checks passed" value={`${checks.passed}/${checks.total}`} />
                 <Fact
@@ -397,8 +397,9 @@ export default function AtlasListingPage({ listing }: { listing: DirectoryListin
               </section>
 
               <p className="atlas-listing__footnote">
-                Classification is Atlas&rsquo;s own and is corrected on review. A listing is evidence
-                a scan found these tools on the date shown, not a safety certification.
+                Classification is Atlas&rsquo;s own and is corrected by a maintainer on review. A
+                listing records the tools a scan detected on the date shown, and says nothing about
+                the site beyond that.
               </p>
             </div>
 

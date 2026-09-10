@@ -25,6 +25,12 @@ export interface SubmitRequest {
   nominate?: boolean
   /** Re-scan of a site that is already listed. */
   rescan?: boolean
+  /**
+   * The token in the submitter's `webmcp.txt` claim line. Proves control of
+   * the host, which is what an unlisted card at /try/<host> stands on. It is
+   * compared during the request and never stored.
+   */
+  claim?: string
   /** Honeypot. A real submitter never fills this; a bot fills everything. */
   website?: string
 }
@@ -39,11 +45,20 @@ export interface SubmitResponse {
   id?: string
   state?: string
   message?: string
+  card?: string
   error?: { code: string; message: string; hint?: string; status?: number }
 }
 
 export const MAX_EMAIL_LENGTH = 254
 export const MAX_INTENT_LENGTH = 500
+
+/**
+ * 16 random bytes as lowercase hex — `openssl rand -hex 16`. The `<input>`
+ * pattern, the endpoint's validation, and the OpenAPI schema all read it from
+ * here so a client cannot be told one rule and checked against another.
+ */
+export const CLAIM_TOKEN_PATTERN = '[0-9a-f]{32}'
+export const CLAIM_TOKEN_LENGTH = 32
 
 /** How many submissions one client may make per rolling window. */
 export const RATE_LIMIT_MAX = 5
@@ -65,6 +80,11 @@ export interface SubmitAccepted {
   id: string
   state: 'received'
   message: string
+  /**
+   * `https://sightmap.org/try/<host>`, present only when the submission
+   * carried a claim that verified. An unlisted page, not an Atlas listing.
+   */
+  card?: string
 }
 
 /** 200 response to `GET /api/atlas/submit?id=…`. Never echoes url or email. */

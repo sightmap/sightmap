@@ -22,6 +22,33 @@ describe('preflightUrl', () => {
     expect(preflightUrl('https://acme.local/').reason).toMatch(/reserved/)
   })
 
+  it('rejects an internationalized hostname, however it is spelled', () => {
+    // `new URL()` runs IDNA before we ever see the host, so the Unicode and
+    // the punycode spellings are the same rejection.
+    for (const url of ['https://bücher.acme.io/', 'https://xn--bcher-kva.acme.io/', 'https://XN--BCHER-KVA.acme.io/']) {
+      const r = preflightUrl(url)
+      expect(r.ok, url).toBe(false)
+      expect(r.reason, url).toBe('internationalized hostnames are not supported yet')
+    }
+    // The look-alike case: a Cyrillic а renders as `apple.com` and reaches
+    // preflight as punycode.
+    expect(preflightUrl('https://аpple.com/').reason).toBe('internationalized hostnames are not supported yet')
+  })
+
+  it('still accepts an ASCII hostname that merely contains dashes', () => {
+    expect(preflightUrl('https://xn-acme.io/').ok).toBe(true)
+    expect(preflightUrl('https://my-shop.acme.io/').ok).toBe(true)
+  })
+
+  it('drops a trailing root dot instead of listing the host twice', () => {
+    const r = preflightUrl('https://acme.io./docs')
+    expect(r).toEqual({ ok: true, url: 'https://acme.io/docs', host: 'acme.io' })
+    // Same host, so the reserved-host check has to see it that way too.
+    expect(preflightUrl('https://localhost./').ok).toBe(false)
+    expect(preflightUrl('https://metadata.internal./').reason).toMatch(/reserved/)
+    expect(preflightUrl('https://acme.io../').reason).toBe('hostname is malformed')
+  })
+
   it('rejects junk', () => {
     expect(preflightUrl('').ok).toBe(false)
     expect(preflightUrl('not a url').ok).toBe(false)

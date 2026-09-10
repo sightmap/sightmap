@@ -290,6 +290,12 @@ export const submitRequestSchema = {
     },
     nominate: { type: 'boolean', description: 'Someone else\'s site, submitted as a nomination.' },
     rescan: { type: 'boolean', description: 'Rescan a site that is already listed.' },
+    claim: {
+      type: 'string',
+      pattern: '^[0-9a-f]{32}$',
+      description:
+        'Optional proof that the submitter controls the host: the same 32 hex characters that appear in https://<host>/webmcp.txt as a comment line `# sightmap-claim: <token>`. Checked during the request and never stored. A submission that carries one gets an unlisted card at /try/<host>; one that does not behaves exactly as before.',
+    },
   },
 }
 
@@ -305,5 +311,30 @@ export const submitAcceptedSchema = {
       description: 'Accepted for scanning. A listing only exists once a human has reviewed and merged it.',
     },
     message: { type: 'string' },
+    card: {
+      type: 'string',
+      format: 'uri',
+      description:
+        'Present only when a `claim` was checked against the host. An unlisted, noindexed page showing what the scan found. Not an Atlas listing: that follows a maintainer review.',
+    },
   },
 }
+
+/**
+ * The failures that only the submit endpoint can return, kept next to the
+ * request schema they belong to. `claim-unreachable` and `claim-mismatch` are
+ * 422 rather than 400 because the request was well formed — the host simply
+ * does not carry the line yet — and nothing is stored either way, so the
+ * caller can fix the file and post the same body again.
+ */
+export const submitErrorCodes = {
+  claimUnreachable: 'claim-unreachable',
+  claimMismatch: 'claim-mismatch',
+  quarantined: 'quarantined',
+} as const
+
+export const submitClaimFailedDescription =
+  'The claim could not be checked: `claim-unreachable` (webmcp.txt did not answer 200, was too large, or redirected off-site) or `claim-mismatch` (the file is there, the line is not). Nothing was stored.'
+
+export const submitQuarantinedDescription =
+  'Code `quarantined`: a maintainer has taken this host off the pipeline. Submissions for it are refused with or without a claim.'
