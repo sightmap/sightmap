@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { CityLot } from '../../src/types/city'
+import { archetypeFor } from './blueprint'
 import {
   activeMilestones,
-  archetypeForCategory,
   assignLots,
   centralityAt,
   CityListingInput,
@@ -242,7 +242,7 @@ describe('assignLots', () => {
       const lot = plan.lots[a.lot]
       expect(reserved.has(a.lot), `${a.slug} took a reserved lot`).toBe(false)
       const listing = seedListings.find((l) => l.slug === a.slug)!
-      expect(lot.district).toBe(archetypeForCategory(listing.category))
+      expect(lot.district).toBe(archetypeFor(listing.category))
     }
     // (added, slug) order, which is the order the plan is grown in.
     expect(assignments.map((a) => a.slug)).toEqual([...seedListings].map((l) => l.slug).sort())
@@ -365,7 +365,7 @@ describe('windowMask', () => {
   })
 })
 
-describe('archetypeForCategory', () => {
+describe('archetypeFor', () => {
   it('maps the categories the directory uses and falls back to office', () => {
     const cases: [string, string][] = [
       ['commerce', 'storefront'],
@@ -379,7 +379,16 @@ describe('archetypeForCategory', () => {
       ['other', 'office'],
       ['made-up', 'office'],
     ]
-    for (const [category, archetype] of cases) expect(archetypeForCategory(category)).toBe(archetype)
+    for (const [category, archetype] of cases) expect(archetypeFor(category)).toBe(archetype)
+  })
+
+  it('can reach every district the plan lays out', () => {
+    // A district no category maps to is ground no listing can ever be given,
+    // so the table and the eight seeds have to stay in step.
+    const reachable = new Set(
+      ['commerce', 'finance', 'devtools', 'media', 'travel', 'health', 'data', 'other'].map(archetypeFor)
+    )
+    expect(reachable).toEqual(new Set(plan.districts.map((d) => d.archetype)))
   })
 })
 

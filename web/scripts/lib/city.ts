@@ -30,6 +30,7 @@ import type {
   CityRoad,
   CityTier,
 } from '../../src/types/city'
+import { archetypeFor } from './blueprint'
 
 /** The plan never changes unless this string does. */
 export const CITY_SEED = 'sightmap-atlas-city'
@@ -436,48 +437,6 @@ function districtAt(x: number, z: number): Archetype {
     }
   }
   return best.archetype
-}
-
-/**
- * Archetype from a listing's category. A local copy of the blueprint's table
- * on purpose: the city must not import the blueprint builder, which reads a
- * whole listing. The integrator should fold the two into one exported table.
- */
-const ARCHETYPE_BY_CATEGORY: Record<string, Archetype> = {
-  commerce: 'storefront',
-  shopping: 'storefront',
-  marketplace: 'storefront',
-  retail: 'storefront',
-  finance: 'bank',
-  fintech: 'bank',
-  crypto: 'bank',
-  payments: 'bank',
-  devtools: 'workshop',
-  developer: 'workshop',
-  infrastructure: 'workshop',
-  api: 'workshop',
-  tooling: 'workshop',
-  media: 'theatre',
-  entertainment: 'theatre',
-  video: 'theatre',
-  music: 'theatre',
-  news: 'theatre',
-  travel: 'terminal',
-  logistics: 'terminal',
-  transport: 'terminal',
-  maps: 'terminal',
-  health: 'clinic',
-  medical: 'clinic',
-  wellness: 'clinic',
-  data: 'library',
-  reference: 'library',
-  productivity: 'library',
-  education: 'library',
-  research: 'library',
-}
-
-export function archetypeForCategory(category: string): Archetype {
-  return ARCHETYPE_BY_CATEGORY[category] ?? 'office'
 }
 
 // -------------------------------------------------------------- centrality
@@ -995,7 +954,7 @@ export function assignLots(plan: CityPlan, listings: CityListingInput[]): CityAs
 
   for (const listing of ordered) {
     if (placed.has(listing.slug)) continue
-    const want = archetypeForCategory(listing.category)
+    const want = archetypeFor(listing.category)
     const start = fnv1a(listing.slug) % Math.max(plan.lots.length, 1)
     const lot = probe(plan, taken, start, want) ?? probe(plan, taken, start, null)
     if (lot === undefined) continue
