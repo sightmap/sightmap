@@ -284,7 +284,7 @@ Each `?` line is unmatched among the links on the current page. Add a view or ad
     Run `sightmap validate` after changing corpus YAML. It works offline and exits 1 on load or validation errors, so it can run as a required CI check.
   </Step>
   <Step title="Lint for style">
-    Run `sightmap lint --warn-only` and read the warnings as a review checklist. Add `--all-snapshots` once you have captures, so match counts separate real problems from false positives.
+    Run `sightmap lint --warn-only` and read the warnings as a review checklist. Once you have captures, lint auto-reconciles against them, so match counts separate real problems from false positives.
   </Step>
   <Step title="Search before you add">
     Before naming a component, search for its proposed name and selector. Reuse or promote an existing definition when it already represents the same UI.
