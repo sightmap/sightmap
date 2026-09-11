@@ -3889,6 +3889,87 @@ footer {
   color: var(--accent);
 }
 
+/* ---- LISTING BUILDING ---- */
+.atlas-building {
+  margin-bottom: 3rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.atlas-building__stats { margin-bottom: 1rem; }
+
+/* The stage carries the blueprint-blue of the /building page, so the static
+   drawing and the scene that replaces it sit on the same ground. */
+.atlas-building__stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1c4a94 0%, #12336c 100%);
+  /* The scene is drag-to-rotate; a vertical swipe still scrolls the page. */
+  touch-action: pan-y;
+}
+
+.atlas-building__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 1.5rem;
+  transition: opacity 0.9s ease 0.2s;
+}
+
+.atlas-building__stage[data-ready='true'] .atlas-building__poster { opacity: 0; }
+
+.atlas-building__controls {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.atlas-building__tour {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(9, 26, 61, 0.72);
+  color: #f2ece3;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.atlas-building__tour:hover {
+  background: rgba(9, 26, 61, 0.9);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.atlas-building__note {
+  margin-top: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+/* The sign over a closed building's door, anchored in the scene. */
+.bld-sign {
+  padding: 0.1rem 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: #f6f2ea;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-building__poster { transition: none; }
+}
+
 /* ---- LISTING META RAIL EXTRAS ---- */
 .atlas-listing__actions a {
   color: var(--accent);
