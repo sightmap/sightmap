@@ -3,7 +3,6 @@ import { Instance, Instances, Line, RoundedBox } from '@react-three/drei'
 import { useMemo, useRef, type ComponentRef } from 'react'
 import * as THREE from 'three'
 import {
-  FLOORS,
   FLOOR_D,
   FLOOR_H,
   FLOOR_W,
@@ -14,12 +13,14 @@ import {
   SLAB_T,
   WALL_T,
   floorY,
+  type BuildingModel,
   type Kind,
   type Room,
 } from './model'
 import { furnish, type Item, type ItemType } from './furnish'
 import { sheetLinePoints } from './geometry'
 import { smoothstep } from './chapters'
+import { useBuildingModel } from './context'
 import { useShared } from './state'
 
 // Each floor starts life as a blueprint sheet lying on the table. As `rise`
@@ -30,12 +31,11 @@ import { useShared } from './state'
 type LineRef = ComponentRef<typeof Line>
 
 const WALL_H = FLOOR_H - SLAB_T
-const N = FLOORS.length
 const STEEL = '#26272c'
 
-/** Where sheet i lies when fanned across the table. */
-function fan(i: number): { x: number; z: number; r: number } {
-  const k = i - (N - 1) / 2
+/** Where sheet i lies when fanned across a table of n sheets. */
+function fan(i: number, n: number): { x: number; z: number; r: number } {
+  const k = i - (n - 1) / 2
   return { x: k * 1.05 - 0.3, z: -k * 0.85 + 0.3, r: k * 0.09 }
 }
 
@@ -288,9 +288,9 @@ function CurtainWall({ mats, side }: { mats: Mats; side: 'x' | 'z' }) {
 
 // ---------------------------------------------------------------------------
 
-function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: number }) {
+function FloorUnit({ model, index: i, mats, t0 }: { model: BuildingModel; index: number; mats: Mats; t0: number }) {
   const s = useShared()
-  const floor = FLOORS[i]
+  const floor = model.floors[i]
   const g = useRef<THREE.Group>(null)
   const sheet = useRef<THREE.Mesh>(null)
   const sheetMat = useRef<THREE.MeshStandardMaterial>(null)
@@ -298,7 +298,7 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
   const slab = useRef<THREE.Group>(null)
   const rooms = useRef<THREE.Group>(null)
   const walls = useRef<THREE.Group>(null)
-  const pts = useMemo(() => sheetLinePoints(i), [i])
+  const pts = useMemo(() => sheetLinePoints(model, i), [model, i])
   const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r)), [floor])
   // LineSegments2 accumulates dash distance across every segment, so one
   // growing dash draws the sheet in sequence: border, footprint, then rooms.
@@ -311,7 +311,7 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
     }
     return l
   }, [pts])
-  const pose = fan(i)
+  const pose = fan(i, model.floors.length)
 
   useFrame(() => {
     const c = s.cur
@@ -406,7 +406,7 @@ function FloorUnit({ index: i, mats, t0 }: { index: number; mats: Mats; t0: numb
 // ---------------------------------------------------------------------------
 // Roof: garden beds, deck, lounge, solar array, and the structural frame.
 
-function Roof({ mats }: { mats: Mats }) {
+function Roof({ mats, n }: { mats: Mats; n: number }) {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
   const beds = useMemo(
@@ -442,9 +442,9 @@ function Roof({ mats }: { mats: Mats }) {
   }, [])
   useFrame(() => {
     if (!g.current) return
-    const rise = stagger(s.cur.rise, N) * s.cur.walls
+    const rise = stagger(s.cur.rise, n) * s.cur.walls
     g.current.visible = rise > 0.01
-    g.current.position.y = THREE.MathUtils.lerp(floorY(N) - 0.6, floorY(N), rise)
+    g.current.position.y = THREE.MathUtils.lerp(floorY(n) - 0.6, floorY(n), rise)
     g.current.scale.setScalar(Math.max(rise, 0.001))
   })
   const top = SLAB_T
@@ -521,10 +521,10 @@ function Roof({ mats }: { mats: Mats }) {
   )
 }
 
-function Frame({ mats }: { mats: Mats }) {
+function Frame({ mats, n }: { mats: Mats; n: number }) {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
-  const H = floorY(N) + SLAB_T
+  const H = floorY(n) + SLAB_T
   useFrame(() => {
     if (!g.current) return
     const rise = smoothstep(THREE.MathUtils.clamp(s.cur.rise * 1.6 - 0.2, 0, 1)) * s.cur.walls
@@ -554,15 +554,16 @@ function Frame({ mats }: { mats: Mats }) {
 }
 
 export default function Tower() {
+  const model = useBuildingModel()
   const mats = useMaterials()
   const t0 = useMemo(() => performance.now() + 400, [])
   return (
     <group>
-      {FLOORS.map((_, i) => (
-        <FloorUnit key={i} index={i} mats={mats} t0={t0} />
+      {model.floors.map((_, i) => (
+        <FloorUnit key={i} model={model} index={i} mats={mats} t0={t0} />
       ))}
-      <Roof mats={mats} />
-      <Frame mats={mats} />
+      <Roof mats={mats} n={model.floors.length} />
+      <Frame mats={mats} n={model.floors.length} />
     </group>
   )
 }

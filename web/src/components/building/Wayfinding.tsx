@@ -1,8 +1,9 @@
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
-import { useRef } from 'react'
-import { FLOORS, FLOOR_D, FLOOR_W, SLAB_T, floorY, roomTop } from './model'
+import { useMemo, useRef } from 'react'
+import { FLOOR_D, FLOOR_W, SLAB_T, floorY, roomTop, type BuildingModel } from './model'
 import { smoothstep } from './chapters'
+import { useBuildingModel } from './context'
 import { useShared } from './state'
 
 // The signage: a floor directory down the right-hand edge, tags over the
@@ -15,45 +16,50 @@ interface Anchor {
   node: React.ReactNode
 }
 
-const anchors: Anchor[] = []
-FLOORS.forEach((f, i) => {
-  anchors.push({
-    kind: 'floor',
-    floor: i,
-    pos: [FLOOR_W / 2 + 0.15, floorY(i) + 0.95, -FLOOR_D / 2 + 0.3],
-    node: (
-      <>
-        <b>{String(i).padStart(2, '0')}</b> {f.name} <span>{f.route}</span>
-      </>
-    ),
+function anchorsFor(model: BuildingModel): Anchor[] {
+  const anchors: Anchor[] = []
+  model.floors.forEach((f, i) => {
+    anchors.push({
+      kind: 'floor',
+      floor: i,
+      pos: [FLOOR_W / 2 + 0.15, floorY(i) + 0.95, -FLOOR_D / 2 + 0.3],
+      node: (
+        <>
+          <b>{String(i).padStart(2, '0')}</b> {f.name} <span>{f.route}</span>
+        </>
+      ),
+    })
+    for (const r of f.rooms) {
+      if (r.tag) {
+        anchors.push({
+          kind: 'tag',
+          floor: i,
+          pos: [r.x, floorY(i) + SLAB_T + roomTop(r) + 0.15, r.z],
+          node: r.name,
+        })
+      }
+      if (r.memory) {
+        anchors.push({
+          kind: 'memory',
+          floor: i,
+          pos: [r.x - r.w / 2 - 0.4, floorY(i) + SLAB_T + roomTop(r) + 0.55, r.z + 1.0],
+          node: (
+            <>
+              <em>memory</em>
+              {r.memory}
+            </>
+          ),
+        })
+      }
+    }
   })
-  for (const r of f.rooms) {
-    if (r.tag) {
-      anchors.push({
-        kind: 'tag',
-        floor: i,
-        pos: [r.x, floorY(i) + SLAB_T + roomTop(r) + 0.15, r.z],
-        node: r.name,
-      })
-    }
-    if (r.memory) {
-      anchors.push({
-        kind: 'memory',
-        floor: i,
-        pos: [r.x - r.w / 2 - 0.4, floorY(i) + SLAB_T + roomTop(r) + 0.55, r.z + 1.0],
-        node: (
-          <>
-            <em>memory</em>
-            {r.memory}
-          </>
-        ),
-      })
-    }
-  }
-})
+  return anchors
+}
 
 export default function Wayfinding() {
   const s = useShared()
+  const model = useBuildingModel()
+  const anchors = useMemo(() => anchorsFor(model), [model])
   const els = useRef<(HTMLDivElement | null)[]>([])
   useFrame(() => {
     const c = s.cur
