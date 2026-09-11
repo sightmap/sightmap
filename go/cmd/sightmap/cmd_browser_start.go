@@ -161,6 +161,22 @@ func runBrowserStart(args []string) error {
 		"--no-first-run",
 		"--no-default-browser-check",
 		"--disable-blink-features=AutomationControlled",
+		// Keep a headful tab LIVE even when its window is occluded/backgrounded.
+		// macOS/Windows native-occlusion detection otherwise marks an occluded
+		// window's tab visibilityState "hidden", where Chrome starves
+		// requestAnimationFrame (measured 0 fps) and every frame-dependent
+		// interaction silently degrades — scrollIntoView can't paint,
+		// elementFromPoint reads a stale layout, and a custom widget's own
+		// rAF-driven open/commit animation never advances (JB's Angular selects
+		// "clicked" but never committed). Disabling occlusion calculation plus the
+		// backgrounding throttles keeps it "visible" with rAF running (measured
+		// ~61 fps under the SAME occlusion in an A/B test), so a CLI-driven headful
+		// session is reliable WITHOUT stealing OS focus. Standard automation flags;
+		// a no-op for headless, which is already visible.
+		"--disable-features=CalculateNativeWinOcclusion",
+		"--disable-backgrounding-occluded-windows",
+		"--disable-renderer-backgrounding",
+		"--disable-background-timer-throttling",
 	}
 	// Headless auto-detection: on Linux with no display, a non-headless Chrome
 	// dies with "Missing X server or $DISPLAY". Default to headless so a headless

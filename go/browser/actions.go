@@ -136,6 +136,22 @@ func AwaitNavigation(ctx context.Context, conn *CDPConn, maxWait time.Duration) 
 
 // GetURL returns the current page URL.
 // Uses Target.getTargetInfo — the result has a targetInfo.url field.
+// BringToFront foregrounds the tab (CDP Page.bringToFront), making it the active,
+// VISIBLE tab in its window. This matters for more than looks: a backgrounded tab
+// is throttled to visibilityState "hidden", where Chrome starves
+// requestAnimationFrame (observed at 0 frames/s on a detached jetblue session).
+// Any interaction that needs frames then degrades or no-ops -- scrollIntoView
+// can't paint, elementFromPoint reads a stale layout, and a widget's own
+// rAF-driven open/commit animation never advances (the custom <select> options
+// that "click" but don't commit). Foregrounding the tab restores a live frame
+// clock, so it is the general fix for that whole class, not a per-widget hack.
+func BringToFront(ctx context.Context, conn *CDPConn) error {
+	if _, err := conn.call(ctx, "Page.bringToFront", map[string]interface{}{}); err != nil {
+		return fmt.Errorf("BringToFront: %w", err)
+	}
+	return nil
+}
+
 func GetURL(ctx context.Context, conn *CDPConn) (string, error) {
 	result, err := conn.call(ctx, "Target.getTargetInfo", map[string]interface{}{})
 	if err != nil {

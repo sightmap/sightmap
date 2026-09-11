@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -30,6 +31,8 @@ func runBrowser(args []string) error {
 		return runStatus(args[1:])
 	case "navigate":
 		return runNavigate(args[1:])
+	case "front", "activate":
+		return runFront(args[1:])
 	case "eval":
 		return runEval(args[1:])
 	case "inject", "add-script":
@@ -78,7 +81,8 @@ Session:
   stop
   status
   navigate <url>
-  eval <script>
+  front                                         foreground the tab (Page.bringToFront) so it's visible & rAF runs (fixes hidden-tab throttling)
+  eval [--timeout-ms N] <script>                run a script; awaits a returned Promise (default 30 000 ms bound)
   inject [--file PATH | <script>] [--persist]   run a script now; --persist re-injects it on every new document/tab (whole session)
   inject --list | --remove ID                   list or remove persisted scripts
 
@@ -417,6 +421,25 @@ func resolveTab(args []string) (tabID string, rest []string) {
 	return "", args
 }
 
+// resolveTimeoutMs extracts the --timeout-ms flag (in milliseconds) from args,
+// returning the duration and the remaining args; absent or unparseable falls
+// back to def. It mirrors the other resolve* helpers so `browser eval` can take
+// the flag WITHOUT a FlagSet, whose parser would choke on a script positional
+// that itself contains flag-like tokens. Raising it is the right lever when an
+// awaited action (e.g. an execActions list with waitFor steps) runs past the 30s
+// default — preferable to decoupling into fire-and-forget + heap-polling, which
+// is only needed for genuinely open-ended or progress-observed work.
+func resolveTimeoutMs(args []string, def time.Duration) (timeout time.Duration, rest []string) {
+	for i, a := range args {
+		if a == "--timeout-ms" && i+1 < len(args) {
+			if ms, err := strconv.Atoi(args[i+1]); err == nil && ms > 0 {
+				return time.Duration(ms) * time.Millisecond, append(args[:i:i], args[i+2:]...)
+			}
+		}
+	}
+	return def, args
+}
+
 func dial(addr string) (*browser.CDPConn, error) {
 	ctx := context.Background()
 	conn, err := browser.DialCDP(ctx, addr)
@@ -470,12 +493,38 @@ func runNavigate(args []string) error {
 // settles fails cleanly instead of hanging the CLI.
 const evalTimeout = 30 * time.Second
 
+// runFront foregrounds the target tab. A detached/backgrounded tab is throttled
+// to visibilityState "hidden", where Chrome starves requestAnimationFrame; any
+// frame-dependent interaction (scrollIntoView, coordinate hit-testing, a
+// widget's own open/commit animation) then degrades. Bringing it to front
+// restores a live frame clock — the general fix for that class of flake.
+func runFront(args []string) error {
+	sightmapDir, args := resolveSightmapDir(args)
+	addr, args := resolveAddr(args, sightmapDir)
+	tabID, _ := resolveTab(args)
+
+	conn, err := browser.Connect(addr, tabID)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := browser.BringToFront(ctx, conn); err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, "brought tab to front")
+	return nil
+}
+
 func runEval(args []string) error {
 	sightmapDir, args := resolveSightmapDir(args)
 	addr, args := resolveAddr(args, sightmapDir)
 	tabID, args := resolveTab(args)
+	timeout, args := resolveTimeoutMs(args, evalTimeout)
 	if len(args) == 0 {
-		return fmt.Errorf("usage: browser eval <script>")
+		return fmt.Errorf("usage: browser eval [--timeout-ms N] <script>")
 	}
 	script := args[0]
 
@@ -486,8 +535,9 @@ func runEval(args []string) error {
 	defer conn.Close()
 
 	// EvalJSON awaits a returned Promise; bound it so a never-settling promise
-	// can't hang the CLI indefinitely.
-	ctx, cancel := context.WithTimeout(context.Background(), evalTimeout)
+	// can't hang the CLI indefinitely. Default 30s; --timeout-ms raises it for a
+	// long awaited action (an execActions list whose waitFor steps run past 30s).
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	result, err := browser.EvalJSON(ctx, conn, script)
