@@ -164,7 +164,11 @@ func mcpCallScript(name, argsJSON string) string {
   // CallToolResult back as a JSON string; a JS polyfill takes/returns objects. A
   // built-in method reads as "[native code]", so shape the payload to the surface
   // (native rejects a bare object with "Failed to parse input arguments").
-  const nativeSurface = /\[native code\]/.test(Function.prototype.toString.call(mc.executeTool));
+  // Sniff BOTH methods: on a framework-patched page (e.g. Angular's Zone.js) one
+  // method can be wrapped in a JS shim that hides "[native code]" while the other
+  // stays native, so treating either as native avoids mis-shaping the payload.
+  const isNative = f => /\[native code\]/.test(Function.prototype.toString.call(f));
+  const nativeSurface = isNative(mc.executeTool) || isNative(mc.getTools);
   try {
     let result = await mc.executeTool(tool, nativeSurface ? JSON.stringify(args) : args);
     // Normalize the native JSON-string result to an object so the CLI sees one shape.

@@ -530,7 +530,7 @@ func runScreenshot(args []string) error {
 			Clip:             clip,
 		})
 		if err != nil {
-			return fmt.Errorf("screenshot: %w", err)
+			return crashAnnotated(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag, fmt.Errorf("screenshot: %w", err))
 		}
 		// Silently fix up the extension so callers that use the default --out
 		// don't end up with a JPEG file named .png.
@@ -567,7 +567,7 @@ func runScreenshot(args []string) error {
 					Clip:             clip,
 				})
 				if err != nil {
-					return fmt.Errorf("screenshot (JPEG fallback): %w", err)
+					return crashAnnotated(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag, fmt.Errorf("screenshot (JPEG fallback): %w", err))
 				}
 				if strings.HasSuffix(outPath, ".png") {
 					outPath = outPath[:len(outPath)-4] + ".jpg"
