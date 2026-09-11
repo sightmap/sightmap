@@ -144,14 +144,14 @@ A component may declare `properties: Property[]` — named values surfaced along
 
 | Form | Resolves to |
 |---|---|
-| `text` | the node's accessible text (implementation-defined accessible name) |
+| `text` | the node's accessible text (implementation-defined accessible name), or its rendered text when it has no accessible name |
 | `attr=NAME` | the value of attribute `NAME` carried on the node's observed attribute set; omitted if the node does not carry it |
 | `PATH.prop` | the value extracted for property `prop` of the descendant component addressed by `PATH` |
 | `exists:PATH` | `"true"` if `PATH` resolves to at least one matched component; omitted otherwise (boolean state flag) |
 
 `PATH` is a dotted sequence of component names naming a descendant, each segment resolved first-match (in document order) within the previous segment's matched subtree (`Price`, `Row.Price`). In a `PATH.prop` value reference the final segment is a property name; in `exists:PATH` the whole path names components. References descend only — a property may address a component nested beneath the one declaring it, never a parent, sibling, or cousin — so resolution is a bottom-up pass over a DAG. To surface a value from a sub-element, promote that sub-element to a declared child component and reference it.
 
-The observed attribute set read by `attr=NAME` is implementation-defined: which attributes a node carries depends on the consumer (a web SDK may carry a fixed allowlist plus `aria-*`/`data-*`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
+The observed attribute set read by `attr=NAME` is implementation-defined: which attributes a node carries depends on the consumer (the reference web SDK carries every attribute the live DOM carries, minus injected sightmap ids and framework-internal `_`-scoping attributes like Angular's `_nghost`/`_ngcontent`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
 
 **Value omission is silent** — a property whose `text` is empty, whose attribute is not carried, or whose `PATH` matches nothing is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
 
