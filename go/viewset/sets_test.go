@@ -256,7 +256,7 @@ func TestGate(t *testing.T) {
 	// ── First baseline: empty snapshots dir → always writes ──────────────────
 	emptyDir := filepath.Join(t.TempDir(), ".sightmap")
 	cand := Slots{Matched: map[string]bool{"Header": true}}
-	res, write := Gate(corpus, emptyDir, "home", cand, false)
+	res, write := Gate(corpus, emptyDir, "home", cand, true, false)
 	if !write {
 		t.Errorf("first capture into an empty set was refused: %+v", res)
 	}
@@ -266,14 +266,14 @@ func TestGate(t *testing.T) {
 
 	// Even a fingerprint-empty first capture must write — len(others)==0 wins
 	// over IsNovel(); the blank-page guard lives in the capture command, not here.
-	if _, write := Gate(corpus, emptyDir, "home", empty, false); !write {
+	if _, write := Gate(corpus, emptyDir, "home", empty, true, false); !write {
 		t.Error("an empty first capture was refused; the first baseline must always write")
 	}
 
 	// ── Redundant second: one capture already on disk → gated ────────────────
 	secondDir := filepath.Join(t.TempDir(), ".sightmap")
 	writeFakeCapture(t, secondDir, "home", "20260101T000000Z")
-	res2, write2 := Gate(corpus, secondDir, "home", empty, false)
+	res2, write2 := Gate(corpus, secondDir, "home", empty, true, false)
 	if write2 {
 		t.Errorf("redundant capture vs an existing set was written: %+v", res2)
 	}
@@ -282,7 +282,7 @@ func TestGate(t *testing.T) {
 	}
 
 	// --force bypasses the gate even when nothing is novel.
-	if _, write := Gate(corpus, secondDir, "home", empty, true); !write {
+	if _, write := Gate(corpus, secondDir, "home", empty, true, true); !write {
 		t.Error("--force did not bypass the novelty gate")
 	}
 }

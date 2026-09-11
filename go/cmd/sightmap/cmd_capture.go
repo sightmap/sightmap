@@ -100,7 +100,7 @@ func runCapture(args []string) error {
 	}
 	if !*forceFlag {
 		cand := viewset.SlotsFromMatch(res.Matches, cov.Orphans, cov.ParentMap)
-		if gres, write := viewset.Gate(corpus, *lf.sightmapDir, viewBasename, cand, false); !write {
+		if gres, write := viewset.Gate(corpus, *lf.sightmapDir, viewBasename, cand, visible, false); !write {
 			// The gate always writes the first capture of a view (len(others)==0),
 			// so reaching here means a baseline already exists and this one is
 			// redundant — say that plainly rather than "nothing new vs N", which
@@ -196,7 +196,7 @@ func runCaptureAll(
 		// Novelty gate: don't append a redundant capture to the view set.
 		if !force {
 			cand := viewset.SlotsFromMatch(res.Matches, cov.Orphans, cov.ParentMap)
-			if gres, write := viewset.Gate(corpus, sightmapDir, v.ViewDir, cand, false); !write {
+			if gres, write := viewset.Gate(corpus, sightmapDir, v.ViewDir, cand, visible, false); !write {
 				results = append(results, result{name: label, skipped: true, skippedVs: gres.ComparedTo})
 				continue
 			}
