@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -452,6 +454,47 @@ func dial(addr string) (*browser.CDPConn, error) {
 	return conn, nil
 }
 
+// crashUnresponsiveHint is appended when a tab is diagnosed unresponsive.
+const crashUnresponsiveHint = "\n  the tab is UNRESPONSIVE — a trivial follow-up probe also timed out, so the " +
+	"renderer has likely CRASHED (e.g. RESULT_CODE_KILLED_BAD_MESSAGE from a bad Mojo message) " +
+	"or its main thread is wedged. Browser-level CDP still answers; the page does not. " +
+	"Recover: reload it ('browser navigate <url>') or restart ('browser stop' then 'browser start')."
+
+// crashAnnotated turns an opaque CDP deadline into an actionable renderer-crash /
+// wedge diagnosis. A killed renderer leaves browser-level CDP answering while
+// Runtime.evaluate / Page.captureScreenshot on that tab hang to their deadline,
+// so the bare error is an indistinguishable "context deadline exceeded". On a
+// deadline we RE-PROBE the same tab with a trivial, short eval: if that also
+// times out (or a fresh connection can't reach a live content tab at all), the
+// tab is unresponsive rather than merely slow, and we say so. A probe that
+// answers means the original op was genuinely slow, so the error passes through
+// unchanged — as do non-deadline errors. This measures the symptom directly and
+// needs no CDP crash-event plumbing (Target.targetCrashed is unreliable: it
+// requires auto-attach and does not fire for every renderer-kill path).
+func crashAnnotated(addr, tabID string, err error) error {
+	if err == nil || !isDeadlineErr(err) {
+		return err
+	}
+	conn, derr := browser.Connect(addr, tabID)
+	if derr != nil {
+		// A fresh connection finds no live content tab — gone or crashed hard.
+		return fmt.Errorf("%w%s", err, crashUnresponsiveHint)
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, perr := browser.EvalJSON(ctx, conn, "1"); perr != nil && isDeadlineErr(perr) {
+		return fmt.Errorf("%w%s", err, crashUnresponsiveHint)
+	}
+	return err
+}
+
+// isDeadlineErr reports whether err is (or wraps) a context deadline — the shape
+// a CDP call takes when the renderer never answers.
+func isDeadlineErr(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "context deadline exceeded")
+}
+
 func runNavigate(args []string) error {
 	sightmapDir, args := resolveSightmapDir(args)
 	addr, args := resolveAddr(args, sightmapDir)
@@ -542,7 +585,7 @@ func runEval(args []string) error {
 
 	result, err := browser.EvalJSON(ctx, conn, script)
 	if err != nil {
-		return err
+		return crashAnnotated(addr, tabID, err)
 	}
 
 	// Pretty-print if valid JSON object/array, otherwise raw.
