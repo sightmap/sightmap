@@ -112,6 +112,7 @@ emits:
 | `public/atlas/sites/<slug>/tools.json` | that listing's tools with full input schemas |
 | `public/atlas/sites/<slug>/blueprint.json` | the building derived from the scan: floors for pages, rooms for tools, walks for journeys |
 | `public/atlas/scans/<slug>.json` | the latest scan report, verbatim |
+| `public/atlas/city.json` | the city plan with every listing placed on its lot and the unclaimed lots filled or fenced |
 | `public/atlas/scans/<slug>/<date>.json` | every scan on file |
 | `public/atlas/<slug>.md` | markdown twin of the listing page |
 | `public/atlas/<slug>/badge.svg` | "Sightmap · N tools detected · <date>" badge |

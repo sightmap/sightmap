@@ -34,6 +34,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { atlasCategories, loadAtlas, resolveCorpus, resolveScreenshots } from './lib/atlas'
 import { blueprintSummary, deriveBlueprint } from './lib/blueprint'
+import { assignLots, fillerFor, planCity } from './lib/city'
 import { directoryCategories, loadDirectory, scanDateOf, scanFilesFor } from './lib/directory'
 import { listingMarkdown } from './lib/directory-markdown'
 import {
@@ -198,11 +199,23 @@ async function main() {
   // render checks and pages without a fetch — minus the `$ ` CLI transcript,
   // which nothing on the page renders and which is already published in full
   // in the scan JSON above.
+  // The city: one plan, the same on every build, with the listings placed on
+  // it and the unclaimed lots filled or fenced. Written after the listings so
+  // a lot a listing's YAML records is what the page shows.
+  const plan = planCity()
+  const assignments = assignLots(plan, directory.listings)
+  const fills = fillerFor(plan, assignments)
+  writeJson('city.json', { ...plan, assignments, fills })
+  const placed = new Map(assignments.map((a) => [a.slug, a]))
+  console.log(`  city: ${assignments.length} placed on ${plan.lots.length} lots, ${fills.length} filled or fenced`)
+
   const directoryListings: DirectoryListingView[] = directory.listings.map((listing) => ({
     ...listing,
     report: reportWithoutTranscript(listing.report),
     starter: sightkickStarter(listing.report),
     blueprint: blueprints.get(listing.slug) as Blueprint,
+    lot: placed.get(listing.slug)?.lot ?? -1,
+    peak: placed.get(listing.slug)?.peak ?? false,
   }))
 
   fs.writeFileSync(
