@@ -31,6 +31,8 @@ func runBrowser(args []string) error {
 		return runStatus(args[1:])
 	case "navigate":
 		return runNavigate(args[1:])
+	case "front", "activate":
+		return runFront(args[1:])
 	case "eval":
 		return runEval(args[1:])
 	case "inject", "add-script":
@@ -79,6 +81,7 @@ Session:
   stop
   status
   navigate <url>
+  front                                         foreground the tab (Page.bringToFront) so it's visible & rAF runs (fixes hidden-tab throttling)
   eval [--timeout-ms N] <script>                run a script; awaits a returned Promise (default 30 000 ms bound)
   inject [--file PATH | <script>] [--persist]   run a script now; --persist re-injects it on every new document/tab (whole session)
   inject --list | --remove ID                   list or remove persisted scripts
@@ -489,6 +492,31 @@ func runNavigate(args []string) error {
 // evalTimeout bounds a single `browser eval`, so an awaited promise that never
 // settles fails cleanly instead of hanging the CLI.
 const evalTimeout = 30 * time.Second
+
+// runFront foregrounds the target tab. A detached/backgrounded tab is throttled
+// to visibilityState "hidden", where Chrome starves requestAnimationFrame; any
+// frame-dependent interaction (scrollIntoView, coordinate hit-testing, a
+// widget's own open/commit animation) then degrades. Bringing it to front
+// restores a live frame clock — the general fix for that class of flake.
+func runFront(args []string) error {
+	sightmapDir, args := resolveSightmapDir(args)
+	addr, args := resolveAddr(args, sightmapDir)
+	tabID, _ := resolveTab(args)
+
+	conn, err := browser.Connect(addr, tabID)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := browser.BringToFront(ctx, conn); err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, "brought tab to front")
+	return nil
+}
 
 func runEval(args []string) error {
 	sightmapDir, args := resolveSightmapDir(args)
