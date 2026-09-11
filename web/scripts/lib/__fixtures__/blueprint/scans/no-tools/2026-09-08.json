@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "url": "https://quiet.example.org/",
+  "finalUrl": "https://quiet.example.org/",
+  "host": "quiet.example.org",
+  "scannedAt": "2026-09-08T10:00:00.000Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "chromium"
+  },
+  "surface": "polyfilled",
+  "status": "api-empty",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://x//",
+      "path": "/",
+      "title": "Quiet",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": []
+    },
+    {
+      "url": "https://x//about",
+      "path": "/about",
+      "title": "About",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": []
+    }
+  ],
+  "tools": [],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "0/0"
+    }
+  ],
+  "counts": {
+    "tools": 0,
+    "pages": 2,
+    "read": 0,
+    "action": 0,
+    "sensitive": 0,
+    "described": 0,
+    "withInputSchema": 0,
+    "declarative": 0
+  },
+  "hints": {
+    "forms": [],
+    "links": [],
+    "title": "quiet.example.org",
+    "description": ""
+  },
+  "notes": []
+}
