@@ -51,13 +51,24 @@ func SlotsForCapture(snapPath string, corpus *sightmap.Corpus) (Slots, bool) {
 
 // ViewSlots re-matches every capture currently in the view's set against the
 // current corpus, optionally excluding one path.
+//
+// excludePath is excluded by IDENTITY, not lexical spelling: both sides are
+// normalized to a canonical absolute, cleaned, slash form before comparing, so
+// the operator's verbatim candidate argument (absolute vs relative, or with a
+// "./" prefix) excludes the same on-disk capture that discovery (Find) emits.
+// filepath.Abs does not resolve symlinks, so two captures reached via distinct
+// symlink aliases still compare unequal; that is intentional and matches the
+// single-file identity the rest of the code assumes.
 func ViewSlots(sightmapDir, viewBasename string, corpus *sightmap.Corpus, excludePath string) []Slots {
 	all, _ := Find(sightmapDir, nil)
 	entries := GroupByView(all)[viewBasename]
-	excl := filepath.ToSlash(excludePath)
+	excl := ""
+	if excludePath != "" {
+		excl = canonicalCapturePath(excludePath)
+	}
 	var out []Slots
 	for _, e := range entries {
-		if excl != "" && filepath.ToSlash(e.Path) == excl {
+		if excl != "" && canonicalCapturePath(e.Path) == excl {
 			continue
 		}
 		if cs, ok := SlotsForCapture(e.Path, corpus); ok {
@@ -66,6 +77,21 @@ func ViewSlots(sightmapDir, viewBasename string, corpus *sightmap.Corpus, exclud
 		}
 	}
 	return out
+}
+
+// canonicalCapturePath returns a canonical absolute, cleaned, slash-separator
+// form of path for identity comparison: filepath.Abs resolves a relative path
+// against the process working directory (and both e.Path and the operator's
+// argument are relative to the same cwd), Clean collapses "./" and "..", and
+// ToSlash normalizes OS separators. Returns "" when the path cannot be made
+// absolute, in which case ViewSlots leaves it unexcluded rather than risk a
+// false-positive exclusion.
+func canonicalCapturePath(path string) string {
+	a, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	return filepath.ToSlash(filepath.Clean(a))
 }
 
 // Gate decides whether a freshly extracted capture should be written to its
