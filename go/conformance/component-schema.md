@@ -16,7 +16,7 @@ identity for native mobile elements).
 | Classes | []string | `classes` | CSS class list in document order |
 | Attrs | map[string]string | `attrs` | Attribute key→value pairs |
 | AttrOps | map[string]string | `attrOps` | Operator for each Attrs entry where not `"="`. See operators below |
-| Not | \*SelectorPart | `not` | If non-nil, the element must NOT match this sub-selector (`:not()`) |
+| Not | []ParsedSelector | `not` | The `:not()` argument list: a flat list of complex selectors; if non-empty, the element must NOT match ANY of them |
 
 All fields are `omitempty` — absent from JSON when zero/nil.
 
