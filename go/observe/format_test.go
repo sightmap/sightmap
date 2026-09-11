@@ -134,3 +134,64 @@ func TestFormat_NoCorpus(t *testing.T) {
 		t.Errorf("did not expect a [Coverage] line without a corpus, got:\n%s", out)
 	}
 }
+
+// TestFormat_MatchedInvisible_TreeAgreesWithT2Trace reproduces the user-visible
+// symptom of the matched-invisible bug: a sightmap-matched container that did
+// not paint (e.g. a display:contents or zero-size wrapper) whose interactive
+// descendants ARE visible. coverage.Score attributes those descendants to the
+// matched ancestor with no visibility check (T2 scopes → "[Navbar] (2)"), and
+// the [Guide] reports the match. But render.Filter's invisible branch lacked
+// the `&& !matched` guard its sibling transparency rules carried, so it made
+// the matched node transparent: the [Navbar] wrapper vanished from the
+// component tree and the visible links were promoted under a synthetic
+// `document` root — a self-contradiction within a single observe.Format stream.
+//
+// Under the fix the matched invisible node is kept, so the tree and the
+// T2 trace agree: a `[Navbar]` wrapper renders above the visible links and no
+// synthetic `document` root appears. This is the end-to-end counterpart to the
+// render.Filter unit tests (see go/render/render_test.go:
+// TestFilter_MatchedInvisible_KeepsWrapper).
+func TestFormat_MatchedInvisible_TreeAgreesWithT2Trace(t *testing.T) {
+	navbar := &sightmap.ComponentNode{
+		Role: "generic", Name: "", IsVisible: false, IsInteractive: false,
+		Children: []*sightmap.ComponentNode{
+			{Role: "link", Name: "Open", IsVisible: true, IsInteractive: true},
+			{Role: "link", Name: "Settings", IsVisible: true, IsInteractive: true},
+		},
+	}
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
+		navbar: {Name: "Navbar"},
+	}
+	cov := coverage.Score(navbar, matches, coverage.Options{VisibleOnly: true})
+	r := &Result{
+		Root:          navbar,
+		Matches:       matches,
+		Coverage:      cov,
+		View:          &sightmap.ViewDef{Name: "page", Route: "/"},
+		GlobalNames:   map[string]bool{},
+		CorpusApplied: true,
+	}
+	var b bytes.Buffer
+	Format(&b, r, FormatOpts{Trace: true})
+	out := b.String()
+
+	// T2 trace must still attribute both links to [Navbar] (grouping is
+	// visibility-agnostic by design — this was correct even under the bug).
+	if !strings.Contains(out, "[Navbar] (2)") {
+		t.Errorf("expected T2 trace to show '[Navbar] (2)', got:\n%s", out)
+	}
+	// The component tree must now agree: the [Navbar] wrapper renders on its own
+	// line above its visible descendants (not promoted under a synthetic root).
+	if !strings.Contains(out, "\n[Navbar]\n") {
+		t.Errorf("expected component tree to include a '[Navbar]' wrapper line, got:\n%s", out)
+	}
+	// The synthetic `document` root (Filter's ≥2-child fallback, fired when the
+	// matched node was incorrectly made transparent) must NOT appear.
+	if strings.Contains(out, "\ndocument\n") {
+		t.Errorf("expected no synthetic 'document' root in the component tree, got:\n%s", out)
+	}
+	// Both visible interactive descendants must still render under the wrapper.
+	if !strings.Contains(out, `link "Open"`) || !strings.Contains(out, `link "Settings"`) {
+		t.Errorf("expected both visible links to be preserved, got:\n%s", out)
+	}
+}

@@ -75,6 +75,60 @@ func TestFilter_InvisibleAncestor_KeepsVisibleDescendant(t *testing.T) {
 	}
 }
 
+// TestFilter_MatchedInvisible_KeepsWrapper is the matched counterpart to
+// TestFilter_InvisibleAncestor_KeepsVisibleDescendant. The invisible branch of
+// decide() is the only transparency rule that historically lacked a `&& !matched`
+// guard, so a sightmap-matched INVISIBLE container was made transparent instead
+// of kept: convert never built a Comp for it, dropping its [ComponentName]
+// wrapper and promoting its visible children anonymously (under a synthetic
+// `document` root when ≥2 survived). With the guard, a matched invisible node
+// falls through to keepNode, convert runs the role-replacement block
+// (Role = match name), and the visible descendants render beneath the wrapper —
+// keeping the tree in lockstep with coverage and the T2 trace, which attribute
+// those descendants to the same matched node. (See the end-to-end consistency
+// test in go/observe/format_test.go.)
+func TestFilter_MatchedInvisible_KeepsWrapper(t *testing.T) {
+	nav := node("nav", "generic", "", false /* visible */, false, false,
+		node("a1", "link", "Open", true, true, false),
+		node("a2", "link", "Settings", true, true, false),
+	)
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{nav: {Name: "Navbar"}}
+	comp := Filter(nav, matches)
+	if comp == nil {
+		t.Fatal("expected non-nil comp: matched-invisible node should keep its wrapper")
+	}
+	if comp.Role != "Navbar" {
+		t.Errorf("expected role='Navbar' (match name replaces role), got %q", comp.Role)
+	}
+	if comp.Match == nil {
+		t.Error("expected Match to be preserved")
+	}
+	if len(comp.Children) != 2 {
+		t.Fatalf("expected 2 visible children preserved under wrapper, got %d", len(comp.Children))
+	}
+}
+
+// TestFilter_MatchedFullyInvisible_ChildlessComp pins the behavior of a matched
+// container whose ENTIRE subtree is invisible (e.g. display:none, where probe.js
+// propagates invisibility to all descendants): there are no visible survivors to
+// promote, so the kept node renders as a CHILDLESS [Comp]. This is the same
+// behavior the codebase already has for a VISIBLE empty matched container (see
+// TestFilter_MatchProtectsFromTransparency, which uses a childless matched
+// role="none" node) — the fix removes the asymmetry rather than introducing one.
+func TestFilter_MatchedFullyInvisible_ChildlessComp(t *testing.T) {
+	nav := node("nav", "generic", "", false /* visible */, false, false,
+		node("a1", "link", "Open", false, true, false), // invisible child
+	)
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{nav: {Name: "Navbar"}}
+	comp := Filter(nav, matches)
+	if comp == nil || comp.Role != "Navbar" || comp.Match == nil {
+		t.Fatalf("expected childless [Navbar] comp, got %+v", comp)
+	}
+	if len(comp.Children) != 0 {
+		t.Errorf("expected 0 children (fully-invisible subtree), got %d", len(comp.Children))
+	}
+}
+
 func TestFilter_Drop_Script(t *testing.T) {
 	root := nodeWithTag("1", "none", "", "script", true, false, false)
 	comp := Filter(root, nil)
