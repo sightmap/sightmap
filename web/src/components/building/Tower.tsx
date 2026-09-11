@@ -22,6 +22,7 @@ import { sheetLinePoints } from './geometry'
 import { smoothstep } from './chapters'
 import { useBuildingModel } from './context'
 import { useShared } from './state'
+import Shell from './Shell'
 
 // Each floor starts life as a blueprint sheet lying on the table. As `rise`
 // climbs, the sheet lifts to its floor height, fades into a slab, and the
@@ -553,10 +554,19 @@ function Frame({ mats, n }: { mats: Mats; n: number }) {
   )
 }
 
-export default function Tower() {
+/**
+ * `dollhouse` is the cutaway the tour draws: every floor, its rooms and the
+ * two back curtain walls, open on the camera side. `closed` is the same
+ * building seen from the street, with its facade on and no interior — the
+ * form the city uses.
+ */
+export type TowerMode = 'dollhouse' | 'closed'
+
+export default function Tower({ mode = 'dollhouse' }: { mode?: TowerMode }) {
   const model = useBuildingModel()
   const mats = useMaterials()
   const t0 = useMemo(() => performance.now() + 400, [])
+  if (mode === 'closed') return <Shell />
   return (
     <group>
       {model.floors.map((_, i) => (
