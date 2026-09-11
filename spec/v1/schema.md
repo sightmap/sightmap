@@ -137,6 +137,7 @@ A component may declare `properties: Property[]` — named values surfaced along
 | Form | Resolves to |
 |---|---|
 | `text` | the node's accessible text (implementation-defined accessible name) |
+| `raw_text` | the node's own literal text: its direct text-node children, whitespace-normalized. Excludes descendant-element text and CSS `::before`/`::after` (which are not child nodes). See [SEP-0013](../seps/0013-richer-node-data.md). |
 | `attr=NAME` | the value of attribute `NAME` carried on the node's observed attribute set; omitted if the node does not carry it |
 | `PATH.prop` | the value extracted for property `prop` of the descendant component addressed by `PATH` |
 | `exists:PATH` | `"true"` if `PATH` resolves to at least one matched component; omitted otherwise (boolean state flag) |
@@ -144,6 +145,8 @@ A component may declare `properties: Property[]` — named values surfaced along
 `PATH` is a dotted sequence of component names naming a descendant, each segment resolved first-match (in document order) within the previous segment's matched subtree (`Price`, `Row.Price`). In a `PATH.prop` value reference the final segment is a property name; in `exists:PATH` the whole path names components. References descend only — a property may address a component nested beneath the one declaring it, never a parent, sibling, or cousin — so resolution is a bottom-up pass over a DAG. To surface a value from a sub-element, promote that sub-element to a declared child component and reference it.
 
 The observed attribute set read by `attr=NAME` is implementation-defined: which attributes a node carries depends on the consumer (a web SDK may carry a fixed allowlist plus `aria-*`/`data-*`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
+
+**`text` vs `raw_text`.** `text` is the node's accessible name — what a user perceives as its label, which may weld in text from `aria-label`, an associated `<label>`, or CSS pseudo-content. `raw_text` is the node's own author-written text (its direct text-node children only), computed identically on every consumer, live or offline: the deterministic escape for when the accessible name is polluted, or when the literal source text is what you want. The two are the ends of a spectrum — everything perceived, versus the literal author text. See [SEP-0013](../seps/0013-richer-node-data.md).
 
 **Value omission is silent** — a property whose `text` is empty, whose attribute is not carried, or whose `PATH` matches nothing is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
 
