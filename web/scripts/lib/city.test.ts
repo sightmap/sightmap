@@ -95,6 +95,12 @@ describe('planCity', () => {
     }
   })
 
+  it('holds enough lots for the directory to grow into', () => {
+    // The observation tower is reserved for the 250th listing, so the ground
+    // has to have more addresses than that before it is worth reserving.
+    expect(plan.lots.length).toBeGreaterThanOrEqual(300)
+  })
+
   it('leaves no two lots overlapping', () => {
     const lots = plan.lots
     expect(lots.length).toBeGreaterThan(100)

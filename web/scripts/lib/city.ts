@@ -37,19 +37,33 @@ export const CITY_SEED = 'sightmap-atlas-city'
 
 // ---------------------------------------------------------------- dimensions
 
-const BOUNDS = { w: 320, d: 240 }
+/**
+ * The plan was drawn on a 320 × 240 ground and is built larger. Lots, blocks
+ * and roads keep their drawn size — a shopfront is a shopfront, and a street
+ * is as wide as two cars — so the only thing that buys the city more addresses
+ * is more ground, and it needs them: at the drawn size it holds about 165
+ * lots, fewer than the 250 listings the observation tower is reserved for.
+ * Everything with a position scales through `s`, so the proportions the plan
+ * was drawn in survive.
+ */
+const SCALE = 1.4
+/** A drawn coordinate, on the ground as built. */
+const s = (n: number): number => Math.round(n * SCALE * 100) / 100
+
+const BOUNDS = { w: s(320), d: s(240) }
 /** Half-diagonal of the bounds: the distance at which centrality reaches 0. */
 const HALF_DIAGONAL = Math.hypot(BOUNDS.w / 2, BOUNDS.d / 2)
 
+// Road widths are traffic, not ground, so they are drawn and built alike.
 const AVENUE_W = 8
 const STREET_W = 5
 const STUB_W = 4
 const PATH_W = 4
 
 /** The avenue ring, as the half-extents of its centreline rectangle. */
-const RING = { x: 140, z: 100 }
+const RING = { x: s(140), z: s(100) }
 /** Half-side of the paved square where the two cross avenues meet. */
-const PLAZA_R = 14
+const PLAZA_R = s(14)
 
 /** A block is split until its longest side fits, and never below the minimum. */
 const MIN_BLOCK = 24
@@ -69,8 +83,8 @@ const MIN_WEDGE = 5
 const LOT_GAP = 0.1
 
 /** Cul-de-sac stubs: where they leave the ring, how far out, and the circle. */
-const STUB_LEN = 14
-const STUB_CIRCLE = 6
+const STUB_LEN = s(14)
+const STUB_CIRCLE = s(6)
 
 /** Unassigned lots above this centrality get filler massing, below it dirt. */
 const FILLER_CENTRALITY = 0.45
@@ -225,18 +239,18 @@ const RING_POINTS: Pt[] = [
  */
 const DIAGONAL_POINTS: Pt[] = [
   [-RING.x, RING.z],
-  [-60, 44],
+  [s(-60), s(44)],
   [0, 0],
 ]
 
 /** Where the six cul-de-sac stubs leave the ring, and which way they point. */
 const STUBS: { at: Pt; dir: Pt }[] = [
-  { at: [-80, -RING.z], dir: [0, -1] },
-  { at: [40, -RING.z], dir: [0, -1] },
-  { at: [-40, RING.z], dir: [0, 1] },
-  { at: [90, RING.z], dir: [0, 1] },
-  { at: [-RING.x, -40], dir: [-1, 0] },
-  { at: [RING.x, 55], dir: [1, 0] },
+  { at: [s(-80), -RING.z], dir: [0, -1] },
+  { at: [s(40), -RING.z], dir: [0, -1] },
+  { at: [s(-40), RING.z], dir: [0, 1] },
+  { at: [s(90), RING.z], dir: [0, 1] },
+  { at: [-RING.x, s(-40)], dir: [-1, 0] },
+  { at: [RING.x, s(55)], dir: [1, 0] },
 ]
 
 function baseRoads(): CityRoad[] {
@@ -416,14 +430,14 @@ function chopBand(rect: Rect, along: 'x' | 'z'): Rect[] {
  * the quiet quadrants to the clinic and the library, and the rest to offices.
  */
 const DISTRICTS: CityDistrict[] = [
-  { archetype: 'bank', name: 'Exchange', x: 12, z: -12, accent: 0 },
-  { archetype: 'storefront', name: 'Market Row', x: -56, z: 8, accent: 1 },
-  { archetype: 'theatre', name: 'The Strand', x: 10, z: 56, accent: 2 },
-  { archetype: 'workshop', name: 'Foundry', x: -78, z: 58, accent: 3 },
-  { archetype: 'terminal', name: 'Eastgate', x: 124, z: 40, accent: 4 },
-  { archetype: 'clinic', name: 'Northfield', x: -104, z: -64, accent: 5 },
-  { archetype: 'library', name: 'Scholars', x: 86, z: -70, accent: 6 },
-  { archetype: 'office', name: 'Midtown', x: 56, z: 18, accent: 7 },
+  { archetype: 'bank', name: 'Exchange', x: s(12), z: s(-12), accent: 0 },
+  { archetype: 'storefront', name: 'Market Row', x: s(-56), z: s(8), accent: 1 },
+  { archetype: 'theatre', name: 'The Strand', x: s(10), z: s(56), accent: 2 },
+  { archetype: 'workshop', name: 'Foundry', x: s(-78), z: s(58), accent: 3 },
+  { archetype: 'terminal', name: 'Eastgate', x: s(124), z: s(40), accent: 4 },
+  { archetype: 'clinic', name: 'Northfield', x: s(-104), z: s(-64), accent: 5 },
+  { archetype: 'library', name: 'Scholars', x: s(86), z: s(-70), accent: 6 },
+  { archetype: 'office', name: 'Midtown', x: s(56), z: s(18), accent: 7 },
 ]
 
 function districtAt(x: number, z: number): Archetype {
