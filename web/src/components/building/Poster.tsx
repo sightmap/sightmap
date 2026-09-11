@@ -2,7 +2,8 @@
 // prerender ships and what a visitor sees before the WebGL chunk arrives (or
 // instead of it, when WebGL is unavailable). The same model data draws it, so
 // it is a faithful line drawing of the scene rather than a placeholder.
-import { CORE, FLOORS, FLOOR_D, FLOOR_H, FLOOR_W } from './model'
+import { CORE, FLOOR_D, FLOOR_H, FLOOR_W, type BuildingModel } from './model'
+import { useBuildingModel } from './context'
 
 const COS30 = Math.cos(Math.PI / 6)
 const SIN30 = 0.5
@@ -34,18 +35,29 @@ function box(x: number, z: number, w: number, d: number, y0: number, h: number):
   return `${top}M${pt(fr)}L${pt(frT)}M${pt(r)}L${pt(rT)}M${pt(l)}L${pt(lT)}M${pt(l)}L${pt(fr)}L${pt(r)}`
 }
 
-function build(): { floors: string; rooms: string; core: string; table: string; grid: string } {
+interface Drawing {
+  floors: string
+  rooms: string
+  core: string
+  table: string
+  grid: string
+  /** Fits the shell alone, for the bare frame. */
+  viewBox: string
+}
+
+function build(model: BuildingModel): Drawing {
+  const n = model.floors.length
   let floors = ''
   let rooms = ''
-  for (let i = 0; i < FLOORS.length; i++) {
+  for (let i = 0; i < n; i++) {
     const y = i * FLOOR_H
     floors += rect(0, 0, FLOOR_W, FLOOR_D, y)
-    for (const r of FLOORS[i].rooms) {
+    for (const r of model.floors[i].rooms) {
       const blocks = r.blocks ?? [{ x: r.x, z: r.z, w: r.w, d: r.d }]
       for (const b of blocks) rooms += box(b.x, b.z, b.w, b.d, y + 0.18 + (r.base ?? 0), r.h * 1.25)
     }
   }
-  const topY = FLOORS.length * FLOOR_H
+  const topY = n * FLOOR_H
   floors += rect(0, 0, FLOOR_W, FLOOR_D, topY)
   // Front corner verticals of the shell.
   const corners: [number, number][] = [
@@ -60,35 +72,74 @@ function build(): { floors: string; rooms: string; core: string; table: string; 
   let grid = ''
   for (let gx = -8; gx <= 8; gx += 2) grid += `M${pt(iso(gx, 0, -7))}L${pt(iso(gx, 0, 7))}`
   for (let gz = -6; gz <= 6; gz += 2) grid += `M${pt(iso(-8.5, 0, gz))}L${pt(iso(8.5, 0, gz))}`
-  return { floors, rooms, core, table, grid }
+  // The shell's extreme corners bound everything drawn inside it.
+  const xs: number[] = []
+  const ys: number[] = []
+  for (const [cx, cz] of corners) {
+    for (const y of [0, topY]) {
+      const [px, py] = iso(cx, y, cz)
+      xs.push(px)
+      ys.push(py)
+    }
+  }
+  const pad = 16
+  const x0 = Math.min(...xs) - pad
+  const y0 = Math.min(...ys) - pad
+  const viewBox = `${x0.toFixed(1)} ${y0.toFixed(1)} ${(Math.max(...xs) - x0 + pad).toFixed(1)} ${(Math.max(...ys) - y0 + pad).toFixed(1)}`
+  return { floors, rooms, core, table, grid, viewBox }
 }
 
-const D = build()
+// One drawing per building, kept for the life of the model it was drawn from.
+const cache = new WeakMap<BuildingModel, Drawing>()
 
-export default function Poster({ hidden }: { hidden: boolean }) {
+export function drawingFor(model: BuildingModel): Drawing {
+  let d = cache.get(model)
+  if (!d) {
+    d = build(model)
+    cache.set(model, d)
+  }
+  return d
+}
+
+export interface PosterProps {
+  hidden: boolean
+  /** Drop the drafting table and crop to the building. */
+  bare?: boolean
+  className?: string
+}
+
+export default function Poster({ hidden, bare = false, className = 'bld-poster' }: PosterProps) {
+  const model = useBuildingModel()
+  const D = drawingFor(model)
   return (
     <svg
-      className="bld-poster"
+      className={className}
       data-component="BuildingPoster"
       data-hidden={hidden ? 'true' : 'false'}
-      viewBox="-420 -400 840 690"
+      viewBox={bare ? D.viewBox : '-420 -400 840 690'}
       preserveAspectRatio="xMidYMid meet"
       aria-hidden="true"
       focusable="false"
     >
-      <defs>
-        <linearGradient id="bld-poster-table" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#1c4a94" />
-          <stop offset="1" stopColor="#12336c" />
-        </linearGradient>
-        <clipPath id="bld-poster-clip">
-          <path d={D.table} />
-        </clipPath>
-      </defs>
-      <g transform="translate(0,60)">
-        <path d={D.table} fill="url(#bld-poster-table)" />
-        <path d={D.grid} stroke="#3e6fc4" strokeWidth="0.6" fill="none" clipPath="url(#bld-poster-clip)" />
-        <path d={D.table} stroke="#8fb0ea" strokeWidth="1.2" fill="none" />
+      {!bare && (
+        <defs>
+          <linearGradient id="bld-poster-table" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#1c4a94" />
+            <stop offset="1" stopColor="#12336c" />
+          </linearGradient>
+          <clipPath id="bld-poster-clip">
+            <path d={D.table} />
+          </clipPath>
+        </defs>
+      )}
+      <g transform={bare ? undefined : 'translate(0,60)'}>
+        {!bare && (
+          <>
+            <path d={D.table} fill="url(#bld-poster-table)" />
+            <path d={D.grid} stroke="#3e6fc4" strokeWidth="0.6" fill="none" clipPath="url(#bld-poster-clip)" />
+            <path d={D.table} stroke="#8fb0ea" strokeWidth="1.2" fill="none" />
+          </>
+        )}
         <path d={D.rooms} stroke="#ffffff" strokeOpacity="0.55" strokeWidth="0.8" fill="none" strokeLinejoin="round" />
         <path d={D.floors} stroke="#ffffff" strokeOpacity="0.9" strokeWidth="1.1" fill="none" strokeLinejoin="round" />
         <path d={D.core} stroke="#9fd1ff" strokeOpacity="0.9" strokeWidth="1" fill="none" />

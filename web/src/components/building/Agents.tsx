@@ -2,9 +2,10 @@ import { useFrame } from '@react-three/fiber'
 import { Trail } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { JOURNEYS, TRAVELLER_COLORS, type Journey } from './model'
+import { TRAVELLER_COLORS, type Journey } from './model'
 import { buildPath, pointAt, type Path } from './geometry'
 import { smoothstep } from './chapters'
+import { useBuildingModel } from './context'
 import { useShared } from './state'
 
 // The people: one walker per journey, looping through its stops, riding the
@@ -132,8 +133,9 @@ function Agent({ journey, path }: { journey: Journey; path: Path }) {
 
 export default function Agents() {
   const s = useShared()
-  const journeys = useMemo(() => (s.mobile ? JOURNEYS.slice(0, 5) : JOURNEYS), [s.mobile])
-  const paths = useMemo(() => journeys.map((j) => buildPath(j)), [journeys])
+  const model = useBuildingModel()
+  const journeys = useMemo(() => (s.mobile ? model.journeys.slice(0, 5) : model.journeys), [model, s.mobile])
+  const paths = useMemo(() => journeys.map((j) => buildPath(model, j)), [model, journeys])
   return (
     <>
       {journeys.map((j, k) => (

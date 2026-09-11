@@ -4,6 +4,7 @@ import Footer from '@/components/Footer'
 import Seo from '@/components/Seo'
 import CopyButton from '@/components/CopyButton'
 import AtlasMark from '@/components/atlas/AtlasMark'
+import ListingBuilding from '@/components/atlas/ListingBuilding'
 import {
   badgeMarkdown,
   checksPassed,
@@ -16,6 +17,7 @@ import {
 import { useScrollToTopOnPush } from '@/lib/useScrollToTopOnPush'
 import { directoryListings } from '@/generated/atlas-manifest'
 import type { DirectoryListingView } from '@/types/directory'
+import type { Blueprint } from '@/types/blueprint'
 // Shared with scripts/prerender.tsx so a client-side navigation from /atlas
 // and a fresh load of the same listing produce an identical <title>.
 import { atlasTitle } from '../../scripts/lib/site'
@@ -56,6 +58,10 @@ export default function AtlasListingPage({ listing }: { listing: DirectoryListin
   const checks = checksPassed(listing)
   const share = shareUrls(listing)
   const badge = badgeMarkdown(listing.slug, listing.name)
+  // Read loosely for now: only admitted listings carry a blueprint, and the
+  // manifest field that publishes it is landing separately. No blueprint, no
+  // building — the rest of the page is unchanged.
+  const blueprint = (listing as { blueprint?: Blueprint }).blueprint
   const rescanHref = `/atlas?url=${encodeURIComponent(listing.url)}&rescan=1#submit`
 
   return (
@@ -106,6 +112,8 @@ export default function AtlasListingPage({ listing }: { listing: DirectoryListin
               </Link>
             </div>
           </header>
+
+          {blueprint && <ListingBuilding blueprint={blueprint} scannedAt={listing.scannedAt} />}
 
           <div className="atlas-listing__layout">
             <div className="atlas-listing__main">
