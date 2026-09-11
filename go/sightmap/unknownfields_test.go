@@ -135,6 +135,38 @@ func findingsWithCode(t *testing.T, code, yaml string) []sightmap.ValidationErro
 	return out
 }
 
+// validateCodes loads inline YAML and returns the multiset of diagnostic codes
+// from a full validation run. Used where a test needs to reason about several
+// codes at once (e.g. the tag vs. pattern case matrix for component property
+// names, where field-type-invalid and component-property-invalid-name are both
+// in play).
+func validateCodes(t *testing.T, yaml string) map[string]int {
+	t.Helper()
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "app.yaml"), yaml)
+	c, err := sightmap.DirLoader(dir).Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	m := map[string]int{}
+	for _, f := range sightmap.Validate(c) {
+		m[f.Code]++
+	}
+	return m
+}
+
+func codesEqual(got, want map[string]int) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for k, n := range want {
+		if got[k] != n {
+			return false
+		}
+	}
+	return true
+}
+
 // yaml.v3 decodes any scalar into a Go string field by taking the raw lexeme,
 // so an unquoted number used to load cleanly here while ajv rejected it. The
 // two conformance checkers have to agree.
@@ -297,5 +329,126 @@ messages:
 `)
 	if len(w) != 1 {
 		t.Fatalf("want 1 unknown-field for the typo, got %d: %v", len(w), w)
+	}
+}
+
+// Component properties are the third property-bearing entity (after request
+// and message properties). Their `name` and `extract` fields are schema-typed
+// strings, so an unquoted bool/int/null loads cleanly into the Go string field
+// while ajv rejects it as "must be string" — the two conformance checkers have
+// to agree. Mirrors TestFieldTypeInvalid_RequestPropertyNonStringScalars and
+// TestFieldTypeInvalid_MessageNonStringScalars.
+func TestFieldTypeInvalid_ComponentPropertyNonStringScalars(t *testing.T) {
+	// Each entry is a full two-line property body. The name cases carry a valid
+	// `extract: text` so the only field-type-invalid comes from the bad name;
+	// the extract cases carry a valid `name: label` so it comes from the bad
+	// extract. (extract's content is already enforced by checkExtractMode, so
+	// a content-invalid extract also emits component-property-extract-invalid,
+	// which this test deliberately filters out.)
+	cases := []struct {
+		name string
+		prop string
+	}{
+		{"integer name", "name: 5\n        extract: text"},
+		{"bool name", "name: true\n        extract: text"},
+		{"null name", "name:\n        extract: text"},
+		{"float name", "name: 1.5\n        extract: text"},
+		{"integer extract", "name: label\n        extract: 5"},
+		{"null extract", "name: label\n        extract:"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := findingsWithCode(t, "field-type-invalid", `
+version: 1
+components:
+  - name: Header
+    selector: '#header'
+    properties:
+      - `+tc.prop+`
+`)
+			if len(got) != 1 {
+				t.Fatalf("want exactly 1 field-type-invalid, got %d: %v", len(got), got)
+			}
+			if !got[0].IsError() {
+				t.Error("a type mismatch must be an error, not a warning")
+			}
+		})
+	}
+}
+
+// A quoted scalar is !!str, so checkStringScalars leaves it alone even when the
+// content would be invalid (e.g. "5"); that content is the pattern check's job
+// (see TestComponentProperty_NameTagAndPatternMatchAjv).
+func TestFieldTypeInvalid_ComponentPropertyQuotedIsClean(t *testing.T) {
+	got := findingsWithCode(t, "field-type-invalid", `
+version: 1
+components:
+  - name: Header
+    selector: '#header'
+    properties:
+      - name: "5"
+        extract: "text"
+`)
+	if len(got) != 0 {
+		t.Fatalf("quoted scalars must be clean of field-type-invalid, got %v", got)
+	}
+}
+
+// TestComponentProperty_NameTagAndPatternMatchAjv is the case matrix from the
+// bug report. yaml.v3 decodes any scalar into a Go string field by the raw
+// lexeme, so the YAML tag and the decoded content vary independently. Each gap
+// uniquely covers one axis; both fixes are required, neither subsumes the
+// other.
+//
+//	name: 5    (!!int)  → lexeme "5" fails pattern → tag check AND pattern check
+//	name: true (!!bool) → lexeme "true" matches     → tag check ONLY  (Gap 1 load-bearing)
+//	name: "5"  (!!str)  → lexeme "5" fails pattern  → pattern check ONLY (Gap 2 load-bearing)
+//	name:      (!!null) → lexeme "" fails pattern   → tag check AND pattern check
+//
+// A property named "true" is reachable downstream via PATH.prop resolution
+// (Header.true), so Case C is wired, not just exit-code divergence — which is
+// why Gap 1 is load-bearing rather than a cosmetic duplicate of the pattern
+// check.
+func TestComponentProperty_NameTagAndPatternMatchAjv(t *testing.T) {
+	cases := []struct {
+		name      string
+		yaml      string
+		wantCodes map[string]int
+	}{
+		{
+			name:      "int name: tag and pattern both fire (overlap)",
+			yaml:      "name: 5\n        extract: text",
+			wantCodes: map[string]int{"field-type-invalid": 1, "component-property-invalid-name": 1},
+		},
+		{
+			name:      "bool name: tag-only (Gap 1 uniquely load-bearing)",
+			yaml:      "name: true\n        extract: text",
+			wantCodes: map[string]int{"field-type-invalid": 1},
+		},
+		{
+			name:      "quoted-str name: pattern-only (Gap 2 uniquely load-bearing)",
+			yaml:      "name: \"5\"\n        extract: text",
+			wantCodes: map[string]int{"component-property-invalid-name": 1},
+		},
+		{
+			name:      "null name: tag and pattern both fire (overlap)",
+			yaml:      "name:\n        extract: text",
+			wantCodes: map[string]int{"field-type-invalid": 1, "component-property-invalid-name": 1},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := validateCodes(t, `
+version: 1
+components:
+  - name: Header
+    selector: '#header'
+    properties:
+      - `+tc.yaml+`
+`)
+			if !codesEqual(got, tc.wantCodes) {
+				t.Fatalf("got %v, want %v", got, tc.wantCodes)
+			}
+		})
 	}
 }
