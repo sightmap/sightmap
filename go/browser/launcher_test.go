@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -136,5 +137,35 @@ func TestFindFreePortExcluding_SkipsExcluded(t *testing.T) {
 	}
 	if cdpPort == busy {
 		t.Fatalf("FindFreePortExcluding returned the busy port %d", busy)
+	}
+}
+
+// TestFindFreePort_ZeroAsksOS covers the documented "0 = auto-allocate" case:
+// the result must be a concrete, bindable port chosen by the OS — never 0 (the
+// old upward scan from 0 "succeeded" on port 0 itself, because net.Listen treats
+// 0 as a wildcard, and the daemon then recorded serverPort=0 and a CDP port of 1).
+func TestFindFreePort_ZeroAsksOS(t *testing.T) {
+	port, err := FindFreePort(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if port <= 0 || port > 65535 {
+		t.Fatalf("FindFreePort(0) = %d, want a concrete port in 1..65535", port)
+	}
+	// The port the OS handed out must actually be bindable by the caller.
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		t.Fatalf("FindFreePort(0) returned %d but it cannot be bound: %v", port, err)
+	}
+	ln.Close()
+
+	// A second auto-allocation that excludes the first must come back distinct —
+	// this is how `start --port 0 --cdp-port 0` keeps the server and CDP apart.
+	cdp, err := FindFreePortExcluding(0, port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cdp <= 0 || cdp == port {
+		t.Fatalf("FindFreePortExcluding(0, %d) = %d, want a different concrete port", port, cdp)
 	}
 }
