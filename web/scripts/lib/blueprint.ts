@@ -405,12 +405,17 @@ export function deriveBlueprint(listing: DirectoryListing): Blueprint {
     return { name: tool.name, kind, params, ...roomSize(kind, params) }
   }
 
+  // A floor is a page that brought at least one room of its own. A page that
+  // only re-registers tools first seen elsewhere adds nothing to walk through,
+  // and an empty floor reads as a mistake rather than a page.
   const floors: BlueprintFloor[] = []
-  for (const page of report.pages.filter((p) => p.tools.length > 0).slice(0, MAX_FLOORS)) {
+  for (const page of report.pages) {
+    if (floors.length >= MAX_FLOORS) break
     const items = report.tools
       .filter((t) => home.get(t.name) === page.path)
       .map(itemFor)
       .sort(byName)
+    if (items.length === 0) continue
     const name = page.title || page.path
     floors.push(floorFor(name, page.path, items.slice(0, ROOMS_PER_FLOOR)))
     // One annex, on the same route: a page with more rooms than a floor holds

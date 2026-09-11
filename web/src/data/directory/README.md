@@ -110,6 +110,7 @@ emits:
 | `public/atlas/stats.json` | counts: listings by type, tools by kind, surfaces, community maps |
 | `public/atlas/sites/<slug>.json` | one listing with its counts, checks, journey, drift |
 | `public/atlas/sites/<slug>/tools.json` | that listing's tools with full input schemas |
+| `public/atlas/sites/<slug>/blueprint.json` | the building derived from the scan: floors for pages, rooms for tools, walks for journeys |
 | `public/atlas/scans/<slug>.json` | the latest scan report, verbatim |
 | `public/atlas/scans/<slug>/<date>.json` | every scan on file |
 | `public/atlas/<slug>.md` | markdown twin of the listing page |
