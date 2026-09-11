@@ -22,7 +22,7 @@ import (
 // stability/access/snapshots/url/properties are all recognized here.
 
 var (
-	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "messages", "snapshots")
+	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "messages", "signals", "snapshots")
 	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "dependencies", "memory", "components", "requests")
 	componentFields = set("name", "selector", "source", "dependencies", "description", "stability", "memory", "tags", "properties", "children")
 	refFields       = set("$ref")
@@ -35,6 +35,7 @@ var (
 
 	requestPropertyFields = set("name", "source", "field", "pattern")
 	messageFields         = set("name", "level", "message", "description", "source", "properties")
+	signalFields          = set("name", "ref", "tags")
 	messagePropertyFields = set("name", "source", "field", "pattern")
 )
 
@@ -134,6 +135,7 @@ func walkFile(node *yaml.Node, file string, out *[]ValidationError) {
 	forEachItem(v["components"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 	forEachItem(v["requests"], func(n *yaml.Node) { walkRequest(n, file, out) })
 	forEachItem(v["messages"], func(n *yaml.Node) { walkMessage(n, file, out) })
+	forEachItem(v["signals"], func(n *yaml.Node) { checkKeys(n, signalFields, file, out) })
 	forEachItem(v["snapshots"], func(n *yaml.Node) { checkKeys(n, snapshotFields, file, out) })
 }
 

@@ -38,6 +38,11 @@
       "description": "Declarative console/exception patterns, addressable by name. Corpus-root only — no view-scoping. See SEP-0006.",
       "items": { "$ref": "#/$defs/message" }
     },
+    "signals": {
+      "type": "array",
+      "description": "Named, reference-based state predicates — the Component/View subset of SEP-0007 point signals. A signal names an existing component or view and denotes the boolean of that entity's current state (component present, or view route active). Corpus-root only. See SEP-0007.",
+      "items": { "$ref": "#/$defs/signal" }
+    },
     "snapshots": {
       "$comment": "Reserved tooling field. Not part of the spec's matching or merge semantics; conforming SDKs MAY ignore it. Consumed by the reference CLI's capture/probe workflow.",
       "type": "array",
@@ -291,6 +296,29 @@
           "type": "array",
           "description": "Ordered list of stack-addressing value extractions for an exception record. See SEP-0006.",
           "items": { "$ref": "#/$defs/messageProperty" }
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "description": "A named, reference-based state predicate: the Component/View subset of SEP-0007 point signals. Evaluated online it is the boolean of the referenced entity's current state. See SEP-0007.",
+      "required": ["name", "ref"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Semantic identity of the signal — a named boolean predicate, addressable by other tooling (e.g. as a completion or availability predicate)."
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of an existing component or view this signal is about. Must resolve to exactly one; a name matching both a component and a view is rejected as ambiguous. Request and message refs are out of this subset."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Open-vocabulary classification labels carried onto the signal. See SEP-0004."
         }
       }
     },

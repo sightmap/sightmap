@@ -380,6 +380,30 @@ Two entries that can match the same record are reported as `message-conflict` (a
 
 A consumer evaluating live records MUST surface an ambiguity when a record matches more than one entry, rather than silently resolving to a first match. See [SEP-0006](../seps/0006-message-entity.md).
 
+## Signal
+
+A named, reference-based **state predicate**: a signal names an existing component or view (`ref:`) and denotes the boolean of that entity's *current* state — a component being present, or a view's route being active. It is the smallest, dependency-free slice of [SEP-0007](../seps/0007-signals.md): the point-signal shape restricted to `Component` and `View` refs (a component ref leans only on the existing [component properties](#component-properties); a view ref needs nothing). Request and message refs — and the temporal/window machinery of the fuller signals proposal — are intentionally out of scope in this subset.
+
+Its purpose is to give the rest of the tooling a named boolean to point at: a completion predicate ("done once `checkout.reached` holds"), an availability predicate ("offer the dismiss affordance while `upsell.present` holds"), or a session classification. Because a component ref evaluates exactly like a component match and a view ref like a route match, a signal is the *named* form of a predicate the matcher already computes.
+
+```yaml
+signals:
+  - name: checkout.reached
+    ref: Checkout           # a view -> its route is active
+
+  - name: upsell.present
+    ref: UpsellModal        # a component -> it currently matches (is present)
+    tags: [interstitial]
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Semantic identity of the signal — a named boolean predicate, addressable by other tooling. |
+| `ref` | string | yes | Name of an existing component or view this signal is about. Must resolve to exactly one. |
+| `tags` | string[] | no | Open-vocabulary classification labels carried onto the signal. |
+
+`ref` must resolve to exactly one entity. A name that matches nothing is reported as `signal-ref-unresolved`; a name that matches **both** a component and a view is `signal-ref-ambiguous` (there is no adjacency rule to prefer one, so it is rejected rather than silently resolved). Signal names must be unique across the corpus. `signals:` is corpus-root only — there is no view-scoped form. See [SEP-0007](../seps/0007-signals.md).
+
 ## Regular expressions
 
 Every author-written regular expression in a sightmap — a request property's `pattern` ([Request properties](#request-properties)), a message's `message` ([Message](#message)), and a message property's `pattern` ([Message properties](#message-properties)) — uses **RE2** syntax: the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package for JavaScript. RE2 is pinned deliberately. It matches in guaranteed linear time (no catastrophic backtracking), and because a pattern is validated at authoring time by one SDK and evaluated against live activity by another, one predictable dialect keeps the two from disagreeing about the same expression. The tradeoff is expressivity: RE2 has **no backreferences and no lookahead/lookbehind**. Character classes, alternation, quantifiers, anchors, and capture groups all work — essentially every pattern in practice.
