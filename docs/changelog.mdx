@@ -8,6 +8,58 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.32.0" description="Released September 11, 2026" tags={["cli"]}>
+
+Add the `raw_text` extract mode (SEP-0013, first half).
+
+`extract: raw_text` returns a node's **own literal text** — the concatenation of its direct text-node children, whitespace-normalized — never its accessibility name. It is pinned to `textContent`-style data, **not** the layout-dependent `innerText`, and it excludes both descendant element text (no `<style>`/`<script>` bleed, no subtree concatenation) and CSS pseudo content (`::before`/`::after`).
+
+It is the deterministic escape for when the accessible name welds in extra text: a heading whose AX name appends a CSS `::after` badge resolves `text` to "Main Most popular" but `raw_text` to "Main", so an exact property match (`SubFare[tier="Main"]`) works. `text` stays the default (and the right choice when the accessible name _is_ the value); an empty `raw_text` omits the property, like the other extract forms.
+
+(The other half of SEP-0013 — pinning `text` to a faithful, cross-consumer accessible-name computation, and carrying interactive-state attributes — is deferred.)
+
+Add the SEP-0007 Component/View **state-signal** subset. A corpus-root `signals:` block names a component (present) or a view (route-active) as a named boolean predicate (`{name, ref, tags?}`) — the dependency-free core of SEP-0007. Resolve one with `Corpus.ResolveSignal` / `SignalByName`; validation reports `signal-ref-unresolved` and `signal-ref-ambiguous`. Request/message refs and the temporal/window machinery are intentionally out of scope.
+
+Offline matcher: support `:not(:has(...))` and a combinator inside `:not(...)`, for parity with the live DOM.
+
+The offline component-tree matcher (used by `snapshot`, `coverage`, `validate`, `sel-check`, and the overlay) now honors two standard-CSS relational selectors it previously mishandled:
+
+- **`:not(:has(...))`** and **`:is(...:has(...))`** — a relational pseudo nested inside `:not()`/`:is()` is now evaluated with the subject's subtree instead of being silently dropped. This unblocks the leaf-scoping pattern `X:not(:has(X))` (e.g. `jb-form-field-container:not(:has(jb-form-field-container))`), which previously matched **zero** nodes offline while resolving live.
+- **A descendant/child combinator inside `:not()`** (e.g. `button:not(nav button)`) now parses and is evaluated against the subject's ancestor chain. Such selectors previously threw a parse error, so a corpus using valid CSS failed to `validate` even though it resolved live.
+
+`:not()` now accepts a complex-selector list, matching CSS Selectors Level 4. Sibling combinators (`+`, `~`) remain unsupported and are still rejected loudly at parse time.
+
+Note: `SelectorPart.Not` changes from `*SelectorPart` to `[]ParsedSelector` to represent the complex-selector-list argument.
+
+Reframe the sightmap-authoring skill's "Property extraction principles" around
+**purpose**: a property earns its place only as a discriminator (makes an
+otherwise-ambiguous instance addressable) or as signal (a value a downstream
+event/agent needs). A property that does neither — most commonly a `text`/`label`
+that just restates a node's accessible name, or a `text` on a nameless container
+that dumps its whole subtree — is noise. Rule 1 now requires a link/button to be
+_identifiable_ (by its accessible name, or a useful property) rather than
+mandating a property (which invited restating-the-name busywork); Rule 2's
+per-instance discriminator is preserved, with an explicit carve-out for responsive
+duplicates (narrow the selector, don't invent a discriminator). Validated against
+the JetBlue corpus (drove ~90% of property decisions cleanly; 21 noise properties
+removed with zero tool breakage).
+
+Live shadow-piercing query (`sel-probe`, `click`/`fill`, property extraction) no longer under-reports on pages with a form.
+
+`__smDeepQueryAll` walked the DOM via instance properties (`node.children`, `el.matches`, `el.shadowRoot`). On an `HTMLFormElement`, a control whose `name`/`id` is `children` makes the form's named getter return that control instead of the element `HTMLCollection` (`[LegacyOverrideBuiltIns]`), so `for (const c of node.children)` threw "children is not iterable" on that form. The blanket `catch` then returned a **truncated** result — silently `0` matches for any element after the form in document order (observed on jetblue.com: `[data-fs-element="submit"]`, `a.rounded-button`, `[data-fs-element="points-toggle"]`, and others reported 0 live while `querySelectorAll` and the offline matcher saw them).
+
+The traversal now goes through cached `Node.prototype`/`Element.prototype` accessors, which bypass any named-property shadowing, so form-heavy pages resolve correctly. Affects every live lookup: `sel-probe`, component-query `click`/`fill`/`hover`, and live property extraction.
+
+`browser mcp` no longer points at Chrome flags that do not exist. The "no WebMCP
+tools here" error used to suggest `--enable-blink-features=ModelContext,ModelContextTesting`
+and `--enable-features=DevToolsWebMCPSupport`; Chrome silently ignores those
+names, so following them left `document.modelContext` undefined on Google Chrome
+and made the native path look unshipped. The message and the `browser mcp` docs
+now name the real switch, `--enable-features=WebMCPTesting` (the same feature as
+`chrome://flags/#enable-webmcp-testing`). Fixes #413.
+
+</Update>
+
 <Update label="sightmap 0.31.2" description="Released September 7, 2026" tags={["cli"]}>
 
 Fix `browser wait-for --component 'X'` timing out whenever the query matched more than one node on the page. The wait polled with the strict single-node resolver (the one `click`/`fill`/`hover` need), so a "several match" result was reported as an ambiguity error and mistaken for "not present yet" — even though `snapshot` listed every instance and `wait-for --selector` with the same multi-match CSS returned immediately. `wait-for --component` now treats presence of ≥1 match as satisfied (multiple matches are proof the component is on the page, which is exactly what the caller is waiting for), via a new `compquery.Present` presence predicate. The interaction commands are unchanged: they still resolve to a single target through the strict `compquery.Resolve`. Narrowed queries keep working — a property predicate (`X[status="Published"]`) or an occurrence index (`X#0`) still matches, and `X#N` waits until occurrence N exists.
