@@ -64,51 +64,23 @@ Both are needed for full event attribution. A component with no `properties:` pr
   selector: '[data-testid="product-pod"]'
   properties:
     - name: label
-      extract: h3             # CSS sub-selector → text of the first matching child
+      extract: text
     - name: sku
       extract: attr=data-sku
 ```
 
 ### Extraction modes
 
+Resolution runs over the component tree (SEP-0010), with no live DOM. To surface
+a value from a sub-element, promote that sub-element to a declared `children:`
+component and reference it via `PATH.prop` or `exists:PATH`.
+
 | `extract:` | Result |
 |------------|--------|
-| `text` | `textContent` (whitespace-collapsed) — the default |
-| `inner_text` | rendered `innerText` (visible text only) |
-| `text_only` | `textContent` with `img,svg,[alt]` stripped (avoids alt-text bleed) |
-| `inner_html` | element's `innerHTML` |
-| `attr=NAME` | the `NAME` attribute, e.g. `attr=aria-label` (note `=`, not `:`) |
-| `exists:SEL` | `"true"` if a descendant matches `SEL`, else the property is omitted (boolean state flag) |
-| `SEL` (any other CSS) | text of the first descendant matching `SEL` |
-
-### Transforms
-
-An optional `transform:` post-processes the extracted string:
-`first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`,
-`match:REGEX`.
-
-`match:REGEX` captures an arbitrary substring/enum: capture group 1 if the
-pattern has one, else the full match; on no match (or an invalid pattern) the
-value passes through unchanged. Use it to split one concatenated label into
-several structured, queryable properties (which is also what the component-query
-DSL matches on). Write patterns in the Go-RE2 ∩ JS-RegExp common subset
-(alternation, character classes, anchors, quantifiers, groups) — no inline `(?i)`
-flags or backreferences. The same canonical transform set is implemented in
-`sightmap/property.go` (offline) and mirrored in the snapshot extractor and the
-overlay extension.
-
-```yaml
-# "Add In-Store Assembly / FREE"  vs  "Add In-Home Assembly / +$179.00"
-- name: AssemblyOption
-  selector: '[data-testid="form-group"]:has(input[type="checkbox"])'
-  properties:
-    - name: assemblyType        # → In-Store | In-Home
-      extract: text
-      transform: 'match:(In-Store|In-Home)'
-    - name: price               # → FREE | $179.00
-      extract: text
-      transform: 'match:(FREE|\$[\d,.]+)'
-```
+| `text` | the matched node's accessible text |
+| `attr=NAME` | the value of attribute `NAME` carried by the node; omitted if not carried (e.g. `attr=aria-label`) |
+| `PATH.prop` | the value extracted for property `prop` of the descendant component addressed by the dotted `PATH` |
+| `exists:PATH` | `"true"` if a descendant component named by `PATH` matches; else the property is omitted (boolean state flag) |
 
 ## Selector quality hierarchy
 
