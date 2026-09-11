@@ -8,6 +8,8 @@
 // carry identical keys. The camelCase fields on DirectoryListing are derived
 // by scripts/lib/directory.ts from the listing and its scan.
 
+import type { Blueprint } from './blueprint'
+
 /** How a tool is classified. `classified by Atlas`, never by the site. */
 export type ToolKind = 'read' | 'action' | 'sensitive'
 
@@ -180,4 +182,6 @@ export interface SightkickStarter {
 /** What the app renders: a listing plus the build-time extras the page shows. */
 export interface DirectoryListingView extends DirectoryListing {
   starter: SightkickStarter
+  /** The building this listing's scan derives, ready to render without a fetch. */
+  blueprint: Blueprint
 }

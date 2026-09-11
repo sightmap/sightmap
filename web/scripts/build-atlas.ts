@@ -21,8 +21,9 @@
 // The same two outputs cover the WebMCP directory (src/data/directory/): the
 // manifest gains `directoryListings` / `directoryCategories`, and public/atlas/
 // gains the agent-facing documents its README's "What the build generates"
-// table names — directory.json, stats.json, sites/, scans/, hosts/, one .md
-// twin and one badge per listing. Same no-network, wipe-and-rewrite contract.
+// table names — directory.json, stats.json, sites/ (including the building
+// blueprint each listing's scan derives), scans/, hosts/, one .md twin and one
+// badge per listing. Same no-network, wipe-and-rewrite contract.
 //
 // The screenshots have to be copied rather than imported from src/: they are
 // referenced from React components that scripts/prerender.tsx renders under
@@ -32,6 +33,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { atlasCategories, loadAtlas, resolveCorpus, resolveScreenshots } from './lib/atlas'
+import { blueprintSummary, deriveBlueprint } from './lib/blueprint'
 import { directoryCategories, loadDirectory, scanDateOf, scanFilesFor } from './lib/directory'
 import { listingMarkdown } from './lib/directory-markdown'
 import {
@@ -45,6 +47,7 @@ import {
 import { listingBadgeSvg } from './lib/badge'
 import { sightkickStarter } from './lib/sightkick-starter'
 import { tarGz } from './lib/tar'
+import type { Blueprint } from '../src/types/blueprint'
 import type { DirectoryListingView } from '../src/types/directory'
 
 const DATA_DIR = path.resolve('src/data/atlas')
@@ -134,6 +137,7 @@ async function main() {
   // than silently overwrite that entry's .md twin (see loadDirectory).
   const directory = loadDirectory(DATA_DIR_DIRECTORY, atlas.entries.map((e) => e.slug))
   const generatedAt = new Date().toISOString()
+  const blueprints = new Map<string, Blueprint>()
 
   for (const listing of directory.listings) {
     // Every scan on file, verbatim. Copied rather than re-serialized from the
@@ -150,6 +154,13 @@ async function main() {
 
     writeJson(`sites/${listing.slug}.json`, siteDocument(listing))
     writeJson(`sites/${listing.slug}/tools.json`, toolsDocument(listing))
+
+    // The building, derived from the scan. Published next to the tools it draws
+    // so anything that renders a listing — this site's city, someone else's —
+    // reads one file rather than re-deriving the geometry.
+    const blueprint = deriveBlueprint(listing)
+    blueprints.set(listing.slug, blueprint)
+    writeJson(`sites/${listing.slug}/blueprint.json`, blueprint)
 
     // The markdown twin of the listing page, and the badge a listed site can
     // embed. Both are generated from the listing, never copied: unlike a
@@ -169,6 +180,9 @@ async function main() {
       `  listed ${listing.slug} (${listing.counts.tools} tool(s), ${listing.counts.pages} page(s), ` +
         `${scanFiles.length} scan(s), ${hosts.length} host lookup(s))`
     )
+    // The derived shape, in one line: a rescan that changes the building shows
+    // up here rather than only in a 300-line JSON diff.
+    console.log(`    building ${blueprintSummary(blueprint)}`)
   }
 
   // Written whichever way the directory came out, including empty: an agent
@@ -188,6 +202,7 @@ async function main() {
     ...listing,
     report: reportWithoutTranscript(listing.report),
     starter: sightkickStarter(listing.report),
+    blueprint: blueprints.get(listing.slug) as Blueprint,
   }))
 
   fs.writeFileSync(
