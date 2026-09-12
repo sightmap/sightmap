@@ -2,7 +2,7 @@
 // prerender ships and what a visitor sees before the WebGL chunk arrives (or
 // instead of it, when WebGL is unavailable). The same model data draws it, so
 // it is a faithful line drawing of the scene rather than a placeholder.
-import { CORE, FLOOR_D, FLOOR_H, FLOOR_W, type BuildingModel } from './model'
+import { CORE, FLOOR_D, FLOOR_W, floorHeight, type BuildingModel } from './model'
 import { useBuildingModel } from './context'
 
 const COS30 = Math.cos(Math.PI / 6)
@@ -47,17 +47,18 @@ interface Drawing {
 
 function build(model: BuildingModel): Drawing {
   const n = model.floors.length
+  const floorH = floorHeight(model)
   let floors = ''
   let rooms = ''
   for (let i = 0; i < n; i++) {
-    const y = i * FLOOR_H
+    const y = i * floorH
     floors += rect(0, 0, FLOOR_W, FLOOR_D, y)
     for (const r of model.floors[i].rooms) {
       const blocks = r.blocks ?? [{ x: r.x, z: r.z, w: r.w, d: r.d }]
       for (const b of blocks) rooms += box(b.x, b.z, b.w, b.d, y + 0.18 + (r.base ?? 0), r.h * 1.25)
     }
   }
-  const topY = n * FLOOR_H
+  const topY = n * floorH
   floors += rect(0, 0, FLOOR_W, FLOOR_D, topY)
   // Front corner verticals of the shell.
   const corners: [number, number][] = [

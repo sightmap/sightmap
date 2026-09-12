@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
-import { FLOOR_D, FLOOR_W, SLAB_T, floorY, roomTop, type BuildingModel } from './model'
+import { FLOOR_D, FLOOR_W, SLAB_T, floorHeight, floorY, roomTop, type BuildingModel } from './model'
 import { smoothstep } from './chapters'
 import { useBuildingModel } from './context'
 import { useShared } from './state'
@@ -18,11 +18,12 @@ interface Anchor {
 
 function anchorsFor(model: BuildingModel): Anchor[] {
   const anchors: Anchor[] = []
+  const floorH = floorHeight(model)
   model.floors.forEach((f, i) => {
     anchors.push({
       kind: 'floor',
       floor: i,
-      pos: [FLOOR_W / 2 + 0.15, floorY(i) + 0.95, -FLOOR_D / 2 + 0.3],
+      pos: [FLOOR_W / 2 + 0.15, floorY(i, floorH) + 0.95, -FLOOR_D / 2 + 0.3],
       node: (
         <>
           <b>{String(i).padStart(2, '0')}</b> {f.name} <span>{f.route}</span>
@@ -34,7 +35,7 @@ function anchorsFor(model: BuildingModel): Anchor[] {
         anchors.push({
           kind: 'tag',
           floor: i,
-          pos: [r.x, floorY(i) + SLAB_T + roomTop(r) + 0.15, r.z],
+          pos: [r.x, floorY(i, floorH) + SLAB_T + roomTop(r) + 0.15, r.z],
           node: r.name,
         })
       }
@@ -42,7 +43,7 @@ function anchorsFor(model: BuildingModel): Anchor[] {
         anchors.push({
           kind: 'memory',
           floor: i,
-          pos: [r.x - r.w / 2 - 0.4, floorY(i) + SLAB_T + roomTop(r) + 0.55, r.z + 1.0],
+          pos: [r.x - r.w / 2 - 0.4, floorY(i, floorH) + SLAB_T + roomTop(r) + 0.55, r.z + 1.0],
           node: (
             <>
               <em>memory</em>

@@ -8,6 +8,7 @@ import {
   SLAB_T,
   TRAVELLER_COLORS,
   findRoom,
+  floorHeight,
   floorY,
   roomStand,
   surfaceAt,
@@ -141,11 +142,11 @@ export default function HealDemo() {
   return (
     <>
       <Walker color={TRAVELLER_COLORS.test} group={walker} trail={false} />
-      <mesh ref={ghost} position={[room.x, floorY(FLOOR) + SLAB_T + PLATE + KIOSK_H / 2, room.z]} visible={false}>
+      <mesh ref={ghost} position={[room.x, floorY(FLOOR, floorHeight(model)) + SLAB_T + PLATE + KIOSK_H / 2, room.z]} visible={false}>
         <boxGeometry args={[room.w, KIOSK_H, room.d]} />
         <meshStandardMaterial color="#ffffff" transparent opacity={0} wireframe emissive="#ffffff" emissiveIntensity={0.6} />
       </mesh>
-      <Html position={[room.x - 1.6, floorY(FLOOR) + SLAB_T + KIOSK_H + 1.15, room.z - 0.4]} zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
+      <Html position={[room.x - 1.6, floorY(FLOOR, floorHeight(model)) + SLAB_T + KIOSK_H + 1.15, room.z - 0.4]} zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
         <div ref={status} className="bld-status bld-status--run" style={{ opacity: 0, visibility: 'hidden' }} />
       </Html>
     </>

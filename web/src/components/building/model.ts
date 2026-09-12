@@ -99,6 +99,18 @@ export interface BuildingModel {
   derived?: boolean
   /** Tools the scan found, for the plate under the sign. */
   tools?: number
+  /**
+   * Storey height. Absent means `FLOOR_H`, the height the demo corpus and a
+   * listing page's building are drawn at.
+   *
+   * The city draws a closed building at its lot's storey count rather than
+   * its floor count, so a three-floor listing on a central lot is a nine-
+   * storey shell. Opening that building must not shrink it, so the dollhouse
+   * that replaces the shell stretches its floors to the same total height.
+   * Only the slabs move: rooms, furniture and people keep their own size,
+   * which is what a taller storey means.
+   */
+  floorH?: number
 }
 
 /** What `closed` mode draws. Mirrors `BlueprintFacade` without importing it. */
@@ -407,7 +419,10 @@ export const TRAVELLER_COLORS: Record<Traveller, string> = {
   test: '#d9a52a',
 }
 
-export const floorY = (i: number): number => i * FLOOR_H
+/** Storey height of one building. */
+export const floorHeight = (model: BuildingModel): number => model.floorH ?? FLOOR_H
+
+export const floorY = (i: number, floorH: number = FLOOR_H): number => i * floorH
 
 export function findRoom(model: BuildingModel, floor: number, name: string): Room {
   const room = model.floors[floor]?.rooms.find((r) => r.name === name)
@@ -424,7 +439,7 @@ export function surfaceAt(model: BuildingModel, floor: number, x: number, z: num
     const top = (room.base ? PLATE : 0) + PLATE
     if (top > lift) lift = top
   }
-  return floorY(floor) + SLAB_T + lift
+  return floorY(floor, floorHeight(model)) + SLAB_T + lift
 }
 
 /** Where a walker stands when visiting a room: just outside the front of

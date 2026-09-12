@@ -4,7 +4,6 @@ import { useMemo, useRef, type ComponentRef } from 'react'
 import * as THREE from 'three'
 import {
   FLOOR_D,
-  FLOOR_H,
   FLOOR_W,
   KIND_COLORS,
   KIOSK_H,
@@ -12,6 +11,7 @@ import {
   SHEET,
   SLAB_T,
   WALL_T,
+  floorHeight,
   floorY,
   type BuildingModel,
   type Kind,
@@ -35,7 +35,6 @@ import Shell from './Shell'
 
 type LineRef = ComponentRef<typeof Line>
 
-const WALL_H = FLOOR_H - SLAB_T
 const STEEL = '#26272c'
 
 /** Where sheet i lies when fanned across a table of n sheets. */
@@ -269,7 +268,7 @@ function Zone({ room, mats }: { room: Room; mats: Mats }) {
 // ---------------------------------------------------------------------------
 // Curtain walls on the two back sides: spandrel, glass, mullions, head beam.
 
-function CurtainWall({ mats, side }: { mats: Mats; side: 'x' | 'z' }) {
+function CurtainWall({ mats, side, wallH }: { mats: Mats; side: 'x' | 'z'; wallH: number }) {
   const len = side === 'x' ? FLOOR_D : FLOOR_W
   const n = Math.round(len / 1.25)
   const mullions = useMemo(() => Array.from({ length: n + 1 }, (_, k) => -len / 2 + (k * len) / n), [len, n])
@@ -282,17 +281,17 @@ function CurtainWall({ mats, side }: { mats: Mats; side: 'x' | 'z' }) {
         <boxGeometry args={size(len, 0.32, WALL_T)} />
         <primitive object={mats.spandrel} attach="material" />
       </mesh>
-      <mesh position={at(0, 0.32 + (WALL_H - 0.42) / 2)}>
-        <boxGeometry args={size(len, WALL_H - 0.42, 0.02)} />
+      <mesh position={at(0, 0.32 + (wallH - 0.42) / 2)}>
+        <boxGeometry args={size(len, wallH - 0.42, 0.02)} />
         <primitive object={mats.glass} attach="material" />
       </mesh>
-      <mesh position={at(0, WALL_H - 0.05)} castShadow>
+      <mesh position={at(0, wallH - 0.05)} castShadow>
         <boxGeometry args={size(len, 0.1, WALL_T + 0.02)} />
         <primitive object={mats.steel} attach="material" />
       </mesh>
       <Instances limit={mullions.length} range={mullions.length} geometry={unitBox} material={mats.steel} castShadow>
         {mullions.map((u) => (
-          <Instance key={u} position={at(u, WALL_H / 2)} scale={size(0.07, WALL_H, WALL_T + 0.02)} />
+          <Instance key={u} position={at(u, wallH / 2)} scale={size(0.07, wallH, WALL_T + 0.02)} />
         ))}
       </Instances>
     </group>
@@ -317,10 +316,19 @@ function FloorUnit({ model, index: i, mats, t0 }: { model: BuildingModel; index:
     // Only a building derived from a scan wears a persona; the demo corpus is
     // the office it has always been.
     if (model.derived && model.facade) {
-      out.push(...personaFurnish(model.facade.archetype, model.facade.variant, floor, i, `${model.seed}`))
+      out.push(
+        ...personaFurnish(
+          model.facade.archetype,
+          model.facade.variant,
+          floor,
+          i,
+          `${model.seed}`,
+          floorHeight(model) - SLAB_T
+        )
+      )
     }
     return out
-  }, [floor, i, model.derived, model.facade, model.seed])
+  }, [floor, i, model])
   // LineSegments2 accumulates dash distance across every segment, so one
   // growing dash draws the sheet in sequence: border, footprint, then rooms.
   const total = useMemo(() => {
@@ -342,7 +350,7 @@ function FloorUnit({ model, index: i, mats, t0 }: { model: BuildingModel; index:
     if (g.current) {
       g.current.position.set(
         pose.x * c.spread * flat,
-        THREE.MathUtils.lerp(y0, floorY(i), rise),
+        THREE.MathUtils.lerp(y0, floorY(i, floorHeight(model)), rise),
         pose.z * c.spread * flat
       )
       g.current.rotation.y = pose.r * c.spread * flat
@@ -417,8 +425,8 @@ function FloorUnit({ model, index: i, mats, t0 }: { model: BuildingModel; index:
         <Furniture items={items} mats={mats} />
       </group>
       <group ref={walls} position={[0, SLAB_T, 0]}>
-        <CurtainWall mats={mats} side="x" />
-        <CurtainWall mats={mats} side="z" />
+        <CurtainWall mats={mats} side="x" wallH={floorHeight(model) - SLAB_T} />
+        <CurtainWall mats={mats} side="z" wallH={floorHeight(model) - SLAB_T} />
       </group>
     </group>
   )
@@ -520,7 +528,8 @@ function Roof({ mats, n, model }: { mats: Mats; n: number; model: BuildingModel 
     if (!g.current) return
     const rise = stagger(s.cur.rise, n) * s.cur.walls
     g.current.visible = rise > 0.01
-    g.current.position.y = THREE.MathUtils.lerp(floorY(n) - 0.6, floorY(n), rise)
+    const top = floorY(n, floorHeight(model))
+    g.current.position.y = THREE.MathUtils.lerp(top - 0.6, top, rise)
     g.current.scale.setScalar(Math.max(rise, 0.001))
   })
   const top = SLAB_T
@@ -604,10 +613,10 @@ function Roof({ mats, n, model }: { mats: Mats; n: number; model: BuildingModel 
   )
 }
 
-function Frame({ mats, n }: { mats: Mats; n: number }) {
+function Frame({ mats, n, floorH }: { mats: Mats; n: number; floorH: number }) {
   const s = useShared()
   const g = useRef<THREE.Group>(null)
-  const H = floorY(n) + SLAB_T
+  const H = floorY(n, floorH) + SLAB_T
   useFrame(() => {
     if (!g.current) return
     const rise = smoothstep(THREE.MathUtils.clamp(s.cur.rise * 1.6 - 0.2, 0, 1)) * s.cur.walls
@@ -655,7 +664,7 @@ export default function Tower({ mode = 'dollhouse' }: { mode?: TowerMode }) {
         <FloorUnit key={i} model={model} index={i} mats={mats} t0={t0} />
       ))}
       <Roof mats={mats} n={model.floors.length} model={model} />
-      <Frame mats={mats} n={model.floors.length} />
+      <Frame mats={mats} n={model.floors.length} floorH={floorHeight(model)} />
       {/* A derived building's rooms are named after real tools, so say so.
           The demo has its own signage in the wayfinding chapter. */}
       {model.derived && <RoomLabels />}

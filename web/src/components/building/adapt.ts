@@ -5,7 +5,16 @@
 import type { Blueprint } from '@/types/blueprint'
 import type { BuildingModel } from './model'
 
-export function modelFromBlueprint(blueprint: Blueprint): BuildingModel {
+export interface AdaptOptions {
+  /**
+   * Storey height, when the building has to reach a height its floor count
+   * alone would not: the city draws a closed building at its lot's storey
+   * count, and opening it must not shrink it.
+   */
+  floorH?: number
+}
+
+export function modelFromBlueprint(blueprint: Blueprint, options: AdaptOptions = {}): BuildingModel {
   return {
     floors: blueprint.floors.map((floor) => ({
       name: floor.name,
@@ -36,5 +45,6 @@ export function modelFromBlueprint(blueprint: Blueprint): BuildingModel {
     seed: blueprint.seed,
     derived: true,
     tools: blueprint.stats.tools,
+    ...(options.floorH === undefined ? {} : { floorH: options.floorH }),
   }
 }

@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { FLOOR_D, FLOOR_W, SLAB_T, floorY, roomTop, type BuildingModel } from './model'
+import { FLOOR_D, FLOOR_W, SLAB_T, floorHeight, floorY, roomTop, type BuildingModel } from './model'
 import { useBuildingModel } from './context'
 
 // The room names, which on a derived building are the tool names the scan
@@ -33,6 +33,7 @@ interface Anchor {
 
 function anchorsFor(model: BuildingModel): Anchor[] {
   const out: Anchor[] = []
+  const floorH = floorHeight(model)
   const sign = model.facade?.sign
   if (sign) {
     // The sign and its plate own their patch of sky; a tool name over them
@@ -40,7 +41,7 @@ function anchorsFor(model: BuildingModel): Anchor[] {
     out.push({
       kind: 'sign',
       text: '',
-      pos: new THREE.Vector3(0, floorY(model.floors.length) + SLAB_T + 1.0, FLOOR_D / 2 + 0.45),
+      pos: new THREE.Vector3(0, floorY(model.floors.length, floorH) + SLAB_T + 1.0, FLOOR_D / 2 + 0.45),
       hw: Math.max(sign.length * 3.6, 70),
       hh: 34,
     })
@@ -53,7 +54,7 @@ function anchorsFor(model: BuildingModel): Anchor[] {
       // Hung off the back-right corner, where the floor directory hangs on
       // the /building page: screen-right is (+X, -Z), so a long page title
       // runs out into the sky rather than across the building or the sign.
-      pos: new THREE.Vector3(FLOOR_W / 2 + 0.4, floorY(i) + SLAB_T + 0.5, -FLOOR_D / 2 - 0.4),
+      pos: new THREE.Vector3(FLOOR_W / 2 + 0.4, floorY(i, floorH) + SLAB_T + 0.5, -FLOOR_D / 2 - 0.4),
       hw: name.length * 3.2 + 12,
       hh: 13,
     })
@@ -62,7 +63,7 @@ function anchorsFor(model: BuildingModel): Anchor[] {
       out.push({
         kind: 'room',
         text,
-        pos: new THREE.Vector3(room.x, floorY(i) + SLAB_T + roomTop(room) + 0.18, room.z),
+        pos: new THREE.Vector3(room.x, floorY(i, floorH) + SLAB_T + roomTop(room) + 0.18, room.z),
         hw: text.length * 2.9 + 9,
         hh: 12,
       })

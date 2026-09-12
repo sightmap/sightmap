@@ -2,7 +2,7 @@ import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { BuildingModelContext, useBuildingModel } from './context'
 import { modelFromBlueprint } from './adapt'
-import { DEMO_MODEL, FLOORS, JOURNEYS, LANES, RISERS } from './model'
+import { DEMO_MODEL, FLOORS, FLOOR_H, JOURNEYS, LANES, RISERS, SLAB_T, floorHeight, floorY, surfaceAt } from './model'
 import {
   PALETTES,
   ROOF_STYLES,
@@ -10,6 +10,7 @@ import {
   paletteColor,
   roofParts,
   rooftopItem,
+  shellHeight,
   windowGrid,
   windowMullions,
 } from './facade'
@@ -110,6 +111,46 @@ describe('modelFromBlueprint', () => {
     expect(model.seed).toBe(FIXTURE_BLUEPRINT.seed)
     // A copy, so mutating the model cannot write back into the blueprint.
     expect(model.facade).not.toBe(FIXTURE_BLUEPRINT.facade)
+  })
+})
+
+describe('storey height', () => {
+  it('leaves the demo building at the height it was drawn at', () => {
+    expect(DEMO_MODEL.floorH).toBeUndefined()
+    expect(floorHeight(DEMO_MODEL)).toBe(FLOOR_H)
+    expect(floorY(0)).toBe(0)
+    expect(floorY(2)).toBe(2 * FLOOR_H)
+    expect(floorY(2, floorHeight(DEMO_MODEL))).toBe(2 * FLOOR_H)
+  })
+
+  it("stacks a blueprint's floors at whatever height it is given", () => {
+    const tall = modelFromBlueprint(FIXTURE_BLUEPRINT, { floorH: 6.6 })
+    expect(tall.floorH).toBe(6.6)
+    expect(floorY(2, floorHeight(tall))).toBe(2 * 6.6)
+    // Deck heights follow the storey, so walkers and labels climb with it.
+    const room = tall.floors[1].rooms[0]
+    expect(surfaceAt(tall, 1, room.x, room.z)).toBeCloseTo(6.6 + SLAB_T + 0.07, 5)
+  })
+
+  it('reaches the height the closed shell on a city lot drew', () => {
+    // The city draws a listing's shell at its lot's storeys, not its floors.
+    // Opening it must not move the roofline, so spending those storeys over
+    // the floors the listing has puts the top slab back where it was.
+    for (const [floors, storeys] of [
+      [1, 6],
+      [2, 4],
+      [2, 9],
+      [3, 4],
+    ]) {
+      const floorH = (storeys / floors) * FLOOR_H
+      expect(floorY(floors, floorH) + SLAB_T, `${floors}/${storeys}`).toBeCloseTo(shellHeight(storeys), 10)
+    }
+  })
+
+  it('leaves a blueprint at the default height when none is given', () => {
+    const plain = modelFromBlueprint(FIXTURE_BLUEPRINT)
+    expect(plain.floorH).toBeUndefined()
+    expect(floorHeight(plain)).toBe(FLOOR_H)
   })
 })
 

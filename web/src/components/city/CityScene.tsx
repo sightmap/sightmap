@@ -188,7 +188,13 @@ function City({ city, listings, night, reduced, focus, onReady, onHover, onSelec
       <CityLife plan={city} reduced={reduced} />
       <Picker buildings={buildings} onHover={onHover} onSelect={onSelect} />
       {focused && blueprint && (
-        <CityFocus lot={focused.lot} blueprint={blueprint} night={night} reduced={reduced} />
+        <CityFocus
+          lot={focused.lot}
+          blueprint={blueprint}
+          storeys={focused.storeys}
+          night={night}
+          reduced={reduced}
+        />
       )}
     </>
   )

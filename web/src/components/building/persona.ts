@@ -18,7 +18,7 @@ import type { Archetype } from '@/types/blueprint'
 import { FLOOR_D, FLOOR_H, FLOOR_W, PLATE, SLAB_T, type Floor, type Room } from './model'
 import type { Item, ItemType } from './furnish'
 
-/** Clear height under the slab above. */
+/** Clear height under the slab above, for a storey of the default height. */
 const CEIL = FLOOR_H - SLAB_T
 /** The open +Z edge of the floor plate: the street side of the dollhouse. */
 const FRONT = FLOOR_D / 2
@@ -152,7 +152,7 @@ function canopy(out: Item[], color: string, stripes: number, width: number, y: n
   out.push(it('awning', 0, y - 0.42, FRONT + 1.12, [width, 0.26, 0.06], color))
 }
 
-function streetLevel(archetype: Archetype, variant: number, seed: string): Item[] {
+function streetLevel(archetype: Archetype, variant: number, seed: string, ceil: number): Item[] {
   const out: Item[] = []
   const r = rng(`${seed}|${archetype}|${variant}`)
   const v = v3(variant)
@@ -221,9 +221,11 @@ function streetLevel(archetype: Archetype, variant: number, seed: string): Item[
       const bay = (FLOOR_W - 1.2) / teeth
       for (let i = 0; i < teeth; i++) {
         const x = -(FLOOR_W - 1.2) / 2 + bay * (i + 0.5)
-        out.push(it('awning', x, CEIL - 0.3, -0.2, [bay * 0.92, 0.06, FLOOR_D - 1.0], '#9ec6ea', 0, -0.46))
-        out.push(it('column', x - bay * 0.46, CEIL - 0.5, -0.2, [0.09, 0.52, FLOOR_D - 1.0], DARK))
-        out.push(it('column', x + bay * 0.46, CEIL - 0.2, -0.2, [0.09, 0.16, FLOOR_D - 1.0], DARK))
+        // The skylight is in the roof, not the furniture, so it hangs from
+        // whatever ceiling this storey actually has.
+        out.push(it('awning', x, ceil - 0.3, -0.2, [bay * 0.92, 0.06, FLOOR_D - 1.0], '#9ec6ea', 0, -0.46))
+        out.push(it('column', x - bay * 0.46, ceil - 0.5, -0.2, [0.09, 0.52, FLOOR_D - 1.0], DARK))
+        out.push(it('column', x + bay * 0.46, ceil - 0.2, -0.2, [0.09, 0.16, FLOOR_D - 1.0], DARK))
       }
       break
     }
@@ -462,9 +464,11 @@ export function personaFurnish(
   variant: number,
   floor: Floor,
   floorIndex: number,
-  seed: string
+  seed: string,
+  /** Clear height of this storey, for the pieces that hang from its ceiling. */
+  ceil: number = CEIL
 ): Item[] {
   const out = roomTreatment(archetype, variant, floor, seed)
-  if (floorIndex === 0) out.push(...streetLevel(archetype, variant, seed))
+  if (floorIndex === 0) out.push(...streetLevel(archetype, variant, seed, ceil))
   return out
 }
