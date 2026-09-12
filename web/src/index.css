@@ -3966,6 +3966,12 @@ footer {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
+/* The closed building's sign is read from across a street. */
+.bld-sign--shell {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
 /* The same name on the dollhouse's front parapet, where it is read at the
    size of a shopfront sign rather than a doorplate. */
 .bld-sign--board {
