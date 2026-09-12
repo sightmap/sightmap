@@ -166,8 +166,24 @@ WebMCP tool IR, so an agent calls \`search_flights(origin, destination, date)\`
 instead of guessing which element on the page is the search box.
 
 WebMCP is an early W3C proposal from Google and Microsoft for how a page hands
-the agent in the same browser tab a list of callable actions. Sightkick
-compiles that surface from the outside, for apps that do not declare one.
+the agent in the same browser tab a list of callable actions. The tools live in
+the site's own pages, so there is no marketplace to apply to: any agent that
+opens the site can use them. Sightkick compiles that surface from the outside,
+for apps that do not declare one. The output is a runtime script and a tool
+file you deploy with the app; agents can use the site as soon as they are live.
+
+## One prompt
+
+The prompt on the page runs the whole loop in a coding agent: map the app,
+compile and check the tools, ship the runtime and a \`webmcp.txt\`. Before the
+first deploy it generates a claim token (\`openssl rand -hex 16\`) and writes it
+into that file as \`# sightmap-claim: <token>\`. Listing the site in the Atlas at
+${SITE_URL}/atlas is an optional last step for owners who want to show their
+work (\`POST ${SITE_URL}/api/atlas/submit\` with the same token as \`claim\`). A
+submission that carries the claim answers with a card URL,
+\`${SITE_URL}/try/<host>\`, the owner can share immediately; the Atlas listing
+itself appears only after a maintainer reviews it. Nothing about the tools on
+the site depends on either.
 
 ## How the two fit together
 
