@@ -3,7 +3,18 @@ import { describe, expect, it } from 'vitest'
 import { BuildingModelContext, useBuildingModel } from './context'
 import { modelFromBlueprint } from './adapt'
 import { DEMO_MODEL, FLOORS, JOURNEYS, LANES, RISERS } from './model'
-import { PALETTES, ROOF_STYLES, paletteColor, roofParts, windowGrid } from './facade'
+import {
+  PALETTES,
+  ROOF_STYLES,
+  groundFloorParts,
+  paletteColor,
+  roofParts,
+  rooftopItem,
+  windowGrid,
+  windowMullions,
+} from './facade'
+
+const ROOFTOP_KINDS_SEEN = ['tank', 'antenna', 'solar', 'garden']
 import { FIXTURE_BLUEPRINT } from './fixture'
 import type { Archetype } from '@/types/blueprint'
 
@@ -139,5 +150,49 @@ describe('closed-mode facade', () => {
     expect(a.map((w) => w.lit).join('')).not.toBe(c.map((w) => w.lit).join(''))
     // Every window sits on a wall of the building it belongs to.
     for (const w of a) expect(w.y).toBeGreaterThan(0)
+  })
+})
+
+describe('closed-mode street level', () => {
+  it('gives every archetype a ground floor and a rooftop item', () => {
+    const archetypes = Object.keys(PALETTES) as Archetype[]
+    for (const a of archetypes) {
+      for (const v of [0, 1, 2]) {
+        const street = groundFloorParts(a, v)
+        expect(street.length, `${a}/${v}`).toBeGreaterThan(1)
+        for (const part of street) {
+          // Everything stands on the pavement and under the second storey's
+          // sill, bar a canopy or a marquee reaching over the street.
+          expect(part.y, `${a}/${v} ${part.kind}`).toBeGreaterThan(-0.1)
+          expect(part.y, `${a}/${v} ${part.kind}`).toBeLessThan(3.2)
+        }
+        const roof = rooftopItem(a, v)
+        expect(ROOFTOP_KINDS_SEEN).toContain(roof.kind)
+        expect(roof.parts.length, `${a}/${v} ${roof.kind}`).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it('moves the ground floor and the roof with the variant', () => {
+    for (const a of Object.keys(PALETTES) as Archetype[]) {
+      const looks = [0, 1, 2].map((v) => JSON.stringify(groundFloorParts(a, v)))
+      expect(new Set(looks).size, a).toBeGreaterThan(1)
+      const tops = [0, 1, 2].map((v) => rooftopItem(a, v).kind)
+      expect(new Set(tops).size, a).toBe(3)
+    }
+  })
+
+  it('frames the windows the mask left, and only those', () => {
+    const windows = windowGrid(3, 4242)
+    const parts = windowMullions(windows)
+    expect(parts.length).toBeGreaterThan(windows.length)
+    // A mullion belongs to a storey a window is on, never to an empty wall.
+    const storeys = new Set(windows.map((w) => w.y.toFixed(3)))
+    for (const p of parts) {
+      const y = p.kind === 'box' ? p.y : p.y
+      expect([...storeys].some((s) => Math.abs(Number(s) - y) < 0.6)).toBe(true)
+    }
+    // No windows, no frames.
+    expect(windowMullions([])).toEqual([])
   })
 })

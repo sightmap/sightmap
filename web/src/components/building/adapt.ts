@@ -34,5 +34,7 @@ export function modelFromBlueprint(blueprint: Blueprint): BuildingModel {
     risers: [],
     facade: { ...blueprint.facade },
     seed: blueprint.seed,
+    derived: true,
+    tools: blueprint.stats.tools,
   }
 }

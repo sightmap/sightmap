@@ -3930,6 +3930,12 @@ footer {
 }
 
 .atlas-building__tour {
+  /* While the tour runs this carries the walk's name, which can be a whole
+     sentence of intent; it grows to a point and then truncates. */
+  max-width: min(22rem, 60vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 0.45rem 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 999px;
@@ -3955,7 +3961,7 @@ footer {
   color: var(--text-dim);
 }
 
-/* The sign over a closed building's door, anchored in the scene. */
+/* The sign over a building's door, anchored in the scene. */
 .bld-sign {
   padding: 0.1rem 0.4rem;
   font-family: var(--mono);
@@ -3964,6 +3970,55 @@ footer {
   color: #f6f2ea;
   white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* The closed building's sign is read from across a street. */
+.bld-sign--shell {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
+/* The same name on the dollhouse's front parapet, where it is read at the
+   size of a shopfront sign rather than a doorplate. */
+.bld-sign--board {
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The plate under it: what the scan actually counted. */
+.bld-plate {
+  padding: 0 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  color: #f6f2ea;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Tool names over the rooms, once the building is close enough to read. */
+.bld-room {
+  padding: 0.12rem 0.34rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(61, 57, 41, 0.18);
+  box-shadow: 0 4px 14px rgba(20, 40, 90, 0.16);
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  line-height: 1.2;
+  color: var(--text-bright);
+  white-space: nowrap;
+  will-change: opacity;
+}
+
+.bld-room--floor {
+  display: inline-block;
+  font-size: 0.46rem;
+  background: rgba(26, 23, 20, 0.86);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fbf8f2;
+  letter-spacing: 0.06em;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -24,7 +24,9 @@ export const ORBIT_LIMIT = 60
 const BASE_AZ = 42
 const CAMERA_DISTANCE = 42
 const WALK = 2.0
-const DWELL = 0.8
+/** How long a walker stands in a room before moving on. Long enough to read
+ *  the room's label and see which one it is standing in. */
+const DWELL = 1.5
 /** More walkers than this on a listing is noise, not information. */
 const MAX_WALKS = 4
 
@@ -36,6 +38,8 @@ export interface ListingSceneProps {
   onReady: () => void
   /** Every walker has reached its last stop. */
   onTourEnd: () => void
+  /** The walk currently under way, or null when none has set off yet. */
+  onWalkChange?: (name: string | null) => void
 }
 
 function lookHeight(model: BuildingModel): number {
@@ -101,11 +105,13 @@ function Tourist({
   journey,
   path,
   touring,
+  onStart,
   onDone,
 }: {
   journey: Journey
   path: Path
   touring: boolean
+  onStart: () => void
   onDone: () => void
 }) {
   const s = useShared()
@@ -113,6 +119,7 @@ function Tourist({
   const run = useRef<Run>({ d: 0, dwell: DWELL, next: 1, wait: journey.delay, done: false })
   const tmp = useMemo(() => new THREE.Vector3(), [])
   const reported = useRef(false)
+  const started = useRef(false)
   const color = TRAVELLER_COLORS[journey.who]
 
   useFrame((_, dt) => {
@@ -125,6 +132,7 @@ function Tourist({
       r.wait = journey.delay
       r.done = false
       reported.current = false
+      started.current = false
       if (g.current) g.current.visible = false
       return
     }
@@ -146,6 +154,10 @@ function Tourist({
       }
     } else if (!r.done) {
       r.done = true
+    }
+    if (!started.current && r.wait <= 0) {
+      started.current = true
+      onStart()
     }
     if (r.done && !reported.current) {
       reported.current = true
@@ -180,21 +192,50 @@ function walksOf(model: BuildingModel): { journey: Journey; path: Path }[] {
   return out
 }
 
-function Tour({ touring, onTourEnd }: { touring: boolean; onTourEnd: () => void }) {
+function Tour({
+  touring,
+  onTourEnd,
+  onWalkChange,
+}: {
+  touring: boolean
+  onTourEnd: () => void
+  onWalkChange?: (name: string | null) => void
+}) {
   const model = useBuildingModel()
   const walks = useMemo(() => walksOf(model), [model])
   const journeys = walks.map((w) => w.journey)
   const left = useRef(journeys.length)
-  const done = useCallback(() => {
-    left.current -= 1
-    if (left.current <= 0) onTourEnd()
-  }, [onTourEnd])
+  // Walkers set off on a stagger, so the button names the one that most
+  // recently left the front door and falls back as each of them arrives.
+  const running = useRef<string[]>([])
+  const announce = useCallback(() => {
+    onWalkChange?.(running.current[running.current.length - 1] ?? null)
+  }, [onWalkChange])
+  const start = useCallback(
+    (name: string) => {
+      running.current.push(name)
+      announce()
+    },
+    [announce]
+  )
+  const done = useCallback(
+    (name: string) => {
+      const i = running.current.indexOf(name)
+      if (i >= 0) running.current.splice(i, 1)
+      announce()
+      left.current -= 1
+      if (left.current <= 0) onTourEnd()
+    },
+    [announce, onTourEnd]
+  )
   useEffect(() => {
     left.current = journeys.length
+    running.current = []
+    onWalkChange?.(null)
     // Nothing routes, so the tour is over before it starts and the button
     // goes back to offering it rather than sticking on "stop".
     if (touring && journeys.length === 0) onTourEnd()
-  }, [touring, journeys.length, onTourEnd])
+  }, [touring, journeys.length, onTourEnd, onWalkChange])
   if (journeys.length === 0) return null
   return (
     <>
@@ -209,14 +250,27 @@ function Tour({ touring, onTourEnd }: { touring: boolean; onTourEnd: () => void 
             visible={touring}
             depthWrite={false}
           />
-          <Tourist journey={j} path={path} touring={touring} onDone={done} />
+          <Tourist
+            journey={j}
+            path={path}
+            touring={touring}
+            onStart={() => start(j.name)}
+            onDone={() => done(j.name)}
+          />
         </group>
       ))}
     </>
   )
 }
 
-export default function ListingScene({ model, shared, touring, onReady, onTourEnd }: ListingSceneProps) {
+export default function ListingScene({
+  model,
+  shared,
+  touring,
+  onReady,
+  onTourEnd,
+  onWalkChange,
+}: ListingSceneProps) {
   const drag = useRef<number | null>(null)
   const start = useRef(0)
 
@@ -257,7 +311,7 @@ export default function ListingScene({ model, shared, touring, onReady, onTourEn
           <Lights />
           <Tower mode="dollhouse" />
           <Core />
-          <Tour touring={touring} onTourEnd={onTourEnd} />
+          <Tour touring={touring} onTourEnd={onTourEnd} onWalkChange={onWalkChange} />
         </SharedStateContext.Provider>
       </BuildingModelContext.Provider>
     </Canvas>

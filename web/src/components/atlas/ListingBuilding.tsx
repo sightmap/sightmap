@@ -51,6 +51,7 @@ export default function ListingBuilding({ blueprint, scannedAt }: ListingBuildin
   const [ready, setReady] = useState(false)
   const [touring, setTouring] = useState(false)
   const [reduced, setReduced] = useState(false)
+  const [walk, setWalk] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -63,10 +64,13 @@ export default function ListingBuilding({ blueprint, scannedAt }: ListingBuildin
 
   const onReady = useCallback(() => setReady(true), [])
   const onTourEnd = useCallback(() => setTouring(false), [])
+  const onWalkChange = useCallback((name: string | null) => setWalk(name), [])
 
   const walks = model.journeys.length
-  // The drawing is isometric, so a taller building needs a taller stage.
-  const stage = Math.round(190 + model.floors.length * FLOOR_H * 34)
+  // The drawing is isometric, so a taller building needs a taller stage. The
+  // stage is also what sets the zoom, so it is generous: a building whose
+  // rooms carry tool names has to be big enough to read them.
+  const stage = Math.round(258 + model.floors.length * FLOOR_H * 46)
 
   return (
     <BuildingModelContext.Provider value={model}>
@@ -90,15 +94,30 @@ export default function ListingBuilding({ blueprint, scannedAt }: ListingBuildin
                 touring={touring}
                 onReady={onReady}
                 onTourEnd={onTourEnd}
+                onWalkChange={onWalkChange}
               />
             </Suspense>
           )}
           {mounted && webgl && walks > 0 && (
             <div className="atlas-building__controls">
-              <button type="button" className="atlas-building__tour" onClick={() => setTouring((t) => !t)}>
+              <button
+                type="button"
+                className="atlas-building__tour"
+                onClick={() => setTouring((t) => !t)}
+                aria-label={touring ? 'Stop the tour' : 'Start the tour'}
+              >
                 {/* Reduced motion gets the routes drawn and the walkers
-                    parked, so the button says what it will actually do. */}
-                {reduced ? (touring ? 'Hide the routes' : 'Show the routes') : touring ? 'Stop the tour' : 'Tour'}
+                    parked, so the button says what it will actually do.
+                    While the tour runs it names the walk under way, since
+                    that is the one piece of the tour the drawing cannot
+                    say by itself. */}
+                {reduced
+                  ? touring
+                    ? 'Hide the routes'
+                    : 'Show the routes'
+                  : touring
+                    ? (walk ?? 'Stop the tour')
+                    : 'Tour'}
               </button>
             </div>
           )}

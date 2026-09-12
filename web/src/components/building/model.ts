@@ -91,6 +91,14 @@ export interface BuildingModel {
   facade?: Facade
   /** Source of every seeded choice in the shell (the window grid). */
   seed: number
+  /**
+   * This building was derived from a listing's blueprint rather than written
+   * by hand. The demo corpus is not, so the /building page keeps the interior
+   * it has always had while a listing's building wears its archetype.
+   */
+  derived?: boolean
+  /** Tools the scan found, for the plate under the sign. */
+  tools?: number
 }
 
 /** What `closed` mode draws. Mirrors `BlueprintFacade` without importing it. */
