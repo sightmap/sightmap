@@ -3955,7 +3955,7 @@ footer {
   color: var(--text-dim);
 }
 
-/* The sign over a closed building's door, anchored in the scene. */
+/* The sign over a building's door, anchored in the scene. */
 .bld-sign {
   padding: 0.1rem 0.4rem;
   font-family: var(--mono);
@@ -3964,6 +3964,25 @@ footer {
   color: #f6f2ea;
   white-space: nowrap;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* The same name on the dollhouse's front parapet, where it is read at the
+   size of a shopfront sign rather than a doorplate. */
+.bld-sign--board {
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The plate under it: what the scan actually counted. */
+.bld-plate {
+  padding: 0 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.54rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #26272c;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {

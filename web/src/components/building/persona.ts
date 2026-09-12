@@ -26,7 +26,7 @@ const FRONT = FLOOR_D / 2
 const BAND = 2.3
 
 const WOOD = '#d8bf9a'
-const DARKWOOD = '#8b6a4a'
+const DARKWOOD = '#6f5236'
 const DARK = '#2b2d33'
 const WHITE = '#f6f2ea'
 const CREAM = '#e9e2d6'
@@ -102,29 +102,25 @@ function shelving(
   r: () => number,
   ry = 0
 ): void {
+  // Books sit proud of the carcass on the side the camera is on, so a run of
+  // shelving reads as books rather than as a plank.
+  const face = depth * 0.34
   const along = (u: number): [number, number] =>
-    ry === 0 ? [x + u, z] : [x, z + u]
+    ry === 0 ? [x + u, z + face] : [x + face, z + u]
   const size = (a: number, b: number): [number, number, number] =>
     ry === 0 ? [a, h, b] : [b, h, a]
   out.push(it('shelf', x, y + h / 2, z, size(len, depth), DARKWOOD))
+  const shelves = h > 1.3 ? 3 : 2
   const n = Math.floor(len / 0.17)
   for (let i = 0; i < n; i++) {
     if (r() < 0.22) continue
     const u = -len / 2 + 0.09 + i * 0.17
     const [bx, bz] = along(u)
-    const bh = 0.2 + r() * 0.12
-    for (const row of [0.22, h * 0.55, h * 0.55 + 0.42].slice(0, h > 1.2 ? 3 : 2)) {
-      if (r() < 0.25) continue
-      out.push(
-        it(
-          'book',
-          bx,
-          y + row + bh / 2,
-          bz,
-          size(0.1, depth * 0.72),
-          BOOKS[Math.floor(r() * BOOKS.length)]
-        )
-      )
+    const bh = 0.22 + r() * 0.14
+    for (let k = 0; k < shelves; k++) {
+      if (r() < 0.22) continue
+      const sy = y + 0.16 + (k * (h - 0.3)) / shelves
+      out.push(it('book', bx, sy + bh / 2, bz, size(0.11, depth * 0.6), BOOKS[Math.floor(r() * BOOKS.length)]))
     }
   }
 }
@@ -133,7 +129,7 @@ function shelving(
 // Street level: the open front aisle of the ground floor.
 
 const AWNING_COLORS = ['#c9456d', '#2f7d5e', '#b8860b']
-const CANOPY_COLORS = ['#7fb3c9', '#8fc0a9', '#c3d3dd']
+const CANOPY_COLORS = ['#2f7d8f', '#3f8f6a', '#4a7fb8']
 
 /** A striped canopy hung over the open face, sloping down toward the street. */
 function canopy(out: Item[], color: string, stripes: number, width: number, y: number): void {
@@ -225,8 +221,9 @@ function streetLevel(archetype: Archetype, variant: number, seed: string): Item[
       const bay = (FLOOR_W - 1.2) / teeth
       for (let i = 0; i < teeth; i++) {
         const x = -(FLOOR_W - 1.2) / 2 + bay * (i + 0.5)
-        out.push(it('awning', x, CEIL - 0.28, -0.2, [bay * 0.92, 0.06, FLOOR_D - 1.0], '#cfe3f5', 0, -0.42))
-        out.push(it('column', x - bay * 0.44, CEIL - 0.42, -0.2, [0.07, 0.34, FLOOR_D - 1.0], DARK))
+        out.push(it('awning', x, CEIL - 0.3, -0.2, [bay * 0.92, 0.06, FLOOR_D - 1.0], '#9ec6ea', 0, -0.46))
+        out.push(it('column', x - bay * 0.46, CEIL - 0.5, -0.2, [0.09, 0.52, FLOOR_D - 1.0], DARK))
+        out.push(it('column', x + bay * 0.46, CEIL - 0.2, -0.2, [0.09, 0.16, FLOOR_D - 1.0], DARK))
       }
       break
     }
@@ -298,7 +295,11 @@ function streetLevel(archetype: Archetype, variant: number, seed: string): Item[
     }
     case 'clinic': {
       // A clean canopy over the door, and reception under it.
-      canopy(out, CANOPY_COLORS[v], 3, FLOOR_W * 0.5, 1.86)
+      canopy(out, CANOPY_COLORS[v], 3, FLOOR_W * 0.46, 1.72)
+      // The one mark a clinic is known by, painted on top of the canopy where
+      // the view from above reads it.
+      out.push(it('awning', 0, 1.79, FRONT + 0.42, [1.3, 0.05, 0.4], WHITE, 0, -0.36))
+      out.push(it('awning', 0, 1.79, FRONT + 0.42, [0.44, 0.05, 1.2], WHITE, 0, -0.36))
       out.push(it('counter', -1.9, 0.28, BAND + 0.55, [3.8, 0.56, 0.7], WHITE))
       out.push(it('counter', -1.9, 0.59, BAND + 0.55, [3.96, 0.06, 0.84], CANOPY_COLORS[v]))
       out.push(it('counter', 0.35, 0.28, BAND + 1.15, [0.7, 0.56, 1.3], WHITE))
@@ -327,8 +328,6 @@ function streetLevel(archetype: Archetype, variant: number, seed: string): Item[
       }
       person(out, -2.4, BAND + 0.75 - 0.82, 0.2, 0, r)
       person(out, -1.2, BAND + 0.75 + 0.82, 0.2, Math.PI, r)
-      // A stack run against the front edge, so the shelves read from outside.
-      shelving(out, 2.9, 0, BAND + 0.45, 3.4, 1.7, 0.36, r)
       break
     }
     case 'office':
@@ -347,8 +346,12 @@ function roomTreatment(archetype: Archetype, variant: number, floor: Floor, seed
   switch (archetype) {
     case 'library': {
       // Stacks: rows of thin tall boxes, denser on the higher variants.
+      // One run down the left of every floor. Shorter than the floor and no
+      // taller than a person, so the stacks read from outside without walling
+      // the rooms behind them off.
+      shelving(out, -1.5, 0, 2.62, FLOOR_W - 4.2, 1.24, 0.3, r)
       const rows = 3 + v
-      for (const room of pickRooms(floor, ['content', 'data'], 5)) {
+      for (const room of pickRooms(floor, ['content', 'data'], 6)) {
         const y = roomY(room)
         const long = room.w >= room.d
         const len = (long ? room.w : room.d) - 0.35
@@ -358,7 +361,7 @@ function roomTreatment(archetype: Archetype, variant: number, floor: Floor, seed
           const off = -dep / 2 + (dep / n) * (i + 0.5)
           const x = long ? room.x : room.x + off
           const z = long ? room.z + off : room.z
-          shelving(out, x, y, z, len, 1.45, 0.28, r, long ? 0 : Math.PI / 2)
+          shelving(out, x, y, z, len, 1.62, 0.3, r, long ? 0 : Math.PI / 2)
         }
       }
       break
