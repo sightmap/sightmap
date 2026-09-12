@@ -3930,6 +3930,12 @@ footer {
 }
 
 .atlas-building__tour {
+  /* While the tour runs this carries the walk's name, which can be a whole
+     sentence of intent; it grows to a point and then truncates. */
+  max-width: min(22rem, 60vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 0.45rem 0.9rem;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 999px;
