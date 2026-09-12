@@ -23,6 +23,13 @@ export type ItemType =
   | 'partition'
   | 'rail'
   | 'counter'
+  // Persona pieces (persona.ts): a sloped canopy, a round column, a crate and
+  // a bed. Boxes and cylinders like everything above, so one instanced mesh
+  // per type per floor still covers the whole building.
+  | 'awning'
+  | 'column'
+  | 'crate'
+  | 'bed'
 
 export interface Item {
   type: ItemType
@@ -31,6 +38,9 @@ export interface Item {
   y: number
   z: number
   ry: number
+  /** Tilt, for pieces that are not upright (a canopy, a vault door). */
+  rx?: number
+  rz?: number
   sx: number
   sy: number
   sz: number

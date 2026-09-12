@@ -18,6 +18,7 @@ import {
   type Room,
 } from './model'
 import { furnish, type Item, type ItemType } from './furnish'
+import { personaFurnish } from './persona'
 import { sheetLinePoints } from './geometry'
 import { smoothstep } from './chapters'
 import { useBuildingModel } from './context'
@@ -84,6 +85,10 @@ function useMaterials(): Mats {
       partition: plain({ transparent: true, opacity: 0.22, roughness: 0.1, depthWrite: false }),
       rail: plain({ roughness: 0.5 }),
       counter: plain({ roughness: 0.6 }),
+      awning: plain({ roughness: 0.8 }),
+      column: plain({ roughness: 0.85 }),
+      crate: plain({ roughness: 0.95 }),
+      bed: plain({ roughness: 0.8 }),
     }
     return {
       kinds,
@@ -158,6 +163,10 @@ const GEOM: Record<ItemType, THREE.BufferGeometry> = {
   partition: unitBox,
   rail: unitBox,
   counter: unitBox,
+  awning: unitBox,
+  column: unitCyl,
+  crate: unitBox,
+  bed: unitBox,
 }
 const NO_SHADOW: ItemType[] = ['partition', 'leaf', 'book']
 
@@ -188,7 +197,7 @@ function Furniture({ items, mats }: { items: Item[]; mats: Mats }) {
             <Instance
               key={k}
               position={[it.x, it.y, it.z]}
-              rotation={[0, it.ry, 0]}
+              rotation={[it.rx ?? 0, it.ry, it.rz ?? 0]}
               scale={[it.sx, it.sy, it.sz]}
               color={it.color}
             />
@@ -300,7 +309,15 @@ function FloorUnit({ model, index: i, mats, t0 }: { model: BuildingModel; index:
   const rooms = useRef<THREE.Group>(null)
   const walls = useRef<THREE.Group>(null)
   const pts = useMemo(() => sheetLinePoints(model, i), [model, i])
-  const items = useMemo(() => floor.rooms.flatMap((r) => furnish(r)), [floor])
+  const items = useMemo(() => {
+    const out = floor.rooms.flatMap((r) => furnish(r))
+    // Only a building derived from a scan wears a persona; the demo corpus is
+    // the office it has always been.
+    if (model.derived && model.facade) {
+      out.push(...personaFurnish(model.facade.archetype, model.facade.variant, floor, i, `${model.seed}`))
+    }
+    return out
+  }, [floor, i, model.derived, model.facade, model.seed])
   // LineSegments2 accumulates dash distance across every segment, so one
   // growing dash draws the sheet in sequence: border, footprint, then rooms.
   const total = useMemo(() => {
