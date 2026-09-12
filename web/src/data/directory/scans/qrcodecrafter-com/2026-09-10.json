@@ -1,0 +1,991 @@
+{
+  "version": 1,
+  "url": "https://qrcodecrafter.com/",
+  "finalUrl": "https://qrcodecrafter.com/",
+  "host": "qrcodecrafter.com",
+  "scannedAt": "2026-09-10T00:49:43.820Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "sightmap dev"
+  },
+  "surface": "polyfilled",
+  "status": "needs-review",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://qrcodecrafter.com/",
+      "path": "/",
+      "title": "Free QR Code Generator With Logo",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "generate_verified_qr",
+        "generate_bulk_qr",
+        "create_dynamic_qr",
+        "manage_dynamic_qr",
+        "create_dynamic_qr_campaign",
+        "create_qr_vault",
+        "manage_qr_vault",
+        "create_print_ready_qr_campaign",
+        "generate_qr",
+        "create_static_qr_code"
+      ]
+    },
+    {
+      "url": "https://qrcodecrafter.com/wifi",
+      "path": "/wifi",
+      "title": "Custom WiFi QR Code Generator | QR Code Crafter",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "generate_verified_qr",
+        "generate_bulk_qr",
+        "create_dynamic_qr",
+        "manage_dynamic_qr",
+        "create_dynamic_qr_campaign",
+        "create_qr_vault",
+        "manage_qr_vault",
+        "create_print_ready_qr_campaign",
+        "generate_qr",
+        "create_wifi_qr_code"
+      ]
+    },
+    {
+      "url": "https://qrcodecrafter.com/vcard",
+      "path": "/vcard",
+      "title": "Free vCard QR Code Generator for Contact Cards | QR Code Crafter",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "generate_verified_qr",
+        "generate_bulk_qr",
+        "create_dynamic_qr",
+        "manage_dynamic_qr",
+        "create_dynamic_qr_campaign",
+        "create_qr_vault",
+        "manage_qr_vault",
+        "create_print_ready_qr_campaign",
+        "generate_qr",
+        "import_vcard_contact",
+        "create_vcard_qr_code"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "generate_verified_qr",
+      "description": "Generate a static QR asset, structurally review its payload, assess quiet zone and contrast settings, decode the final SVG, PNG, JPG, or WebP file, compare payload hashes, and return an evidence-linked receipt. Asset bytes are returned only when final-file decoding matches the requested payload.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "bgColor": {
+            "default": "#ffffff",
+            "description": "Background color as a six-digit hex value.",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "type": "string"
+          },
+          "contentType": {
+            "description": "Optional hint describing the QR payload type. This does not change generation behavior but helps agents choose examples and validation.",
+            "enum": [
+              "url",
+              "appstore",
+              "social",
+              "text",
+              "wifi",
+              "email",
+              "sms",
+              "phone",
+              "whatsapp",
+              "vcard",
+              "event",
+              "location",
+              "crypto",
+              "pix",
+              "upi",
+              "phonepe",
+              "swish",
+              "sepa",
+              "ideal",
+              "mobilepayvipps",
+              "qris",
+              "paypal",
+              "venmo",
+              "cashapp",
+              "promptpay",
+              "vietqr",
+              "swissqr"
+            ],
+            "type": "string"
+          },
+          "errorCorrectionLevel": {
+            "default": "H",
+            "description": "QR error correction level. Use H when embedding logos.",
+            "enum": [
+              "L",
+              "M",
+              "Q",
+              "H"
+            ],
+            "type": "string"
+          },
+          "fgColor": {
+            "default": "#000000",
+            "description": "Foreground color as a six-digit hex value.",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "type": "string"
+          },
+          "format": {
+            "default": "png",
+            "description": "Output format to generate and decode. Verification supports SVG, PNG, JPG, and WebP.",
+            "enum": [
+              "svg",
+              "png",
+              "jpg",
+              "webp"
+            ],
+            "type": "string"
+          },
+          "logo": {
+            "description": "Optional PNG, JPG, or WebP data URL for a centered logo. Keep source files under 1MB.",
+            "maxLength": 1398230,
+            "pattern": "^data:image\\/(png|jpe?g|webp);base64,[A-Za-z0-9+/]+={0,2}$",
+            "type": "string"
+          },
+          "margin": {
+            "default": 4,
+            "description": "Quiet-zone margin around the QR code.",
+            "maximum": 16,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "size": {
+            "default": 1024,
+            "description": "Requested output size in pixels for raster/SVG output or points for PDF/EPS.",
+            "maximum": 4096,
+            "minimum": 256,
+            "type": "integer"
+          },
+          "value": {
+            "description": "Exact QR payload to encode, such as an HTTPS URL, WIFI payload, vCard, calendar event, payment URI, or text.",
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "description mentions \"compare\"",
+      "warnings": []
+    },
+    {
+      "name": "generate_bulk_qr",
+      "description": "Generate a ZIP archive of up to 50 static QR code files from CSV or row objects. Use for labels, classrooms, packaging, menus, and agent batch workflows.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "bgColor": {
+            "default": "#ffffff",
+            "description": "Shared background hex color.",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "type": "string"
+          },
+          "errorCorrectionLevel": {
+            "default": "H",
+            "description": "Shared QR error correction level.",
+            "enum": [
+              "L",
+              "M",
+              "Q",
+              "H"
+            ],
+            "type": "string"
+          },
+          "fgColor": {
+            "default": "#111111",
+            "description": "Shared foreground hex color.",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "type": "string"
+          },
+          "format": {
+            "default": "svg",
+            "description": "Shared output format for every generated file. Prefer svg for large batches.",
+            "enum": [
+              "svg",
+              "png",
+              "jpg",
+              "webp",
+              "pdf",
+              "eps"
+            ],
+            "type": "string"
+          },
+          "margin": {
+            "default": 4,
+            "description": "Shared quiet-zone margin.",
+            "maximum": 16,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "rows": {
+            "description": "Rows to include in the ZIP archive. Use up to 50 rows per request.",
+            "oneOf": [
+              {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "filename": {
+                      "description": "Optional filename stem for this generated QR file.",
+                      "maxLength": 64,
+                      "type": "string"
+                    },
+                    "value": {
+                      "description": "Exact QR payload for this file.",
+                      "maxLength": 2048,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "maxItems": 50,
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "description": "CSV rows such as filename,value or value,filename.",
+                "maxLength": 220000,
+                "type": "string"
+              }
+            ]
+          },
+          "size": {
+            "default": 1024,
+            "description": "Shared QR output size.",
+            "maximum": 4096,
+            "minimum": 256,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "unclassified — defaults to action until reviewed",
+      "warnings": []
+    },
+    {
+      "name": "create_dynamic_qr",
+      "description": "Create an editable public HTTPS redirect and return its stable QR URL plus a one-time private management capability.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "destination": {
+            "description": "Public HTTPS destination. Private, local, credential-bearing, and sensitive-token URLs are rejected.",
+            "format": "uri",
+            "maxLength": 2048,
+            "minLength": 1,
+            "pattern": "^https://",
+            "type": "string"
+          },
+          "label": {
+            "description": "Optional private label for identifying the managed redirect.",
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "required": [
+          "destination"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    },
+    {
+      "name": "manage_dynamic_qr",
+      "description": "Read, update, pause, resume, rotate, or permanently delete a dynamic QR redirect using its private capability. Changes fetch the current ETag first.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "default": "read",
+            "description": "Read, update, pause, resume, rotate, or permanently delete the dynamic QR redirect.",
+            "enum": [
+              "read",
+              "update",
+              "pause",
+              "resume",
+              "rotate",
+              "delete"
+            ],
+            "type": "string"
+          },
+          "destination": {
+            "description": "Replacement public HTTPS destination, required when updating the URL.",
+            "format": "uri",
+            "maxLength": 2048,
+            "pattern": "^https://",
+            "type": "string"
+          },
+          "label": {
+            "description": "Optional replacement private label for an update action.",
+            "maxLength": 80,
+            "type": "string"
+          },
+          "managementToken": {
+            "description": "Private 43-character bearer capability. Never include it in public QR artwork.",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          },
+          "slug": {
+            "description": "Public 22-character identifier from the redirect or management URL.",
+            "pattern": "^[A-Za-z0-9_-]{22}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "slug",
+          "managementToken"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "sensitive",
+      "riskReason": "description mentions \"delete\"",
+      "warnings": []
+    },
+    {
+      "name": "create_dynamic_qr_campaign",
+      "description": "Sequentially create up to five editable HTTPS redirects and return a private manifest with explicit partial failures and one-time management capabilities.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "rows": {
+            "description": "One to five dynamic redirect records. Creation is sequential and partial failures are returned without automatic retry.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "destination": {
+                  "description": "Public HTTPS destination. Private, local, credential-bearing, and sensitive-token URLs are rejected.",
+                  "format": "uri",
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "pattern": "^https://",
+                  "type": "string"
+                },
+                "filename": {
+                  "description": "Optional local asset filename retained only in the returned manifest.",
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                "label": {
+                  "description": "Optional private label for identifying the managed redirect.",
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                "placement": {
+                  "description": "Optional private placement note retained only in the returned manifest.",
+                  "maxLength": 120,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "destination"
+              ],
+              "type": "object"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    },
+    {
+      "name": "create_qr_vault",
+      "description": "Create a private capability-managed vault for up to 50 dynamic QR redirects. Empty vaults expire after six hours; adding a QR makes the project durable.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 80,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    },
+    {
+      "name": "manage_qr_vault",
+      "description": "Read analytics, rename, delete, or manage project-owned dynamic QR redirects using one private vault capability. Mutations fetch the current ETag first.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "read",
+              "read_analytics",
+              "rename",
+              "delete",
+              "create_qr",
+              "update_qr",
+              "pause_qr",
+              "resume_qr",
+              "delete_qr"
+            ],
+            "type": "string"
+          },
+          "destination": {
+            "format": "uri",
+            "maxLength": 2048,
+            "pattern": "^https://",
+            "type": "string"
+          },
+          "folder": {
+            "maxLength": 40,
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 80,
+            "type": "string"
+          },
+          "managementToken": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "type": "string"
+          },
+          "slug": {
+            "pattern": "^[A-Za-z0-9_-]{22}$",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "maxLength": 24,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 8,
+            "type": "array"
+          },
+          "vaultId": {
+            "pattern": "^[A-Za-z0-9_-]{22}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "vaultId",
+          "managementToken"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "sensitive",
+      "riskReason": "description mentions \"delete\"",
+      "warnings": []
+    },
+    {
+      "name": "create_print_ready_qr_campaign",
+      "description": "Turn a brief of one to five safe HTTPS destinations into editable or static print campaign records, generate each QR asset with conservative print defaults, decode-check every final digital file, and return explicit partial failures plus separate public and private manifests.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "campaignName": {
+            "description": "Required campaign name used in the returned manifests and inferred asset filenames.",
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+          },
+          "dynamic": {
+            "default": true,
+            "description": "Create editable QR Code Crafter redirects before generating the verified artwork.",
+            "type": "boolean"
+          },
+          "errorCorrectionLevel": {
+            "default": "H",
+            "description": "Print-safe QR error correction level. H is the conservative default.",
+            "enum": [
+              "M",
+              "Q",
+              "H"
+            ],
+            "type": "string"
+          },
+          "includeManifest": {
+            "default": true,
+            "description": "Include the public campaign manifest. Private capabilities are always returned separately when created.",
+            "type": "boolean"
+          },
+          "outputFormat": {
+            "default": "svg",
+            "description": "Verified SVG, PNG, JPG, or WebP output. SVG is the recommended commercial-print master.",
+            "enum": [
+              "svg",
+              "png",
+              "jpg",
+              "webp"
+            ],
+            "type": "string"
+          },
+          "physicalSizeMm": {
+            "default": 25,
+            "description": "Target printed width in millimetres. Raster assets are rendered at no less than 300 dpi.",
+            "maximum": 300,
+            "minimum": 20,
+            "type": "number"
+          },
+          "rows": {
+            "description": "One to five public HTTPS destinations. Processing is sequential and is never retried automatically.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "destination": {
+                  "description": "Public HTTPS destination. Private, local, credential-bearing, and sensitive-token URLs are rejected.",
+                  "format": "uri",
+                  "maxLength": 2048,
+                  "minLength": 1,
+                  "pattern": "^https://",
+                  "type": "string"
+                },
+                "filename": {
+                  "description": "Optional safe filename stem or filename with the selected extension.",
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "Short campaign label for the asset and manifest.",
+                  "maxLength": 80,
+                  "type": "string"
+                },
+                "placement": {
+                  "description": "Where the QR code will appear, such as A5 flyer main CTA.",
+                  "maxLength": 120,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "destination"
+              ],
+              "type": "object"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "campaignName",
+          "rows"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    },
+    {
+      "name": "generate_qr",
+      "description": "Generate a static QR code in SVG, PNG, JPG, WebP, PDF, or EPS format and return file metadata.",
+      "inputSchema": {
+        "properties": {
+          "bgColor": {
+            "description": "Background hex color such as #ffffff.",
+            "type": "string"
+          },
+          "contentType": {
+            "description": "Optional payload type hint: url, wifi, vcard, event, pix, upi, swish, sepa, paypal, promptpay, vietqr, or swissqr.",
+            "type": "string"
+          },
+          "errorCorrectionLevel": {
+            "description": "Error correction level: L, M, Q, or H.",
+            "type": "string"
+          },
+          "fgColor": {
+            "description": "Foreground hex color such as #000000.",
+            "type": "string"
+          },
+          "format": {
+            "description": "Output format: svg, png, jpg, webp, pdf, or eps.",
+            "type": "string"
+          },
+          "logo": {
+            "description": "Optional PNG, JPG, or WebP data URL under 1MB for a centered logo.",
+            "type": "string"
+          },
+          "margin": {
+            "description": "Quiet-zone margin from 0 to 16.",
+            "type": "number"
+          },
+          "size": {
+            "description": "Output size from 256 to 4096.",
+            "type": "number"
+          },
+          "value": {
+            "description": "Required QR payload to encode.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/wifi",
+        "/vcard"
+      ],
+      "impl": "declarative",
+      "api": "dom",
+      "risk": "action",
+      "riskReason": "unclassified — defaults to action until reviewed",
+      "warnings": []
+    },
+    {
+      "name": "create_static_qr_code",
+      "description": "Create a static QR code from URL, text, Wi-Fi, email, SMS, phone, WhatsApp, or vCard input.",
+      "inputSchema": {
+        "properties": {
+          "contentType": {
+            "description": "QR content type currently selected in the all-in-one generator.",
+            "type": "string"
+          },
+          "url": {
+            "description": "Website URL, landing page, document link, menu link, review link, app page, or campaign destination to encode.",
+            "type": "string"
+          },
+          "value": {
+            "description": "Generated payload for URL QR codes. Sensitive QR contents are omitted from this aggregate field; use the visible form fields or runtime generate_qr tool.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "declarative",
+      "api": "dom",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    },
+    {
+      "name": "create_wifi_qr_code",
+      "description": "Create a static Wi-Fi QR code for a network name, security type, and password.",
+      "inputSchema": {
+        "properties": {
+          "contentType": {
+            "description": "Generate a Wi-Fi QR code from the submitted network fields.",
+            "type": "string"
+          },
+          "hidden": {
+            "description": "Whether the Wi-Fi network is hidden from normal network lists.",
+            "type": "string"
+          },
+          "password": {
+            "description": "Wi-Fi password. Leave empty for open networks.",
+            "type": "string"
+          },
+          "security": {
+            "description": "Wi-Fi security type: WPA, WEP, or nopass for an open network.",
+            "type": "string"
+          },
+          "ssid": {
+            "description": "Wi-Fi network name, also known as the SSID.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/wifi",
+      "pages": [
+        "/wifi"
+      ],
+      "impl": "declarative",
+      "api": "dom",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": [
+        "metadata matches password"
+      ]
+    },
+    {
+      "name": "import_vcard_contact",
+      "description": "Import one local vCard 2.1, 3.0, or 4.0 .vcf file up to 256 KB to prefill the static contact QR code form without uploading the contact.",
+      "inputSchema": {
+        "properties": {
+          "vcardFile": {
+            "description": "Optional single-contact vCard 2.1, 3.0, or 4.0 .vcf file used locally to prefill the contact QR form. Maximum 256 KB.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/vcard",
+      "pages": [
+        "/vcard"
+      ],
+      "impl": "declarative",
+      "api": "dom",
+      "risk": "action",
+      "riskReason": "unclassified — defaults to action until reviewed",
+      "warnings": []
+    },
+    {
+      "name": "create_vcard_qr_code",
+      "description": "Create a static vCard contact QR code from required identity, phone, and email fields.",
+      "inputSchema": {
+        "properties": {
+          "email": {
+            "description": "Required email address to encode in the vCard QR code.",
+            "type": "string"
+          },
+          "form_submission_time": {
+            "description": "Internal anti-abuse timestamp captured when the form first rendered. Agents should leave this field unchanged.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Required full contact name to encode in the vCard QR code.",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Required phone number to encode in the vCard QR code.",
+            "type": "string"
+          },
+          "phone_confirm": {
+            "description": "Internal anti-abuse field. Leave this field empty.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "phone"
+        ],
+        "type": "object"
+      },
+      "page": "/vcard",
+      "pages": [
+        "/vcard"
+      ],
+      "impl": "declarative",
+      "api": "dom",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "13/13"
+    },
+    {
+      "id": "described",
+      "label": "Every tool has a description",
+      "ok": true,
+      "detail": "13/13"
+    },
+    {
+      "id": "input-schema",
+      "label": "Every tool has an input schema",
+      "ok": true,
+      "detail": "13/13"
+    },
+    {
+      "id": "snake-case",
+      "label": "Tool names are snake_case",
+      "ok": true,
+      "detail": "13/13"
+    },
+    {
+      "id": "unique",
+      "label": "Tool names are unique",
+      "ok": true,
+      "detail": "13 distinct"
+    },
+    {
+      "id": "no-suspicious",
+      "label": "No suspicious wording in tool metadata",
+      "ok": false,
+      "detail": "create_wifi_qr_code"
+    },
+    {
+      "id": "route-scoped",
+      "label": "Tool set changes with the page",
+      "ok": true,
+      "detail": "3 distinct tool sets across 3 pages"
+    }
+  ],
+  "counts": {
+    "tools": 13,
+    "pages": 3,
+    "read": 1,
+    "action": 10,
+    "sensitive": 2,
+    "described": 13,
+    "withInputSchema": 13,
+    "declarative": 5
+  },
+  "hints": {
+    "forms": [],
+    "links": [
+      "#main-content",
+      "/",
+      "/",
+      "/wifi",
+      "/vcard",
+      "/event",
+      "/static-qr-code-generator",
+      "/qr-code-file-formats",
+      "/qr-code-size-guide",
+      "/wifi",
+      "/qr-code-file-formats",
+      "/qr-code-app",
+      "/static-vs-dynamic-qr-code",
+      "/qr-code-api",
+      "/qr-code-safety-privacy",
+      "/event",
+      "/qr-code-guides",
+      "/qr-code-api",
+      "/how-to-create-a-qr-code",
+      "/business-card-qr-code",
+      "/app-store-qr-code",
+      "/pdf-qr-code-generator",
+      "/bulk-qr-code-generator",
+      "/qr-code-readability-lab",
+      "/email",
+      "/text",
+      "/app-store-qr-code",
+      "/social-media-qr-code",
+      "/pinterest-qr-code",
+      "/reddit-qr-code",
+      "/snapchat-qr-code",
+      "/twitch-qr-code",
+      "/line-qr-code",
+      "/business-card-qr-code",
+      "/event",
+      "/location",
+      "/pdf-qr-code-generator",
+      "/payments/pix",
+      "/payments/upi",
+      "/phonepe-qr-code"
+    ],
+    "title": "Free QR Code Generator With Logo",
+    "description": "Create free static QR codes for links, Wi-Fi, business cards, messages, and payments. Customize colors, add a logo, and download six file formats."
+  },
+  "notes": [
+    "operator Chrome flags: --ssl-version-max=tls1.2",
+    "sightmap browser mcp list saw 8 tool(s) on /",
+    "$ sightmap version",
+    "$ sightmap browser start --detach --headless --port 45433 --cdp-port 44885 --profile /tmp/atlas-scan-BS74P7/profile --url about:blank --log-file /tmp/atlas-scan-BS74P7/daemon.log --chrome-flag=--enable-blink-features=ModelContext,ModelC… --chrome-flag=--enable-features=DevToolsWebMCPSupport --chrome-flag=--proxy-server=http://127.0.0.1:41767 --chrome-flag=--proxy-bypass-list=localhost;127.0.0.1;[::1] --chrome-flag=--deny-permission-prompts --chrome-flag=--ssl-version-max=tls1.2 --chrome-binary /opt/pw-browsers/chromium --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap",
+    "$ sightmap browser tabs list --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap ×2",
+    "$ sightmap browser inject --persist --file /tmp/atlas-scan-BS74P7/recorder.js --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap",
+    "$ sightmap browser inject --list --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap ×10",
+    "$ sightmap browser navigate https://qrcodecrafter.com/ --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap ×4",
+    "$ sightmap browser mcp list --json --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap",
+    "$ sightmap browser navigate https://qrcodecrafter.com/wifi --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap ×4",
+    "$ sightmap browser navigate https://qrcodecrafter.com/vcard --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab F11BBFC4EAE15AA214F6F46B3EE6C73C --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap ×4",
+    "$ sightmap browser stop --sightmap-dir /tmp/atlas-scan-BS74P7/.sightmap"
+  ]
+}
