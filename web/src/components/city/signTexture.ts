@@ -2,6 +2,7 @@
 // reading its own region of it. The listing page can afford an HTML label over
 // its single building; a street cannot, so the text becomes texels here.
 import * as THREE from 'three'
+import type { InstancedPart } from './instancing'
 import { drawSignAtlas, packSigns, type SignAtlas, type SignItem } from './signs'
 
 const PLATE_H = 56
@@ -45,6 +46,8 @@ export const SIGN_HEIGHT = 1.15
 export interface SignInstance {
   /** Index into the atlas's regions. */
   region: number
+  /** Lot the sign belongs to, so it can step aside with its building. */
+  lot: number
   matrix: THREE.Matrix4
 }
 
@@ -53,7 +56,7 @@ export interface SignInstance {
  * rather than a patched standard material because a sign needs no lighting and
  * because the region has to reach the vertex stage as a per-instance attribute.
  */
-export function buildSignMesh(sign: SignTexture, instances: SignInstance[]): THREE.InstancedMesh | null {
+export function buildSignMesh(sign: SignTexture, instances: SignInstance[]): InstancedPart | null {
   if (instances.length === 0) return null
   const geometry = new THREE.PlaneGeometry(1, 1)
   const regions = new Float32Array(instances.length * 4)
@@ -93,5 +96,5 @@ export function buildSignMesh(sign: SignTexture, instances: SignInstance[]): THR
   mesh.instanceMatrix.needsUpdate = true
   mesh.renderOrder = 2
   mesh.computeBoundingSphere()
-  return mesh
+  return { mesh, owners: new Int32Array(instances.map((i) => i.lot)), base: matrices }
 }

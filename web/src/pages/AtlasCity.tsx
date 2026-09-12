@@ -43,8 +43,9 @@ export default function AtlasCity() {
           <p className="atlas-city__note">
             A building&rsquo;s floors are the pages a scan reached and its height is what its
             address allows, so the skyline is the directory&rsquo;s shape and not a ranking.
-            Nothing here is an endorsement. Click a building to look inside it, then again to open
-            its listing — or start from <Link to="/atlas">the gallery</Link>.
+            Nothing here is an endorsement. Drag to turn the city, shift-drag to pan, scroll to
+            zoom; click a building to look inside it, then again to open its listing — or start
+            from <Link to="/atlas">the gallery</Link>.
           </p>
         </div>
       </main>

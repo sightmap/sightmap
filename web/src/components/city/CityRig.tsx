@@ -11,9 +11,9 @@ import type { CityLot, CityPlan } from '@/types/city'
 export const PITCH_MIN = THREE.MathUtils.degToRad(35)
 export const PITCH_MAX = THREE.MathUtils.degToRad(55)
 export const DISTANCE_MIN = 34
-export const DISTANCE_MAX = 460
+export const DISTANCE_MAX = 660
 
-const OVERVIEW = { yaw: Math.PI * 0.18, pitch: THREE.MathUtils.degToRad(46), distance: 330 }
+const OVERVIEW = { yaw: Math.PI * 0.18, pitch: THREE.MathUtils.degToRad(48), distance: 470 }
 /** How close the camera stands when it has flown down to one building. */
 const CLOSE = { pitch: THREE.MathUtils.degToRad(38), distance: 44 }
 
@@ -37,6 +37,8 @@ export default function CityRig({ plan, focus, reduced }: CityRigProps) {
   const goal = useRef<Pose>({ x: 0, z: 0, ...OVERVIEW })
   const now = useRef<Pose>({ ...goal.current })
   const home = useRef<Pose>({ ...goal.current })
+  /** True while the camera is down at a building, so "back" means the city. */
+  const down = useRef(false)
   const v = useMemo(() => ({ dir: new THREE.Vector3(), target: new THREE.Vector3(), right: new THREE.Vector3() }), [])
   const limit = useMemo(
     () => ({ x: plan.bounds.w * 0.52, z: plan.bounds.d * 0.52 }),
@@ -139,7 +141,10 @@ export default function CityRig({ plan, focus, reduced }: CityRigProps) {
   // view flies down to one address, then back to where it came from.
   useEffect(() => {
     if (focus) {
-      home.current = { ...goal.current }
+      // Only the first descent remembers where the city was being looked at;
+      // walking from one building to the next must not overwrite it.
+      if (!down.current) home.current = { ...goal.current }
+      down.current = true
       goal.current = {
         x: focus.x,
         z: focus.z,
@@ -149,6 +154,7 @@ export default function CityRig({ plan, focus, reduced }: CityRigProps) {
         distance: CLOSE.distance,
       }
     } else {
+      down.current = false
       goal.current = { ...home.current }
     }
   }, [focus])

@@ -105,6 +105,7 @@ function build(buildings: CityBuilding[]): Built {
         const width = (SIGN_HEIGHT * r.width) / r.height
         signs.push({
           region,
+          lot: lot.id,
           matrix: place(
             new THREE.Matrix4(),
             base,
@@ -216,10 +217,11 @@ function build(buildings: CityBuilding[]): Built {
   add(awnings.build(BOX, accentMat, { castShadow: true, name: 'awnings' }))
   add(marks.build(CYLINDER, markMat, { name: 'sightkick' }))
 
-  const signMesh = sign ? buildSignMesh(sign, signs) : null
-  if (signMesh) {
-    signMesh.name = 'signs'
-    group.add(signMesh)
+  const signPart = sign ? buildSignMesh(sign, signs) : null
+  if (signPart) {
+    signPart.mesh.name = 'signs'
+    parts.push(signPart)
+    group.add(signPart.mesh)
   }
 
   return {
@@ -229,9 +231,9 @@ function build(buildings: CityBuilding[]): Built {
     dispose: () => {
       for (const mat of materials) mat.dispose()
       sign?.texture.dispose()
-      if (signMesh) {
-        signMesh.geometry.dispose()
-        ;(signMesh.material as THREE.Material).dispose()
+      if (signPart) {
+        signPart.mesh.geometry.dispose()
+        ;(signPart.mesh.material as THREE.Material).dispose()
       }
     },
   }

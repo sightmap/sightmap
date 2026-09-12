@@ -19,7 +19,7 @@ export default function CityLights({ plan, night }: CityLightsProps) {
   const { scene } = useThree()
   const sun = useRef<THREE.DirectionalLight>(null)
   const sky = useMemo(() => ({ day: new THREE.Color(SKY.day), night: new THREE.Color(SKY.night) }), [])
-  const fog = useMemo(() => new THREE.Fog(SKY.day, 240, 900), [])
+  const fog = useMemo(() => new THREE.Fog(SKY.day, 420, 1500), [])
 
   useEffect(() => {
     const color = night ? sky.night : sky.day
@@ -42,12 +42,14 @@ export default function CityLights({ plan, night }: CityLightsProps) {
 
   return (
     <>
-      <ambientLight intensity={night ? 0.5 : 0.85} color={night ? '#6f7fbf' : '#ffffff'} />
-      <hemisphereLight args={[night ? '#5a6bb0' : '#ffffff', night ? '#232a45' : '#c9c3ac', night ? 0.4 : 0.75]} />
+      {/* Warm sun against cool shade: the ambient stays low so a wall that
+          faces away from the sun is visibly a different plane. */}
+      <ambientLight intensity={night ? 0.42 : 0.55} color={night ? '#6f7fbf' : '#eef1f6'} />
+      <hemisphereLight args={[night ? '#5a6bb0' : '#dfe7f0', night ? '#232a45' : '#bdb49c', night ? 0.38 : 0.62]} />
       <directionalLight
         ref={sun}
         position={[reach * 0.7, reach * 1.1, -reach * 0.55]}
-        intensity={night ? 0.5 : 1.8}
+        intensity={night ? 0.55 : 2.1}
         color={night ? SUN.night : SUN.day}
         castShadow
         shadow-mapSize={[2048, 2048]}
