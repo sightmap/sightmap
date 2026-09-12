@@ -55,10 +55,11 @@ describe('the stats line', () => {
     expect(stats.listings).toBe(8)
     expect(stats.lots).toBe(plan.lots.length)
     expect(stats.filler + stats.empty).toBe(city.fills.length)
-    expect(stats.landmarks).toBe(3)
+    // The milestones are still empty lots and do not count yet.
+    expect(stats.landmarks).toBe(city.landmarks.filter((l) => l.minListings === undefined).length)
     expect(cityCaption(stats)).toBe(
       `8 listings on ${stats.lots} lots, ${stats.filler} filler buildings and ` +
-        `${stats.empty} empty lots, ${stats.roads} roads and 3 landmarks.`
+        `${stats.empty} empty lots, ${stats.roads} roads and ${stats.landmarks} landmarks.`
     )
   })
 })
