@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import type { CityLot } from '../../src/types/city'
+import { CITY_STOREYS } from '../../src/types/city'
 import { archetypeFor } from './blueprint'
 import {
   activeMilestones,
   assignLots,
+  fillChance,
+  fillStoreys,
+  orientedSize,
+  propsFor,
+  storeysFor,
   centralityAt,
   CityListingInput,
   fillerFor,
@@ -18,6 +24,7 @@ import {
 } from './city'
 
 const plan = planCity()
+const buildable = plan.lots.filter((l) => !l.tiny)
 
 /** Shortest distance from a rectangle to a polyline, by sampling the line. */
 function polylineRectDist(points: [number, number][], r: { x: number; z: number; w: number; d: number }): number {
@@ -95,10 +102,36 @@ describe('planCity', () => {
     }
   })
 
-  it('holds enough lots for the directory to grow into', () => {
+  it('holds enough buildable lots for the directory to grow into', () => {
     // The observation tower is reserved for the 250th listing, so the ground
     // has to have more addresses than that before it is worth reserving.
-    expect(plan.lots.length).toBeGreaterThanOrEqual(300)
+    // Pocket parks are not addresses and do not count.
+    expect(buildable.length).toBeGreaterThanOrEqual(300)
+  })
+
+  it('marks a lot too small for a building as tiny and nothing else', () => {
+    for (const lot of plan.lots) {
+      const { frontage, depth } = orientedSize(lot)
+      expect(lot.tiny).toBe(frontage < 11 || depth < 8.5)
+    }
+    for (const lot of buildable) {
+      const { frontage, depth } = orientedSize(lot)
+      expect(frontage, `lot ${lot.id}`).toBeGreaterThanOrEqual(11)
+      expect(depth, `lot ${lot.id}`).toBeGreaterThanOrEqual(8.5)
+    }
+  })
+
+  it('lines each cul-de-sac with a close of four to six lots', () => {
+    const stubs = plan.roads.filter((r) => r.kind === 'cul-de-sac')
+    for (const stub of stubs) {
+      // Its leg turns off the neck, so the stub is three points, not two.
+      expect(stub.points).toHaveLength(3)
+      const close = plan.blocks.find((b) => b.edges.length === 0 && pointPolylineDist(b.x, b.z, stub.points) < 1)!
+      const on = plan.lots.filter((l) => l.block === close.id)
+      expect(on.length, `${stub.id} has ${on.length} lots`).toBeGreaterThanOrEqual(4)
+      expect(on.length, `${stub.id} has ${on.length} lots`).toBeLessThanOrEqual(6)
+      for (const lot of on) expect(lot.tiny).toBe(false)
+    }
   })
 
   it('leaves no two lots overlapping', () => {
@@ -202,9 +235,26 @@ describe('planCity', () => {
     const kinds = plan.props.map((p) => p.kind)
     expect(kinds).toContain('fountain')
     expect(kinds).toContain('beacon')
-    expect(kinds.filter((k) => k === 'water-tower')).toHaveLength(1)
+    const towers = plan.props.filter((p) => p.kind === 'water-tower')
+    expect(towers).toHaveLength(1)
+    // On a lot of its own, so it cannot straddle whatever is built beside it.
+    const tower = plan.landmarks.find((l) => l.id === 'water-tower')!
+    expect(towers[0].lot).toBe(tower.lot)
+    expect(plan.blocks[plan.lots[tower.lot!].block].rim).toBe(true)
     expect(kinds.filter((k) => k === 'bus-shelter').length).toBeGreaterThan(4)
-    expect(kinds.filter((k) => k === 'billboard')).toHaveLength(plan.lots.filter((l) => l.wedge).length)
+    const spoken = new Set(plan.landmarks.map((l) => l.lot))
+    const billboards = plan.props.filter((p) => p.kind === 'billboard')
+    expect(billboards.length).toBeGreaterThan(0)
+    for (const board of billboards) {
+      const lot = plan.lots[board.lot!]
+      expect(lot.wedge).toBe(true)
+      expect(lot.tiny).toBe(false)
+      expect(spoken.has(lot.id), `billboard on landmark lot ${lot.id}`).toBe(false)
+      // On the kerb: outside the lot rectangle, at its front edge.
+      const outside = Math.abs(board.x - lot.x) > lot.w / 2 || Math.abs(board.z - lot.z) > lot.d / 2
+      expect(outside, `billboard ${board.id} stands inside lot ${lot.id}`).toBe(true)
+      expect(Math.hypot(board.x - lot.x, board.z - lot.z)).toBeLessThan(Math.max(lot.w, lot.d))
+    }
     expect(kinds.filter((k) => k === 'bench').length).toBeGreaterThan(8)
     expect(kinds.filter((k) => k === 'tree').length).toBeGreaterThan(12)
     for (const p of plan.props) expect(plan.districts.some((d) => d.archetype === p.district)).toBe(true)
@@ -223,8 +273,8 @@ describe('planCity', () => {
     expect(cars.map((l) => l.count)).toEqual([12, 6, 6, 6])
     expect(plan.loops.filter((l) => l.kind === 'pedestrian').reduce((n, l) => n + l.count, 0)).toBeLessThanOrEqual(40)
     for (const loop of plan.loops) {
-      const road = plan.roads.find((r) => r.id === loop.road)!
-      expect(loop.tier).toBe(road.tier)
+      const on = (loop.roads ?? [loop.road]).map((id) => plan.roads.find((r) => r.id === id)!)
+      expect(loop.tier).toBe(on[0].tier)
       expect(loop.phases).toHaveLength(loop.count)
       for (const p of loop.phases) expect(p).toBeGreaterThanOrEqual(0)
       for (const p of loop.phases) expect(p).toBeLessThan(1)
@@ -232,9 +282,34 @@ describe('planCity', () => {
       const last = loop.points[loop.points.length - 1]
       expect(first, `${loop.id} is not closed`).toEqual(last)
       for (const [x, z] of loop.points) {
-        expect(pointPolylineDist(x, z, road.points), `${loop.id} leaves ${road.id}`).toBeLessThanOrEqual(road.width / 2)
+        const best = Math.min(...on.map((r) => pointPolylineDist(x, z, r.points) - r.width / 2))
+        expect(best, `${loop.id} leaves its roads at ${x},${z}`).toBeLessThanOrEqual(0)
       }
     }
+  })
+
+  it('drives the cars round the plaza rather than through the fountain', () => {
+    const plaza = plan.landmarks.find((l) => l.id === 'plaza')!
+    const r = plaza.r!
+    for (const loop of plan.loops.filter((l) => l.kind === 'car')) {
+      for (const [x, z] of loop.points) {
+        expect(Math.abs(x) >= r || Math.abs(z) >= r, `${loop.id} drives into the plaza at ${x},${z}`).toBe(true)
+      }
+      // And no leg of the loop cuts the corner across it either.
+      for (let i = 0; i + 1 < loop.points.length; i++) {
+        const [ax, az] = loop.points[i]
+        const [bx, bz] = loop.points[i + 1]
+        for (let t = 0; t <= 1; t += 0.02) {
+          const x = ax + (bx - ax) * t
+          const z = az + (bz - az) * t
+          expect(Math.abs(x) >= r - 0.01 || Math.abs(z) >= r - 0.01, `${loop.id} crosses the plaza`).toBe(true)
+        }
+      }
+    }
+    // The diagonal stops at the plaza ring instead of running into the square.
+    const diagonal = plan.roads.find((r2) => r2.id === 'diagonal')!
+    const tip = diagonal.points[diagonal.points.length - 1]
+    expect(Math.max(Math.abs(tip[0]), Math.abs(tip[1]))).toBeGreaterThanOrEqual(r)
   })
 })
 
@@ -265,7 +340,7 @@ describe('assignLots', () => {
   })
 
   it('honours a persisted lot over the probe', () => {
-    const free = plan.lots.find((l) => !reservedLots(plan).has(l.id) && l.id !== assignLots(plan, seedListings)[0].lot)!
+    const free = buildable.find((l) => !reservedLots(plan).has(l.id) && l.id !== assignLots(plan, seedListings)[0].lot)!
     const pinned = seedListings.map((l) => (l.slug === 'telnyx-com' ? { ...l, lot: free.id } : l))
     const assignments = assignLots(plan, pinned)
     expect(assignments.find((a) => a.slug === 'telnyx-com')!.lot).toBe(free.id)
@@ -275,17 +350,65 @@ describe('assignLots', () => {
     expect(natural).not.toBe(free.id)
   })
 
-  it('probes from the slug hash, so the lot depends on the slug and nothing else', () => {
+  it('probes the best addresses in its district, from the slug hash', () => {
     const one: CityListingInput = { slug: 'alpha-io', category: 'finance', added: '2026-09-01', tools: toolsOf(1) }
     const solo = assignLots(plan, [one])[0]
-    const start = fnv1a(one.slug) % plan.lots.length
     const reserved = reservedLots(plan)
+    // Every buildable lot in the district, best address first; the walk starts
+    // somewhere in the best eight and steps over whatever is already spoken for.
+    const book = buildable
+      .filter((l) => l.district === 'bank')
+      .sort((a, b) => b.centrality - a.centrality || a.id - b.id)
+    const start = fnv1a(one.slug) % 8
     let expected = -1
-    for (let i = 0; i < plan.lots.length && expected < 0; i++) {
-      const lot = plan.lots[(start + i) % plan.lots.length]
-      if (!reserved.has(lot.id) && lot.district === 'bank') expected = lot.id
+    for (let i = 0; i < book.length && expected < 0; i++) {
+      const lot = book[(start + i) % book.length]
+      if (!reserved.has(lot.id)) expected = lot.id
     }
     expect(solo.lot).toBe(expected)
+    // And it is a good address, not whatever the survey order happened to hold.
+    expect(plan.lots[solo.lot].centrality).toBeGreaterThan(0.7)
+  })
+
+  it('gives the first listings a downtown address, not the far rim', () => {
+    for (const a of assignLots(plan, seedListings)) {
+      expect(plan.lots[a.lot].centrality, `${a.slug} landed at the rim`).toBeGreaterThan(0.5)
+    }
+  })
+
+  it('never puts a listing on a lot too small to build on', () => {
+    const many: CityListingInput[] = Array.from({ length: 120 }, (_, i) => ({
+      slug: `site-${String(i).padStart(3, '0')}`,
+      category: 'other',
+      added: '2026-09-10',
+      tools: toolsOf(1),
+    }))
+    for (const a of assignLots(plan, many)) expect(plan.lots[a.lot].tiny).toBe(false)
+  })
+
+  it('draws a listing at its own floors, raised by its lot', () => {
+    const listings: CityListingInput[] = [
+      { slug: 'one-floor', category: 'other', added: '2026-09-01', tools: toolsOf(1), floors: 1 },
+      { slug: 'three-floors', category: 'other', added: '2026-09-02', tools: toolsOf(9), floors: 3 },
+    ]
+    for (const a of assignLots(plan, listings)) {
+      const lot = plan.lots[a.lot]
+      const floors = listings.find((l) => l.slug === a.slug)!.floors
+      expect(a.storeys).toBe(storeysFor(lot, floors, a.peak))
+      // Never a bungalow, however thin the scan.
+      expect(a.storeys).toBeGreaterThanOrEqual(CITY_STOREYS.minFloors * lot.heightScale)
+    }
+    // The peak is drawn half again as tall as it would otherwise be.
+    const lot = buildable[0]
+    expect(storeysFor(lot, 4, true)).toBe(Math.round(storeysFor(lot, 4, false) * CITY_STOREYS.peak))
+  })
+
+  it('drops a billboard that would stand in front of somebody door', () => {
+    const assignments = assignLots(plan, seedListings)
+    const shown = propsFor(plan, assignments)
+    const used = new Set(assignments.map((a) => a.lot))
+    for (const prop of shown) expect(prop.lot === undefined || !used.has(prop.lot)).toBe(true)
+    expect(shown.length).toBeLessThanOrEqual(plan.props.length)
   })
 
   it('crowns the listing with the most tools as the peak', () => {
@@ -295,7 +418,7 @@ describe('assignLots', () => {
   })
 
   it('falls back out of the district when it is full', () => {
-    const crowd: CityListingInput[] = plan.lots
+    const crowd: CityListingInput[] = buildable
       .filter((l) => l.district === 'bank')
       .map((_, i) => ({ slug: `bank-${String(i).padStart(3, '0')}`, category: 'finance', added: '2026-09-10', tools: toolsOf(1) }))
     const extra: CityListingInput = { slug: 'zzz-overflow', category: 'finance', added: '2026-09-11', tools: toolsOf(1) }
@@ -311,31 +434,66 @@ describe('fillerFor', () => {
   const fills = fillerFor(plan, assignments)
   const byLot = new Map(fills.map((f) => [f.lot, f]))
 
-  it('fills the good addresses and fences the poor ones', () => {
+  it('draws every unclaimed buildable lot and nothing else', () => {
     const assigned = new Set(assignments.map((a) => a.lot))
-    // A lot already built on draws nothing: the three launch landmarks stand
-    // on theirs, and the listings stand on theirs.
+    // A lot already built on draws nothing: the launch landmarks stand on
+    // theirs, and the listings stand on theirs.
     const standing = new Set(plan.landmarks.filter((l) => l.minListings === undefined).map((l) => l.lot))
     const waiting = new Set(plan.landmarks.filter((l) => l.minListings !== undefined).map((l) => l.lot))
     for (const lot of plan.lots) {
       const fill = byLot.get(lot.id)
-      if (assigned.has(lot.id) || standing.has(lot.id)) {
+      if (lot.tiny || assigned.has(lot.id) || standing.has(lot.id)) {
         expect(fill, `lot ${lot.id} is taken and should not be filled`).toBeUndefined()
         continue
       }
       expect(fill).toBeDefined()
-      expect(fill!.kind).toBe(!waiting.has(lot.id) && lot.centrality > 0.45 ? 'filler' : 'empty')
+      if (waiting.has(lot.id)) expect(fill!.kind).toBe('empty')
       if (fill!.kind === 'empty') {
         expect(fill!.storeys).toBe(0)
         expect(fill!.mask).toBe(0)
       } else {
-        expect(fill!.storeys).toBeGreaterThanOrEqual(lot.heightScale)
-        expect(fill!.storeys).toBeLessThanOrEqual(4 * lot.heightScale)
+        expect(fill!.storeys).toBeGreaterThanOrEqual(1)
+        expect(fill!.storeys).toBeLessThanOrEqual(CITY_STOREYS.fillMax * lot.heightScale)
         expect(fill!.mask).toBe(windowMask(lot.id))
       }
     }
     expect(fills.filter((f) => f.kind === 'filler').length).toBeGreaterThan(10)
     expect(fills.filter((f) => f.kind === 'empty').length).toBeGreaterThan(10)
+  })
+
+  it('feathers the built-up part into the rim instead of ending at a line', () => {
+    expect(fillChance(0.1)).toBe(0)
+    expect(fillChance(0.9)).toBe(1)
+    expect(fillChance(0.475)).toBeCloseTo(0.5, 5)
+    // Rising, and never a jump: the whole point of easing it.
+    let last = -1
+    for (let c = 0; c <= 1.0001; c += 0.05) {
+      const p = fillChance(c)
+      expect(p).toBeGreaterThanOrEqual(last)
+      last = p
+    }
+    // Which shows up as gap sites downtown and stragglers out at the rim.
+    const near = plan.lots.filter((l) => !l.tiny && l.centrality > 0.7).map((l) => byLot.get(l.id))
+    const far = plan.lots.filter((l) => !l.tiny && l.centrality < 0.35).map((l) => byLot.get(l.id))
+    expect(near.filter((f) => f?.kind === 'empty').length).toBeGreaterThan(0)
+    expect(far.filter((f) => f?.kind === 'filler').length).toBeGreaterThan(0)
+  })
+
+  it('never lets filler out-top the street it stands in', () => {
+    const byId = new Map(plan.lots.map((l) => [l.id, l]))
+    const tallest = new Map<number, number>()
+    for (const a of assignments) tallest.set(byId.get(a.lot)!.block, Math.max(tallest.get(byId.get(a.lot)!.block) ?? 0, a.storeys))
+    for (const fill of fills) {
+      if (fill.kind !== 'filler') continue
+      const cap = tallest.get(byId.get(fill.lot)!.block)
+      if (cap === undefined) continue
+      expect(fill.storeys, `filler on lot ${fill.lot} towers over its block`).toBeLessThanOrEqual(cap + CITY_STOREYS.fillHeadroom)
+    }
+    // And on its own a filler massing is squat by design.
+    for (const lot of buildable.slice(0, 40)) {
+      expect(fillStoreys(lot.id, lot.heightScale)).toBeLessThanOrEqual(CITY_STOREYS.fillMax * lot.heightScale)
+      expect(fillStoreys(lot.id, lot.heightScale)).toBeGreaterThanOrEqual(CITY_STOREYS.fillMin * lot.heightScale)
+    }
   })
 
   it('holds a milestone lot empty until the directory earns it, then builds on it', () => {

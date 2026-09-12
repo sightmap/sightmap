@@ -80,6 +80,11 @@ export interface CityLot {
   heightScale: 1 | 2 | 3
   /** True when the diagonal avenue clips this lot; these are landmark sites. */
   wedge: boolean
+  /**
+   * Too small for a building to stand on. Never assigned, never filled, drawn
+   * as a pocket park, and not counted when asking how much room the city has.
+   */
+  tiny: boolean
 }
 
 export interface CityDistrict {
@@ -98,6 +103,7 @@ export type CityLandmarkKind =
   | 'plaza'
   | 'park'
   | 'mast'
+  | 'water-tower'
   | 'city-hall'
   | 'clock-tower'
   | 'observation-tower'
@@ -134,14 +140,18 @@ export interface CityProp {
   rotation: number
   /** District the prop takes its accent from. */
   district: Archetype
+  /** The lot this prop belongs to, for the ones that stand in front of one. */
+  lot?: number
 }
 
 export interface CityLoop {
   id: string
   /** Cars run on avenues, pedestrians on the plaza and park paths. */
   kind: 'car' | 'pedestrian'
-  /** Id of the road this loop follows. */
+  /** Id of the road this loop follows, or its first when it follows several. */
   road: string
+  /** Every road the loop runs on, when going round the plaza takes more than one. */
+  roads?: string[]
   /** Tier of that road, so the renderer can size and speed the traffic. */
   tier: CityTier
   /** How many agents run the loop; the renderer decides their speed. */
@@ -173,7 +183,27 @@ export interface CityAssignment {
   lot: number
   /** The one clear high point: the assigned listing with the most tools. */
   peak: boolean
+  /** Storeys the closed facade draws: the building's floors, raised by its lot. */
+  storeys: number
 }
+
+/**
+ * How many storeys the city draws, as data the renderer reads rather than
+ * numbers it repeats. Filler is deliberately squat: it is there to give a
+ * street two sides, and a filler block that out-tops the listings turns the
+ * skyline into noise.
+ */
+export const CITY_STOREYS = {
+  /** Filler massing, before the lot's height scale multiplies it. */
+  fillMin: 1,
+  fillMax: 2,
+  /** No building draws fewer than this many storeys, however few floors it has. */
+  minFloors: 2,
+  /** The peak is drawn this much taller, so the profile has one clear high point. */
+  peak: 1.5,
+  /** Filler may out-top the tallest building on its own block by this much. */
+  fillHeadroom: 1,
+} as const
 
 /** What an unassigned lot draws, so growth is legible instead of blank. */
 export interface CityFill {

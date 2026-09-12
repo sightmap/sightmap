@@ -30,6 +30,8 @@ import type {
   CityRoad,
   CityTier,
 } from '../../src/types/city'
+import { CITY_STOREYS } from '../../src/types/city'
+import { FLOOR_D, FLOOR_W } from '../../src/components/building/model'
 import { archetypeFor } from './blueprint'
 
 /** The plan never changes unless this string does. */
@@ -64,6 +66,12 @@ const PATH_W = 4
 const RING = { x: s(140), z: s(100) }
 /** Half-side of the paved square where the two cross avenues meet. */
 const PLAZA_R = s(14)
+/**
+ * Half-side of the avenue ring around that square. Traffic runs round the
+ * plaza rather than across it — a car that drives through the fountain reads
+ * as a bug long before anyone asks whether the layout is plausible.
+ */
+const PLAZA_RING_R = PLAZA_R + AVENUE_W / 2
 
 /** A block is split until its longest side fits, and never below the minimum. */
 const MIN_BLOCK = 24
@@ -79,15 +87,41 @@ const RIM_LOT = { frontage: 18, depth: 16 }
 const CORE_LOT = { frontage: 14, depth: 12 }
 /** Smallest side a lot the diagonal clips may be shrunk to before it is lost. */
 const MIN_WEDGE = 5
+/**
+ * What a lot needs to hold a building: the floor plate the building page draws
+ * (FLOOR_W x FLOOR_D) with a metre of air round it. Anything smaller is a
+ * pocket park — a building on it would spill over its own kerb.
+ */
+const BUILDABLE = { frontage: FLOOR_W + 1, depth: FLOOR_D + 1 }
 /** Air between neighbouring lots, so rounded rectangles never touch. */
 const LOT_GAP = 0.1
 
-/** Cul-de-sac stubs: where they leave the ring, how far out, and the circle. */
-const STUB_LEN = s(14)
+/**
+ * Cul-de-sac stubs. A radial neck off the ring reaches the middle of the rim
+ * band and then turns to run along it, which is the only shape that fits a
+ * close of houses into a band this shallow: a purely radial stub would end in
+ * its own turning circle with no room for a single lot beside it.
+ */
 const STUB_CIRCLE = s(6)
+/** Depth of the lots that line a cul-de-sac leg, either side of it. */
+const STUB_LOT_DEPTH = 10
+/**
+ * The neck reaches exactly the depth at which a row of lots fits either side
+ * of the leg: the ring's kerb on one side, the edge of the ground on the
+ * other. The rim band is twice that depth plus the carriageway, so the two
+ * numbers are the same number and are written that way.
+ */
+const STUB_NECK = AVENUE_W / 2 + STUB_LOT_DEPTH + STUB_W / 2
+/** Long enough for three lots a side, which is what makes a close a close. */
+const STUB_LEG = 66
 
-/** Unassigned lots above this centrality get filler massing, below it dirt. */
-const FILLER_CENTRALITY = 0.45
+/**
+ * Where filler gives way to empty lots. Between these two the odds ease, so
+ * the built-up part of the city feathers into the rim instead of ending at a
+ * line, and a few gap sites survive downtown.
+ */
+const FILL_FROM = 0.2
+const FILL_TO = 0.75
 
 // ------------------------------------------------------------------ seeding
 
@@ -235,23 +269,37 @@ const RING_POINTS: Pt[] = [
 
 /**
  * The diagonal: a real polyline with one kink, so it reads as a road that was
- * there before the grid rather than as a construction line.
+ * there before the grid rather than as a construction line. It stops where it
+ * meets the plaza ring instead of running into the square.
  */
-const DIAGONAL_POINTS: Pt[] = [
-  [-RING.x, RING.z],
-  [s(-60), s(44)],
-  [0, 0],
+const DIAGONAL_KINK: Pt = [s(-60), s(44)]
+const DIAGONAL_POINTS: Pt[] = [[-RING.x, RING.z], DIAGONAL_KINK, meetsPlazaRing(DIAGONAL_KINK)]
+
+/** Where a line drawn from `from` to the plaza crosses the plaza ring. */
+function meetsPlazaRing(from: Pt): Pt {
+  const t = PLAZA_RING_R / Math.max(Math.abs(from[0]), Math.abs(from[1]))
+  return [r2(from[0] * t), r2(from[1] * t)]
+}
+
+/**
+ * Where the six cul-de-sacs leave the ring, which way the neck points out of
+ * it, and which way the leg then runs along the rim band.
+ */
+const STUBS: { at: Pt; dir: Pt; along: Pt }[] = [
+  { at: [s(-80), -RING.z], dir: [0, -1], along: [1, 0] },
+  { at: [s(40), -RING.z], dir: [0, -1], along: [-1, 0] },
+  { at: [s(-40), RING.z], dir: [0, 1], along: [1, 0] },
+  { at: [s(90), RING.z], dir: [0, 1], along: [-1, 0] },
+  { at: [-RING.x, s(-40)], dir: [-1, 0], along: [0, 1] },
+  { at: [RING.x, s(55)], dir: [1, 0], along: [0, -1] },
 ]
 
-/** Where the six cul-de-sac stubs leave the ring, and which way they point. */
-const STUBS: { at: Pt; dir: Pt }[] = [
-  { at: [s(-80), -RING.z], dir: [0, -1] },
-  { at: [s(40), -RING.z], dir: [0, -1] },
-  { at: [s(-40), RING.z], dir: [0, 1] },
-  { at: [s(90), RING.z], dir: [0, 1] },
-  { at: [-RING.x, s(-40)], dir: [-1, 0] },
-  { at: [RING.x, s(55)], dir: [1, 0] },
-]
+/** The neck corner and the far end of one cul-de-sac's leg. */
+function stubPoints(stub: { at: Pt; dir: Pt; along: Pt }): [Pt, Pt, Pt] {
+  const knee: Pt = [r2(stub.at[0] + stub.dir[0] * STUB_NECK), r2(stub.at[1] + stub.dir[1] * STUB_NECK)]
+  const end: Pt = [r2(knee[0] + stub.along[0] * STUB_LEG), r2(knee[1] + stub.along[1] * STUB_LEG)]
+  return [stub.at, knee, end]
+}
 
 function baseRoads(): CityRoad[] {
   // Cloned, so a caller that edits one plan's roads cannot reach into the next.
@@ -282,14 +330,21 @@ function baseRoads(): CityRoad[] {
     },
     { id: 'diagonal', kind: 'avenue', tier: 2, width: AVENUE_W, points: clone(DIAGONAL_POINTS), closed: false },
   ]
+  roads.push({
+    id: 'plaza-ring',
+    kind: 'avenue',
+    tier: 2,
+    width: AVENUE_W,
+    points: squarePoints(PLAZA_RING_R),
+    closed: true,
+  })
   STUBS.forEach((stub, i) => {
-    const end: Pt = [stub.at[0] + stub.dir[0] * STUB_LEN, stub.at[1] + stub.dir[1] * STUB_LEN]
     roads.push({
       id: `stub-${i}`,
       kind: 'cul-de-sac',
       tier: 0,
       width: STUB_W,
-      points: [stub.at, end],
+      points: stubPoints(stub),
       closed: false,
       turningCircle: STUB_CIRCLE,
     })
@@ -299,16 +354,81 @@ function baseRoads(): CityRoad[] {
     kind: 'path',
     tier: 0,
     width: PATH_W,
-    points: [
-      [-PLAZA_R, -PLAZA_R],
-      [PLAZA_R, -PLAZA_R],
-      [PLAZA_R, PLAZA_R],
-      [-PLAZA_R, PLAZA_R],
-      [-PLAZA_R, -PLAZA_R],
-    ],
+    points: squarePoints(PLAZA_R - PATH_W / 2),
     closed: true,
   })
   return roads
+}
+
+/**
+ * The close of houses each cul-de-sac exists to serve: one block per leg, with
+ * a row of lots either side of it fronting the stub. Without them a stub is a
+ * road driven into a field, which is what the rim looked like.
+ */
+function culDeSacs(nextBlockId: number): { blocks: CityBlock[]; lots: (DraftLot & { wedge: boolean })[] } {
+  const blocks: CityBlock[] = []
+  const lots: (DraftLot & { wedge: boolean })[] = []
+  const frontage = RIM_LOT.frontage
+  const across = STUB_W + STUB_LOT_DEPTH * 2
+
+  STUBS.forEach((stub, i) => {
+    const [, knee] = stubPoints(stub)
+    const alongX = stub.along[0] !== 0
+    const from = alongX ? knee[0] : knee[1]
+    const step = alongX ? stub.along[0] : stub.along[1]
+    const fixed = alongX ? knee[1] : knee[0]
+    const mid = from + (step * STUB_LEG) / 2
+
+    const id = nextBlockId + i
+    blocks.push({
+      id,
+      x: r2(alongX ? mid : fixed),
+      z: r2(alongX ? fixed : mid),
+      w: r2(alongX ? STUB_LEG : across),
+      d: r2(alongX ? across : STUB_LEG),
+      // Its lots front the stub down the middle, not the block's own edges.
+      edges: [],
+      rim: true,
+      centrality: r2(baseCentrality(alongX ? mid : fixed, alongX ? fixed : mid)),
+    })
+
+    // Clear of the neck at one end and the turning circle at the other.
+    const usable = STUB_LEG - STUB_W / 2 - STUB_CIRCLE
+    const n = Math.floor(usable / frontage)
+    const slack = (usable - n * frontage) / 2
+    const len = r2(frontage - LOT_GAP)
+    const dep = r2(STUB_LOT_DEPTH - LOT_GAP)
+    for (let side = -1; side <= 1; side += 2) {
+      // `side` is which flank of the leg; the lot faces back across it.
+      const edge: CityEdge = alongX ? (side > 0 ? 'n' : 's') : side > 0 ? 'w' : 'e'
+      const acrossC = fixed + side * (STUB_W / 2 + STUB_LOT_DEPTH / 2)
+      for (let k = 0; k < n; k++) {
+        const alongC = from + step * (STUB_W / 2 + slack + frontage * (k + 0.5))
+        lots.push({
+          x: r2(alongX ? alongC : acrossC),
+          z: r2(alongX ? acrossC : alongC),
+          w: alongX ? len : dep,
+          d: alongX ? dep : len,
+          rotation: ROTATION[edge],
+          block: id,
+          edge,
+          wedge: false,
+        })
+      }
+    }
+  })
+  return { blocks, lots }
+}
+
+/** A closed axis-aligned square of half-side `r`, clockwise from its NW corner. */
+function squarePoints(r: number): Pt[] {
+  return [
+    [-r, -r],
+    [r, -r],
+    [r, r],
+    [-r, r],
+    [-r, -r],
+  ]
 }
 
 // ------------------------------------------------------------ block splitting
@@ -562,6 +682,20 @@ function lotsForBlock(block: CityBlock): DraftLot[] {
   return out
 }
 
+/**
+ * A lot's frontage and depth in its own frame, whichever way round it faces.
+ */
+export function orientedSize(lot: Pick<CityLot, 'w' | 'd' | 'rotation'>): { frontage: number; depth: number } {
+  const sideways = Math.abs(Math.round(Math.sin(lot.rotation))) === 1
+  return sideways ? { frontage: lot.d, depth: lot.w } : { frontage: lot.w, depth: lot.d }
+}
+
+/** True when no building fits: the lot is drawn as a pocket park instead. */
+function isTiny(lot: Pick<CityLot, 'w' | 'd' | 'rotation'>): boolean {
+  const { frontage, depth } = orientedSize(lot)
+  return frontage < BUILDABLE.frontage || depth < BUILDABLE.depth
+}
+
 /** Midpoint of the edge a lot faces, which is where it meets its street. */
 export function frontPoint(lot: Pick<CityLot, 'x' | 'z' | 'w' | 'd' | 'rotation'>): [number, number] {
   const s = Math.round(Math.sin(lot.rotation))
@@ -615,43 +749,59 @@ export function planCity(): CityPlan {
     blocks.push({ id, x: rect.x, z: rect.z, w: rect.w, d: rect.d, edges, rim, centrality: r2(baseCentrality(rect.x, rect.z)) })
   })
 
-  // 2. Lots, minus the ones the plaza, the paths and the stubs pave over, and
-  //    with the ones the diagonal clips shrunk back inside their block.
-  const plazaKeepOut: Rect = { x: 0, z: 0, w: (PLAZA_R + PATH_W / 2) * 2, d: (PLAZA_R + PATH_W / 2) * 2 }
+  // 2. Lots, minus the ones the plaza, the paths and the cul-de-sacs pave
+  //    over, and with the ones the diagonal clips shrunk back inside their
+  //    block. The cul-de-sacs then line their own legs with the close of
+  //    houses that is the whole point of driving a road out there.
+  const keepOut = PLAZA_RING_R + AVENUE_W / 2
+  const plazaKeepOut: Rect = { x: 0, z: 0, w: keepOut * 2, d: keepOut * 2 }
   const stubs = roads.filter((r) => r.kind === 'cul-de-sac')
+  const paved = (lot: Rect): boolean => {
+    if (rectsOverlap(lot, plazaKeepOut)) return true
+    for (const stub of stubs) {
+      const end = stub.points[stub.points.length - 1]
+      if (polylineRectDist(stub.points, lot) < stub.width / 2) return true
+      if (pointRectDist(end[0], end[1], lot) < STUB_CIRCLE) return true
+    }
+    return false
+  }
   const drafts: (DraftLot & { wedge: boolean })[] = []
   for (const block of blocks) {
     for (const lot of lotsForBlock(block)) {
-      if (rectsOverlap(lot, plazaKeepOut)) continue
-      let blocked = false
-      for (const stub of stubs) {
-        const end = stub.points[stub.points.length - 1]
-        if (polylineRectDist(stub.points, lot) < stub.width / 2 || pointRectDist(end[0], end[1], lot) < STUB_CIRCLE) {
-          blocked = true
-          break
-        }
-      }
-      if (blocked) continue
+      if (paved(lot)) continue
       const clipped = clipToDiagonal(lot, diagonal)
       if (clipped) drafts.push(clipped)
     }
   }
+  const closes = culDeSacs(blocks.length)
+  blocks.push(...closes.blocks)
+  for (const lot of closes.lots) {
+    if (!drafts.some((d) => rectsOverlap(d, lot))) drafts.push(lot)
+  }
 
-  // 3. The three launch landmarks, settled before any lot is measured because
-  //    they bias the centrality every lot is then measured with. A lot's id is
-  //    its index in `drafts`, so a landmark can claim one here.
+  // 3. The launch landmarks, settled before any lot is measured because they
+  //    bias the centrality every lot is then measured with. Each stands on a
+  //    lot of its own, so nothing is ever built through one; a lot's id is its
+  //    index in `drafts`, so a landmark can claim one here.
   const landmarks: CityLandmark[] = [
     { id: 'plaza', kind: 'plaza', name: 'Fountain Square', x: 0, z: 0, r: PLAZA_R },
   ]
-  const parkIdx = pickBest(drafts, (d) => (d.wedge ? baseCentrality(d.x, d.z) : -Infinity))
-  if (parkIdx >= 0) {
-    landmarks.push({ id: 'park', kind: 'park', name: 'Wedge Park', x: drafts[parkIdx].x, z: drafts[parkIdx].z, r: 8, lot: parkIdx })
+  const claimed = new Set<number>()
+  const claim = (score: (lot: DraftLot & { wedge: boolean }) => number): number => {
+    const i = pickBest(drafts, (d, j) => (claimed.has(j) || isTiny(d) ? -Infinity : score(d)))
+    if (i >= 0) claimed.add(i)
+    return i
   }
+  const site = (id: string, kind: CityLandmark['kind'], name: string, i: number, r: number) => {
+    if (i >= 0) landmarks.push({ id, kind, name, x: drafts[i].x, z: drafts[i].z, r, lot: i })
+  }
+  site('park', 'park', 'Wedge Park', claim((d) => (d.wedge ? baseCentrality(d.x, d.z) : -Infinity)), 8)
   const corner = { x: BOUNDS.w / 2, z: -BOUNDS.d / 2 }
-  const mastIdx = pickBest(drafts, (d) => (d === drafts[parkIdx] ? -Infinity : -Math.hypot(d.x - corner.x, d.z - corner.z)))
-  if (mastIdx >= 0) {
-    landmarks.push({ id: 'mast', kind: 'mast', name: 'Beacon Mast', x: drafts[mastIdx].x, z: drafts[mastIdx].z, r: 4, lot: mastIdx })
-  }
+  site('mast', 'mast', 'Beacon Mast', claim((d) => -Math.hypot(d.x - corner.x, d.z - corner.z)), 4)
+  // The water tower needs a lot of its own too: it used to be dropped at a rim
+  // block's centre, which put it straddling whatever was built either side.
+  const rimBlocks = new Set(blocks.filter((b) => b.rim).map((b) => b.id))
+  site('water-tower', 'water-tower', 'Water Tower', claim((d) => (rimBlocks.has(d.block) ? baseCentrality(d.x, d.z) : -Infinity)), 5)
 
   const plan: CityPlan = {
     v: 1,
@@ -682,6 +832,7 @@ export function planCity(): CityPlan {
       centrality,
       heightScale: heightScaleFor(centrality),
       wedge: draft.wedge,
+      tiny: isTiny(draft),
     }
   })
 
@@ -758,11 +909,11 @@ function clipToDiagonal(lot: DraftLot, diagonal: CityRoad): (DraftLot & { wedge:
 }
 
 /** Index of the highest-scoring item, or -1 when every score is -Infinity. */
-function pickBest<T>(items: T[], score: (item: T) => number): number {
+function pickBest<T>(items: T[], score: (item: T, index: number) => number): number {
   let best = -1
   let bestScore = -Infinity
   for (let i = 0; i < items.length; i++) {
-    const s = score(items[i])
+    const s = score(items[i], i)
     if (s > bestScore) {
       bestScore = s
       best = i
@@ -784,7 +935,7 @@ function reserveMilestones(plan: CityPlan): void {
     let best: CityLot | undefined
     let bestScore = -Infinity
     for (const lot of plan.lots) {
-      if (taken.has(lot.id)) continue
+      if (taken.has(lot.id) || lot.tiny) continue
       const s = score(lot)
       if (s > bestScore) {
         bestScore = s
@@ -816,8 +967,8 @@ export function activeMilestones(plan: CityPlan, count: number): CityLandmark[] 
 
 function planProps(plan: CityPlan): CityProp[] {
   const props: CityProp[] = []
-  const push = (kind: CityProp['kind'], x: number, z: number, rotation = 0) => {
-    props.push({ id: props.length, kind, x: r2(x), z: r2(z), rotation: r2(rotation), district: districtAt(x, z) })
+  const push = (kind: CityProp['kind'], x: number, z: number, rotation = 0, lot?: number) => {
+    props.push({ id: props.length, kind, x: r2(x), z: r2(z), rotation: r2(rotation), district: districtAt(x, z), lot })
   }
   const avenues = plan.roads.filter((r) => r.kind === 'avenue')
 
@@ -844,8 +995,14 @@ function planProps(plan: CityPlan): CityProp[] {
     onAvenue++
   }
 
+  // A billboard stands on the kerb in front of a wedge, facing the traffic the
+  // diagonal brings past it — not in the middle of the lot, where it used to
+  // sit inside the park and on top of the clock tower.
+  const spoken = new Set(plan.landmarks.map((l) => l.lot))
   for (const lot of plan.lots) {
-    if (lot.wedge) push('billboard', lot.x, lot.z, lot.rotation)
+    if (!lot.wedge || lot.tiny || spoken.has(lot.id)) continue
+    const [fx, fz] = frontPoint(lot)
+    push('billboard', fx + Math.sin(lot.rotation), fz + Math.cos(lot.rotation), lot.rotation, lot.id)
   }
 
   // Benches and trees ring the two places people stand still.
@@ -869,13 +1026,18 @@ function planProps(plan: CityPlan): CityProp[] {
   const mast = plan.landmarks.find((l) => l.id === 'mast')
   if (mast) push('beacon', mast.x, mast.z)
 
-  let tower: CityBlock | null = null
-  for (const block of plan.blocks) {
-    if (!block.rim) continue
-    if (!tower || block.centrality > tower.centrality) tower = block
-  }
-  if (tower) push('water-tower', tower.x, tower.z)
+  const tower = plan.landmarks.find((l) => l.id === 'water-tower')
+  if (tower) push('water-tower', tower.x, tower.z, 0, tower.lot)
   return props
+}
+
+/**
+ * The plan's props minus the ones standing in front of a lot a listing has
+ * taken: a billboard belongs to an empty wedge, not to somebody's front door.
+ */
+export function propsFor(plan: CityPlan, assignments: CityAssignment[]): CityProp[] {
+  const used = new Set(assignments.map((a) => a.lot))
+  return plan.props.filter((p) => p.lot === undefined || !used.has(p.lot))
 }
 
 // ------------------------------------------------------------------- loops
@@ -886,14 +1048,15 @@ const LANE_OFFSET = 2
 function planLoops(plan: CityPlan): CityLoop[] {
   const loops: CityLoop[] = []
   const road = (id: string) => plan.roads.find((r) => r.id === id)
-  const add = (id: string, kind: CityLoop['kind'], roadId: string, count: number, points: Pt[]) => {
-    const src = road(roadId)
+  const add = (id: string, kind: CityLoop['kind'], on: string[], count: number, points: Pt[]) => {
+    const src = road(on[0])
     if (!src) return
     const next = rng(subSeed(`loop:${id}`))
     loops.push({
       id,
       kind,
-      road: roadId,
+      road: on[0],
+      roads: on,
       tier: src.tier,
       count,
       phases: Array.from({ length: count }, () => r2(next())),
@@ -905,7 +1068,7 @@ function planLoops(plan: CityPlan): CityLoop[] {
   if (ring) {
     const o = RING.x - LANE_OFFSET
     const p = RING.z - LANE_OFFSET
-    add('cars-ring', 'car', 'ring', 12, [
+    add('cars-ring', 'car', ['ring'], 12, [
       [-o, -p],
       [o, -p],
       [o, p],
@@ -913,20 +1076,47 @@ function planLoops(plan: CityPlan): CityLoop[] {
       [-o, -p],
     ])
   }
-  add('cars-avenue-ns', 'car', 'avenue-ns', 6, outAndBack([
-    [0, -RING.z],
-    [0, RING.z],
-  ]))
-  add('cars-avenue-ew', 'car', 'avenue-ew', 6, outAndBack([
-    [-RING.x, 0],
-    [RING.x, 0],
-  ]))
-  add('cars-diagonal', 'car', 'diagonal', 6, outAndBack(DIAGONAL_POINTS))
+  // The cross avenues run out to the plaza ring, round it, and back out the
+  // far side: the square is a place, not a junction, and the fountain is not a
+  // roundabout.
+  const p = PLAZA_RING_R
+  const o = LANE_OFFSET
+  add('cars-avenue-ns', 'car', ['avenue-ns', 'plaza-ring'], 6, [
+    [o, -RING.z],
+    [o, -p],
+    [p, -p],
+    [p, p],
+    [o, p],
+    [o, RING.z],
+    [-o, RING.z],
+    [-o, p],
+    [-p, p],
+    [-p, -p],
+    [-o, -p],
+    [-o, -RING.z],
+    [o, -RING.z],
+  ])
+  add('cars-avenue-ew', 'car', ['avenue-ew', 'plaza-ring'], 6, [
+    [-RING.x, o],
+    [-p, o],
+    [-p, p],
+    [p, p],
+    [p, o],
+    [RING.x, o],
+    [RING.x, -o],
+    [p, -o],
+    [p, -p],
+    [-p, -p],
+    [-p, -o],
+    [-RING.x, -o],
+    [-RING.x, o],
+  ])
+  add('cars-diagonal', 'car', ['diagonal'], 6, outAndBack(DIAGONAL_POINTS))
 
   const plaza = road('plaza-path')
-  if (plaza) add('walk-plaza', 'pedestrian', 'plaza-path', 24, plaza.points.map((p) => [...p] as Pt))
+  if (plaza) add('walk-plaza', 'pedestrian', ['plaza-path'], 24, plaza.points.map((q) => [...q] as Pt))
   const park = road('park-path')
-  if (park) add('walk-park', 'pedestrian', 'park-path', 16, park.points.map((p) => [...p] as Pt))
+  if (park) add('walk-park', 'pedestrian', ['park-path'], 16, park.points.map((q) => [...q] as Pt))
   return loops
 }
 
@@ -942,7 +1132,29 @@ function outAndBack(points: Pt[]): Pt[] {
 export type CityListingInput = Pick<ListingMeta, 'slug' | 'category' | 'added' | 'tools'> & {
   /** The lot the listing's YAML already records, if it has one. */
   lot?: number
+  /** Floors on the listing's blueprint; the build reads it from there. */
+  floors?: number
 }
+
+/**
+ * The lots a district offers, best address first. The probe walks this rather
+ * than the plan's own order, which is the order the ground was surveyed in and
+ * puts the rim band next to downtown: eight listings used to scatter, three of
+ * them landing on the far side of the ring from their own district.
+ */
+function addressBook(plan: CityPlan): Map<Archetype | null, CityLot[]> {
+  const book = new Map<Archetype | null, CityLot[]>()
+  const rank = (a: CityLot, b: CityLot) => b.centrality - a.centrality || a.id - b.id
+  const open = plan.lots.filter((l) => !l.tiny)
+  book.set(null, [...open].sort(rank))
+  for (const district of plan.districts) {
+    book.set(district.archetype, open.filter((l) => l.district === district.archetype).sort(rank))
+  }
+  return book
+}
+
+/** How far down the best addresses a slug may start looking. */
+const PROBE_WINDOW = 8
 
 /**
  * Places listings on the plan. Two rules keep a building where people left it:
@@ -956,21 +1168,22 @@ export type CityListingInput = Pick<ListingMeta, 'slug' | 'category' | 'added' |
 export function assignLots(plan: CityPlan, listings: CityListingInput[]): CityAssignment[] {
   const ordered = [...listings].sort((a, b) => (a.added === b.added ? a.slug.localeCompare(b.slug) : a.added.localeCompare(b.added)))
   const taken = reservedLots(plan)
-  const byId = new Map(plan.lots.map((l) => [l.id, l]))
+  const open = new Set(plan.lots.filter((l) => !l.tiny).map((l) => l.id))
   const placed = new Map<string, number>()
 
   for (const listing of ordered) {
     if (listing.lot === undefined) continue
-    if (!byId.has(listing.lot) || taken.has(listing.lot)) continue
+    if (!open.has(listing.lot) || taken.has(listing.lot)) continue
     taken.add(listing.lot)
     placed.set(listing.slug, listing.lot)
   }
 
+  const book = addressBook(plan)
   for (const listing of ordered) {
     if (placed.has(listing.slug)) continue
     const want = archetypeFor(listing.category)
-    const start = fnv1a(listing.slug) % Math.max(plan.lots.length, 1)
-    const lot = probe(plan, taken, start, want) ?? probe(plan, taken, start, null)
+    const seed = fnv1a(listing.slug)
+    const lot = probe(book.get(want) ?? [], taken, seed) ?? probe(book.get(null) ?? [], taken, seed)
     if (lot === undefined) continue
     taken.add(lot)
     placed.set(listing.slug, lot)
@@ -987,19 +1200,36 @@ export function assignLots(plan: CityPlan, listings: CityListingInput[]): CityAs
     }
   }
 
+  const byId = new Map(plan.lots.map((l) => [l.id, l]))
   return ordered
     .filter((l) => placed.has(l.slug))
-    .map((l) => ({ slug: l.slug, lot: placed.get(l.slug)!, peak: l.slug === peak }))
+    .map((l) => {
+      const lot = placed.get(l.slug)!
+      const isPeak = l.slug === peak
+      return { slug: l.slug, lot, peak: isPeak, storeys: storeysFor(byId.get(lot)!, l.floors, isPeak) }
+    })
 }
 
-/** First free lot from `start`, wrapping once; `district` narrows the search. */
-function probe(plan: CityPlan, taken: Set<number>, start: number, district: Archetype | null): number | undefined {
-  const n = plan.lots.length
-  for (let i = 0; i < n; i++) {
-    const lot = plan.lots[(start + i) % n]
-    if (taken.has(lot.id)) continue
-    if (district !== null && lot.district !== district) continue
-    return lot.id
+/**
+ * Storeys a listing draws on its lot: its real floors, never fewer than two so
+ * a one-page site is still a building, raised by the lot's height scale, and
+ * half again for the one peak.
+ */
+export function storeysFor(lot: CityLot, floors: number | undefined, peak: boolean): number {
+  const base = Math.max(floors ?? 0, CITY_STOREYS.minFloors) * lot.heightScale
+  return peak ? Math.round(base * CITY_STOREYS.peak) : base
+}
+
+/**
+ * First free lot in an address book, starting somewhere in the best few so two
+ * slugs do not both want the same front door, then walking down the list.
+ */
+function probe(lots: CityLot[], taken: Set<number>, seed: number): number | undefined {
+  if (lots.length === 0) return undefined
+  const start = seed % Math.min(PROBE_WINDOW, lots.length)
+  for (let i = 0; i < lots.length; i++) {
+    const lot = lots[(start + i) % lots.length]
+    if (!taken.has(lot.id)) return lot.id
   }
   return undefined
 }
@@ -1011,11 +1241,33 @@ export function windowMask(lotId: number): number {
   return fnv1a(`window:${lotId}`)
 }
 
+/** Hermite ease between two edges; 0 below `e0`, 1 above `e1`. */
+function smoothstep(e0: number, e1: number, x: number): number {
+  const t = clamp01((x - e0) / (e1 - e0))
+  return t * t * (3 - 2 * t)
+}
+
+/** How likely an unclaimed lot is to have been built on already. */
+export function fillChance(centrality: number): number {
+  return smoothstep(FILL_FROM, FILL_TO, centrality)
+}
+
+/** Storeys a filler massing draws on a lot, before the block's cap. */
+export function fillStoreys(lotId: number, heightScale: number): number {
+  const span = CITY_STOREYS.fillMax - CITY_STOREYS.fillMin + 1
+  const n = CITY_STOREYS.fillMin + Math.floor(rng(fnv1a(`filler:${lotId}`))() * span)
+  return n * heightScale
+}
+
 /**
- * What every lot with no listing on it draws. A good address gets a filler
- * massing so the street has two sides; a poor one gets dirt and a fence, so it
- * is obvious the city has room to grow. A milestone lot the directory has not
- * earned yet is empty; once earned it is a landmark and not a fill at all.
+ * What every lot with no listing on it draws. A good address is likely to be
+ * built on already so the street has two sides; a poor one is more likely to
+ * be dirt and a fence, so the room the city has to grow is visible. The odds
+ * ease between the two rather than switching at a threshold, which drew the
+ * built-up part as a disc with a razor edge and no gap sites downtown at all.
+ *
+ * Filler never out-tops its own street by more than a storey, and a milestone
+ * lot is held empty however good its address: the point of it is the gap.
  */
 export function fillerFor(plan: CityPlan, assignments: CityAssignment[]): CityFill[] {
   const used = new Set(assignments.map((a) => a.lot))
@@ -1025,16 +1277,26 @@ export function fillerFor(plan: CityPlan, assignments: CityAssignment[]): CityFi
       .map((l) => l.lot)
   )
   const waiting = new Set(plan.landmarks.filter((l) => l.minListings !== undefined).map((l) => l.lot))
+
+  // Tallest listing on each block, so filler can be kept in its place.
+  const byId = new Map(plan.lots.map((l) => [l.id, l]))
+  const tallest = new Map<number, number>()
+  for (const a of assignments) {
+    const lot = byId.get(a.lot)
+    if (!lot) continue
+    tallest.set(lot.block, Math.max(tallest.get(lot.block) ?? 0, a.storeys))
+  }
+
   const fills: CityFill[] = []
   for (const lot of plan.lots) {
-    if (used.has(lot.id) || built.has(lot.id)) continue
-    // A milestone lot is held empty however good its address, because the
-    // point of it is that the gap in the street is visible.
-    if (waiting.has(lot.id) || lot.centrality <= FILLER_CENTRALITY) {
+    if (lot.tiny || used.has(lot.id) || built.has(lot.id)) continue
+    const chance = waiting.has(lot.id) ? 0 : fillChance(lot.centrality)
+    if (rng(fnv1a(`fill:${lot.id}`))() >= chance) {
       fills.push({ lot: lot.id, kind: 'empty', storeys: 0, mask: 0 })
       continue
     }
-    const storeys = (1 + Math.floor(rng(fnv1a(`filler:${lot.id}`))() * 4)) * lot.heightScale
+    const cap = tallest.get(lot.block)
+    const storeys = Math.max(1, Math.min(fillStoreys(lot.id, lot.heightScale), cap === undefined ? Infinity : cap + CITY_STOREYS.fillHeadroom))
     fills.push({ lot: lot.id, kind: 'filler', storeys, mask: windowMask(lot.id) })
   }
   return fills
