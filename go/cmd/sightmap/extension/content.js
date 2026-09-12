@@ -151,6 +151,38 @@ function resolveElement(el, components) {
   }));
 }
 
+// Descend from a hover/hit target INTO the component subtree below it. Bottom-up
+// closest() fails when the target is an ANCESTOR of the real component — e.g. a
+// control with pointer-events:none whose hit bubbles up to a styling wrapper that
+// sits ABOVE jb-form-field-container. Among active components, return the deepest
+// element inside `root` whose box contains the pointer, so the caller can resolve
+// from a real component element. (x, y) are viewport coords.
+function deepestComponentAt(root, x, y, components) {
+  if (!root || !components) return null;
+  let best = null;
+  let bestDepth = -1;
+  for (const comp of components) {
+    if (!comp.selector) continue;
+    let els;
+    try {
+      els = root.querySelectorAll(comp.selector);
+    } catch {
+      continue;
+    }
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+      const d = domDepth(el);
+      if (d > bestDepth) {
+        bestDepth = d;
+        best = el;
+      }
+    }
+  }
+  return best;
+}
+
 function resolveTier(el, path, components) {
   if (!path.length) return 3;
   const innermost = path[path.length - 1];
@@ -190,6 +222,8 @@ const state = {
   overlayEl: null,
   tooltipEl: null,
   hoverTarget: null,
+  hoverX: 0,
+  hoverY: 0,
 };
 
 /**
@@ -501,13 +535,25 @@ function onMouseMove(e) {
   if (e.target?.id?.startsWith?.("__sightmap")) return;
 
   state.hoverTarget = e.target;
+  state.hoverX = e.clientX;
+  state.hoverY = e.clientY;
 
   if (hoverRaf) cancelAnimationFrame(hoverRaf);
   hoverRaf = requestAnimationFrame(() => {
     if (!state.hoverTarget) return;
     const comps = activeComponents();
-    const path = resolveElement(state.hoverTarget, comps);
-    renderOverlay(path, state.hoverTarget);
+    let target = state.hoverTarget;
+    // Prefer the deepest component actually UNDER the pointer. Bottom-up
+    // closest() from the hover target only sees components the target is INSIDE,
+    // so when the target is a wrapper above the component it resolves a coarse
+    // ancestor (e.g. ExpansionPanelContent) — or nothing, when the real control
+    // has pointer-events:none. Descending to the deepest component element whose
+    // box contains the pointer and resolving from there matches the top-down
+    // "innermost wins" the CLI resolver produces.
+    const inner = deepestComponentAt(target, state.hoverX, state.hoverY, comps);
+    if (inner) target = inner;
+    const path = resolveElement(target, comps);
+    renderOverlay(path, target);
 
     chrome.runtime
       .sendMessage({

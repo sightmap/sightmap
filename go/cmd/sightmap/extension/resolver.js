@@ -187,6 +187,48 @@ export function resolveElement(el, components) {
 }
 
 /**
+ * Descend from a hover/hit target INTO the component subtree below it.
+ *
+ * Bottom-up resolveElement() (via closest()) fails when the target is an
+ * ANCESTOR of the real component — e.g. a control with pointer-events:none whose
+ * hit-test bubbles up to a styling wrapper that sits ABOVE the component
+ * container. Among active components, return the deepest element inside `root`
+ * whose bounding box contains the pointer (x, y viewport coords), so the caller
+ * can resolve from a real component element. Returns null when nothing matches.
+ *
+ * @param {Element}                             root
+ * @param {number}                              x
+ * @param {number}                              y
+ * @param {import("./types.js").FlatComponent[]} components
+ * @returns {Element|null}
+ */
+export function deepestComponentAt(root, x, y, components) {
+  if (!root || !components) return null;
+  let best = null;
+  let bestDepth = -1;
+  for (const comp of components) {
+    if (!comp.selector) continue;
+    let els;
+    try {
+      els = root.querySelectorAll(comp.selector);
+    } catch {
+      continue; // invalid selector
+    }
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) continue;
+      if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+      const d = domDepth(el);
+      if (d > bestDepth) {
+        bestDepth = d;
+        best = el;
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * Determine the coverage tier of an element given a resolved path.
  * T1 = element itself has a direct component match
  * T2 = element is inside a matched component but not directly matched
