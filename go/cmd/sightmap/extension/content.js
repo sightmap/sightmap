@@ -543,17 +543,16 @@ function onMouseMove(e) {
     if (!state.hoverTarget) return;
     const comps = activeComponents();
     let target = state.hoverTarget;
-    let path = resolveElement(target, comps);
-    // Miss? The pointer may be over a wrapper ABOVE the component (e.g. a
-    // pointer-events:none input under a styling div). Descend to the real
-    // component element under the cursor and resolve from there.
-    if (!path.length) {
-      const inner = deepestComponentAt(target, state.hoverX, state.hoverY, comps);
-      if (inner) {
-        path = resolveElement(inner, comps);
-        if (path.length) target = inner;
-      }
-    }
+    // Prefer the deepest component actually UNDER the pointer. Bottom-up
+    // closest() from the hover target only sees components the target is INSIDE,
+    // so when the target is a wrapper above the component it resolves a coarse
+    // ancestor (e.g. ExpansionPanelContent) — or nothing, when the real control
+    // has pointer-events:none. Descending to the deepest component element whose
+    // box contains the pointer and resolving from there matches the top-down
+    // "innermost wins" the CLI resolver produces.
+    const inner = deepestComponentAt(target, state.hoverX, state.hoverY, comps);
+    if (inner) target = inner;
+    const path = resolveElement(target, comps);
     renderOverlay(path, target);
 
     chrome.runtime
