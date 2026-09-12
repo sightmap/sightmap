@@ -1,0 +1,299 @@
+{
+  "version": 1,
+  "url": "https://three.example.org/",
+  "finalUrl": "https://three.example.org/",
+  "host": "three.example.org",
+  "scannedAt": "2026-09-08T10:00:00.000Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "chromium"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://x//",
+      "path": "/",
+      "title": "Home",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "about",
+        "account_balance",
+        "browse",
+        "buy_item",
+        "search_items"
+      ]
+    },
+    {
+      "url": "https://x//catalog",
+      "path": "/catalog",
+      "title": "Catalog",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "browse",
+        "filter_items"
+      ]
+    },
+    {
+      "url": "https://x//checkout",
+      "path": "/checkout",
+      "title": "",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "card_details",
+        "pay"
+      ]
+    },
+    {
+      "url": "https://x//help",
+      "path": "/help",
+      "title": "Help",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "contact_support"
+      ]
+    },
+    {
+      "url": "https://x//press",
+      "path": "/press",
+      "title": "Press",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": []
+    }
+  ],
+  "tools": [
+    {
+      "name": "about",
+      "description": "About this shop.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "account_balance",
+      "description": "Read the signed-in account balance.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "sensitive",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "browse",
+      "description": "Browse the catalogue.",
+      "page": "/",
+      "pages": [
+        "/",
+        "/catalog"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "action",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "buy_item",
+      "description": "Buy one item.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "action",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "search_items",
+      "description": "Search the catalogue.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "filter_items",
+      "description": "Filter the catalogue.",
+      "page": "/catalog",
+      "pages": [
+        "/catalog"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "card_details",
+      "description": "Read the stored card.",
+      "page": "/checkout",
+      "pages": [
+        "/checkout"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "sensitive",
+      "riskReason": "fixture",
+      "warnings": []
+    },
+    {
+      "name": "pay",
+      "description": "Pay for the basket.",
+      "page": "/checkout",
+      "pages": [
+        "/checkout"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "action",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          },
+          "p3": {
+            "type": "string"
+          },
+          "p4": {
+            "type": "string"
+          },
+          "p5": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "contact_support",
+      "description": "Open a support thread.",
+      "page": "/help",
+      "pages": [
+        "/help"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "9/9"
+    }
+  ],
+  "counts": {
+    "tools": 9,
+    "pages": 5,
+    "read": 4,
+    "action": 3,
+    "sensitive": 2,
+    "described": 9,
+    "withInputSchema": 8,
+    "declarative": 0
+  },
+  "hints": {
+    "forms": [],
+    "links": [],
+    "title": "three.example.org",
+    "description": ""
+  },
+  "notes": []
+}

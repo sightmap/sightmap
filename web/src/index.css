@@ -3889,6 +3889,142 @@ footer {
   color: var(--accent);
 }
 
+/* ---- LISTING BUILDING ---- */
+.atlas-building {
+  margin-bottom: 3rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.atlas-building__stats { margin-bottom: 1rem; }
+
+/* The stage carries the blueprint-blue of the /building page, so the static
+   drawing and the scene that replaces it sit on the same ground. */
+.atlas-building__stage {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1c4a94 0%, #12336c 100%);
+  /* The scene is drag-to-rotate; a vertical swipe still scrolls the page. */
+  touch-action: pan-y;
+}
+
+.atlas-building__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 1.5rem;
+  transition: opacity 0.9s ease 0.2s;
+}
+
+.atlas-building__stage[data-ready='true'] .atlas-building__poster { opacity: 0; }
+
+.atlas-building__controls {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.atlas-building__tour {
+  /* While the tour runs this carries the walk's name, which can be a whole
+     sentence of intent; it grows to a point and then truncates. */
+  max-width: min(22rem, 60vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(9, 26, 61, 0.72);
+  color: #f2ece3;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.atlas-building__tour:hover {
+  background: rgba(9, 26, 61, 0.9);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.atlas-building__note {
+  margin-top: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+/* The sign over a building's door, anchored in the scene. */
+.bld-sign {
+  padding: 0.1rem 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: #f6f2ea;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* The closed building's sign is read from across a street. */
+.bld-sign--shell {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+}
+
+/* The same name on the dollhouse's front parapet, where it is read at the
+   size of a shopfront sign rather than a doorplate. */
+.bld-sign--board {
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* The plate under it: what the scan actually counted. */
+.bld-plate {
+  padding: 0 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  color: #f6f2ea;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Tool names over the rooms, once the building is close enough to read. */
+.bld-room {
+  padding: 0.12rem 0.34rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(61, 57, 41, 0.18);
+  box-shadow: 0 4px 14px rgba(20, 40, 90, 0.16);
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  line-height: 1.2;
+  color: var(--text-bright);
+  white-space: nowrap;
+  will-change: opacity;
+}
+
+.bld-room--floor {
+  display: inline-block;
+  font-size: 0.46rem;
+  background: rgba(26, 23, 20, 0.86);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fbf8f2;
+  letter-spacing: 0.06em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-building__poster { transition: none; }
+}
+
 /* ---- LISTING META RAIL EXTRAS ---- */
 .atlas-listing__actions a {
   color: var(--accent);
@@ -3932,3 +4068,163 @@ footer {
 @media (max-width: 560px) {
   .atlas-listing { padding-top: 7rem; }
 }
+
+/* ---- THE CITY (/atlas/city) ---- */
+.atlas-city {
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+}
+
+.atlas-city__header { margin-bottom: 1.5rem; }
+
+.atlas-city__header .section-desc { margin-bottom: 0.75rem; }
+
+.atlas-city__stats {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* The stage carries the city's own sky, so the legend underneath it and the
+   scene that replaces it sit on the same ground. */
+.atlas-city__stage {
+  position: relative;
+  overflow: hidden;
+  height: min(74vh, 720px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #e7edf4 0%, #d3dbe6 100%);
+  /* The scene takes the drag; a page scroll needs the margins. */
+  touch-action: none;
+}
+
+.atlas-city__legend {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 1.75rem;
+}
+
+.atlas-city__legend-h {
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.atlas-city__legend-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem 1.5rem;
+  list-style: none;
+}
+
+.atlas-city__legend-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.atlas-city__legend-item a {
+  color: var(--text-bright);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.atlas-city__legend-item a:hover { color: var(--accent); }
+
+.atlas-city__legend-meta,
+.atlas-city__legend-empty {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.atlas-city__hud {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.atlas-city__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(26, 23, 20, 0.18);
+  border-radius: 999px;
+  background: rgba(250, 248, 246, 0.88);
+  color: var(--text-bright);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.atlas-city__button:hover {
+  background: #ffffff;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.atlas-city__button--go {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.atlas-city__button--go:hover { background: #b13a5e; color: #fff; }
+
+.atlas-city__caption {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  max-width: min(60%, 26rem);
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(26, 23, 20, 0.12);
+  border-radius: 8px;
+  background: rgba(250, 248, 246, 0.9);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text);
+}
+
+.atlas-city__note {
+  margin-top: 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+.atlas-city__note a { color: var(--accent); }
+
+.atlas-city__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.atlas-city__link:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .atlas-city { padding-top: 7rem; }
+  .atlas-city__stage { height: min(62vh, 480px); }
+}
+
+.atlas-index__city { margin-bottom: 0.5rem; }
+
+/* Sits under the building section's own rule, so the link reads as part of it. */
+.atlas-listing__city { margin: -2.25rem 0 3rem; }

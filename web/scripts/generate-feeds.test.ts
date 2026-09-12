@@ -129,14 +129,15 @@ describe('buildSitemap', () => {
     expect(xml).toContain('<loc>https://sightmap.org/developers</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/building</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/sightkick</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(10)
+    expect(xml.match(/<url>/g)).toHaveLength(11)
+    expect(xml).toContain('<loc>https://sightmap.org/atlas/city</loc>')
   })
 
   it('lists every directory listing at /atlas/<slug> too', () => {
     const xml = buildSitemap(POSTS, ATLAS, NOW, LISTINGS)
     expect(xml).toContain('<loc>https://sightmap.org/atlas/alpha-tools</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/atlas/beta-demo</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(12)
+    expect(xml.match(/<url>/g)).toHaveLength(13)
   })
 
   it('uses the newest of either kind as the atlas index lastmod', () => {
@@ -167,7 +168,7 @@ describe('buildSitemap', () => {
     expect(xml).toContain('<loc>https://sightmap.org/developers</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/building</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/sightkick</loc>')
-    expect(xml.match(/<url>/g)).toHaveLength(6)
+    expect(xml.match(/<url>/g)).toHaveLength(7)
     expect(xml).not.toContain('undefined')
     expect(xml).toContain('<lastmod>2026-07-28</lastmod>')
   })

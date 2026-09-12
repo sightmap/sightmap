@@ -11,6 +11,8 @@
 // Pure data — no three.js import — so scripts/prerender.tsx can pull the
 // chapter copy that depends on these counts without loading WebGL code.
 
+import type { Archetype, RoofStyle } from '@/types/blueprint'
+
 export type Kind = 'nav' | 'form' | 'content' | 'action' | 'data'
 
 export interface Block {
@@ -45,7 +47,8 @@ export interface Room {
 export interface Floor {
   name: string
   route: string
-  source: string
+  /** Source file the view is drawn from. Absent for a derived building. */
+  source?: string
   rooms: Room[]
 }
 
@@ -67,6 +70,57 @@ export interface Journey {
   stops: [number, string][]
   /** Seconds before the first departure, so the crowd is staggered. */
   delay: number
+}
+
+/** Per-floor circulation lanes: one list of axis-aligned polylines per floor. */
+export type Lanes = [number, number][][][]
+
+/**
+ * One building. The demo corpus below is one of these; a listing's blueprint
+ * becomes another through `modelFromBlueprint`. Every component in this
+ * directory reads its building from `BuildingModelContext`, whose default is
+ * `DEMO_MODEL`, so the /building page draws exactly what it always drew.
+ */
+export interface BuildingModel {
+  floors: Floor[]
+  lanes: Lanes
+  journeys: Journey[]
+  /** Service risers in the core. A derived building has none. */
+  risers: Riser[]
+  /** Closed-mode facade. Absent means the tower is only ever a dollhouse. */
+  facade?: Facade
+  /** Source of every seeded choice in the shell (the window grid). */
+  seed: number
+  /**
+   * This building was derived from a listing's blueprint rather than written
+   * by hand. The demo corpus is not, so the /building page keeps the interior
+   * it has always had while a listing's building wears its archetype.
+   */
+  derived?: boolean
+  /** Tools the scan found, for the plate under the sign. */
+  tools?: number
+  /**
+   * Storey height. Absent means `FLOOR_H`, the height the demo corpus and a
+   * listing page's building are drawn at.
+   *
+   * The city draws a closed building at its lot's storey count rather than
+   * its floor count, so a three-floor listing on a central lot is a nine-
+   * storey shell. Opening that building must not shrink it, so the dollhouse
+   * that replaces the shell stretches its floors to the same total height.
+   * Only the slabs move: rooms, furniture and people keep their own size,
+   * which is what a taller storey means.
+   */
+  floorH?: number
+}
+
+/** What `closed` mode draws. Mirrors `BlueprintFacade` without importing it. */
+export interface Facade {
+  archetype: Archetype
+  variant: number
+  roof: RoofStyle
+  palette: number
+  sign: string
+  sightkick: boolean
 }
 
 export const FLOOR_W = 10
@@ -365,34 +419,37 @@ export const TRAVELLER_COLORS: Record<Traveller, string> = {
   test: '#d9a52a',
 }
 
-export const floorY = (i: number): number => i * FLOOR_H
+/** Storey height of one building. */
+export const floorHeight = (model: BuildingModel): number => model.floorH ?? FLOOR_H
 
-export function findRoom(floor: number, name: string): Room {
-  const room = FLOORS[floor]?.rooms.find((r) => r.name === name)
+export const floorY = (i: number, floorH: number = FLOOR_H): number => i * floorH
+
+export function findRoom(model: BuildingModel, floor: number, name: string): Room {
+  const room = model.floors[floor]?.rooms.find((r) => r.name === name)
   if (!room) throw new Error(`model: no room ${name} on floor ${floor}`)
   return room
 }
 
 /** Deck height at a point: slab plus the tallest zone carpet covering it. */
-export function surfaceAt(floor: number, x: number, z: number): number {
+export function surfaceAt(model: BuildingModel, floor: number, x: number, z: number): number {
   let lift = 0
-  for (const room of FLOORS[floor].rooms) {
+  for (const room of model.floors[floor].rooms) {
     const blocks = room.blocks ?? [{ x: room.x, z: room.z, w: room.w, d: room.d }]
     if (!blocks.some((b) => Math.abs(x - b.x) <= b.w / 2 && Math.abs(z - b.z) <= b.d / 2)) continue
     const top = (room.base ? PLATE : 0) + PLATE
     if (top > lift) lift = top
   }
-  return floorY(floor) + SLAB_T + lift
+  return floorY(floor, floorHeight(model)) + SLAB_T + lift
 }
 
 /** Where a walker stands when visiting a room: just outside the front of
  *  its zone, on whatever carpet is actually underfoot. */
-export function roomStand(floor: number, room: Room, shift = 0): [number, number, number] {
+export function roomStand(model: BuildingModel, floor: number, room: Room, shift = 0): [number, number, number] {
   const rx = room.alt ? room.x + (room.alt.x - room.x) * shift : room.x
   const rz = room.alt ? room.z + (room.alt.z - room.z) * shift : room.z
   const x = room.stand ? room.stand[0] : rx
   const z = room.stand ? room.stand[1] : Math.min(rz + room.d / 2 + (room.kind === 'action' ? 0.35 : 0.25), AISLE_Z)
-  return [x, surfaceAt(floor, x, z), z]
+  return [x, surfaceAt(model, floor, x, z), z]
 }
 
 /** Top of a room's tallest element, for hanging a label over it. */
@@ -409,4 +466,13 @@ export const COUNTS = {
   requests: RISERS.length,
   memory: FLOORS.reduce((n, f) => n + f.rooms.filter((r) => r.memory).length, 0) + 5,
   journeys: JOURNEYS.length,
+}
+
+/** The demo corpus as one building — the context's default value. */
+export const DEMO_MODEL: BuildingModel = {
+  floors: FLOORS,
+  lanes: LANES,
+  journeys: JOURNEYS,
+  risers: RISERS,
+  seed: 0,
 }

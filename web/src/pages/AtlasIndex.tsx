@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import Seo from '@/components/Seo'
@@ -120,6 +120,11 @@ export default function AtlasIndex() {
             <div className="section-label">Atlas</div>
             <h1>Apps with WebMCP tools, and maps of the ones without</h1>
             <p className="section-desc">{ATLAS_DESCRIPTION}</p>
+            <p className="atlas-index__city">
+              <Link className="atlas-city__link" to="/atlas/city">
+                See the gallery as a city &rarr;
+              </Link>
+            </p>
             <p className="atlas-index__machine">
               For agents:{' '}
               <a href="/atlas/directory.json">

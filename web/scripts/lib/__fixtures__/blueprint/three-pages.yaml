@@ -1,0 +1,65 @@
+slug: three-pages
+name: Three Pages
+url: https://three.example.org/
+host: three.example.org
+description: A fixture site with three tool-bearing pages and one page past the floor cap.
+category: commerce
+type: live
+built_with_sightkick: true
+submitted_by: owner
+labels: []
+collections: []
+added: 2026-09-01
+updated: 2026-09-08
+scan: scans/three-pages/2026-09-08.json
+tools:
+  # The scan called `browse` an action; the maintainer corrected it on review,
+  # which is the kind the room has to take.
+  - name: browse
+    kind: read
+    description: Browse the catalogue.
+    page: /
+  - name: search_items
+    kind: read
+    description: Search the catalogue.
+    page: /
+  - name: buy_item
+    kind: action
+    description: Buy one item.
+    page: /
+  - name: account_balance
+    kind: sensitive
+    description: Read the signed-in account balance.
+    page: /
+  - name: about
+    kind: read
+    description: About this shop.
+    page: /
+  - name: filter_items
+    kind: read
+    description: Filter the catalogue.
+    page: /catalog
+  - name: pay
+    kind: action
+    description: Pay for the basket.
+    page: /checkout
+  - name: card_details
+    kind: sensitive
+    description: Read the stored card.
+    page: /checkout
+journey:
+  intent: Check out with a saved card
+  outcome: passed
+  ran_at: 2026-09-08
+  tools_called: [search_items, pay, card_details]
+  duration_ms: 4200
+  notes: Ran read-only against a test account.
+suggested_journeys:
+  - intent: Find an item and buy it
+    tools: [search_items, buy_item]
+  - intent: Ask a human for help
+    tools: [contact_support]
+strengths:
+  - Every tool declares a schema
+improvements:
+  - The checkout tools are not described

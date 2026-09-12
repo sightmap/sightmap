@@ -38,6 +38,7 @@ describe('listingUrls', () => {
       markdown: 'https://sightmap.org/atlas/alpha-tools.md',
       json: 'https://sightmap.org/atlas/sites/alpha-tools.json',
       tools: 'https://sightmap.org/atlas/sites/alpha-tools/tools.json',
+      blueprint: 'https://sightmap.org/atlas/sites/alpha-tools/blueprint.json',
       scan: 'https://sightmap.org/atlas/scans/alpha-tools.json',
       badge: 'https://sightmap.org/atlas/alpha-tools/badge.svg',
     })
@@ -73,8 +74,10 @@ describe('directoryIndexListing', () => {
       badge: 'https://sightmap.org/atlas/alpha-tools/badge.svg',
     })
     // The index is the file an agent reads whole, so the payload that makes a
-    // listing large has to stay out of it.
+    // listing large has to stay out of it — the building included: it is one
+    // fetch away from the site document that links it.
     expect(JSON.stringify(entry)).not.toContain('inputSchema')
+    expect('blueprint' in entry).toBe(false)
   })
 })
 
@@ -148,6 +151,7 @@ describe('siteDocument', () => {
     const doc = siteDocument(alpha())
     expect(doc.links.markdown).toBe('https://sightmap.org/atlas/alpha-tools.md')
     expect(doc.links.badge).toBe('https://sightmap.org/atlas/alpha-tools/badge.svg')
+    expect(doc.links.blueprint).toBe('https://sightmap.org/atlas/sites/alpha-tools/blueprint.json')
     expect(doc.links.directory).toBe('https://sightmap.org/atlas/directory.json')
     expect(doc.links.stats).toBe('https://sightmap.org/atlas/stats.json')
     expect(doc.links.scans).toEqual([
