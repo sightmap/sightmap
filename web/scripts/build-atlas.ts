@@ -34,7 +34,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { atlasCategories, loadAtlas, resolveCorpus, resolveScreenshots } from './lib/atlas'
 import { blueprintSummary, deriveBlueprint } from './lib/blueprint'
-import { assignLots, fillerFor, planCity } from './lib/city'
+import { assignLots, fillerFor, planCity, propsFor } from './lib/city'
 import { directoryCategories, loadDirectory, scanDateOf, scanFilesFor } from './lib/directory'
 import { listingMarkdown } from './lib/directory-markdown'
 import {
@@ -203,9 +203,14 @@ async function main() {
   // it and the unclaimed lots filled or fenced. Written after the listings so
   // a lot a listing's YAML records is what the page shows.
   const plan = planCity()
-  const assignments = assignLots(plan, directory.listings)
+  const assignments = assignLots(
+    plan,
+    // The blueprint's floor count is what a building is drawn from, so the
+    // city needs it to know how tall each listing stands on its lot.
+    directory.listings.map((listing) => ({ ...listing, floors: blueprints.get(listing.slug)?.floors.length }))
+  )
   const fills = fillerFor(plan, assignments)
-  writeJson('city.json', { ...plan, assignments, fills })
+  writeJson('city.json', { ...plan, props: propsFor(plan, assignments), assignments, fills })
   const placed = new Map(assignments.map((a) => [a.slug, a]))
   console.log(`  city: ${assignments.length} placed on ${plan.lots.length} lots, ${fills.length} filled or fenced`)
 
