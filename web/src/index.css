@@ -4013,3 +4013,163 @@ footer {
 @media (max-width: 560px) {
   .atlas-listing { padding-top: 7rem; }
 }
+
+/* ---- THE CITY (/atlas/city) ---- */
+.atlas-city {
+  padding-top: 9rem;
+  padding-bottom: 5rem;
+}
+
+.atlas-city__header { margin-bottom: 1.5rem; }
+
+.atlas-city__header .section-desc { margin-bottom: 0.75rem; }
+
+.atlas-city__stats {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* The stage carries the city's own sky, so the legend underneath it and the
+   scene that replaces it sit on the same ground. */
+.atlas-city__stage {
+  position: relative;
+  overflow: hidden;
+  height: min(74vh, 720px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #e7edf4 0%, #d3dbe6 100%);
+  /* The scene takes the drag; a page scroll needs the margins. */
+  touch-action: none;
+}
+
+.atlas-city__legend {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 1.75rem;
+}
+
+.atlas-city__legend-h {
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.atlas-city__legend-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem 1.5rem;
+  list-style: none;
+}
+
+.atlas-city__legend-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.atlas-city__legend-item a {
+  color: var(--text-bright);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.atlas-city__legend-item a:hover { color: var(--accent); }
+
+.atlas-city__legend-meta,
+.atlas-city__legend-empty {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.atlas-city__hud {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.atlas-city__button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid rgba(26, 23, 20, 0.18);
+  border-radius: 999px;
+  background: rgba(250, 248, 246, 0.88);
+  color: var(--text-bright);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.atlas-city__button:hover {
+  background: #ffffff;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.atlas-city__button--go {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.atlas-city__button--go:hover { background: #b13a5e; color: #fff; }
+
+.atlas-city__caption {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  max-width: min(60%, 26rem);
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(26, 23, 20, 0.12);
+  border-radius: 8px;
+  background: rgba(250, 248, 246, 0.9);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text);
+}
+
+.atlas-city__note {
+  margin-top: 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+
+.atlas-city__note a { color: var(--accent); }
+
+.atlas-city__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.atlas-city__link:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .atlas-city { padding-top: 7rem; }
+  .atlas-city__stage { height: min(62vh, 480px); }
+}
+
+.atlas-index__city { margin-bottom: 0.5rem; }
+
+/* Sits under the building section's own rule, so the link reads as part of it. */
+.atlas-listing__city { margin: -2.25rem 0 3rem; }

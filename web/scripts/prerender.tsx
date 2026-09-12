@@ -23,6 +23,8 @@ import {
   ATLAS_DESCRIPTION,
   HOME_TITLE,
   BLOG_INDEX_TITLE,
+  ATLAS_CITY_DESCRIPTION,
+  ATLAS_CITY_TITLE,
   ATLAS_INDEX_TITLE,
   NOT_FOUND_TITLE,
   NOT_FOUND_DESCRIPTION,
@@ -435,6 +437,30 @@ async function main() {
     )
   )
 
+  // The city. Its scene is client-only and lazy (see src/components/city/
+  // CityView.tsx), so this file carries the header, the stats line and the
+  // legend — one link per listed building — which is what a crawler, a
+  // no-JS visitor and a browser without WebGL get.
+  write(
+    'atlas/city',
+    renderRoute(
+      shell,
+      '/atlas/city',
+      {
+        url: `${SITE_URL}/atlas/city`,
+        ogUrl: `${DEPLOY_URL}/atlas/city`,
+        title: ATLAS_CITY_TITLE,
+        description: ATLAS_CITY_DESCRIPTION,
+        image: `${SITE_URL}/og-image.png`,
+        ogImage: `${DEPLOY_URL}/og-image.png`,
+        imageAlt: DEFAULT_IMAGE_ALT,
+        imageDimensionsKnown: true,
+        type: 'website',
+      },
+      siteJsonLd
+    )
+  )
+
   for (const entry of atlas.entries) {
     const url = `${SITE_URL}/atlas/${entry.slug}`
     const ogUrl = `${DEPLOY_URL}/atlas/${entry.slug}`
@@ -686,7 +712,7 @@ async function main() {
   )
 
   console.log(
-    `\n  prerender complete: ${posts.length + atlas.entries.length + directory.listings.length + 7} page(s)`
+    `\n  prerender complete: ${posts.length + atlas.entries.length + directory.listings.length + 8} page(s)`
   )
 }
 
