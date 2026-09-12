@@ -1201,13 +1201,19 @@ export function assignLots(plan: CityPlan, listings: CityListingInput[]): CityAs
   }
 
   const byId = new Map(plan.lots.map((l) => [l.id, l]))
-  return ordered
+  const settled = ordered
     .filter((l) => placed.has(l.slug))
     .map((l) => {
       const lot = placed.get(l.slug)!
-      const isPeak = l.slug === peak
-      return { slug: l.slug, lot, peak: isPeak, storeys: storeysFor(byId.get(lot)!, l.floors, isPeak) }
+      return { slug: l.slug, lot, peak: l.slug === peak, storeys: storeysFor(byId.get(lot)!, l.floors, false) }
     })
+  // The peak is the high point of the whole skyline, not just half again its
+  // own height: a one-floor site on a tall lot must not out-top it.
+  const tallest = settled.reduce((m, a) => Math.max(m, a.storeys), 0)
+  for (const a of settled) {
+    if (a.peak) a.storeys = Math.max(a.storeys, Math.round(tallest * CITY_STOREYS.peak))
+  }
+  return settled
 }
 
 /**

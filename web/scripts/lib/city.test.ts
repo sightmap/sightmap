@@ -394,13 +394,18 @@ describe('assignLots', () => {
     for (const a of assignLots(plan, listings)) {
       const lot = plan.lots[a.lot]
       const floors = listings.find((l) => l.slug === a.slug)!.floors
-      expect(a.storeys).toBe(storeysFor(lot, floors, a.peak))
+      if (!a.peak) expect(a.storeys).toBe(storeysFor(lot, floors, false))
       // Never a bungalow, however thin the scan.
       expect(a.storeys).toBeGreaterThanOrEqual(CITY_STOREYS.minFloors * lot.heightScale)
     }
-    // The peak is drawn half again as tall as it would otherwise be.
     const lot = buildable[0]
     expect(storeysFor(lot, 4, true)).toBe(Math.round(storeysFor(lot, 4, false) * CITY_STOREYS.peak))
+  })
+
+  it('draws the peak above every other building, whatever lot it stands on', () => {
+    const assignments = assignLots(plan, seedListings)
+    const peak = assignments.find((a) => a.peak)!
+    for (const a of assignments) if (!a.peak) expect(peak.storeys).toBeGreaterThan(a.storeys)
   })
 
   it('drops a billboard that would stand in front of somebody door', () => {
