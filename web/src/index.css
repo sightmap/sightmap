@@ -3978,11 +3978,35 @@ footer {
 .bld-plate {
   padding: 0 0.3rem;
   font-family: var(--mono);
-  font-size: 0.54rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: #26272c;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  color: #f6f2ea;
   white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Tool names over the rooms, once the building is close enough to read. */
+.bld-room {
+  padding: 0.12rem 0.34rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(61, 57, 41, 0.18);
+  box-shadow: 0 4px 14px rgba(20, 40, 90, 0.16);
+  font-family: var(--mono);
+  font-size: 0.5rem;
+  line-height: 1.2;
+  color: var(--text-bright);
+  white-space: nowrap;
+  will-change: opacity;
+}
+
+.bld-room--floor {
+  display: inline-block;
+  font-size: 0.46rem;
+  background: rgba(26, 23, 20, 0.86);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fbf8f2;
+  letter-spacing: 0.06em;
 }
 
 @media (prefers-reduced-motion: reduce) {

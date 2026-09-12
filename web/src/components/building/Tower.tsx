@@ -21,6 +21,7 @@ import { furnish, type Item, type ItemType } from './furnish'
 import { personaFurnish } from './persona'
 import { paletteColor, roofParts } from './facade'
 import RoofShape from './RoofShape'
+import RoomLabels from './RoomLabels'
 import { sheetLinePoints } from './geometry'
 import { smoothstep } from './chapters'
 import { useBuildingModel } from './context'
@@ -435,7 +436,7 @@ function Sign({ model, y }: { model: BuildingModel; y: number }) {
   const sign = model.facade?.sign
   if (!sign) return null
   const tools = model.tools ?? model.floors.reduce((n, f) => n + f.rooms.length, 0)
-  const w = THREE.MathUtils.clamp(1.3 + sign.length * 0.26, 2.6, FLOOR_W * 0.56)
+  const w = THREE.MathUtils.clamp(1.6 + sign.length * 0.42, 3.0, FLOOR_W * 0.78)
   return (
     <group position={[0, y, FLOOR_D / 2 + 0.45]}>
       <mesh position={[0, 1.32, 0]} castShadow>
@@ -455,11 +456,11 @@ function Sign({ model, y }: { model: BuildingModel; y: number }) {
           {sign}
         </div>
       </Html>
-      <mesh position={[0, 0.79, 0.02]} castShadow>
-        <boxGeometry args={[1.75, 0.32, 0.07]} />
-        <meshStandardMaterial color="#f2ece3" roughness={0.85} />
+      <mesh position={[0, 0.52, 0.04]} castShadow>
+        <boxGeometry args={[2.0, 0.36, 0.08]} />
+        <meshStandardMaterial color="#3d3929" roughness={0.85} />
       </mesh>
-      <Html position={[0, 0.79, 0.09]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }} wrapperClass="bld-sign-anchor">
+      <Html position={[0, 0.52, 0.11]} center zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }} wrapperClass="bld-sign-anchor">
         <div className="bld-plate" aria-hidden="true">
           {tools} tool{tools === 1 ? '' : 's'}
         </div>
@@ -476,11 +477,11 @@ function Roof({ mats, n, model }: { mats: Mats; n: number; model: BuildingModel 
   const facade = model.derived ? model.facade : undefined
   const style = facade?.roof ?? 'flat'
   const shaped = !!facade && style !== 'flat' && style !== 'parapet'
-  const shape = useMemo(() => (shaped ? roofParts(style, FLOOR_W - 0.8, FLOOR_D - 0.8) : []), [shaped, style])
+  const shape = useMemo(() => (shaped ? roofParts(style, FLOOR_W - 1.8, FLOOR_D - 1.8) : []), [shaped, style])
   const roofMats = useMemo(() => {
     const base = new THREE.Color(paletteColor(facade?.archetype ?? 'office', facade?.palette ?? 0))
     return {
-      roof: new THREE.MeshStandardMaterial({ color: base.clone().multiplyScalar(0.72), roughness: 0.9 }),
+      roof: new THREE.MeshStandardMaterial({ color: base.clone().multiplyScalar(0.88), roughness: 0.9 }),
       trim: new THREE.MeshStandardMaterial({ color: '#f2ece3', roughness: 0.85 }),
     }
   }, [facade?.archetype, facade?.palette])
@@ -655,6 +656,9 @@ export default function Tower({ mode = 'dollhouse' }: { mode?: TowerMode }) {
       ))}
       <Roof mats={mats} n={model.floors.length} model={model} />
       <Frame mats={mats} n={model.floors.length} />
+      {/* A derived building's rooms are named after real tools, so say so.
+          The demo has its own signage in the wayfinding chapter. */}
+      {model.derived && <RoomLabels />}
     </group>
   )
 }
