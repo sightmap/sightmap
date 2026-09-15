@@ -221,6 +221,17 @@ func (c *Collector) attachTab(tabID string) {
 	if err := conn.EnableDomain(ctx, "Network"); err != nil {
 		fmt.Fprintf(os.Stderr, "[collector] tab %s Network.enable: %v\n", tabID, err)
 	}
+	// Force document.hasFocus()==true regardless of the real OS window focus.
+	// Some widgets gate behavior on page focus (e.g. react-aria date pickers open
+	// only on focus WHILE the page holds OS focus) — which an agent/side-panel/
+	// headless driver never has, so they can't be driven in-page without this.
+	// Playwright/Puppeteer enable the same emulation by default. Set on the
+	// collector's persistent per-tab connection so it lives for the whole session
+	// (sightkick-6b6b). Best-effort: older Chrome or a transitional target may
+	// reject it; that just restores the prior focus-dependent behavior.
+	if _, err := conn.call(ctx, "Emulation.setFocusEmulationEnabled", map[string]interface{}{"enabled": true}); err != nil {
+		fmt.Fprintf(os.Stderr, "[collector] tab %s Emulation.setFocusEmulationEnabled: %v\n", tabID, err)
+	}
 
 	c.tabsMu.Lock()
 	c.tabs[tabID] = &tabColl{conn: conn, cancel: cancel}
