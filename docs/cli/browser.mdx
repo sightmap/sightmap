@@ -248,6 +248,7 @@ The default picker is [Jev](https://docs.typesafe.ai/introduction) through TypeS
 | `--max-steps` | `20` | Stop after this many steps |
 | `--json` | off | Print the run (steps, timings, transitions) as JSON on stdout |
 | `--bench` | | Run a suite JSON file instead of one goal; with `--repeat N`, `--only NAME`, `--out FILE` |
+| `--grow` | off | Grow the corpus while exploring: name the unmapped controls of every page visited (see below) |
 
 With no `--done-when` the loop stops when the picker's own "done" judgment passes 0.85. With one, the picker's judgment is only logged. Progress goes to stderr, one line per step with the picked element, the top probabilities, and where the time went:
 
@@ -270,6 +271,17 @@ OK  done_when satisfied  steps=6  1.5s  picker=jev:jev-latest calls=5 732ms toke
 Pages with more than 60 candidates are folded into one option per owning component or landmark, plus up to 20 elements whose name or link matches a word of the goal; a group answer triggers a second pick inside that group. A control acted on twice at the same URL is hidden from later picks. `browser explore` exits non-zero when the goal is not reached.
 
 `--bench` runs a suite of goals with a reset between them and prints a table plus one summary line (success, steps, seconds per step, model calls and latency, tokens, and a USD estimate for priced pickers). The suites under `go/explore/bench/` reproduce the numbers in that directory's README.
+
+#### `--grow`: build the corpus as you go
+
+With `--grow`, every page the loop observes also grows the corpus at `--sightmap-dir` (created with an empty `components.yaml` if absent). Unmapped interactive nodes are grouped by their nearest stable ancestor selector (the same hooks `explain` prints), Jev classifies each group as buttons, links, inputs, a select, a nav, cards, or noise, a template names it (`NavListLink`, `ProductPodLink`, `SearchProductsInput`), the scoped selector is verified against the offline matcher on that page, and the component is appended to the view's YAML with `label` (and `href` for links) properties. A page with no matching view gets one, named from its route pattern (`/catalogue/*/index.html` becomes `CatalogueDetail`). A selector that turns up on a second view is moved to `components.yaml` as a global. Every write is followed by a corpus reload and validation and is rolled back if the corpus stops loading; the running loop picks up the new corpus at once.
+
+```bash
+sightmap browser explore --sightmap-dir .sightmap --grow \
+  --url https://books.toscrape.com/ --goal "Open the Travel category" --done-when url=category/books/travel
+```
+
+On books.toscrape.com, three passes over the ten-goal suite took an empty corpus to seven components and four views with every visited page fully covered, `validate` and `lint` clean, in about a second of grow time. Names are template names: hand the result to an authoring pass for better ones and memory lines.
 
 ---
 

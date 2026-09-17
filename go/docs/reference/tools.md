@@ -88,6 +88,7 @@ The overlay extension is embedded in the binary and auto-extracted to `~/.sightm
 | `--picker` | `jev` | `jev[:model]` needs `TYPESAFE_API_KEY`; `anthropic[:model]` needs `ANTHROPIC_API_KEY` |
 | `--avoid` | | Controls to keep away from (`Delete`, `Pay`) |
 | `--bench` | | Run a goal suite and print a results table |
+| `--grow` | off | Write components for unmapped controls on every page visited (package `grow`): grouped by container hook, classified by Jev, template-named, selector-verified offline, validated after each write |
 
 Exits non-zero when the goal is not reached. Docs: `docs/cli/browser.mdx`.
 

@@ -65,6 +65,22 @@ quiet samples 40 ms apart). The model is now most of the step.
 Jev token use for whoever prices it: about 1.2k input tokens per call on
 saucedemo, 3.7k on the books home page, 4.7k on Clay; output under 200.
 
+## Growing the corpus (`--grow`)
+
+`sightmap browser explore --bench books.json --grow --repeat 3`, starting from
+the empty `books/.sightmap` (reset it with `rm -rf books/.sightmap/views` and a
+fresh `components.yaml` of `version: 1`, `components: []`):
+
+| repeat | goals | wall / step | coverage of visited pages | corpus after |
+|---|---|---|---|---|
+| 1 | 10/10 | 0.32 s | 0% → 89% | 4 views, 6 components, 4 promoted to global |
+| 2 | 10/10 | 0.29 s | 100% | unchanged |
+| 3 | 10/10 | 0.28 s | 100% | unchanged |
+
+Grow work cost 1.2 s in total across the four page types, with seven Jev
+classification calls. `sightmap validate` and `sightmap lint --warn-only` are
+clean on the result. The run file is `results/books-jev-grow.json`.
+
 ## What the numbers do and do not show
 
 - A typed model at about 200 ms is enough to pick every step on a mapped site,
