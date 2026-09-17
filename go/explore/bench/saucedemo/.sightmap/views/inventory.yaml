@@ -1,0 +1,25 @@
+version: 1
+views:
+  - name: Inventory
+    route: "/inventory.html"
+    url: https://www.saucedemo.com/inventory.html
+    description: The product catalog, six items, reachable only after login.
+    components:
+      - name: SortSelect
+        selector: '[data-test="product-sort-container"]'
+        description: Cycles sort order (name/price, ascending/descending).
+        properties:
+          - name: active
+            extract: attr=value
+      - name: InventoryItem
+        selector: '.inventory_item'
+        description: >
+          No price property — ItemPrice's own text never extracts (see its
+          memory note); read the price visually or via a screenshot instead.
+        properties:
+          - name: name
+            extract: ItemName.text
+        children:
+          - $ref: ItemName
+          - $ref: ItemPrice
+          - $ref: AddToCartButton

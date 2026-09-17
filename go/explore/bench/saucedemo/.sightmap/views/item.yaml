@@ -1,0 +1,12 @@
+version: 1
+views:
+  - name: Item
+    route: "/inventory-item.html"
+    url: https://www.saucedemo.com/inventory-item.html?id=0
+    description: A single product's detail page, reached from Inventory or Cart.
+    components:
+      - name: BackToProductsButton
+        selector: '[data-test="back-to-products"]'
+      - $ref: ItemName
+      - $ref: ItemPrice
+      - $ref: AddToCartButton

@@ -1,0 +1,106 @@
+{
+  "name": "books",
+  "sightmap_dir": "books/.sightmap",
+  "start_url": "https://books.toscrape.com/",
+  "reset": "navigate",
+  "goals": [
+    {
+      "name": "open-travel",
+      "goal": "Open the Travel category.",
+      "spec": {
+        "done_when": {
+          "url_contains": "category/books/travel"
+        }
+      }
+    },
+    {
+      "name": "page-2",
+      "goal": "Go to page 2 of the full book list.",
+      "spec": {
+        "done_when": {
+          "url_contains": "page-2"
+        }
+      }
+    },
+    {
+      "name": "open-light-attic",
+      "goal": "Open the detail page of the book \"A Light in the Attic\".",
+      "spec": {
+        "done_when": {
+          "url_contains": "a-light-in-the-attic"
+        }
+      }
+    },
+    {
+      "name": "mystery-page-2",
+      "goal": "Open the Mystery category and go to its second page.",
+      "spec": {
+        "done_when": {
+          "all": [
+            {
+              "url_contains": "mystery"
+            },
+            {
+              "url_contains": "page-2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "open-sharp-objects",
+      "goal": "Find the book \"Sharp Objects\" and open its page.",
+      "spec": {
+        "done_when": {
+          "url_contains": "sharp-objects"
+        }
+      }
+    },
+    {
+      "name": "open-poetry",
+      "goal": "Open the Poetry category.",
+      "spec": {
+        "done_when": {
+          "url_contains": "category/books/poetry"
+        }
+      }
+    },
+    {
+      "name": "home-from-book",
+      "goal": "Go back to the home page that lists all books.",
+      "start_url": "https://books.toscrape.com/catalogue/tipping-the-velvet_999/index.html",
+      "spec": {
+        "done_when": {
+          "url_contains": "books.toscrape.com/index.html"
+        }
+      }
+    },
+    {
+      "name": "open-science-fiction",
+      "goal": "Open the Science Fiction category.",
+      "spec": {
+        "done_when": {
+          "url_contains": "science-fiction"
+        }
+      }
+    },
+    {
+      "name": "page-3",
+      "goal": "Go forward to the third page of the full book list.",
+      "spec": {
+        "done_when": {
+          "url_contains": "page-3"
+        }
+      }
+    },
+    {
+      "name": "first-travel-book",
+      "goal": "Open the Travel category, then open the first book listed in it.",
+      "spec": {
+        "done_when": {
+          "url_contains": "its-only-the-himalayas"
+        }
+      }
+    }
+  ]
+}

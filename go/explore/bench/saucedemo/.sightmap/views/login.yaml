@@ -1,0 +1,23 @@
+version: 1
+views:
+  - name: Login
+    route: "/"
+    url: https://www.saucedemo.com/
+    description: >
+      The only entry point — a plain login form. saucedemo's published test
+      users (standard_user, locked_out_user, problem_user,
+      performance_glitch_user) are all valid usernames; the password for every
+      one of them is secret_sauce.
+    components:
+      - name: UsernameField
+        selector: '[data-test="username"]'
+      - name: PasswordField
+        selector: '[data-test="password"]'
+      - name: LoginButton
+        selector: '[data-test="login-button"]'
+      - name: LoginError
+        selector: '[data-test="error"]'
+        description: Shown in place of a navigation when login fails (e.g. locked_out_user).
+        properties:
+          - name: message
+            extract: text

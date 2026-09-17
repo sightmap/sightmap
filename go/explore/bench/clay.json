@@ -1,0 +1,113 @@
+{
+  "name": "clay",
+  "start_url": "https://app.clay.com/workspaces/4088/home",
+  "reset": "navigate",
+  "avoid": [
+    "Review changes",
+    "Delete",
+    "Remove",
+    "Pay",
+    "Purchase",
+    "Subscribe",
+    "Downgrade",
+    "Cancel",
+    "Leave workspace",
+    "Sign out",
+    "Log out"
+  ],
+  "goals": [
+    {
+      "name": "billing",
+      "goal": "Open the workspace billing page.",
+      "spec": {
+        "done_when": {
+          "view": "Billing"
+        }
+      }
+    },
+    {
+      "name": "credit-usage",
+      "goal": "Open the credit usage page.",
+      "spec": {
+        "done_when": {
+          "view": "Usage"
+        }
+      }
+    },
+    {
+      "name": "settings",
+      "goal": "Open the workspace settings.",
+      "spec": {
+        "done_when": {
+          "view": "Settings"
+        }
+      }
+    },
+    {
+      "name": "trash",
+      "goal": "Open the trash.",
+      "spec": {
+        "done_when": {
+          "view": "Trash"
+        }
+      }
+    },
+    {
+      "name": "exports",
+      "goal": "Open the exports page.",
+      "spec": {
+        "done_when": {
+          "view": "Exports"
+        }
+      }
+    },
+    {
+      "name": "api-cli",
+      "goal": "Open the API and CLI page.",
+      "spec": {
+        "done_when": {
+          "view": "ApiAndCli"
+        }
+      }
+    },
+    {
+      "name": "workflows",
+      "goal": "Open the workflows page.",
+      "spec": {
+        "done_when": {
+          "view": "Workflows"
+        }
+      }
+    },
+    {
+      "name": "plans",
+      "goal": "Open the page where you pick or upgrade the plan.",
+      "spec": {
+        "done_when": {
+          "view": "PlanSelector"
+        }
+      }
+    },
+    {
+      "name": "open-table",
+      "goal": "Open any existing table in the workspace so its grid is visible.",
+      "spec": {
+        "done_when": {
+          "view": "TableView"
+        }
+      }
+    },
+    {
+      "name": "new-table",
+      "goal": "Create a new blank table and land in it.",
+      "spec": {
+        "done_when": {
+          "view": "TableView",
+          "history_contains": "New"
+        }
+      },
+      "max_steps": 12
+    }
+  ],
+  "note": "Needs a logged-in app.clay.com session started on the sightmap/sites app.clay.com corpus: pass --sightmap-dir <path to sites/app.clay.com/.sightmap> and --tab <id> when more than one tab is open. The avoid list keeps the agent off billing and destructive controls."
+}

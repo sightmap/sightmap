@@ -41,6 +41,8 @@ func runBrowser(args []string) error {
 		return runInject(args[1:])
 	case "mcp":
 		return runMCP(args[1:])
+	case "explore":
+		return runExplore(args[1:])
 	case "click":
 		return runClick(args[1:])
 	case "fill":
@@ -91,6 +93,10 @@ Session:
 WebMCP (tools a page exposes via document.modelContext):
   mcp list [--json]                             enumerate the page's WebMCP tools (name, description, input schema)
   mcp call <tool> [--args JSON] [--param k=v] [--json]   invoke a tool via executeTool; prints its result, non-zero exit on tool error
+
+Autonomous (a typed model picks every step over the annotated tree):
+  explore  --goal "..." [--done-when view=Cart] [--value user=alice] [--picker jev|anthropic] [--plan] [--grow] [--max-steps N] [--json]
+  explore  --bench SUITE.json [--repeat N] [--only NAME] [--out FILE]   run a goal suite and print the results table
 
 Interaction (IDs from sightmap snapshot output):
   click    COMPONENT-ID | --x N --y N

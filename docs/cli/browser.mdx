@@ -230,6 +230,49 @@ Both accept `--addr` and `--tab` like the other page commands.
 
 ---
 
+### `browser explore`
+
+Drive the live tab toward a goal one step at a time. Each step observes the page as the annotated component tree, turns its interactive nodes into a short list of named actions, asks a picker which one to take (and whether the goal is already met), acts, waits for the page to settle, and repeats. The picker only ever answers typed questions: pick one of these, yes or no. It never invents text. Every value the loop types comes from `--value` or a spec file.
+
+The default picker is [Jev](https://docs.typesafe.ai/introduction) through TypeSafe (`TYPESAFE_API_KEY`), which answers in about 200 ms, so a step costs a few hundred milliseconds with no big-model call. `--picker anthropic` puts Claude in the same seat for comparison (`ANTHROPIC_API_KEY`). `--plan` makes one Claude call up front to write the spec from the goal.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--goal` | | What to achieve, in plain words (the positional args are joined into the goal too) |
+| `--done-when` | | Deterministic finish check, repeatable and ANDed: `view=NAME`, `url=SUBSTR`, `text=SUBSTR`, `component=NAME`, `history=SUBSTR`, or `prop=Comp.name~value[@Within.name~value]` |
+| `--value` | | `key=text` the loop may type (repeatable). Fields pick the value whose key overlaps their name; ties go to the picker |
+| `--spec` | | JSON file with `done_when`, `values`, `hint`, and `avoid` |
+| `--avoid` | | Drop controls whose name contains this (repeatable). Use it on real accounts: `Delete`, `Pay`, `Review changes` |
+| `--picker` | `jev` | `jev[:model]` or `anthropic[:model]` |
+| `--plan` | off | Ask Claude once to write the spec from the goal |
+| `--max-steps` | `20` | Stop after this many steps |
+| `--json` | off | Print the run (steps, timings, transitions) as JSON on stdout |
+| `--bench` | | Run a suite JSON file instead of one goal; with `--repeat N`, `--only NAME`, `--out FILE` |
+
+With no `--done-when` the loop stops when the picker's own "done" judgment passes 0.85. With one, the picker's judgment is only logged. Progress goes to stderr, one line per step with the picked element, the top probabilities, and where the time went:
+
+```bash
+sightmap browser explore --url https://www.saucedemo.com/ \
+  --goal "Log in and put the Sauce Labs Backpack in the cart, then open the cart" \
+  --done-when view=Cart --value username=standard_user --value password=secret_sauce
+```
+
+```text
+ 1. Login  filled [UsernameField] with username  [n29:1.00 back:0.00]  done=0.01  321ms (snap 13, pick 149, act 36, settle 122)
+ 2. Login  filled [PasswordField] with password  [n31:1.00 back:0.00]  done=0.01  297ms (snap 8, pick 136, act 30, settle 122)
+ 3. Login  clicked [LoginButton]  [n33:1.00 back:0.00]  done=0.01  282ms (snap 7, pick 142, act 10, settle 122)
+ 4. Inventory  clicked [AddToCartButton label="Add to cart"]  [n91:1.00 back:0.00]  done=0.01  297ms (snap 17, pick 149, act 7, settle 123)
+ 5. Inventory  clicked [CartLink count="Cart, 1 items"]  [n55:1.00 back:0.00]  done=0.02  335ms (snap 28, pick 181, act 5, settle 121)
+ 6. Cart  done
+OK  done_when satisfied  steps=6  1.5s  picker=jev:jev-latest calls=5 732ms tokens=6120+610
+```
+
+Pages with more than 60 candidates are folded into one option per owning component or landmark, plus up to 20 elements whose name or link matches a word of the goal; a group answer triggers a second pick inside that group. A control acted on twice at the same URL is hidden from later picks. `browser explore` exits non-zero when the goal is not reached.
+
+`--bench` runs a suite of goals with a reset between them and prints a table plus one summary line (success, steps, seconds per step, model calls and latency, tokens, and a USD estimate for priced pickers). The suites under `go/explore/bench/` reproduce the numbers in that directory's README.
+
+---
+
 ### `browser clear-storage`
 
 Clears all cookies, including `httpOnly` cookies, and clears storage for one origin. Origin storage includes localStorage, IndexedDB, service workers, and caches.

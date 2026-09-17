@@ -1,0 +1,1971 @@
+{
+ "suite": "saucedemo",
+ "picker": "anthropic:claude-sonnet-5",
+ "when": "2026-09-17T00:36:06.919346-04:00",
+ "summary": {
+  "goals": 10,
+  "ok": 10,
+  "steps": 59,
+  "ms": 68500,
+  "ms_per_step": 1161.0169491525423,
+  "model_calls": 51,
+  "model_ms": 62709,
+  "ms_per_call": 1229.5882352941176,
+  "input_tokens": 75736,
+  "output_tokens": 1588,
+  "usd": 0.251028
+ },
+ "runs": [
+  {
+   "name": "login",
+   "rep": 1,
+   "goal": "Log in as the standard user.",
+   "spec": {
+    "done_when": {
+     "view": "Inventory"
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username before password and login",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 9,
+     "ms_pick": 1302,
+     "ms_act": 4,
+     "ms_settle": 83,
+     "ms": 1399
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before submitting login form",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 11,
+     "ms_pick": 1121,
+     "ms_act": 4,
+     "ms_settle": 83,
+     "ms": 1220
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click Login button to submit credentials",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 10,
+     "ms_pick": 1075,
+     "ms_act": 74,
+     "ms_settle": 82,
+     "ms": 1242,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 17,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    }
+   ],
+   "ms": 3880,
+   "picker_stats": {
+    "calls": 3,
+    "ms": 3497,
+    "input_tokens": 1649,
+    "output_tokens": 93,
+    "usd": 0.006342
+   }
+  },
+  {
+   "name": "add-bike-light",
+   "rep": 1,
+   "goal": "Log in, then add the Sauce Labs Bike Light to the cart.",
+   "spec": {
+    "done_when": {
+     "prop": {
+      "component": "AddToCartButton",
+      "name": "label",
+      "contains": "Remove",
+      "within": {
+       "component": "InventoryItem",
+       "name": "name",
+       "contains": "Bike Light"
+      }
+     }
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username first to log in",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 9,
+     "ms_pick": 1161,
+     "ms_act": 3,
+     "ms_settle": 81,
+     "ms": 1255
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before logging in",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 6,
+     "ms_pick": 1596,
+     "ms_act": 6,
+     "ms_settle": 82,
+     "ms": 1691
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Submit login form to proceed",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 12,
+     "ms_pick": 1156,
+     "ms_act": 9,
+     "ms_settle": 95,
+     "ms": 1273,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n107",
+     "probs": "n107:1.00",
+     "done_prob": 0,
+     "why": "Click Add to cart for Bike Light item",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 15,
+     "ms_pick": 1336,
+     "ms_act": 4,
+     "ms_settle": 81,
+     "ms": 1437
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 26,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "comp": "AddToCartButton",
+     "to": "Inventory",
+     "changed": false
+    }
+   ],
+   "ms": 5683,
+   "picker_stats": {
+    "calls": 4,
+    "ms": 5249,
+    "input_tokens": 5506,
+    "output_tokens": 124,
+    "usd": 0.018378
+   }
+  },
+  {
+   "name": "open-fleece-jacket",
+   "rep": 1,
+   "goal": "Log in and open the product detail page for the Sauce Labs Fleece Jacket.",
+   "spec": {
+    "done_when": {
+     "view": "Item",
+     "text_contains": "Fleece Jacket"
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username first to login",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 18,
+     "ms_pick": 1127,
+     "ms_act": 6,
+     "ms_settle": 82,
+     "ms": 1234
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before submitting login form",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 11,
+     "ms_pick": 1137,
+     "ms_act": 4,
+     "ms_settle": 82,
+     "ms": 1235
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click login button to submit credentials",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 7,
+     "ms_pick": 1193,
+     "ms_act": 50,
+     "ms_settle": 82,
+     "ms": 1333,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n132",
+     "probs": "n132:1.00",
+     "done_prob": 0,
+     "why": "Click Fleece Jacket to open item detail",
+     "action": "clicked [ItemName text=\"View details for Sauce Labs Fleece Jack…\"]",
+     "url_after": "https://www.saucedemo.com/inventory-item.html?id=5",
+     "ms_snap": 15,
+     "ms_pick": 1621,
+     "ms_act": 6,
+     "ms_settle": 95,
+     "ms": 1738,
+     "navigated": true
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory-item.html?id=5",
+     "view": "Item",
+     "coverage": {
+      "interactive": 7,
+      "t1": 6,
+      "t2": 0,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 9,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [ItemName text=\"View details for Sauce Labs Fleece Jack…\"]",
+     "comp": "ItemName",
+     "to": "Item",
+     "changed": true
+    }
+   ],
+   "ms": 5551,
+   "picker_stats": {
+    "calls": 4,
+    "ms": 5078,
+    "input_tokens": 5482,
+    "output_tokens": 127,
+    "usd": 0.018351
+   }
+  },
+  {
+   "name": "backpack-in-cart",
+   "rep": 1,
+   "goal": "Log in, put the Sauce Labs Backpack in the cart, and go to the cart page.",
+   "spec": {
+    "done_when": {
+     "view": "Cart",
+     "prop": {
+      "component": "CartItem",
+      "name": "name",
+      "contains": "Backpack"
+     }
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username first to log in",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 21,
+     "ms_pick": 1135,
+     "ms_act": 4,
+     "ms_settle": 82,
+     "ms": 1243
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before logging in",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 7,
+     "ms_pick": 1115,
+     "ms_act": 3,
+     "ms_settle": 81,
+     "ms": 1208
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click Login to authenticate and proceed",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 17,
+     "ms_pick": 1187,
+     "ms_act": 63,
+     "ms_settle": 82,
+     "ms": 1351,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n90",
+     "probs": "n90:1.00",
+     "done_prob": 0,
+     "why": "Add Sauce Labs Backpack to cart",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 17,
+     "ms_pick": 1306,
+     "ms_act": 4,
+     "ms_settle": 82,
+     "ms": 1410
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n54",
+     "probs": "n54:1.00",
+     "done_prob": 0,
+     "why": "Backpack added; now go to cart page",
+     "action": "clicked [CartLink count=\"Cart, 1 items\"]",
+     "url_after": "https://www.saucedemo.com/cart.html",
+     "ms_snap": 26,
+     "ms_pick": 1153,
+     "ms_act": 6,
+     "ms_settle": 99,
+     "ms": 1285,
+     "navigated": true
+    },
+    {
+     "step": 6,
+     "url": "https://www.saucedemo.com/cart.html",
+     "view": "Cart",
+     "coverage": {
+      "interactive": 10,
+      "t1": 8,
+      "t2": 1,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 9,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "comp": "AddToCartButton",
+     "to": "Inventory",
+     "changed": false
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [CartLink count=\"Cart, 1 items\"]",
+     "comp": "CartLink",
+     "to": "Cart",
+     "changed": true
+    }
+   ],
+   "ms": 6509,
+   "picker_stats": {
+    "calls": 5,
+    "ms": 5896,
+    "input_tokens": 9072,
+    "output_tokens": 163,
+    "usd": 0.029661
+   }
+  },
+  {
+   "name": "checkout-onesie",
+   "rep": 1,
+   "goal": "Log in, buy the Sauce Labs Onesie: add it to the cart, check out with the given name and postal code, and finish the order.",
+   "spec": {
+    "done_when": {
+     "view": "Complete"
+    },
+    "values": {
+     "first_name": "Ada",
+     "last_name": "Lovelace",
+     "password": "secret_sauce",
+     "postal_code": "30301",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username to begin login process",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 12,
+     "ms_pick": 1143,
+     "ms_act": 1045,
+     "ms_settle": 82,
+     "ms": 2283
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before logging in",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 9,
+     "ms_pick": 1217,
+     "ms_act": 5,
+     "ms_settle": 82,
+     "ms": 1314
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click login button to proceed",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 10,
+     "ms_pick": 1137,
+     "ms_act": 62,
+     "ms_settle": 82,
+     "ms": 1292,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n158",
+     "probs": "n158:1.00",
+     "done_prob": 0,
+     "why": "Add Sauce Labs Onesie to cart",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 17,
+     "ms_pick": 1274,
+     "ms_act": 3,
+     "ms_settle": 83,
+     "ms": 1378
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n54",
+     "probs": "n54:1.00",
+     "done_prob": 0,
+     "why": "Onesie added; proceed to cart to checkout",
+     "action": "clicked [CartLink count=\"Cart, 1 items\"]",
+     "url_after": "https://www.saucedemo.com/cart.html",
+     "ms_snap": 28,
+     "ms_pick": 1384,
+     "ms_act": 6,
+     "ms_settle": 95,
+     "ms": 1514,
+     "navigated": true
+    },
+    {
+     "step": 6,
+     "url": "https://www.saucedemo.com/cart.html",
+     "view": "Cart",
+     "coverage": {
+      "interactive": 10,
+      "t1": 8,
+      "t2": 1,
+      "t3": 1
+     },
+     "pick": "n86",
+     "probs": "n86:1.00",
+     "done_prob": 0,
+     "why": "Proceed to checkout to enter shipping info",
+     "action": "clicked [CheckoutButton]",
+     "url_after": "https://www.saucedemo.com/checkout-step-one.html",
+     "ms_snap": 10,
+     "ms_pick": 1357,
+     "ms_act": 8,
+     "ms_settle": 99,
+     "ms": 1475,
+     "navigated": true
+    },
+    {
+     "step": 7,
+     "url": "https://www.saucedemo.com/checkout-step-one.html",
+     "view": "CheckoutInfo",
+     "coverage": {
+      "interactive": 11,
+      "t1": 9,
+      "t2": 0,
+      "t3": 2
+     },
+     "pick": "n65",
+     "probs": "n65:1.00",
+     "done_prob": 0,
+     "why": "Fill first name field with Ada",
+     "action": "filled [FirstNameField] with first_name",
+     "url_after": "https://www.saucedemo.com/checkout-step-one.html",
+     "ms_snap": 10,
+     "ms_pick": 1247,
+     "ms_act": 5,
+     "ms_settle": 83,
+     "ms": 1345
+    },
+    {
+     "step": 8,
+     "url": "https://www.saucedemo.com/checkout-step-one.html",
+     "view": "CheckoutInfo",
+     "coverage": {
+      "interactive": 11,
+      "t1": 9,
+      "t2": 0,
+      "t3": 2
+     },
+     "pick": "n67",
+     "probs": "n67:1.00",
+     "done_prob": 0,
+     "why": "Fill last name field next",
+     "action": "filled [LastNameField] with last_name",
+     "url_after": "https://www.saucedemo.com/checkout-step-one.html",
+     "ms_snap": 16,
+     "ms_pick": 1276,
+     "ms_act": 4,
+     "ms_settle": 83,
+     "ms": 1381
+    },
+    {
+     "step": 9,
+     "url": "https://www.saucedemo.com/checkout-step-one.html",
+     "view": "CheckoutInfo",
+     "coverage": {
+      "interactive": 11,
+      "t1": 9,
+      "t2": 0,
+      "t3": 2
+     },
+     "pick": "n69",
+     "probs": "n69:1.00",
+     "done_prob": 0,
+     "why": "Need to fill postal code field next",
+     "action": "filled [PostalCodeField] with postal_code",
+     "url_after": "https://www.saucedemo.com/checkout-step-one.html",
+     "ms_snap": 17,
+     "ms_pick": 1179,
+     "ms_act": 4,
+     "ms_settle": 83,
+     "ms": 1285
+    },
+    {
+     "step": 10,
+     "url": "https://www.saucedemo.com/checkout-step-one.html",
+     "view": "CheckoutInfo",
+     "coverage": {
+      "interactive": 11,
+      "t1": 9,
+      "t2": 0,
+      "t3": 2
+     },
+     "pick": "n75",
+     "probs": "n75:1.00",
+     "done_prob": 0,
+     "why": "Continue to checkout overview step",
+     "action": "clicked [ContinueButton]",
+     "url_after": "https://www.saucedemo.com/checkout-step-two.html",
+     "ms_snap": 18,
+     "ms_pick": 1179,
+     "ms_act": 8,
+     "ms_settle": 95,
+     "ms": 1301,
+     "navigated": true
+    },
+    {
+     "step": 11,
+     "url": "https://www.saucedemo.com/checkout-step-two.html",
+     "view": "CheckoutOverview",
+     "coverage": {
+      "interactive": 9,
+      "t1": 7,
+      "t2": 1,
+      "t3": 1
+     },
+     "pick": "n104",
+     "probs": "n104:1.00",
+     "done_prob": 0,
+     "why": "Click Finish to complete the order",
+     "action": "clicked [FinishButton]",
+     "url_after": "https://www.saucedemo.com/checkout-complete.html",
+     "ms_snap": 11,
+     "ms_pick": 1367,
+     "ms_act": 60,
+     "ms_settle": 82,
+     "ms": 1521,
+     "navigated": true
+    },
+    {
+     "step": 12,
+     "url": "https://www.saucedemo.com/checkout-complete.html",
+     "view": "Complete",
+     "coverage": {
+      "interactive": 7,
+      "t1": 6,
+      "t2": 0,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 9,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "comp": "AddToCartButton",
+     "to": "Inventory",
+     "changed": false
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [CartLink count=\"Cart, 1 items\"]",
+     "comp": "CartLink",
+     "to": "Cart",
+     "changed": true
+    },
+    {
+     "from": "Cart",
+     "action": "clicked [CheckoutButton]",
+     "comp": "CheckoutButton",
+     "to": "CheckoutInfo",
+     "changed": true
+    },
+    {
+     "from": "CheckoutInfo",
+     "action": "filled [FirstNameField] with first_name",
+     "comp": "FirstNameField",
+     "to": "CheckoutInfo",
+     "changed": false
+    },
+    {
+     "from": "CheckoutInfo",
+     "action": "filled [LastNameField] with last_name",
+     "comp": "LastNameField",
+     "to": "CheckoutInfo",
+     "changed": false
+    },
+    {
+     "from": "CheckoutInfo",
+     "action": "filled [PostalCodeField] with postal_code",
+     "comp": "PostalCodeField",
+     "to": "CheckoutInfo",
+     "changed": false
+    },
+    {
+     "from": "CheckoutInfo",
+     "action": "clicked [ContinueButton]",
+     "comp": "ContinueButton",
+     "to": "CheckoutOverview",
+     "changed": true
+    },
+    {
+     "from": "CheckoutOverview",
+     "action": "clicked [FinishButton]",
+     "comp": "FinishButton",
+     "to": "Complete",
+     "changed": true
+    }
+   ],
+   "ms": 16104,
+   "picker_stats": {
+    "calls": 12,
+    "ms": 14799,
+    "input_tokens": 17281,
+    "output_tokens": 362,
+    "usd": 0.057273
+   }
+  },
+  {
+   "name": "sort-price-low-high",
+   "rep": 1,
+   "goal": "Log in and sort the products by price from low to high.",
+   "spec": {
+    "done_when": {
+     "prop": {
+      "component": "SortSelect",
+      "name": "value",
+      "contains": "low to high"
+     }
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username first to start login",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 12,
+     "ms_pick": 1129,
+     "ms_act": 4,
+     "ms_settle": 81,
+     "ms": 1227
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Need to fill password before logging in",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 5,
+     "ms_pick": 1132,
+     "ms_act": 3,
+     "ms_settle": 83,
+     "ms": 1223
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click Login button to submit credentials",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 15,
+     "ms_pick": 1238,
+     "ms_act": 72,
+     "ms_settle": 82,
+     "ms": 1408,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n62",
+     "probs": "n62:1.00",
+     "done_prob": 0,
+     "why": "Select sort option to order price low to high",
+     "action": "selected \"Price (low to high)\" in [SortSelect]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 18,
+     "ms_pick": 1312,
+     "ms_act": 1123,
+     "ms_settle": 82,
+     "ms": 2536
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 16,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "selected \"Price (low to high)\" in [SortSelect]",
+     "comp": "SortSelect",
+     "to": "Inventory",
+     "changed": false
+    }
+   ],
+   "ms": 6413,
+   "picker_stats": {
+    "calls": 5,
+    "ms": 5925,
+    "input_tokens": 7465,
+    "output_tokens": 136,
+    "usd": 0.024435
+   }
+  },
+  {
+   "name": "logout",
+   "rep": 1,
+   "goal": "Log in, then log out again using the side menu.",
+   "spec": {
+    "done_when": {
+     "view": "Login",
+     "history_contains": "Logout"
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username first to begin login",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 6,
+     "ms_pick": 1073,
+     "ms_act": 3,
+     "ms_settle": 82,
+     "ms": 1165
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before logging in",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 6,
+     "ms_pick": 1115,
+     "ms_act": 4,
+     "ms_settle": 81,
+     "ms": 1207
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click Login button to submit credentials",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 10,
+     "ms_pick": 1276,
+     "ms_act": 97,
+     "ms_settle": 82,
+     "ms": 1466,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n28",
+     "probs": "n28:1.00",
+     "done_prob": 0,
+     "why": "Open side menu to access logout link",
+     "action": "clicked [MenuButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 16,
+     "ms_pick": 1499,
+     "ms_act": 3,
+     "ms_settle": 82,
+     "ms": 1601
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 43,
+      "t1": 21,
+      "t2": 18,
+      "t3": 4
+     },
+     "pick": "n41",
+     "probs": "n41:1.00",
+     "done_prob": 0,
+     "why": "Click Logout link in open side menu",
+     "action": "clicked [LogoutLink]",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 23,
+     "ms_pick": 1186,
+     "ms_act": 4,
+     "ms_settle": 96,
+     "ms": 1311,
+     "navigated": true
+    },
+    {
+     "step": 6,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 9,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [MenuButton]",
+     "comp": "MenuButton",
+     "to": "Inventory",
+     "changed": false
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [LogoutLink]",
+     "comp": "LogoutLink",
+     "to": "Login",
+     "changed": true
+    }
+   ],
+   "ms": 6761,
+   "picker_stats": {
+    "calls": 5,
+    "ms": 6149,
+    "input_tokens": 9243,
+    "output_tokens": 155,
+    "usd": 0.030054
+   }
+  },
+  {
+   "name": "two-items-remove-one",
+   "rep": 1,
+   "goal": "Log in, add the Backpack and the Bolt T-Shirt to the cart, then remove the Backpack so only one item is in the cart.",
+   "spec": {
+    "done_when": {
+     "all": [
+      {
+       "prop": {
+        "component": "CartLink",
+        "name": "count",
+        "contains": "1 item"
+       }
+      },
+      {
+       "prop": {
+        "component": "AddToCartButton",
+        "name": "label",
+        "contains": "Remove",
+        "within": {
+         "component": "InventoryItem",
+         "name": "name",
+         "contains": "Bolt"
+        }
+       }
+      }
+     ]
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username to begin login process",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 5,
+     "ms_pick": 1157,
+     "ms_act": 3,
+     "ms_settle": 82,
+     "ms": 1249
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before logging in",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 10,
+     "ms_pick": 1215,
+     "ms_act": 3,
+     "ms_settle": 82,
+     "ms": 1311
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click Login button to proceed to inventory",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 10,
+     "ms_pick": 1299,
+     "ms_act": 69,
+     "ms_settle": 82,
+     "ms": 1461,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n90",
+     "probs": "n90:1.00",
+     "done_prob": 0,
+     "why": "Add Backpack to cart first",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 17,
+     "ms_pick": 1274,
+     "ms_act": 4,
+     "ms_settle": 82,
+     "ms": 1378
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n126",
+     "probs": "n126:1.00",
+     "done_prob": 0,
+     "why": "Add Bolt T-Shirt to cart before removing Backpack",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 20,
+     "ms_pick": 1274,
+     "ms_act": 2,
+     "ms_settle": 82,
+     "ms": 1380
+    },
+    {
+     "step": 6,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n92",
+     "probs": "n92:1.00",
+     "done_prob": 0,
+     "why": "Remove Backpack from cart to leave one item",
+     "action": "clicked [AddToCartButton label=\"Remove\"]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 18,
+     "ms_pick": 1504,
+     "ms_act": 3,
+     "ms_settle": 82,
+     "ms": 1608
+    },
+    {
+     "step": 7,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 24,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "comp": "AddToCartButton",
+     "to": "Inventory",
+     "changed": false
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [AddToCartButton label=\"Add to cart\"]",
+     "comp": "AddToCartButton",
+     "to": "Inventory",
+     "changed": false
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [AddToCartButton label=\"Remove\"]",
+     "comp": "AddToCartButton",
+     "to": "Inventory",
+     "changed": false
+    }
+   ],
+   "ms": 8414,
+   "picker_stats": {
+    "calls": 6,
+    "ms": 7722,
+    "input_tokens": 12915,
+    "output_tokens": 204,
+    "usd": 0.041805
+   }
+  },
+  {
+   "name": "open-menu",
+   "rep": 1,
+   "goal": "Log in and open the side menu so its links are visible.",
+   "spec": {
+    "done_when": {
+     "component": "LogoutLink",
+     "history_contains": "MenuButton"
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "standard_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter username first before password and login",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 14,
+     "ms_pick": 1188,
+     "ms_act": 2,
+     "ms_settle": 82,
+     "ms": 1287
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before logging in",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 6,
+     "ms_pick": 1153,
+     "ms_act": 5,
+     "ms_settle": 82,
+     "ms": 1247
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click Login button to submit credentials and proceed",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 15,
+     "ms_pick": 1266,
+     "ms_act": 58,
+     "ms_settle": 82,
+     "ms": 1422,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 36,
+      "t1": 17,
+      "t2": 18,
+      "t3": 1
+     },
+     "pick": "n28",
+     "probs": "n28:1.00",
+     "done_prob": 0,
+     "why": "Click MenuButton to open side menu",
+     "action": "clicked [MenuButton]",
+     "url_after": "https://www.saucedemo.com/inventory.html",
+     "ms_snap": 17,
+     "ms_pick": 1237,
+     "ms_act": 2,
+     "ms_settle": 83,
+     "ms": 1340
+    },
+    {
+     "step": 5,
+     "url": "https://www.saucedemo.com/inventory.html",
+     "view": "Inventory",
+     "coverage": {
+      "interactive": 43,
+      "t1": 21,
+      "t2": 18,
+      "t3": 4
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 22,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Inventory",
+     "changed": true
+    },
+    {
+     "from": "Inventory",
+     "action": "clicked [MenuButton]",
+     "comp": "MenuButton",
+     "to": "Inventory",
+     "changed": false
+    }
+   ],
+   "ms": 5320,
+   "picker_stats": {
+    "calls": 4,
+    "ms": 4844,
+    "input_tokens": 5442,
+    "output_tokens": 129,
+    "usd": 0.018261
+   }
+  },
+  {
+   "name": "locked-out-error",
+   "rep": 1,
+   "goal": "Try to log in as the locked out user and get the error message.",
+   "spec": {
+    "done_when": {
+     "component": "LoginError"
+    },
+    "values": {
+     "password": "secret_sauce",
+     "username": "locked_out_user"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n29",
+     "probs": "n29:1.00",
+     "done_prob": 0,
+     "why": "Enter locked out username first",
+     "action": "filled [UsernameField] with username",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 13,
+     "ms_pick": 1144,
+     "ms_act": 4,
+     "ms_settle": 83,
+     "ms": 1245
+    },
+    {
+     "step": 2,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n31",
+     "probs": "n31:1.00",
+     "done_prob": 0,
+     "why": "Fill password field before submitting login form",
+     "action": "filled [PasswordField] with password",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 7,
+     "ms_pick": 1267,
+     "ms_act": 5,
+     "ms_settle": 83,
+     "ms": 1363
+    },
+    {
+     "step": 3,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 4,
+      "t1": 3,
+      "t2": 0,
+      "t3": 1
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Click login button to trigger locked-out error",
+     "action": "clicked [LoginButton]",
+     "url_after": "https://www.saucedemo.com/",
+     "ms_snap": 7,
+     "ms_pick": 1139,
+     "ms_act": 9,
+     "ms_settle": 82,
+     "ms": 1238
+    },
+    {
+     "step": 4,
+     "url": "https://www.saucedemo.com/",
+     "view": "Login",
+     "coverage": {
+      "interactive": 5,
+      "t1": 3,
+      "t2": 1,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 18,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Login",
+     "action": "filled [UsernameField] with username",
+     "comp": "UsernameField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "filled [PasswordField] with password",
+     "comp": "PasswordField",
+     "to": "Login",
+     "changed": false
+    },
+    {
+     "from": "Login",
+     "action": "clicked [LoginButton]",
+     "comp": "LoginButton",
+     "to": "Login",
+     "changed": false
+    }
+   ],
+   "ms": 3865,
+   "picker_stats": {
+    "calls": 3,
+    "ms": 3550,
+    "input_tokens": 1681,
+    "output_tokens": 95,
+    "usd": 0.006468
+   }
+  }
+ ]
+}

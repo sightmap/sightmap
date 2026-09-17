@@ -1,0 +1,22 @@
+version: 1
+views:
+  - name: Complete
+    route: "/checkout-complete.html"
+    url: https://www.saucedemo.com/checkout-complete.html
+    description: Order confirmation — the terminal step of the purchase flow.
+    components:
+      - name: CompleteHeader
+        selector: '[data-test="complete-header"]'
+        properties:
+          - name: text
+            extract: text
+      - name: CompleteText
+        selector: '[data-test="complete-text"]'
+        properties:
+          - name: text
+            extract: text
+      - name: BackHomeButton
+        selector: '[data-test="back-to-products"]'
+        description: Returns to Inventory.
+      - name: GeneratePdfLink
+        selector: '[data-test="generate-pdf-order"]'

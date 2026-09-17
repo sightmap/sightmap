@@ -1,0 +1,16 @@
+title: "browser explore without a goal or suite prints usage before touching the browser"
+run:
+  args: [browser, explore]
+  timeout_seconds: 30
+expect:
+  exit: nonzero
+  output:
+    - must_match: '(?i)usage: browser explore'
+      why: >
+        A missing --goal (and no --bench) is a usage error. It must be reported
+        before any CDP connection is attempted, so the message is the usage
+        line, not "no running session".
+    - must_match: '--done-when'
+      why: the usage line names the finish-check flag, the one users most need to discover.
+    - must_not_match: '(?i)no running session|cannot connect'
+      why: flag validation must not depend on a live browser.

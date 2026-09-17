@@ -1,0 +1,21 @@
+version: 1
+views:
+  - name: CheckoutInfo
+    route: "/checkout-step-one.html"
+    url: https://www.saucedemo.com/checkout-step-one.html
+    description: First checkout step — name and postal code, then Continue.
+    components:
+      - name: FirstNameField
+        selector: '[data-test="firstName"]'
+      - name: LastNameField
+        selector: '[data-test="lastName"]'
+      - name: PostalCodeField
+        selector: '[data-test="postalCode"]'
+      - name: ContinueButton
+        selector: '[data-test="continue"]'
+      - name: CheckoutError
+        selector: '[data-test="error"]'
+        description: Shown instead of advancing when a required field is missing.
+        properties:
+          - name: message
+            extract: text

@@ -119,6 +119,7 @@ Commands:
   browser stop / status / navigate / eval             session management
   browser click / fill / hover / keypress / scroll     interact with page elements
   browser drag / wait-for / dialog                     more interactions
+  browser explore --goal "..." [--bench SUITE.json]    drive the page toward a goal, one typed-model pick per step
   browser tabs list/new/close/resize                   tab management
 
   report        [--sightmap-dir DIR]                              per-view coverage health table + T2 quality

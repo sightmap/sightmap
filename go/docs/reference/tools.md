@@ -75,6 +75,24 @@ The overlay extension is embedded in the binary and auto-extracted to `~/.sightm
 
 ---
 
+## `sightmap browser explore --goal "..."`
+
+**Solves:** Reaching a goal on the live page without scripting the steps. Each step observes the annotated tree, offers the interactive nodes as named options, and a typed picker (Jev by default) chooses one and judges whether the goal is met.
+
+**Key flags:**
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--done-when` | | Deterministic finish check (`view=`, `url=`, `text=`, `component=`, `history=`, `prop=`), repeatable |
+| `--value` | | `key=text` the loop may type; it never invents text |
+| `--picker` | `jev` | `jev[:model]` needs `TYPESAFE_API_KEY`; `anthropic[:model]` needs `ANTHROPIC_API_KEY` |
+| `--avoid` | | Controls to keep away from (`Delete`, `Pay`) |
+| `--bench` | | Run a goal suite and print a results table |
+
+Exits non-zero when the goal is not reached. Docs: `docs/cli/browser.mdx`.
+
+---
+
 ## `sightmap browser navigate URL`
 
 **Solves:** Navigating the live Chrome session to a URL.

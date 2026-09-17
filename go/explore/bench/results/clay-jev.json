@@ -1,0 +1,1093 @@
+{
+ "suite": "clay",
+ "picker": "jev:jev-latest",
+ "when": "2026-09-17T00:40:56.429571-04:00",
+ "summary": {
+  "goals": 10,
+  "ok": 10,
+  "steps": 28,
+  "ms": 13545,
+  "ms_per_step": 483.75,
+  "model_calls": 19,
+  "model_ms": 3977,
+  "ms_per_call": 209.31578947368422,
+  "input_tokens": 101125,
+  "output_tokens": 8584,
+  "usd": 0
+ },
+ "runs": [
+  {
+   "name": "billing",
+   "rep": 1,
+   "goal": "Open the workspace billing page.",
+   "spec": {
+    "done_when": {
+     "view": "Billing"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n205",
+     "probs": "n205:0.99 n174:0.01 back:0.00",
+     "done_prob": 0.02,
+     "action": "clicked [UsageMenuButton]",
+     "url_after": "https://app.clay.com/workspaces/4088/home",
+     "ms_snap": 90,
+     "ms_pick": 745,
+     "ms_act": 54,
+     "ms_settle": 247,
+     "ms": 1137
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 159,
+      "t1": 106,
+      "t2": 52,
+      "t3": 1
+     },
+     "pick": "n206",
+     "probs": "n206:0.54 g:772:0.43 n174:0.02",
+     "done_prob": 0.06,
+     "action": "clicked [UsageMenuButton]",
+     "url_after": "https://app.clay.com/workspaces/4088/home",
+     "ms_snap": 93,
+     "ms_pick": 177,
+     "ms_act": 7,
+     "ms_settle": 168,
+     "ms": 446
+    },
+    {
+     "step": 3,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 156,
+      "t1": 103,
+      "t2": 51,
+      "t3": 2
+     },
+     "pick": "n174",
+     "probs": "n174:0.60 g:187:0.14 g:111:0.12",
+     "done_prob": 0.02,
+     "action": "clicked [SidebarNavLink label=\"Settings\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/settings/general",
+     "ms_snap": 87,
+     "ms_pick": 146,
+     "ms_act": 137,
+     "ms_settle": 378,
+     "ms": 750,
+     "navigated": true
+    },
+    {
+     "step": 4,
+     "url": "https://app.clay.com/workspaces/4088/settings/general",
+     "view": "Settings",
+     "coverage": {
+      "interactive": 69,
+      "t1": 32,
+      "t2": 36,
+      "t3": 1
+     },
+     "pick": "n222",
+     "probs": "n222:0.78 n115:0.22 back:0.00",
+     "done_prob": 0.03,
+     "action": "clicked [SettingsNavLink label=\"Plan \u0026 billing\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/settings/billing",
+     "ms_snap": 53,
+     "ms_pick": 150,
+     "ms_act": 49,
+     "ms_settle": 346,
+     "ms": 599,
+     "navigated": true
+    },
+    {
+     "step": 5,
+     "url": "https://app.clay.com/workspaces/4088/settings/billing",
+     "view": "Billing",
+     "coverage": {
+      "interactive": 67,
+      "t1": 30,
+      "t2": 36,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 51,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [UsageMenuButton]",
+     "comp": "UsageMenuButton",
+     "to": "Home",
+     "changed": false
+    },
+    {
+     "from": "Home",
+     "action": "clicked [UsageMenuButton]",
+     "comp": "UsageMenuButton",
+     "to": "Home",
+     "changed": false
+    },
+    {
+     "from": "Home",
+     "action": "clicked [SidebarNavLink label=\"Settings\"]",
+     "comp": "SidebarNavLink",
+     "to": "Settings",
+     "changed": true
+    },
+    {
+     "from": "Settings",
+     "action": "clicked [SettingsNavLink label=\"Plan \u0026 billing\"]",
+     "comp": "SettingsNavLink",
+     "to": "Billing",
+     "changed": true
+    }
+   ],
+   "ms": 2986,
+   "picker_stats": {
+    "calls": 4,
+    "ms": 1218,
+    "input_tokens": 21958,
+    "output_tokens": 2297,
+    "usd": 0
+   }
+  },
+  {
+   "name": "credit-usage",
+   "rep": 1,
+   "goal": "Open the credit usage page.",
+   "spec": {
+    "done_when": {
+     "view": "Usage"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n205",
+     "probs": "n205:1.00 back:0.00 g:111:0.00",
+     "done_prob": 0.02,
+     "action": "clicked [UsageMenuButton]",
+     "url_after": "https://app.clay.com/workspaces/4088/home",
+     "ms_snap": 106,
+     "ms_pick": 150,
+     "ms_act": 49,
+     "ms_settle": 213,
+     "ms": 520
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 159,
+      "t1": 106,
+      "t2": 52,
+      "t3": 1
+     },
+     "pick": "n787",
+     "probs": "n787:0.92 n206:0.08 back:0.00",
+     "done_prob": 0.08,
+     "action": "clicked [PopoverLink label=\"View usage\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/settings/credit-usage",
+     "ms_snap": 91,
+     "ms_pick": 146,
+     "ms_act": 85,
+     "ms_settle": 337,
+     "ms": 662,
+     "navigated": true
+    },
+    {
+     "step": 3,
+     "url": "https://app.clay.com/workspaces/4088/settings/credit-usage",
+     "view": "Usage",
+     "coverage": {
+      "interactive": 85,
+      "t1": 40,
+      "t2": 44,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 58,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [UsageMenuButton]",
+     "comp": "UsageMenuButton",
+     "to": "Home",
+     "changed": false
+    },
+    {
+     "from": "Home",
+     "action": "clicked [PopoverLink label=\"View usage\"]",
+     "comp": "PopoverLink",
+     "to": "Usage",
+     "changed": true
+    }
+   ],
+   "ms": 1241,
+   "picker_stats": {
+    "calls": 2,
+    "ms": 296,
+    "input_tokens": 11625,
+    "output_tokens": 894,
+    "usd": 0
+   }
+  },
+  {
+   "name": "settings",
+   "rep": 1,
+   "goal": "Open the workspace settings.",
+   "spec": {
+    "done_when": {
+     "view": "Settings"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n174",
+     "probs": "n174:1.00 back:0.00 g:111:0.00",
+     "done_prob": 0.02,
+     "action": "clicked [SidebarNavLink label=\"Settings\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/settings/general",
+     "ms_snap": 95,
+     "ms_pick": 167,
+     "ms_act": 131,
+     "ms_settle": 416,
+     "ms": 812,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/settings/general",
+     "view": "Settings",
+     "coverage": {
+      "interactive": 69,
+      "t1": 32,
+      "t2": 36,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 54,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [SidebarNavLink label=\"Settings\"]",
+     "comp": "SidebarNavLink",
+     "to": "Settings",
+     "changed": true
+    }
+   ],
+   "ms": 866,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 167,
+    "input_tokens": 6251,
+    "output_tokens": 609,
+    "usd": 0
+   }
+  },
+  {
+   "name": "trash",
+   "rep": 1,
+   "goal": "Open the trash.",
+   "spec": {
+    "done_when": {
+     "view": "Trash"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n170",
+     "probs": "n170:1.00 back:0.00 g:112:0.00",
+     "done_prob": 0.01,
+     "action": "clicked [SidebarNavLink label=\"Trash\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/trash",
+     "ms_snap": 102,
+     "ms_pick": 143,
+     "ms_act": 275,
+     "ms_settle": 217,
+     "ms": 739,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/trash",
+     "view": "Trash",
+     "coverage": {
+      "interactive": 60,
+      "t1": 26,
+      "t2": 24,
+      "t3": 10
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 101,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [SidebarNavLink label=\"Trash\"]",
+     "comp": "SidebarNavLink",
+     "to": "Trash",
+     "changed": true
+    }
+   ],
+   "ms": 840,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 142,
+    "input_tokens": 5667,
+    "output_tokens": 431,
+    "usd": 0
+   }
+  },
+  {
+   "name": "exports",
+   "rep": 1,
+   "goal": "Open the exports page.",
+   "spec": {
+    "done_when": {
+     "view": "Exports"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n165",
+     "probs": "n165:1.00 back:0.00 g:112:0.00",
+     "done_prob": 0.01,
+     "action": "clicked [SidebarNavLink label=\"Exports\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/exports",
+     "ms_snap": 116,
+     "ms_pick": 174,
+     "ms_act": 99,
+     "ms_settle": 258,
+     "ms": 649,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/exports",
+     "view": "Exports",
+     "coverage": {
+      "interactive": 49,
+      "t1": 25,
+      "t2": 23,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 43,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [SidebarNavLink label=\"Exports\"]",
+     "comp": "SidebarNavLink",
+     "to": "Exports",
+     "changed": true
+    }
+   ],
+   "ms": 692,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 174,
+    "input_tokens": 5668,
+    "output_tokens": 431,
+    "usd": 0
+   }
+  },
+  {
+   "name": "api-cli",
+   "rep": 1,
+   "goal": "Open the API and CLI page.",
+   "spec": {
+    "done_when": {
+     "view": "ApiAndCli"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n156",
+     "probs": "n156:1.00 back:0.00 g:112:0.00",
+     "done_prob": 0.01,
+     "action": "clicked [SidebarNavLink label=\"API and CLI\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/api-and-cli",
+     "ms_snap": 114,
+     "ms_pick": 155,
+     "ms_act": 105,
+     "ms_settle": 365,
+     "ms": 741,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/api-and-cli",
+     "view": "ApiAndCli",
+     "coverage": {
+      "interactive": 64,
+      "t1": 35,
+      "t2": 28,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 55,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [SidebarNavLink label=\"API and CLI\"]",
+     "comp": "SidebarNavLink",
+     "to": "ApiAndCli",
+     "changed": true
+    }
+   ],
+   "ms": 796,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 154,
+    "input_tokens": 5676,
+    "output_tokens": 431,
+    "usd": 0
+   }
+  },
+  {
+   "name": "workflows",
+   "rep": 1,
+   "goal": "Open the workflows page.",
+   "spec": {
+    "done_when": {
+     "view": "Workflows"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n140",
+     "probs": "n140:0.88 g:140:0.12 back:0.00",
+     "done_prob": 0.02,
+     "action": "clicked [SidebarNavLink label=\"Workflows Beta\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/terracotta",
+     "ms_snap": 103,
+     "ms_pick": 166,
+     "ms_act": 104,
+     "ms_settle": 413,
+     "ms": 788,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/terracotta",
+     "view": "Workflows",
+     "coverage": {
+      "interactive": 57,
+      "t1": 31,
+      "t2": 25,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 45,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [SidebarNavLink label=\"Workflows Beta\"]",
+     "comp": "SidebarNavLink",
+     "to": "Workflows",
+     "changed": true
+    }
+   ],
+   "ms": 833,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 166,
+    "input_tokens": 5720,
+    "output_tokens": 441,
+    "usd": 0
+   }
+  },
+  {
+   "name": "plans",
+   "rep": 1,
+   "goal": "Open the page where you pick or upgrade the plan.",
+   "spec": {
+    "done_when": {
+     "view": "PlanSelector"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n192",
+     "probs": "n192:0.98 n112:0.02 back:0.00",
+     "done_prob": 0.02,
+     "action": "clicked [UpgradePlanButton label=\"Upgrade your plan\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/billing/plan-selector",
+     "ms_snap": 100,
+     "ms_pick": 253,
+     "ms_act": 188,
+     "ms_settle": 376,
+     "ms": 920,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/billing/plan-selector",
+     "view": "PlanSelector",
+     "coverage": {
+      "interactive": 84,
+      "t1": 15,
+      "t2": 68,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 45,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [UpgradePlanButton label=\"Upgrade your plan\"]",
+     "comp": "UpgradePlanButton",
+     "to": "PlanSelector",
+     "changed": true
+    }
+   ],
+   "ms": 966,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 253,
+    "input_tokens": 5845,
+    "output_tokens": 470,
+    "usd": 0
+   }
+  },
+  {
+   "name": "open-table",
+   "rep": 1,
+   "goal": "Open any existing table in the workspace so its grid is visible.",
+   "spec": {
+    "done_when": {
+     "view": "TableView"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n468",
+     "probs": "n468:0.63 g:466:0.16 n475:0.09",
+     "done_prob": 0.08,
+     "action": "clicked [RowLink]",
+     "url_after": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlgsoyfWHZ5oA7DRgy/tables/t_0tlgsp5SBXYJkMuB5eu/views/gv_0tlgsp5AhBMFrVxG6KW",
+     "ms_snap": 112,
+     "ms_pick": 187,
+     "ms_act": 56,
+     "ms_settle": 585,
+     "ms": 941,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlgsoyfWHZ5oA7DRgy/tables/t_0tlgsp5SBXYJkMuB5eu/views/gv_0tlgsp5AhBMFrVxG6KW",
+     "view": "TableView",
+     "coverage": {
+      "interactive": 148,
+      "t1": 55,
+      "t2": 92,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 90,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [RowLink]",
+     "comp": "RowLink",
+     "to": "TableView",
+     "changed": true
+    }
+   ],
+   "ms": 1032,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 186,
+    "input_tokens": 6277,
+    "output_tokens": 598,
+    "usd": 0
+   }
+  },
+  {
+   "name": "new-table",
+   "rep": 1,
+   "goal": "Create a new blank table and land in it.",
+   "spec": {
+    "done_when": {
+     "view": "TableView",
+     "history_contains": "New"
+    },
+    "avoid": [
+     "Review changes",
+     "Delete",
+     "Remove",
+     "Pay",
+     "Purchase",
+     "Subscribe",
+     "Downgrade",
+     "Cancel",
+     "Leave workspace",
+     "Sign out",
+     "Log out"
+    ]
+   },
+   "picker": "jev:jev-latest",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 155,
+      "t1": 103,
+      "t2": 51,
+      "t3": 1
+     },
+     "pick": "n359",
+     "probs": "n359:1.00 back:0.00 g:112:0.00",
+     "done_prob": 0.03,
+     "action": "clicked [HeaderButton label=\"New\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/home",
+     "ms_snap": 103,
+     "ms_pick": 273,
+     "ms_act": 56,
+     "ms_settle": 85,
+     "ms": 520
+    },
+    {
+     "step": 2,
+     "url": "https://app.clay.com/workspaces/4088/home",
+     "view": "Home",
+     "coverage": {
+      "interactive": 161,
+      "t1": 106,
+      "t2": 54,
+      "t3": 1
+     },
+     "pick": "n860",
+     "group": "g:858",
+     "probs": "n860:0.99 n865:0.01",
+     "done_prob": 0.05,
+     "action": "clicked [MenuItem label=\"Workbook\"]",
+     "url_after": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "ms_snap": 101,
+     "ms_pick": 322,
+     "ms_act": 48,
+     "ms_settle": 407,
+     "ms": 879,
+     "navigated": true
+    },
+    {
+     "step": 3,
+     "url": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "coverage": {
+      "interactive": 68,
+      "t1": 26,
+      "t2": 27,
+      "t3": 15
+     },
+     "pick": "n378",
+     "probs": "n378:1.00 back:0.00 n109:0.00",
+     "done_prob": 0.03,
+     "action": "clicked [AddTableButton]",
+     "url_after": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "ms_snap": 49,
+     "ms_pick": 243,
+     "ms_act": 48,
+     "ms_settle": 163,
+     "ms": 504
+    },
+    {
+     "step": 4,
+     "url": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "coverage": {
+      "interactive": 425,
+      "t1": 48,
+      "t2": 376,
+      "t3": 1
+     },
+     "pick": "n698",
+     "probs": "n698:1.00 back:0.00 g:115:0.00",
+     "done_prob": 0.04,
+     "action": "clicked button \"Blank table\"",
+     "url_after": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "ms_snap": 223,
+     "ms_pick": 201,
+     "ms_act": 50,
+     "ms_settle": 167,
+     "ms": 643
+    },
+    {
+     "step": 5,
+     "url": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "coverage": {
+      "interactive": 116,
+      "t1": 26,
+      "t2": 30,
+      "t3": 60
+     },
+     "pick": "n491",
+     "probs": "n491:0.47 n583:0.15 g:page:0.12",
+     "done_prob": 0.31,
+     "action": "stale element, skipped (button \"Blank table\")",
+     "url_after": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9/tables/t_0tlhrpanJ7Nmfifhz37/views/gv_0tlhrpac5ToPjEgisgW",
+     "ms_snap": 74,
+     "ms_pick": 183,
+     "ms_act": 400,
+     "ms_settle": 0,
+     "ms": 659,
+     "navigated": true
+    },
+    {
+     "step": 6,
+     "url": "https://app.clay.com/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9/tables/t_0tlhrpanJ7Nmfifhz37/views/gv_0tlhrpac5ToPjEgisgW",
+     "view": "TableView",
+     "coverage": {
+      "interactive": 117,
+      "t1": 50,
+      "t2": 66,
+      "t3": 1
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 86,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "Home",
+     "action": "clicked [HeaderButton label=\"New\"]",
+     "comp": "HeaderButton",
+     "to": "Home",
+     "changed": false
+    },
+    {
+     "from": "Home",
+     "action": "clicked [MenuItem label=\"Workbook\"]",
+     "comp": "MenuItem",
+     "to": "/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "changed": true
+    },
+    {
+     "from": "/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "action": "clicked [AddTableButton]",
+     "comp": "AddTableButton",
+     "to": "/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "changed": false
+    },
+    {
+     "from": "/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "action": "clicked button \"Blank table\"",
+     "to": "/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "changed": false
+    },
+    {
+     "from": "/workspaces/4088/workbooks/wb_0tlhrp9p5CVaKHDeEf9",
+     "action": "stale element, skipped (button \"Blank table\")",
+     "to": "TableView",
+     "changed": true
+    }
+   ],
+   "ms": 3293,
+   "picker_stats": {
+    "calls": 6,
+    "ms": 1221,
+    "input_tokens": 26438,
+    "output_tokens": 1982,
+    "usd": 0
+   }
+  }
+ ]
+}

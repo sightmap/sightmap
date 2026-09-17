@@ -1,0 +1,94 @@
+version: 1
+components:
+  - name: MenuButton
+    selector: '#react-burger-menu-btn'
+    description: >
+      Opens the sidebar (All Items / About / Logout / Reset App State). The
+      real interactive element — confirmed live its own data-test="open-menu"
+      lands on a decorative child img, not this button, so the img is not
+      used as the selector.
+  - name: CloseMenuButton
+    selector: '#react-burger-cross-btn'
+  - name: AllItemsLink
+    selector: '[data-test="inventory-sidebar-link"]'
+    description: Sidebar link back to the inventory list.
+  - name: LogoutLink
+    selector: '[data-test="logout-sidebar-link"]'
+  - name: ResetAppStateLink
+    selector: '[data-test="reset-sidebar-link"]'
+    description: >
+      Clears the cart and resets item state without logging out. Useful
+      between scenarios that must not see a stale cart from a prior run.
+  - name: CartLink
+    selector: '[data-test="shopping-cart-link"]'
+    properties:
+      - name: count
+        extract: text
+    children:
+      - name: CartBadge
+        selector: '[data-test="shopping-cart-badge"]'
+  - name: TwitterLink
+    selector: '[data-test="social-twitter"]'
+  - name: FacebookLink
+    selector: '[data-test="social-facebook"]'
+  - name: LinkedInLink
+    selector: '[data-test="social-linkedin"]'
+  - name: ItemName
+    selector: '[data-test$="-title-link"]'
+    description: >
+      A product's title anchor. Confirmed live: sightmap's extract: text only
+      resolves on elements with their own accessibility-tree presence (a
+      real role, e.g. link/button/heading) — the visually-identical inner
+      [data-test="inventory-item-name"] div has none and always extracts
+      empty, even though its selector still resolves fine for a click. Using
+      the wrapping anchor instead of the div is the fix, not a stylistic
+      choice. Absent on the Item detail page (no anchor there — nowhere to
+      navigate from an already-open item), which is fine: no tool reads it
+      there.
+    properties:
+      - name: text
+        extract: text
+  - name: ItemPrice
+    selector: '[data-test="inventory-item-price"]'
+    properties:
+      - name: text
+        extract: text
+  - name: AddToCartButton
+    selector: '.btn_inventory'
+    description: >
+      Toggles between "Add to cart" and "Remove" — same element, same class,
+      only the label and the data-test id change (confirmed live). One
+      component with a label property, not two.
+    properties:
+      - name: label
+        extract: text
+  - name: CancelButton
+    selector: '[data-test="cancel"]'
+  - name: CartItem
+    selector: '.cart_item'
+    description: >
+      A line item, on Cart and on the CheckoutOverview summary (identical
+      markup, confirmed live). Name and price are readable; quantity is not
+      (see Quantity's own note).
+    properties:
+      - name: name
+        extract: ItemName.text
+      - name: price
+        extract: ItemPrice.text
+    children:
+      - $ref: ItemName
+      - $ref: ItemPrice
+      - name: Quantity
+        selector: '[data-test="item-quantity"]'
+        description: >
+          Declared for scope, no property extracted — saucedemo's cart always
+          shows 1 with no stepper to change it, so no tool has needed to read
+          it (confirmed live).
+      - name: RemoveButton
+        selector: '.cart_button'
+        description: >
+          Removes this line. Only present on Cart, not on the read-only
+          CheckoutOverview summary — confirmed live. Scoped to this
+          component's own subtree, so it never matches Finish/Continue,
+          which also carry the shared .cart_button style class but sit
+          outside any .cart_item (confirmed live before relying on it).

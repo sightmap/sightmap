@@ -1,0 +1,183 @@
+{
+  "name": "saucedemo",
+  "sightmap_dir": "saucedemo/.sightmap",
+  "start_url": "https://www.saucedemo.com/",
+  "reset": "clear-storage",
+  "goals": [
+    {
+      "name": "login",
+      "goal": "Log in as the standard user.",
+      "spec": {
+        "done_when": {
+          "view": "Inventory"
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "add-bike-light",
+      "goal": "Log in, then add the Sauce Labs Bike Light to the cart.",
+      "spec": {
+        "done_when": {
+          "prop": {
+            "component": "AddToCartButton",
+            "name": "label",
+            "contains": "Remove",
+            "within": {
+              "component": "InventoryItem",
+              "name": "name",
+              "contains": "Bike Light"
+            }
+          }
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "open-fleece-jacket",
+      "goal": "Log in and open the product detail page for the Sauce Labs Fleece Jacket.",
+      "spec": {
+        "done_when": {
+          "view": "Item",
+          "text_contains": "Fleece Jacket"
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "backpack-in-cart",
+      "goal": "Log in, put the Sauce Labs Backpack in the cart, and go to the cart page.",
+      "spec": {
+        "done_when": {
+          "view": "Cart",
+          "prop": {
+            "component": "CartItem",
+            "name": "name",
+            "contains": "Backpack"
+          }
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "checkout-onesie",
+      "goal": "Log in, buy the Sauce Labs Onesie: add it to the cart, check out with the given name and postal code, and finish the order.",
+      "spec": {
+        "done_when": {
+          "view": "Complete"
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce",
+          "first_name": "Ada",
+          "last_name": "Lovelace",
+          "postal_code": "30301"
+        }
+      },
+      "max_steps": 25
+    },
+    {
+      "name": "sort-price-low-high",
+      "goal": "Log in and sort the products by price from low to high.",
+      "spec": {
+        "done_when": {
+          "prop": {
+            "component": "SortSelect",
+            "name": "value",
+            "contains": "low to high"
+          }
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "logout",
+      "goal": "Log in, then log out again using the side menu.",
+      "spec": {
+        "done_when": {
+          "view": "Login",
+          "history_contains": "Logout"
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "two-items-remove-one",
+      "goal": "Log in, add the Backpack and the Bolt T-Shirt to the cart, then remove the Backpack so only one item is in the cart.",
+      "spec": {
+        "done_when": {
+          "all": [
+            {
+              "prop": {
+                "component": "CartLink",
+                "name": "count",
+                "contains": "1 item"
+              }
+            },
+            {
+              "prop": {
+                "component": "AddToCartButton",
+                "name": "label",
+                "contains": "Remove",
+                "within": {
+                  "component": "InventoryItem",
+                  "name": "name",
+                  "contains": "Bolt"
+                }
+              }
+            }
+          ]
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "open-menu",
+      "goal": "Log in and open the side menu so its links are visible.",
+      "spec": {
+        "done_when": {
+          "component": "LogoutLink",
+          "history_contains": "MenuButton"
+        },
+        "values": {
+          "username": "standard_user",
+          "password": "secret_sauce"
+        }
+      }
+    },
+    {
+      "name": "locked-out-error",
+      "goal": "Try to log in as the locked out user and get the error message.",
+      "spec": {
+        "done_when": {
+          "component": "LoginError"
+        },
+        "values": {
+          "username": "locked_out_user",
+          "password": "secret_sauce"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+version: 1
+views:
+  - name: Cart
+    route: "/cart.html"
+    url: https://www.saucedemo.com/cart.html
+    description: Review before checkout. CartItem, its children, and ContinueShoppingButton/CheckoutButton are the only view-specific pieces here.
+    components:
+      - name: ContinueShoppingButton
+        selector: '[data-test="continue-shopping"]'
+      - name: CheckoutButton
+        selector: '[data-test="checkout"]'

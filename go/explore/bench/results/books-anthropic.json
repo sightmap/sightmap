@@ -1,0 +1,1426 @@
+{
+ "suite": "books",
+ "picker": "anthropic:claude-sonnet-5",
+ "when": "2026-09-17T00:42:49.371872-04:00",
+ "summary": {
+  "goals": 10,
+  "ok": 9,
+  "steps": 44,
+  "ms": 111758,
+  "ms_per_step": 2539.9545454545455,
+  "model_calls": 57,
+  "model_ms": 102737,
+  "ms_per_call": 1802.4035087719299,
+  "input_tokens": 245850,
+  "output_tokens": 4468,
+  "usd": 0.80457
+ },
+ "runs": [
+  {
+   "name": "open-travel",
+   "rep": 1,
+   "goal": "Open the Travel category.",
+   "spec": {
+    "done_when": {
+     "url_contains": "category/books/travel"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n41",
+     "probs": "n41:1.00",
+     "done_prob": 0,
+     "why": "Click Travel category link directly",
+     "action": "clicked link \"Travel\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "ms_snap": 63,
+     "ms_pick": 1355,
+     "ms_act": 7,
+     "ms_settle": 286,
+     "ms": 1712,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "coverage": {
+      "interactive": 100,
+      "t1": 0,
+      "t2": 0,
+      "t3": 100
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 66,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"Travel\"",
+     "to": "/catalogue/category/books/travel_2/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 1779,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 1355,
+    "input_tokens": 4610,
+    "output_tokens": 30,
+    "usd": 0.01428
+   }
+  },
+  {
+   "name": "page-2",
+   "rep": 1,
+   "goal": "Go to page 2 of the full book list.",
+   "spec": {
+    "done_when": {
+     "url_contains": "page-2"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n679",
+     "probs": "n679:1.00",
+     "done_prob": 0,
+     "why": "Click next link to go to page 2",
+     "action": "clicked link \"next\"",
+     "url_after": "https://books.toscrape.com/catalogue/page-2.html",
+     "ms_snap": 96,
+     "ms_pick": 1329,
+     "ms_act": 3,
+     "ms_settle": 279,
+     "ms": 1709,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/page-2.html",
+     "coverage": {
+      "interactive": 136,
+      "t1": 0,
+      "t2": 0,
+      "t3": 136
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 51,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"next\"",
+     "to": "/catalogue/page-2.html",
+     "changed": true
+    }
+   ],
+   "ms": 1761,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 1329,
+    "input_tokens": 4618,
+    "output_tokens": 31,
+    "usd": 0.014319
+   }
+  },
+  {
+   "name": "open-light-attic",
+   "rep": 1,
+   "goal": "Open the detail page of the book \"A Light in the Attic\".",
+   "spec": {
+    "done_when": {
+     "url_contains": "a-light-in-the-attic"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n217",
+     "probs": "n217:1.00",
+     "done_prob": 0,
+     "why": "Click book title link to open detail page",
+     "action": "clicked link \"A Light in the Attic\"",
+     "url_after": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+     "ms_snap": 74,
+     "ms_pick": 1283,
+     "ms_act": 3,
+     "ms_settle": 187,
+     "ms": 1548,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+     "coverage": {
+      "interactive": 5,
+      "t1": 0,
+      "t2": 0,
+      "t3": 5
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 17,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"A Light in the Attic\"",
+     "to": "/catalogue/a-light-in-the-attic_1000/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 1566,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 1283,
+    "input_tokens": 4667,
+    "output_tokens": 31,
+    "usd": 0.014466
+   }
+  },
+  {
+   "name": "mystery-page-2",
+   "rep": 1,
+   "goal": "Open the Mystery category and go to its second page.",
+   "spec": {
+    "done_when": {
+     "all": [
+      {
+       "url_contains": "mystery"
+      },
+      {
+       "url_contains": "page-2"
+      }
+     ]
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n44",
+     "probs": "n44:1.00",
+     "done_prob": 0,
+     "why": "Click Mystery category link to navigate",
+     "action": "clicked link \"Mystery\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "ms_snap": 80,
+     "ms_pick": 1282,
+     "ms_act": 6,
+     "ms_settle": 241,
+     "ms": 1610,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "coverage": {
+      "interactive": 137,
+      "t1": 0,
+      "t2": 0,
+      "t3": 137
+     },
+     "pick": "n47",
+     "probs": "n47:1.00",
+     "done_prob": 0,
+     "why": "Click next link to reach page 2",
+     "action": "clicked link \"Mystery\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "ms_snap": 61,
+     "ms_pick": 1292,
+     "ms_act": 4,
+     "ms_settle": 160,
+     "ms": 1518
+    },
+    {
+     "step": 3,
+     "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "coverage": {
+      "interactive": 137,
+      "t1": 0,
+      "t2": 0,
+      "t3": 137
+     },
+     "pick": "n47",
+     "probs": "n47:1.00",
+     "done_prob": 0,
+     "why": "Click next to go to page 2",
+     "action": "clicked link \"Mystery\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "ms_snap": 52,
+     "ms_pick": 1373,
+     "ms_act": 2,
+     "ms_settle": 154,
+     "ms": 1582
+    },
+    {
+     "step": 4,
+     "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "coverage": {
+      "interactive": 137,
+      "t1": 0,
+      "t2": 0,
+      "t3": 137
+     },
+     "pick": "n658",
+     "probs": "n658:1.00",
+     "done_prob": 0,
+     "why": "Click next link to reach page 2",
+     "action": "clicked link \"Delivering the Truth (Quaker Midwife My…\"",
+     "url_after": "https://books.toscrape.com/catalogue/delivering-the-truth-quaker-midwife-mystery-1_464/index.html",
+     "ms_snap": 57,
+     "ms_pick": 1329,
+     "ms_act": 6,
+     "ms_settle": 195,
+     "ms": 1588,
+     "navigated": true
+    },
+    {
+     "step": 5,
+     "url": "https://books.toscrape.com/catalogue/delivering-the-truth-quaker-midwife-mystery-1_464/index.html",
+     "coverage": {
+      "interactive": 29,
+      "t1": 0,
+      "t2": 0,
+      "t3": 29
+     },
+     "pick": "n33",
+     "probs": "n33:1.00",
+     "done_prob": 0,
+     "why": "Return to Mystery category page to navigate to page 2",
+     "action": "clicked link \"Mystery\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "ms_snap": 27,
+     "ms_pick": 1316,
+     "ms_act": 5,
+     "ms_settle": 158,
+     "ms": 1507,
+     "navigated": true
+    },
+    {
+     "step": 6,
+     "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "coverage": {
+      "interactive": 137,
+      "t1": 0,
+      "t2": 0,
+      "t3": 137
+     },
+     "pick": "n683",
+     "group": "g:679",
+     "probs": "n683:1.00",
+     "done_prob": 0,
+     "why": "Click next link to reach mystery page 2",
+     "action": "clicked link \"next\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/mystery_3/page-2.html",
+     "ms_snap": 56,
+     "ms_pick": 2508,
+     "ms_act": 4,
+     "ms_settle": 240,
+     "ms": 2809,
+     "navigated": true
+    },
+    {
+     "step": 7,
+     "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/page-2.html",
+     "coverage": {
+      "interactive": 105,
+      "t1": 0,
+      "t2": 0,
+      "t3": 105
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 50,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"Mystery\"",
+     "to": "/catalogue/category/books/mystery_3/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/mystery_3/index.html",
+     "action": "clicked link \"Mystery\"",
+     "to": "/catalogue/category/books/mystery_3/index.html",
+     "changed": false
+    },
+    {
+     "from": "/catalogue/category/books/mystery_3/index.html",
+     "action": "clicked link \"Mystery\"",
+     "to": "/catalogue/category/books/mystery_3/index.html",
+     "changed": false
+    },
+    {
+     "from": "/catalogue/category/books/mystery_3/index.html",
+     "action": "clicked link \"Delivering the Truth (Quaker Midwife My…\"",
+     "to": "/catalogue/delivering-the-truth-quaker-midwife-mystery-1_464/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/delivering-the-truth-quaker-midwife-mystery-1_464/index.html",
+     "action": "clicked link \"Mystery\"",
+     "to": "/catalogue/category/books/mystery_3/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/mystery_3/index.html",
+     "action": "clicked link \"next\"",
+     "to": "/catalogue/category/books/mystery_3/page-2.html",
+     "changed": true
+    }
+   ],
+   "ms": 10668,
+   "picker_stats": {
+    "calls": 7,
+    "ms": 9099,
+    "input_tokens": 28436,
+    "output_tokens": 228,
+    "usd": 0.088728
+   }
+  },
+  {
+   "name": "open-sharp-objects",
+   "rep": 1,
+   "goal": "Find the book \"Sharp Objects\" and open its page.",
+   "spec": {
+    "done_when": {
+     "url_contains": "sharp-objects"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n286",
+     "probs": "n286:1.00",
+     "done_prob": 0,
+     "why": "Click Sharp Objects link to open its page",
+     "action": "clicked link \"Sharp Objects\"",
+     "url_after": "https://books.toscrape.com/catalogue/sharp-objects_997/index.html",
+     "ms_snap": 78,
+     "ms_pick": 1289,
+     "ms_act": 4,
+     "ms_settle": 199,
+     "ms": 1571,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/sharp-objects_997/index.html",
+     "coverage": {
+      "interactive": 17,
+      "t1": 0,
+      "t2": 0,
+      "t3": 17
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 23,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"Sharp Objects\"",
+     "to": "/catalogue/sharp-objects_997/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 1595,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 1289,
+    "input_tokens": 4655,
+    "output_tokens": 35,
+    "usd": 0.01449
+   }
+  },
+  {
+   "name": "open-poetry",
+   "rep": 1,
+   "goal": "Open the Poetry category.",
+   "spec": {
+    "done_when": {
+     "url_contains": "category/books/poetry"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n104",
+     "probs": "n104:1.00",
+     "done_prob": 0,
+     "why": "Click Poetry category link directly",
+     "action": "clicked link \"Poetry\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/poetry_23/index.html",
+     "ms_snap": 77,
+     "ms_pick": 1294,
+     "ms_act": 4,
+     "ms_settle": 240,
+     "ms": 1617,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/category/books/poetry_23/index.html",
+     "coverage": {
+      "interactive": 132,
+      "t1": 0,
+      "t2": 0,
+      "t3": 132
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 61,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"Poetry\"",
+     "to": "/catalogue/category/books/poetry_23/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 1678,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 1294,
+    "input_tokens": 4612,
+    "output_tokens": 31,
+    "usd": 0.014301
+   }
+  },
+  {
+   "name": "home-from-book",
+   "rep": 1,
+   "goal": "Go back to the home page that lists all books.",
+   "spec": {
+    "done_when": {
+     "url_contains": "books.toscrape.com/index.html"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/catalogue/tipping-the-velvet_999/index.html",
+     "coverage": {
+      "interactive": 9,
+      "t1": 0,
+      "t2": 0,
+      "t3": 9
+     },
+     "pick": "n27",
+     "probs": "n27:1.00",
+     "done_prob": 0,
+     "why": "Click Home link to return to books index",
+     "action": "clicked link \"Home\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 34,
+     "ms_pick": 1098,
+     "ms_act": 5,
+     "ms_settle": 155,
+     "ms": 1293,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 54,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/catalogue/tipping-the-velvet_999/index.html",
+     "action": "clicked link \"Home\"",
+     "to": "/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 1347,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 1098,
+    "input_tokens": 748,
+    "output_tokens": 30,
+    "usd": 0.002694
+   }
+  },
+  {
+   "name": "open-science-fiction",
+   "rep": 1,
+   "goal": "Open the Science Fiction category.",
+   "spec": {
+    "done_when": {
+     "url_contains": "science-fiction"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n83",
+     "probs": "n83:1.00",
+     "done_prob": 0,
+     "why": "Click Science Fiction category link directly",
+     "action": "clicked link \"Science Fiction\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+     "ms_snap": 74,
+     "ms_pick": 1240,
+     "ms_act": 5,
+     "ms_settle": 239,
+     "ms": 1559,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/category/books/science-fiction_16/index.html",
+     "coverage": {
+      "interactive": 120,
+      "t1": 0,
+      "t2": 0,
+      "t3": 120
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 45,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"Science Fiction\"",
+     "to": "/catalogue/category/books/science-fiction_16/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 1605,
+   "picker_stats": {
+    "calls": 1,
+    "ms": 1240,
+    "input_tokens": 4961,
+    "output_tokens": 33,
+    "usd": 0.015378
+   }
+  },
+  {
+   "name": "page-3",
+   "rep": 1,
+   "goal": "Go forward to the third page of the full book list.",
+   "spec": {
+    "done_when": {
+     "url_contains": "page-3"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": false,
+   "reason": "no result within 20 steps",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Click next to go to page-2 first",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 78,
+     "ms_pick": 2589,
+     "ms_act": 2,
+     "ms_settle": 140,
+     "ms": 2810,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Click next to reach page 2 first",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 52,
+     "ms_pick": 2510,
+     "ms_act": 5,
+     "ms_settle": 164,
+     "ms": 2733
+    },
+    {
+     "step": 3,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Click next to go to page-2 first",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 54,
+     "ms_pick": 2536,
+     "ms_act": 5,
+     "ms_settle": 158,
+     "ms": 2755
+    },
+    {
+     "step": 4,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n27",
+     "group": "g:25",
+     "probs": "n27:1.00",
+     "done_prob": 0,
+     "why": "Click next to reach page-2 first",
+     "action": "clicked link \"Home\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 56,
+     "ms_pick": 2550,
+     "ms_act": 4,
+     "ms_settle": 157,
+     "ms": 2768
+    },
+    {
+     "step": 5,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n27",
+     "group": "g:25",
+     "probs": "n27:1.00",
+     "done_prob": 0,
+     "why": "Click next to go to page-2 first",
+     "action": "clicked link \"Home\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 50,
+     "ms_pick": 2737,
+     "ms_act": 4,
+     "ms_settle": 157,
+     "ms": 2949
+    },
+    {
+     "step": 6,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n37",
+     "group": "g:35",
+     "probs": "n37:1.00",
+     "done_prob": 0,
+     "why": "Click next to reach page-2, then page-3",
+     "action": "clicked link \"Books\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books_1/index.html",
+     "ms_snap": 53,
+     "ms_pick": 2793,
+     "ms_act": 5,
+     "ms_settle": 157,
+     "ms": 3009,
+     "navigated": true
+    },
+    {
+     "step": 7,
+     "url": "https://books.toscrape.com/catalogue/category/books_1/index.html",
+     "coverage": {
+      "interactive": 136,
+      "t1": 0,
+      "t2": 0,
+      "t3": 136
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Click next to reach page 2 first",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 53,
+     "ms_pick": 2560,
+     "ms_act": 4,
+     "ms_settle": 158,
+     "ms": 2776,
+     "navigated": true
+    },
+    {
+     "step": 8,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n37",
+     "group": "g:35",
+     "probs": "n37:1.00",
+     "done_prob": 0,
+     "why": "Click next to reach page-2 first",
+     "action": "clicked link \"Books\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books_1/index.html",
+     "ms_snap": 55,
+     "ms_pick": 2995,
+     "ms_act": 4,
+     "ms_settle": 157,
+     "ms": 3212,
+     "navigated": true
+    },
+    {
+     "step": 9,
+     "url": "https://books.toscrape.com/catalogue/category/books_1/index.html",
+     "coverage": {
+      "interactive": 136,
+      "t1": 0,
+      "t2": 0,
+      "t3": 136
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Click next to go to page-2 first",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 57,
+     "ms_pick": 2599,
+     "ms_act": 4,
+     "ms_settle": 159,
+     "ms": 2820,
+     "navigated": true
+    },
+    {
+     "step": 10,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n41",
+     "group": "g:39",
+     "probs": "n41:1.00",
+     "done_prob": 0,
+     "why": "Navigate to page-2 first, then continue to page-3",
+     "action": "clicked link \"Travel\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "ms_snap": 55,
+     "ms_pick": 3197,
+     "ms_act": 3,
+     "ms_settle": 155,
+     "ms": 3411,
+     "navigated": true
+    },
+    {
+     "step": 11,
+     "url": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "coverage": {
+      "interactive": 100,
+      "t1": 0,
+      "t2": 0,
+      "t3": 100
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Navigate to full book list before going to page 3",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 42,
+     "ms_pick": 8513,
+     "ms_act": 5,
+     "ms_settle": 157,
+     "ms": 8718,
+     "navigated": true
+    },
+    {
+     "step": 12,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n41",
+     "group": "g:39",
+     "probs": "n41:1.00",
+     "done_prob": 0,
+     "why": "Go to page-2 first, then next to page-3",
+     "action": "clicked link \"Travel\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "ms_snap": 54,
+     "ms_pick": 2566,
+     "ms_act": 5,
+     "ms_settle": 156,
+     "ms": 2783,
+     "navigated": true
+    },
+    {
+     "step": 13,
+     "url": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "coverage": {
+      "interactive": 100,
+      "t1": 0,
+      "t2": 0,
+      "t3": 100
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Navigate to full book list to page forward",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 41,
+     "ms_pick": 5918,
+     "ms_act": 4,
+     "ms_settle": 152,
+     "ms": 6117,
+     "navigated": true
+    },
+    {
+     "step": 14,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n44",
+     "group": "g:39",
+     "probs": "n44:1.00",
+     "done_prob": 0,
+     "why": "Click next to go to page-2 first",
+     "action": "clicked link \"Mystery\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "ms_snap": 60,
+     "ms_pick": 2992,
+     "ms_act": 4,
+     "ms_settle": 161,
+     "ms": 3218,
+     "navigated": true
+    },
+    {
+     "step": 15,
+     "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "coverage": {
+      "interactive": 137,
+      "t1": 0,
+      "t2": 0,
+      "t3": 137
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Navigate to full books list first",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 56,
+     "ms_pick": 8316,
+     "ms_act": 5,
+     "ms_settle": 168,
+     "ms": 8546,
+     "navigated": true
+    },
+    {
+     "step": 16,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n44",
+     "group": "g:39",
+     "probs": "n44:1.00",
+     "done_prob": 0,
+     "why": "Click next to go to page-2, then page-3",
+     "action": "clicked link \"Mystery\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "ms_snap": 57,
+     "ms_pick": 2515,
+     "ms_act": 4,
+     "ms_settle": 164,
+     "ms": 2741,
+     "navigated": true
+    },
+    {
+     "step": 17,
+     "url": "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html",
+     "coverage": {
+      "interactive": 137,
+      "t1": 0,
+      "t2": 0,
+      "t3": 137
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Return home to reach full book list pages",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 60,
+     "ms_pick": 10008,
+     "ms_act": 4,
+     "ms_settle": 155,
+     "ms": 10229,
+     "navigated": true
+    },
+    {
+     "step": 18,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n47",
+     "group": "g:39",
+     "probs": "n47:1.00",
+     "done_prob": 0,
+     "why": "Go to page-2 first, then page-3",
+     "action": "clicked link \"Historical Fiction\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/historical-fiction_4/index.html",
+     "ms_snap": 51,
+     "ms_pick": 2695,
+     "ms_act": 3,
+     "ms_settle": 271,
+     "ms": 3020,
+     "navigated": true
+    },
+    {
+     "step": 19,
+     "url": "https://books.toscrape.com/catalogue/category/books/historical-fiction_4/index.html",
+     "coverage": {
+      "interactive": 137,
+      "t1": 0,
+      "t2": 0,
+      "t3": 137
+     },
+     "pick": "n19",
+     "group": "g:15",
+     "probs": "n19:1.00",
+     "done_prob": 0,
+     "why": "Return to homepage to reach full book list",
+     "action": "clicked link \"Books to Scrape\"",
+     "url_after": "https://books.toscrape.com/index.html",
+     "ms_snap": 52,
+     "ms_pick": 6831,
+     "ms_act": 4,
+     "ms_settle": 158,
+     "ms": 7047,
+     "navigated": true
+    },
+    {
+     "step": 20,
+     "url": "https://books.toscrape.com/index.html",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n47",
+     "group": "g:39",
+     "probs": "n47:1.00",
+     "done_prob": 0,
+     "why": "Click next to reach page-2, then page-3",
+     "action": "clicked link \"Historical Fiction\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/historical-fiction_4/index.html",
+     "ms_snap": 57,
+     "ms_pick": 2979,
+     "ms_act": 5,
+     "ms_settle": 158,
+     "ms": 3200,
+     "navigated": true
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": false
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": false
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Home\"",
+     "to": "/index.html",
+     "changed": false
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Home\"",
+     "to": "/index.html",
+     "changed": false
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Books\"",
+     "to": "/catalogue/category/books_1/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books_1/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Books\"",
+     "to": "/catalogue/category/books_1/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books_1/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Travel\"",
+     "to": "/catalogue/category/books/travel_2/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/travel_2/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Travel\"",
+     "to": "/catalogue/category/books/travel_2/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/travel_2/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Mystery\"",
+     "to": "/catalogue/category/books/mystery_3/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/mystery_3/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Mystery\"",
+     "to": "/catalogue/category/books/mystery_3/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/mystery_3/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Historical Fiction\"",
+     "to": "/catalogue/category/books/historical-fiction_4/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/historical-fiction_4/index.html",
+     "action": "clicked link \"Books to Scrape\"",
+     "to": "/index.html",
+     "changed": true
+    },
+    {
+     "from": "/index.html",
+     "action": "clicked link \"Historical Fiction\"",
+     "to": "/catalogue/category/books/historical-fiction_4/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 84876,
+   "picker_stats": {
+    "calls": 40,
+    "ms": 80377,
+    "input_tokens": 176851,
+    "output_tokens": 3925,
+    "usd": 0.589428
+   }
+  },
+  {
+   "name": "first-travel-book",
+   "rep": 1,
+   "goal": "Open the Travel category, then open the first book listed in it.",
+   "spec": {
+    "done_when": {
+     "url_contains": "its-only-the-himalayas"
+    }
+   },
+   "picker": "anthropic:claude-sonnet-5",
+   "ok": true,
+   "reason": "done_when satisfied",
+   "steps": [
+    {
+     "step": 1,
+     "url": "https://books.toscrape.com/",
+     "coverage": {
+      "interactive": 135,
+      "t1": 0,
+      "t2": 0,
+      "t3": 135
+     },
+     "pick": "n41",
+     "probs": "n41:1.00",
+     "done_prob": 0,
+     "why": "Open Travel category page first",
+     "action": "clicked link \"Travel\"",
+     "url_after": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "ms_snap": 78,
+     "ms_pick": 1225,
+     "ms_act": 4,
+     "ms_settle": 154,
+     "ms": 1462,
+     "navigated": true
+    },
+    {
+     "step": 2,
+     "url": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html",
+     "coverage": {
+      "interactive": 100,
+      "t1": 0,
+      "t2": 0,
+      "t3": 100
+     },
+     "pick": "n215",
+     "group": "g:211",
+     "probs": "n215:1.00",
+     "done_prob": 0,
+     "why": "Open first book, Its Only the Himalayas",
+     "action": "clicked link \"It's Only the Himalayas\"",
+     "url_after": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
+     "ms_snap": 42,
+     "ms_pick": 3150,
+     "ms_act": 6,
+     "ms_settle": 190,
+     "ms": 3389,
+     "navigated": true
+    },
+    {
+     "step": 3,
+     "url": "https://books.toscrape.com/catalogue/its-only-the-himalayas_981/index.html",
+     "coverage": {
+      "interactive": 29,
+      "t1": 0,
+      "t2": 0,
+      "t3": 29
+     },
+     "done_prob": 0,
+     "action": "done",
+     "ms_snap": 30,
+     "ms_pick": 0,
+     "ms_act": 0,
+     "ms_settle": 0,
+     "ms": 0
+    }
+   ],
+   "transitions": [
+    {
+     "from": "/",
+     "action": "clicked link \"Travel\"",
+     "to": "/catalogue/category/books/travel_2/index.html",
+     "changed": true
+    },
+    {
+     "from": "/catalogue/category/books/travel_2/index.html",
+     "action": "clicked link \"It's Only the Himalayas\"",
+     "to": "/catalogue/its-only-the-himalayas_981/index.html",
+     "changed": true
+    }
+   ],
+   "ms": 4883,
+   "picker_stats": {
+    "calls": 3,
+    "ms": 4373,
+    "input_tokens": 11692,
+    "output_tokens": 94,
+    "usd": 0.036486
+   }
+  }
+ ]
+}
