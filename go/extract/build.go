@@ -63,6 +63,14 @@ func walkDOMNode(
 	probeByID map[string]*ProbeComponent,
 	a11yByID map[int]*A11YNode,
 ) (*sightmap.ComponentNode, []*sightmap.ComponentNode) {
+	// Prune non-content nodes and their whole subtrees before recursing: the CLI's
+	// own injected overlay, plus document-metadata / script / style tags that never
+	// represent app content. Returning (nil, nil) drops the node WITHOUT promoting
+	// its descendants, so tree-out stays rendered app content only (sightmap-f422).
+	if isNonContentNode(node) {
+		return nil, nil
+	}
+
 	// Treat shadow roots as ordinary children (appended after regular children
 	// to preserve document order of the light tree first).
 	allDOM := make([]*DOMNode, 0, len(node.Children)+len(node.ShadowRoots))
@@ -228,6 +236,29 @@ func a11yString(v *A11YValue) string {
 		return ""
 	}
 	return fmt.Sprintf("%v", v.Value)
+}
+
+// nonContentTags are DOM elements that never carry app content a sightmap should
+// map — document metadata and script/style. They and their subtrees are pruned
+// from the component tree so tree-out is rendered content only.
+var nonContentTags = map[string]bool{
+	"HEAD": true, "SCRIPT": true, "STYLE": true, "META": true,
+	"LINK": true, "TITLE": true, "NOSCRIPT": true, "TEMPLATE": true, "BASE": true,
+}
+
+// isNonContentNode reports whether a DOM node should be pruned from the tree:
+// either a non-content tag (above) or one of the CLI's own injected overlay
+// elements (#__sightmap-overlay / #__sightmap-tooltip), which otherwise leak in
+// as visible, non-ignored bogus candidates.
+func isNonContentNode(node *DOMNode) bool {
+	if nonContentTags[strings.ToUpper(node.NodeName)] {
+		return true
+	}
+	switch domAttr(node.Attributes, "id") {
+	case "__sightmap-overlay", "__sightmap-tooltip":
+		return true
+	}
+	return false
 }
 
 // domAttr reads a named attribute from a flat CDP attributes slice whose
