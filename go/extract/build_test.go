@@ -400,3 +400,57 @@ func TestClassAttrDuplication(t *testing.T) {
 		t.Errorf("Selector.Attrs[\"class\"] = %q, want %q", classAttr, "btn btn-primary")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Test – Non-content pruning (sightmap-f422): the CLI's injected overlay and
+// document-metadata / script / style subtrees are dropped from the tree, even
+// when they were probed and tagged with a sightmap id.
+// ---------------------------------------------------------------------------
+
+func TestPruneNonContentNodes(t *testing.T) {
+	probe := &ProbeResult{Success: true, Results: []ProbeComponent{
+		{Id: "root", TagName: "MAIN", Selector: "main"},
+		{Id: "btn", TagName: "BUTTON", Selector: "button"},
+		// These are probed too — without the prune they'd become nodes.
+		{Id: "ov", TagName: "DIV", Selector: "div"},
+		{Id: "box", TagName: "DIV", Selector: "div"},
+		{Id: "scr", TagName: "SCRIPT", Selector: "script"},
+		{Id: "ttl", TagName: "TITLE", Selector: "title"},
+	}}
+	a11y := []A11YNode{
+		a11yNode(10, "main", "Main"),
+		a11yNode(11, "button", "Submit"),
+	}
+	domRoot := domWrapper("#document",
+		domChild(1, 10, "MAIN", "root",
+			domChild(2, 11, "BUTTON", "btn"),
+			// Injected overlay (has both id and a sightmap id) + a nested box.
+			&DOMNode{
+				NodeID: 3, BackendNodeID: 12, NodeName: "DIV",
+				Attributes: []string{"id", "__sightmap-overlay", "data-sightmap-id", "ov"},
+				Children:   []*DOMNode{domChild(4, 13, "DIV", "box")},
+			},
+			// A stray tagged <script>, and a <head> subtree with a probed <title>.
+			domChild(5, 14, "SCRIPT", "scr"),
+			domWrapper("HEAD", domChild(6, 15, "TITLE", "ttl")),
+		),
+	)
+
+	root, err := BuildTree(probe, a11y, domRoot)
+	if err != nil {
+		t.Fatalf("BuildTree error: %v", err)
+	}
+	if root.Role != "main" {
+		t.Fatalf("root.Role = %q, want %q", root.Role, "main")
+	}
+	if len(root.Children) != 1 {
+		var got []string
+		for _, c := range root.Children {
+			got = append(got, c.Role)
+		}
+		t.Fatalf("root has %d children %v, want 1 (button); overlay/script/head must be pruned", len(root.Children), got)
+	}
+	if root.Children[0].Name != "Submit" {
+		t.Errorf("surviving child = %q, want the button %q", root.Children[0].Name, "Submit")
+	}
+}
