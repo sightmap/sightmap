@@ -2009,15 +2009,67 @@ footer {
   color: var(--text-dim);
 }
 
+/* "called" and "next call" carry the distinction the caption used to blur:
+   what produced this screen, versus the guidance naming what to call next.
+   Both get the same label chip so the pairing is obvious at a glance. */
+.prose .sk-frames__label {
+  flex: none;
+  padding: 0.05rem 0.4rem;
+  border-radius: 5px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.prose .sk-frames__call,
 .prose .sk-frames__breadcrumb {
-  margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.prose .sk-frames__call {
+  margin-bottom: 0.5rem;
+}
+
+.prose .sk-frames__call code,
+.prose .sk-frames__breadcrumb code {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-bright);
+  background: none;
+  padding: 0;
+}
+
+.prose .sk-frames__note {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.prose .sk-frames__breadcrumb {
+  margin-top: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
   border: 1px solid var(--accent-dim);
   background: var(--accent-dim);
-  font-family: var(--mono);
   font-size: 0.78rem;
   color: var(--text);
+}
+
+.prose .sk-frames__breadcrumb .sk-frames__label {
+  background: transparent;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.prose .sk-frames__reason {
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }
 
 /* Feature trace: the three-tier playback widget for the "building-in-layers"

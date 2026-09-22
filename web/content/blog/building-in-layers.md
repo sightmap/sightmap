@@ -1,5 +1,5 @@
 ---
-title: 'Building in layers: composing sightmap and sightkick'
+title: 'Composing Sightmap and Sightkick: Building in Layers'
 excerpt: "What does browser automation look like when you design it for autonomous agents from day one? Three layers: a map that names the app, a toolbox of atomic actions over those names, and a spec that composes them. Each layer references the one below it only by name, and each one answers pass or fail on its own."
 topic: 'research'
 date: '2026-09-22'
@@ -8,13 +8,13 @@ slug: 'building-in-layers'
 image: '/blog/og/building-in-layers.png'
 ---
 
-What does browser automation look like when you design it for autonomous agents from day one?
+What does browser automation look like when you design it for autonomous AI agents from day one?
 
-Ask an agent to operate a modern web app and it hits a wall. The raw DOM is noisy, CSS selectors churn, and apps hide their state behind dynamic routing. Forcing a model to parse markup, infer business logic, locate elements, and execute all at once guarantees failure. The agent isn't failing for lack of intelligence. It's failing because we handed it the wrong primitives.
+If you ask an LLM agent to interact with a modern web app, it hits a fundamental wall. The raw DOM is too noisy, CSS selectors change constantly, and web apps hide their state behind complex, dynamic routing. Forcing an agent to parse raw HTML, infer business logic, map elements, and execute actions all at once guarantees failure. The agent isn't failing because it lacks intelligence; it's failing because we haven't given it the right primitives.
 
-An agent-first approach means rethinking the interface between models and web apps. Instead of treating the browser as a chaotic canvas of DOM nodes to guess against, decompose the interaction into structured, machine-legible layers.
+An agent-first approach requires rethinking the interface between models and web applications. Instead of treating the browser as a chaotic canvas of raw DOM nodes for an agent to guess against, we need to decompose web interaction into structured, machine-legible layers.
 
-That shift is why we built [sightmap](/blog/sightmap) and [sightkick](/blog/sightkick). Together they form a three-tier architecture built for agentic execution: a map, a toolbox, and a spec. Each layer is a checked-in artifact that references the layer below it strictly by name, and nothing more.
+That shift in perspective is why we built [Sightmap](/blog/sightmap) and [Sightkick](/blog/sightkick). Together, they establish a three-tiered architecture designed specifically for agentic execution: a map, a toolbox, and a spec. Each layer is a checked-in artifact, referencing the layer below it strictly by name, and nothing more.
 
 ## Three layers, bottom to top
 
@@ -24,7 +24,7 @@ That shift is why we built [sightmap](/blog/sightmap) and [sightkick](/blog/sigh
 
 Each example below is real, taken from Burrito Co.'s checkout.
 
-1. **Components (`.sightmap`), the agent's map.** Before an agent can act it needs a reliable map of the terrain. A [sightmap](/blog/sightmap) isolates the raw DOM by naming every view, component, and request in your app. **This is the only layer where CSS selectors exist.** The agent never sees CSS, only semantic component names. Here's `ReviewTotals`, the order-totals block on the checkout Review step:
+1. **Components (`.sightmap`), the agent's map.** Before an agent can act, it needs a reliable map of the terrain. A [Sightmap](/blog/sightmap) isolates the raw DOM by naming every view, component, and request in your application (e.g., `MenuCard`, `ApplyPromoButton`, `ReviewTotals`). **This is the only layer where raw CSS selectors exist.** The agent never sees CSS; it only sees clean, semantic component names. Here's `ReviewTotals`, the order-totals block on the checkout Review step:
 
    ```yaml
    - name: ReviewTotals
@@ -41,7 +41,7 @@ Each example below is real, taken from Burrito Co.'s checkout.
              extract: text
    ```
 
-2. **Tools (`.sightkick`), the agent's capabilities.** Rather than asking an agent to write browser manipulation code, [sightkick](/blog/sightkick) turns component names into atomic, callable tools. Every `query:` field references a corpus component by name, so `sightkick build` can validate the entire toolset up front: an agent can never invoke an action against a component that doesn't exist.
+2. **Tools (`.sightkick`), the agent's capabilities.** Instead of asking an agent to write raw browser manipulation code, [Sightkick](/blog/sightkick) translates component names into atomic, callable tools like `apply_promo`, `read_cart`, or `place_order`. A tool's `query` fields strictly reference Sightmap component names. Running `sightkick build` validates the entire toolset, ensuring an agent can never invoke an action on a component that doesn't exist.
 
    ```yaml
    - name: apply_promo
@@ -70,7 +70,7 @@ Each example below is real, taken from Burrito Co.'s checkout.
          property: total
    ```
 
-3. **The spec (`.feature` plus a plan), the intent.** At the top sits human-readable intent: a `.feature` file paired with a compiled execution plan. Every Gherkin line maps to a single tool call and an expectation, serialized as checked-in JSON.
+3. **The spec (`.feature` + plan), the agent's intent.** At the highest level sits the human-readable intent: a `.feature` file paired with a compiled execution plan. Every line of Gherkin maps directly to a single tool call and an expected state assertion, serialized as clean JSON.
 
    ```json
    {
