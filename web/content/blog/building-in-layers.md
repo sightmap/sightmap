@@ -10,7 +10,7 @@ image: '/blog/og/building-in-layers.png'
 
 What does browser automation look like when you design it for autonomous AI agents from day one?
 
-If you ask an LLM agent to interact with a modern web app, it hits a fundamental wall. The raw DOM is too noisy, CSS selectors change constantly, and web apps hide their state behind complex, dynamic routing. Forcing an agent to parse raw HTML, infer business logic, map elements, and execute actions all at once guarantees failure. The agent isn't failing because it lacks intelligence; it's failing because we haven't given it the right primitives.
+If you ask a System Two (LLM) agent to interact with a modern web app, it hits a fundamental wall. The raw DOM is too noisy, CSS selectors change constantly, and web apps hide their state behind complex, dynamic routing. Forcing an agent to parse raw HTML, infer business logic, map elements, and execute actions all at once guarantees failure. The agent isn't failing because it lacks intelligence; it's failing because we haven't given it the right primitives.
 
 An agent-first approach requires rethinking the interface between models and web applications. Instead of treating the browser as a chaotic canvas of raw DOM nodes for an agent to guess against, we need to decompose web interaction into structured, machine-legible layers.
 
