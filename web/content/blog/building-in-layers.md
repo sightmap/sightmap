@@ -1,6 +1,6 @@
 ---
 title: 'Building in layers: composing sightmap and sightkick'
-excerpt: 'A sightmap names what your app is. A sightkick tool layer turns those names into callable actions. A feature file composes actions into a workflow. Each layer names only the one below it, and each one answers pass or fail on its own. Watch a real 13-step purchase resolve through all three, live.'
+excerpt: "What does browser automation look like when you design it for autonomous agents from day one? Three layers: a map that names the app, a toolbox of atomic actions over those names, and a spec that composes them. Each layer references the one below it only by name, and each one answers pass or fail on its own."
 topic: 'research'
 date: '2026-09-22'
 author: 'Clint Ayres'
@@ -8,9 +8,13 @@ slug: 'building-in-layers'
 image: '/blog/og/building-in-layers.png'
 ---
 
-A `.feature` file has held up for ten years. It reads like a spec because it is one: `Given`, `When`, `Then`, in the language the business actually uses. What never held up is the layer underneath it: one hand-written step definition per line, a regex plus imperative browser code with selectors baked in. That glue is a second codebase, and it rots independently of the spec it exists to protect. You've debugged that suite. The `.feature` file was fine, and the failure surfaced three layers away from the sentence it was supposed to guard.
+What does browser automation look like when you design it for autonomous agents from day one?
 
-[Sightmap](/blog/sightmap) and [Sightkick](/blog/sightkick) are our answer to that glue. This post is about the shape the answer takes once both exist: three layers, each one a checked-in artifact, each one naming the layer below it and nothing more.
+Ask an agent to operate a modern web app and it hits a wall. The raw DOM is noisy, CSS selectors churn, and apps hide their state behind dynamic routing. Forcing a model to parse markup, infer business logic, locate elements, and execute all at once guarantees failure. The agent isn't failing for lack of intelligence. It's failing because we handed it the wrong primitives.
+
+An agent-first approach means rethinking the interface between models and web apps. Instead of treating the browser as a chaotic canvas of DOM nodes to guess against, decompose the interaction into structured, machine-legible layers.
+
+That shift is why we built [sightmap](/blog/sightmap) and [sightkick](/blog/sightkick). Together they form a three-tier architecture built for agentic execution: a map, a toolbox, and a spec. Each layer is a checked-in artifact that references the layer below it strictly by name, and nothing more.
 
 ## Three layers, bottom to top
 
@@ -18,9 +22,9 @@ A `.feature` file has held up for ten years. It reads like a spec because it is 
 <img src="/blog/images/building-in-layers/pyramid.jpg" alt="An isometric diagram of a three-tier pyramid. Bottom tier, indigo, labeled Components / .sightmap, its surface a grid of small named rectangles. Middle tier, teal, labeled Tools / .sightkick, eight connected tool icons in a dotted loop. Top tier, amber, labeled Features / .feature, a single sheet of paper." />
 </figure>
 
-Each layer below is real, taken from Burrito Co.'s checkout, and each one names only the layer directly underneath it.
+Each example below is real, taken from Burrito Co.'s checkout.
 
-1. **Components.** A [sightmap](/blog/sightmap) names every view, component, and request in your app, standing in for the raw DOM. Here's `ReviewTotals`, the order-totals block on the checkout Review step:
+1. **Components (`.sightmap`), the agent's map.** Before an agent can act it needs a reliable map of the terrain. A [sightmap](/blog/sightmap) isolates the raw DOM by naming every view, component, and request in your app. **This is the only layer where CSS selectors exist.** The agent never sees CSS, only semantic component names. Here's `ReviewTotals`, the order-totals block on the checkout Review step:
 
    ```yaml
    - name: ReviewTotals
@@ -37,7 +41,7 @@ Each layer below is real, taken from Burrito Co.'s checkout, and each one names 
              extract: text
    ```
 
-2. **Tools.** A [sightkick](/blog/sightkick) tool layer turns those names into atomic, callable actions. Here's `apply_promo`, and note that every `query:` field names a corpus component, never a CSS selector:
+2. **Tools (`.sightkick`), the agent's capabilities.** Rather than asking an agent to write browser manipulation code, [sightkick](/blog/sightkick) turns component names into atomic, callable tools. Every `query:` field references a corpus component by name, so `sightkick build` can validate the entire toolset up front: an agent can never invoke an action against a component that doesn't exist.
 
    ```yaml
    - name: apply_promo
@@ -66,7 +70,7 @@ Each layer below is real, taken from Burrito Co.'s checkout, and each one names 
          property: total
    ```
 
-3. **A spec.** A `.feature` file plus a resolved plan, checked in as JSON. Every Gherkin line maps to one tool call and one expectation. Here's the step that calls `apply_promo`:
+3. **The spec (`.feature` plus a plan), the intent.** At the top sits human-readable intent: a `.feature` file paired with a compiled execution plan. Every Gherkin line maps to a single tool call and an expectation, serialized as checked-in JSON.
 
    ```json
    {
@@ -77,17 +81,17 @@ Each layer below is real, taken from Burrito Co.'s checkout, and each one names 
    }
    ```
 
-Follow one name through all three layers. `ReviewTotals` is declared once, in the corpus. `apply_promo` addresses it by that name, in its `returns.value.query`, never by `.review-totals` directly. The plan step calls `apply_promo` and never mentions `ReviewTotals` at all; it doesn't need to, because the tool already resolved that name. Each layer references the layer below only by name, and nothing else. When `ReviewTotals`'s markup changes, one line of the corpus changes, and every tool and every plan that names it keeps working. A test written against `.review-totals` directly needs fixing at every call site that used it.
+Structuring the app this way decouples UI changes from agent reasoning. Follow one name up the stack: `ReviewTotals` is declared once, in the corpus; `apply_promo` addresses it by that name and never by `.review-totals`; the plan step calls `apply_promo` and never mentions `ReviewTotals` at all, because the tool already resolved it. When a frontend engineer changes that markup, you update **one line** in the map. Every tool, every stored plan, and the agent's reasoning all stay intact.
 
 ## Watch it resolve
 
-Below is a real 13-step plan, `examples/burrito/plans/purchase.plan.json` from the sightkick repo, run against Burrito Co., the demo app from both posts above. First, the real screenshots, one frame per stage, each carrying the guidance breadcrumb that pointed there:
+Below is a 13-step plan, `examples/burrito/plans/purchase.plan.json` from the sightkick repo, running against our demo app, Burrito Co. First, the real screenshots, one frame per stage, each carrying the guidance breadcrumb that pointed there:
 
 <div data-widget="sightkick-frames" data-figure="journey">
 <img src="/blog/images/sightkick/tool-01-menu.png" alt="The Burrito Co. menu, five items with prices, at the start of the purchase journey." />
 </div>
 
-Now the same run from the other side. Step through it and all three layers move together: the Gherkin line, the tool call it resolved to, and the corpus components that tool addresses.
+Now the same run from the other side. Step through the trace and all three layers move in lockstep: the Gherkin intent triggers a deterministic tool call, which resolves to the mapped corpus components.
 
 <div data-widget="feature-trace">
 <pre>
@@ -109,11 +113,11 @@ Order two steak burritos with a promo code
 </pre>
 </div>
 
-Two things worth pulling out of that trace.
+An agent resolved that plan once. Every run since is a Node script calling the tools directly: no model, no tokens, no sampling variance. Two behaviors in the trace are worth pulling out.
 
-The plan runs 13 steps, but the `purchase` journey it was resolved from lists 14, one more, `read_item_customizations`, between opening the item and customizing it. A journey is advice compiled into guidance breadcrumbs; it grants no capability. The agent that resolved this plan chose not to take that step, and the plan still runs, because a journey was never in a position to stop it.
+**Journeys are guidance, not execution scripts.** The `purchase` journey lists 14 steps, one more than the plan runs, including a `read_item_customizations` inspection between opening the item and customizing it. A journey compiles into advisory breadcrumbs attached to each tool result; it grants no capability and gates nothing. The resolved plan simply doesn't include that step, and it runs clean, because a journey was never in a position to stop it.
 
-And Burrito Co.'s checkout is a three-step wizard, Delivery, Payment, Review, all on one route; the URL never changes between steps. `ensure_view: Checkout` can't tell them apart, so the wizard's position is a declared corpus property, `CheckoutSteps.activeStep`, and every mutating tool on that view guards and waits on it instead of the URL. That's a fact about the app that would otherwise get re-derived by every test that touches checkout. It's absorbed once, in the corpus, and every tool above it inherits it for free.
+**State complexity is absorbed at the map layer.** Burrito Co.'s checkout wizard handles Delivery, Payment, and Review under a single URL, so `ensure_view: Checkout` can't tell them apart. Rather than making every caller re-derive where it sits in the form, the corpus exposes `CheckoutSteps.activeStep` as a declared property, and every mutating tool on that view guards and waits on it. The state-tracking burden moves off the agent and into the layer that already knows.
 
 ## Three closed loops beat one open problem
 
@@ -121,18 +125,24 @@ And Burrito Co.'s checkout is a three-step wizard, Delivery, Payment, Review, al
 <img src="/blog/images/building-in-layers/closed-loop.jpg" alt="Left: one glowing hexagon holding a small robot icon and a circular loop of arrows with a checkmark badge, labeled One Closed Loop. Right: seven of the same hexagons tessellated into a honeycomb, connected edge to edge, labeled Composed." />
 </figure>
 
-Give an agent the whole problem (map the app, write the tools, write the tests, keep them all in sync) and it flails, because nothing tells it when it's wrong until something downstream breaks in a way that doesn't point back at the cause. Give it one bounded loop at a time and it converges, because failure is legible and local:
+Prompting an agent to solve web automation as one open-ended task (map the page, work out the buttons, run the flow, verify the output) creates an unconstrained search space with no feedback. When it fails, nothing tells the agent where.
 
-- **Components:** coverage. Orphaned elements is a number; the target is zero.
-- **Tools:** `sightkick build`. It fails on any reference the corpus doesn't have and hands back candidates.
-- **A spec:** two hashes, one over the scenario text, one over the compiled tool manifest. A mismatch stops the run instead of reporting a misleading result.
+Layering breaks that into three isolated loops, each with an immediate, local pass/fail signal:
 
-Each one answers pass or fail with no human in the loop, scoped to exactly the layer it verifies. One closed system at a time, composed into the complex one.
+- **Components:** coverage. Unmapped interactive elements are counted as orphans, and the target is zero.
+- **Tools:** `sightkick build`. It validates every tool reference against the map and hands back concrete candidates when one doesn't resolve.
+- **Specs:** two hashes, one over the scenario text, one over the compiled tool manifest. A mismatch halts the run before it can report a misleading result.
 
-## Where to start, and what isn't there yet
+Each loop gives the agent a bounded problem with a legible edge. Compose the small verifiable loops and the complex one becomes tractable.
 
-Build order is the layer order: map one view down to zero orphans, write the tools that view affords, then write the feature that uses them. Each step is buildable and checkable without the layer above it existing yet.
+## Where to start
 
-A couple of things worth being honest about. Resolving a `.feature` file into a plan isn't automated; an agent does it once, by hand, and there's no resolver yet. A journey's compiler is a pairwise walk over hand-authored pairs, not a search, so there's no inference and no planning. And a tool never crosses a navigation, because [WebMCP](https://webmachinelearning.github.io/webmcp/)'s cross-document tool responses are unspecified upstream. The protocol forced that granularity, and the granularity turned out to be the right one anyway: a tool that doesn't know which scenario is calling it is a tool that's reusable across all of them.
+Build from the ground up: map a single view until orphans hit zero, define the tools that view exposes, then write the feature spec that uses them. Each layer is buildable and checkable before the one above it exists.
 
-Start with the map: [github.com/sightmap/sightmap](https://github.com/sightmap/sightmap). Then the tool layer: [github.com/sightmap/sightkick](https://github.com/sightmap/sightkick). Read the [sightmap](/blog/sightmap) and [sightkick](/blog/sightkick) posts for the mechanics of each.
+Worth knowing before you adopt it:
+
+- **Plan resolution.** Translating a `.feature` file into a JSON plan takes one agent pass today, by hand-off. There's no automated resolver yet.
+- **Journey compilation.** The compiler walks hand-authored pairs and attaches guidance. There's no inference and no graph search behind it.
+- **Navigation boundaries.** Tools never cross a navigation, because [WebMCP](https://webmachinelearning.github.io/webmcp/) leaves cross-document tool responses unspecified. The protocol forced that granularity, and it turned out to be the right one: a tool that doesn't know which scenario is calling it is reusable across all of them.
+
+Map your application: [github.com/sightmap/sightmap](https://github.com/sightmap/sightmap). Build your toolset: [github.com/sightmap/sightkick](https://github.com/sightmap/sightkick). The [sightmap](/blog/sightmap) and [sightkick](/blog/sightkick) posts cover the mechanics of each.
