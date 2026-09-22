@@ -18,13 +18,66 @@ A `.feature` file has held up for ten years. It reads like a spec because it is 
 <img src="/blog/images/building-in-layers/pyramid.jpg" alt="An isometric diagram of a three-tier pyramid. Bottom tier, indigo, labeled Components / .sightmap, its surface a grid of small named rectangles. Middle tier, teal, labeled Tools / .sightkick, eight connected tool icons in a dotted loop. Top tier, amber, labeled Features / .feature, a single sheet of paper." />
 </figure>
 
-**Components.** A [sightmap](/blog/sightmap) names every view, component, and request in your app. `MenuCard`, `ApplyPromoButton`, `ReviewTotals`, each one a name over a selector, with declared properties standing in for the raw DOM. The CSS lives here and nowhere else.
+Each layer below is real, taken from Burrito Co.'s checkout, and each one names only the layer directly underneath it.
 
-**Tools.** A [sightkick](/blog/sightkick) tool layer turns those names into atomic, callable actions: `apply_promo`, `read_cart`, `place_order`. A tool's `query:` fields are corpus component names, never CSS, and `sightkick build` fails the build on any name the corpus doesn't have.
+1. **Components.** A [sightmap](/blog/sightmap) names every view, component, and request in your app, standing in for the raw DOM. Here's `ReviewTotals`, the order-totals block on the checkout Review step:
 
-**A spec.** A `.feature` file plus a resolved plan. Every Gherkin line maps to one tool call and one expectation, checked in as JSON.
+   ```yaml
+   - name: ReviewTotals
+     selector: '.review-totals'
+     description: 'Order totals breakdown on the Review step'
+     properties:
+       - name: total
+         extract: ReviewTotalsAmount.text
+     children:
+       - name: ReviewTotalsAmount
+         selector: '.review-totals__row--total'
+         properties:
+           - name: text
+             extract: text
+   ```
 
-Each layer references the layer below only by name. When `AddToCartButton`'s class changes, one line of the corpus changes, and every tool and every plan that names it keeps working. A test written against the raw selector needs fixing at every call site that used it.
+2. **Tools.** A [sightkick](/blog/sightkick) tool layer turns those names into atomic, callable actions. Here's `apply_promo`, and note that every `query:` field names a corpus component, never a CSS selector:
+
+   ```yaml
+   - name: apply_promo
+     description: Apply a promo code on the Review step and read the new total.
+     ensure_view: Checkout
+     params:
+       - name: code
+         type: string
+         required: true
+         description: The promo code. BURRITO20 is the only one that works.
+     guard:
+       absent:
+         query: PromoField
+     steps:
+       - fill:
+           query: PromoField
+           value: '{{code}}'
+       - click:
+           query: ApplyPromoButton
+       - wait_for:
+           query: PromoAppliedLabel
+     returns:
+       description: 'The order total after the promo, e.g. "Total: $18.92".'
+       value:
+         query: ReviewTotals
+         property: total
+   ```
+
+3. **A spec.** A `.feature` file plus a resolved plan, checked in as JSON. Every Gherkin line maps to one tool call and one expectation. Here's the step that calls `apply_promo`:
+
+   ```json
+   {
+     "gherkin": "And I apply the promo code \"BURRITO20\"",
+     "tool": "apply_promo",
+     "params": { "code": "BURRITO20" },
+     "expect": { "value": { "contains": "$18.92" } }
+   }
+   ```
+
+Follow one name through all three layers. `ReviewTotals` is declared once, in the corpus. `apply_promo` addresses it by that name, in its `returns.value.query`, never by `.review-totals` directly. The plan step calls `apply_promo` and never mentions `ReviewTotals` at all; it doesn't need to, because the tool already resolved that name. Each layer references the layer below only by name, and nothing else. When `ReviewTotals`'s markup changes, one line of the corpus changes, and every tool and every plan that names it keeps working. A test written against `.review-totals` directly needs fixing at every call site that used it.
 
 ## Watch it resolve
 

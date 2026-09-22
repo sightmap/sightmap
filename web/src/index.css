@@ -1946,12 +1946,23 @@ footer {
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--bg-code);
+  display: flex;
+  justify-content: center;
 }
 
 .prose .sk-frames__frame img {
+  /* These are near-1:1 full-page captures of a narrow app (1728x1882
+     native), so the generic `.prose img` breakout rule (width: 100% of a
+     wide article column) stretched them tall enough to push the controls
+     and caption below the fold. Same specificity fight goes the other way
+     here: this selector already beats the breakout rule, so capping height
+     and letting width follow is enough, no !important needed. */
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: auto;
+  max-height: 480px;
+  margin: 0 auto;
 }
 
 .prose .sk-frames__controls {
@@ -2050,6 +2061,12 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  /* All 13 lines unbounded ran to ~600px on its own, more than half a
+     typical viewport, which is most of why the widget didn't fit on
+     screen. Capped and scrollable; the active line scrolls into view as
+     the trace advances (see FeatureTrace.tsx). */
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 .prose .ftrace__feature-line {
@@ -2093,7 +2110,7 @@ footer {
   /* Content varies per step (params, guard, and guidance are each optional),
      from ~140px to ~270px measured across all 13 steps. Fixed so autoplay
      doesn't reflow the whole page underneath it every 1.6s. */
-  min-height: 285px;
+  min-height: 274px;
 }
 
 .prose .ftrace__tool-name {
@@ -2161,7 +2178,7 @@ footer {
   /* Content varies per step (0 to 5 query/read lines), from ~75px to ~215px
      measured across all 13 steps. Fixed for the same reason as the tool
      pane above: no page reflow while this autoplays. */
-  min-height: 225px;
+  min-height: 216px;
 }
 
 .prose .ftrace__pane--corpus .ftrace__pane-label {

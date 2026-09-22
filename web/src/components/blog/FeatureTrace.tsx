@@ -191,7 +191,15 @@ export default function FeatureTrace() {
   const [i, setI] = useState(0)
   const [playing, setPlaying] = useState(false)
   const figureRef = useRef<HTMLElement>(null)
+  const activeLineRef = useRef<HTMLButtonElement>(null)
   const hasStarted = useRef(false)
+
+  // The feature list is capped and scrollable (see .ftrace__feature-list in
+  // index.css), so the active line needs to be kept in view by hand as the
+  // trace advances.
+  useEffect(() => {
+    activeLineRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [i])
 
   // Start playback the first time the widget scrolls into view, so it
   // doesn't finish its run before a reader gets to it, and never at all for
@@ -251,6 +259,7 @@ export default function FeatureTrace() {
             <li key={n}>
               <button
                 type="button"
+                ref={n === i ? activeLineRef : undefined}
                 className={
                   'ftrace__feature-line' + (n === i ? ' is-current' : n < i ? ' is-done' : '')
                 }
