@@ -3,6 +3,7 @@ import CodeBlock from './CodeBlock'
 import SightmapSnapshot from './SightmapSnapshot'
 import SkillVsSightmap from './SkillVsSightmap'
 import SightkickFrames from './SightkickFrames'
+import FeatureTrace from './FeatureTrace'
 
 // Interactive figures are authored in markdown as
 //
@@ -19,6 +20,7 @@ const WIDGETS: Record<string, (attribs: Record<string, string>) => React.ReactEl
   'sightmap-snapshot': (a) => <SightmapSnapshot figure={a['data-figure']} />,
   'skill-vs-sightmap': () => <SkillVsSightmap />,
   'sightkick-frames': (a) => <SightkickFrames figure={a['data-figure']} />,
+  'feature-trace': () => <FeatureTrace />,
 }
 
 // Recursively collect the raw text of a parsed <code> element, so a fenced

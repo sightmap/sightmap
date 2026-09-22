@@ -171,6 +171,15 @@ views:
         selector: '.smap-svs'
         source: src/components/blog/SkillVsSightmap.tsx
         description: Static SVG contrasting skill-dump context with contextual disclosure
+      - name: FeatureTrace
+        selector: '.ftrace'
+        source: src/components/blog/FeatureTrace.tsx
+        description: Steps through a real 13-step plan, one Gherkin line/tool call/corpus resolution at a time
+        memory:
+          - Autoplays once scrolled into view, unless prefers-reduced-motion is set; any manual control pauses it
+        children:
+          - name: ftrace-controls
+            selector: '.ftrace__controls'
       - name: PostHeader
         selector: '.blog-post__header'
         source: src/pages/BlogPost.tsx
