@@ -1,6 +1,6 @@
 ---
 title: 'Composing Sightmap and Sightkick: Building in Layers'
-excerpt: 'Sightkick operates at the CUA layer, giving models a clean tool interface to your app. Let agents compose those tools into test suites and you get model intelligence during setup and maintenance, paired with sub-second, zero-token execution on every commit. Three layers: a map, a toolbox, and a spec.'
+excerpt: 'Sightkick gives agents a clean tool interface to drive web apps live, which is ideal for co-browsing and troubleshooting. CI needs the opposite: sub-second speed, zero non-determinism, zero token cost. So agents author and resolve the plans upfront instead. Three layers: a map, a toolbox, and a spec.'
 topic: 'research'
 date: '2026-09-22'
 author: 'Clint Ayres'
@@ -8,11 +8,13 @@ slug: 'building-in-layers'
 image: '/blog/og/building-in-layers.png'
 ---
 
-There are more ways to be successful in browser automation today than ever before. Computer-Using Agents (CUAs), WebMCP, and fast System 1 and System 2 models are expanding what's possible, opening up incredible avenues for dynamic web interaction and autonomous navigation.
+There are more ways to be successful in browser automation today than ever before. Computer-Using Agents (CUAs), WebMCP, and fast System 1 and System 2 models are expanding what's possible, opening up incredible avenues for dynamic web interaction.
 
-Sightkick operates directly at that CUA layer, providing a clean, structured tool interface for models to interact with web apps. But rather than relying on live CUA reasoning to drive the browser on every build, we can now let agents compose those tools together, authoring and resolving test suites that execute imperatively, deterministically, and virtually for free in CI. You get model intelligence during setup and maintenance, paired with the sub-second speed and zero-token execution cost on every commit.
+Sightkick operates directly at that CUA layer. Paired with a System 1 or System 2 model, it gives agents a clean, structured tool interface to drive web applications in real time, making it ideal for co-browsing, live troubleshooting, and interactive workflows.
 
-That shift in perspective is why we built **Sightmap** and **Sightkick**. Together, they establish a three-tiered architecture built for agent-defined, deterministic execution: a map, a toolbox, and a spec. Each layer is a checked-in artifact, referencing the layer below it strictly by name, and nothing more.
+But if you want to bring that agent intelligence into your CI pipeline, driving the browser live on every commit isn't the right tool for the job. CI demands sub-second speed, zero non-determinism, and zero token costs.
+
+That's where **Sightmap** and **Sightkick** work together. Rather than running live model reasoning during a build, agents use these tools to _author and resolve_ test plans upfront. The result is a three-tiered architecture built for agent-defined, deterministic execution: a map, a toolbox, and a spec. Each layer is a checked-in artifact, referencing the layer below it strictly by name, and nothing more.
 
 ## Three Layers, Bottom to Top
 
@@ -39,7 +41,7 @@ That shift in perspective is why we built **Sightmap** and **Sightkick**. Togeth
    ```
 
 2. **Tools (`.sightkick`): The Toolbox**
-   Sightkick operates at the CUA layer, using System 1/2 models against your Sightmap to turn component names into atomic, callable actions (`apply_promo`, `read_cart`, `place_order`). Running `sightkick build` validates the entire toolset, instantly failing if a tool targets an unmapped component.
+   Sightkick operates at the CUA layer, using models against your Sightmap to turn component names into atomic, callable actions (`apply_promo`, `read_cart`, `place_order`). Running `sightkick build` validates the entire toolset, instantly failing if a tool targets an unmapped component.
 
    ```yaml
    - name: apply_promo
@@ -69,7 +71,31 @@ That shift in perspective is why we built **Sightmap** and **Sightkick**. Togeth
    ```
 
 3. **The Spec (`.feature` + Plan): The Execution Artifact**
-   The high-level intent: a standard `.feature` file paired with a compiled execution plan. Every line of Gherkin maps directly to one tool call and an expected assertion, checked into source control as clean JSON.
+   The high-level intent, in a standard `.feature` file. No selectors, no tool names, nothing an agent put there. This is the artifact a product owner can read and a developer can argue with:
+
+   ```gherkin
+   Feature: Order a burrito
+     As a hungry customer
+     I want to customize an item and pay for it
+     So that I get a confirmed order
+
+     Scenario: Order two steak burritos with a promo code
+       Given the menu lists five items
+       When I open "Classic Burrito"
+       And I customize "protein" as "steak"
+       And I increase the quantity to 2
+       And I add it to the cart
+       Then the cart holds one line for "Classic Burrito" at "$21.90"
+       When I check out
+       And I enter the delivery address "123 Main St", "Denver", "CO", "80203"
+       And I pay with card "4242 4242 4242 4242" expiring "09/26"
+       And I apply the promo code "BURRITO20"
+       Then the order total is "$18.92"
+       When I place the order
+       Then I get an order id
+   ```
+
+   An agent resolves that once against the toolbox. Every line of Gherkin becomes one tool call and one assertion, checked into source control as clean JSON:
 
    ```json
    {
@@ -84,13 +110,9 @@ When UI code changes, you update **one line** in the Sightmap corpus. The tools,
 
 ## Watch It Resolve
 
-Below is a 13-step plan (`examples/burrito/plans/purchase.plan.json` from the sightkick repo) resolved and executed against our demo app, Burrito Co. First, the real screenshots, one frame per stage, each carrying the guidance breadcrumb that pointed there:
+Below is a 13-step plan ([`examples/burrito/plans/purchase.plan.json`](https://github.com/sightmap/sightkick/blob/main/examples/burrito/plans/purchase.plan.json) from the sightkick repo) resolved and executed against our demo app, Burrito Co.
 
-<div data-widget="sightkick-frames" data-figure="journey">
-<img src="/blog/images/sightkick/tool-01-menu.png" alt="The Burrito Co. menu, five items with prices, at the start of the purchase journey." />
-</div>
-
-When you step through the trace, all three layers move in lockstep: the Gherkin intent triggers the deterministic tool call, which targets the mapped components.
+When you step through the trace, all three layers move in lockstep: the Gherkin intent triggers the deterministic tool call, which targets the mapped components. Each frame is the real screen that call produced.
 
 <div data-widget="feature-trace">
 <pre>
@@ -112,10 +134,10 @@ Order two steak burritos with a promo code
 </pre>
 </div>
 
-This architecture unlocks two critical advantages:
+This layered architecture solves two major pain points in browser testing:
 
-- **Journeys are advisory guidance, not fragile controllers.** The original `purchase` journey suggested 14 steps, including inspecting item customizations. When resolving the plan, the agent recognized the inspection step wasn't required for this run and bypassed it cleanly without breaking execution.
-- **State complexity is absorbed once.** Burrito Co.'s checkout wizard handles Delivery, Payment, and Review under a single URL. The Sightmap corpus exposes `CheckoutSteps.activeStep` as a property, allowing every mutating tool to guard against state automatically, removing the burden of URL-guessing from the runner entirely.
+- **Journeys guide agents; they don't break runs.** The original `purchase` journey included 14 steps, like inspecting item customizations. When resolving the plan, the agent realized that inspection step wasn't needed for this specific run and safely skipped it without breaking the execution.
+- **State tracking is handled by the map.** Burrito Co.'s checkout wizard handles Delivery, Payment, and Review all under a single URL. Instead of forcing the test runner to guess where it is, the Sightmap exposes `CheckoutSteps.activeStep` as a property. Every tool automatically checks this state before running.
 
 ## Three Closed Loops Beat One Open Problem
 
@@ -123,24 +145,24 @@ This architecture unlocks two critical advantages:
 <img src="/blog/images/building-in-layers/closed-loop.jpg" alt="Left: one glowing hexagon holding a small robot icon and a circular loop of arrows with a checkmark badge, labeled One Closed Loop. Right: seven of the same hexagons tessellated into a honeycomb, connected edge to edge, labeled Composed." />
 </figure>
 
-Asking an agent to solve browser testing as an open-ended task (map the page, click around, figure out if it worked) creates an unconstrained search space with no feedback loop.
+If you ask an AI agent to handle the entire testing lifecycle at once (map the app, write the tools, write the tests, and keep them synced) it will fail. There's no feedback loop telling it _where_ something broke until everything downstream collapses.
 
-Decomposing the problem into three isolated, deterministic loops makes failure local and legible:
+Breaking the problem into three isolated, deterministic loops makes failures obvious and easy to fix:
 
-- **Components (Map):** Verified by coverage metrics. Target is zero unmapped orphan elements.
-- **Tools (Actions):** Verified by `sightkick build`. Validates all tool references against the component map and offers corrections on missing elements.
-- **Specs (Intent):** Verified by dual-hash validation over scenario text and compiled tool manifests. Mismatches halt execution before running bad builds.
+- **Components (Map):** Verified by coverage. The target is zero unmapped elements.
+- **Tools (Actions):** Verified by `sightkick build`. It instantly catches invalid component references and suggests correct ones.
+- **Specs (Intent):** Verified by dual hashes (one for the text, one for the tools). If they don't match, the run stops before executing a bad test.
 
-Each closed loop delivers an immediate pass/fail signal. Composing them yields a test suite that is lightning-fast in CI, yet completely authored and maintained by agents.
+Each loop gives a clear pass/fail signal. When you compose them, you get a test suite that is lightning-fast in CI, but fully authored and maintained by agents.
 
 ## Where to Start, and What's Next
 
-Build from the ground up: map a view down to zero orphans, use Sightkick with a System 1/2 model at the CUA layer to expose its tools, and resolve feature specs against those tools. Each layer can be built and verified before the layer above it exists.
+Build from the ground up: map a view until you have zero orphans, use Sightkick with a model to generate its tools, and resolve feature specs against them. You can build and verify each layer before the one above it even exists.
 
-**A couple of things to keep in mind:**
+**Two things to keep in mind:**
 
-- **Model dependency during setup:** Sightkick relies on System 1/2 models during the authoring and plan-resolution phase. Once a `.feature` file is resolved into a checked-in JSON plan, execution in CI is deterministic and requires no live model reasoning.
-- **Navigation boundaries:** Tools are intentionally scoped to single documents due to current [WebMCP](https://webmachinelearning.github.io/webmcp/) cross-document response handling. This boundary keeps tools modular and reusable across distinct scenarios.
+- **Models are for authoring, not running:** Sightkick uses System 1/2 models to author tools and resolve plans. Once a `.feature` file is saved as a JSON plan, it runs in CI completely deterministically. No live models required.
+- **Tools are page-specific:** Tools are intentionally scoped to single documents (due to how [WebMCP](https://webmachinelearning.github.io/webmcp/) handles cross-document responses). This keeps tools modular and perfectly reusable across different test scenarios.
 
 Ready to build agent-defined, deterministic specs?
 

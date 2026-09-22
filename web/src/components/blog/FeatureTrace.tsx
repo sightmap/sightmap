@@ -12,6 +12,10 @@ type Step = {
   gherkin: string
   tool: string
   ensureView: string
+  // The real screen this call produced. Several steps legitimately share a
+  // capture: a read doesn't change the screen the write before it produced.
+  shot: string
+  shotAlt: string
   params?: Record<string, string>
   guard?: string
   queries: string[]
@@ -21,11 +25,15 @@ type Step = {
   guidance?: string
 }
 
+const IMG = '/blog/images/sightkick'
+
 const STEPS: Step[] = [
   {
     gherkin: 'Given the menu lists five items',
     tool: 'read_menu',
     ensureView: 'Menu',
+    shot: `${IMG}/tool-01-menu.png`,
+    shotAlt: 'The Burrito Co. menu, five items with prices.',
     queries: [],
     reads: [
       { component: 'MenuCard', selector: '.menu-card', property: 'itemName ← MenuCardName.text' },
@@ -39,6 +47,8 @@ const STEPS: Step[] = [
     gherkin: 'When I open "Classic Burrito"',
     tool: 'open_item',
     ensureView: 'Menu',
+    shot: `${IMG}/tool-02-item-before.png`,
+    shotAlt: 'Classic Burrito detail page, chicken selected, quantity 1.',
     params: { name: 'Classic Burrito' },
     queries: ['MenuCard[itemName*="Classic Burrito" i]'],
     result: 'ok: true, wait_for view: ItemDetail',
@@ -49,6 +59,8 @@ const STEPS: Step[] = [
     gherkin: 'And I customize "protein" as "steak"',
     tool: 'customize_item',
     ensureView: 'ItemDetail',
+    shot: `${IMG}/tool-03-item-after.png`,
+    shotAlt: 'The same detail page, steak now the selected protein.',
     params: { group: 'protein', option: 'steak' },
     queries: ['CustomizationGroup[groupName*="protein" i] OptionButton[label*="steak" i]'],
     reads: [{ component: 'OptionButton', selector: '.option-btn', property: 'label ← text' }],
@@ -59,6 +71,8 @@ const STEPS: Step[] = [
     gherkin: 'And I increase the quantity to 2',
     tool: 'increase_item_quantity',
     ensureView: 'ItemDetail',
+    shot: `${IMG}/journey-02-item.png`,
+    shotAlt: 'Classic Burrito detail page, steak selected, quantity 2, the button reading Add 2 to Cart $21.90.',
     queries: ['QtyButton[label="+"]'],
     reads: [
       {
@@ -74,6 +88,8 @@ const STEPS: Step[] = [
     gherkin: 'And I add it to the cart',
     tool: 'add_item_to_cart',
     ensureView: 'ItemDetail',
+    shot: `${IMG}/journey-03-cart.png`,
+    shotAlt: 'The cart holding one line, 2x Classic Burrito at $21.90.',
     queries: ['AddToCartButton'],
     result: 'ok: true, wait_for view: Cart',
     expect: 'ok: true',
@@ -83,6 +99,8 @@ const STEPS: Step[] = [
     gherkin: 'Then the cart holds one line for "Classic Burrito" at "$21.90"',
     tool: 'read_cart',
     ensureView: 'Cart',
+    shot: `${IMG}/journey-03-cart.png`,
+    shotAlt: 'The same cart line, read back: 2x Classic Burrito at $21.90.',
     queries: [],
     reads: [
       { component: 'CartItem', selector: '.cart-item', property: 'itemName ← CartItemName.text' },
@@ -95,6 +113,8 @@ const STEPS: Step[] = [
     gherkin: 'When I check out',
     tool: 'go_to_checkout',
     ensureView: 'Cart',
+    shot: `${IMG}/journey-04-checkout-delivery.png`,
+    shotAlt: 'Checkout step 1 of 3, Delivery, with the address fields.',
     queries: ['CheckoutButton'],
     result: 'ok: true',
     expect: 'ok: true',
@@ -103,6 +123,8 @@ const STEPS: Step[] = [
     gherkin: 'And I enter the delivery address "123 Main St", "Denver", "CO", "80203"',
     tool: 'submit_delivery_address',
     ensureView: 'Checkout',
+    shot: `${IMG}/journey-05-checkout-payment.png`,
+    shotAlt: 'Checkout step 2 of 3, Payment, with the card fields.',
     params: { street: '123 Main St', city: 'Denver', state: 'CO', zip: '80203' },
     guard: 'wait CheckoutSteps[activeStep*="Delivery" i]',
     queries: ['StreetField', 'CityField', 'StateField', 'ZipField', 'ContinueButton'],
@@ -116,6 +138,8 @@ const STEPS: Step[] = [
     gherkin: 'And I pay with card "4242 4242 4242 4242" expiring "09/26"',
     tool: 'submit_payment_details',
     ensureView: 'Checkout',
+    shot: `${IMG}/journey-06-checkout-review.png`,
+    shotAlt: 'Checkout step 3 of 3, Review, before the promo code.',
     params: { card_number: '4242 4242 4242 4242', expiry: '09/26' },
     guard: 'wait CheckoutSteps[activeStep*="Payment" i]',
     queries: [
@@ -135,6 +159,8 @@ const STEPS: Step[] = [
     gherkin: 'And I apply the promo code "BURRITO20"',
     tool: 'apply_promo',
     ensureView: 'Checkout',
+    shot: `${IMG}/tool-05-promo-after.png`,
+    shotAlt: 'The Review step with BURRITO20 applied and the total at $18.92.',
     params: { code: 'BURRITO20' },
     guard: 'absent: PromoField',
     queries: ['PromoField', 'ApplyPromoButton', 'PromoAppliedLabel'],
@@ -154,6 +180,8 @@ const STEPS: Step[] = [
     gherkin: 'Then the order total is "$18.92"',
     tool: 'read_order_total',
     ensureView: 'Checkout',
+    shot: `${IMG}/tool-06-promo-detail.png`,
+    shotAlt: 'Close-up of the order totals: subtotal, promo discount, tax, and a total of $18.92.',
     queries: [],
     reads: [
       {
@@ -170,6 +198,8 @@ const STEPS: Step[] = [
     gherkin: 'When I place the order',
     tool: 'place_order',
     ensureView: 'Checkout',
+    shot: `${IMG}/journey-07-confirmation.png`,
+    shotAlt: 'The order confirmation screen, with an order id and Total Charged $23.65.',
     queries: ['PlaceOrderButton'],
     result: 'ok: true',
     expect: 'ok: true',
@@ -178,6 +208,8 @@ const STEPS: Step[] = [
     gherkin: 'Then I get an order id',
     tool: 'read_order_id',
     ensureView: 'Confirmation',
+    shot: `${IMG}/journey-07-confirmation.png`,
+    shotAlt: 'The same confirmation screen, the order id read back off it.',
     queries: [],
     reads: [{ component: 'OrderIdDisplay', selector: '.order-id', property: 'orderId ← text' }],
     result: '"ORD-1757329143100"',
@@ -185,20 +217,35 @@ const STEPS: Step[] = [
   },
 ]
 
-const ADVANCE_MS = 1600
+const ADVANCE_MS = 1000
 
 export default function FeatureTrace() {
   const [i, setI] = useState(0)
   const [playing, setPlaying] = useState(false)
   const figureRef = useRef<HTMLElement>(null)
   const activeLineRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLOListElement>(null)
   const hasStarted = useRef(false)
 
   // The feature list is capped and scrollable (see .ftrace__feature-list in
-  // index.css), so the active line needs to be kept in view by hand as the
+  // index.css), so the active line has to be kept in view by hand as the
   // trace advances.
+  //
+  // This nudges the list's own scrollTop rather than calling scrollIntoView,
+  // which walks up and scrolls every scrollable ancestor including the
+  // document: on mount, with the widget below the fold, that yanked the whole
+  // page down to the widget on every load.
   useEffect(() => {
-    activeLineRef.current?.scrollIntoView({ block: 'nearest' })
+    const line = activeLineRef.current
+    const list = listRef.current
+    if (!line || !list) return
+    const lineBox = line.getBoundingClientRect()
+    const listBox = list.getBoundingClientRect()
+    if (lineBox.top < listBox.top) {
+      list.scrollTop -= listBox.top - lineBox.top
+    } else if (lineBox.bottom > listBox.bottom) {
+      list.scrollTop += lineBox.bottom - listBox.bottom
+    }
   }, [i])
 
   // Start playback the first time the widget scrolls into view, so it
@@ -228,11 +275,14 @@ export default function FeatureTrace() {
   // setState call from inside the effect itself.
   const isAdvancing = playing && i < last
 
+  // `i` has to be a dependency: without it the effect never re-runs as the
+  // step changes (isAdvancing stays true the whole way), so exactly one
+  // timer is ever scheduled and playback stops after a single step.
   useEffect(() => {
     if (!isAdvancing) return
     const t = setTimeout(() => setI((n) => Math.min(last, n + 1)), ADVANCE_MS)
     return () => clearTimeout(t)
-  }, [isAdvancing, last])
+  }, [isAdvancing, i, last])
 
   const step = STEPS[i]
 
@@ -254,7 +304,7 @@ export default function FeatureTrace() {
     <figure className="ftrace" ref={figureRef}>
       <div className="ftrace__pane ftrace__pane--feature">
         <div className="ftrace__pane-label">purchase.feature</div>
-        <ol className="ftrace__feature-list">
+        <ol className="ftrace__feature-list" ref={listRef}>
           {STEPS.map((s, n) => (
             <li key={n}>
               <button
@@ -276,6 +326,26 @@ export default function FeatureTrace() {
         </ol>
       </div>
 
+      <div className="ftrace__stage">
+        {/* Every frame is mounted and only the active one is shown, rather
+            than swapping one img's src. Swapping meant each frame was
+            fetched and decoded the first time it came up, which at a 1s
+            cadence lands as a visible blank-then-snap. Mounted up front,
+            the browser has them all decoded before playback reaches them,
+            and the nine unique files are deduped by the HTTP cache. */}
+        <div className="ftrace__shot">
+          {STEPS.map((s, n) => (
+            <img
+              key={n}
+              src={s.shot}
+              alt={n === i ? s.shotAlt : ''}
+              aria-hidden={n !== i}
+              className={n === i ? 'is-current' : undefined}
+            />
+          ))}
+        </div>
+
+        <div className="ftrace__panes">
       <div className="ftrace__pane ftrace__pane--tool" aria-live="polite">
         <div className="ftrace__pane-label">tool call</div>
         <div className="ftrace__tool-name">
@@ -318,6 +388,8 @@ export default function FeatureTrace() {
             <span className="ftrace__read-property">{r.property}</span>
           </div>
         ))}
+          </div>
+        </div>
       </div>
 
       <div className="ftrace__controls">

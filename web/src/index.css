@@ -2088,6 +2088,72 @@ footer {
   gap: 0.6rem;
 }
 
+/* The screenshot sits beside the three panes rather than above them, so the
+   widget gains the real screen without gaining its height. Burrito Co.'s
+   captures are portrait (1728x1882), which suits a narrow left column. */
+/* The screenshot sits beside the tool and corpus panes and is sized to their
+   combined height, so the widget gains the real screen without gaining
+   height and without leaving dead space next to it. The column is `auto`:
+   the image's width follows from that height at its native 1728x1882. */
+/* The screenshot sits beside the tool and corpus panes and stretches to
+   their combined height, so the widget gains the real screen without
+   gaining height and without dead space beside it. The column ratio is
+   tuned so a 1728x1882 capture very nearly fills that height exactly.
+   The image is positioned absolutely on purpose: in flow, `height: 100%`
+   inside a stretched grid cell makes the image's height and the row's
+   height define each other, and the widget balloons past 2500px. */
+.prose .ftrace__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.prose .ftrace__shot {
+  position: relative;
+  min-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-code);
+}
+
+/* All frames stay mounted and stacked; only the active one is painted, so
+   advancing a step is a visibility flip rather than a fetch and decode. */
+.prose .ftrace__shot img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0;
+  visibility: hidden;
+}
+
+.prose .ftrace__shot img.is-current {
+  visibility: visible;
+}
+
+.prose .ftrace__panes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .prose .ftrace__stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prose .ftrace__shot img {
+    max-height: 340px;
+    width: auto;
+  }
+}
+
 .prose .ftrace__pane {
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -2159,10 +2225,11 @@ footer {
   background: var(--bg-subtle);
   color: var(--text);
   font-size: 0.85rem;
-  /* Content varies per step (params, guard, and guidance are each optional),
-     from ~140px to ~270px measured across all 13 steps. Fixed so autoplay
-     doesn't reflow the whole page underneath it every 1.6s. */
-  min-height: 274px;
+  /* Content varies per step (params, guard, and guidance are each optional).
+     Measured across all 13 steps at this column's width, the tallest is
+     ~292px. Fixed so autoplay doesn't reflow the page underneath it every
+     1.6s. */
+  min-height: 300px;
 }
 
 .prose .ftrace__tool-name {
