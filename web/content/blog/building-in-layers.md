@@ -14,6 +14,10 @@ A `.feature` file has held up for ten years. It reads like a spec because it is 
 
 ## Three layers, bottom to top
 
+<figure class="shot shot-wide">
+<img src="/blog/images/building-in-layers/pyramid.jpg" alt="An isometric diagram of a three-tier pyramid. Bottom tier, indigo, labeled Components / .sightmap, its surface a grid of small named rectangles. Middle tier, teal, labeled Tools / .sightkick, eight connected tool icons in a dotted loop. Top tier, amber, labeled Features / .feature, a single sheet of paper." />
+</figure>
+
 **Components.** A [sightmap](/blog/sightmap) names every view, component, and request in your app. `MenuCard`, `ApplyPromoButton`, `ReviewTotals`, each one a name over a selector, with declared properties standing in for the raw DOM. The CSS lives here and nowhere else.
 
 **Tools.** A [sightkick](/blog/sightkick) tool layer turns those names into atomic, callable actions: `apply_promo`, `read_cart`, `place_order`. A tool's `query:` fields are corpus component names, never CSS, and `sightkick build` fails the build on any name the corpus doesn't have.
@@ -24,7 +28,13 @@ Each layer references the layer below only by name. When `AddToCartButton`'s cla
 
 ## Watch it resolve
 
-Below is a real 13-step plan, `examples/burrito/plans/purchase.plan.json` from the sightkick repo, run against Burrito Co., the demo app from both posts above. Step through it and all three layers move together: the Gherkin line, the tool call it resolved to, and the corpus components that tool addresses.
+Below is a real 13-step plan, `examples/burrito/plans/purchase.plan.json` from the sightkick repo, run against Burrito Co., the demo app from both posts above. First, the real screenshots, one frame per stage, each carrying the guidance breadcrumb that pointed there:
+
+<div data-widget="sightkick-frames" data-figure="journey">
+<img src="/blog/images/sightkick/tool-01-menu.png" alt="The Burrito Co. menu, five items with prices, at the start of the purchase journey." />
+</div>
+
+Now the same run from the other side. Step through it and all three layers move together: the Gherkin line, the tool call it resolved to, and the corpus components that tool addresses.
 
 <div data-widget="feature-trace">
 <pre>
@@ -53,6 +63,10 @@ The plan runs 13 steps, but the `purchase` journey it was resolved from lists 14
 And Burrito Co.'s checkout is a three-step wizard, Delivery, Payment, Review, all on one route; the URL never changes between steps. `ensure_view: Checkout` can't tell them apart, so the wizard's position is a declared corpus property, `CheckoutSteps.activeStep`, and every mutating tool on that view guards and waits on it instead of the URL. That's a fact about the app that would otherwise get re-derived by every test that touches checkout. It's absorbed once, in the corpus, and every tool above it inherits it for free.
 
 ## Three closed loops beat one open problem
+
+<figure class="shot shot-wide">
+<img src="/blog/images/building-in-layers/closed-loop.jpg" alt="Left: one glowing hexagon holding a small robot icon and a circular loop of arrows with a checkmark badge, labeled One Closed Loop. Right: seven of the same hexagons tessellated into a honeycomb, connected edge to edge, labeled Composed." />
+</figure>
 
 Give an agent the whole problem (map the app, write the tools, write the tests, keep them all in sync) and it flails, because nothing tells it when it's wrong until something downstream breaks in a way that doesn't point back at the cause. Give it one bounded loop at a time and it converges, because failure is legible and local:
 
