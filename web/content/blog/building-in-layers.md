@@ -1,5 +1,5 @@
 ---
-title: 'Composing Sightmap and Sightkick: A Map, a Toolbox, and a Spec'
+title: 'Composing Sightmap and Sightkick: Building in Layers'
 excerpt: 'Sightkick operates at the CUA layer, giving models a clean tool interface to your app. Let agents compose those tools into test suites and you get model intelligence during setup and maintenance, paired with sub-second, zero-token execution on every commit. Three layers: a map, a toolbox, and a spec.'
 topic: 'research'
 date: '2026-09-22'
