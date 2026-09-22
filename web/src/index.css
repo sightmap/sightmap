@@ -1946,12 +1946,23 @@ footer {
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--bg-code);
+  display: flex;
+  justify-content: center;
 }
 
 .prose .sk-frames__frame img {
+  /* These are near-1:1 full-page captures of a narrow app (1728x1882
+     native), so the generic `.prose img` breakout rule (width: 100% of a
+     wide article column) stretched them tall enough to push the controls
+     and caption below the fold. Same specificity fight goes the other way
+     here: this selector already beats the breakout rule, so capping height
+     and letting width follow is enough, no !important needed. */
   display: block;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   height: auto;
+  max-height: 480px;
+  margin: 0 auto;
 }
 
 .prose .sk-frames__controls {
@@ -1998,8 +2009,277 @@ footer {
   color: var(--text-dim);
 }
 
+/* "called" and "next call" carry the distinction the caption used to blur:
+   what produced this screen, versus the guidance naming what to call next.
+   Both get the same label chip so the pairing is obvious at a glance. */
+.prose .sk-frames__label {
+  flex: none;
+  padding: 0.05rem 0.4rem;
+  border-radius: 5px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.prose .sk-frames__call,
 .prose .sk-frames__breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.prose .sk-frames__call {
+  margin-bottom: 0.5rem;
+}
+
+.prose .sk-frames__call code,
+.prose .sk-frames__breadcrumb code {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-bright);
+  background: none;
+  padding: 0;
+}
+
+.prose .sk-frames__note {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.prose .sk-frames__breadcrumb {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent-dim);
+  background: var(--accent-dim);
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.prose .sk-frames__breadcrumb .sk-frames__label {
+  background: transparent;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.prose .sk-frames__reason {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+/* Feature trace: the three-tier playback widget for the "building-in-layers"
+   post. Three stacked panes (feature / tool / corpus) with an emphasis ramp
+   from --text down to --text-dim, so the layers read as "top is what you
+   author, bottom is machinery" without a separate color per layer. See
+   FeatureTrace.tsx. */
+.prose .ftrace {
+  margin: 2rem 0;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* The screenshot sits beside the three panes rather than above them, so the
+   widget gains the real screen without gaining its height. Burrito Co.'s
+   captures are portrait (1728x1882), which suits a narrow left column. */
+/* The screenshot sits beside the tool and corpus panes and is sized to their
+   combined height, so the widget gains the real screen without gaining
+   height and without leaving dead space next to it. The column is `auto`:
+   the image's width follows from that height at its native 1728x1882. */
+/* The screenshot sits beside the tool and corpus panes and stretches to
+   their combined height, so the widget gains the real screen without
+   gaining height and without dead space beside it. The column ratio is
+   tuned so a 1728x1882 capture very nearly fills that height exactly.
+   The image is positioned absolutely on purpose: in flow, `height: 100%`
+   inside a stretched grid cell makes the image's height and the row's
+   height define each other, and the widget balloons past 2500px. */
+.prose .ftrace__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: stretch;
+}
+
+.prose .ftrace__shot {
+  position: relative;
+  min-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-code);
+}
+
+/* All frames stay mounted and stacked; only the active one is painted, so
+   advancing a step is a visibility flip rather than a fetch and decode. */
+.prose .ftrace__shot img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  margin: 0;
+  border-radius: 0;
+  visibility: hidden;
+}
+
+.prose .ftrace__shot img.is-current {
+  visibility: visible;
+}
+
+.prose .ftrace__panes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .prose .ftrace__stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .prose .ftrace__shot img {
+    max-height: 340px;
+    width: auto;
+  }
+}
+
+.prose .ftrace__pane {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 0.7rem 0.85rem;
+}
+
+.prose .ftrace__pane-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+
+.prose .ftrace__pane--feature {
+  background: var(--bg-raised);
+}
+
+.prose .ftrace__feature-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  /* All 13 lines unbounded ran to ~600px on its own, more than half a
+     typical viewport, which is most of why the widget didn't fit on
+     screen. Capped and scrollable; the active line scrolls into view as
+     the trace advances (see FeatureTrace.tsx). */
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.prose .ftrace__feature-line {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  transition: background 0.12s;
+}
+
+.prose .ftrace__feature-line:hover {
+  background: var(--bg-subtle);
+}
+
+.prose .ftrace__feature-line.is-done {
+  color: var(--text);
+}
+
+.prose .ftrace__feature-line.is-current {
+  color: var(--text-bright);
+  font-weight: 600;
+  background: var(--accent-dim);
+}
+
+.prose .ftrace__feature-mark {
+  min-width: 1em;
+  color: var(--accent);
+}
+
+.prose .ftrace__pane--tool {
+  background: var(--bg-subtle);
+  color: var(--text);
+  font-size: 0.85rem;
+  /* Content varies per step (params, guard, and guidance are each optional).
+     Measured across all 13 steps at this column's width, the tallest is
+     ~292px. Fixed so autoplay doesn't reflow the page underneath it every
+     1.6s. */
+  min-height: 300px;
+}
+
+.prose .ftrace__tool-name {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.prose .ftrace__tool-view {
+  font-weight: 400;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+.prose .ftrace__kv {
   margin-top: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.prose .ftrace__kv-key {
+  color: var(--text-dim);
+}
+
+.prose .ftrace__guard {
+  margin-top: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+.prose .ftrace__result,
+.prose .ftrace__expect {
+  margin-top: 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.prose .ftrace__result-label {
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  margin-right: 0.4rem;
+}
+
+.prose .ftrace__guidance {
+  margin-top: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
   border: 1px solid var(--accent-dim);
@@ -2007,6 +2287,106 @@ footer {
   font-family: var(--mono);
   font-size: 0.78rem;
   color: var(--text);
+}
+
+.prose .ftrace__pane--corpus {
+  background: var(--bg-code);
+  color: var(--code-caption);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  /* Content varies per step (0 to 5 query/read lines), from ~75px to ~215px
+     measured across all 13 steps. Fixed for the same reason as the tool
+     pane above: no page reflow while this autoplays. */
+  min-height: 216px;
+}
+
+.prose .ftrace__pane--corpus .ftrace__pane-label {
+  color: var(--code-caption);
+}
+
+.prose .ftrace__corpus-empty {
+  font-style: italic;
+}
+
+.prose .ftrace__query {
+  margin-bottom: 0.3rem;
+  word-break: break-word;
+  color: var(--code-text);
+}
+
+.prose .ftrace__read {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.2rem;
+}
+
+.prose .ftrace__read-component {
+  color: var(--code-text);
+  font-weight: 600;
+}
+
+.prose .ftrace__read-selector {
+  color: var(--code-accent);
+}
+
+.prose .ftrace__read-property {
+  color: var(--code-caption);
+}
+
+.prose .ftrace__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+
+.prose .ftrace__nav {
+  padding: 0.3rem 0.7rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition:
+    background 0.12s,
+    opacity 0.12s;
+}
+
+.prose .ftrace__nav:hover:not(:disabled) {
+  background: var(--bg-subtle);
+}
+
+.prose .ftrace__nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.prose .ftrace__count {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-left: 0.4rem;
+}
+
+.prose .ftrace figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 640px) {
+  .prose .ftrace {
+    padding: 0.6rem;
+  }
+  .prose .ftrace__pane {
+    padding: 0.55rem 0.65rem;
+  }
+  .prose .ftrace__feature-line {
+    font-size: 0.8rem;
+  }
 }
 
 /* ---- BLOG INDEX ---- */
