@@ -1,5 +1,5 @@
 ---
-title: 'Composing sightmap and sightkick: a map, a toolbox, and a spec'
+title: 'Building in layers: composing sightmap and sightkick'
 excerpt: 'A sightmap names what your app is. A sightkick tool layer turns those names into callable actions. A feature file composes actions into a workflow. Each layer names only the one below it, and each one answers pass or fail on its own. Watch a real 13-step purchase resolve through all three, live.'
 topic: 'research'
 date: '2026-09-22'
