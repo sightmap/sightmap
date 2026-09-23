@@ -1,6 +1,6 @@
 ---
 sep: 0014
-title: Declaring publish targets via an `environments[]` field
+title: Named environments, referenced by views and requests
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-09-08
@@ -12,224 +12,306 @@ related-discussions: []
 
 ## Summary
 
-Add an optional, file-root-only `environments` field: a flat list of
-`{name, value, platform?, build_type?}` entries, each giving a local name to an identifier a
-session already reports about itself, a hostname on web, or a bundle/package name (optionally
-split by build variant) on native. `environments` is a **reserved tooling field**, like `access`
-and `snapshots`: consumed by the `subtext sightmap publish` CLI to resolve `--env <name>` into the
-scope a corpus is published under, but no part of this spec's route matching or merge semantics.
-Declaring an environment does not make a corpus specific to it; the corpus still matches by path
-everywhere, exactly as it would with no `environments` block at all. The declaration only gives an
-environment a local name to publish under.
+Add an `environments` field in two roles. At a file root it defines named environments,
+`{name, value, platform?, build_type?}`, where `value` is the identifier a running app reports about
+itself (a hostname on web, a bundle ID or application ID on native) and `build_type` separates build
+variants that share one identifier. On a view or a request it is a list of names referencing those
+definitions: the environments a view is served on, or an endpoint is called on. Definitions from
+every file form one project-wide registry, so an identifier is written once and referenced by name
+everywhere else. Environments are declarative: they don't change route matching, and a view or
+request that references none declares no constraint.
 
 ## Motivation
 
-One sightmap corpus can describe several apps at once (web, iOS, Android), and each is released
-independently. A publish tool needs a way to turn a human-chosen name (`staging`, `ios-beta`) into
-the identifier a session actually reports, so that a corpus published under that name resolves for
-the right sessions later. Two problems make that harder than a single string field:
+A sightmap corpus says what a page or endpoint *is*, but nothing about *where* it runs. The only
+host-bearing field, `url:`, is a single optional navigation target rather than an identity, and many
+corpora never set it. Tools built on a corpus keep needing the missing piece:
 
-1. **Web and native don't share an identifier shape.** A session reports a hostname on web, and a
-   bundle or package name on native. There's no common URL-like reading that covers both, so a
-   field designed around one platform's identifier doesn't carry over to the other.
-2. **A bundle ID alone under-determines the environment.** An iOS beta and its release build ship
-   under one bundle ID. Two environments that need to stay distinguishable would report the same
-   identifier and collapse into one, unless something else, a build variant, separates them.
+1. **A compiled page has no host.** A consumer that compiles views into host-scoped page definitions
+   derives each host from `url:`. With no `url:`, every compiled page matches any host.
+2. **A request matcher can't be anchored.** `request.route` is path-only. A consumer turning it into
+   a matcher against full URLs has no host to anchor on, so the matcher accepts the same path on any
+   host.
+3. **A corpus spans several apps.** One corpus often describes a web app and its iOS and Android
+   counterparts, each released independently. A tool that publishes a corpus per deploy target
+   needs a stable name for each target (`staging`, `ios-beta`) and the identifier that target
+   reports.
+4. **Not everything runs everywhere.** An SSO page is served only from `auth.acme.com`, and the
+   app's API is called on `api.acme.com`, not on the host serving the page. Where-it-runs has to
+   attach to individual views and requests, not only to the corpus as a whole.
 
-Without a per-corpus name for these identifiers, a publish call has to spell out the same
-identifier by hand every time, with no way for a CI script to look one up by a short, memorable
-name.
+Two properties of real identifiers shape the design. Web and native don't share an identifier: web
+reports a hostname, native reports a bundle or application ID, and a URL-shaped field fits only the
+first. And an identifier alone can under-determine the environment: an iOS beta and its release
+build ship under one bundle ID, so only the build variant tells them apart.
 
 ## Proposal
 
 ### Shape
 
+Definitions live at a file root, in any file. `environments.yaml` is a convention, not a rule:
+
 ```yaml
 # .sightmap/environments.yaml
+version: 1
 environments:
+  - { name: api,          value: api.acme.com }
+  - { name: auth,         value: auth.acme.com }
   - { name: local,        value: app.acme.test }
-  - { name: staging,      value: app.staging.acme.com }
   - { name: prod,         value: app.acme.com }
+  - { name: staging,      value: app.staging.acme.com }
 
+  - { name: android-prod, platform: android, value: com.acme.app, build_type: release }
   - { name: ios-beta,     platform: ios,     value: com.acme.app, build_type: beta }
   - { name: ios-prod,     platform: ios,     value: com.acme.app, build_type: release }
-  - { name: android-prod, platform: android, value: com.acme.app, build_type: release }
 ```
 
-Six entries, three apps, one corpus. `environments` lives in its own file, or anywhere at a file
-root; it doesn't have to share a file with the views and requests it has nothing to do with:
+Views and requests in any file reference them by name:
 
 ```yaml
-# .sightmap/orders.yaml: an ordinary file, unaware environments.yaml exists
+# .sightmap/account.yaml
 version: 1
 views:
   - name: OrderHistory
     route: "/ui/*/settings/orders/history"
+    environments: [local, prod, staging]
+  - name: SsoLogin
+    route: /sso/login
+    environments: [auth]
+    requests:
+      - name: SsoCallback
+        route: /sso/callback
+        method: POST
+        environments: [api]          # its own list; SsoLogin's [auth] is not inherited
 requests:
   - name: GetProfile
     route: /settings/profile
     method: GET
+    environments: [api]
+  - name: Ping
+    route: /api/ping
+    method: GET                      # no environments: no constraint declared
 ```
 
-`OrderHistory` and `GetProfile` don't reference `environments` at all, because there's no view- or
-request-level position for this field to occupy (see [Field reference](#field-reference)). Both
-still match by route on a session from `local`, `staging`, or `prod` identically, whether or not
-`environments.yaml` exists in the corpus. Publishing this same corpus under `--env ios-beta` doesn't
-change what `OrderHistory` matches either; it only lets `com.acme.app` (build `beta`) resolve to
-whichever corpus was last published there. Declaring `environments` changes what `subtext sightmap
-publish --env <name>` resolves to, and nothing else in this file.
+`ios-beta` and `ios-prod` share `com.acme.app` and differ only by `build_type`. Native entries are
+referenced the same way as web entries.
 
 ### Field reference
 
+| Position | Items | Description |
+|---|---|---|
+| `environments` (file root) | environment definitions | Defines named environments and registers each `name` project-wide. |
+| `environments` (view) | names | Environments this view is served on. |
+| `environments` (request) | names | Environments this endpoint is called on. |
+
+An environment definition:
+
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `name` | string | yes | (none) | A local alias, resolved by `subtext sightmap publish --env <name>`. Not read by matching. |
-| `platform` | string, enum `web` \| `ios` \| `android` | no | `web` | Selects the identifier space `value` is read in. Stated explicitly rather than inferred from `value`'s shape, because a package name like `com.acme.app` is also a syntactically valid hostname. |
-| `value` | string | yes | (none) | The identifier a session reports for this environment: a hostname (web) or a bundle/package name (native), verbatim. |
-| `build_type` | string | no | (none) | Native build variant (`release`, `beta`, `debug`, etc). Separates two environments that share one `value`. Not meaningful for `platform: web`. |
+| `name` | string, `^[a-z][a-z0-9_-]*$` | yes | (none) | Unique across the corpus. What views, requests, and tools refer to. |
+| `platform` | `web` \| `ios` \| `android` | no | `web` | Which kind of identifier `value` is. Stated rather than inferred, because an application ID like `com.acme.app` is also a valid hostname. |
+| `value` | string | yes | (none) | The identifier the app reports: a hostname on web, a bundle ID on iOS, an application ID on Android. No scheme, port, or path. |
+| `build_type` | string | no | (none) | Build variant (`release`, `beta`, `debug`). Separates environments that share one `value`. Native only. |
 
-`environments` joins `access` and `snapshots` as a **reserved tooling field**: permitted by the
-schema so a corpus that uses it validates, not part of this spec's matching or merge semantics, and
-a conforming SDK MAY ignore it entirely. No file-discovery change either: every `*.yaml` under
-`.sightmap/` is already discovered and merged, so `environments.yaml` is a naming convention, not a
-new rule. A `platform: web` repo writes `{name, value}` and never sees `platform` or `build_type`.
+A web-only corpus writes `{name, value}` and never sees `platform` or `build_type`.
 
 ### Semantics
 
-`environments` entries are declarative labels, not a matching input. A corpus that declares
-`environments` still matches a session by route exactly as it would with no `environments` block at
-all, following the general rule for [reserved tooling fields](../v1/schema.md#reserved-tooling-fields).
-What each field maps to on the session side, once a downstream consumer (the publish CLI, and the
-storage/resolution layer described in the parent design) reads it:
+#### Definitions and references
 
-| Declared | Session attribute | Role |
-|---|---|---|
-| `platform: web` | `PLATFORM` = `PAGE_TYPE_WEB` | selects the identifier space |
-| `platform: ios` | `PLATFORM` = `PAGE_TYPE_IOS` | selects the identifier space |
-| `platform: android` | `PLATFORM` = `PAGE_TYPE_ANDROID` | selects the identifier space |
-| `value`, web | `DOMAIN` | the identifier matched, verbatim |
-| `value`, native | `APP_PACKAGE` | the identifier matched, verbatim |
-| `build_type` | `BUILD_TYPE` | separates two environments sharing one `APP_PACKAGE` |
-| `name` | (none) | a local alias for `--env`; no session attribute |
+Items in a file-root `environments` array are definitions (objects). Items in a view's or request's
+`environments` array are references (bare names). A definition is never valid on a view or request,
+and a bare name is never valid at a file root. Every identifier lives in exactly one definition, so
+rotating a hostname is a one-line edit, and a tool listing every environment in a corpus reads
+definitions only.
 
-Read as a sentence: a **web** session matches on `PLATFORM` plus `DOMAIN`; an **iOS** or **Android**
-session matches on `PLATFORM` plus `APP_PACKAGE` plus `BUILD_TYPE`. None of these are new attributes
-invented for this spec: each mirrors an attribute a session-capture platform already reports and
-already matches on for its own recording-targeting rules (platform, domain or package identifier,
-build variant), so this SEP introduces no parallel vocabulary for the same facts.
+#### The registry is project-wide
 
-An app-version attribute is not part of this SEP's shape. A native session is pinned to a corpus by
-app version rather than by session start time, because a user decides when to update and two app
-versions run in the field for weeks, but that's a resolution-time rule for the consumer reading
-`environments`, not a field this spec adds. How a stored, published corpus resolves against a
-session (publication history, fallback tiers) is a downstream storage/publish design's concern, out
-of scope for this SEP.
+Definitions from every loaded file form one registry, the same lookup scope
+[SEP-0002](0002-component-ref.md) uses for components. When two definitions share a `name`, the one
+from the first file by source path wins, and a conforming SDK SHOULD warn
+(`environment-name-collision`).
+
+#### Reference resolution
+
+Every reference MUST resolve to a registry entry; a reference that names no entry is invalid
+(`environment-ref-unresolved`). Resolution is a scalar lookup: a definition contains no references,
+so there is no expansion order and no possibility of a cycle.
+
+#### Absent or empty means unconstrained
+
+A view or request with no `environments`, or with `environments: []`, declares no constraint. It
+does not mean "runs nowhere": an accidentally emptied list should not flip an entity from matching
+everywhere to matching nothing. A conforming SDK SHOULD warn on an explicit empty list
+(`environments-empty`).
+
+#### No inheritance
+
+A view's or request's list is its own. A view-scoped request does not inherit its enclosing view's
+list, because a page and the API it calls routinely run on different hosts (`SsoLogin` on `auth`,
+`SsoCallback` on `api` above). Definitions at a file root do not become defaults for that file's
+views and requests either; defining `auth` in a file says nothing about where that file's views run.
+
+#### Not a route-matching input
+
+A URL matches a view or request by path alone, as it does today. A session whose identifier matches
+none of an entity's environments still matches that entity's route. Making environments a match
+filter would silently reclassify existing traffic the moment an author adds a list to a previously
+unconstrained entity. Environments are data about an entity for consumers to use as they need:
+compiling host-scoped page definitions, anchoring request matchers, choosing a publish target by
+name.
+
+#### Identifiers
+
+A web `value` is a hostname and compares case-insensitively. A native `value` is a bundle ID or
+application ID and compares byte-for-byte. A definition with no `build_type` covers every build
+variant of its `value`; a definition with one covers only that variant. Two definitions with the
+same `platform`, `value`, and `build_type` describe the same environment under two names, and a
+conforming SDK SHOULD warn (`environment-duplicate`).
+
+#### `environments` and `url` are complementary
+
+`url:` is one concrete, navigable address. `environments` is the set of places an entity runs.
+`url:` does not imply an environment, and a consumer MUST NOT derive one from it: doing so would
+make every corpus with a `url:` constrained, and "no `environments` declared" would stop meaning
+"unconstrained" for every existing corpus.
 
 ### Conformance
 
-- MUST accept an optional `environments` array at the file root: `{name, value}` required,
-  `platform` (enum `web`/`ios`/`android`, default `web`) and `build_type` optional.
-- MUST treat `environments` as a reserved tooling field: MUST NOT let its presence or contents
-  change route-matching or merge-resolution results for any view, request, or component.
-- MAY ignore `environments` entirely; no behavior in this spec depends on an SDK implementing it.
-- MUST NOT require `platform` or `build_type` when validating; a `platform: web` entry omitting
-  `build_type` is valid.
+- MUST accept `environments` at the file root (definitions), on a view (references), and on a
+  request (references).
+- MUST reject a definition on a view or request, and a bare name at a file root.
+- MUST build one project-wide registry from every loaded file's file-root definitions. SHOULD warn
+  when two definitions share a `name`; the first by source-file path wins
+  (`environment-name-collision`).
+- MUST reject a reference that names no registry entry (`environment-ref-unresolved`).
+- MUST reject a definition whose `value` isn't a valid hostname (web) or dot-separated identifier
+  (native), or that sets `build_type` with `platform: web` (`environment-invalid`).
+- MUST treat an absent or empty view- or request-level list as unconstrained. SHOULD warn on an
+  explicit `environments: []` (`environments-empty`).
+- MUST NOT inherit a view's list into its view-scoped requests, or a file's definitions into its
+  views and requests.
+- SHOULD warn when two definitions share `platform`, `value`, and `build_type`
+  (`environment-duplicate`).
+- **MUST NOT treat `environments` as an input to route matching.**
+- MUST NOT derive an environment from `url:`.
+- MUST NOT emit any diagnostic for a corpus that declares no `environments` anywhere.
 
 ### JSON Schema diff
 
-- `$defs.environment`: **new**, mirroring the shape of `$defs.snapshot` and
-  `$defs.view.properties.access`, a reserved-tooling-field object:
+- `$defs.environmentName`: **new**.
+  ```
+  $defs.environmentName:
+    type: string
+    pattern: "^[a-z][a-z0-9_-]*$"
+  ```
+- `$defs.environment`: **new**. The `value` pattern admits both hostnames and native identifiers;
+  the stricter per-platform check is `environment-invalid`'s job.
   ```
   $defs.environment:
-    $comment: "Reserved tooling field. Not part of the spec's matching or merge semantics; conforming SDKs MAY ignore it."
     type: object
     required: [name, value]
     additionalProperties: false
     properties:
-      name: { type: string }
+      name: { $ref: "#/$defs/environmentName" }
       platform: { type: string, enum: [web, ios, android], default: web }
-      value: { type: string }
+      value: { type: string, pattern: "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$" }
       build_type: { type: string }
-    description: "Non-normative tooling field: a local name for an identifier a session reports about itself (hostname on web, bundle/package name on native), consumed by the publish CLI to resolve --env."
   ```
-- `properties.environments` (root): **added**, optional, `{ type: array, items: { $ref: "#/$defs/environment" } }`, with a `$comment` matching the reserved-tooling-field wording used for `snapshots`. Root `required` is unchanged (`["version"]`).
-- No `$defs.view.properties.environments` or `$defs.request.properties.environments`: this field has
-  no per-view or per-request position, and no reference/registry mechanism. It is file-root-only,
-  exactly like `snapshots`.
-- `fileRootFields` (the Go SDK's unknown-field allowlist) gains `"environments"`. `viewFields` and
-  `requestFields` are unchanged; this SEP touches neither.
+- `properties.environments` (root): **added**, optional,
+  `{ type: array, items: { $ref: "#/$defs/environment" } }`. Root `required` unchanged.
+- `$defs.view.properties.environments`: **added**, optional,
+  `{ type: array, items: { $ref: "#/$defs/environmentName" } }`. `$defs.view.required` unchanged.
+- `$defs.request.properties.environments`: **added**, optional,
+  `{ type: array, items: { $ref: "#/$defs/environmentName" } }`. `$defs.request.required` unchanged.
+- No removals, no type changes to existing `$defs` entries.
+- The Go SDK's unknown-field allowlists `fileRootFields`, `viewFields`, and `requestFields` each
+  gain `"environments"`.
+
+### Canonical format
+
+- Key order gains `environments` after `version` at the top level, after `route` on a view, and
+  after `method` on a request.
+- An environment definition's key order is `name, platform, value, build_type`.
+- The top-level `environments` sequence is alphabetized by `name`, like `views`.
+- View- and request-level reference lists carry no order, so they are sorted and deduplicated like
+  `dependencies`.
 
 ## Alternatives considered
 
-### 1. Do nothing: keep environment identifiers out of the corpus, pass them on the CLI
+### 1. Do nothing: pass hosts to each tool out of band
 
-Have `subtext sightmap publish` take `--scope-kind`/`--scope-value`/`--build-type` directly, with no
-corpus-level declaration at all. (This remains available regardless, as an escape hatch; see
-[Field reference](#field-reference).)
+A consumer takes a host from a command-line flag or options struct instead of the corpus.
 
-**Ruled out:** it works, but every publish call has to spell out the same identifiers by hand, with
-no way for a CI script to look them up by a short, memorable name. `--env <name>` resolved from a
-checked-in `environments:` block is the whole reason this field exists.
+**Ruled out:** the information lives only in the author's head, every tool re-asks for it, and a
+single flag can't express per-entity differences like an SSO page on its own host or an API on
+another.
 
-### 2. Infer `platform` from `value`'s shape instead of declaring it explicitly
+### 2. Inline definitions on views and requests, no registry
 
-Skip the `platform` field and guess web vs. native from whether `value` parses as a hostname.
+Let each view or request write `{value, platform, build_type}` directly.
 
-**Ruled out:** a package name like `com.acme.app` is also a syntactically valid hostname, so the
-guess would silently decide which identifier space a lookup runs in, with no way for an author to
-correct a wrong guess short of renaming the app.
+**Ruled out:** a corpus split across many files repeats the same identifier in every one, so rotating
+a hostname becomes a multi-file find-and-replace with nothing keeping the copies in sync. Names also
+give publishing tools a stable handle (`--env staging`) independent of any one view.
 
-### 3. Name fields after the session attributes directly (`domain`, `app_package`) instead of a
-generic `value`
+### 3. A URL-shaped field (`scheme://host[:port]`)
 
-Instead of one `value` field whose meaning depends on `platform`, use a differently-named field per
-platform.
+Declare each environment as a URL origin.
 
-**Ruled out:** `value`'s role, an identifier a session reports about itself, is the same fact on
-every platform; only which identifier space it's read in differs, and `platform` already carries
-that. A per-platform field name would mean a schema union keyed on `platform`, for no benefit over
-one field whose meaning `platform` already disambiguates.
+**Ruled out:** a bundle ID or application ID has no URL reading, and an origin has no place for a
+build variant, so two native environments sharing one bundle ID would collapse into one.
+
+### 4. Infer `platform` from `value`
+
+Guess web or native from whether `value` looks like a hostname.
+
+**Ruled out:** `com.acme.app` is a valid hostname, so the guess would silently pick the wrong
+identifier space, with no way for an author to correct it short of renaming the app.
+
+### 5. File-root definitions double as defaults for that file
+
+Treat a file's definitions as the environments of every view and request in that file.
+
+**Ruled out:** it conflates defining an environment with applying it. A file that defines `auth`
+would silently constrain every view in it to `auth`. An explicit file-level default, separate from
+definitions, is an open question below.
+
+### 6. Make environments a route-matching constraint
+
+Filter view and request lookups on the session's identifier as well as the path.
+
+**Ruled out:** every consumer relies on path-only matching today, and an author adding a list to an
+entity would silently change what traffic it matches. An opt-in matching mode could come in a later
+SEP as a separate entry point, so adopting it is a call-site change rather than a corpus change.
 
 ## Migration
 
-`environments` is additive and reserved: no existing corpus declares it today, so no existing file
-needs rewriting. An SDK implementing this SEP needs:
-
-- The `$defs.environment` schema addition and `properties.environments` at the file root (see
-  [JSON Schema diff](#json-schema-diff)).
-- `"environments"` added to the Go SDK's `fileRootFields` allowlist, or a conforming corpus produces
-  spurious `unknown-field` warnings against an older SDK.
-- No canonical-format change beyond whatever key-ordering/list-handling rule applies to other
-  reserved tooling fields (see [`access`/`snapshots`](../v1/schema.md#reserved-tooling-fields));
-  `environments` should follow that existing precedent rather than inventing its own.
+`environments` is additive: no existing corpus declares it, so no existing file changes meaning or
+formatting. Under `additionalProperties: false` at the root, `$defs.view`, and `$defs.request`, an
+SDK pinned before this SEP rejects any corpus that uses the field, so consumers pin an SDK version
+that implements it before authoring `environments`. The Go SDK's `fileRootFields`, `viewFields`,
+and `requestFields` allowlists need the same addition, or a conforming corpus produces spurious
+`unknown-field` warnings.
 
 ## Open questions
 
-1. **Should `environments` eventually feed matching, not just publish resolution?** Today it's
-   purely a reserved tooling field, following `access`/`snapshots`. A future SEP proposing
-   environment-aware route matching would need to promote some subset of this shape out of
-   "reserved" status, as an explicitly opt-in mechanism so it doesn't silently reclassify existing
-   pathname-only matches. Not proposed here.
-2. **Is a flat, file-root-only list sufficient, or will a real multi-file corpus want to split
-   `environments.yaml` per app**, the way [SEP-0001](0001-dependencies-field.md)'s `dependencies`
-   scopes other definitions to files? Nothing in the shape prevents one `environments.yaml` per
-   platform; whether the spec should say anything about that convention is open.
-3. **Should an unrecognized `platform` value warn or silently pass through?** As a reserved tooling
-   field, the schema's `enum` already rejects anything outside `web`/`ios`/`android` at validation
-   time; whether that's the right strictness for a field SDKs are otherwise free to ignore is worth a
-   second opinion.
+1. **A file-level default.** A file whose every view runs on `[local, prod, staging]` repeats that
+   list per view. An explicit default, separate from definitions (see alternative 5), would remove
+   the repetition. Is it worth a second concept?
+2. **Hostname wildcards.** Ephemeral preview hosts (`pr-123.preview.acme.com`) can't be enumerated.
+   If wildcards are added, they should be a distinct, right-anchored form (`**.preview.acme.com`),
+   not route matching's `*`, which already means something for `/`-separated path segments.
+3. **Ports.** `value` forbids a port, so a local environment on a non-default port is identified by
+   hostname alone. Is that ever ambiguous in practice?
+4. **Opt-in environment-aware matching.** What a separate match entry point would look like, and
+   whether it covers requests as well as views.
 
 ## References
 
-- A downstream storage/publish design (outside this repo): publish/ingest storage, publication
-  resolution tiers, and native mobile scope kinds all consume this SEP's `environments:` block, but
-  none of that resolution logic is part of this spec.
-- [`spec/v1/schema.md#reserved-tooling-fields`](../v1/schema.md#reserved-tooling-fields): the
-  `access`/`snapshots` precedent this SEP's `environments` field follows. Permitted by the schema,
-  outside matching/merge semantics, ignorable by a conforming SDK.
-- A recording-targeting attribute model already in use elsewhere in the consuming platform: the
-  session attributes (platform, domain or package identifier, build variant) this SEP's fields are
-  chosen to align with, so nothing here is invented in parallel to what targeting already matches
-  on.
-- [SEP-0001](0001-dependencies-field.md): file-scoped declarations precedent, referenced in
-  [Open questions](#open-questions).
+- [`spec/v1/schema.md#route-matching`](../v1/schema.md#route-matching): the path-only matching rule
+  this SEP does not change.
+- [SEP-0002](0002-component-ref.md): the project-wide registry and first-by-path collision rule this
+  SEP reuses for a scalar definition instead of a component subtree.
+- [SEP-0001](0001-dependencies-field.md): the sort-and-deduplicate canonical rule reused for
+  reference lists.
