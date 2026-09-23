@@ -56,7 +56,28 @@ environments:
   - { name: android-prod, platform: android, value: com.acme.app, build_type: release }
 ```
 
-Six entries, three apps, one corpus.
+Six entries, three apps, one corpus. `environments` lives in its own file, or anywhere at a file
+root; it doesn't have to share a file with the views and requests it has nothing to do with:
+
+```yaml
+# .sightmap/orders.yaml: an ordinary file, unaware environments.yaml exists
+version: 1
+views:
+  - name: OrderHistory
+    route: "/ui/*/settings/orders/history"
+requests:
+  - name: GetProfile
+    route: /settings/profile
+    method: GET
+```
+
+`OrderHistory` and `GetProfile` don't reference `environments` at all, because there's no view- or
+request-level position for this field to occupy (see [Field reference](#field-reference)). Both
+still match by route on a session from `local`, `staging`, or `prod` identically, whether or not
+`environments.yaml` exists in the corpus. Publishing this same corpus under `--env ios-beta` doesn't
+change what `OrderHistory` matches either; it only lets `com.acme.app` (build `beta`) resolve to
+whichever corpus was last published there. Declaring `environments` changes what `subtext sightmap
+publish --env <name>` resolves to, and nothing else in this file.
 
 ### Field reference
 
