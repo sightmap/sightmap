@@ -24,39 +24,28 @@ environment a local name to publish under.
 
 ## Motivation
 
-One sightmap corpus can describe several apps at once, web, iOS, Android, and each is released
+One sightmap corpus can describe several apps at once (web, iOS, Android), and each is released
 independently. A publish tool needs a way to turn a human-chosen name (`staging`, `ios-beta`) into
 the identifier a session actually reports, so that a corpus published under that name resolves for
-the right sessions later. For web that identifier is a hostname; native has no equivalent of a URL
-at all, so the same shape can't just be reused as written.
+the right sessions later. Two problems make that harder than a single string field:
 
-This SEP was originally drafted as `origins:`, a web-only, URL-keyed registry with per-view and
-per-request overrides (see [Alternatives considered](#1-keep-origins-as-drafted-url-keyed-web-only)
-for why that shape is replaced rather than extended). Two problems rule out extending it directly:
+1. **Web and native don't share an identifier shape.** A session reports a hostname on web, and a
+   bundle or package name on native. There's no common URL-like reading that covers both, so a
+   field designed around one platform's identifier doesn't carry over to the other.
+2. **A bundle ID alone under-determines the environment.** An iOS beta and its release build ship
+   under one bundle ID. Two environments that need to stay distinguishable would report the same
+   identifier and collapse into one, unless something else, a build variant, separates them.
 
-1. **`url:` doesn't map to native platforms.** A bundle ID or package name isn't a URL, and forcing
-   one into `scheme://host[:port]` shape buys nothing: there's no scheme, and treating the bundle ID
-   as a "host" invites exactly the ambiguity the original grammar was designed to foreclose.
-2. **A rename alone doesn't cover matching.** An iOS beta and an iOS release ship under one bundle
-   ID. Two environments that need to stay distinguishable would report the same identifier and
-   collapse into one, unless something else, a build variant, separates them.
-
-Replacing the block outright costs nothing: `origins:` is still in the design phase, nothing reads
-it, and no corpus has adopted it.
+Without a per-corpus name for these identifiers, a publish call has to spell out the same
+identifier by hand every time, with no way for a CI script to look one up by a short, memorable
+name.
 
 ## Proposal
 
 ### Shape
 
 ```yaml
-# Before: SEP-0014 as drafted. Web only.
-origins:
-  - { name: staging, url: https://app.staging.acme.com }
-  - { name: prod,    url: https://app.acme.com }
-```
-
-```yaml
-# After: .sightmap/environments.yaml
+# .sightmap/environments.yaml
 environments:
   - { name: local,        value: app.acme.test }
   - { name: staging,      value: app.staging.acme.com }
@@ -143,38 +132,15 @@ of scope for this SEP.
     description: "Non-normative tooling field: a local name for an identifier a session reports about itself (hostname on web, bundle/package name on native), consumed by the publish CLI to resolve --env."
   ```
 - `properties.environments` (root): **added**, optional, `{ type: array, items: { $ref: "#/$defs/environment" } }`, with a `$comment` matching the reserved-tooling-field wording used for `snapshots`. Root `required` is unchanged (`["version"]`).
-- No `$defs.view.properties.origins` or `$defs.request.properties.origins`: unlike the withdrawn
-  `origins:` draft, `environments` has no per-view or per-request position and no reference/registry
-  mechanism. It is file-root-only, exactly like `snapshots`.
+- No `$defs.view.properties.environments` or `$defs.request.properties.environments`: this field has
+  no per-view or per-request position, and no reference/registry mechanism. It is file-root-only,
+  exactly like `snapshots`.
 - `fileRootFields` (the Go SDK's unknown-field allowlist) gains `"environments"`. `viewFields` and
   `requestFields` are unchanged; this SEP touches neither.
 
 ## Alternatives considered
 
-### 1. Keep `origins:` as drafted (URL-keyed, web-only)
-
-Extend the original SEP-0014 draft in place: keep the `{name, url}` shape and its per-view/per-request
-override, and find some way to fit native identifiers into a `url:` field.
-
-**Ruled out:** see [Motivation](#motivation): a bundle ID or package name is not a URL, and the
-`scheme://host[:port]` grammar the original draft depends on for unambiguous reference resolution has
-no natural reading for either. Nothing implements the draft yet, so there is no migration cost to
-avoid by keeping it.
-
-### 2. Rename `url:` to a generic `value:` inside the existing registry/reference design
-
-Keep the named-definition-and-reference registry, per-view/per-request overrides, and origin-tuple
-grammar from the original draft, and just widen the value type to admit a bundle or package name
-alongside a URL.
-
-**Ruled out:** a rename doesn't solve the collapsing-identifier problem; an iOS beta and release
-sharing one bundle ID still need a `build_type` to stay distinct, and that has no place in an origin
-*tuple* (scheme/host/port) at all. Once `build_type` is added as a genuinely new axis, the per-view/
-per-request override and reference-registry machinery bring no benefit for a purely declarative,
-file-root-only field, so most of the original draft's complexity would be carried forward for no
-reason.
-
-### 3. Do nothing: keep environment identifiers out of the corpus, pass them on the CLI
+### 1. Do nothing: keep environment identifiers out of the corpus, pass them on the CLI
 
 Have `subtext sightmap publish` take `--scope-kind`/`--scope-value`/`--build-type` directly, with no
 corpus-level declaration at all. (This remains available regardless, as an escape hatch; see
@@ -182,14 +148,31 @@ corpus-level declaration at all. (This remains available regardless, as an escap
 
 **Ruled out:** it works, but every publish call has to spell out the same identifiers by hand, with
 no way for a CI script to look them up by a short, memorable name. `--env <name>` resolved from a
-checked-in `environments:` block is the whole reason this field exists; see the parent design's
-`subtext sightmap publish --env staging` examples.
+checked-in `environments:` block is the whole reason this field exists.
+
+### 2. Infer `platform` from `value`'s shape instead of declaring it explicitly
+
+Skip the `platform` field and guess web vs. native from whether `value` parses as a hostname.
+
+**Ruled out:** a package name like `com.acme.app` is also a syntactically valid hostname, so the
+guess would silently decide which identifier space a lookup runs in, with no way for an author to
+correct a wrong guess short of renaming the app.
+
+### 3. Name fields after the session attributes directly (`domain`, `app_package`) instead of a
+generic `value`
+
+Instead of one `value` field whose meaning depends on `platform`, use a differently-named field per
+platform.
+
+**Ruled out:** `value`'s role, an identifier a session reports about itself, is the same fact on
+every platform; only which identifier space it's read in differs, and `platform` already carries
+that. A per-platform field name would mean a schema union keyed on `platform`, for no benefit over
+one field whose meaning `platform` already disambiguates.
 
 ## Migration
 
-`environments` is additive and reserved: no existing corpus declares `origins` or `environments`
-today (the former never shipped past Draft), so no existing file needs rewriting. An SDK
-implementing this SEP needs:
+`environments` is additive and reserved: no existing corpus declares it today, so no existing file
+needs rewriting. An SDK implementing this SEP needs:
 
 - The `$defs.environment` schema addition and `properties.environments` at the file root (see
   [JSON Schema diff](#json-schema-diff)).
@@ -199,15 +182,13 @@ implementing this SEP needs:
   reserved tooling fields (see [`access`/`snapshots`](../v1/schema.md#reserved-tooling-fields));
   `environments` should follow that existing precedent rather than inventing its own.
 
-Because the original `origins:` draft never shipped, this SEP replaces it outright rather than
-deprecating a field already in the wild.
-
 ## Open questions
 
 1. **Should `environments` eventually feed matching, not just publish resolution?** Today it's
-   purely a reserved tooling field, following `access`/`snapshots`. If a future SEP wants
-   origin-aware route matching (raised and deferred in the original `origins:` draft), it would need
-   to promote some subset of this shape out of "reserved" status. Not proposed here.
+   purely a reserved tooling field, following `access`/`snapshots`. A future SEP proposing
+   environment-aware route matching would need to promote some subset of this shape out of
+   "reserved" status, as an explicitly opt-in mechanism so it doesn't silently reclassify existing
+   pathname-only matches. Not proposed here.
 2. **Is a flat, file-root-only list sufficient, or will a real multi-file corpus want to split
    `environments.yaml` per app**, the way [SEP-0001](0001-dependencies-field.md)'s `dependencies`
    scopes other definitions to files? Nothing in the shape prevents one `environments.yaml` per
