@@ -1,7 +1,7 @@
 ---
 title: "Sightmap Requests: Routes, Methods, and Payload Shapes"
 sidebarTitle: "Requests"
-description: "Name API endpoints with glob routes, optional method filters, and documentary payload fields."
+description: "Name API endpoints with glob routes, optional method filters, documentary payload fields, and values extracted from live traffic."
 ---
 
 A request assigns a semantic name to an API endpoint. Consumers can show `SearchFlights` alongside `POST /api/flights/search` in enriched network output.
@@ -29,7 +29,7 @@ A request assigns a semantic name to an API endpoint. Consumers can show `Search
   headers: [x-request-id]
 ```
 
-`name` and `route` are required. See [Schema reference](/reference/schema#request) for the full type, including the `Payload` and `Field` sub-types.
+`name` and `route` are required. See [Schema reference](/reference/schema#request) for the full type, including the `Payload`, `Field`, and `RequestProperty` sub-types.
 
 ## Route patterns
 
@@ -80,7 +80,7 @@ View matching uses a different rule: exactly one view wins by specificity. See [
 
 `request` and `response` describe the expected payload shape. Both are `Payload` objects with an optional `fields` array. Each field requires a `name` and may include a free-text `type` and `description`. The `type` value is not restricted to a predefined set.
 
-The listed fields are documentary, not exhaustive. They do not validate live request or response payloads.
+The listed fields are documentary, not exhaustive. They do not validate live request or response payloads. To extract a value from live traffic, use [`properties`](#properties).
 
 `headers` lists header names that a consumer may highlight in network details. This example documents the response from a current-user endpoint:
 
@@ -97,6 +97,43 @@ The listed fields are documentary, not exhaustive. They do not validate live req
         type: string
 ```
 
+## Properties
+
+A payload's `fields` describe expected shape. `properties:` instead names values to extract from live traffic, so a consumer can reason about what a request actually returned. An HTTP `200` does not distinguish an approved payment from a declined one when the outcome is in the response body.
+
+```yaml
+- name: CheckoutPayment
+  route: /api/checkout/pay
+  method: POST
+  properties:
+    - name: outcome              # a JSON body value
+      source: rsp.body
+      field: status
+    - name: rate_limit_remaining # a header value refined by a regex
+      source: rsp.headers
+      field: X-RateLimit-Remaining
+      pattern: '(\d+)'
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Key a consumer refers to the value by. Must match `^[a-z][a-z0-9_]*$`. |
+| `source` | yes | Root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. |
+| `field` | see below | For a body source, an object-key dot path; a numeric segment indexes an array (`items.0.name`). For a headers source, a case-insensitive header name. |
+| `pattern` | see below | An RE2 regex applied to what `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the value when present; otherwise the whole match. |
+
+Each property needs at least one of `field` and `pattern`, and a headers source always needs `field`. `pattern` uses [RE2 syntax](/reference/schema#regular-expressions), which has no backreferences or lookaround; the reference CLI rejects an invalid pattern with `request-property-pattern-invalid`.
+
+Extraction requires live traffic. A tool that reads only the corpus treats `properties:` as declared but unavailable, not as an error. A property that doesn't resolve, such as a missing key, an out-of-range index, or no pattern match, is omitted silently. Omission is the normal case, because whether a body or header is available depends on the capture layer's payload and privacy settings.
+
+`status`, `method`, and `duration` are reserved identity names. A consumer can reference them without any `properties:` declaration. Declaring a property with one of those names shadows the HTTP identity, and the reference CLI warns with `request-property-shadows-reserved`. Prefer a distinct name such as `outcome`.
+
+See [Request properties](/reference/schema#request-properties) and [SEP-0005](https://github.com/sightmap/sightmap/blob/main/spec/seps/0005-request-properties.md).
+
+## Tags
+
+A request can carry `tags:`, a list of open-vocabulary classification labels. Every matching request applies its own tags, so a request's resolved tag set is the union across every matching definition. See [Tags](/reference/schema#tags).
+
 ## Scoped vs global
 
 Requests can be declared at the file root or inside a view.
@@ -109,4 +146,4 @@ Declare a request at the file root when it applies regardless of the active view
 
 ## Next
 
-[Memory](/spec/memory) covers the `memory:` field that any request can carry, surfaced to the agent in the network-trace detail view.
+[Messages](/spec/messages) gives console output and exceptions the named entity that `requests:` gives network calls. [Memory](/spec/memory) covers the `memory:` field that any request can carry, surfaced to the agent in the network-trace detail view.

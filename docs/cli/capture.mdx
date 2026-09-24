@@ -1,13 +1,13 @@
 ---
-title: "Sightmap CLI: Snapshot, Capture, and Inspect"
+title: "Sightmap CLI: Snapshot, Capture, Inspect, and Explain"
 sidebarTitle: "Snapshot & capture"
-description: "Observe a live page as an annotated component tree, persist captures into a view's set, and inspect the raw DOM for selector authoring."
+description: "Observe a live page as an annotated component tree, persist captures into a view's set, and inspect or explain individual nodes for selector authoring."
 ---
 
-These commands read a live page over the Chrome DevTools Protocol and apply your `.sightmap/` corpus. `snapshot` **observes** a page — it prints an annotated tree and coverage, and never touches the corpus. `capture` **persists** a capture into the matched view's set, subject to the novelty gate. `inspect` shows the unfiltered DOM structure for selector authoring.
+These commands read a live page over the Chrome DevTools Protocol and apply your `.sightmap/` corpus. `snapshot` **observes** a page — it prints an annotated tree and coverage, and never touches the corpus. `capture` **persists** a capture into the matched view's set, subject to the novelty gate. `inspect` shows the unfiltered DOM structure for selector authoring, and `explain` reports one node's facts, selector candidates, and coverage tier.
 
 <Note>
-All three commands need a running browser session. Start one with `sightmap browser start`; see [Browser session](/cli/browser). Use [Coverage commands](/cli/coverage) to score saved captures, [View sets](/cli/snapshots) to understand their layout and maintenance, and [selector tools](/cli/selectors) to verify a selector before adding it to YAML.
+These commands need a running browser session, except `explain --snap`, which reads a saved capture offline. Start a session with `sightmap browser start`; see [Browser session](/cli/browser). Use [Coverage commands](/cli/coverage) to score saved captures, [View sets](/cli/snapshots) to understand their layout and maintenance, and [selector tools](/cli/selectors) to verify a selector before adding it to YAML.
 </Note>
 
 ---
@@ -16,7 +16,11 @@ All three commands need a running browser session. Start one with `sightmap brow
 
 Connects to Chrome, extracts the component tree, applies the corpus, and emits an annotated ARIA tree with coverage statistics **to stdout** (or to `--out FILE`). `snapshot` is a pure observe command: it never writes into the corpus's capture set and never applies the novelty gate. Persisting a capture is `capture`'s job.
 
-The output contains a `[View: ...]` header when the URL matches a view, a `[Guide]` with match counts by component, the component tree, and a `[Coverage]` summary. `[Warnings]` lists declared components that matched no nodes. `[Conflicts]` flags runtime ambiguities: two or more views matching this URL at equal specificity (declaration order picked the winner), and any single DOM node matched by more than one component (first-match-wins kept only one, which also explains a component that otherwise looks like it matched zero nodes). When a corpus is loaded but **no** view's route matches the URL (for example after an auth redirect), the header is replaced by a `[No view matched] <url>` notice so you know the page is off the map. The `[Coverage]` summary is printed whenever a corpus is applied — even for a matched view with no components yet, where every interactive node reads as an orphan — so the `snapshot --coverage` bootstrap always has something to iterate on.
+The output contains a `[View: ...]` header when the URL matches a view, a `[Guide]` with match counts by component, the component tree, and a `[Coverage]` summary. `[Warnings]` lists declared components that matched no nodes. `[Conflicts]` flags runtime ambiguities: two or more views matching this URL at equal specificity (declaration order picked the winner), and any single DOM node matched by more than one component (first-match-wins kept only one, which also explains a component that otherwise looks like it matched zero nodes). When a corpus is loaded but **no** view's route matches the URL (for example after an auth redirect), the header is replaced by a `[No view matched] <url>` notice so you know the page is off the map. The `[Coverage]` summary is printed whenever a corpus is applied — even for a matched view with no components yet, where every interactive node reads as an orphan — so the `snapshot --coverage` bootstrap always has something to iterate on. When a clean pass comes only from global components, `[Coverage]` adds a `⚠` line saying the view contributed 0 components, so an unmodeled page does not read as done.
+
+With no corpus at `--sightmap-dir`, `snapshot` prints a notice to stderr and renders the raw tree with no component names or coverage. A page with 0 interactive nodes still renders, but the command exits 1 because the page is probably blank or still loading.
+
+The extracted tree contains rendered app content only. Sightmap's own injected overlay and non-content elements (`head`, `script`, `style`, `meta`, `link`, `title`, `noscript`, `template`, `base`) are pruned with their subtrees, so they never appear in the output, `--tree-out`, `--json`, or `capture` files.
 
 Each tree line starts with a numeric probe ID, then the node content:
 
@@ -29,7 +33,7 @@ The probe ID is a handle for the [interaction commands](/cli/interaction). Compo
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address (host:port). |
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning. |
 | `--coverage` | `false` | Print `[View]` + `[Coverage]` + cluster traces only, suppressing the component tree. |
 | `--depth` | `0` | Max tree depth (0 = unlimited). |
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
@@ -42,7 +46,7 @@ The probe ID is a handle for the [interaction commands](/cli/interaction). Compo
 | `--tab` | — | Target tab ID (from `browser start` output). |
 | `--trace` | `false` | Include selector hints for unlabeled interactive clusters. |
 | `--tree-out` | — | Write raw component tree JSON to this file (enables offline `coverage`/`multi-coverage`). |
-| `--url` | — | Navigate to this URL before snapping. |
+| `--url` | — | Navigate to this URL before snapping. Waits for the page to go idle. |
 | `--visible` | `true` | Count only visible nodes (use `--include-hidden` to disable). |
 | `--wait` | `0` | Extra seconds to wait after DOM stability is detected (use for unusually slow pages). |
 
@@ -77,7 +81,7 @@ SiteHeader        1
 87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
 ```
 
-`--coverage` gives a terse feedback view — the same `[View]`, `[Warnings]`, and `[Coverage]` sections plus the T3/T2 cluster traces, with the (potentially huge) tree suppressed. It is the fastest way to read a page's coverage while authoring:
+`--coverage` gives a terse feedback view — the same `[View]`, `[Warnings]`, and `[Coverage]` sections plus the unlabeled T3 clusters and T2 scope traces, with the `[Guide]` and the (potentially huge) tree suppressed. It is the fastest way to read a page's coverage while authoring:
 
 ```bash
 sightmap snapshot --coverage --url 'https://example.com/products/outdoor'
@@ -86,6 +90,7 @@ sightmap snapshot --coverage --url 'https://example.com/products/outdoor'
 ```text
 [View: ProductListPage]
 route: /products/**
+
 
 [Coverage] (visible only)
 87 interactive · 21 direct T1 (24%) · 61 scoped T2 (70%) · 5 orphaned T3 ✗
@@ -98,11 +103,11 @@ Unlabeled clusters:
 
 Verify a suggested selector with `sel-probe` before writing YAML, add the component, then run `snapshot --coverage` again. Repeat until the coverage line reads `0 orphaned T3 ✓`.
 
-`--tree-out` writes the raw component tree used by `coverage`, `multi-coverage`, and `sel-check`. `--json` writes an annotated version that adds matched component names, `memory` notes, and extracted property values. Both flags require a file path. `--out` writes the rendered annotated output to an arbitrary file — this is a plain file write, unrelated to the corpus view set.
+`--tree-out` writes the raw component tree used by `coverage`, `multi-coverage`, `sel-check`, and `explain --snap`. `--json` writes an annotated version that adds matched component names (`component`), `memory` notes, and resolved property values (`props`). Both flags require a file path. `--out` writes the rendered annotated output to an arbitrary file — this is a plain file write, unrelated to the corpus view set.
 
-<Warning>
-Property extraction (the `properties:` field on components, shown as `prop="val"` in the annotated output and included in `--json` files) is a draft spec extension and may change. The v1 schema does not define the field.
-</Warning>
+<Note>
+Property values (`prop="val"` in the tree, `props` in `--json` files) come from a component's `properties:` and are resolved offline over the extracted component tree, not read from the live DOM. Each `extract` is one of `text`, `raw_text`, `attr=NAME`, `PATH.prop`, or `exists:PATH`; to surface a value from a sub-element, declare that sub-element as a child component and reference it. See [Component properties](/reference/schema#component-properties) in the spec.
+</Note>
 
 <Tip>
 Defaults for `--wait`, `--trace`, and `--include-hidden` can be set once in `.sightmap/config.yaml` (`snapshot.wait`, `snapshot.trace`, `snapshot.include_hidden`) instead of repeating them per invocation. Async-rendered pages that populate after load usually need `--wait 1` or `--wait 2`.
@@ -116,20 +121,22 @@ Extracts the component tree exactly as `snapshot` does, then **persists** it int
 
 A view is a *set* of captures, not a single file — real pages are non-deterministic. `capture` appends rather than overwrites, and the novelty gate keeps a capture only when it adds a matched component type or an orphan slot that does not appear elsewhere in the set. Changes to values such as products, prices, or copy do not count. The first capture of a view always writes; `--force` bypasses the gate.
 
+`capture` also refuses to save a page with 0 interactive nodes, which is almost always blank or still loading, unless you pass `--force`. Defaults for `--wait`, `--trace`, and `--include-hidden` come from `.sightmap/config.yaml` (`snapshot.*`), as with `snapshot`.
+
 **Flags:**
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address (host:port). |
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning. |
 | `--all` | `false` | Capture every view URL declared in `views/*.yaml` (top-level `url:` plus `snapshots[].url`). |
 | `--force` | `false` | Write the capture even if it adds no new component or slot vs the view set (skip the novelty gate). |
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
-| `--json` | `false` | Also write an annotated JSON sibling next to each capture. |
+| `--json` | `false` | Also write an annotated JSON sibling (`{stamp}.snap.annotated.json`) next to each capture. |
 | `--selectors` | `false` | Show `tag #id [data-testid]` selector hints in the saved capture. |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
 | `--tab` | — | Target tab ID (from `browser start` output). |
 | `--trace` | `false` | Include selector hints for unlabeled interactive clusters in the saved capture. |
-| `--url` | — | Navigate to this URL before capturing. |
+| `--url` | — | Navigate to this URL before capturing. Waits for the page to go idle. |
 | `--wait` | `0` | Extra seconds to wait after DOM stability is detected (use for unusually slow pages). |
 
 ```bash
@@ -141,13 +148,13 @@ capture saved: .sightmap/snapshots/plp/20260722T183502Z.snap
   87 interactive · T1 24% · T2 70% · T3 5
 ```
 
-A capture the gate rejects reports on stderr and writes nothing:
+A capture the gate rejects reports on stderr, writes nothing, and exits 0:
 
 ```text
-capture: nothing new vs 3 capture(s) in plp — not saved (use --force to keep)
+capture: plp already has 3 capture(s); this one adds no new component or interactive slot — not saved (use --force to keep it anyway)
 ```
 
-`--all` navigates to each view's top-level `url` and any `snapshots[].url` variants, appends a novelty-gated capture for each target, then prints a summary:
+`--all` navigates to each view's top-level `url` and any `snapshots[].url` variants, appends a novelty-gated capture for each target, then prints a summary. A `snapshots[]` target is labeled `view/name`; a target that failed prints `ERROR:`, and a blank page prints `∅ 0 interactive — blank or still loading, not saved`:
 
 ```bash
 sightmap capture --all
@@ -158,7 +165,7 @@ capturing home → https://example.com/
 capturing plp → https://example.com/products/outdoor
 capturing pdp → https://example.com/p/garden-hose-50ft
 
-home                  = nothing new vs 3 capture(s) — not saved
+home                  = redundant vs 3 existing capture(s) — not saved
 plp                   142 interactive · T1 61% · T2 39% · T3 0 ✓
 pdp                   98 interactive · T1 74% · T2 26% · T3 0 ✓
 ```
@@ -177,15 +184,16 @@ Each line shows the probe ID, a CSS-selector-style display (`tag#id[attr="value"
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address (host:port). |
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning. |
 | `--classes` | `false` | Show CSS class names in selector display. |
 | `--depth` | `0` | Max tree depth to print (0 = unlimited). |
 | `--interactive` | `false` | Show only interactive nodes and their ancestors. |
 | `--out` | — | Write output to file instead of stdout. |
 | `--selectors` | `false` | Show all attributes, not just key identifying ones. |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir for ★ annotations. |
+| `--tab` | — | Target tab ID (from `browser start` output). |
 | `--url` | — | Navigate to this URL before inspecting. |
-| `--wait` | `0` | Seconds to wait after navigation (minimum 0.5 when `--url` is used). |
+| `--wait` | `0` | Extra seconds to wait before extracting (minimum 0.5 when `--url` is used). |
 
 ```bash
 sightmap inspect --url 'https://example.com/products/outdoor' --interactive
@@ -209,6 +217,49 @@ sightmap inspect --url 'https://example.com/products/outdoor' --interactive
 Prefer source-controlled attributes such as `data-testid`, `data-component`, or a stable `id`. Use class names or structural selectors only when the application exposes no more stable hook. See [Selectors](/concepts/selectors) for selector guidance.
 </Tip>
 
+---
+
+### `explain`
+
+Answers "what is this node, and how is it covered?" for one or a few nodes. Pick nodes with a CSS selector (positional), `--id` (a probe ID from `snapshot` or `inspect`), or `--grep` (a case-insensitive substring of the role or accessible name). For each node, `explain` prints its tag, ID, and classes; role and name; flags (`interactive`, `hidden`, `ignored`); attributes; coverage tier with the owning component; up to four ranked selector candidates; and up to six ancestors, each with its best hook and owning component.
+
+It works on the live page by default. Pass `--snap FILE` to read a saved capture (`.snap` or `.snap.tree.json`) offline; the capture's `route:` header decides which view's components apply. Coverage tier and owner lines appear only when a corpus loads from `--sightmap-dir`. When nothing matches, it prints `no matching nodes` and exits 0.
+
+Put flags before the selector: flags after the positional selector are not parsed.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning. |
+| `--grep` | — | Select nodes whose role or accessible name contains this substring (case-insensitive). |
+| `--id` | — | Select the node with this tree ID. |
+| `--max` | `10` | Max nodes to explain. |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
+| `--snap` | — | Read a saved capture (`.snap` or `.snap.tree.json`) offline instead of the live page. |
+| `--tab` | — | Target tab ID (from `browser start` output). Live mode only. |
+| `--url` | — | Navigate to this URL before extracting. Live mode only. |
+| `--wait` | `0` | Extra seconds to wait before extracting (minimum 0.5 when `--url` is used). Live mode only. |
+
+```bash
+sightmap explain --snap .sightmap/snapshots/plp/20260923T183502Z.snap --grep 'add to cart' --max 1
+```
+
+```text
+button  #5
+    role/name: button "Add to Cart"
+    flags: interactive
+    attrs: aria-label="Add Garden Hose 50ft to cart"  data-testid="atc"  type="button"
+    coverage: T1 (direct)  ← [AddToCartButton]
+    candidates: [data-testid="atc"]
+    ancestors:
+      div.product-pod  {[data-testid="product-pod"]}  ← [ProductPod]
+      main
+      (no element)
+```
+
+An orphan reads `coverage: T3 (orphan)` with no owner. Verify a candidate with `sel-probe` before writing it to YAML.
+
 ## Typical flow
 
 <Steps>
@@ -219,7 +270,7 @@ Prefer source-controlled attributes such as `data-testid`, `data-component`, or 
     Run `sightmap snapshot --coverage --url 'URL'` and read the coverage line. For each unlabeled cluster, verify the suggested selector with `sel-probe`, add a component to your YAML, and run it again until `0 orphaned T3 ✓`.
   </Step>
   <Step title="Inspect when you need an anchor">
-    When no suggestion fits, run `sightmap inspect --interactive` to see the raw DOM with `★` marks on already-claimed nodes, and pick a stable attribute to build the selector from.
+    When no suggestion fits, run `sightmap inspect --interactive` to see the raw DOM with `★` marks on already-claimed nodes, and pick a stable attribute to build the selector from. To see one node's ranked selector candidates and owning component, run `sightmap explain --id ID` with its probe ID.
   </Step>
   <Step title="Refresh the view sets">
     Run `sightmap capture --all` to append a novelty-gated capture for every view URL in `views/*.yaml`, then score them offline with the [coverage commands](/cli/coverage).

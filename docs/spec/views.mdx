@@ -90,6 +90,12 @@ views:
 View names should be unique across the sightmap. Runtime behavior is implementation-defined when two files define the same view name. Conforming implementations SHOULD emit a warning.
 </Warning>
 
+## Tags and stability
+
+A view can carry `tags:`, a list of open-vocabulary classification labels. Tags do not follow the most-specific-wins rule. The resolved tag set for a URL is the union across every view whose route matches, not only the view that supplies the identity. For example, if a broad `/checkout/**` view is tagged `defect` and a more specific `/checkout/payment` view has no tags, `/checkout/payment` resolves to the specific view's name and still carries `tags: [defect]`. See [Tags](/reference/schema#tags).
+
+`stability` marks a view as a `stub` (a placeholder not yet fleshed out) or `deferred` (intentionally left unmapped for now). Omit it for an active view. It is advisory and does not change matching. See [Stability](/reference/schema#stability).
+
 ## Dependencies
 
 `source` names the view's primary file. List supplementary files, such as feature-specific hooks, stores, and CSS modules, under `dependencies`. Reverse-lookup tools can then associate changes to those files with the view:

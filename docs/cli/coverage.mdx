@@ -15,7 +15,7 @@ The coverage commands re-match saved captures against the current `.sightmap/` Y
 A view can have several timestamped captures. `coverage` reports tiers per capture and evaluates component presence across the set. `multi-coverage` takes the highest match count per component in each view. `report` aggregates each view into one row.
 
 <Note>
-These commands read the `.snap.tree.json` files written by `snapshot`. See [Capture commands](/cli/capture) for creating them and [View sets](/cli/snapshots) for their layout. Use `validate` and `lint` to check the YAML itself; see [Corpus commands](/cli/corpus).
+These commands read the `.snap.tree.json` files written by `capture` (or by `snapshot --tree-out`). See [Capture commands](/cli/capture) for creating them and [View sets](/cli/snapshots) for their layout. Use `validate` and `lint` to check the YAML itself; see [Corpus commands](/cli/corpus).
 </Note>
 
 ---
@@ -30,7 +30,7 @@ Re-runs T1/T2/T3 coverage on saved captures. With no arguments, it reads capture
 - `[Absent]` lists components whose full selector and leaf selector matched nothing in the set.
 - `[Presence]` lists components that matched only some captures and shows the most recent matching capture.
 
-The command exits with an error when it cannot read a capture or any capture has T3 orphans. `[Warnings]`, `[Absent]`, `[Presence]`, and `[Annotation gaps]` do not affect the exit status. `[Annotation gaps]` lists non-interactive content nodes with no component context when their accessible names contain a letter and are at least 12 characters long.
+The command exits with an error when it cannot read a capture, any capture has T3 orphans, or a capture has no interactive nodes (a blank page never passes). `[Warnings]`, `[Absent]`, `[Presence]`, and `[Annotation gaps]` do not affect the exit status. `[Annotation gaps]` lists non-interactive content nodes with no component context when their accessible names contain a letter and are at least 12 characters long.
 
 **Flags:**
 
@@ -38,7 +38,7 @@ The command exits with an error when it cannot read a capture or any capture has
 |------|---------|-------------|
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in coverage stats. |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir. |
-| `--trace` | `false` | Print unlabeled cluster details for T3 orphaned nodes. |
+| `--trace` | `false` | Print unlabeled cluster details for T3 orphaned nodes, plus T2 scopes. Defaults to `coverage.trace` in `.sightmap/config.yaml`. |
 | `--visible` | `true` | Count only visible nodes (use `--include-hidden` to disable). |
 
 ```bash
@@ -57,13 +57,22 @@ sightmap coverage
   ProductListPage: PromoCarousel — matched in 1 of 2 snaps (last 2026-06-08 00:15Z)
 ```
 
-With `--trace`, each failing capture also prints its orphan clusters, grouped by role and nearest stable-attribute ancestor with a suggested selector:
+With `--trace`, each capture also prints its orphan clusters, grouped by role and nearest stable-attribute ancestor with a suggested selector, and its T2 scopes (matched components with unmatched interactive children):
 
 ```text
+20260923T183502Z.snap (visible only):
+  13 interactive · 5 direct T1 (38%) · 5 scoped T2 (38%) · 3 orphaned T3 ✗
+
 Unlabeled clusters:
-  5× button (no text)
-       inside: div[data-testid="product-pod"]
-       → [data-testid="product-pod"] button
+  2× button (no text)
+       inside: div[data-testid="quick-view"]
+       → [data-testid="quick-view"] button
+  1× button "Feedback"
+
+T2 scopes (interactive children without direct component matches):
+  [SiteHeader] (2)
+    link "Home"
+    link "Cart"
 ```
 
 <Tip>
@@ -76,7 +85,7 @@ A component can be absent from one capture and present in another. Capture the r
 
 Builds a cross-page matrix with one row per component and one column per view. Each cell is the highest match count for that component across the view's captures. `-` means the component never matched in that view. The column header reads `view·N` when the view has more than one capture.
 
-Below the matrix, `multi-coverage` lists components that matched in at least two views but are not global components. It counts views rather than capture files.
+Below the matrix, `multi-coverage` lists components that matched in at least two views but are not global components. It counts views rather than capture files. A capture directory that matches no view in the current corpus (stale or renamed) is marked `*` in the header, listed in a `⚠` warning, and excluded from the global-candidate analysis.
 
 **Flags:**
 
@@ -146,6 +155,7 @@ sightmap report · example.com · 2026-07-22
 T2 quality (add child components to improve coverage quality):
     8  [FacetFilter]  (plp)
     7  [GlobalNav]  (home, pdp)
+sightmap report: 1 view(s) with issues
 ```
 
 <Tip>

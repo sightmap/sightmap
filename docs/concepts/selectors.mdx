@@ -13,7 +13,15 @@ Framework component handles are tied to React, Vue, or another runtime. XPath ca
 CSS selectors operate on the DOM that the agent already sees. Their stability depends on what they target: source-controlled attributes usually outlast generated class names, text content, and positional structure.
 
 <Note>
-Sightmap supports tag, ID, class, and attribute selectors; descendant and child (`>`) combinators; and the pseudo-classes `:not()`, `:is()`, `:where()`, and `:has()`. It does not support sibling combinators (`+`, `~`) or positional pseudo-classes such as `:nth-child()`. Verify selectors with `sightmap sel-probe` or `sightmap sel-check`. See [Selector tools](/cli/selectors).
+Sightmap matches selectors offline against the component tree, so it supports a subset of CSS:
+
+- Tag, universal (`*`), ID, class, and attribute selectors, including the `=`, `^=`, `$=`, `*=`, `~=`, and `|=` operators and presence-only `[attr]`.
+- Descendant and child (`>`) combinators.
+- `:not()` with a selector list whose entries can be complex selectors. Combinators and nested `:has()` work inside it, as in `jb-form-field-container:not(:has(jb-form-field-container))` or `button.primary:not(jb-sign-in button)`.
+- `:has()` with relative selectors, using descendant or child (`>`) combinators.
+- `:is()` and `:where()` with a list of compound selectors (no combinators inside).
+
+Sibling combinators (`+`, `~`) are not supported anywhere, including inside `:not()` and `:has()`. Every other pseudo-class, including positional ones such as `:nth-child()`, is rejected. Verify selectors with `sightmap sel-probe` or `sightmap sel-check`. See [Selector tools](/cli/selectors).
 </Note>
 
 ## Use arrays for fallbacks
@@ -30,7 +38,7 @@ A `selector` can be one CSS string or an ordered array. Sightmap uses the first 
 
 In this example, `data-component` is the preferred hook, `data-picker` supports older markup, and the class selector is the last fallback. Remove stale alternatives after the migration is complete.
 
-If the selected pattern matches several elements, Sightmap gives all of them the component name. Child selectors run within each matched parent's subtree, so two unrelated card components can both contain `button.primary` without colliding.
+If the selected pattern matches several elements, Sightmap gives all of them the component name. Child selectors run within each matched parent's subtree, so two unrelated card components can both contain `button.primary` without colliding. Matching runs over a flattened tree in which shadow-root content appears as ordinary children of its host, so selectors cross shadow boundaries without any piercing syntax.
 
 ## The `data-component` convention
 

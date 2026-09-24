@@ -17,6 +17,7 @@ This document is the human-readable reference. The machine-readable contract is 
 
 ```yaml
 version: 1
+url:         # optional, string — default representative URL for this file's views
 memory:      # optional, string[] — file-level notes (see "Memory")
 views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
@@ -28,6 +29,7 @@ signals:     # optional, Signal[] — named state predicates
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `version` | integer | yes | Must be `1`. |
+| `url` | string | no | Default representative URL for every view in this file that omits its own `url`. See [View](#view). |
 | `memory` | string[] | no | File-level memory entries. Surfaced as context to the agent for any view in this file. |
 | `views` | [View](#view)[] | no | Views defined in this file. |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
@@ -578,7 +580,7 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
 - MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern` and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Reference SDK.** The Go SDK under `go/` implements these live-activity requirements: `Corpus.RequestsForRecord` and `Corpus.MessagesForRecord` match an observed request or console record and resolve its `properties:`, and the reference CLI's `console` and `network` commands annotate each captured record with every matching entry and its extracted values. The conformance fixtures do not yet exercise live evaluation.
 
 ## Open questions
 

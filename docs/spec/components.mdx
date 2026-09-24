@@ -17,7 +17,7 @@ A component is a named DOM subtree, identified by one or more CSS selectors. Nam
       selector: '[role="gridcell"]'
 ```
 
-`name` and `selector` are required. See [Schema reference](/reference/schema#component) for the full field list, including `description`, `source`, `memory`, and `properties`.
+`name` and `selector` are required. See [Schema reference](/reference/schema#component) for the full field list, including `description`, `source`, `memory`, `properties`, `tags`, and `stability`.
 
 ## Selectors
 
@@ -38,6 +38,8 @@ A component is a named DOM subtree, identified by one or more CSS selectors. Nam
 Use the array form to keep one name across UI variants, such as a redesigned page, a feature flag, or a third-party widget. Sightmap tries each selector in order and uses the first one that matches one or more elements.
 
 If a selector matches multiple elements, all matches get the name. Selectors are not required to be unique.
+
+Selectors match against the captured component tree, which is a flattened representation: each shadow root's content appears as ordinary children of its host. Selectors therefore match across shadow boundaries with no piercing syntax. A tool that re-implements matching against the live DOM MUST traverse shadow roots to agree with the corpus. See [Selector semantics](/reference/schema#selector-semantics).
 
 ## The `data-component` convention
 
@@ -132,25 +134,71 @@ See the [schema reference](/reference/schema#component-references) for the full 
 
 ## Properties
 
-A component can declare `properties:` — named values pulled from its matched element and shown alongside the name in enriched snapshots, so an agent sees not just *what* matched but *what state it is in*:
+A component can declare `properties:`, which are named values shown alongside the component name in enriched snapshots. An agent then sees what matched and what state it is in, such as `[DateFilterButton label="This Weekend"]`.
+
+Property values resolve **over the component tree**. A value comes from the matched component's own node or from the properties of components nested beneath it, never from arbitrary DOM. Resolution therefore works offline against a serialized tree, and on any UI platform that produces one.
 
 ```yaml
 - name: DateFilterButton
   selector: '[data-testid="date-filter-button"]'
   properties:
     - name: label
-      extract: text          # → [DateFilterButton label="This Weekend"]
+      extract: text              # → [DateFilterButton label="This Weekend"]
+
 - name: ProductCard
   selector: '[data-testid="product-pod"]'
   properties:
     - name: price
-      extract: '[data-testid="price"]'   # a CSS sub-selector, read from the child
-      transform: first_dollar
+      extract: Price.text        # a property of the Price child
     - name: sold_out
-      extract: 'exists:[aria-label="Sold Out"]'   # boolean flag; omitted when absent
+      extract: exists:SoldOutBadge   # "true" when the child matched; omitted otherwise
+  children:
+    - name: Price
+      selector: '[data-testid="price"]'
+      properties:
+        - name: text
+          extract: text
+    - name: SoldOutBadge
+      selector: '[aria-label="Sold Out"]'
 ```
 
-Each property has a `name` (the annotation key), an `extract` directive (`text`, `inner_text`, `text_only`, `inner_html`, `attr=NAME`, `exists:SEL`, or a CSS sub-selector), and an optional `transform` (`first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`). Extraction runs on the exact matched element, from the live DOM at snapshot time — offline tools omit the values. A value that comes back empty (or an `exists:`/sub-selector that finds nothing) is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md).
+Each property has a `name` and an `extract` directive. `name` must match `^[a-z][a-z0-9_]*$` and be unique within the component. `extract` must be exactly one of these forms; validation rejects any other value:
+
+| Form | Resolves to |
+|---|---|
+| `text` | The node's accessible text (its accessible name) |
+| `raw_text` | The node's own literal text: its direct text-node children, whitespace-normalized |
+| `attr=NAME` | The value of attribute `NAME` in the node's observed attribute set |
+| `PATH.prop` | The value of property `prop` on the descendant component addressed by `PATH` |
+| `exists:PATH` | `"true"` when `PATH` resolves to at least one matched component |
+
+`PATH` is a dotted sequence of component names, such as `Price` or `Row.Price`. Each segment resolves to the first match, in document order, within the previous segment's matched subtree. References only descend: a property can address a component nested beneath the one that declares it, never a parent, sibling, or cousin. To read a value from a sub-element, declare that sub-element as a child component and reference its property.
+
+The attribute set that `attr=NAME` reads is implementation-defined. A web consumer might carry a fixed allowlist plus `aria-*` and `data-*` attributes, and other platforms carry synthetic attributes. An attribute the consumer did not carry is indistinguishable from an absent one.
+
+### `text` vs `raw_text`
+
+`text` is the accessible name, which is what a user perceives as the label. It can include text from `aria-label`, an associated `<label>`, or CSS `::before`/`::after` content. `raw_text` is the node's own author-written text. It excludes descendant elements and pseudo-element content, and every consumer computes it identically, live or offline.
+
+Use `text` when the accessible name is the value you want, such as an icon button labeled only by `aria-label`. Use `raw_text` when the accessible name includes extra text. For example, a heading `<h3>Main</h3>` with a `::after` badge reading "Most popular" has the accessible name "Main Most popular", while its `raw_text` is "Main". See [SEP-0013](https://github.com/sightmap/sightmap/blob/main/spec/seps/0013-richer-node-data.md).
+
+### Omission and the reserved `value` name
+
+Value omission is silent. When a property's text is empty, its attribute is not carried, or its `PATH` matches nothing, the property is dropped from the annotation. Consumers MUST NOT treat omission as an error.
+
+The name `value` is reserved. You can declare it to override the accessibility tree's own value, and implementations MUST prefer a declared `value` over the AX value.
+
+<Note>
+This tree-closed model is defined by [SEP-0010](https://github.com/sightmap/sightmap/blob/main/spec/seps/0010-tree-closed-component-properties.md), which supersedes the extraction model of [SEP-0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md). The earlier DOM modes (`inner_text`, `text_only`, `inner_html`, and bare CSS sub-selectors) and the `transform` field are no longer valid. To migrate, promote the sub-element to a child component and reference it with `PATH.prop` or `exists:PATH`.
+</Note>
+
+See the [schema reference](/reference/schema#component-properties) for the normative statement.
+
+## Tags and stability
+
+A component can carry `tags:`, a list of open-vocabulary classification labels such as `defect`. Tags resolve differently from names. A node's name comes from the nearest enclosing match, but its tags are the union across every matching ancestor level. A `SubmitButton` child of a `CheckoutForm` tagged `defect` resolves to `name: SubmitButton` and `tags: [defect]`. Implementations deduplicate the resolved set and SHOULD emit it in sorted order. See [Tags](/reference/schema#tags) and [SEP-0004](https://github.com/sightmap/sightmap/blob/main/spec/seps/0004-component-tags.md).
+
+`stability` records how much you trust a selector: `uncertain` means it is a best guess, and `unstable` means it is known to break across renders. Omit it for a stable component. It is advisory and does not change matching. See [Stability](/reference/schema#stability).
 
 ## Dependencies
 

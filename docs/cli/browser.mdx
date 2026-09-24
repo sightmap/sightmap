@@ -7,24 +7,24 @@ description: "Install Chrome for Testing, start and stop sightmap sessions, navi
 `sightmap browser` manages the Chrome for Testing session used by live commands. Sightmap records the session in `.sightmap/.session`. By default, Chrome exposes its DevTools endpoint on `localhost:7892`; `browser start` also runs the Sightmap HTTP server on port `7891` for the overlay extension.
 
 <Note>
-This page covers session management. See [Page interaction](/cli/interaction) for `click`, `fill`, `screenshot`, `bounds`, and tab management. See [Capturing pages](/cli/capture) for annotated component trees. Page commands also accept `--addr` and `--tab`; see the [shared conventions](/cli/overview).
+This page covers session management. See [Page interaction](/cli/interaction) for `click`, `fill`, `screenshot`, `bounds`, and tab management. See [Capturing pages](/cli/capture) for annotated component trees. Page commands also accept `--addr`, `--tab`, and `--sightmap-dir`; see the [shared conventions](/cli/overview).
 </Note>
 
 ---
 
 ### `browser install`
 
-Downloads the latest stable Chrome for Testing into `~/.sightmap/browsers/` and prints the path to the installed binary. Idempotent: if the current stable version is already installed, it prints the path and exits `0`. Takes no flags.
+Downloads the latest stable Chrome for Testing into `~/.sightmap/browsers/` and prints the path to the installed binary. Idempotent: if the current stable version is already installed, it prints `Already installed: PATH` and the path, and exits `0`. On a platform with no Stable build (currently linux-arm64), it warns and falls back to the next available channel. Takes no flags.
 
 ```bash
 sightmap browser install
 ```
 
 ```text
-Resolving latest Chrome for Testing (Stable)...
-  version: 151.0.7922.47  platform: mac-arm64
+Resolving latest Chrome for Testing...
+  version: 151.0.7922.47  platform: mac-arm64  channel: Stable
 Downloading https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.47/mac-arm64/chrome-mac-arm64.zip
-    5%  8 / 178 MB     25%  44 / 178 MB     50%  89 / 178 MB     75%  133 / 178 MB    100%  178 / 178 MB
+  100%  178 / 178 MB
 Extracting...
 Installed: /Users/you/.sightmap/browsers/chrome-151.0.7922.47/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
 /Users/you/.sightmap/browsers/chrome-151.0.7922.47/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing
@@ -36,38 +36,71 @@ The final line is the binary path on stdout, so scripts can capture it; progress
 
 ### `browser start`
 
-`start` launches Chrome, starts the Sightmap HTTP server, and loads the overlay extension. The extension is embedded in the binary and extracted to `~/.sightmap/extension/` when needed. The server recompiles the corpus after YAML changes under `.sightmap/`. `start` runs in the foreground until you press Ctrl-C, which stops Chrome and the server.
+`start` launches Chrome, starts the Sightmap HTTP server, and loads the overlay extension. The extension is embedded in the binary and extracted to `~/.sightmap/extension/` when needed. The server recompiles the corpus after YAML changes under `.sightmap/`.
 
 The `start` daemon owns the session: it is the only way to launch Chrome for sightmap, and every live command attaches to it. It also runs the console/network **collector** that buffers browser activity for the [`console` and `network`](/cli/devtools) commands, so those need a running `start` session.
 
-Run it from the site directory (the one containing `.sightmap/`), typically in a second terminal or as a background job. `start` creates `.sightmap/` if it is absent and records the session at `.sightmap/.session`; if it cannot persist that file it fails loudly rather than running sessionless. Every other command finds the session through this file, keyed by `--sightmap-dir` — so with no session file a command falls back to the default CDP port and **warns**, since a session answering there may belong to a different corpus or agent. Pass `--addr` to target a specific session explicitly.
+Plain `start` is a foreground daemon: it holds the shell until you press Ctrl-C, which stops Chrome and the server. In scripts and agent harnesses, pass `--detach` instead. It launches the daemon in the background, in its own process session so it outlives the launching shell, waits until Chrome and the server both answer, and then returns. Stop a detached session with [`browser stop`](#browser-stop).
+
+Run it from the site directory (the one containing `.sightmap/`). `start` creates `.sightmap/` if it is absent and records the session at `.sightmap/.session`; if it cannot persist that file it fails loudly rather than running sessionless. Every other command finds the session through this file, keyed by `--sightmap-dir`. With no session file, a command falls back to the default CDP port and **warns**, since a session answering there may belong to a different corpus or agent. Pass `--addr` to target a specific session explicitly.
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--detach` | off | Run the daemon in the background and return once it is ready. Use this in scripts and agents. |
+| `--log-file` | `~/.sightmap/logs/<site>-daemon.log` | With `--detach`, where the daemon writes its output. `<site>` is the name of the directory containing `.sightmap/`. |
 | `--port` | `7891` | Sightmap HTTP server port (`0` = auto-allocate) |
 | `--cdp-port` | `7892` | Chrome remote debugging port (`0` = auto-allocate) |
 | `--sightmap-dir` | `.sightmap` | Path to the corpus directory |
-| `--extensions` | embedded overlay | Comma-separated extension paths to load instead of the embedded overlay extension |
 | `--url` | none | Navigate here after launch |
-| `--profile` | per-site directory under `~/.sightmap/profiles/` | Chrome user data dir |
-| `--headless` | off | Run Chrome headless |
 | `--wait` | `0` | Seconds to wait after navigation |
+| `--headless` | off | Run Chrome headless |
+| `--profile` | `~/.sightmap/profiles/<site>` | Chrome user data dir. `<site>` is `name:` from `.sightmap/config.yaml`, else the current directory's name. |
+| `--extensions` | embedded overlay | Comma-separated extension paths to load instead of the embedded overlay extension |
+| `--chrome-binary` | auto-detected | Path to a specific Chrome binary |
+| `--chrome-flag` | none | Extra flag to pass to Chrome; repeatable, e.g. `--chrome-flag=--no-sandbox` |
+| `--attach` | none | Attach to an already-running Chrome's CDP endpoint (`host:port`) instead of launching one. See [Attach mode](#attach-to-an-existing-chrome). |
+
+A busy `--port` or `--cdp-port` slides to the next free port; `0` lets the OS pick one. Either way, `start` prints the ports it actually bound and records them in the session file. `.sightmap/config.yaml` can set defaults for `--port` (`browser.port`) and `--wait` (`snapshot.wait`).
+
+Launch details:
+
+- Chrome resolution prefers the managed Chrome for Testing from `browser install`, then a system Chrome. `--chrome-binary` overrides both.
+- On Linux with neither `$DISPLAY` nor `$WAYLAND_DISPLAY` set, `start` runs headless automatically and prints a note.
+- Running as root adds `--no-sandbox`. If Chrome fails because the host blocks its sandbox, the error suggests `--chrome-flag=--no-sandbox`. `--chrome-flag` values are appended last, so they can override the defaults.
+- Headful Chrome launches with window-occlusion detection and background throttling disabled, so a window hidden behind your editor keeps rendering and running `requestAnimationFrame`. A background tab can still be throttled; use [`browser front`](#browser-front) for that.
+- The collector enables CDP focus emulation on every tab, so `document.hasFocus()` returns `true` even when the window does not hold OS focus. Widgets that open only on focus can be driven from an unfocused or headless session.
 
 ```bash
 cd sites/shop.example.com/
+sightmap browser start --detach --url 'https://shop.example.com'
+```
+
+```text
+● detached  cdp=7892  server=7891  daemon-pid=84190
+  log:  /Users/you/.sightmap/logs/shop.example.com-daemon.log
+  The daemon runs in the background and survives this shell.
+  Drive it with other 'sightmap browser' commands; stop it with 'sightmap browser stop'.
+```
+
+`--detach` is idempotent. When a live daemon already owns this corpus, it prints `● already running  cdp=7892  server=7891  (see 'sightmap browser status')` and returns without starting another. If the daemon exits early or is not ready within 25 seconds, `start --detach` fails and prints the tail of the daemon log.
+
+In the foreground, `start` prints the tab ID and keeps running:
+
+```bash
 sightmap browser start --url 'https://shop.example.com'
 ```
 
 ```text
-[serve-sightmap] listening on http://:7891
+[serve-sightmap] listening on http://127.0.0.1:7891
 ● ready  port=7891  cdp=7892  pid=84210  tab=8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D
   Addr: --addr localhost:7892
   Tab:  --tab 8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D  (pass this on commands once other agents open tabs here)
-  Press Ctrl-C to stop.
+  This is a foreground daemon — it holds THIS shell until you Ctrl-C.
+  Run other 'sightmap browser' commands from a DIFFERENT shell, or launch with --detach in scripts/agents.
 ```
 
 <Note>
-If Chrome is already running for this site, `start` opens a new tab in the existing session and prints that tab's ID:
+If Chrome is already running for this site, a foreground `start` opens a new tab in the existing session, prints that tab's ID, and exits:
 
 ```text
 ● tab    cdp=7892  tab=F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A
@@ -75,14 +108,34 @@ If Chrome is already running for this site, `start` opens a new tab in the exist
   Pass --tab F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A on EVERY command this session — other tabs belong to other agents.
 ```
 
-Pass that ID as `--tab` on every subsequent page command.
+Pass that ID as `--tab` on every subsequent page command. To open a tab from a script, use `browser tabs new`, which prints only the new tab ID.
 </Note>
+
+#### Attach to an existing Chrome
+
+`--attach host:port` runs the daemon against a Chrome you launched yourself with `--remote-debugging-port`. The Sightmap server and collector work as usual. This is a degraded mode: sightmap does not own the profile or guarantee the overlay extension, console and network capture begin when you attach, and `browser stop` or Ctrl-C detaches without closing the browser. With `--url`, it opens its own tab instead of using yours. Attach mode always runs in the foreground; `--detach` has no effect with `--attach`.
+
+```bash
+sightmap browser start --attach localhost:9222
+```
+
+```text
+[serve-sightmap] listening on http://127.0.0.1:7891
+● attached  cdp=localhost:9222  server=7891  tab=
+  Addr: --addr localhost:9222
+  Degraded mode: browser is caller-owned; console/network capture is live from now on.
+  Press Ctrl-C (or 'browser stop') to detach — the browser is left running.
+```
 
 ---
 
 ### `browser stop`
 
-Stops the session's Chrome process group. If needed, it finds remaining processes by profile directory. It removes the session file after Chrome stops. Takes no flags.
+Stops the session's Chrome process group. If needed, it finds remaining processes by profile directory. It removes the session file after Chrome stops. For an `--attach` session it signals the daemon to detach, prints `detached (browser left running)`, and leaves the browser open.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to stop |
 
 ```bash
 sightmap browser stop
@@ -99,18 +152,19 @@ With no session running it prints `no active session` and exits `0`.
 
 ### `browser status`
 
-Reports session health by probing the CDP endpoint and lists each open content tab with its `--tab` value. If Chrome is gone, it prints `✗ unreachable`, removes the stale session file, and tells you to run `browser start` again.
+Reports session health by probing the CDP endpoint and the Sightmap server, and lists each open content tab with its `--tab` value. If Chrome is gone, it prints `✗ unreachable`, removes the stale session file, and tells you to run `browser start` again.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--tab` | none | Mark this tab in the status output |
+| `--tab` | none | Mark this tab with `→` in the tab list |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to report |
 
 ```bash
 sightmap browser status
 ```
 
 ```text
-● running  cdp=7892  pid=84210
+● running  cdp=7892  server=7891  pid=84210
   profile: /Users/you/.sightmap/profiles/shop.example.com
   tabs (2):
     --tab 8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D  https://shop.example.com/
@@ -118,18 +172,23 @@ sightmap browser status
   multiple tabs open — pass --tab <ID> on page commands to avoid crosstalk.
 ```
 
-With no session it prints `○ no session`. If a Chrome process for the site's profile is still alive without a session file, it reports `⚠ orphan` and points you at `browser stop` to reap it.
+Other states:
+
+- `○ no session` means no session file exists.
+- `⚠ orphan` means a Chrome process for the site's profile is alive without a session file. Run `browser stop` to reap it.
+- `⚠ degraded` means Chrome answers but the Sightmap server does not, usually because the daemon was killed with its shell. Console and network capture and live corpus reload are unavailable. Run `browser stop`, then `browser start --detach`.
 
 ---
 
 ### `browser navigate`
 
-Navigates the session to a URL and waits for the page to load. The URL is a positional argument. After a redirect — server-side or client-side (an SPA auth guard bouncing `/login → /`, or `/ → /workspace`) — `navigate` prints the requested and final URLs, so you know where you actually landed.
+Navigates the session to a URL and waits for the page load event. The URL is a positional argument. After a redirect, `navigate` prints both the requested and the final URL, so you know where you actually landed. This covers server-side redirects and client-side redirects that fire within 2 seconds of load, such as an SPA auth guard bouncing `/login → /`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--tab` | the lone content tab | Target tab ID |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to use |
 
 ```bash
 sightmap browser navigate 'https://shop.example.com/deals'
@@ -146,16 +205,38 @@ navigated to https://shop.example.com/deals
 
 ---
 
+### `browser front`
+
+Brings the tab to the front (CDP `Page.bringToFront`). A background tab reports `visibilityState` `"hidden"`, and Chrome stops running `requestAnimationFrame` in it. Frame-dependent interactions then fail silently: scrolling does not paint, hit-testing reads a stale layout, and animated widgets never finish opening or committing. Run `front` when interactions on a background tab behave this way. `activate` is an alias.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | the session for `--sightmap-dir` | CDP address |
+| `--tab` | the lone content tab | Target tab ID |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to use |
+
+```bash
+sightmap browser front --tab F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A
+```
+
+```text
+brought tab to front
+```
+
+---
+
 ### `browser eval`
 
-Evaluates a JavaScript expression in the page context. The script is a positional argument. The command pretty-prints JSON objects and arrays.
+Evaluates a JavaScript expression in the page context. The script is a positional argument. If the expression returns a Promise, such as an async IIFE, `eval` awaits it and prints the settled value. The command pretty-prints JSON values and exits `1` on a thrown exception (`EvalJSON: JS exception: ...`).
 
 Only JSON-serializable values can be returned. A DOM element reference such as `document.querySelector(...)` cannot be returned by value; extract a property such as `document.querySelector('h1')?.textContent`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--tab` | the lone content tab | Target tab ID |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to use |
+| `--timeout-ms` | `30000` | Upper bound on the evaluation, including an awaited Promise. Raise it for a long-running awaited action. |
 
 ```bash
 sightmap browser eval '({url: location.href, title: document.title})'
@@ -168,65 +249,95 @@ sightmap browser eval '({url: location.href, title: document.title})'
 }
 ```
 
+When an evaluation hits its deadline, `eval` sends the tab a trivial probe. If the probe also times out, the renderer has likely crashed or its main thread is stuck, and the error says so:
+
+```text
+sightmap browser: cdp: Runtime.evaluate: context deadline exceeded
+  the tab is UNRESPONSIVE — a trivial follow-up probe also timed out, so the renderer has likely CRASHED (e.g. RESULT_CODE_KILLED_BAD_MESSAGE from a bad Mojo message) or its main thread is wedged. Browser-level CDP still answers; the page does not. Recover: reload it ('browser navigate <url>') or restart ('browser stop' then 'browser start').
+```
+
+If the probe answers, the page was only slow and the original error prints unchanged.
+
 ---
 
 ### `browser inject`
 
-Injects a script into the page. Where `eval` runs once in the current document, `inject --persist` registers the script with the session daemon so it re-runs at the start of **every new document, in every tab, for the life of the session** — surviving navigations. It is backed by CDP `Page.addScriptToEvaluateOnNewDocument`, held on the daemon's session-lifetime connection (a script added over a per-command connection would be dropped the moment that command exits). Handy for polyfills, overlays, and instrumentation or experimentation bundles that must outlive a multi-page flow.
+Injects a script into the page. Where `eval` runs once in the current document, `inject --persist` registers the script with the session daemon so it re-runs at the start of **every new document, in every tab, for the life of the session**, surviving navigations. It is backed by CDP `Page.addScriptToEvaluateOnNewDocument`, held on the daemon's session-lifetime connection. A script added over a per-command connection would be dropped when that command exits. Use it for polyfills, overlays, and instrumentation or experimentation bundles that must outlive a multi-page flow. `add-script` is an alias.
 
-Provide the source as an inline positional argument or with `--file`. `--persist` also runs the script once in the currently-loaded document (best-effort), since `addScriptToEvaluateOnNewDocument` only affects future documents.
+Provide the source as an inline positional argument or with `--file`. `--persist` also runs the script once in the currently loaded document (best effort), since `addScriptToEvaluateOnNewDocument` only affects future documents.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--file` | — | Read the script source from this file instead of an inline arg |
-| `--persist` | `false` | Re-inject on every new document and new tab for the whole session |
-| `--remove` | — | Remove a previously-persisted script by its id |
-| `--list` | `false` | List the scripts currently persisted for this session |
-| `--addr` | `localhost:7892` | CDP address (one-shot run) |
+| `--file` | none | Read the script source from this file instead of an inline arg |
+| `--persist` | off | Re-inject on every new document and new tab for the whole session |
+| `--remove` | none | Remove a previously persisted script by its ID |
+| `--list` | off | List the scripts currently persisted for this session |
+| `--addr` | the session for `--sightmap-dir` | CDP address (one-shot run) |
 | `--tab` | the lone content tab | Target tab ID (one-shot run) |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to use |
 
 `--persist`, `--remove`, and `--list` require a running `browser start` session, since the registry lives in its daemon.
 
 ```bash
-# Register a bundle that re-applies on every navigation, and print its id.
 sightmap browser inject --file ./runtime.js --persist
-# inject: persisted as inj-1 — re-injected on every new document; remove with 'browser inject --remove inj-1'
+```
 
+```text
+inject: persisted as inj-1 — re-injected on every new document; remove with 'browser inject --remove inj-1'
+inject: also ran once in the current document
+```
+
+List and remove persisted scripts by ID:
+
+```bash
 sightmap browser inject --list
 sightmap browser inject --remove inj-1
+```
+
+```text
+inj-1  (18342 bytes, 2 tab(s))
+inject: removed inj-1
 ```
 
 ---
 
 ### `browser mcp`
 
-Enumerate and call the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools a page exposes. A page can declare callable actions to an in-browser agent through `document.modelContext` (`getTools()` / `executeTool()`); `mcp list` reads them and `mcp call` invokes one — so you can call a named action instead of driving the UI blind.
+Enumerates and calls the [WebMCP](https://webmachinelearning.github.io/webmcp/) tools a page exposes. A page can declare callable actions to an in-browser agent through `document.modelContext` (`getTools()` / `executeTool()`). `mcp list` reads them and `mcp call` invokes one, so you can call a named action instead of driving the UI blind.
 
-`mcp list` distinguishes three states: **native** WebMCP (a browser-provided `document.modelContext`), a **polyfilled** one (provided by a page script), and **absent**. When absent it fails loudly with the Chrome flag that enables native WebMCP. One tool runs at a single point in time; WebMCP has no cross-navigation tool responses, so if a tool triggers a client-side navigation, re-run `mcp list` on the new view. Any guidance the tool returns (e.g. a hint toward the next tool) is part of its result.
+`mcp list` distinguishes three states: **native** WebMCP (a browser-provided `document.modelContext`), a **polyfilled** one (provided by a page script), and **absent**. When absent it fails loudly with the Chrome flag that enables native WebMCP. A tool call runs at a single point in time, and WebMCP has no cross-navigation tool responses. If a tool triggers a client-side navigation, re-run `mcp list` on the new view. Any guidance the tool returns, such as a hint toward the next tool, is part of its result.
 
-Google Chrome ships native WebMCP off, behind `chrome://flags/#enable-webmcp-testing`. Start the session with the equivalent switch (the managed Chrome for Testing from `browser install` has it on by default):
+Google Chrome ships native WebMCP off, behind `chrome://flags/#enable-webmcp-testing`. Start the session with the equivalent switch. The managed Chrome for Testing from `browser install` has it on by default.
 
 ```bash
-sightmap browser start --chrome-flag=--enable-features=WebMCPTesting
+sightmap browser start --detach --chrome-flag=--enable-features=WebMCPTesting
 ```
 
 | Command | Flags | Description |
 |---------|-------|-------------|
-| `mcp list` | `--json` | Enumerate exposed tools (name, description, input schema). `--json` emits the full schemas. |
-| `mcp call <tool>` | `--args JSON`, `--param k=v`, `--json` | Invoke a tool via `executeTool` and print its result. Supply arguments as a JSON object (`--args`) and/or repeatable `--param key=value` pairs (each value parsed as JSON when possible, else a string) layered over `--args`. |
+| `mcp list` | `--json` | Enumerate exposed tools (name, description, input schema). `--json` emits the full tool list with schemas. |
+| `mcp call <tool>` | `--args JSON`, `--param k=v`, `--json` | Invoke a tool via `executeTool` and print its result. Supply arguments as a JSON object (`--args`, default `{}`) and/or repeatable `--param key=value` pairs, each value parsed as JSON when possible and otherwise used as a string. `--param` values are merged over `--args`. |
 
-Tools return the standard WebMCP `CallToolResult` envelope (`{ content, isError }`). `mcp call` unwraps it — rendering the text/structured content (and any guidance the tool includes) as itself rather than a stringified blob — and **exits non-zero when the tool reports `isError`**, so it is scriptable. `--json` prints the raw envelope verbatim.
+Both subcommands also accept `--addr`, `--tab`, and `--sightmap-dir` like the other page commands. Each call is bounded at 30 seconds.
+
+Tools return the standard WebMCP `CallToolResult` envelope (`{ content, isError }`). `mcp call` unwraps it, rendering the text or structured content and any guidance the tool includes as-is rather than as a stringified blob. It **exits non-zero when the tool reports `isError`**, so it is scriptable. `--json` prints the raw result verbatim.
 
 ```bash
 sightmap browser mcp list
-# WebMCP (polyfilled) — 1 tool(s):
-#   search — Search flights by route
-
-sightmap browser mcp call search --args '{"query": "ATL to LHR"}'
-sightmap browser mcp call search --param query="ATL to LHR"   # equivalent
 ```
 
-Both accept `--addr` and `--tab` like the other page commands.
+```text
+WebMCP (polyfilled) — 1 tool(s):
+  search — Search flights by route
+(use --json for full input schemas; call one with 'browser mcp call <tool> --args {…}')
+```
+
+These two calls are equivalent:
+
+```bash
+sightmap browser mcp call search --args '{"query": "ATL to LHR"}'
+sightmap browser mcp call search --param query="ATL to LHR"
+```
 
 ---
 
@@ -236,8 +347,9 @@ Clears all cookies, including `httpOnly` cookies, and clears storage for one ori
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--tab` | the lone content tab | Target tab ID |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to use |
 | `--origin` | current page origin | Origin whose storage to clear |
 
 ```bash
@@ -257,15 +369,15 @@ clear-storage: done — navigate to homepage and wait before accessing protected
     `sightmap browser install` downloads Chrome for Testing to `~/.sightmap/browsers/`.
   </Step>
   <Step title="Start the session">
-    From the site directory, run `sightmap browser start`. Note the `--addr` and `--tab` values it prints.
+    From the site directory, run `sightmap browser start --detach`, or plain `sightmap browser start` in a terminal of its own.
   </Step>
   <Step title="Check health">
-    `sightmap browser status` confirms `● running` and lists open tabs.
+    `sightmap browser status` confirms `● running` and lists open tabs with their `--tab` values.
   </Step>
   <Step title="Navigate and work">
     `sightmap browser navigate 'https://...'`, then capture and interact ([Capturing pages](/cli/capture), [Page interaction](/cli/interaction)).
   </Step>
   <Step title="Stop when done">
-    Ctrl-C in the `start` terminal, or `sightmap browser stop` from anywhere in the site directory.
+    `sightmap browser stop` from the site directory, or Ctrl-C in the terminal running a foreground `start`.
   </Step>
 </Steps>

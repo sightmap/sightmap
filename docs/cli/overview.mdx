@@ -20,7 +20,7 @@ See [Install the Sightmap CLI](/start/install) for all install options. To insta
 sightmap browser fill --clear SearchInput 'garden hose'
 ```
 
-Commands backed by Go flag sets accept single-dash (`-url`) and double-dash (`--url`) spellings. `browser navigate` and `browser eval` parse `--addr` and `--tab` directly, so use the double-dash form shown in this reference.
+Commands backed by Go flag sets accept single-dash (`-url`) and double-dash (`--url`) spellings, with the value after a space or `=`. A few commands parse their flags directly instead: `browser navigate`, `front`, `eval`, `status`, and `stop`, and `browser tabs list`, `new`, and `close`. For those, use the double-dash form with a space-separated value, such as `--tab ID` rather than `--tab=ID`.
 
 **Run commands from the site directory.** Most commands read the corpus from `--sightmap-dir`, which defaults to `.sightmap` in the current directory.
 
@@ -29,13 +29,13 @@ Several flags appear in multiple command groups:
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--sightmap-dir` | `.sightmap` | Path to the corpus directory |
-| `--addr` | `localhost:7892` | CDP address of the Chrome session (printed by `browser start`) |
+| `--addr` | the session recorded for `--sightmap-dir` | CDP address of the Chrome session (printed by `browser start`). With no session file, commands fall back to `localhost:7892`, and most print a warning. |
 | `--tab` | the lone content tab | Target tab ID; required whenever two or more content tabs are open |
 | `--include-hidden` | off | Count hidden and off-screen nodes too |
 
-**Address sessions by port and tab.** `sightmap browser start` launches Chrome with its DevTools endpoint on `localhost:7892` and the Sightmap HTTP server on port `7891`. Live commands use `--addr` to reach the session. When more than one content tab is open, page commands require `--tab` with the tab ID printed by `browser start`. See [Browser sessions](/cli/browser).
+**Address sessions by port and tab.** `sightmap browser start` launches Chrome with its DevTools endpoint on `localhost:7892` and the Sightmap HTTP server on port `7891` by default, sliding to the next free port when one is busy, and records the ports it bound in `.sightmap/.session`. Live commands read that file to reach the session; pass `--addr` to target a different one. When more than one content tab is open, page commands require `--tab` with the tab ID printed by `browser start`. See [Browser sessions](/cli/browser).
 
-**`browser start` is the only launcher.** Live commands attach to a session you started; there is no auto-launch. When none is running they stop with `Start a session first: sightmap browser start`. That single owner also hosts the console/network collector behind the [devtools commands](/cli/devtools).
+**`browser start` is the only launcher.** Live commands attach to a session you started; there is no auto-launch. When none is running they stop with `Start a session first: sightmap browser start`. That single owner also hosts the console/network collector behind the [devtools commands](/cli/devtools). Plain `start` holds its shell until Ctrl-C; in scripts and agents, run `sightmap browser start --detach`, which returns once the session is ready.
 
 <Note>
 **Vocabulary.** A sightmap **view** is a route-scoped definition in the corpus; a browser **tab** is a live page in the session. They are different things — the [glossary](/reference/glossary) disambiguates `view`, `tab`, and related terms.
@@ -94,9 +94,30 @@ A page with no interactive nodes renders the `∅` mark (rather than `✓`/`✗`
   </Card>
 </CardGroup>
 
----
+## Command index
 
-`sightmap version` prints the build version and exits. See [Integration](/cli/integrate).
+Every command the `sightmap` binary dispatches, grouped by reference page. Run `sightmap <command> --help` (or `sightmap browser <subcommand> --help`) for the full flag list.
+
+| Command | What it does | Reference |
+|---------|--------------|-----------|
+| `browser install` | Download Chrome for Testing | [Browser sessions](/cli/browser) |
+| `browser start` / `stop` / `status` | Launch, stop, and inspect the session daemon | [Browser sessions](/cli/browser) |
+| `browser navigate` / `front` / `eval` / `inject` | Load a URL, foreground the tab, run or persist page scripts | [Browser sessions](/cli/browser) |
+| `browser mcp list` / `call` | List and call a page's WebMCP tools | [Browser sessions](/cli/browser) |
+| `browser clear-storage` | Clear cookies and origin storage | [Browser sessions](/cli/browser) |
+| `browser click` / `fill` / `hover` / `keypress` / `scroll` / `drag` | Act on the live page | [Page interaction](/cli/interaction) |
+| `browser wait-for` / `dialog` | Wait for a postcondition; resolve a JS dialog | [Page interaction](/cli/interaction) |
+| `browser screenshot` / `bounds` | Capture the viewport; print component bounding boxes | [Page interaction](/cli/interaction) |
+| `browser tabs list` / `new` / `close` / `resize` | Manage the session's tabs | [Page interaction](/cli/interaction) |
+| `snapshot` / `capture` / `inspect` / `explain` | Observe, persist, or dump the page tree; explain one node's coverage and selector candidates | [Snapshot & capture](/cli/capture) |
+| `coverage` / `multi-coverage` / `report` | Measure T1/T2/T3 coverage | [Coverage](/cli/coverage) |
+| `capture-novelty` / `capture-prune` | Maintain each view's capture set | [View sets](/cli/snapshots) |
+| `suggest` / `gap` / `sel-probe` / `sel-check` | Find and verify selectors | [Selector tools](/cli/selectors) |
+| `init` / `validate` / `lint` / `stats` / `search` / `discover` | Scaffold, check, count, and search the corpus | [Corpus checks](/cli/corpus) |
+| `console list` / `get`, `network list` / `get` | Read captured console and network activity | [Devtools](/cli/devtools) |
+| `atlas` / `serve-sightmap` / `export` / `push` / `skills install` / `version` | Community corpora, the overlay server, corpus JSON export and upload, bundled skills, version | [Integration](/cli/integrate) |
+
+Aliases: `browser front` is also `activate`, `browser inject` is also `add-script`, `browser keypress` is also `key-press`, and several hyphenated commands also accept underscore spellings (`sel_probe`, `multi_coverage`, `browser wait_for`, …).
 
 ## Typical flow
 
@@ -105,7 +126,7 @@ A page with no interactive nodes renders the `∅` mark (rather than `✓`/`✗`
     Install the CLI ([Install](/start/install)), then `sightmap browser install` to download Chrome for Testing.
   </Step>
   <Step title="Start a session">
-    From the site directory, run `sightmap browser start`. It launches Chrome, the Sightmap server, and the overlay extension ([Browser sessions](/cli/browser)).
+    From the site directory, run `sightmap browser start --detach` (or plain `start` in a terminal of its own). It launches Chrome, the Sightmap server, and the overlay extension ([Browser sessions](/cli/browser)).
   </Step>
   <Step title="Iterate on pages">
     Observe annotated snapshots and close coverage gaps with `snapshot --coverage`, then persist captures with `capture` and the selector tools ([Snapshot & capture](/cli/capture), [Coverage](/cli/coverage)).

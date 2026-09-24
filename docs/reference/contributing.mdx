@@ -37,6 +37,22 @@ Changes such as adding or renaming a field, changing route or merge semantics, o
 
 AI-assisted contributions (including SEP drafts) are accepted as long as you've read the output yourself and can defend it under review.
 
+### Current SEPs
+
+The status column shows the `status` recorded in each SEP's front matter. For what the format contains today, [`spec/v1/schema.md`](/reference/schema) is normative, and it already includes shapes from some SEPs still marked Draft.
+
+| SEP | Topic | Status |
+|---|---|---|
+| [0001](https://github.com/sightmap/sightmap/blob/main/spec/seps/0001-dependencies-field.md) | `dependencies[]` on views and components | Draft |
+| [0002](https://github.com/sightmap/sightmap/blob/main/spec/seps/0002-component-ref.md) | Component references via `$ref` | Draft |
+| [0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md) | Component `properties[]` | Accepted; its extraction model is superseded by SEP-0010 |
+| [0004](https://github.com/sightmap/sightmap/blob/main/spec/seps/0004-component-tags.md) | Classification `tags[]` | Draft |
+| [0005](https://github.com/sightmap/sightmap/blob/main/spec/seps/0005-request-properties.md) | Request `properties[]` | Draft |
+| [0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md) | Console/exception `messages[]` | Accepted; amended by SEP-0010 |
+| [0007](https://github.com/sightmap/sightmap/blob/main/spec/seps/0007-signals.md) | `signals[]` | Draft; only the component/view point-signal subset is in the spec |
+| [0010](https://github.com/sightmap/sightmap/blob/main/spec/seps/0010-tree-closed-component-properties.md) | Tree-closed component property extraction | Accepted |
+| [0013](https://github.com/sightmap/sightmap/blob/main/spec/seps/0013-richer-node-data.md) | `raw_text` and interactive-state node data | Accepted; `raw_text` has shipped, while interactive-state attributes and the pinned runtime `text` are pending |
+
 ## Pull request expectations
 
 - **One concern per PR.** If you fix two unrelated bugs, that's two PRs.

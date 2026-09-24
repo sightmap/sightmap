@@ -11,7 +11,7 @@ These commands work on one selector at a time. For the selector syntax the match
 </Note>
 
 <Note>
-**Selector subset.** Sightmap selectors support the descendant (space) and direct-child (`>`) combinators only, and exactly four pseudo-classes: `:not()`, `:is()`, `:where()`, and `:has()`. Positional pseudo-classes such as `:nth-child()` are errors at `validate` time.
+**Selector subset.** Sightmap selectors support the descendant (space) and direct-child (`>`) combinators only, and exactly four pseudo-classes: `:not()`, `:is()`, `:where()`, and `:has()`. The offline matcher evaluates `:has()` nested inside `:not()` or `:is()` (for example `div:not(:has(div))` to match only the innermost container) and descendant or child combinators inside `:not()` (for example `button:not(nav button)`). Sibling combinators (`+`, `~`), a top-level comma, and positional pseudo-classes such as `:nth-child()` are parse errors at `validate` time.
 </Note>
 
 ---
@@ -26,7 +26,7 @@ Pass `--exclude-known` to hide candidates already covered by a global component 
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning |
 | `--exclude-known` | off | Exclude elements already matched by a global component |
 | `--group` | off | Group candidates by nearest known ancestor component |
 | `--max` | `20` | Max candidates to show |
@@ -34,6 +34,8 @@ Pass `--exclude-known` to hide candidates already covered by a global component 
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
 | `--snap` | auto-detected | Path to a `.snap.tree.json` for grouping (newest in the current directory when omitted) |
 | `--tab` | — | Target tab ID (from `browser start` output) |
+| `--url` | — | Accepted but currently ignored: `suggest` scans the page already loaded in the tab. Navigate first with `sightmap browser navigate` |
+| `--wait` | `0` | Accepted but currently ignored |
 
 ```bash
 sightmap suggest --exclude-known
@@ -75,13 +77,13 @@ With `--scope COMPONENT`, the command reports unmatched interactive nodes (T2) i
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning |
 | `--include-hidden` | off | Include hidden/off-screen nodes in gap analysis |
 | `--scope` | — | Filter gaps to unmatched nodes within the named component's subtree |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
 | `--tab` | — | Target tab ID (from `browser start` output) |
 | `--url` | — | Navigate to this URL before extracting |
-| `--visible` | `true` | Deprecated: visible-only is now the default |
+| `--wait` | `0` | Extra seconds to wait before extracting |
 
 ```bash
 sightmap gap --url 'https://www.example.com/b/garden-hoses'
@@ -102,7 +104,7 @@ Gap analysis — 5 orphaned interactive nodes:
        inside: (no stable ancestor)
 ```
 
-When every visible interactive node is covered, the command prints `✓ no orphaned interactive nodes`. In scoped mode the header becomes `T2 gaps in [ComponentName] — N unmatched interactive elements:` and a clean result prints `✓ No T2 gaps in [ComponentName]`.
+When every visible interactive node is covered, the command prints `✓ no orphaned interactive nodes`, followed by a `⚠` line when only global components cover the page (no view models it). In scoped mode the header becomes `T2 gaps in [ComponentName] — N unmatched interactive elements:` and a clean result prints `✓ No T2 gaps in [ComponentName]`.
 
 <Tip>
 The `→` hint is unverified. Run it through `sel-probe` before writing YAML because a broad match can inflate coverage.
@@ -126,7 +128,7 @@ With `--all`, the command navigates to the corpus's snapshot targets. A view wit
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning |
 | `--all` | off | Probe the selector on every snapshot target declared by the corpus |
 | `--full` | off | Show full text (no truncation to 80 characters) |
 | `--max` | `10` | Max matches to query and show |

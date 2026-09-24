@@ -1,0 +1,56 @@
+---
+title: "Sightmap Signals: Named State Predicates Over Components and Views"
+sidebarTitle: "Signals"
+description: "Give tooling a named boolean to point at by referencing an existing component or view instead of redeclaring its selector or route."
+---
+
+A signal is a named, reference-based state predicate. It names an existing component or view in `ref:` and stands for the boolean of that entity's current state: the component is present, or the view's route is active.
+
+```yaml
+signals:
+  - name: checkout.reached
+    ref: Checkout           # a view: true while its route is active
+
+  - name: upsell.present
+    ref: UpsellModal        # a component: true while it matches
+    tags: [interstitial]
+```
+
+`name` and `ref` are required. See [Schema reference](/reference/schema#signal) for the normative statement.
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Semantic identity of the signal, which other tooling references. Signal names must be unique across the corpus. |
+| `ref` | yes | Name of an existing component or view. It must resolve to exactly one entity. |
+| `tags` | no | Open-vocabulary classification labels carried onto the signal. |
+
+`signals:` exists only at the file root. It has no view-scoped form.
+
+## What a signal is for
+
+A signal gives other tooling a named boolean to reference. Examples include a completion predicate ("done once `checkout.reached` holds"), an availability predicate ("offer the dismiss control while `upsell.present` holds"), and a session classification.
+
+A signal never redeclares a selector or route. A component ref evaluates exactly like a component match, and a view ref evaluates like a route match, so a signal is a named form of a predicate the matcher already computes. When the component's selector or the view's route changes, the signal follows it.
+
+## Resolving `ref`
+
+`ref` must resolve to exactly one component or view.
+
+| Condition | Diagnostic |
+|---|---|
+| `ref` matches no component or view | `signal-ref-unresolved` |
+| `ref` matches both a component and a view | `signal-ref-ambiguous` |
+
+A name that matches both kinds is rejected instead of resolved, because there is no rule for preferring one over the other.
+
+## Scope of this subset
+
+Stream `1` includes the smallest, dependency-free part of [SEP-0007](https://github.com/sightmap/sightmap/blob/main/spec/seps/0007-signals.md): point signals restricted to component and view refs. The broader proposal is still a Draft. It covers request and message refs, `filter:` constraints on an entity's properties, and temporal or window-based evaluation. None of those are in the spec yet. A `ref` to a request or message name does not resolve.
+
+<Note>
+Because the JSON Schema sets `additionalProperties: false`, a `signals:` entry with any key other than `name`, `ref`, or `tags` fails validation, including `filter:`.
+</Note>
+
+## Next
+
+[Memory](/spec/memory) covers the freeform notes you can attach to files, views, components, and requests.

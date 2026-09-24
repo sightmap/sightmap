@@ -7,7 +7,7 @@ description: "Click, fill, scroll, and screenshot a live page by probe ID, compo
 Once a session is running ([Browser sessions](/cli/browser)), these commands act on the live page: `click`, `fill`, `hover`, `keypress`, `scroll`, `drag`, `wait-for`, `dialog`, `screenshot`, `bounds`, and `tabs`. Most commands target a numeric probe ID from [`sightmap snapshot`](/cli/capture) or a component query, a CSS-shaped expression that matches Sightmap component names and properties.
 
 <Note>
-All commands on this page except `tabs` subcommands resolve a session with `--addr` (default `localhost:7892`) and `--tab`. Pass `--tab` whenever two or more content tabs are open. Session lifecycle commands are documented under [Browser sessions](/cli/browser).
+All commands on this page except `tabs` subcommands resolve a session with `--addr` and `--tab`. `--addr` defaults to the session recorded for `--sightmap-dir` (default `.sightmap`); with no session file it falls back to `localhost:7892` and warns. Pass `--tab` whenever two or more content tabs are open. Session lifecycle commands are documented under [Browser sessions](/cli/browser).
 </Note>
 
 ## Component queries
@@ -44,18 +44,22 @@ Property predicates depend on `properties:` extraction. The Go CLI implements `p
 
 ### `browser click`
 
-Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Before dispatching, it scrolls the target to the center of the viewport and verifies that its center is the top-most element there. It **errors** instead of silently doing nothing when the target cannot be positioned in the viewport, or is `covered by another element` (an open overlay or modal). On success it echoes a confirmation with the real post-scroll coordinates, e.g. `clicked CartNavButton @ (674,30)`. A click may trigger navigation that settles **after** the command returns (client-side SPA routing is asynchronous); `click` does not wait for it. Follow an action that should navigate with an explicit [`wait-for`](#browser-wait-for) on the destination — the same act-then-wait split Playwright and Selenium use. (`--x`/`--y` coordinate clicks skip the scroll-and-verify step.)
+Clicks an element. The target is a probe ID, a component query, or raw `--x` and `--y` coordinates. Before dispatching, it scrolls the target to the center of the viewport and verifies that its center is the top-most element there. It **errors** instead of silently doing nothing when the target cannot be positioned in the viewport, or is `covered by another element` (an open overlay or modal). On success it echoes a confirmation to stderr with the real post-scroll coordinates, e.g. `clicked CartNavButton @ (674,30)`, or `clicked @ (X,Y)` for a coordinate click. A click may trigger navigation that settles **after** the command returns (client-side SPA routing is asynchronous); `click` does not wait for it. Follow an action that should navigate with an explicit [`wait-for`](#browser-wait-for) on the destination — the same act-then-wait split Playwright and Selenium use. (`--x`/`--y` coordinate clicks skip the scroll-and-verify step.)
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
-| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries; keys session lookup) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 | `--x` | `-1` | Absolute x coordinate (skips node lookup) |
 | `--y` | `-1` | Absolute y coordinate (skips node lookup) |
 
 ```bash
 sightmap browser click 'ProductCard[name^="Weber"] AddToCartButton'
+```
+
+```text
+clicked ProductCard[name^="Weber"] AddToCartButton @ (1184,612)
 ```
 
 <Tip>
@@ -70,13 +74,17 @@ Types a value into an input. Takes two positionals: the target (probe ID or comp
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--clear` | off | Clear the field via JS before typing (use for React-controlled inputs) |
-| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries; keys session lookup) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
 ```bash
 sightmap browser fill --clear SearchInput 'garden hose'
+```
+
+```text
+filled SearchInput = "garden hose"
 ```
 
 <Tip>
@@ -91,12 +99,12 @@ sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object
 
 ### `browser hover`
 
-Moves the pointer over an element, such as a menu or tooltip trigger. It accepts the same targets as `click`: a probe ID, component query, or `--x` and `--y`. On success it echoes a confirmation to stderr.
+Moves the pointer over an element, such as a menu or tooltip trigger. It accepts the same targets as `click`: a probe ID, component query, or `--x` and `--y`. On success it echoes a confirmation to stderr, such as `hovered AccountMenu @ (1320,32)`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
-| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries; keys session lookup) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 | `--x` | `-1` | Absolute x coordinate (skips node lookup) |
 | `--y` | `-1` | Absolute y coordinate (skips node lookup) |
@@ -113,7 +121,8 @@ Sends a key event to the focused element. Click or fill a field first when it ne
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (keys session lookup) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
 ```bash
@@ -125,15 +134,15 @@ sightmap browser keypress Enter
 
 ### `browser scroll`
 
-Scrolls the page by pixel deltas, scrolls a component into view, or does both. When both are set, `--component-id` brings the target into view before applying the deltas. On success it echoes what it scrolled to stderr.
+Scrolls the page by pixel deltas, scrolls a component into view, or does both. When both are set, `--component-id` brings the target into view before applying the deltas. Pass at least one of the three flags. On success it echoes what it scrolled to stderr, such as `scrolled FooterLinks into view` or `scrolled by (0,800)`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--component-id` | none | Component ID or `'ComponentQuery'` to scroll into view first |
 | `--delta-x` | `0` | Horizontal scroll delta in pixels |
 | `--delta-y` | `0` | Vertical scroll delta in pixels |
-| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries; keys session lookup) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
 ```bash
@@ -149,9 +158,10 @@ Drags an element by pixel deltas. The target is a positional probe ID from snaps
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--delta-x` | `0` | Horizontal drag delta in pixels |
 | `--delta-y` | `0` | Vertical drag delta in pixels |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (keys session lookup) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
 ```bash
@@ -162,16 +172,17 @@ sightmap browser drag 214 --delta-x 120 --delta-y 0
 
 ### `browser wait-for`
 
-Waits for exactly one condition. It is the explicit step boundary after an action that triggers navigation or asynchronous rendering: act, then `wait-for` the postcondition. On success it echoes what it matched to stderr; on timeout it exits `1` with a message like `wait-for: timed out after 10000ms waiting for selector "..."`.
+Waits for exactly one condition; passing none or several is a usage error. It is the explicit step boundary after an action that triggers navigation or asynchronous rendering: act, then `wait-for` the postcondition. On success it echoes what it matched to stderr; on timeout it exits `1` with a message like `wait-for: timed out after 10000ms waiting for selector "..."`.
 
-The semantic conditions are corpus-aware and auto-retry until they hold: `--view` waits until the current URL resolves to a named sightmap view, and `--component` waits until a component query (name plus optional property filters, e.g. `WorkItemRow[key="FALCON-7"]`) matches at least one node on the live page. `--url` (a plain URL substring, not a glob or regex), `--selector`, and `--load` are the raw DOM/URL escape hatches — prefer `--view`/`--component` when the destination is in the corpus, since they absorb dynamic path segments and wait for real rendered content rather than a URL proxy.
+The semantic conditions are corpus-aware and auto-retry until they hold: `--view` waits until the current URL resolves to a named sightmap view, and `--component` waits until a component query (name plus optional property filters, e.g. `WorkItemRow[key="FALCON-7"]`) matches at least one node on the live page. A query that matches several nodes counts as present; unlike `click`, `wait-for` does not require a single target. The query syntax is checked up front, so a malformed query fails immediately instead of timing out. `--url` (a plain URL substring, not a glob or regex), `--selector`, and `--load` are the raw DOM/URL escape hatches — prefer `--view`/`--component` when the destination is in the corpus, since they absorb dynamic path segments and wait for real rendered content rather than a URL proxy.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--component` | none | Wait until this component query matches a node (e.g. `WorkItemDetail`) |
 | `--load` | off | Wait for the page load event |
 | `--selector` | none | Wait until a DOM element matching this CSS selector appears |
+| `--sightmap-dir` | `.sightmap` | Corpus for `--view` and `--component`; keys session lookup |
 | `--tab` | the lone content tab | Target tab ID |
 | `--timeout-ms` | `10000` | Timeout in milliseconds |
 | `--url` | none | Wait until the page URL contains this **substring** (a plain substring, not a glob or regex) |
@@ -183,41 +194,52 @@ sightmap browser wait-for --view Checkout            # URL resolves to the Check
 sightmap browser wait-for --component 'OrderSummary' # or wait until a component appears
 ```
 
+```text
+view "Checkout" now matches the page URL
+component query "OrderSummary" now matches
+```
+
 ---
 
 ### `browser dialog`
 
-Resolves a blocking JavaScript dialog (`alert`, `confirm`, `prompt`). The action is a positional argument: `accept` or `dismiss`. On success it echoes `accepted dialog` / `dismissed dialog` to stderr; when no dialog is open it reports that clearly instead of surfacing a raw CDP error.
+Resolves a blocking JavaScript dialog (`alert`, `confirm`, `prompt`). The action is a positional argument: `accept` or `dismiss`. On success it echoes `accepted dialog` / `dismissed dialog` to stderr. When no dialog is open it fails with `dialog: no dialog is currently open (nothing to accept)` instead of surfacing a raw CDP error.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (keys session lookup) |
 | `--text` | none | Prompt input text (prompt dialogs only) |
 
 ```bash
 sightmap browser dialog accept --text 'Springfield'
 ```
 
+```text
+accepted dialog
+```
+
 ---
 
 ### `browser screenshot`
 
-Captures the current viewport as a PNG. If the PNG attempt times out, the command retries as JPEG unless you pass `--no-retry`. Pass `--component` or `--selector` to clip the capture to a single element's bounding box instead of the whole viewport.
+Captures the current viewport as a PNG. If the PNG attempt times out, the command prints `screenshot: PNG timed out, retrying as JPEG...` and retries as JPEG at quality 80, with half the timeout (at most 8 seconds), unless you pass `--no-retry`. A JPEG capture, whether from `--jpeg` or the fallback, renames a `.png` output path to `.jpg`. Pass `--component` or `--selector`, not both, to clip the capture to the matched elements instead of the whole viewport.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address |
+| `--addr` | the session for `--sightmap-dir` | CDP address |
 | `--tab` | the lone content tab | Target tab ID |
 | `--out` | `screenshot.png` | Output file path |
 | `--stdout` | off | Write image bytes to stdout (for piping) |
-| `--component` | none | Clip to the bounding box of this Sightmap component (by name) |
+| `--component` | none | Clip to the bounding box of this component query |
 | `--selector` | none | Clip to the bounding box of elements matching this CSS selector |
 | `--expand-pct` | `0` | Grow the clip outward on all sides by this percent of its size (only with `--component`/`--selector`) |
 | `--timeout-ms` | `15000` | Timeout in milliseconds for each attempt |
 | `--jpeg` | off | Capture JPEG without attempting PNG |
-| `--quality` | `80` | JPEG quality from 0 to 100; ignored for PNG |
+| `--quality` | `80` | JPEG quality from 0 to 100 for `--jpeg`; ignored for PNG |
 | `--no-retry` | off | Disable the JPEG fallback after a PNG timeout |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for `--component`; keys session lookup) |
 
 ```bash
 sightmap browser screenshot --out cart.png
@@ -233,22 +255,24 @@ Clip to one component, with a little surrounding context:
 sightmap browser screenshot --component CartSummary --expand-pct 10 --out cart-summary.png
 ```
 
-The clip resolves to the union of the component's in-viewport matches (the same boxes `browser bounds` reports); an off-screen target errors with `no in-viewport match to clip to`.
+The clip resolves to the union of the query's in-viewport matches (the same boxes `browser bounds` reports); an off-screen target errors with `no in-viewport match to clip to`.
+
+When a JPEG capture hits its deadline, `screenshot` probes the tab the same way [`browser eval`](/cli/browser#browser-eval) does. If the tab is unresponsive, the error appends the `UNRESPONSIVE` diagnosis and recovery steps.
 
 ---
 
 ### `browser bounds`
 
-Prints bounding boxes as JSON, with viewport percentages and raw pixels. Query by positional component names, by raw CSS selector, or use `--all` for every matched component. Component-name lookup is exact and case-insensitive by default; it does not use the component-query language. The command skips offscreen matches unless you pass `--include-offscreen`.
+Prints bounding boxes as JSON, with viewport percentages and raw pixels. Query by one or more positional [component queries](#component-queries), by raw CSS selector, or use `--all` for every matched component. Unlike `click`, a query that matches several components emits a box for each one. `--substring` switches to a case-insensitive substring match on the component name only, without the query grammar. The command skips offscreen matches unless you pass `--include-offscreen`, and notes each query that matched nothing on stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--addr` | the session for `--sightmap-dir` | CDP address (host:port) |
 | `--all` | off | Emit bounds for every matched component (ignores positional queries) |
 | `--include-offscreen` | off | Include components whose bounds fall entirely outside the viewport |
-| `--selector` | none | Query raw DOM elements by CSS selector instead of component name |
-| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component-name queries) |
-| `--substring` | off | Match component names by case-insensitive substring (default: exact, case-insensitive) |
+| `--selector` | none | Query raw DOM elements by CSS selector instead of a component query (no corpus needed) |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries; keys session lookup) |
+| `--substring` | off | Match a case-insensitive substring of the component name (name only; skips the query grammar) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
 ```bash
@@ -281,14 +305,14 @@ viewport: 1440x900
 
 ### `browser tabs`
 
-Tab management for the session. `browser start` prints your tab's ID; `tabs list` shows every open content tab.
+Tab management for the session. `browser start` prints your tab's ID; `tabs list` shows every open content tab. The `tabs` subcommands take no `--addr`: they always use the session recorded for `--sightmap-dir` (default `.sightmap`).
 
 | Subcommand | Description |
 |------------|-------------|
-| `tabs list` | List open tabs (TargetID, URL, Title) |
-| `tabs new [URL]` | Open a new tab; prints its TargetID |
-| `tabs close <target-id>` | Close a tab |
-| `tabs resize [--tab <ID>] <width> <height>` | Resize a tab's viewport |
+| `tabs list` | List open content tabs, one per line: TargetID, URL, and title, tab-separated |
+| `tabs new [URL]` | Open a new tab; prints its TargetID on stdout |
+| `tabs close <target-id>` | Close a tab; echoes `closed tab <target-id>` |
+| `tabs resize [--tab <ID>] <width> <height>` | Resize a tab's viewport; echoes `resized viewport to WIDTHxHEIGHT` |
 
 ```bash
 sightmap browser tabs list
@@ -309,7 +333,7 @@ F2B71D9E4C8A2B5F0E3D6C1A9B8E7F4A	https://shop.example.com/cart	Your Cart
     Use a component query, such as `browser click 'ProductCard[name^="Weber"] AddToCartButton'` or `browser fill --clear SearchInput 'garden hose'`.
   </Step>
   <Step title="Wait for the result">
-    `browser wait-for --url '/cart'` (or `--selector`/`--load`) before the next action.
+    `browser wait-for --view Cart` or `--component 'CartSummary'` before the next action. Fall back to `--url`, `--selector`, or `--load` when the destination is not in the corpus.
   </Step>
   <Step title="Verify">
     Run another snapshot to read the new state. To inspect it visually, run `browser screenshot --out after.png` and use `browser bounds` to locate components.

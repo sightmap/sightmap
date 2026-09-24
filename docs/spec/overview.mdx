@@ -1,16 +1,16 @@
 ---
 title: "The Sightmap Specification: YAML Format Overview"
 sidebarTitle: "Overview"
-description: "Learn how YAML files under .sightmap/ define views, components, requests, and memory."
+description: "Learn how YAML files under .sightmap/ define views, components, requests, messages, signals, and memory."
 ---
 
-A sightmap is a directory of YAML files at the root of a project, under `.sightmap/`. It describes the app's **views**, **components**, and **requests**, with optional **memory** entries that carry notes agents can use at runtime.
+A sightmap is a directory of YAML files at the root of a project, under `.sightmap/`. It describes the app's **views**, **components**, and **requests**, plus corpus-root **messages** (console and exception patterns) and **signals** (named state predicates), with optional **memory** entries that carry notes agents can use at runtime.
 
 These pages explain the format. The [Schema reference](/reference/schema) provides the field-by-field contract and is generated from [the canonical spec](https://github.com/sightmap/sightmap/blob/main/spec/v1/schema.md).
 
 ## What's in a sightmap
 
-Four kinds of definitions, all optional:
+Six kinds of definitions, all optional:
 
 <CardGroup cols={2}>
   <Card title="Views" icon="window-maximize" href="/spec/views">
@@ -22,12 +22,18 @@ Four kinds of definitions, all optional:
   <Card title="Requests" icon="arrow-right-arrow-left" href="/spec/requests">
     Named API endpoints identified by route patterns.
   </Card>
+  <Card title="Messages" icon="message" href="/spec/messages">
+    Named console-output and exception patterns, matched by level and regex.
+  </Card>
+  <Card title="Signals" icon="signal" href="/spec/signals">
+    Named boolean predicates over an existing component or view.
+  </Card>
   <Card title="Memory" icon="brain" href="/spec/memory">
-    Short freeform notes attached to any of the above.
+    Short freeform notes attached to files, views, components, and requests.
   </Card>
 </CardGroup>
 
-Every `*.yaml` and `*.yml` file under `.sightmap/` is discovered recursively and merged. The directory layout is for authors; it has no semantic meaning.
+Every `*.yaml` and `*.yml` file under `.sightmap/` is discovered recursively and merged. Merging appends each top-level collection (`views`, `components`, `requests`, `messages`, `signals`) across files. The directory layout is for authors; it has no semantic meaning.
 
 ## Top-level fields
 
@@ -35,13 +41,20 @@ Every file begins with `version: 1`. All other top-level keys are optional.
 
 ```yaml
 version: 1
+url:         # string — default representative URL for views in this file
 memory:      # string[] — file-level notes
 views:       # View[]
 components:  # Component[] — global, matched on every view
 requests:    # Request[] — global, matched on every view
+messages:    # Message[] — console/exception patterns, corpus-root only
+signals:     # Signal[] — named state predicates, corpus-root only
 ```
 
 `components` and `requests` at the file root are global and match against every view. Nest them inside a view to limit them to that view. Scoped definitions are additive with globals, except that a view-scoped `$ref` subsumes a global component with the same name. Entries in any `components:` array may be `$ref` references to shared definitions. See [Components](/spec/components) and [Requests](/spec/requests) for the matching rules.
+
+`messages` and `signals` exist only at the file root; neither has a view-scoped form. See [Messages](/spec/messages) and [Signals](/spec/signals).
+
+The JSON Schema also permits a file-level `snapshots:` list. It is a [reserved tooling field](/reference/schema#reserved-tooling-fields) used by capture tooling, not part of matching or merge semantics.
 
 ## Two versioning axes
 
@@ -65,7 +78,7 @@ views:
         selector: '[data-component="SearchBox"]'
 ```
 
-This file defines one view and one view-scoped component. Other files can add views, nested components, glob routes, requests, and memory entries.
+This file defines one view and one view-scoped component. Other files can add views, nested components, glob routes, requests, messages, signals, and memory entries.
 
 <Warning>
 Quote attribute selectors so YAML parses them as strings: `selector: '[data-component="X"]'`. Unquoted, the brackets are read as a YAML flow sequence and the entry fails validation.
@@ -73,4 +86,4 @@ Quote attribute selectors so YAML parses them as strings: `selector: '[data-comp
 
 ## Next
 
-Start with [Views](/spec/views) for routes and view-level structure, then [Components](/spec/components) for selector semantics. The full schema reference, including every field on every type, is in [Schema reference](/reference/schema).
+Start with [Views](/spec/views) for routes and view-level structure, then [Components](/spec/components) for selector semantics and properties. Every author-written regular expression in a sightmap uses RE2 syntax; see [Regular expressions](/reference/schema#regular-expressions). The full schema reference, including every field on every type, is in [Schema reference](/reference/schema).

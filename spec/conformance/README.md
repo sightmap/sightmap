@@ -45,7 +45,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 005 | `selector-array` | `selector` accepts array; alternates tried in order |
 | 006 | `view-scoped-vs-global` | Global components match everywhere; scoped only on their view |
 | 007 | `request-method-filter` | `match` filters requests by HTTP method |
-| 008 | `dependencies-binding` | `dependencies` globs bind definitions to source files ([SEP-0001](../seps/0001-dependencies.md)) |
+| 008 | `dependencies-binding` | `dependencies` globs bind definitions to source files ([SEP-0001](../seps/0001-dependencies-field.md)) |
 | 010 | `component-ref` | `$ref` expansion, view attestation, and global+view-scoped dedup ([SEP-0002](../seps/0002-component-ref.md)) |
 | 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
 | 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
@@ -56,6 +56,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, and views ([SEP-0004](../seps/0004-component-tags.md)) |
 | 018 | `request-properties` | `properties:` on a request validates via `field` (body and header paths) and `pattern`; declaring a reserved identity name warns with `request-property-shadows-reserved` ([SEP-0005](../seps/0005-request-properties.md)) |
 | 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](../seps/0006-message-entity.md)) |
+| 020 | `message-properties` | Message stack `properties:` (`source: stack` with `top.file`, `top.function`, and an indexed frame refined by `pattern`) validates ([SEP-0006](../seps/0006-message-entity.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

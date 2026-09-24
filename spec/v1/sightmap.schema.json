@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/sightmap/sightmap/main/spec/v1/sightmap.schema.json",
   "title": "Sightmap v1",
-  "description": "A sightmap file: one YAML document under .sightmap/ describing views, components, requests, and memory entries. See https://github.com/sightmap/sightmap/blob/main/spec/v1/schema.md for the human-readable reference.",
+  "description": "A sightmap file: one YAML document under .sightmap/ describing views, components, requests, messages, signals, and memory entries. See https://github.com/sightmap/sightmap/blob/main/spec/v1/schema.md for the human-readable reference.",
   "type": "object",
   "required": ["version"],
   "additionalProperties": false,
@@ -166,7 +166,7 @@
         "memory": { "$ref": "#/$defs/memory" },
         "properties": {
           "type": "array",
-          "description": "Ordered list of DOM-value extractions surfaced in enriched snapshot output. See SEP-0003.",
+          "description": "Ordered list of named values surfaced in enriched snapshot output, resolved over the component tree. See SEP-0010 (supersedes the extraction model of SEP-0003).",
           "items": { "$ref": "#/$defs/componentProperty" }
         },
         "tags": {

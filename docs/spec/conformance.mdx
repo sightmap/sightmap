@@ -13,13 +13,28 @@ A conforming implementation:
 - **MUST** accept any file that validates against [`sightmap.schema.json`](https://github.com/sightmap/sightmap/blob/main/spec/v1/sightmap.schema.json), and reject any that doesn't.
 - **MUST** implement [route matching](/spec/views#most-specific-wins) as specified: most-specific-wins for views and all-matches-apply for requests.
 - **MUST** implement [global vs view-scoped](/spec/views#scoped-vs-global) precedence.
+- **MUST** resolve `tags` as a union across every applicable definition, never narrowed by nearest-wins or most-specific-wins identity rules. See [Tags](/reference/schema#tags).
+- **MUST** reject a [request property](/spec/requests#properties) with a missing or unknown `source`, with neither `field` nor `pattern`, or with a headers `source` and no `field`.
+- **MUST** reject any author-written regular expression that is not valid RE2: a request property's `pattern`, a [message](/spec/messages)'s `message`, or a message property's `pattern`. See [Regular expressions](/reference/schema#regular-expressions).
+- **MUST** reject a [message property](/spec/messages#stack-properties) whose `source` is not `stack` or that omits `field`.
 - **SHOULD** surface applicable [`memory`](/spec/memory) entries when the parent definition is active.
 - **MAY** ignore fields it doesn't use.
 - **MAY** add non-standard behavior as long as it doesn't change the meaning of conforming inputs.
 
+## Implementations that evaluate live activity
+
+An implementation that also evaluates observed network requests, console records, or DOM state additionally:
+
+- **MUST** resolve request `properties:` only from live traffic, and MUST NOT error when a request that declares `properties:` is used in a static context.
+- **MUST** omit an unresolved property value silently, without a diagnostic.
+- **MUST** apply `pattern` to the value `field` resolved when both are present, using capture group 1 when the pattern has one and the whole match otherwise.
+- **MUST** match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating an omitted constraint as match-any.
+- **MUST** surface an ambiguity when a record matches more than one `messages:` entry.
+- **MUST** resolve a message property only from a live record's stack, omitting the value silently when there is no stack or the frame or attribute doesn't resolve.
+
 The full statement is in the [schema reference](/reference/schema#conformance).
 
-Individual sections add requirements for specific features, including [component references](/spec/components#component-references) and [dependencies](/reference/schema#dependencies).
+Individual sections add requirements for specific features, including [component references](/spec/components#referencing-shared-components), [component properties](/spec/components#properties), [signals](/spec/signals#resolving-ref), and [dependencies](/reference/schema#dependencies).
 
 Any tool that writes `.sightmap/*.yaml` files MUST produce the [canonical YAML format](https://github.com/sightmap/sightmap/blob/main/spec/v1/canonical-format.md). The `1NN` conformance fixtures test that output byte for byte.
 

@@ -40,7 +40,7 @@ A tool acting in the reader role: it loads a sightmap and applies it to the runn
 
 ### Corpus
 
-The views, components, requests, and memory produced by loading and merging a project's sightmap files. `validate`, `lint`, and `search` load the directory as a corpus. Coverage commands re-match saved captures against that corpus. See [the Go library](/reference/go-library).
+The views, components, requests, messages, signals, and memory produced by loading and merging a project's sightmap files. `validate`, `lint`, and `search` load the directory as a corpus. Coverage commands re-match saved captures against that corpus. See [the Go library](/reference/go-library).
 
 ### Coverage tiers
 
@@ -58,21 +58,37 @@ A human, an agent, or both working together to author and maintain `.sightmap/`.
 
 Short freeform notes attached at the file root or to a view, component, or request. Memory records runtime context that source code may not state, such as quirks, invariants, and workarounds. See [Memory](/spec/memory).
 
+### Message
+
+A named console-output or uncaught-exception pattern, matched by `level` and an RE2 `message` regex, with optional `properties:` extracted from the exception's stack. Defined under the file-root `messages:`. See [Messages](/spec/messages).
+
 ### Novelty gate
 
 The rule applied when `capture` appends to a view set. The first capture is kept; later captures are kept only when they add a matched component type or uncovered interactive slot. Changes to values such as products, prices, or copy do not count. `sightmap capture --force` bypasses the gate. See [Snapshots](/cli/snapshots).
 
 ### Project semver
 
-The [SemVer](https://semver.org/) version assigned to the spec project, currently `0.1.0` in the canonical versioning policy. It is independent of both the spec stream in a sightmap file and the shipped CLI version. The current CLI/npm release is `0.13.1`; `sightmap version` prints the installed CLI version. See [Versioning policy](/reference/versioning).
+The [SemVer](https://semver.org/) version assigned to the spec project, currently `0.1.0` in the canonical versioning policy. It is independent of both the spec stream in a sightmap file and the shipped CLI version. `sightmap version` prints the installed CLI version. See [Versioning policy](/reference/versioning).
+
+### Property
+
+A named value surfaced alongside a matched entity. Component properties resolve over the component tree with an `extract` directive (`text`, `raw_text`, `attr=NAME`, `PATH.prop`, or `exists:PATH`). Request and message properties extract values from live traffic or an exception's stack with `source`, `field`, and `pattern`. See [Components](/spec/components#properties) and [Requests](/spec/requests#properties).
+
+### RE2
+
+The regular-expression dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package. Every author-written regex in a sightmap uses it. RE2 matches in linear time and has no backreferences or lookaround. See [Regular expressions](/reference/schema#regular-expressions).
 
 ### Request
 
-A named API endpoint with a route glob and optional method filter, payload fields, headers, source path, description, and memory. Defined under `requests:`. See [Requests](/spec/requests).
+A named API endpoint with a route glob and optional method filter, payload fields, headers, source path, description, memory, tags, and properties extracted from live traffic. Defined under `requests:`. See [Requests](/spec/requests).
 
 ### Selector
 
 A CSS selector (or array of alternatives) that locates a component's root element. Child selectors are scoped to the matched parent's subtree. See [Selectors](/concepts/selectors).
+
+### SEP
+
+A Sightmap Enhancement Proposal: the design document required for a change to spec semantics, such as a new field or a changed matching rule. SEPs live in [`spec/seps/`](https://github.com/sightmap/sightmap/tree/main/spec/seps). See [Contributing](/reference/contributing#spec-changes-go-through-seps).
 
 ### Session
 
@@ -86,6 +102,10 @@ A corpus YAML document under `.sightmap/` that conforms to the stream 1 schema. 
 
 The `.sightmap/` directory at the project root. Sightmap discovers and merges corpus `*.yaml` and `*.yml` files recursively. The Go loader skips the `snapshots/` and `review/` subdirectories because they hold non-corpus artifacts.
 
+### Signal
+
+A named boolean predicate that references an existing component (true while it is present) or view (true while its route is active). Defined under the file-root `signals:`. See [Signals](/spec/signals).
+
 ### Stream version
 
 The integer in a sightmap file's `version` field, currently `1`. It selects the spec stream used to interpret the file and changes only for a breaking change to the YAML format. It is independent of project SemVer. See [Versioning policy](/reference/versioning).
@@ -93,6 +113,10 @@ The integer in a sightmap file's `version` field, currently `1`. It selects the 
 ### Tab
 
 A live browser page in a **session**, identified by the `--tab` ID printed by `browser start`. Distinct from a sightmap **view**: a tab is a running page; a view is a route-scoped definition in the corpus. When two or more tabs are open, page commands require `--tab` to avoid cross-agent crosstalk.
+
+### Tags
+
+Open-vocabulary classification labels, such as `defect`, on a view, component, request, or signal. Unlike names, tags on views, components, and requests resolve as a union across every applicable definition. See [Tags](/reference/schema#tags).
 
 ### View
 

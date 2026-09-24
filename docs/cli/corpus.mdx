@@ -1,14 +1,50 @@
 ---
 title: "Sightmap CLI: Corpus Health Tools Reference"
 sidebarTitle: "Corpus"
-description: "Use validate, lint, stats, search, and discover to check corpus structure, review selector quality, count what the corpus holds, find definitions, and classify linked routes."
+description: "Use init, validate, lint, stats, search, and discover to scaffold a corpus, check its structure, review selector quality, count what it holds, find definitions, and classify linked routes."
 ---
 
-`sightmap validate` checks whether the corpus loads and follows the CLI's structural rules. `sightmap lint` reports selector and naming problems. `sightmap stats` counts what the corpus holds. `sightmap search` searches component definitions offline. `sightmap discover` classifies same-host links from the current page against the corpus.
+`sightmap init` scaffolds a new corpus. `sightmap validate` checks whether the corpus loads and follows the CLI's structural rules. `sightmap lint` reports selector and naming problems. `sightmap stats` counts what the corpus holds. `sightmap search` searches component definitions offline. `sightmap discover` classifies same-host links from the current page against the corpus.
 
 <Note>
-`validate`, `lint`, `stats`, and `search` are fully offline — no browser needed. `discover` reads links from a live page, so it needs a running session (see [Browser](/cli/browser)). For scoring how well the corpus covers a page, see [Coverage](/cli/coverage); for the normative YAML format, see [the spec](/spec/overview).
+`init`, `validate`, `lint`, `stats`, and `search` are fully offline — no browser needed. `discover` reads links from a live page, so it needs a running session (see [Browser](/cli/browser)). For scoring how well the corpus covers a page, see [Coverage](/cli/coverage); for the normative YAML format, see [the spec](/spec/overview).
 </Note>
+
+---
+
+### `sightmap init`
+
+Scaffolds a schema-correct corpus so the first files you edit already have `version: 1`, the `views:` wrapper, and correct nesting. It writes `components.yaml` (an empty global component file with a commented example) and `views/example.yaml` (one `Home` view with a placeholder component) under `--sightmap-dir`. Existing files are never overwritten; each is reported as `skipped`.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory to create |
+
+```bash
+sightmap init
+```
+
+```text
+  created  .sightmap/components.yaml
+  created  .sightmap/views/example.yaml
+
+Scaffolded .sightmap. Next:
+  1. edit .sightmap/views/example.yaml for your app (route:, url:, component selectors)
+  2. sightmap validate
+  3. sightmap browser start  &&  sightmap snapshot --coverage
+```
+
+Run it again on a scaffolded corpus and it changes nothing:
+
+```text
+  skipped  .sightmap/components.yaml (already exists)
+  skipped  .sightmap/views/example.yaml (already exists)
+.sightmap is already scaffolded — nothing to do.
+```
+
+To start from a corpus someone has already published instead, see [`sightmap atlas`](/cli/integrate).
 
 ---
 
@@ -18,9 +54,13 @@ Loads the YAML and checks the resulting corpus. It verifies required fields (a v
 
 Warnings flag *corpus conflicts* — two definitions that collide on identity where only one can win and a fallback rule (declaration order) silently resolves it: duplicate view `name` (`merge-collision-view`), two views sharing a `route` (`route-conflict`), and duplicate root-level global component names with different selectors (`merge-collision-component`). The corpus still loads; the warning tells you which definition is shadowing another.
 
-Warnings also flag **unknown fields** (`unknown-field`) — a key the spec doesn't define at its position, such as a typo (`memroy:`) or an experimental field. These warn rather than fail, so you can stash work-in-progress fields during development; recognized fields (including the reserved tooling fields `access` and `snapshots`) are never flagged.
+Warnings also flag **unknown fields** (`unknown-field`) — a key the spec doesn't define at its position, such as a typo (`memroy:`) or an experimental field. These warn rather than fail, so you can stash work-in-progress fields during development; recognized fields (including the reserved tooling fields `access` and `snapshots`) are never flagged. A corpus with global components but no `views:` list gets a `no-views` warning, because capture, report, and per-view coverage need views.
 
-The command also rejects selector syntax outside Sightmap's supported subset. For example, `:nth-child()` produces a parse error; the supported pseudo-classes are `:not()`, `:is()`, `:where()`, and `:has()`.
+Component `properties:` are checked against the spec's extract grammar. Each `extract` must be `text`, `raw_text`, `attr=NAME`, `PATH.prop`, or `exists:PATH`; anything else — a CSS sub-selector such as `.price`, or a removed mode such as `inner_text`, `text_only`, or `inner_html` — is a `component-property-extract-invalid` error, and a property name declared twice on one component is `component-property-duplicate`.
+
+Corpus-root `signals:` are checked too. A signal whose `ref` names no component or view is `signal-ref-unresolved`, and one whose `ref` names both a component and a view is `signal-ref-ambiguous`. Both are errors, as are a missing `name` or `ref` and a duplicate signal name (`merge-collision-signal`).
+
+The command also rejects selector syntax outside Sightmap's supported subset. For example, `:nth-child()` and the sibling combinators `+` and `~` produce parse errors; the supported pseudo-classes are `:not()`, `:is()`, `:where()`, and `:has()`. See [Selector tools](/cli/selectors) for the full subset.
 
 **Flags:**
 
@@ -39,9 +79,11 @@ sightmap validate
 On a broken corpus, each error prints as one `error:` line and the command exits 1; warnings print as `warning:` lines and do not affect the exit code:
 
 ```text
-error: BrowsePage: view has empty route
+error: ProductPod: component "ProductPod" property "price": unrecognized extract mode ".price" (expected text, raw_text, attr=NAME, PATH.prop, or exists:PATH)
+error: checkout.reached: signal "checkout.reached" ref "Checkuot" does not resolve to a known component or view
+error: cart.open: signal "cart.open" ref "Cart" is ambiguous: it matches both a component and a view
 warning: route "/products" is claimed by 2 views (ProductList, Browse); only the first (ProductList) applies to that URL
-sightmap validate: 1 validation error(s), 1 warning(s)
+sightmap validate: 3 validation error(s), 1 warning(s)
 ```
 
 When only warnings are present the command prints `✓ no errors (N warning(s))` and exits 0.
@@ -60,13 +102,13 @@ Runs static style and maintainability checks without a browser. The five main ru
 | `id-hash-selector` | `#id` selectors that look auto-generated (long digit runs, hash-like fragments) | Use `data-testid` or a semantic attribute; keep a stable framework hook (like `#__next`) with a `memory:` note explaining it |
 | `multi-instance-no-property` | A broad selector with no uniqueness anchor and no `properties:` | Add a property, narrow the selector, make it a child component, or mark it `stability: unstable`; singleton-style names are exempt |
 
-Three other checks run with them. `name-case` flags component names that do not start with an uppercase letter. `comma-in-selector` flags a top-level comma and expects separate selector entries instead. The `validation` rule re-emits each `validate` error as a warning.
+Other checks run with them. `name-case` flags component names that do not start with an uppercase letter. `comma-in-selector` flags a top-level comma and expects separate selector entries instead. `message-level-unknown` flags a `messages:` entry whose `level` is not one of `log`, `debug`, `info`, `warn`, `error`, or `exception`, since it can never match. The `validation` rule re-emits each `validate` finding, error or warning, as a lint warning.
 
-By default, `lint` exits 1 when it finds a warning. Pass `--warn-only` to print warnings and exit 0.
+By default, `lint` exits 1 when it finds a warning and ends with `sightmap lint: N lint warning(s)`. Pass `--warn-only` to print warnings and exit 0.
 
 Snapshot data refines `multi-instance-no-property`. `--snapshot FILE` counts selector matches in one capture; `--all-snapshots` reads `.sightmap/snapshots/**/*.snap.tree.json`. A count of 1 suppresses the warning. A count of 0 adds `(0 matches in snapshot — selector may be broken)`, while a higher count adds `(matched N times in snapshot)`.
 
-When you pass no snapshot flag, `lint` **auto-reconciles** against any captures under `.sightmap/snapshots/` — so a container-ish selector that actually matches a single node is not falsely flagged. With no captures present it runs the static heuristics unchanged. Pass `--snapshot`/`--all-snapshots` to control the set explicitly.
+When you pass no snapshot flag, `lint` **auto-reconciles** against every `.snap.tree.json` under `.sightmap/snapshots/`, as if you had passed `--all-snapshots`, so a container-ish selector that actually matches a single node is not falsely flagged. It says so on stderr: `lint: reconciling against N captured snapshot(s); pass --snapshot/--all-snapshots to control this, or capture with 'sightmap capture'`. With no captures present it runs the static heuristics unchanged. Pass `--snapshot` to reconcile against one capture instead.
 
 **Flags:**
 
@@ -86,15 +128,15 @@ warn [broad-tag-selector]: SiteHeader: selector "header": [broad-tag-selector] b
 warn [multi-instance-no-property]: PromoTile: [multi-instance-no-property] selector likely matches multiple instances but defines no properties to differentiate them. Consider adding a property (e.g., label, id, or parent context), narrowing the selector, marking as a child component scoped to a parent, or marking stability: unstable if this is an accepted T2 residual.
 ```
 
-<Warning>
-Property extraction (`properties:` on components) is implemented by the CLI as a draft extension — it is not part of spec v1 and may change. The `multi-instance-no-property` rule reflects the CLI's behavior, not a spec requirement.
-</Warning>
+<Note>
+`properties:` is part of spec v1 (see [Component properties](/reference/schema#component-properties)), but `multi-instance-no-property` is a CLI style heuristic, not a spec requirement.
+</Note>
 
 ---
 
 ### `sightmap stats`
 
-Counts what the corpus holds: corpus-wide totals for views, components, requests, properties, and memory entries, followed by a per-view component and request table. The counts describe the corpus *after loading* — `$ref`s expanded, component hierarchies flattened — so they match what every other command sees.
+Counts what the corpus holds: corpus-wide totals for views, components, requests, messages, properties, and memory entries, followed by a per-view component and request table. The counts describe the corpus *after loading* — `$ref`s expanded, component hierarchies flattened — so they match what every other command sees.
 
 **Flags:**
 
@@ -108,21 +150,22 @@ sightmap stats
 ```
 
 ```text
-sightmap stats · example.com · 2026-08-05
-──────────────────────────────────
- Views       3
- Components  8
- Requests    3
- Properties  3
- Memory      2
-──────────────────────────────────
- View  Route  Components  Requests
-──────────────────────────────────
- home  /               4         0
- pdp   /p/**           3         1
- plp   /b/**           5         1
-──────────────────────────────────
- 3 views  ·  8 distinct components (per-view rows sum to 12)
+sightmap stats · shop · 2026-09-24
+────────────────────────────────────────────
+ Views       2
+ Components  11
+ Requests    2
+ Messages    0
+ Properties  4
+ Memory      1
+────────────────────────────────────────────
+ View      Route        Components  Requests
+────────────────────────────────────────────
+ (global)  (all views)           2         1
+ home      /                     3         0
+ plp       /b/**                 8         1
+────────────────────────────────────────────
+ 2 views  ·  11 distinct components  (2 declared globally, shared by every view)
 ```
 
 **What each total counts:**
@@ -132,14 +175,17 @@ sightmap stats · example.com · 2026-08-05
 | `Views` | View definitions in the corpus |
 | `Components` | Distinct component **names** corpus-wide — the size of the corpus vocabulary |
 | `Requests` | Global plus view-scoped request definitions |
+| `Messages` | Corpus-root `messages:` definitions |
 | `Properties` | `properties:` entries summed over distinct component **definitions** |
 | `Memory` | `memory:` entries at file, view, component, and request level |
 
-**Per-view rows need not sum to the `Components` total, in either direction.** A global component that three views `$ref` appears in three rows but counts once in the total, which pushes the sum *above* it — the summary line prints both numbers so the gap is visible rather than surprising. A global component no view references counts in the total but appears in no row, which pushes the sum *below* it.
+**The table has a `(global)` row.** Corpus-root components and requests apply to every view, so they are reported once in a `(global)` row, printed only when the corpus has any, instead of being attributed to a view. Each view row counts only what is declared under that view after `$ref` expansion, including the flattened children of a `$ref`'d component. A view's effective coverage is its own row plus the `(global)` row.
+
+**Rows need not sum to the `Components` total, in either direction.** A global component that three views `$ref` appears in three view rows and in the `(global)` row, but counts once in the total. In the example, `home` pulls in `SiteHeader` and its child `SearchInput` by `$ref`, so the rows sum to 13 against 11 distinct names.
 
 `Components` deduplicates by name, but `Properties` and `Memory` sum over distinct definitions, because two views may legally define different components under the same local name (only *global* name collisions are rejected). Deduplicating those by name would silently drop the second view's properties and memory. A `$ref` expanded at a view's top level is a byte-identical copy of the global and counts once; a `$ref` expanded under a parent is scoped to that parent, so it is a separate extraction site and counts again.
 
-**`--json` is a published contract.** It prints one JSON object on stdout and nothing else — no banner to strip. The field names are consumed by CI outside this repo, so they are stable: `views`, `components`, `requests`, `properties`, `memory`, and `per_view`, whose rows carry `name`, `route`, `components`, and `requests`.
+**`--json` is a published contract.** It prints one JSON object on stdout and nothing else — no banner to strip. The field names are consumed by CI outside this repo, so they are stable: `views`, `components`, `requests`, `messages`, `properties`, `memory`, and `per_view`, whose rows carry `name`, `route`, `components`, and `requests`. `per_view` has no `(global)` row.
 
 ```bash
 sightmap stats --json
@@ -147,28 +193,23 @@ sightmap stats --json
 
 ```json
 {
-  "views": 3,
-  "components": 8,
-  "requests": 3,
-  "properties": 3,
-  "memory": 2,
+  "views": 2,
+  "components": 11,
+  "requests": 2,
+  "messages": 0,
+  "properties": 4,
+  "memory": 1,
   "per_view": [
     {
       "name": "home",
       "route": "/",
-      "components": 4,
-      "requests": 0
-    },
-    {
-      "name": "pdp",
-      "route": "/p/**",
       "components": 3,
-      "requests": 1
+      "requests": 0
     },
     {
       "name": "plp",
       "route": "/b/**",
-      "components": 5,
+      "components": 8,
       "requests": 1
     }
   ]
@@ -254,10 +295,12 @@ Run it on pages that link to major sections of the app, then add views for relev
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--addr` | `localhost:7892` | CDP address (host:port) |
+| `--addr` | session for `--sightmap-dir` | CDP address (host:port). Defaults to the session `browser start` recorded for the corpus, falling back to `localhost:7892` with a warning |
 | `--all` | off | Include surveyed (`○`) patterns in output |
 | `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` directory |
 | `--tab` | — | Target tab ID (from `browser start` output) |
+| `--url` | — | Accepted but currently ignored: `discover` reads the page already loaded in the tab. Navigate first with `sightmap browser navigate` |
+| `--wait` | `0` | Accepted but currently ignored |
 
 ```bash
 sightmap discover --all
@@ -280,6 +323,9 @@ Each `?` line is unmatched among the links on the current page. Add a view or ad
 ## Typical flow
 
 <Steps>
+  <Step title="Scaffold the corpus">
+    In a new project, run `sightmap init`, then edit `views/example.yaml` with a real route, URL, and selectors.
+  </Step>
   <Step title="Validate after every edit">
     Run `sightmap validate` after changing corpus YAML. It works offline and exits 1 on load or validation errors, so it can run as a required CI check.
   </Step>

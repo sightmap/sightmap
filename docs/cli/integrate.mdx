@@ -1,10 +1,10 @@
 ---
 title: "Sightmap CLI: Integration Tools Reference"
 sidebarTitle: "Integrations"
-description: "Find and install corpora from the community atlas, serve the compiled corpus over HTTP, install the bundled agent skills, and print the CLI version."
+description: "Find and install corpora from the community atlas, serve or export the loaded corpus as JSON, install the bundled agent skills, and print the CLI version."
 ---
 
-`sightmap atlas` finds and installs corpora published in the community atlas. `sightmap serve-sightmap` serves the compiled corpus as JSON and recompiles it when YAML changes. `sightmap skills install` extracts the bundled agent skills. `sightmap version` prints the binary version.
+`sightmap atlas` finds and installs corpora published in the community atlas. `sightmap serve-sightmap` serves the loaded corpus as JSON and reloads it when YAML changes. `sightmap export` emits the same corpus JSON to stdout, a file, or an HTTP endpoint, and `sightmap push` uploads a saved copy. `sightmap skills install` extracts the bundled agent skills. `sightmap version` prints the binary version.
 
 <Note>
 `sightmap browser start` runs the same HTTP server alongside Chrome. Use `serve-sightmap` when you need the corpus endpoint without a managed browser session. See [Browser](/cli/browser) for session management.
@@ -14,7 +14,7 @@ description: "Find and install corpora from the community atlas, serve the compi
 
 ### `sightmap atlas`
 
-Three verbs over the community atlas ([sightmap.org/atlas](https://sightmap.org/atlas)), the catalog of corpora other people have published:
+Four subcommands over the community atlas ([sightmap.org/atlas](https://sightmap.org/atlas)), the catalog of corpora other people have published:
 
 | Command | What it does |
 | --- | --- |
@@ -146,9 +146,10 @@ sightmap atlas validate index.json
   entry 1: duplicate slug "square-pos"
   entry 2: slug "../escape" contains a path separator
   entry 3 (acme-shop): control character or invalid UTF-8 in Acme\x1b]0;pwned\x07
+sightmap atlas: 3 problem(s) in the catalog
 ```
 
-Exits **0** when the catalog is clean and **1** when it is not. Reads stdin for `-` or no argument.
+Exits **0** with `The catalog is valid.` when the catalog is clean and **1** when it is not. Reads stdin for `-` or no argument.
 
 It runs against the bytes as published, which is the point: `find` escapes that text as it parses, so no reader ever sees the raw byte and only the publisher can fix it. A duplicate slug is the same shape of problem — the second entry silently shadows the first at install time, and only a whole-catalog check sees both.
 
@@ -217,16 +218,16 @@ What `add` does not do is vet the corpus's content. It proves the YAML loads and
 
 ### `sightmap serve-sightmap`
 
-Compiles the `.sightmap/` corpus and serves it over HTTP on port 7891 by default. Two endpoints:
+Loads the `.sightmap/` corpus and serves it over HTTP on `127.0.0.1`, port 7891 by default. Two endpoints:
 
 | Endpoint | Returns |
 | --- | --- |
-| `GET /sightmap` | The compiled corpus JSON: `site`, `version`, `views` (name and route), `globals`, and `viewComponents` keyed by route |
+| `GET /sightmap` | `{"site", "version", "corpus"}`: a site label, a cache-busting version stamp, and the corpus in the same canonical wire shape that [`export`](#sightmap-export) prints |
 | `GET /sightmap/version` | A version-only response for polling clients: `{"version":"..."}` |
 
-The `version` value is a Unix-millisecond timestamp created with each compile. Both endpoints set `Access-Control-Allow-Origin: *`.
+The `version` value is a Unix-millisecond timestamp created with each load. Both endpoints set `Access-Control-Allow-Origin: *`.
 
-The server watches `.yaml` and `.yml` files under `.sightmap/` and recompiles 200 ms after the last filesystem event. It excludes the `snapshots/` and `review/` directories, so writing captures does not change the corpus version.
+The server watches `.yaml` and `.yml` files under `.sightmap/` and reloads 200 ms after the last filesystem event. It excludes the `snapshots/` and `review/` directories, so writing captures does not change the corpus version. A reload that fails to load logs `[serve-sightmap] load error: ...` and keeps serving the previous corpus.
 
 The bundled browser extension fetches the corpus for its side panel and DevTools integration. `browser start` extracts the extension to `~/.sightmap/extension/` when it is missing or its bundled version has changed.
 
@@ -242,12 +243,12 @@ sightmap serve-sightmap
 ```
 
 ```text
-[serve-sightmap] listening on http://:7891
+[serve-sightmap] listening on http://127.0.0.1:7891
 ```
 
-After a YAML change, the server logs `[serve-sightmap] recompiled (v1753208412345)` with the new version value.
+After a YAML change, the server logs `[serve-sightmap] reloaded (v1790285039286)` with the new version value.
 
-Fetch the compiled corpus:
+Fetch the corpus:
 
 ```bash
 curl -s localhost:7891/sightmap
@@ -255,41 +256,126 @@ curl -s localhost:7891/sightmap
 
 ```json
 {
-  "site": "example-shop",
-  "version": "1753208412345",
-  "views": [
-    { "name": "plp", "route": "/b/**" },
-    { "name": "pdp", "route": "/p/**" }
-  ],
-  "globals": [
-    {
-      "name": "SiteHeader",
-      "selector": "header[data-testid=\"site-header\"]",
-      "parentChain": [],
-      "properties": []
-    }
-  ],
-  "viewComponents": {
-    "/b/**": [
+  "site": "shop",
+  "version": "1790285039286",
+  "corpus": {
+    "globals": [
       {
-        "name": "ProductPod",
-        "selector": "[data-testid=\"product-pod\"]",
-        "parentChain": [],
-        "properties": [
-          { "name": "label", "extract": "h3" }
-        ]
+        "name": "SiteHeader",
+        "selectors": ["header[data-testid=\"site-header\"]"]
       }
     ],
-    "/p/**": []
+    "views": [
+      {
+        "name": "plp",
+        "route": "/b/**",
+        "components": [
+          {
+            "name": "ProductPod",
+            "selectors": ["[data-testid=\"product-pod\"]"],
+            "properties": [
+              { "name": "price", "extract": "raw_text" }
+            ]
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
-`site` is the basename of the directory the server was started in. Each component carries its `name`, a comma-joined `selector` string, a `parentChain` (always an array, empty for top-level components), and its `properties`.
+`site` is the basename of the directory the server was started in. `corpus` is the loaded corpus with `$ref`s expanded and child components flattened: each component carries `name`, a `selectors` array (a child's selectors are joined to its parent's), and, when present, `source`, `memory`, `tags`, `properties`, `parentChain` (ancestor component names, root-first), and `stability`. Empty fields are omitted.
 
-<Warning>
-The `properties` entries reflect property extraction (`properties:` on components), which the CLI implements as a draft extension — it is not part of spec v1 and may change.
-</Warning>
+---
+
+### `sightmap export`
+
+Loads the corpus and prints it as the canonical corpus wire: indented JSON of the loaded corpus, byte-for-byte the shape a Go library consumer of `sightmap.Corpus` reads and the `corpus` field that `serve-sightmap` serves. `$ref`s are expanded and child components flattened, as described under [`serve-sightmap`](#sightmap-serve-sightmap). Top-level keys are `memory`, `globals`, `views`, `requests`, `messages`, and `signals`, each omitted when empty; views carry `name`, `route`, and, when present, `memory`, `components`, and `requests`. Authoring-only fields such as `url`, `stability`, `access`, and `snapshots` on views are not part of the wire.
+
+Without `--sightmap-dir`, `export` uses the nearest `.sightmap/` at or above the positional `dir` (or the current directory), so you can run it from anywhere inside a project. It writes to stdout, to a file with `-o`, or POSTs to a URL with `--url`.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--insecure` | off | Skip TLS verification when POSTing (automatic for `localhost`, `127.0.0.1`, `::1`, and `*.test` or `*.localhost` hosts) |
+| `-o` | stdout | Write to this file instead of stdout (ignored when `--url` is set) |
+| `--sightmap-dir` | nearest `.sightmap/` | Path to the `.sightmap/` directory; skips the upward search |
+| `--url` | — | POST the corpus to this URL as `application/json` |
+
+```bash
+sightmap export
+```
+
+```json
+{
+  "globals": [
+    {
+      "name": "SiteHeader",
+      "selectors": [
+        "header[data-testid=\"site-header\"]"
+      ]
+    }
+  ],
+  "views": [
+    {
+      "name": "plp",
+      "route": "/b/**",
+      "components": [
+        {
+          "name": "ProductPod",
+          "selectors": [
+            "[data-testid=\"product-pod\"]"
+          ],
+          "properties": [
+            {
+              "name": "price",
+              "extract": "raw_text"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+`--url` sends no auth headers: the destination URL is expected to carry its own token, typically as a query parameter. The upload reports on stderr and echoes any response body:
+
+```bash
+sightmap export --url 'https://ingest.example.com/sightmap?token=TOKEN'
+```
+
+```text
+sightmap: uploaded 509 bytes to ingest.example.com (HTTP 200)
+{"ok":true}
+```
+
+A non-2xx response fails the command with the status and response body. With no `.sightmap/` found, it fails with `export: no .sightmap/ directory found at or above DIR`.
+
+---
+
+### `sightmap push`
+
+POSTs a corpus JSON file, or stdin when `FILE` is omitted or `-`, to `URL` as `application/json`. It is the transport half of `export` as a separate step, and shares its upload behavior: no auth headers, `http` or `https` URLs only, a 30-second timeout, the same stderr report, and failure on a non-2xx response.
+
+**Flags:**
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--insecure` | off | Skip TLS verification (automatic for `localhost`, `127.0.0.1`, `::1`, and `*.test` or `*.localhost` hosts) |
+
+```bash
+sightmap export -o corpus.json
+sightmap push 'https://ingest.example.com/sightmap?token=TOKEN' corpus.json
+```
+
+```text
+sightmap: uploaded 510 bytes to ingest.example.com (HTTP 200)
+{"ok":true}
+```
+
+Pipe the two together to skip the file: `sightmap export | sightmap push 'URL'`.
 
 ---
 
@@ -316,7 +402,7 @@ sightmap skills install
 installed 2 sightmap skill(s) → /Users/you/.agents/skills
   sightmap-authoring
   sightmap-browser
-  version: 0.13.1
+  version: 0.32.0
 ```
 
 <Tip>
@@ -334,7 +420,7 @@ sightmap version
 ```
 
 ```text
-sightmap version 0.13.1
+sightmap version 0.32.0
 ```
 
 Releases are published on [GitHub Releases](https://github.com/sightmap/sightmap/releases); see [Install](/start/install) for the npm and `go install` paths.
@@ -352,9 +438,9 @@ Releases are published on [GitHub Releases](https://github.com/sightmap/sightmap
     Start a full session with `sightmap browser start` (the server is included), or run `sightmap serve-sightmap` standalone when you only need the HTTP endpoint.
   </Step>
   <Step title="Consume the endpoints">
-    Point your tooling at `GET /sightmap` for the compiled corpus and poll `GET /sightmap/version` to detect changes. The overlay extension does exactly this.
+    Point your tooling at `GET /sightmap` for the corpus and poll `GET /sightmap/version` to detect changes. The overlay extension does exactly this. For a one-off copy, or to upload the corpus to another service, use `sightmap export` instead.
   </Step>
   <Step title="Edit YAML and let it reload">
-    Save a `.yaml` or `.yml` file under a watched corpus directory. The server recompiles 200 ms after the last filesystem event and changes the version value. Polling clients can then fetch the new corpus.
+    Save a `.yaml` or `.yml` file under a watched corpus directory. The server reloads 200 ms after the last filesystem event and changes the version value. Polling clients can then fetch the new corpus.
   </Step>
 </Steps>

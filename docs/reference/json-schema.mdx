@@ -15,6 +15,33 @@ The schema lives in the monorepo and has a stable `$id` URL.
 | `$id` | `https://raw.githubusercontent.com/sightmap/sightmap/main/spec/v1/sightmap.schema.json` |
 | Source | [`spec/v1/sightmap.schema.json`](https://github.com/sightmap/sightmap/blob/main/spec/v1/sightmap.schema.json) |
 
+## Top-level shape
+
+Each file is an object that requires `version` and rejects unknown keys (`additionalProperties: false`).
+
+| Property | Schema | Notes |
+|---|---|---|
+| `version` | `const: 1` | Required |
+| `url` | string | File-level default representative URL for views that omit their own |
+| `memory` | `$defs/memory` | Non-empty strings |
+| `views` | array of `$defs/view` | |
+| `components` | array of `$defs/componentOrRef` | An inline `component` or a `componentRef` (`{ $ref: Name }`) |
+| `requests` | array of `$defs/request` | |
+| `messages` | array of `$defs/message` | Corpus-root only |
+| `signals` | array of `$defs/signal` | Corpus-root only |
+| `snapshots` | array of `$defs/snapshot` | Reserved tooling field; implementations MAY ignore it |
+
+The nested definitions are `view`, `component`, `componentRef`, `componentOrRef`, `componentProperty`, `request`, `requestProperty`, `payload`, `field`, `message`, `messageProperty`, `signal`, `selector`, `memory`, and `snapshot`.
+
+Some rules are enforced by validators rather than by the schema:
+
+- The `extract` grammar on `componentProperty` is a plain non-empty string in the schema. Implementations validate that it is one of `text`, `raw_text`, `attr=NAME`, `PATH.prop`, or `exists:PATH`.
+- `pattern` and `message` regexes are strings in the schema. Implementations MUST reject any that is not valid RE2.
+- `requestProperty` requires `field` or `pattern`, and requires `field` for a headers `source`. The schema encodes both rules with `anyOf` and `if`/`then`.
+- Signal `ref` resolution (`signal-ref-unresolved`, `signal-ref-ambiguous`) and `$ref` resolution (`ref-unresolved`, `ref-circular`) need the whole corpus, so a single-file schema check cannot catch them.
+
+See the [Schema reference](/reference/schema) for field semantics.
+
 ## yaml-language-server directive
 
 Add this comment as the first line of a `.sightmap/*.yaml` file to enable schema-based validation, completion, and hover documentation in compatible editors:

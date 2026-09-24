@@ -16,7 +16,7 @@ A curator can be a human, an agent, or both working together. The curator:
 - Records useful runtime behavior in `memory`.
 - Updates or removes definitions when the app changes.
 
-The [`sightmap` CLI](/cli/overview) supports this work with live browser snapshots, selector probes, and coverage reports. The bundled [`sightmap-authoring`](https://github.com/sightmap/sightmap/blob/main/go/skills/sightmap-authoring/SKILL.md) skill gives an agent the edit-and-verify workflow.
+The [`sightmap` CLI](/cli/overview) supports this work with live browser snapshots, selector probes, and coverage reports. The bundled [`sightmap-authoring`](https://github.com/sightmap/sightmap/blob/main/skills/sightmap-authoring/SKILL.md) skill gives an agent the edit-and-verify workflow.
 
 Curation still requires judgment. Coverage can find an unnamed button, but it cannot decide whether that button deserves its own component, which semantic name will remain useful, or whether an observed behavior belongs in `memory`. When an agent drafts the YAML, a human can review the same diff as any other code change.
 

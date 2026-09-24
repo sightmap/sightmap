@@ -21,7 +21,7 @@ The `command` values in `expected.json` (`match`, `explain`, `fmt`, `validate`, 
 
 ## Runtime-semantics fixtures (`0NN`)
 
-The `0NN` series covers loading, route matching, and diagnostics:
+The `0NN` series covers loading, route matching, validation of each entity type, and diagnostics:
 
 | # | Name | Exercises |
 |---|---|---|
@@ -36,6 +36,14 @@ The `0NN` series covers loading, route matching, and diagnostics:
 | 010 | `component-ref` | `$ref` expansion, view attestation, global+view dedup (SEP-0002) |
 | 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
 | 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
+| 013 | `route-trailing-slash` | Trailing slashes on the URL path are normalized away before matching |
+| 014 | `component-properties` | Component `properties:` with the tree-closed `extract` grammar validates (SEP-0010) |
+| 015 | `view-url` | `url:` on a view, and a file-level default, validates |
+| 016 | `stability-tooling-fields` | `stability:` on views and components validates; reserved tooling fields `access:` and `snapshots:` are permitted |
+| 017 | `tags` | `tags:` validates on components at several nesting levels, requests, and views (SEP-0004) |
+| 018 | `request-properties` | Request `properties:` validates via `field` and `pattern`; a reserved identity name warns with `request-property-shadows-reserved` (SEP-0005) |
+| 019 | `messages` | `messages:` validates, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` (SEP-0006) |
+| 020 | `message-properties` | Message stack `properties:` (`top.file`, `top.function`, an indexed frame with `pattern`) validates (SEP-0006) |
 
 ## Canonical-format fixtures (`1NN`)
 
@@ -67,6 +75,31 @@ node scripts/validate-sightmap.mjs conformance
 ```
 
 The checker above validates YAML; it does not execute the `{ command, args, expected }` cases. Each implementation needs a fixture runner that loads the `sightmap/` directory, executes each `command` with its `args`, and checks the result against `expected`.
+
+<Note>
+Most `cases` are not executed by the reference implementation yet. The exception is the message fixtures (`019`, `020`): the Go test `go/sightmap/spec_conformance_test.go` runs the reference validator over them and asserts each `validate` case's diagnostics. For every other fixture, `expected.json` is a contract for implementations and a record of intent, and the Go unit tests provide the executed coverage. A passing schema check means only that the inputs are schema-valid.
+</Note>
+
+## Selector-matching fixtures
+
+A separate corpus under [`go/conformance/fixtures/`](https://github.com/sightmap/sightmap/tree/main/go/conformance/fixtures) tests the component-tree matching layer. Each fixture holds a `component-tree.json`, a flat `sightmap.yaml`, and an `expected-matches.json` that maps component names to node IDs. The Go runner in `go/match/conformance_test.go` executes all of them with `go test ./match/...`.
+
+| # | Name | Exercises |
+|---|---|---|
+| 001 | `simple-tag` | Tag selectors |
+| 002 | `class-selector` | Class selectors |
+| 003 | `attribute-selectors` | Attribute selectors and operators |
+| 004 | `descendant` | Descendant combinator |
+| 005 | `direct-child` | Child (`>`) combinator |
+| 006 | `not-pseudo` | `:not()` |
+| 007 | `multi-query` | Several component definitions matched in one traversal |
+| 008 | `first-match-wins` | A node claimed by more than one definition keeps the first |
+| 009 | `invisible-included` | Matching runs before visibility filtering, so invisible nodes still match |
+| 010 | `iframe-prefix` | Frame-prefixed node IDs do not affect traversal |
+| 011 | `native-mobile-synthetic` | Synthetic selectors on native-mobile nodes |
+| 012 | `id-class-field-attrs` | Attribute selectors on `id` and `class` resolve against the node's dedicated ID and class fields |
+| 013 | `not-has-leaf-scoping` | `:has()` nested inside `:not()`: `X:not(:has(X))` matches only the innermost `X` |
+| 014 | `not-complex-descendant` | A descendant combinator inside `:not()`: `a b:not(c b)` excludes matches that have a `c` ancestor |
 
 ## Contributing a new fixture
 

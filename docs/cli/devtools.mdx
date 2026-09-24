@@ -4,50 +4,58 @@ sidebarTitle: "Devtools"
 description: "Read captured browser console messages and network requests from a running Sightmap session."
 ---
 
-`sightmap console` and `sightmap network` read the browser activity captured during a session. The [`browser start`](/cli/browser) daemon runs a **collector**: a session-lifetime CDP client that attaches to every tab and buffers console messages and network requests into bounded ring buffers (the most recent ~1000 of each). These commands query that buffer over the daemon's HTTP server.
+`sightmap console` and `sightmap network` read the browser activity captured during a session. The [`browser start`](/cli/browser) daemon runs a **collector**: a session-lifetime CDP client that attaches to every tab and buffers console messages and network requests into bounded ring buffers (the most recent 1000 of each). These commands query that buffer over the daemon's HTTP server, found through the session file for `--sightmap-dir`.
 
 <Note>
-Devtools commands require a running `browser start` session — the collector lives in that daemon. With no session they print `no running session — start one with 'sightmap browser start'`. Entries captured before the session started are not available.
+Devtools commands require a running `browser start` session, because the collector lives in that daemon. With no session they print `no running session — start one with 'sightmap browser start'`. Entries captured before the session started are not available. For an `--attach` session, capture begins when the daemon attaches.
 </Note>
 
-Buffers are invisible until they overflow: a long burst of activity (or a client that stays away for a while) drops the oldest entries, which `list` reports as `(N earlier entries dropped — buffer overflowed)`.
+Buffers are invisible until they overflow: a long burst of activity drops the oldest entries, which `list` reports as `(N earlier console entries dropped — buffer overflowed)` (or `network entries`).
+
+**Entries are matched against the corpus.** Each entry is checked against the corpus's `messages:` (console) and [`requests:`](/spec/requests) (network) definitions at query time. The name of every matching definition appears in brackets, or `[--]` when none match, followed by any extracted properties in braces. See [Message](/reference/schema#message) in the schema reference.
 
 ---
 
 ### `console list`
 
-Lists captured console messages, oldest to newest. Uncaught exceptions are folded in as level `exception`.
+Lists captured console messages, oldest to newest. Uncaught exceptions are folded in as level `exception`; `console.warn` appears as `warn`, and `console.assert` failures as `error`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--level` | all | Filter by level: `log`, `debug`, `info`, `warn`, `error`, `exception` |
 | `--tab` | all tabs | Filter by tab ID |
-| `--limit` | all | Show only the most recent N messages |
+| `--limit` | `0` (all) | Show only the most recent N messages |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to query and whose `messages:` to match |
 
 ```bash
 sightmap console list --level error --limit 20
 ```
 
 ```text
-[42] error     Uncaught TypeError: cart.total is not a function
-[57] exception TypeError: undefined is not iterable
+[42] [--]                   error     Uncaught TypeError: cart.total is not a function
+[57] [CartVersionMismatch]  error     cart version mismatch (expected v12, got v13)
 ```
 
-Each line is `[index] level text`. When entries span multiple tabs, the tab ID is shown too. The `index` is stable — pass it to `console get`.
+Each line is `[index] [matches] level text {properties}`. When entries span multiple tabs, the first 8 characters of the tab ID appear in brackets before the text. The `index` is stable; pass it to `console get`. With nothing captured, it prints `No console messages captured.`
 
 ---
 
 ### `console get`
 
-Prints one console message by index.
+Prints one console message by index, followed by `Matches:` and `Properties:` lines when the corpus matches it.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to query |
 
 ```bash
-sightmap console get 42
+sightmap console get 57
 ```
 
 ```text
-[42] error  (tab 8A3F0C7D)
-Uncaught TypeError: cart.total is not a function
+[57] error  (tab 8A3F0C7D)
+cart version mismatch (expected v12, got v13)
+Matches: CartVersionMismatch
 ```
 
 ---
@@ -58,32 +66,34 @@ Lists captured network requests, oldest to newest.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--type` | all | Filter by resource type (`Document`, `XHR`, `Fetch`, `Stylesheet`, `Image`, `Script`, `Font`, …) |
+| `--type` | all | Filter by resource type, case-insensitive (`Document`, `XHR`, `Fetch`, `Stylesheet`, `Image`, `Script`, `Font`, …) |
 | `--url` | all | Filter by URL substring (case-insensitive) |
 | `--tab` | all tabs | Filter by tab ID |
-| `--limit` | all | Show only the most recent N requests |
+| `--limit` | `0` (all) | Show only the most recent N requests |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to query and whose `requests:` to match |
 
 ```bash
 sightmap network list --type XHR --url /api/cart
 ```
 
 ```text
-[128] POST https://shop.example.com/api/cart → 500 Server Error (XHR)
-[131] GET https://shop.example.com/api/cart → 200 OK (XHR)
+[128] [CartApi]              POST https://shop.example.com/api/cart → 500 Server Error (XHR) {sku=12345}
+[131] [CartApi]              GET https://shop.example.com/api/cart → 200 OK (XHR)
 ```
 
-Each line is `[index] method url → status (resourceType)`. Requests with no response yet show `pending`.
+Each line is `[index] [matches] method url → status (resourceType) {properties}`. Requests with no response yet show `pending`. With nothing captured, it prints `No network requests captured.`
 
 ---
 
 ### `network get`
 
-Prints one request's metadata by index, then its response body. Bodies are fetched on demand from the collector connection that observed the request.
+Prints one request's metadata and headers by index, then its response body. The collector keeps XHR and Fetch response bodies as they arrive; other bodies are fetched on demand from the connection that observed the request, and Chrome may already have evicted them. In that case `network get` still prints the metadata and reports that the body is no longer available.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--response-file` | none | Write the full response body to this file instead of previewing it |
 | `--request-file` | none | Write the request body (POST data) to this file |
+| `--sightmap-dir` | `.sightmap` | Corpus whose session to query |
 
 ```bash
 sightmap network get 128 --response-file /tmp/cart-error.json
@@ -95,10 +105,17 @@ URL: https://shop.example.com/api/cart
 Resource Type: XHR
 Status: 500 Server Error
 Tab: 8A3F0C7D2B1E4F6A9C8D7E5B3A2F1E0D
+Matches: CartApi
+Properties:
+  sku = 12345
+Request Headers:
+  Content-Type: application/json
+Response Headers:
+  content-type: application/json
 response body saved: /tmp/cart-error.json (842 bytes)
 ```
 
-Without `--response-file`, `network get` previews the first few KB of the response body inline.
+Without `--response-file`, `network get` prints the response body inline under `Response Body:`, truncated to the first 4096 bytes. Header values longer than 512 characters are truncated.
 
 ---
 
@@ -106,7 +123,7 @@ Without `--response-file`, `network get` previews the first few KB of the respon
 
 <Steps>
   <Step title="Start a session">
-    `sightmap browser start` — the collector begins capturing as soon as Chrome is ready.
+    `sightmap browser start --detach`. The collector begins capturing as soon as Chrome is ready.
   </Step>
   <Step title="Reproduce the issue">
     Drive the page with [interaction commands](/cli/interaction) or in the browser window.

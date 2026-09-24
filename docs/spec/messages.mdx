@@ -1,0 +1,108 @@
+---
+title: "Sightmap Messages: Console and Exception Patterns"
+sidebarTitle: "Messages"
+description: "Name recurring console output and uncaught exceptions by level and RE2 pattern so every consumer classifies them the same way."
+---
+
+A message is a named console-output or runtime-exception pattern. It gives console activity the kind of named entity that `requests:` gives network activity. You can state once that a cart version mismatch breaks checkout, and consumers do not each need their own matching logic.
+
+```yaml
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    description: The cart was mutated by another tab; checkout will fail.
+    source: src/cart/sync.ts
+
+  - name: SlowNetworkWarning
+    level: WARN
+    message: 'request .* took over \d+ms'
+
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    message: 'Cannot read propert(y|ies) .* of (null|undefined)'
+```
+
+Only `name` is required. See [Schema reference](/reference/schema#message) for the full type.
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Stable identifier that other tooling can reference by name. |
+| `level` | no | Exact, case-insensitive match against the observed record's level. Matches any level if omitted. |
+| `message` | no | An RE2 regex matched against the record's text. Matches any text if omitted. |
+| `description` | no | What the pattern means, for a human reading the corpus. |
+| `source` | no | Relative path to the source most likely to emit the record. |
+| `properties` | no | Values to extract from an exception's stack. See [Stack properties](#stack-properties). |
+
+`messages:` exists only at the file root. It has no view-scoped form.
+
+## Matching
+
+A record matches an entry when every declared constraint holds: `level` by case-insensitive equality, and `message` by regex. An omitted constraint matches anything. An entry that declares neither `level` nor `message` matches every record, which is valid but rarely useful.
+
+`message` uses [RE2 syntax](/reference/schema#regular-expressions), the dialect of Go's `regexp`, Rust's `regex`, and the `re2` npm package. RE2 matches in linear time and has no backreferences or lookaround. Character classes, alternation, quantifiers, anchors, and capture groups all work. Implementations MUST reject a `message` that is not valid RE2; the reference CLI reports `message-regex-invalid`.
+
+## Levels
+
+The reference capture emits these levels:
+
+| Level | Origin |
+|---|---|
+| `log`, `debug`, `info` | `console.log`, `console.debug`, `console.info` |
+| `warn` | `console.warn` |
+| `error` | `console.error`, `console.assert` |
+| `exception` | An uncaught exception or unhandled rejection |
+
+<Warning>
+An uncaught exception arrives as `exception`, not `error`. `level: ERROR` does not match one. To match exceptions, write `level: EXCEPTION`.
+</Warning>
+
+Because the origin is carried as a level value, console output and exceptions share one entity and need no separate `kind:` field.
+
+The `level` vocabulary is open: it is free text, not an enum, so a corpus can name a level that another consumer's capture emits. The tradeoff is that a typo matches nothing instead of failing validation. For example, `level: WARNING` never matches, because the reference capture normalizes that level to `warn`. `sightmap lint` flags a level outside the known set with `message-level-unknown`.
+
+## Ambiguous matches
+
+Two entries that can match the same record are ambiguous.
+
+- **Static overlap.** When the overlap is decidable from the corpus, validation warns with `message-conflict`. The overlap is decidable when both entries have the same `level` (or one omits it) and an identical or absent `message`. Whether two different regexes can match the same text is not decidable in general, so validation does not check it.
+- **Live records.** A consumer that evaluates live records MUST surface an ambiguity when a record matches more than one entry. It must not silently use the first match.
+
+[SEP-0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md) also has implementations warn when two entries share a `name` (`merge-collision-message`), because a name that appears twice cannot be referenced unambiguously.
+
+## Stack properties
+
+`properties:` extracts named values from an uncaught exception's stack trace. You can classify an exception by where it was thrown and record the failing location. The shape reuses the `source`/`field`/`pattern` model from [request properties](/spec/requests#properties).
+
+```yaml
+messages:
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    message: 'Cannot read propert(y|ies) .* of (null|undefined)'
+    properties:
+      - name: origin_file        # the throwing frame's file
+        source: stack
+        field: top.file
+      - name: origin_fn
+        source: stack
+        field: top.function
+      - name: caller_base        # frame 1's file, refined to its basename
+        source: stack
+        field: 1.file
+        pattern: '([^/]+)$'
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Key a consumer refers to the value by. Must match `^[a-z][a-z0-9_]*$`. |
+| `source` | yes | Root to read from. The only value in stream `1` is `stack`. |
+| `field` | yes | `<frame>.<attribute>`. `<frame>` is `top` (an alias for `0`) or a non-negative frame index, with the throwing frame first. `<attribute>` is `function`, `file`, `line`, or `column`. |
+| `pattern` | no | An RE2 regex applied to what `field` resolved. Capture group 1 is the value when present; otherwise the whole match. |
+
+`field` is always required, because a stack has no useful bare-regex scan. Validation rejects a `source` other than `stack`, a missing `field`, and a `pattern` that is not valid RE2.
+
+Extraction requires live records, and value omission is silent. A property that doesn't resolve is absent, not an error. This includes a plain console record with no stack, an out-of-range frame index, an unknown attribute, and a pattern with no match.
+
+## Next
+
+[Signals](/spec/signals) name a boolean predicate over an existing component or view. See [Message](/reference/schema#message) in the schema reference for the normative statement.
