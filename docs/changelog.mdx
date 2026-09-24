@@ -31,6 +31,12 @@ The offline component-tree matcher (used by `snapshot`, `coverage`, `validate`, 
 
 Note: `SelectorPart.Not` changes from `*SelectorPart` to `[]ParsedSelector` to represent the complex-selector-list argument.
 
+Reliable CLI-driven headful sessions.
+
+- **`browser front`** (alias `activate`) brings the tab to the front (CDP `Page.bringToFront`). A backgrounded tab runs at `visibilityState: "hidden"`, where Chrome starves `requestAnimationFrame`, so frame-dependent interactions (scroll-into-view, coordinate hit-testing, a widget's own open/commit animation) silently stall; foregrounding the tab restores a live frame clock.
+- **`browser eval --timeout-ms N`** raises the bound on an awaited script (default 30 000 ms), for a long awaited action such as a multi-step injected action list.
+- `browser start` now launches headful Chrome with occlusion and background-throttling disabled (`--disable-features=CalculateNativeWinOcclusion`, `--disable-backgrounding-occluded-windows`, `--disable-renderer-backgrounding`, `--disable-background-timer-throttling`), so a session window hidden behind your editor or terminal stays visible to the page and keeps rendering. No-op for headless.
+
 Reframe the sightmap-authoring skill's "Property extraction principles" around
 **purpose**: a property earns its place only as a discriminator (makes an
 otherwise-ambiguous instance addressable) or as signal (a value a downstream
@@ -57,6 +63,10 @@ names, so following them left `document.modelContext` undefined on Google Chrome
 and made the native path look unshipped. The message and the `browser mcp` docs
 now name the real switch, `--enable-features=WebMCPTesting` (the same feature as
 `chrome://flags/#enable-webmcp-testing`). Fixes #413.
+
+`browser eval` and `browser screenshot` now diagnose an unresponsive tab. When a call hits its deadline, the CLI re-probes the same tab with a trivial eval; if that also times out, the error says the tab is **unresponsive** (the renderer has likely crashed or its main thread is wedged) and how to recover (`browser navigate <url>`, or `browser stop` then `browser start`), instead of a bare "context deadline exceeded". A probe that answers leaves the original error unchanged.
+
+`browser mcp call` also detects native WebMCP more robustly: on a framework-patched page (e.g. Angular's Zone.js wrapping `executeTool`), it now treats the surface as native if either `getTools` or `executeTool` is native, so arguments are sent as the JSON string native WebMCP requires rather than rejected with "Failed to parse input arguments".
 
 </Update>
 

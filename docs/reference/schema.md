@@ -10,7 +10,7 @@ description: "Exhaustive field-level reference for the Sightmap v1 YAML format, 
 
 > **Status**: spec stream `1`, project semver **0.1.0** (pre-1.0). In-place tightening allowed until the project hits 1.0.0. See [the versioning policy](/reference/versioning).
 
-A sightmap is a directory of YAML files at the root of a project, under `.sightmap/`. It describes the app's **views**, **components**, and **requests**, with optional **memory** entries that carry notes agents can use at runtime.
+A sightmap is a directory of YAML files at the root of a project, under `.sightmap/`. It describes the app's **views**, **components**, and **requests**, plus corpus-root **messages** (console/exception patterns) and **signals** (named state predicates), with optional **memory** entries that carry notes agents can use at runtime.
 
 This document is the human-readable reference. The machine-readable contract is [`sightmap.schema.json`](https://github.com/sightmap/sightmap/blob/main/spec/v1/sightmap.schema.json).
 
@@ -19,7 +19,7 @@ This document is the human-readable reference. The machine-readable contract is 
 - Every `*.yaml` and `*.yml` file under `.sightmap/` is discovered recursively.
 - All files are loaded and merged at load time. The directory layout is a convenience for authors; it has no semantic meaning.
 - Every file must begin with `version: 1`.
-- Merging is shallow-append per top-level collection (`views`, `components`, `requests`). Two files may define the same view; the runtime behavior in that case is implementation-defined and SDKs SHOULD emit a warning.
+- Merging is shallow-append per top-level collection (`views`, `components`, `requests`, `messages`, `signals`). Two files may define the same view; the runtime behavior in that case is implementation-defined and SDKs SHOULD emit a warning.
 
 ## File root
 
@@ -30,6 +30,7 @@ views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
 requests:    # optional, Request[] — global, matched on every view
 messages:    # optional, Message[] — console/exception patterns
+signals:     # optional, Signal[] — named state predicates
 ```
 
 | Field | Type | Required | Description |
@@ -40,6 +41,7 @@ messages:    # optional, Message[] — console/exception patterns
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
 | `requests` | [Request](#request)[] | no | **Global** requests — matched against every view. |
 | `messages` | [Message](#message)[] | no | Console-output and exception patterns. Corpus-root only; there is no view-scoped form. |
+| `signals` | [Signal](#signal)[] | no | Named state predicates over a component or view. Corpus-root only; there is no view-scoped form. |
 
 ## View
 
@@ -98,7 +100,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `description` | string | no | Free-text. Not surfaced at runtime. |
 | `memory` | string[] | no | Component-level memory entries. |
 | `stability` | string | no | Authoring-confidence marker: `uncertain` or `unstable`. See [Stability](#stability). |
-| `properties` | [Property](#component-properties)[] | no | Named DOM-value extractions surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Extracted from the live DOM at snapshot time; unavailable to offline tools. See [Component properties](#component-properties). |
+| `properties` | [Property](#component-properties)[] | no | Named values surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Resolved over the component tree, so offline tools can compute them from a serialized tree. See [Component properties](#component-properties). |
 | `tags` | string[] | no | Open-vocabulary classification labels for this component. See [Tags](#tags). |
 | `children` | (Component \| [ComponentRef](#component-references))[] | no | Nested components. Child selectors are scoped to the parent's subtree. Entries may be either inline definitions or `$ref` reference objects. |
 
