@@ -255,6 +255,21 @@ function activeComponents() {
   return [...byName.values()];
 }
 
+/**
+ * True once a corpus has actually loaded. fetchSightmap only records
+ * state.version when the fetch came back with a non-empty component set, so the
+ * version stamp IS the "loaded and usable" signal.
+ *
+ * Do NOT use state.globals.length for this. `globals` is the optional file-root
+ * components.yaml list, and it is omitempty on the wire — a corpus whose
+ * components are all view-scoped (the common case) ships no `globals` key at
+ * all. Gating on it left hover permanently dead while clicks kept resolving,
+ * because the click path already gated on state.version.
+ */
+function corpusLoaded() {
+  return Boolean(state.version);
+}
+
 // ── Sightmap loading ──────────────────────────────────────────────────────────
 
 // The content script prefers a DIRECT fetch to the local sightmap server. On an
@@ -392,7 +407,7 @@ async function pollVersion() {
   // Keep retrying until we have a non-empty corpus. state.version is only set
   // once a load succeeded WITH components, so this also covers the "server
   // answered empty at startup" case that used to stick permanently.
-  if (!state.version || !state.globals.length) {
+  if (!corpusLoaded()) {
     await fetchSightmap();
     return;
   }
@@ -529,7 +544,7 @@ function renderOverlay(path, target) {
 let hoverRaf = null;
 
 function onMouseMove(e) {
-  if (!state.enabled || !state.globals.length) return;
+  if (!state.enabled || !corpusLoaded()) return;
 
   // Ignore events on our own overlay elements
   if (e.target?.id?.startsWith?.("__sightmap")) return;
