@@ -51,3 +51,30 @@ jobs:
       - run: go build ./...
 
       - run: go test ./...
+
+  js:
+    # The browser-side JS embedded into the Go binary (go/**/*.js) has jsdom
+    # tests, but nothing ran them until now — which is how a matcher bug that
+    # discarded 48% of a corpus shipped. Path-filtered with the rest of go/**.
+    name: embedded js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # The extension's matching core lives in resolver.js. content.js carries a
+      # GENERATED copy of it, because an MV3 declarative content script runs as a
+      # classic script and cannot import an ES module. Fail on drift rather than
+      # let one fix land in only one of the two copies.
+      - name: extension resolver copy in sync
+        run: node scripts/sync-extension-resolver.mjs --check
+
+      - run: npm run fmt:check
+
+      - run: npm test
