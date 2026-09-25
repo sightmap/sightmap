@@ -7,12 +7,17 @@
  * This module is the portable core of the overlay; it is designed to be
  * reusable outside the extension context (e.g. in a hosted service worker
  * that has access to a serialized DOM tree).
+ *
+ * Everything between the SHARED-WITH-CONTENT markers below is mirrored verbatim
+ * into content.js, which is a classic MV3 content script and cannot import an ES
+ * module. resolver.test.js fails if the two copies drift — edit here, then run
+ * `node scripts/sync-extension-resolver.mjs`.
  */
 
 import { buildFormatted } from "./types.js";
 export { buildFormatted };
 
-// ── DOM helpers ───────────────────────────────────────────────────────────────
+// ─── SHARED-WITH-CONTENT:START ───────────────────────────────────────────────
 
 /** Count how many elements are between el and documentElement. */
 function domDepth(el) {
@@ -25,16 +30,78 @@ function domDepth(el) {
   return depth;
 }
 
+// ── Component addressing ──────────────────────────────────────────────────────
+
+/**
+ * Separator joining a component's ancestor names into its address.
+ *
+ * NUL, because the spec puts no charset restriction on a component `name`
+ * (`{type: "string", minLength: 1}`), so any printable separator could in
+ * principle occur inside one. Addresses are internal keys and are never shown.
+ */
+const ADDRESS_SEP = "\u0000";
+
+/**
+ * A component's identity: its ancestor chain plus its own name.
+ *
+ * Component names are unique only WITHIN A PARENT — that scoping is the whole
+ * point of `children:` in the spec ("this is how Sightmap avoids naming
+ * collisions between, say, two different card components that both contain a
+ * button.primary"). So a bare name is NOT an identity, and any map keyed by one
+ * silently merges unrelated components.
+ *
+ * That is not an edge case on real pages. A production sign-in corpus we measured
+ * has 104 components under 54 distinct names — `Text` ×18, `Label` ×13 — so a
+ * name-keyed map discards 48% of the map before matching even starts.
+ *
+ * @param {import("./types.js").FlatComponent} comp
+ * @returns {string}
+ */
+export function componentAddress(comp) {
+  return [...(comp.parentChain ?? []), comp.name].join(ADDRESS_SEP);
+}
+
+/** The address of a component's parent, or "" for a root component. */
+export function parentAddress(comp) {
+  return (comp.parentChain ?? []).join(ADDRESS_SEP);
+}
+
+/**
+ * Collapse component lists into one active set, later entries winning at the
+ * same ADDRESS — the merge a caller wants when overlaying view-scoped components
+ * onto file-root globals.
+ *
+ * Keyed by address, not name: a view component should override an identically
+ * *addressed* global, but two components merely sharing a leaf name are
+ * unrelated and must both survive.
+ *
+ * @param {...import("./types.js").FlatComponent[]} lists  low → high precedence
+ * @returns {import("./types.js").FlatComponent[]}
+ */
+export function dedupeByAddress(...lists) {
+  const byAddress = new Map();
+  for (const list of lists) {
+    for (const comp of list ?? []) byAddress.set(componentAddress(comp), comp);
+  }
+  return [...byAddress.values()];
+}
+
+/** The component named `name` whose parent is `ownerAddress`, or null. */
+function childNamed(components, ownerAddress, name) {
+  return (
+    components.find(
+      (c) => parentAddress(c) === ownerAddress && c.name === name,
+    ) ?? null
+  );
+}
+
 // ── Property extraction ───────────────────────────────────────────────────────
 
 /**
- * First element in el's subtree (document order, excluding el) matched by the
- * component named `name` — found via that component's compound selector, scoped
- * to el by containment. Mirrors the Go matcher's "first descendant matched
- * component named X".
+ * First element in el's subtree (document order, excluding el) matched by `def`.
+ * Mirrors the Go matcher's "first descendant matched component named X".
  */
-function firstDescendantEl(el, name, components) {
-  const def = components.find((c) => c.name === name);
+function firstDescendantEl(el, def) {
   if (!def || !def.selector) return null;
   try {
     return el.querySelectorAll(def.selector)[0] ?? null;
@@ -43,40 +110,61 @@ function firstDescendantEl(el, name, components) {
   }
 }
 
-/** Walk a dotted component-name path into el's subtree; deepest element or null. */
-function resolvePath(el, path, components) {
+/**
+ * Walk a dotted component-name path down from `el`, resolving each segment among
+ * the CHILDREN of the component reached so far — starting from `ownerAddress`.
+ *
+ * Resolving a segment by bare name instead would pick an arbitrary namesake from
+ * anywhere in the corpus: a submit button's `Label.label` resolved `Label` to a
+ * text field's label somewhere else entirely, found nothing inside the button,
+ * and silently dropped the property.
+ *
+ * @returns {{el: Element, def: object}|null} the deepest segment's element + def
+ */
+function resolvePath(el, path, components, ownerAddress) {
   let cur = el;
+  let addr = ownerAddress;
+  let def = null;
   for (const seg of path.split(".")) {
     if (!seg) return null;
-    const next = firstDescendantEl(cur, seg, components);
+    def = childNamed(components, addr, seg);
+    if (!def) return null;
+    const next = firstDescendantEl(cur, def);
     if (!next) return null;
     cur = next;
+    addr = componentAddress(def);
   }
-  return cur === el ? null : cur;
+  return cur === el ? null : { el: cur, def };
 }
 
 /**
  * Resolve one SEP-0010 extract directive against el, over the component tree.
  * References descend only, so recursion always terminates.
  */
-function resolveExtract(el, extract, components) {
+function resolveExtract(el, extract, components, ownerAddress) {
   if (extract === "text") return el.textContent;
   if (typeof extract !== "string") return null;
   if (extract.startsWith("attr=")) return el.getAttribute(extract.slice(5));
   if (extract.startsWith("exists:")) {
-    return resolvePath(el, extract.slice(7), components) ? "true" : null;
+    return resolvePath(el, extract.slice(7), components, ownerAddress)
+      ? "true"
+      : null;
   }
   // PATH.prop — the descendant component's own extracted property.
   const dot = extract.lastIndexOf(".");
   if (dot <= 0 || dot === extract.length - 1) return null;
-  const path = extract.slice(0, dot);
-  const target = resolvePath(el, path, components);
-  if (!target) return null;
-  const def = components.find((c) => c.name === path.split(".").pop());
-  if (!def) return null;
-  const pd = (def.properties || []).find((p) => p.name === extract.slice(dot + 1));
+  const hit = resolvePath(el, extract.slice(0, dot), components, ownerAddress);
+  if (!hit) return null;
+  const pd = (hit.def.properties || []).find(
+    (p) => p.name === extract.slice(dot + 1),
+  );
   if (!pd) return null;
-  return resolveExtract(target, pd.extract, components);
+  return resolveExtract(
+    hit.el,
+    pd.extract,
+    components,
+    componentAddress(hit.def),
+  );
 }
 
 /**
@@ -85,17 +173,27 @@ function resolveExtract(el, extract, components) {
  * reference descendant components. `text` is the element's DOM text content — the
  * extension's implementation-defined accessible text.
  *
+ * `ownerAddress` is the address of the component these descriptors belong to;
+ * descendant references resolve among ITS children. It defaults to "" (a root
+ * component), which is also what a caller with no hierarchy wants.
+ *
  * @param {Element}             el
  * @param {import("./types.js").PropertyDescriptor[]} descriptors
  * @param {import("./types.js").FlatComponent[]}      components
+ * @param {string}              [ownerAddress]
  * @returns {Record<string,string>}
  */
-export function extractProperties(el, descriptors, components) {
+export function extractProperties(
+  el,
+  descriptors,
+  components,
+  ownerAddress = "",
+) {
   if (!descriptors || !descriptors.length) return {};
   const result = {};
   for (const desc of descriptors) {
     try {
-      let val = resolveExtract(el, desc.extract, components || []);
+      let val = resolveExtract(el, desc.extract, components || [], ownerAddress);
       if (val == null || val === "") continue;
       val = String(val).trim().replace(/\s+/g, " ");
       if (val) result[desc.name] = val.slice(0, 120); // cap at 120 chars
@@ -116,8 +214,10 @@ export function extractProperties(el, descriptors, components) {
  *  - Returns the nearest ancestor-or-self that matches the selector
  *  - Is O(depth) per component — fast enough for 60fps hover
  *
- * Parent scoping is enforced: a child component is only included if its matched
- * ancestor is inside the immediate parent component's matched element.
+ * Parent scoping is enforced BY ADDRESS: a child is included only if its own
+ * parent matched, and matched inside it. Components are visited ancestor-first so
+ * that "its parent matched" is always decidable, whatever order the caller
+ * supplied them in.
  *
  * @param {Element}                              el         - Hovered or clicked element
  * @param {import("./types.js").FlatComponent[]} components - Flat list from CompiledSightmap
@@ -126,11 +226,17 @@ export function extractProperties(el, descriptors, components) {
 export function resolveElement(el, components) {
   if (!el || !components || !components.length) return [];
 
-  /** @type {Map<string, Element>} Maps component name → its matched ancestor element */
-  const matchedElements = new Map();
-  const matchList = []; // { name, element, depth, properties }
+  // Ancestor-first. A component can only be scoped once its parent has been
+  // resolved, and the caller's order is not guaranteed to be depth-first.
+  const ordered = [...components].sort(
+    (a, b) => (a.parentChain?.length ?? 0) - (b.parentChain?.length ?? 0),
+  );
 
-  for (const comp of components) {
+  /** @type {Map<string, Element>} component ADDRESS → its matched ancestor */
+  const matchedByAddress = new Map();
+  const matchList = []; // { comp, element, depth }
+
+  for (const comp of ordered) {
     if (!comp.selector) continue;
 
     let ancestor;
@@ -141,47 +247,31 @@ export function resolveElement(el, components) {
     }
     if (!ancestor) continue;
 
-    // ── Parent scoping ─────────────────────────────────────────────────
-    // If this component has a parent chain, verify the matched ancestor
-    // is actually inside the immediate parent's matched element.
-    if (comp.parentChain && comp.parentChain.length > 0) {
-      const parentName = comp.parentChain[comp.parentChain.length - 1];
-      const parentEl = matchedElements.get(parentName);
-      if (parentEl) {
-        // The ancestor must be the parentEl or a descendant of it
-        if (parentEl !== ancestor && !parentEl.contains(ancestor)) continue;
-      } else {
-        // Parent wasn't matched yet — find it from the ancestor's lineage
-        // (handles cases where components array ordering isn't depth-first)
-        const parentComp = components.find((c) => c.name === parentName);
-        if (parentComp) {
-          let parentMatch;
-          try {
-            parentMatch = ancestor.closest(parentComp.selector);
-          } catch {
-            continue;
-          }
-          if (!parentMatch) continue;
-          matchedElements.set(parentName, parentMatch);
-        }
-      }
+    if ((comp.parentChain?.length ?? 0) > 0) {
+      // A component whose own parent did not match is not in scope, however much
+      // its selector looks like a hit. Looking the parent up by bare name would
+      // accept an unrelated namesake's match as authority.
+      const parentEl = matchedByAddress.get(parentAddress(comp));
+      if (!parentEl) continue;
+      if (parentEl !== ancestor && !parentEl.contains(ancestor)) continue;
     }
 
-    matchedElements.set(comp.name, ancestor);
-    matchList.push({
-      name: comp.name,
-      element: ancestor,
-      depth: domDepth(ancestor),
-      properties: comp.properties ?? [],
-    });
+    matchedByAddress.set(componentAddress(comp), ancestor);
+    matchList.push({ comp, element: ancestor, depth: domDepth(ancestor) });
   }
 
   // Sort by depth ascending (shallowest = outermost first)
   matchList.sort((a, b) => a.depth - b.depth);
 
   return matchList.map((m) => ({
-    name: m.name,
-    properties: extractProperties(m.element, m.properties, components),
+    name: m.comp.name,
+    address: componentAddress(m.comp),
+    properties: extractProperties(
+      m.element,
+      m.comp.properties ?? [],
+      components,
+      componentAddress(m.comp),
+    ),
     boundingBox: m.element.getBoundingClientRect(),
   }));
 }
@@ -241,9 +331,12 @@ export function deepestComponentAt(root, x, y, components) {
  */
 export function resolveTier(el, path, components) {
   if (!path.length) return 3;
-  // T1: the element itself (or its direct tag) is the innermost match's element
+  // T1: the element itself is the innermost match's element. Looked up by
+  // address — by name would test an unrelated namesake's selector.
   const innermost = path[path.length - 1];
-  const innermostComp = components.find((c) => c.name === innermost.name);
+  const innermostComp = components.find(
+    (c) => componentAddress(c) === innermost.address,
+  );
   if (innermostComp) {
     try {
       if (el.matches(innermostComp.selector)) return 1;
@@ -251,3 +344,5 @@ export function resolveTier(el, path, components) {
   }
   return 2;
 }
+
+// ─── SHARED-WITH-CONTENT:END ─────────────────────────────────────────────────
