@@ -1,5 +1,42 @@
 # @sightmap/sightmap
 
+## 0.33.0
+
+### Minor Changes
+
+- 9b01e45: browser: enable CDP focus emulation (`Emulation.setFocusEmulationEnabled`) on each tab so `document.hasFocus()` is always true regardless of the real OS window focus. Some page widgets gate behavior on page focus — e.g. react-aria date pickers open only on focus _while the page holds OS focus_ — which an agent-, side-panel-, or headless-driven page never has, making them impossible to actuate in-page. Matches Playwright/Puppeteer, which enable the same emulation by default. Best-effort: a transitional target or very old Chrome that rejects the call simply falls back to the prior focus-dependent behavior.
+
+### Patch Changes
+
+- c80799d: Fix `sightmap browser start --port 0` / `--cdp-port 0` (documented as
+  "auto-allocate"): port 0 now asks the OS for a free port and records the port
+  actually bound in `.sightmap/.session`. Previously 0 resolved to 0, the daemon
+  bound an OS-chosen port but wrote `serverPort: 0`, CDP landed on port 1, and
+  `start --detach` exited 0 while every client command then refused the session
+  with "no running session". `start --detach` also no longer reports a session
+  ready until its file records a reachable server port.
+- 49dbd72: Overlay: resolve components when hover lands on a wrapper above the component (e.g. a `pointer-events:none` control).
+
+  The overlay extension resolved the hovered element bottom-up with `closest()`. When a control has `pointer-events:none` and a styling wrapper sits ABOVE the component container (as JetBlue's checkout form fields do — a `.first-name` div wraps `jb-form-field-container > input`), the hit-test lands on that wrapper, which is an _ancestor_ of the component subtree, so `closest()` walks up and finds nothing — the field appeared uncovered even though the CLI resolver (top-down) matched it. On a resolution miss the overlay now descends into the hovered element to the deepest active-component element whose box contains the pointer, and resolves from there.
+
+- c7ea891: Fix the extension overlay rendering nothing on hover for any corpus without a `components.yaml`.
+
+  The content script used `state.globals.length` as its "corpus is loaded" signal. But `globals` is the _optional_ file-root component list and is `omitempty` on the wire, so a corpus whose components are all view-scoped — the common case, and what `sightmap init` produces — serves no `globals` key at all. The gate was therefore permanently false:
+
+  - **Hover was dead.** `onMouseMove` returned before resolving, so `#__sightmap-overlay` injected fine but never got any children: no highlight boxes, no tooltip, no console error. Clicks kept working and logging correct component paths, because the click path gates on `state.version` — which made the failure look like a hover/render bug rather than a readiness-gate bug.
+  - **The corpus was re-fetched on every poll.** `pollVersion` took the same gate, so it never reached the cheap `/sightmap/version` path and re-downloaded the whole corpus every 4s, logging `[sightmap] loaded N components` each time.
+
+  Both paths now share a single `corpusLoaded()` helper keyed on `state.version`, which `fetchSightmap` only records once a load returned a non-empty component set — so the "server answered before its corpus finished loading" retry behavior is unchanged.
+
+  The extension manifest version is bumped so an already-installed `~/.sightmap/extension` is re-extracted on the next `browser start` (`ensureExtension` only reinstalls on a version change).
+
+- fd2d2d9: Snapshot tree hygiene: exclude non-content nodes from the extracted component tree (`snapshot --tree-out`, `capture`, `--json`).
+
+  The tree builder now prunes two classes of node — together with their whole subtrees — before they reach output, so a captured `*.snap.tree.json` is app content only and is safe to use as an authoring/golden fixture without post-processing:
+
+  1. The CLI's own injected overlay (`#__sightmap-overlay`, `#__sightmap-tooltip`). It was visible and non-ignored, so it leaked into the tree JSON and enumerated as bogus candidates.
+  2. Document-metadata and non-rendered tags: `<head>`, `<script>`, `<style>`, `<meta>`, `<link>`, `<title>`, `<noscript>`, `<template>`, `<base>`.
+
 ## 0.32.0
 
 ### Minor Changes
