@@ -144,13 +144,20 @@ A component can declare `properties:` — named values pulled from its matched e
   selector: '[data-testid="product-pod"]'
   properties:
     - name: price
-      extract: '[data-testid="price"]'   # a CSS sub-selector, read from the child
-      transform: first_dollar
+      extract: Price.text          # descendant component, not a raw CSS sub-selector
     - name: sold_out
-      extract: 'exists:[aria-label="Sold Out"]'   # boolean flag; omitted when absent
+      extract: exists:SoldOutBadge # boolean flag; omitted when absent
+  children:
+    - name: Price
+      selector: '[data-testid="price"]'
+      properties:
+        - name: text
+          extract: text
+    - name: SoldOutBadge
+      selector: '[aria-label="Sold Out"]'
 ```
 
-Each property has a `name` (the annotation key), an `extract` directive (`text`, `inner_text`, `text_only`, `inner_html`, `attr=NAME`, `exists:SEL`, or a CSS sub-selector), and an optional `transform` (`first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`). Extraction runs on the exact matched element, from the live DOM at snapshot time — offline tools omit the values. A value that comes back empty (or an `exists:`/sub-selector that finds nothing) is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md).
+Each property has a `name` (the annotation key) and an `extract` directive (`text`, `attr=NAME`, `PATH.prop`, or `exists:PATH`), resolved over the component tree with no live DOM. `text` reads the matched node's accessible text, `attr=NAME` a carried attribute, `PATH.prop` a descendant component's own extracted property, `exists:PATH` `"true"` if a descendant component matches (else omitted). To surface a value from a sub-element, promote that sub-element to a declared child component. A value that resolves empty or matches nothing is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0010](https://github.com/sightmap/sightmap/blob/main/spec/seps/0010-tree-closed-component-properties.md).
 
 ## Dependencies
 
