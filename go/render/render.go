@@ -35,7 +35,9 @@ type FormatOpts struct {
 // Filter builds a compact, filtered Comp tree from a raw ComponentNode tree.
 // It applies the shouldFilter algorithm:
 //   - style/script/noscript tags are dropped (with their subtrees)
-//   - invisible nodes are dropped (with their subtrees)
+//   - invisible nodes (without a sightmap match) are made transparent (their
+//     visible descendants are promoted); a sightmap-MATCHED invisible node is
+//     kept so its [ComponentName] wrapper survives above the visible descendants
 //   - role="none" structural wrappers (without a sightmap match) are made
 //     transparent (removed; their children are promoted)
 //   - AX-ignored nodes (without a sightmap match) are made transparent
@@ -185,7 +187,14 @@ func decide(node *sightmap.ComponentNode, matched bool) disposition {
 	// both: a genuinely hidden subtree renders nothing (every node transparent),
 	// while visible descendants of an invisible ancestor survive — which keeps the
 	// tree in lockstep with coverage, which counts those same visible nodes.
-	if !node.IsVisible {
+	// The `!matched` guard mirrors the sibling transparency rules below: a
+	// sightmap-matched invisible container is KEPT (falls through to keepNode) so
+	// its [ComponentName] wrapper survives and the role-replacement block in
+	// convert runs — otherwise the visible descendants are promoted anonymously
+	// while coverage and the T2 trace still attribute them to the matched node,
+	// contradicting the tree. (A fully-invisible matched subtree still renders,
+	// as a childless [Comp], the same as a visible empty matched container.)
+	if !node.IsVisible && !matched {
 		return makeTransparent
 	}
 
