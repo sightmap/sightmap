@@ -143,6 +143,31 @@ so nothing goes stale. Prefer queries on dynamic pages.
   addressable (see the `sightmap-authoring` skill).
 - `--sightmap-dir` (default `.sightmap`) controls which corpus resolves a query.
 
+## Recovering a missing component
+
+A zero-match query is a failed observation, not proof of a broken selector. Do
+not guess another target or replay the action automatically.
+
+1. Keep the same `--tab` and `--sightmap-dir` on live/browser commands. Check the current
+   URL/view and take a fresh `sightmap snapshot`. If the page is still loading,
+   wait for a known readiness condition; if the control lives in a menu or modal,
+   reveal that state before inspecting it again.
+2. Read the query and relevant YAML. A component may exist but fail a property
+   predicate, ancestor chain, or occurrence selection. Check the snapshot's
+   extracted values and `[Conflicts]` before changing any selector. Ambiguous
+   results need disambiguation, not repair.
+3. If the intended element is present in the fresh tree but lacks its expected
+   component annotation, follow **Verified selector repair** in the
+   `sightmap-authoring` skill. Use `explain` to inspect candidate facts and
+   `sel-probe` to verify the effective selector before editing YAML.
+4. After a verified repair, take another snapshot and confirm the original
+   component query identifies the intended target. Continue the authorized task
+   using that query; do not reuse a probe ID from an earlier extraction.
+
+If the intended element is absent, preserve the corpus and report the observed
+state. Optional components and intermittent page content can correctly match zero
+nodes; a single missing capture is insufficient evidence for a repair.
+
 ## Console & network — the runtime view of the corpus
 
 The `browser start` daemon owns the session and runs a **collector** that buffers
