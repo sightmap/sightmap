@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from '@/App'
+import { bootSightkick } from '@/lib/sightkick-boot'
 import '@/index.css'
 
 const el = document.getElementById('root')!
@@ -34,3 +35,8 @@ if (stamp !== undefined && normalize(stamp) === normalize(location.pathname)) {
 } else {
   createRoot(el).render(tree)
 }
+
+// The Atlas registers its own WebMCP tools (compiled from this repo's .sightkick/
+// tool layer by scripts/build-sightkick.ts). No-op off /atlas, and no-op in any
+// build that shipped without the layer.
+bootSightkick()
