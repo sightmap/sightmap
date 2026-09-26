@@ -169,49 +169,6 @@ func GetURL(ctx context.Context, conn *CDPConn) (string, error) {
 	return resp.TargetInfo.URL, nil
 }
 
-// WaitForNetworkIdle waits for Chrome's "networkIdle" lifecycle event, which
-// fires when there have been no more than 2 in-flight network requests for at
-// least 500 ms. This is the same signal Playwright uses for waitUntil:"networkidle"
-// and is the correct post-navigate wait for React/SPA pages: the a11y tree is
-// fully hydrated only after all data-fetch requests have settled.
-//
-// The function enables lifecycle events, then waits up to maxWait. On timeout
-// it returns nil rather than an error — a partial render is better than no snap.
-// Callers must subscribe BEFORE navigating; use NavigateAndWaitIdle instead.
-func WaitForNetworkIdle(ctx context.Context, conn *CDPConn, maxWait time.Duration) error {
-	if _, err := conn.call(ctx, "Page.setLifecycleEventsEnabled", map[string]interface{}{
-		"enabled": true,
-	}); err != nil {
-		// Non-fatal: fall through to timeout path.
-		_ = err
-	}
-	ch := conn.Subscribe("Page.lifecycleEvent")
-	defer conn.Unsubscribe("Page.lifecycleEvent", ch)
-
-	deadline := time.NewTimer(maxWait)
-	defer deadline.Stop()
-	for {
-		select {
-		case raw, ok := <-ch:
-			if !ok {
-				return nil
-			}
-			var ev struct {
-				Name string `json:"name"`
-			}
-			if err := json.Unmarshal(raw, &ev); err == nil && ev.Name == "networkIdle" {
-				return nil
-			}
-		case <-deadline.C:
-			return nil // timeout — proceed with whatever rendered so far
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-conn.done:
-			return nil
-		}
-	}
-}
-
 // NavigateAndWaitIdle navigates to url and waits for both loadEventFired and
 // networkIdle (React/SPA safe). Subscribes before navigating to avoid the race
 // where a fast SPA router settles before we subscribe.
