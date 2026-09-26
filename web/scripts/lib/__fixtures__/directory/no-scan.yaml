@@ -1,0 +1,10 @@
+slug: no-scan
+name: No Scan
+url: https://noscan.example.org/
+host: noscan.example.org
+description: Points at a scan that is not there.
+category: devtools
+type: demo
+added: 2026-09-01
+updated: 2026-09-01
+scan: scans/no-scan/2026-09-01.json

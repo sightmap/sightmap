@@ -5,32 +5,9 @@ import CopyButton from '@/components/CopyButton'
 import SightkickLogo from '@/components/SightkickLogo'
 import { SIGHTKICK_DESCRIPTION, SIGHTKICK_TITLE } from '../../scripts/lib/site'
 
+import { AGENT_PROMPT } from '@/lib/sightkick-prompt'
+
 const INSTALL = 'npm install -g @sightmap/sightkick'
-
-// The one-click prompt. Written to be pasted whole into a coding agent, so it
-// carries the install, the skills, and the shape of the job — not a summary of
-// this page. Kept as one string so the copy button and the rendered block can
-// never drift.
-const AGENT_PROMPT = `Build a WebMCP tool layer for this app with sightmap + sightkick.
-
-1. npm install -g @sightmap/sightmap @sightmap/sightkick
-2. sightmap skills install
-   Read sightmap-authoring, sightmap-browser, sightkick-authoring and
-   sightkick-debug before you start. They are the source of truth.
-3. Start a session against the running app:
-   sightmap browser start --url <APP_URL>
-4. Follow sightmap-authoring to map the 1-3 pages the tools need. Verify every
-   selector with sel-probe before it goes into YAML, get each page to 0
-   orphaned nodes, and run sightmap capture on each view.
-5. Follow sightkick-authoring to write .sightkick/tools.yaml. Include at least
-   one read tool. Declare a journey so results carry guidance.
-6. sightkick build . --verify -o tools.ir.json
-7. sightkick browser .            # starts the session, persist-injects the tools
-   sightmap browser mcp list      # confirm they registered
-   sightkick call . <tool> --param k=v --via cli
-   sightkick call . <tool> --param k=v --via webmcp
-8. Report what you built, the JSON each tool returned, and anything that failed
-   with its actual error text.`
 
 const USE_CASES: { tag: string; title: string; body: React.ReactNode }[] = [
   {
