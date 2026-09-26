@@ -44,19 +44,6 @@ type parser struct {
 	i int
 }
 
-func (p *parser) peek() (byte, bool) {
-	if p.i >= len(p.s) {
-		return 0, false
-	}
-	return p.s[p.i], true
-}
-
-func (p *parser) consume() byte {
-	c := p.s[p.i]
-	p.i++
-	return c
-}
-
 // skipWhitespace advances past any ASCII whitespace. Returns true if any was skipped.
 func (p *parser) skipWhitespace() bool {
 	start := p.i
