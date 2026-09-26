@@ -1,0 +1,54 @@
+slug: telnyx-com
+name: Telnyx
+url: https://telnyx.com/
+host: telnyx.com
+description: Telnyx sells voice, messaging, and AI infrastructure on a carrier network it owns, with tools that answer product and pricing questions.
+  private network, GPUs, edge compute."
+category: devtools
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-10
+updated: 2026-09-10
+scan: scans/telnyx-com/2026-09-10.json
+tools:
+  - name: ask_telnyx
+    kind: read
+    description: Ask a natural-language question about Telnyx products, pricing, APIs, or policies.
+      Returns NLWeb-format pointers to the canonical Telnyx resources that answer the question.
+    page: /
+  - name: get_pricing
+    kind: read
+    description: "Get Telnyx product pricing as Markdown: voice, messaging, phone numbers, AI inference,
+      storage and more, with links to the per-product pricing pages."
+    page: /
+  - name: get_docs_index
+    kind: read
+    description: "Get the llms.txt index of machine-readable Telnyx documentation: product docs, API
+      reference, pricing, policies, and agent onboarding, as a Markdown link list."
+    page: /
+  - name: site_info
+    kind: read
+    description: Return basic metadata about this Telnyx site (domain, public documentation URL).
+    page: /
+suggested_journeys:
+  - intent: Call ask_telnyx and read what it returns.
+    tools:
+      - ask_telnyx
+  - intent: Call get_pricing and read what it returns.
+    tools:
+      - get_pricing
+  - intent: Call get_docs_index and read what it returns.
+    tools:
+      - get_docs_index
+strengths:
+  - Every tool has a name (4/4).
+  - Every tool has a description (4/4).
+  - Every tool has an input schema (4/4).
+  - Tool names are snake_case (4/4).
+  - Tool names are unique (4 distinct).
+  - No suspicious wording in tool metadata (none flagged).
+improvements:
+  - The tool set does not change with the page (same tools on all 3 pages).

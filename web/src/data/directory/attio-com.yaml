@@ -1,0 +1,38 @@
+slug: attio-com
+name: Attio
+url: https://attio.com/
+host: attio.com
+description: The system for revenue teams to build pipeline, accelerate deals, and grow accounts
+  around the clock.
+category: productivity
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-10
+updated: 2026-09-10
+scan: scans/attio-com/2026-09-10.json
+tools:
+  - name: view_pricing
+    kind: read
+    description: View Attio's pricing plans and compare features across tiers including Free, Plus, Pro,
+      and Enterprise.
+    page: /
+  - name: subscribe_newsletter
+    kind: sensitive
+    description: Subscribe to Attio product updates and newsletters with a work email address
+    page: /
+suggested_journeys:
+  - intent: Call view_pricing and read what it returns.
+    tools:
+      - view_pricing
+strengths:
+  - Every tool has a name (2/2).
+  - Every tool has a description (2/2).
+  - Tool names are snake_case (2/2).
+  - Tool names are unique (2 distinct).
+  - No suspicious wording in tool metadata (none flagged).
+improvements:
+  - Not every tool has an input schema (1/2).
+  - The tool set does not change with the page (same tools on all 3 pages).

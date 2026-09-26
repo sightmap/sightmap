@@ -1,0 +1,271 @@
+{
+  "version": 1,
+  "url": "https://telnyx.com/",
+  "finalUrl": "https://telnyx.com/",
+  "host": "telnyx.com",
+  "scannedAt": "2026-09-10T00:49:21.118Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "sightmap dev"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://telnyx.com/",
+      "path": "/",
+      "title": "Infrastructure for realtime agents | Telnyx",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "ask_telnyx",
+        "get_pricing",
+        "get_docs_index",
+        "site_info"
+      ]
+    },
+    {
+      "url": "https://telnyx.com/products/voice-ai-agents",
+      "path": "/products/voice-ai-agents",
+      "title": "Voice AI Agents that pick up, keep up, and scale up.",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "ask_telnyx",
+        "get_pricing",
+        "get_docs_index",
+        "site_info"
+      ]
+    },
+    {
+      "url": "https://telnyx.com/products/text-to-speech-api",
+      "path": "/products/text-to-speech-api",
+      "title": "Real-time Text-to-Speech API | Telnyx",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "ask_telnyx",
+        "get_pricing",
+        "get_docs_index",
+        "site_info"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "ask_telnyx",
+      "description": "Ask a natural-language question about Telnyx products, pricing, APIs, or policies. Returns NLWeb-format pointers to the canonical Telnyx resources that answer the question.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "description": "The question to ask, in plain language.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/products/voice-ai-agents",
+        "/products/text-to-speech-api"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "description mentions \"about\"",
+      "warnings": []
+    },
+    {
+      "name": "get_pricing",
+      "description": "Get Telnyx product pricing as Markdown: voice, messaging, phone numbers, AI inference, storage and more, with links to the per-product pricing pages.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/products/voice-ai-agents",
+        "/products/text-to-speech-api"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name starts with \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "get_docs_index",
+      "description": "Get the llms.txt index of machine-readable Telnyx documentation: product docs, API reference, pricing, policies, and agent onboarding, as a Markdown link list.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/products/voice-ai-agents",
+        "/products/text-to-speech-api"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name starts with \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "site_info",
+      "description": "Return basic metadata about this Telnyx site (domain, public documentation URL).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/products/voice-ai-agents",
+        "/products/text-to-speech-api"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"info\"",
+      "warnings": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "4/4"
+    },
+    {
+      "id": "described",
+      "label": "Every tool has a description",
+      "ok": true,
+      "detail": "4/4"
+    },
+    {
+      "id": "input-schema",
+      "label": "Every tool has an input schema",
+      "ok": true,
+      "detail": "4/4"
+    },
+    {
+      "id": "snake-case",
+      "label": "Tool names are snake_case",
+      "ok": true,
+      "detail": "4/4"
+    },
+    {
+      "id": "unique",
+      "label": "Tool names are unique",
+      "ok": true,
+      "detail": "4 distinct"
+    },
+    {
+      "id": "no-suspicious",
+      "label": "No suspicious wording in tool metadata",
+      "ok": true,
+      "detail": "none flagged"
+    },
+    {
+      "id": "route-scoped",
+      "label": "Tool set changes with the page",
+      "ok": false,
+      "detail": "same tools on all 3 pages"
+    }
+  ],
+  "counts": {
+    "tools": 4,
+    "pages": 3,
+    "read": 4,
+    "action": 0,
+    "sensitive": 0,
+    "described": 4,
+    "withInputSchema": 4,
+    "declarative": 0
+  },
+  "hints": {
+    "forms": [
+      {
+        "page": "/products/voice-ai-agents",
+        "action": "",
+        "fields": [],
+        "method": "get"
+      }
+    ],
+    "links": [
+      "/",
+      "/products/voice-ai-agents",
+      "/products/text-to-speech-api",
+      "/products/speech-to-text-api",
+      "/products/embeddings-api",
+      "/products/web-search-api",
+      "/products/agent-browser",
+      "/products/meeting-bot",
+      "/products/voice-design-lab",
+      "/products/inference",
+      "/products/agentsdk",
+      "/products/functions",
+      "/products/stateful-actors",
+      "/products/kv",
+      "/products/sqldb",
+      "/products/storage",
+      "/products/phone-numbers",
+      "/products/voice-api",
+      "/products/sip-trunks",
+      "/products/sms-api",
+      "/products/email-api",
+      "/products/rcs",
+      "/products/whatsapp-business-api",
+      "/products/webrtc",
+      "/products/verify-api",
+      "/products/number-reputation",
+      "/products/number-lookup",
+      "/products/deepfake-detection",
+      "/products/branded-calling",
+      "/products/iot-sim-card",
+      "/products/esim",
+      "/products/mobile-voice",
+      "/products/iot-vpn",
+      "/products/programmable-networking",
+      "/products/cloud-vpn",
+      "/products/global-ip",
+      "/products/builds",
+      "/agent-signup.md",
+      "https://x402.telnyx.com/",
+      "/products"
+    ],
+    "title": "Infrastructure for realtime agents | Telnyx",
+    "description": "Telnyx is the only licensed carrier that owns its AI infrastructure end-to-end: private network, GPUs, edge compute. Nothing sits between your agent and the person on the line because every hop is ours."
+  },
+  "notes": [
+    "operator Chrome flags: --ssl-version-max=tls1.2",
+    "sightmap browser mcp list saw 4 tool(s) on /",
+    "$ sightmap version",
+    "$ sightmap browser start --detach --headless --port 35417 --cdp-port 36373 --profile /tmp/atlas-scan-N92EX7/profile --url about:blank --log-file /tmp/atlas-scan-N92EX7/daemon.log --chrome-flag=--enable-blink-features=ModelContext,ModelC… --chrome-flag=--enable-features=DevToolsWebMCPSupport --chrome-flag=--proxy-server=http://127.0.0.1:41767 --chrome-flag=--proxy-bypass-list=localhost;127.0.0.1;[::1] --chrome-flag=--deny-permission-prompts --chrome-flag=--ssl-version-max=tls1.2 --chrome-binary /opt/pw-browsers/chromium --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap",
+    "$ sightmap browser tabs list --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap ×3",
+    "$ sightmap browser inject --persist --file /tmp/atlas-scan-N92EX7/recorder.js --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap",
+    "$ sightmap browser inject --list --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap ×8",
+    "$ sightmap browser navigate https://telnyx.com/ --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap ×4",
+    "$ sightmap browser mcp list --json --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap",
+    "$ sightmap browser navigate https://telnyx.com/products/voice-ai-agents --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap ×4",
+    "$ sightmap browser navigate https://telnyx.com/products/text-to-speech-api --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab 1FC16F8A1F0D9B495D9BD210F9913FBC --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap ×4",
+    "$ sightmap browser stop --sightmap-dir /tmp/atlas-scan-N92EX7/.sightmap"
+  ]
+}
