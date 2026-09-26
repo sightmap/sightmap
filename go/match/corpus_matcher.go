@@ -88,35 +88,56 @@ func (m *Matcher) Components(pageURL string) []sightmap.ComponentDef {
 }
 
 // Conflicts returns the nodes in root directly matched by more than one distinct
-// component name for pageURL. A single name matching many nodes (e.g. a list of
-// cards) is normal and never reported; a single node claimed by several names is
-// the ambiguity, since Match is first-match-wins and keeps only the first. It
-// reuses the same cached queries as Match, so it sees exactly the same matches.
+// component DEFINITION for pageURL. One definition matching many nodes (e.g. a
+// list of cards) is normal and never reported; one node claimed by several
+// definitions is the ambiguity, since Match is first-match-wins and keeps only
+// the first. It reuses the same cached queries as Match, so it sees exactly the
+// same matches.
+//
+// Claims are deduplicated by DEFINITION, not by name. A component name is unique
+// only within its parent, so deduplicating by name silently discarded every
+// conflict between two same-named definitions — which is not a corner case: a
+// production sign-in corpus had five nodes each claimed by two definitions that
+// happened to share a name, and this reported none of them. MatchQuery carries
+// Def for exactly this reason. A definition with several alternative selectors
+// still counts once, since they are one definition.
 func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sightmap.Conflict {
 	entry := m.entryFor(pageURL)
 	if root == nil || len(entry.queries) == 0 {
 		return nil
 	}
 
-	namesByNode := make(map[*sightmap.ComponentNode][]string)
+	type claims struct {
+		defs  []*sightmap.ComponentDef
+		names []string
+	}
+	byNode := make(map[*sightmap.ComponentNode]*claims)
 	var order []*sightmap.ComponentNode
 	FindAllMatches(root, entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
-		names := namesByNode[node]
-		for _, n := range names {
-			if n == q.Name {
-				return // count distinct names only
-			}
-		}
-		if len(names) == 0 {
+		c := byNode[node]
+		if c == nil {
+			c = &claims{}
+			byNode[node] = c
 			order = append(order, node)
 		}
-		namesByNode[node] = append(names, q.Name)
+		for i, d := range c.defs {
+			// Identity is the def pointer. Queries built without one (never the case
+			// via ParseQueries) fall back to the old name comparison.
+			if q.Def != nil && d == q.Def {
+				return
+			}
+			if q.Def == nil && d == nil && c.names[i] == q.Name {
+				return
+			}
+		}
+		c.defs = append(c.defs, q.Def)
+		c.names = append(c.names, q.Name)
 	})
 
 	var out []sightmap.Conflict
 	for _, node := range order {
-		if names := namesByNode[node]; len(names) >= 2 {
-			out = append(out, sightmap.Conflict{Node: node, Names: names})
+		if c := byNode[node]; len(c.defs) >= 2 {
+			out = append(out, sightmap.Conflict{Node: node, Names: c.names, Defs: c.defs})
 		}
 	}
 	return out
