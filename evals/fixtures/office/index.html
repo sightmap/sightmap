@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Office eval fixture</title>
+<style>body{font:18px system-ui;max-width:700px;margin:30px}section{margin:25px 0}input,button,a{margin:8px;padding:8px}td{padding:8px}</style>
+<h1>Office</h1>
+<section><h2>Save contact</h2><form id="contact"><label>Name <input data-component="ContactName" id="name" required></label><button data-component="SaveContact">Save contact</button></form><output id="saved" data-component="ContactResult"></output></section>
+<section><h2>Directory</h2><label>Filter <input data-component="DirectoryFilter" id="filter"></label><table><tbody><tr data-key="Ada"><td>Ada</td><td><button data-component="SelectPerson" data-person="Ada">Select Ada</button></td></tr><tr data-key="Grace"><td>Grace</td><td><button data-component="SelectPerson" data-person="Grace">Select Grace</button></td></tr></tbody></table><output data-component="SelectionResult" id="selected"></output></section>
+<section><h2>Report</h2><a data-component="ReportLink" href="#report">Open report</a><p data-component="ReportValue" id="report" hidden>Quarter total: 42</p></section>
+<script>
+contact.addEventListener('submit', e => { e.preventDefault(); document.querySelector('#saved').textContent='Saved: '+document.querySelector('#name').value; });
+filter.addEventListener('input', () => { document.querySelectorAll('[data-key]').forEach(row => row.hidden=!row.dataset.key.toLowerCase().includes(filter.value.toLowerCase())); });
+document.querySelectorAll('[data-person]').forEach(button => button.addEventListener('click', () => { selected.textContent='Selected: '+button.dataset.person; }));
+addEventListener('hashchange', () => { report.hidden=location.hash!=='#report'; });
+</script></html>
