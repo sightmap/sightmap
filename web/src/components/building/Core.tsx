@@ -2,32 +2,34 @@ import { useFrame } from '@react-three/fiber'
 import { Edges, Instance, Instances } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { CORE, FLOORS, FLOOR_H, RISERS, SLAB_T, floorY } from './model'
+import { CORE, SLAB_T, floorHeight, floorY, type Riser } from './model'
 import { smoothstep } from './chapters'
+import { useBuildingModel } from './context'
 import { useShared } from './state'
 
 // The service core: a glass elevator shaft in the back corner with the API
 // risers running up inside it. Pulses travel the risers — requests in flight.
-const TOP = FLOORS.length * FLOOR_H + 0.55
+// A building derived from a scan has no risers, so the shaft stands alone.
+const topOf = (floors: number, floorH: number): number => floors * floorH + 0.55
 const stepGeom = new THREE.BoxGeometry(1, 1, 1)
 
 // A switchback stair climbing the shaft next to the elevator.
-function Stairs() {
+function Stairs({ floors, floorH }: { floors: number; floorH: number }) {
   const steps = useMemo(() => {
     const out: { p: [number, number, number]; s: [number, number, number] }[] = []
     const perFlight = 7
     const x0 = CORE.x - CORE.w / 2 + 0.22
-    for (let f = 0; f < FLOORS.length; f++) {
-      const base = floorY(f) + SLAB_T
+    for (let f = 0; f < floors; f++) {
+      const base = floorY(f, floorH) + SLAB_T
       for (let k = 0; k < perFlight; k++) {
         const t = k / perFlight
-        const y = base + 0.15 + t * (FLOOR_H - 0.3)
+        const y = base + 0.15 + t * (floorH - 0.3)
         const z = f % 2 === 0 ? CORE.z - CORE.d / 2 + 0.2 + t * (CORE.d - 0.4) : CORE.z + CORE.d / 2 - 0.2 - t * (CORE.d - 0.4)
         out.push({ p: [x0, y, z], s: [0.36, 0.05, 0.2] })
       }
     }
     return out
-  }, [])
+  }, [floors, floorH])
   return (
     <Instances limit={steps.length} range={steps.length} geometry={stepGeom} castShadow>
       <meshStandardMaterial color="#d8bf9a" roughness={0.7} />
@@ -38,13 +40,16 @@ function Stairs() {
   )
 }
 
-function Pulses() {
+function Pulses({ risers, floorH }: { risers: Riser[]; floorH: number }) {
   const s = useShared()
   const refs = useRef<(THREE.Mesh | null)[]>([])
-  const heights = useMemo(() => RISERS.map((r) => floorY(Math.max(...r.floors)) + SLAB_T + 0.6), [])
+  const heights = useMemo(
+    () => risers.map((r) => floorY(Math.max(...r.floors), floorH) + SLAB_T + 0.6),
+    [risers, floorH]
+  )
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
-    RISERS.forEach((_, k) => {
+    risers.forEach((_, k) => {
       const m = refs.current[k]
       if (!m) return
       const speed = s.reduced ? 0 : 0.34 + k * 0.03
@@ -57,7 +62,7 @@ function Pulses() {
   })
   return (
     <>
-      {RISERS.map((r, k) => (
+      {risers.map((r, k) => (
         <mesh
           key={r.name}
           ref={(el) => {
@@ -78,6 +83,10 @@ const riserZ = (): number => CORE.z - CORE.d / 2 + 0.22
 
 export default function Core() {
   const s = useShared()
+  const model = useBuildingModel()
+  const { floors, risers } = model
+  const floorH = floorHeight(model)
+  const TOP = topOf(floors.length, floorH)
   const g = useRef<THREE.Group>(null)
   const car = useRef<THREE.Mesh>(null)
   useFrame(({ clock }) => {
@@ -103,8 +112,8 @@ export default function Core() {
         <boxGeometry args={[0.8, 1.05, 0.9]} />
         <meshStandardMaterial color="#fbf8f2" roughness={0.6} />
       </mesh>
-      {RISERS.map((r, k) => {
-        const h = floorY(Math.max(...r.floors)) + SLAB_T + 0.6
+      {risers.map((r, k) => {
+        const h = floorY(Math.max(...r.floors), floorH) + SLAB_T + 0.6
         return (
           <group key={r.name}>
             <mesh position={[riserX(k), h / 2, riserZ()]}>
@@ -112,7 +121,7 @@ export default function Core() {
               <meshStandardMaterial color={r.color} emissive={r.color} emissiveIntensity={0.35} roughness={0.5} />
             </mesh>
             {r.floors.map((f) => (
-              <mesh key={f} position={[riserX(k), floorY(f) + SLAB_T + 0.35, riserZ() + 0.12]}>
+              <mesh key={f} position={[riserX(k), floorY(f, floorH) + SLAB_T + 0.35, riserZ() + 0.12]}>
                 <boxGeometry args={[0.16, 0.16, 0.24]} />
                 <meshStandardMaterial color={r.color} emissive={r.color} emissiveIntensity={0.5} roughness={0.5} />
               </mesh>
@@ -120,8 +129,8 @@ export default function Core() {
           </group>
         )
       })}
-      <Stairs />
-      <Pulses />
+      <Stairs floors={floors.length} floorH={floorH} />
+      <Pulses risers={risers} floorH={floorH} />
     </group>
   )
 }

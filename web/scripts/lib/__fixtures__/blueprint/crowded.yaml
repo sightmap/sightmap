@@ -1,0 +1,18 @@
+slug: crowded
+name: Crowded Console
+url: https://crowded.example.org/
+host: crowded.example.org
+description: A fixture site with one page carrying fourteen tools.
+category: data
+type: demo
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-01
+updated: 2026-09-06
+scan: scans/crowded/2026-09-08.json
+tools: []
+suggested_journeys: []
+strengths: []
+improvements: []

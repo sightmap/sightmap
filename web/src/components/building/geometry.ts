@@ -6,14 +6,13 @@ import * as THREE from 'three'
 import {
   CORE,
   CORE_DOOR,
-  FLOORS,
   FLOOR_D,
   FLOOR_W,
-  LANES,
   SHEET,
   findRoom,
   roomStand,
   surfaceAt,
+  type BuildingModel,
   type Journey,
 } from './model'
 import { DRAWN, furnish } from './furnish'
@@ -21,7 +20,7 @@ import { DRAWN, furnish } from './furnish'
 type P3 = [number, number, number]
 
 /** Pairs of points (LineSegments layout) drawing one floor plan on its sheet. */
-export function sheetLinePoints(floorIndex: number): P3[] {
+export function sheetLinePoints(model: BuildingModel, floorIndex: number): P3[] {
   const y = 0.012
   const pts: P3[] = []
   const rect = (x: number, z: number, w: number, d: number) => {
@@ -55,7 +54,7 @@ export function sheetLinePoints(floorIndex: number): P3[] {
   arc(CORE.x + CORE.w / 2, CORE_DOOR.z, 0.45, 0, Math.PI / 2)
   // Rooms, with the footprints of their furniture drawn lighter in spirit:
   // the same layout the built floor gets, so the drawing is the plan.
-  for (const r of FLOORS[floorIndex].rooms) {
+  for (const r of model.floors[floorIndex].rooms) {
     const blocks = r.blocks ?? [{ x: r.x, z: r.z, w: r.w, d: r.d }]
     for (const b of blocks) rect(b.x, b.z, b.w, b.d)
     for (const it of furnish(r)) {
@@ -130,9 +129,9 @@ function between(t: number, a: number, b: number): boolean {
   return t >= Math.min(a, b) - EPS && t <= Math.max(a, b) + EPS
 }
 
-function laneSegments(floor: number): { a: P2; b: P2 }[] {
+function laneSegments(model: BuildingModel, floor: number): { a: P2; b: P2 }[] {
   const segs: { a: P2; b: P2 }[] = []
-  for (const lane of LANES[floor]) {
+  for (const lane of model.lanes[floor]) {
     for (let i = 0; i < lane.length - 1; i++) {
       segs.push({ a: { x: lane[i][0], z: lane[i][1] }, b: { x: lane[i + 1][0], z: lane[i + 1][1] } })
     }
@@ -172,13 +171,20 @@ function splitPoints(s: { a: P2; b: P2 }, others: { a: P2; b: P2 }[]): P2[] {
   return pts
 }
 
-const graphs: Graph[] = []
+// One cache per building, so a second model on the page cannot read the
+// first one's lane graph.
+const graphs = new WeakMap<BuildingModel, Graph[]>()
 
-function graphFor(floor: number): Graph {
-  const cached = graphs[floor]
+function graphFor(model: BuildingModel, floor: number): Graph {
+  let byFloor = graphs.get(model)
+  if (!byFloor) {
+    byFloor = []
+    graphs.set(model, byFloor)
+  }
+  const cached = byFloor[floor]
   if (cached) return cached
   const g: Graph = { nodes: new Map(), adj: new Map() }
-  const raw = laneSegments(floor)
+  const raw = laneSegments(model, floor)
   for (const s of raw) {
     const pts = splitPoints(s, raw)
     if (isH(s)) pts.sort((a, b) => a.x - b.x)
@@ -192,7 +198,7 @@ function graphFor(floor: number): Graph {
       addEdge(g, addNode(g, uniq[i].x, uniq[i].z), addNode(g, uniq[i + 1].x, uniq[i + 1].z))
     }
   }
-  graphs[floor] = g
+  byFloor[floor] = g
   return g
 }
 
@@ -252,9 +258,16 @@ function dijkstra(g: Graph, start: string, end: string): string[] {
 }
 
 /** Axis-aligned lane route on one floor, including the start and end stands. */
-export function routeOnFloor(floor: number, ax: number, az: number, bx: number, bz: number): P2[] {
+export function routeOnFloor(
+  model: BuildingModel,
+  floor: number,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number
+): P2[] {
   if (Math.hypot(ax - bx, az - bz) < EPS) return [{ x: ax, z: az }]
-  const g = cloneGraph(graphFor(floor))
+  const g = cloneGraph(graphFor(model, floor))
   const pa = projectToGraph(g, ax, az)
   const pb = projectToGraph(g, bx, bz)
   const sa = addNode(g, pa.x, pa.z)
@@ -282,7 +295,7 @@ export function routeOnFloor(floor: number, ax: number, az: number, bx: number, 
  * room → door → up the shaft → out the door → room when the floor changes.
  * `lift` raises the whole path (the trajectory ribbon floats a little).
  */
-export function buildPath(journey: Journey, lift = 0, healShift = 0): Path {
+export function buildPath(model: BuildingModel, journey: Journey, lift = 0, healShift = 0): Path {
   const points: THREE.Vector3[] = []
   const stops: number[] = []
   const push = (p: P3) => {
@@ -293,14 +306,14 @@ export function buildPath(journey: Journey, lift = 0, healShift = 0): Path {
   }
   const follow = (floor: number, route: { x: number; z: number }[], skipFirst: boolean) => {
     for (const p of skipFirst ? route.slice(1) : route) {
-      push([p.x, surfaceAt(floor, p.x, p.z), p.z])
+      push([p.x, surfaceAt(model, floor, p.x, p.z), p.z])
     }
   }
   let last: P3 | null = null
   for (let k = 0; k < journey.stops.length; k++) {
     const [f, name] = journey.stops[k]
-    const room = findRoom(f, name)
-    const stand = roomStand(f, room, room.alt ? healShift : 0)
+    const room = findRoom(model, f, name)
+    const stand = roomStand(model, f, room, room.alt ? healShift : 0)
     if (!last) {
       stops.push(push(stand))
       last = stand
@@ -308,12 +321,12 @@ export function buildPath(journey: Journey, lift = 0, healShift = 0): Path {
     }
     const [pf] = journey.stops[k - 1]
     if (pf !== f) {
-      follow(pf, routeOnFloor(pf, last[0], last[2], CORE_DOOR.x, CORE_DOOR.z), true)
-      push([CORE.x, surfaceAt(pf, CORE.x, CORE.z), CORE.z])
-      push([CORE.x, surfaceAt(f, CORE.x, CORE.z), CORE.z])
-      follow(f, routeOnFloor(f, CORE_DOOR.x, CORE_DOOR.z, stand[0], stand[2]), false)
+      follow(pf, routeOnFloor(model, pf, last[0], last[2], CORE_DOOR.x, CORE_DOOR.z), true)
+      push([CORE.x, surfaceAt(model, pf, CORE.x, CORE.z), CORE.z])
+      push([CORE.x, surfaceAt(model, f, CORE.x, CORE.z), CORE.z])
+      follow(f, routeOnFloor(model, f, CORE_DOOR.x, CORE_DOOR.z, stand[0], stand[2]), false)
     } else {
-      follow(f, routeOnFloor(f, last[0], last[2], stand[0], stand[2]), true)
+      follow(f, routeOnFloor(model, f, last[0], last[2], stand[0], stand[2]), true)
     }
     stops.push(points.length - 1)
     last = stand

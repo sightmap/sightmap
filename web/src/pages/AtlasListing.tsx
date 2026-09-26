@@ -4,6 +4,7 @@ import Footer from '@/components/Footer'
 import Seo from '@/components/Seo'
 import CopyButton from '@/components/CopyButton'
 import AtlasMark from '@/components/atlas/AtlasMark'
+import ListingBuilding from '@/components/atlas/ListingBuilding'
 import {
   badgeMarkdown,
   checksPassed,
@@ -106,6 +107,14 @@ export default function AtlasListingPage({ listing }: { listing: DirectoryListin
               </Link>
             </div>
           </header>
+
+          <ListingBuilding blueprint={listing.blueprint} scannedAt={listing.scannedAt} />
+          <p className="atlas-listing__city">
+            {/* The same building, at the address it keeps. */}
+            <Link className="atlas-city__link" to={`/atlas/city?focus=${listing.slug}`}>
+              See it in the city &rarr;
+            </Link>
+          </p>
 
           <div className="atlas-listing__layout">
             <div className="atlas-listing__main">

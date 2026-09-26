@@ -20,6 +20,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { DirectoryListing, ListingMeta, ListingTool, ListingType, ScanReport } from '../../src/types/directory'
 import { loadAtlas } from './atlas'
+import { assignLots, planCity } from './city'
 import { ListingSchema, canonicalHost, issuesOf, listingToYaml, loadDirectory, slugFromHost, uniqueSlug } from './directory'
 import type { Review } from './review'
 
@@ -148,6 +149,7 @@ export async function createListing(input: CreateListingInput): Promise<CreatedL
     submitted_by: input.submittedBy ?? existing?.submitted_by ?? 'maintainer',
     labels: existing?.labels ?? [],
     collections: existing?.collections ?? [],
+    lot: existing?.lot,
     added: existing?.added ?? today,
     updated: today,
     scan: scanRel,
@@ -157,6 +159,14 @@ export async function createListing(input: CreateListingInput): Promise<CreatedL
     improvements: review.improvements,
   }
   if (existing?.journey) meta.journey = existing.journey
+  // A new listing takes its lot now, with every other listing already in
+  // place, and the YAML records it so the PR that adds the listing shows the
+  // address and no later build can move it.
+  if (meta.lot === undefined) {
+    const others = listings.filter((l) => l.slug !== slug)
+    const assigned = assignLots(planCity(), [...others, meta]).find((a) => a.slug === slug)
+    if (assigned) meta.lot = assigned.lot
+  }
 
   const parsed = ListingSchema.safeParse(meta)
   if (!parsed.success) {
