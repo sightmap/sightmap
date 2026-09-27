@@ -12,6 +12,12 @@ type ComponentDef struct {
 	Properties  []ComponentPropertyDef `json:"properties,omitempty"`
 	ParentChain []string               `json:"parentChain,omitempty"` // ancestor component names, root-first
 	Stability   string                 `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"
+	// Origin identifies the global definition this def was instantiated from: its
+	// address within that global, NUL-joined. The root global and every $ref
+	// expansion of it are separate ComponentDefs with the same Origin, because
+	// flattening deep-copies the global at each reference site. Empty for
+	// components authored inline in a view.
+	Origin string `json:"-"`
 }
 
 // ComponentPropertyDef describes a value extracted from a matched component,

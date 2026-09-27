@@ -100,7 +100,8 @@ func (m *Matcher) Components(pageURL string) []sightmap.ComponentDef {
 // production sign-in corpus had five nodes each claimed by two definitions that
 // happened to share a name, and this reported none of them. MatchQuery carries
 // Def for exactly this reason. A definition with several alternative selectors
-// still counts once, since they are one definition.
+// still counts once, since they are one definition, and so do a global and its
+// $ref expansions, which are copies of one definition.
 func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sightmap.Conflict {
 	entry := m.entryFor(pageURL)
 	if root == nil || len(entry.queries) == 0 {
@@ -121,12 +122,7 @@ func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sigh
 			order = append(order, node)
 		}
 		for i, d := range c.defs {
-			// Identity is the def pointer. Queries built without one (never the case
-			// via ParseQueries) fall back to the old name comparison.
-			if q.Def != nil && d == q.Def {
-				return
-			}
-			if q.Def == nil && d == nil && c.names[i] == q.Name {
+			if sameClaimant(d, q.Def, c.names[i], q.Name) {
 				return
 			}
 		}
@@ -141,4 +137,20 @@ func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sigh
 		}
 	}
 	return out
+}
+
+// sameClaimant reports whether two claims on a node come from one definition.
+// Defs instantiated from the same global (the global itself and each $ref
+// expansion of it) share an Origin; any other def is identified by its pointer.
+// Queries built without a Def (never the case via ParseQueries) fall back to
+// comparing names.
+func sameClaimant(a, b *sightmap.ComponentDef, aName, bName string) bool {
+	switch {
+	case a == nil || b == nil:
+		return a == nil && b == nil && aName == bName
+	case a == b:
+		return true
+	default:
+		return a.Origin != "" && a.Origin == b.Origin
+	}
 }

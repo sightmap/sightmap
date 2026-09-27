@@ -15,4 +15,5 @@ quietly dropped one claimant on every one of them.
 Names alone cannot identify a claimant in that case, so `Conflict.Defs` is
 index-aligned with `Names`, and the `[Conflicts]` report disambiguates repeated
 names by selector. A definition offering several alternative selectors still
-counts once.
+counts once, and so does a global together with its `$ref` expansions, which
+share the new `ComponentDef.Origin`.

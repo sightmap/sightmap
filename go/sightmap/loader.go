@@ -254,7 +254,7 @@ func loadDir(path string) (*Corpus, error) {
 	ctx.diagnostics = append(ctx.diagnostics, globalNameCollisions(globalRaws)...)
 
 	// Flatten global components (hierarchy → compound descendant selectors).
-	globalComps := flattenAll(globalRaws, ctx)
+	globalComps := flattenAll(globalRaws, ctx, 0)
 
 	// Global (file-root) request definitions. Requests are flat — no $ref,
 	// hierarchy, or selector cascade — so they convert directly.
@@ -292,7 +292,7 @@ func loadDir(path string) (*Corpus, error) {
 				Name:       rv.Name,
 				Route:      rv.Route,
 				Memory:     rv.Memory,
-				Components: flattenAll(rv.Components, ctx),
+				Components: flattenAll(rv.Components, ctx, -1),
 				Requests:   toRequestDefs(rv.Requests, ctx),
 				Stability:  rv.Stability,
 				Access:     access,
@@ -540,11 +540,12 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 // ComponentDefs with compound descendant selectors. Order is deterministic and
 // stable: components in declaration order, each parent immediately before its
 // flattened children (pre-order). Combined with loadDir's lexical file walk this
-// gives the corpus a reproducible flattened/wire ordering.
-func flattenAll(rcs []rawComponent, ctx *flattenCtx) []ComponentDef {
+// gives the corpus a reproducible flattened/wire ordering. originDepth is 0 for
+// the file-root globals and -1 for a view's components; see flattenOne.
+func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []ComponentDef {
 	var result []ComponentDef
 	for _, rc := range rcs {
-		result = append(result, flattenOne(rc, nil, ctx, nil, nil)...)
+		result = append(result, flattenOne(rc, nil, ctx, nil, nil, originDepth)...)
 	}
 	return result
 }
@@ -557,7 +558,9 @@ func flattenAll(rcs []rawComponent, ctx *flattenCtx) []ComponentDef {
 // extension can scope child selectors to their parent's DOM subtree.
 // refStack is the chain of $ref names currently being expanded; it guards
 // against circular references, which would otherwise recurse forever.
-func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string) []ComponentDef {
+// originDepth is the index in parentChain where the enclosing global instance
+// begins, or -1 outside any global; it derives ComponentDef.Origin.
+func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string, originDepth int) []ComponentDef {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
 	if rc.Ref != "" {
 		for _, prev := range refStack {
@@ -582,6 +585,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		}
 		refStack = append(refStack, rc.Ref)
 		rc = global
+		originDepth = len(parentChain)
 	}
 
 	// A real (non-$ref) component that lacks a required field would otherwise be
@@ -635,11 +639,14 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		ParentChain: parentChain, // nil for top-level; omitted from JSON
 		Stability:   rc.Stability,
 	}}
+	if originDepth >= 0 {
+		result[0].Origin = strings.Join(append(append([]string(nil), parentChain[originDepth:]...), rc.Name), "\x00")
+	}
 
 	// Recurse into children: extend the parent chain with this component's name.
 	childChain := append(append([]string(nil), parentChain...), rc.Name)
 	for _, child := range rc.Children {
-		result = append(result, flattenOne(child, mySels, ctx, childChain, refStack)...)
+		result = append(result, flattenOne(child, mySels, ctx, childChain, refStack, originDepth)...)
 	}
 
 	return result
