@@ -86,6 +86,31 @@ export function dedupeByAddress(...lists) {
   return [...byAddress.values()];
 }
 
+/**
+ * The active component set for a page: file-root globals overlaid with the
+ * components of every matching view.
+ *
+ * A global is dropped when a matching view declares a component with the same
+ * NAME at any depth, as Go's Corpus.ComponentsForURL does. That covers a nested
+ * `$ref` expansion of the global itself (`Card > $ref: Button` flattens to the
+ * address Card/Button), which the spec says subsumes the global for that view
+ * rather than matching alongside it. Within the views, identity is by address.
+ *
+ * @param {import("./types.js").FlatComponent[]}   globals
+ * @param {import("./types.js").FlatComponent[][]} viewLists
+ * @returns {import("./types.js").FlatComponent[]}
+ */
+export function activeComponentSet(globals, viewLists) {
+  const viewNames = new Set();
+  for (const list of viewLists) {
+    for (const comp of list ?? []) viewNames.add(comp.name);
+  }
+  return dedupeByAddress(
+    (globals ?? []).filter((g) => !viewNames.has(g.name)),
+    ...viewLists,
+  );
+}
+
 /** The component named `name` whose parent is `ownerAddress`, or null. */
 function childNamed(components, ownerAddress, name) {
   return (

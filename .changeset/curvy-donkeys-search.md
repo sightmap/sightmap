@@ -20,3 +20,7 @@ places, and on any real page that silently produced wrong answers:
 All three now key on a component's address (its `parentChain` plus its name).
 `resolveElement` visits components ancestor-first and requires a component's own
 parent to have matched, and each returned match carries its `address`.
+
+A file-root global is still dropped when a matching view declares a component of
+the same name at any depth, as `Corpus.ComponentsForURL` does, so a view-scoped
+`$ref` expansion subsumes its global instead of matching alongside it.

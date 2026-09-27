@@ -3,9 +3,25 @@ name: go
 on:
   push:
     branches: [main]
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths:
+      - 'go/**'
+      - 'skills/**'
+      - '.github/workflows/go.yml'
+      # dependencies of the embedded js job
+      - 'scripts/sync-extension-resolver.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'jest.config.js'
   pull_request:
-    paths: ['go/**', 'skills/**', '.github/workflows/go.yml']
+    paths:
+      - 'go/**'
+      - 'skills/**'
+      - '.github/workflows/go.yml'
+      # dependencies of the embedded js job
+      - 'scripts/sync-extension-resolver.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'jest.config.js'
 
 permissions:
   contents: read

@@ -106,6 +106,31 @@ function dedupeByAddress(...lists) {
   return [...byAddress.values()];
 }
 
+/**
+ * The active component set for a page: file-root globals overlaid with the
+ * components of every matching view.
+ *
+ * A global is dropped when a matching view declares a component with the same
+ * NAME at any depth, as Go's Corpus.ComponentsForURL does. That covers a nested
+ * `$ref` expansion of the global itself (`Card > $ref: Button` flattens to the
+ * address Card/Button), which the spec says subsumes the global for that view
+ * rather than matching alongside it. Within the views, identity is by address.
+ *
+ * @param {import("./types.js").FlatComponent[]}   globals
+ * @param {import("./types.js").FlatComponent[][]} viewLists
+ * @returns {import("./types.js").FlatComponent[]}
+ */
+function activeComponentSet(globals, viewLists) {
+  const viewNames = new Set();
+  for (const list of viewLists) {
+    for (const comp of list ?? []) viewNames.add(comp.name);
+  }
+  return dedupeByAddress(
+    (globals ?? []).filter((g) => !viewNames.has(g.name)),
+    ...viewLists,
+  );
+}
+
 /** The component named `name` whose parent is `ownerAddress`, or null. */
 function childNamed(components, ownerAddress, name) {
   return (
@@ -417,21 +442,18 @@ function normalizeComp(c) {
 /**
  * Return the active component list for the current URL.
  *
- * Deduplication is by component ADDRESS, not by name. The intent is only that a
- * view-scoped component should win over an identically-ADDRESSED global; keying
- * by bare name instead threw away every nested namesake, because component names
- * are unique only within a parent. On a real page that is most of the corpus:
- * a production sign-in map of 104 components has 54 distinct names, so 50 of
- * them vanished before matching, and a click resolved two levels deep instead of
- * six.
+ * View components are deduplicated by ADDRESS, not by name: keying by bare name
+ * threw away every nested namesake, because component names are unique only
+ * within a parent. On a real page that is most of the corpus: a production
+ * sign-in map of 104 components has 54 distinct names, so 50 of them vanished
+ * before matching, and a click resolved two levels deep instead of six. Globals
+ * are still subsumed by name; see activeComponentSet.
  */
 function activeComponents() {
   const pathname = location.pathname;
-  // Globals first, then view-specific (view wins at the same address).
-  // Globals first, then every matching view (view wins at the same address).
-  return dedupeByAddress(
+  return activeComponentSet(
     state.globals,
-    ...state.views
+    state.views
       .filter((v) => matchRoute(v.route, pathname))
       .map((v) => v.components),
   );

@@ -204,12 +204,57 @@ describe("dedupeByAddress", () => {
     expect(merged[0].selector).toBe(".view");
   });
 
-  test("a view component does NOT override a global that merely shares a name", () => {
+  test("a component that merely shares a name at another address is kept", () => {
     const globals = [{ name: "Label", parentChain: [], selector: ".global" }];
     const view = [
       { name: "Label", parentChain: ["Card"], selector: ".in-card" },
     ];
     expect(dedupeByAddress(globals, view)).toHaveLength(2);
+  });
+});
+
+describe("activeComponentSet", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("a view's nested namesake subsumes the file-root global", () => {
+    // Matches Go's Corpus.ComponentsForURL and the spec's $ref conformance rule:
+    // `Form > Field > $ref: Label` must not also match as the root global.
+    const globals = [{ name: "Label", parentChain: [], selector: "label" }];
+    const view = [
+      { name: "Form", parentChain: [], selector: "#f" },
+      { name: "Field", parentChain: ["Form"], selector: "#f .field" },
+      {
+        name: "Label",
+        parentChain: ["Form", "Field"],
+        selector: "#f .field label",
+      },
+    ];
+    const active = activeComponentSet(globals, [view]);
+    expect(active.map(componentAddress)).toEqual(view.map(componentAddress));
+
+    document.body.innerHTML = `
+      <form id="f"><div class="field"><label><input id="in"></label></div></form>
+      <label id="out">outside</label>`;
+    const inside = resolveElement(document.getElementById("in"), active);
+    expect(inside.map((m) => m.name)).toEqual(["Form", "Field", "Label"]);
+    expect(resolveElement(document.getElementById("out"), active)).toEqual([]);
+  });
+
+  test("keeps globals no matching view names, and every view namesake", () => {
+    const globals = [
+      { name: "Nav", parentChain: [], selector: "nav" },
+      { name: "Label", parentChain: [], selector: "label" },
+    ];
+    const viewA = [
+      { name: "Label", parentChain: ["Form", "Field"], selector: ".a" },
+    ];
+    const viewB = [
+      { name: "Label", parentChain: ["Form", "Submit"], selector: ".b" },
+    ];
+    const active = activeComponentSet(globals, [viewA, viewB]);
+    expect(active.map((c) => c.selector)).toEqual(["nav", ".a", ".b"]);
   });
 });
 
