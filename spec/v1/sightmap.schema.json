@@ -164,6 +164,11 @@
           "items": { "type": "string", "minLength": 1 },
           "description": "Open-vocabulary classification labels applied to matches of this component, e.g. \"defect\". Resolved as a union across every matching ancestor level, not just the nearest-enclosing match used for naming. See SEP-0004."
         },
+        "privacy": {
+          "type": "string",
+          "enum": ["block", "mask", "unmask"],
+          "description": "Whether a capture consumer may retain this element's content: block withholds it entirely, mask retains structure but not text, unmask overrides an enclosing block/mask. Applies to the matched element and its subtree; nearest-enclosing declaration wins. Omission declares nothing. See SEP-0009."
+        },
         "children": {
           "type": "array",
           "description": "Nested components. Selectors are scoped to the parent's matched subtree. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",

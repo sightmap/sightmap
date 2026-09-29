@@ -1,0 +1,36 @@
+version: 1
+components:
+  # A mask on the form, overridden two ways beneath it: block tightens,
+  # unmask carves out the one element that is safe to keep.
+  - name: CheckoutForm
+    selector: '.checkout-form'
+    privacy: mask
+    children:
+      - name: CardNumberInput
+        selector: 'input[name="cc"]'
+        privacy: block
+      - name: OrderTotal
+        selector: '.order-total'
+        privacy: unmask
+      # No declaration: inherits the enclosing mask.
+      - name: SubmitButton
+        selector: 'button[type="submit"]'
+
+  # Omission at the top level declares nothing at all.
+  - name: NavFooter
+    selector: '#footer'
+
+  # A block with no children, and a component carrying both privacy and tags
+  # to show they are independent axes.
+  - name: SocialSecurityInput
+    selector: 'input[name="ssn"]'
+    privacy: block
+    tags: [pii]
+
+views:
+  - name: Checkout
+    route: /checkout/**
+    components:
+      - name: GuestEmailInput
+        selector: 'input[name="email"]'
+        privacy: mask

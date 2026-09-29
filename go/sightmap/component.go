@@ -4,11 +4,16 @@ package sightmap
 // Hierarchical YAML selectors should be pre-flattened by the caller into
 // compound descendant selectors before compiling into match queries.
 type ComponentDef struct {
-	Name        string                 `json:"name"`
-	Selectors   []string               `json:"selectors"`
-	Source      string                 `json:"source,omitempty"`
-	Memory      []string               `json:"memory,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
+	Name      string   `json:"name"`
+	Selectors []string `json:"selectors"`
+	Source    string   `json:"source,omitempty"`
+	Memory    []string `json:"memory,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
+	// Privacy is the authored capture directive: "" (undeclared), "block", "mask" or
+	// "unmask". It applies to the matched element and its subtree, and the nearest
+	// enclosing declaration wins. Undeclared means the corpus says nothing, not "capture
+	// this". See SEP-0009.
+	Privacy     string                 `json:"privacy,omitempty"`
 	Properties  []ComponentPropertyDef `json:"properties,omitempty"`
 	ParentChain []string               `json:"parentChain,omitempty"` // ancestor component names, root-first
 	Stability   string                 `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"
