@@ -4,11 +4,20 @@ title: Signals — composing a named, tagged classification from existing entiti
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-07-31
-updated: 2026-07-31
+updated: 2026-09-29
 spec-version-target: 1
 related-issues: []
 related-discussions: []
 ---
+
+> **Partially shipped as a subset.** PR #445 landed the Component/View
+> state-predicate slice of this proposal: a `signals:` entry carries `name`,
+> `ref` and `tags`, and denotes the boolean of the referenced entity's current
+> state. The `filter:` mechanism, `Request` and `Message` refs, and evaluation
+> are all still unimplemented, and have no conformance fixture. The declaration
+> and validation layer for the full proposal is open as PR #114, which predates
+> the subset and needs rebasing onto it; its fixture also claims number 020,
+> which `020-message-properties` now holds.
 
 ## Summary
 

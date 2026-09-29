@@ -2,13 +2,16 @@
 sep: 0014
 title: Named environments and origins, referenced by views and requests
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Accepted
 created: 2026-09-08
-updated: 2026-09-23
+updated: 2026-09-29
 spec-version-target: 1
 related-issues: []
 related-discussions: []
 ---
+
+> **Accepted 2026-09-29. Not yet implemented.** Neither `environments` nor
+> `origins` exists in `spec/v1/sightmap.schema.json` or in the Go SDK.
 
 ## Summary
 

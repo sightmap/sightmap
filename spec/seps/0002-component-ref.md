@@ -2,14 +2,18 @@
 sep: 0002
 title: Component references via `$ref`
 author: Joel Webber (@joelgwebber)
-status: Draft
+status: Accepted
 created: 2026-05-19
-updated: 2026-05-20
+updated: 2026-09-29
 spec-version-target: 1
 related-issues: []  # none — design discussion happened in the companion impl PR
 related-discussions:
   - "Companion implementation PR (kernel `$ref` expansion + dedup + diagnostics): https://github.com/sightmap/sightmap-js/pull/90"
 ---
+
+> **Accepted 2026-09-29. Implemented.** `$ref` expansion, deduplication, and
+> circular-chain diagnostics ship in the Go SDK, covered by conformance
+> fixtures 010, 011 and 012.
 
 ## Summary
 

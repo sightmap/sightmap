@@ -2,13 +2,20 @@
 sep: 0004
 title: Authored classification tags via `tags[]`
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Accepted
 created: 2026-07-29
-updated: 2026-07-29
+updated: 2026-09-29
 spec-version-target: 1
 related-issues: []
 related-discussions: []
 ---
+
+> **Accepted 2026-09-29. Partially implemented.** `tags` on `Component` and
+> `Request` ship end to end, covered by conformance fixture 017. `View.tags` is
+> in `spec/v1/sightmap.schema.json` but absent from the Go SDK: `ViewDef`
+> carries no `Tags` field, and the loader's view field allowlist omits `tags`,
+> so a corpus carrying a view tag validates under ajv and is rejected by the Go
+> loader. Closing that divergence is outstanding.
 
 ## Summary
 

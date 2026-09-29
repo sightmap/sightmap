@@ -2,13 +2,24 @@
 sep: 0005
 title: Request property extraction via `properties[]`
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Accepted
 created: 2026-07-31
-updated: 2026-08-10
+updated: 2026-09-29
 spec-version-target: 1
 related-issues: [157]
 related-discussions: []
 ---
+
+> **Accepted 2026-09-29. Implemented.** The `source` / `field` / `pattern`
+> extraction described below ships in the Go SDK, covered by conformance
+> fixture 018. The header-addressing question raised in PR #165 was settled by
+> PR #171, which introduced `source` and made `field` required whenever
+> `source` is a headers block; that PR is superseded and should be closed.
+>
+> One addressing gap is still open, as issue #187: `properties[]` can reach a
+> body or a header block, but not a query parameter or a path segment. PR #166
+> (SEP-0008) proposes the view-side half of that; the request-side half has no
+> proposal yet.
 
 > **Amended by [SEP-0010](0010-tree-closed-component-properties.md):** the
 > `transform` field is removed from request `properties[]`. Fold any
