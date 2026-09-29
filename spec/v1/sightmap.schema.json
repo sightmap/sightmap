@@ -164,6 +164,10 @@
           "items": { "type": "string", "minLength": 1 },
           "description": "Open-vocabulary classification labels applied to matches of this component, e.g. \"defect\". Resolved as a union across every matching ancestor level, not just the nearest-enclosing match used for naming. See SEP-0004."
         },
+        "watch": {
+          "type": "boolean",
+          "description": "Ask a capture consumer to report this component's visibility lifecycle (rendered, visible, gone) even when it is never interacted with. Applies to this component only, never its children. A consumer's interactivity filter must not suppress it. See SEP-0015."
+        },
         "children": {
           "type": "array",
           "description": "Nested components. Selectors are scoped to the parent's matched subtree. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",

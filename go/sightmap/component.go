@@ -4,11 +4,15 @@ package sightmap
 // Hierarchical YAML selectors should be pre-flattened by the caller into
 // compound descendant selectors before compiling into match queries.
 type ComponentDef struct {
-	Name        string                 `json:"name"`
-	Selectors   []string               `json:"selectors"`
-	Source      string                 `json:"source,omitempty"`
-	Memory      []string               `json:"memory,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
+	Name      string   `json:"name"`
+	Selectors []string `json:"selectors"`
+	Source    string   `json:"source,omitempty"`
+	Memory    []string `json:"memory,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
+	// Watch asks a capture consumer to report this component's visibility lifecycle even
+	// when it is never interacted with. Applies to this component only, never its
+	// children. See SEP-0015.
+	Watch       bool                   `json:"watch,omitempty"`
 	Properties  []ComponentPropertyDef `json:"properties,omitempty"`
 	ParentChain []string               `json:"parentChain,omitempty"` // ancestor component names, root-first
 	Stability   string                 `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"
