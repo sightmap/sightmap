@@ -530,7 +530,11 @@ A component may declare `watch: true`, asking a capture consumer to report its *
   watch: true
 ```
 
-A consumer that reports visibility SHOULD report, for each matched element, that it rendered, that it became visible, and that it ended. These are a lifecycle rather than an enumeration: a consumer reports them under whatever names and granularity it already uses, and one with only a coarser notion of "seen" satisfies this with that. Each matched element is reported separately; a consumer that cannot distinguish instances MUST still report the first.
+For each matched element, a consumer that reports visibility MUST report that the element **became visible to the user**, and MAY report the rest of the lifecycle around it — rendered, no longer visible, removed. Becoming visible is the only moment that answers the question the field exists for; the surrounding events are largely churn, since an element can render far off-screen, re-render on every state change, and be removed by a route transition. A consumer whose only notion is a coarse "seen" conforms with that alone.
+
+Repeat reports SHOULD be collapsed: an element that leaves and re-enters the viewport, or whose observer fires several times for one appearance, is one appearance. Each matched element is reported separately; a consumer that cannot distinguish instances MUST still report the first.
+
+**Visibility is passive.** An element scrolling into view is a layout side effect, not something the user did, so a consumer that ranks or attributes activity MUST NOT treat a visibility report as an interaction.
 
 **`watch` applies to the component it is declared on, never to its `children`.** This is the opposite of [`privacy`](#privacy), deliberately: privacy is a restriction, where covering the subtree is the safe default, while `watch` generates records, where covering a subtree silently would multiply them.
 
