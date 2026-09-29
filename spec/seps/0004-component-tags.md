@@ -405,9 +405,9 @@ merged-but-unimplemented spec change.
    entity in the spec today (no selector or route to attach a definition to). Tags there
    would need a different mechanism than this SEP proposes — left to a follow-on SEP if a
    real use case emerges.
-3. **Canonical formatting.** `dependencies[]` (SEP-0001) is canonicalized — sorted and
-   deduplicated — by the `fmt` command, with a dedicated conformance fixture
-   (`108-fmt-dependencies-canonical`). Should `tags[]`, being similarly an unordered set
+3. **Canonical formatting.** `canonical-format.md` defines a sort-and-deduplicate rule for
+   unordered string arrays. Its only instance, `dependencies[]`, went away with SEP-0001, so
+   the rule currently applies to no field. Should `tags[]`, being an unordered set
    rather than an ordered list (unlike `properties[]`, where authoring order is meaningful),
    get the same treatment? This SEP proposes runtime resolution be deduplicated and stably
    ordered (see Semantics) but does not commit to a specific canonical-format fixture number

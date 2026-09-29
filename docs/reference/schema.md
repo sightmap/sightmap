@@ -64,7 +64,6 @@ A named screen in the app, identified by a URL route.
 | `stability` | string | no | Authoring-confidence marker: `stub` or `deferred`. See [Stability](#stability). |
 | `description` | string | no | Free-text. Not surfaced at runtime but useful for PR review and future maintenance. |
 | `source` | string | no | Relative path to the source file. |
-| `dependencies` | string[] | no | Supplementary files (minimatch globs, project-root-anchored, `!` negates) whose changes should trigger re-curation of this view. See [Dependencies](#dependencies). |
 | `memory` | string[] | no | View-level memory entries. |
 | `tags` | string[] | no | Open-vocabulary classification labels for this view. See [Tags](#tags). |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | View-scoped components. Additive with globals (but a view-scoped `$ref` subsumes the matching global for that view — see [Component references](#component-references)). |
@@ -94,7 +93,6 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `name` | string | yes | Replaces the generic a11y role in enriched snapshots. |
 | `selector` | string \| string[] | yes | CSS selector, or a list of alternatives. First match wins. |
 | `source` | string | no | Path to the source file. Rendered inline as `[src: …]` in enriched snapshots. |
-| `dependencies` | string[] | no | Supplementary files (minimatch globs, project-root-anchored, `!` negates) whose changes should trigger re-curation of this component. See [Dependencies](#dependencies). |
 | `description` | string | no | Free-text. Not surfaced at runtime. |
 | `memory` | string[] | no | Component-level memory entries. |
 | `stability` | string | no | Authoring-confidence marker: `uncertain` or `unstable`. See [Stability](#stability). |
@@ -157,36 +155,6 @@ The observed attribute set read by `attr=NAME` is implementation-defined: which 
 **`text` vs `raw_text`.** `text` is the node's accessible name — what a user perceives as its label, which may weld in text from `aria-label`, an associated `<label>`, or CSS pseudo-content. `raw_text` is the node's own author-written text (its direct text-node children only), computed identically on every consumer, live or offline: the deterministic escape for when the accessible name is polluted, or when the literal source text is what you want. The two are the ends of a spectrum — everything perceived, versus the literal author text. See [SEP-0013](https://github.com/sightmap/sightmap/blob/main/spec/seps/0013-richer-node-data.md).
 
 **Value omission is silent** — a property whose `text` is empty, whose attribute is not carried, or whose `PATH` matches nothing is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
-
-## Dependencies
-
-The `dependencies` field on a view or component declares supplementary files whose changes SHOULD trigger re-curation of the entry. It is purely curation-time metadata — runtime consumers (browser-driving agents, session-replay enrichers) read DOM/runtime state, not source files, and MUST NOT introduce page-load runtime cost on the basis of this field.
-
-### What belongs
-
-- Hooks the view or component consumes (e.g. `useChecklist`, `useAuth`)
-- Services / stores / shared utilities
-- CSS / style files the entry loads
-- Helper modules that don't warrant their own entry
-
-### What does NOT belong
-
-- Tests (`*.test.ts`, `*.spec.tsx`)
-- Type-only imports
-- Framework code (React, Vue, etc.)
-- Files that have their own component or request entry — use the existing entry-level binding, don't restate
-
-### Glob semantics
-
-Strings in `dependencies` are interpreted as minimatch globs, project-root-anchored (the directory containing `.sightmap/`). A `!` prefix negates. When multiple positive globs match the same file, the first positive glob in declaration order wins for provenance reporting.
-
-### Normative rules
-
-A conforming SDK MUST surface a diagnostic when:
-
-1. An entry's resolved `dependencies[]` set contains its own `source`. Diagnostic code: `dependencies.self-redundant`.
-2. An entry's resolved `dependencies[]` set contains a path that is the `source` of any other entry in the same `.sightmap/`. Diagnostic code: `dependencies.overlaps-entry`.
-3. A glob in `dependencies[]` resolves to zero files. Diagnostic code: `unknown-source` (existing vocabulary, narrowed to apply to `dependencies[]` globs).
 
 ## Request
 

@@ -32,7 +32,6 @@ The `0NN` series covers loading, route matching, and diagnostics:
 | 005 | `selector-array` | `selector` accepts an array |
 | 006 | `view-scoped-vs-global` | Global components match everywhere; scoped only on their view |
 | 007 | `request-method-filter` | Request matching filters by HTTP method |
-| 008 | `dependencies-binding` | `dependencies[]` glob binding and diagnostics (SEP-0001) |
 | 010 | `component-ref` | `$ref` expansion, view attestation, global+view dedup (SEP-0002) |
 | 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
 | 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
@@ -50,7 +49,6 @@ The `1NN` series covers the byte-level YAML format defined by [`spec/v1/canonica
 | 104 | `fmt-header-preservation` | Leading `#`-comment blocks preserved verbatim |
 | 105 | `fmt-idempotent` | Canonicalizing canonical input is a no-op |
 | 106 | `fmt-invalid-untouched` | Schema-invalid input is rejected without changes |
-| 108 | `fmt-dependencies-canonical` | `dependencies` arrays sorted and deduplicated |
 
 <Note>
 These fixtures define canonical output; the CLI does not include a formatter command. An implementation that writes Sightmap YAML can check its output against this series.

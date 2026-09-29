@@ -481,8 +481,8 @@ so would constrain every existing corpus that sets `url:`.
 - An environment definition's key order is `name, platform, app_id, build_type, backend, origins`.
   Keys within any origin map are alphabetized.
 - The top-level `environments` sequence is alphabetized by `name`.
-- View- and request-level reference lists carry no order, so they are sorted and deduplicated like
-  `dependencies`.
+- View- and request-level reference lists carry no order, so they are sorted and deduplicated under
+  the unordered-string-array rule in [`canonical-format.md`](../v1/canonical-format.md#list-ordering).
 
 ## Alternatives considered
 
@@ -611,8 +611,8 @@ conforming corpus produces spurious `unknown-field` warnings.
   this SEP does not change.
 - [SEP-0002](0002-component-ref.md): the project-wide registry and first-by-path collision rule this
   SEP reuses for environments and shared origins.
-- [SEP-0001](0001-dependencies-field.md): the sort-and-deduplicate canonical rule reused for
-  reference lists.
+- [`spec/v1/canonical-format.md#list-ordering`](../v1/canonical-format.md#list-ordering): the
+  sort-and-deduplicate rule for unordered string arrays, reused for reference lists.
 - RFC 6454 (*The Web Origin Concept*): the scheme, host, and port tuple an origin URL carries.
 - Browser extension match patterns and the WHATWG URLPattern standard: prior art for wildcards bounded
   by URL components, the model for origin patterns.

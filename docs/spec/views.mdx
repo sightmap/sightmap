@@ -90,22 +90,6 @@ views:
 View names should be unique across the sightmap. Runtime behavior is implementation-defined when two files define the same view name. Conforming implementations SHOULD emit a warning.
 </Warning>
 
-## Dependencies
-
-`source` names the view's primary file. List supplementary files, such as feature-specific hooks, stores, and CSS modules, under `dependencies`. Reverse-lookup tools can then associate changes to those files with the view:
-
-```yaml
-views:
-  - name: FlightSearch
-    route: /search
-    source: src/pages/FlightSearch.tsx
-    dependencies:
-      - src/hooks/useFlightSearch.ts
-      - src/stores/flightFilterStore.ts
-```
-
-`dependencies` is curation-time metadata. Each string is a project-root-anchored minimatch glob; prefix it with `!` to negate it. Runtime consumers MUST NOT add page-load cost based on this field. See the [schema reference](/reference/schema#dependencies) for usage rules and diagnostics.
-
 ## Next
 
 [Components](/spec/components) covers selector strings, arrays, and nesting rules. [Requests](/spec/requests) covers method filters and route normalization.
