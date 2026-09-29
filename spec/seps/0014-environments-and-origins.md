@@ -49,7 +49,7 @@ corpora never set it. Tools built on a corpus keep needing the missing piece:
 6. **Some hosts can't be enumerated.** A preview deploy gets a new host per pull request, and a local
    dev server binds whichever port is free. A list of literal origins can't describe either.
 
-A deploy target (`staging`, `ios-beta`) and a surface (`app`, `api`) are different things. A session
+A deploy target (`staging`, `android-beta`) and a surface (`app`, `api`) are different things. A session
 belongs to a deploy target, and a corpus is published to one. A surface is a host a deploy target
 serves pages from or calls: the same surface in two targets is the same part of the product on two
 hosts, and an API surface has no sessions of its own. Defining first-party surfaces inside each web
@@ -72,15 +72,19 @@ Environments and shared origins are defined at a file root, in any file:
 # .sightmap/environments.yaml
 version: 1
 environments:
-  - name: ios-beta
-    platform: ios
+  - name: android-beta
+    platform: android
     app_id: com.acme.app
     build_type: beta
     backend: staging
+  - name: android-prod
+    platform: android
+    app_id: com.acme.app
+    build_type: release
+    backend: prod
   - name: ios-prod
     platform: ios
     app_id: com.acme.app
-    build_type: release
     backend: prod
   - name: local
     origins:
@@ -126,7 +130,7 @@ views:
         origins: [facebook]
   - name: OrderHistoryScreen
     route: /orders/history
-    environments: [ios-beta, ios-prod]
+    environments: [android-beta, android-prod, ios-prod]
     requests:
       - name: SyncOrders
         route: /orders/sync
@@ -139,27 +143,32 @@ requests:
     origins: [telemetry-eu, telemetry-us]
 ```
 
-`OrderHistoryScreen` is the iOS screen. Views currently match by URL route only, so its `route`
+`OrderHistoryScreen` is the native screen. Views currently match by URL route only, so its `route`
 stands in for a native screen key, which is outside this SEP.
+
+The two Android entries share one `app_id` and are told apart by `build_type`. The iOS entry
+declares none, because a platform whose apps report no build variant cannot be split that way; see
+[Build variants are only as precise as the platform](#build-variants-are-only-as-precise-as-the-platform).
 
 How each entity resolves:
 
-| | local | preview | staging | prod | ios-beta | ios-prod |
-|---|---|---|---|---|---|---|
-| `OrderHistory` | `localhost:*` (pattern) | `deploy-preview-*--acme.netlify.app` (pattern) | `app.staging.acme.com` | `app.acme.com` | not present | not present |
-| `ListOrders` | `localhost:8080` | `api.staging.acme.com` | `api.staging.acme.com` | `api.acme.com` | not present | not present |
-| `FacebookPixel` | `www.facebook.com` | `www.facebook.com` | `www.facebook.com` | `www.facebook.com` | not present | not present |
-| `OrderHistoryScreen` | not present | not present | not present | not present | no surface | no surface |
-| `SyncOrders` | not present | not present | not present | not present | `api.staging.acme.com` | `api.acme.com` |
-| `SendTelemetry` | EU or US | EU or US | EU or US | EU or US | EU or US | EU or US |
+| | local | preview | staging | prod | android-beta | android-prod | ios-prod |
+|---|---|---|---|---|---|---|---|
+| `OrderHistory` | `localhost:*` (pattern) | `deploy-preview-*--acme.netlify.app` (pattern) | `app.staging.acme.com` | `app.acme.com` | not present | not present | not present |
+| `ListOrders` | `localhost:8080` | `api.staging.acme.com` | `api.staging.acme.com` | `api.acme.com` | not present | not present | not present |
+| `FacebookPixel` | `www.facebook.com` | `www.facebook.com` | `www.facebook.com` | `www.facebook.com` | not present | not present | not present |
+| `OrderHistoryScreen` | not present | not present | not present | not present | no surface | no surface | no surface |
+| `SyncOrders` | not present | not present | not present | not present | `api.staging.acme.com` | `api.acme.com` | `api.acme.com` |
+| `SendTelemetry` | EU or US | EU or US | EU or US | EU or US | EU or US | EU or US | EU or US |
 
-`ListOrders` and `FacebookPixel` are absent from the iOS environments because their view is.
-`SyncOrders` resolves `api` through each iOS environment's `backend`.
+`ListOrders` and `FacebookPixel` are absent from the native environments because their view is.
+`SyncOrders` resolves `api` through each native environment's `backend`.
 
 Which environment a session belongs to: `http://localhost:5173` belongs to `local`,
 `https://deploy-preview-464--acme.netlify.app` to `preview`, and `https://app.staging.acme.com` to
 `staging`. `preview` and `staging` share an API host, which is harmless because no session runs on
-it. An iOS session from `com.acme.app` belongs to `ios-beta` or `ios-prod` by its build type.
+it. An Android session from `com.acme.app` belongs to `android-beta` or `android-prod` by its build
+variant, and an iOS session from the same `app_id` belongs to `ios-prod`.
 
 ### Field reference
 
@@ -262,7 +271,7 @@ An origin URL can name a set of origins instead of one, with wildcards in exactl
   `https://**.acme.com` matches `app.acme.com` and `app.staging.acme.com`.
 - **`*` as the port** matches any port, or none: `http://localhost:*`.
 
-The scheme is always literal, and a host pattern never matches its own bare suffix
+The scheme never carries a wildcard, and a host pattern never matches its own bare suffix
 (`https://*.acme.com` does not match `https://acme.com`). Host wildcards anchor at the right, so the
 literal suffix is what a pattern commits to. `*` and `**` mean what they mean in routes, applied to
 `.`-separated labels instead of `/`-separated segments.
@@ -288,9 +297,12 @@ API host, so sharing alone is not an error; a conforming SDK MAY warn when two w
 define the same origin (`origin-host-shared`). An origin that several environments genuinely share,
 like a backend API, belongs in the shared `origins` map, where it never identifies a session at all.
 
-Ports are part of the comparison, so `http://localhost:3000` and `http://localhost:3001` are
-different environments. A consumer that cannot observe a session's port compares scheme and host
-only, and resolves to nothing when that is ambiguous.
+Matching compares host and port, not scheme. `http://localhost:3000` and `http://localhost:3001`
+are different environments, but `http://app.acme.com` and `https://app.acme.com` are the same one,
+because a session's reported identity is not guaranteed to carry a scheme. An origin still declares
+a scheme, which is what makes it navigable and what an entity's URL is built from; the scheme is
+just not a discriminator. A consumer that cannot observe a session's port compares the host alone
+and resolves to nothing when that is ambiguous.
 
 A native session belongs to the environment whose `platform` and `app_id` match its app, preferring
 one whose `build_type` matches the session's build variant; an environment with no `build_type`
@@ -298,8 +310,19 @@ covers every variant of its `app_id`. Two native environments with the same `pla
 and `build_type` are the same target under two names, and a conforming SDK SHOULD warn
 (`environment-duplicate`).
 
+#### Build variants are only as precise as the platform
+
+Splitting one `app_id` across environments by `build_type` works only where the app reports a build
+variant. Where it reports none, every build of that `app_id` looks identical, so a `build_type` an
+environment declares matches nothing and the app's sessions resolve only against an environment
+that declares no `build_type`. Two consequences: declare at most one environment per `app_id` on
+such a platform, and expect a warning rather than silence if a corpus declares more. This is a
+property of what the running app reports, not of the corpus, so a corpus written today stays
+correct if the platform starts reporting one later.
+
 Web hostnames compare case-insensitively; app IDs compare byte-for-byte. Origins compare after
-lowercasing the scheme and host and dropping a port equal to the scheme's default.
+lowercasing the host and dropping a port of 80 or 443, either of which a session may already have
+dropped before a consumer sees it.
 
 #### Publishing is out of scope
 
@@ -374,6 +397,10 @@ so would constrain every existing corpus that sets `url:`.
 - MUST assign a web session to the web environment with the most specific origin matching the
   session's origin, and to none if the most specific matches span several environments. MAY warn
   when two web environments define the same origin (`origin-host-shared`).
+- MUST compare origins on host and port only, ignoring the scheme, after lowercasing the host and
+  dropping a port of 80 or 443.
+- MUST match a native session's build variant against `build_type` verbatim, and MUST treat an
+  environment with no `build_type` as covering every variant of its `app_id`.
 - SHOULD warn when an origin name resolves in some web environments but not others
   (`origin-environment-gap`), and when two native environments share `platform`, `app_id`, and
   `build_type` (`environment-duplicate`).
