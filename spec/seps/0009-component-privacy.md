@@ -2,7 +2,7 @@
 sep: 0009
 title: Component capture privacy via `privacy`
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Review
 created: 2026-09-29
 updated: 2026-09-29
 spec-version-target: 1
