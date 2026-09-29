@@ -301,6 +301,7 @@ messages:
 | `message` | string | no | [RE2](#regular-expressions) regex matched against the record's text. Match-any if omitted. |
 | `description` | string | no | What this pattern means, for a human reading the corpus. |
 | `source` | string | no | Relative path to the source most likely to emit this. |
+| `tags` | string[] | no | Open-vocabulary classification labels for this message. See [Tags](#tags). |
 | `properties` | [MessageProperty](#message-properties)[] | no | Values to extract from an exception's stack. |
 
 A record matches when every declared constraint holds. Declaring neither `level` nor `message` matches every record, which is legal but rarely useful. `message` is an [RE2 regular expression](#regular-expressions).
@@ -483,11 +484,12 @@ Omit the field for an active view or a stable component.
 
 ## Tags
 
-Views, components, and requests may all carry an optional `tags: string[]` — open-vocabulary
+Views, components, requests, messages, and signals may all carry an optional `tags: string[]` — open-vocabulary
 classification labels (e.g. `defect`) distinct from `name`. Where `name` (or a view/request's
 identity) answers "what is this," `tags` answers "does this belong to some cross-cutting
 classification I care about." See [SEP-0004](https://github.com/sightmap/sightmap/blob/main/spec/seps/0004-component-tags.md) for the full
-proposal and rationale.
+proposal and rationale, and [SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-message-and-signal-tags.md) for messages and
+signals.
 
 Each entity type already has a rule for resolving *identity* when more than one definition
 could apply to the same match. Tags deliberately do **not** follow that rule — a broader,
@@ -499,6 +501,8 @@ resolution is instead a **union across every applicable definition**:
 | Component | Nearest-enclosing wins — the walk from the target node toward the root stops at the first matching level. | Union across every matching ancestor level, not just the nearest. |
 | View | Most-specific-route wins (see [View matching](#view-matching-most-specific-wins)). | Union across every view whose route matches the URL, not just the most-specific one. |
 | Request | Not applicable — [all matching requests already apply](#request-matching-all-matches-apply); there is no single winner to begin with. | Union across every matching request — the existing "all matches apply" rule already gives this for free. |
+| Message | Ambiguous matches are **refused**: a consumer MUST surface an ambiguity rather than pick a winner. | Union across every matching entry. The classification therefore survives an ambiguity the identity does not: a consumer that cannot say *which* message a record is can still say it is tagged `defect`. |
+| Signal | Single, named classification; `ref` resolves to exactly one entity. | Union of the signal's own `tags` with the resolved tags of the entity named by `ref`. |
 
 A component example: a `CheckoutForm` tagged `defect` with an untagged `SubmitButton` child
 — a click on the button resolves `name: SubmitButton` (nearest-enclosing, unchanged) and

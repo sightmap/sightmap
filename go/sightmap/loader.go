@@ -61,6 +61,7 @@ type rawMessage struct {
 	Message     string               `yaml:"message"`
 	Description string               `yaml:"description"`
 	Source      string               `yaml:"source"`
+	Tags        []string             `yaml:"tags"`
 	Properties  []rawMessageProperty `yaml:"properties"`
 }
 
@@ -86,6 +87,7 @@ type rawView struct {
 	Components  []rawComponent `yaml:"components"`
 	Requests    []rawRequest   `yaml:"requests"`
 	Stability   string         `yaml:"stability"`
+	Tags        []string       `yaml:"tags"`
 	Access      *rawAccess     `yaml:"access"`
 }
 
@@ -294,6 +296,7 @@ func loadDir(path string) (*Corpus, error) {
 				Memory:     rv.Memory,
 				Components: flattenAll(rv.Components, ctx),
 				Requests:   toRequestDefs(rv.Requests, ctx),
+				Tags:       rv.Tags,
 				Stability:  rv.Stability,
 				Access:     access,
 				URL:        viewURL,
@@ -422,6 +425,7 @@ func toMessageDefs(rms []rawMessage) []MessageDef {
 			Message:     rm.Message,
 			Description: rm.Description,
 			Source:      rm.Source,
+			Tags:        rm.Tags,
 			Properties:  toMessageProperties(rm.Properties),
 		}
 		md.precompile() // cache the compiled pattern once, at load time

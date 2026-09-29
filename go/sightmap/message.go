@@ -35,6 +35,11 @@ type MessageDef struct {
 	Description string `json:"description,omitempty"`
 	Source      string `json:"source,omitempty"`
 
+	// Tags are open-vocabulary classification labels (SEP-0017). A record's effective
+	// message tags are the union across every entry it matches, so the classification
+	// survives an identity ambiguity that the name does not.
+	Tags []string `json:"tags,omitempty"`
+
 	// Properties declares named values to extract from an exception record's
 	// stack (the SEP-0006 stack-addressing follow-on, mirroring SEP-0005's
 	// request properties). Resolved by ExtractProperties against Message.Stack.

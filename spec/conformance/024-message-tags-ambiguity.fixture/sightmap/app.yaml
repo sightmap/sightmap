@@ -1,0 +1,17 @@
+version: 1
+# Message identity is a refusal, not a winner: SEP-0006 requires a consumer to
+# surface an ambiguity when a record matches more than one entry. Tags are not
+# bound by that. An ERROR reading "cart version mismatch" matches both entries
+# below, so its identity is ambiguous and the message-conflict warning fires,
+# while its tags resolve to the union [checkout, defect] regardless.
+#
+# This is the case where SEP-0004's union rule does the most work: a consumer
+# that cannot say WHICH message a record is can still say it is tagged defect.
+messages:
+  - name: AnyCheckoutError
+    level: ERROR
+    tags: [checkout]
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    tags: [defect]
