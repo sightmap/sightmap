@@ -20,7 +20,8 @@ broader `block` or `mask` that would otherwise cover it. The directive applies t
 element and its subtree, and the nearest enclosing declaration wins, so the common shape is a
 `mask` on a form with an `unmask` on the one field inside it that is safe to keep. It governs
 [extracted properties](0010-tree-closed-component-properties.md) as well as captured content, at
-the node each value is read from rather than at the component that declared it.
+the node each value is read from rather than at the component that declared it, and it draws an
+explicit line through attributes, which can be either structure or content.
 
 ## Motivation
 
@@ -86,7 +87,7 @@ components:
 | Value | Meaning |
 |---|---|
 | `block` | The element and its subtree MUST NOT be captured. Neither content nor structure is retained. |
-| `mask` | The element's structure and layout MAY be captured; its text and input values MUST NOT be. |
+| `mask` | The element's structure and layout MAY be captured; its text, input values, and attribute values MUST NOT be, except the interactive-state attributes named under [Attributes](#attributes-under-mask). |
 | `unmask` | The element and its subtree are captured in full, overriding any enclosing `block` or `mask`. |
 
 ### JSON Schema
@@ -155,9 +156,40 @@ it MAY be surfaced, since `mask` already permits structure. Under `block` it MUS
 blocked element is not reported at all. Every other extract form (`text`, `raw_text`, `attr=NAME`,
 `PATH.prop`) yields content and is withheld under either.
 
-Attributes count as content rather than structure, so `attr=` is withheld under `mask` even for an
-attribute that looks like state. Splitting them would mean maintaining an allowlist of safe
-attribute names, and an allowlist that is wrong once leaks.
+`attr=` is withheld under `mask` for every attribute **except** the four interactive-state names
+below, which resolve normally. Under `block` nothing resolves, state included, because a blocked
+element is not reported at all.
+
+#### Attributes under `mask`
+
+`mask` permits structure and withholds content, and an attribute can be either, so the line has to
+be drawn in the spec rather than left to each consumer. Leaving it open is the gap this closes: a
+`data-email` attribute is neither text nor an input value, so a consumer reading `mask` narrowly
+could retain it in the recording while the corpus believed the element was protected.
+
+A consumer MUST withhold, under `mask`:
+
+- **The value of any attribute the corpus reads via an `attr=` extract, anywhere in the corpus.** An
+  author who names an attribute in an extract has declared that it carries a value worth reading,
+  which is the definition of content. Tying the rule to the corpus rather than to a fixed list is
+  what keeps it from going stale.
+- **The value of any `data-*` attribute**, and of `value`, `title`, `alt`, `placeholder`, and
+  `aria-label`. These routinely carry user-visible or user-derived text.
+
+A consumer MAY retain, under `mask`:
+
+- **The four interactive-state attributes [SEP-0013](0013-richer-node-data.md) defines** —
+  `checked`, `selected`, `disabled`, `expanded`. This is a closed set fixed by the spec rather than
+  an open allowlist, and each carries a state rather than a value. Withholding them would make
+  `mask` and SEP-0013 mutually unusable, since a masked form could then report no control state at
+  all, which is most of what makes a masked form worth recording.
+- **Presentational attributes needed to render the element's shape**, such as `class`, `style` and
+  `id`.
+
+That last permission is a residual risk, and it is stated rather than hidden: a `class` or `id`
+built from user data, `class="user-jane-doe"`, survives a `mask`. The spec cannot close it without
+making `mask` unimplementable for replay, which needs those attributes to render anything at all.
+An author carrying user data in a presentational attribute should reach for `block`.
 
 Withholding follows the existing omission rule: the property is **absent**, exactly as if it had
 not resolved. SEP-0010 already requires consumers to treat omission as normal rather than as an
@@ -182,7 +214,11 @@ A conforming capture consumer MUST:
 - Never capture content the resolved value marks `block` or `mask`, regardless of its own defaults.
 - Withhold any `properties[]` value whose node resolves to `block` or `mask`, judged at the node
   the value is read from rather than at the declaring component, and omit it the way an unresolved
-  property is omitted. `exists:PATH` MAY still resolve under `mask`; nothing resolves under `block`.
+  property is omitted. Under `mask`, `exists:PATH` and the four interactive-state attributes MAY
+  still resolve; under `block` nothing resolves.
+- Under `mask`, withhold from the captured recording the value of every `data-*` attribute, of
+  `value`/`title`/`alt`/`placeholder`/`aria-label`, and of any attribute named by an `attr=` extract
+  anywhere in the corpus.
 
 A conforming consumer that does not capture page content at all, such as an offline matcher or a
 documentation generator, MUST accept and ignore the field.

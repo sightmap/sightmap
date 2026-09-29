@@ -536,7 +536,7 @@ A component may declare `privacy`, stating whether a capture consumer — anythi
 | Value | Meaning |
 |---|---|
 | `block` | The element and its subtree MUST NOT be captured. Neither content nor structure is retained. |
-| `mask` | The element's structure and layout MAY be captured; its text and input values MUST NOT be. |
+| `mask` | The element's structure and layout MAY be captured; its text, input values, and attribute values MUST NOT be, except the interactive-state attributes noted below. |
 | `unmask` | The element and its subtree are captured in full, overriding any enclosing `block` or `mask`. |
 
 A declaration applies to the matched element **and its entire subtree**, so masking a form masks the fields inside it without naming each one.
@@ -551,7 +551,11 @@ A declaration applies to the matched element **and its entire subtree**, so mask
 
 The governing node is the one the value is **read from**, not the component that declared the property. Extraction is tree-closed, so a `PATH.prop` directive resolves against a descendant component and that descendant's own resolved privacy applies — a component with no declaration of its own cannot launder a value out of a blocked descendant.
 
-`exists:PATH` is the exception, reporting presence rather than content: it MAY be surfaced under `mask`, which already permits structure, and MUST NOT under `block`. Every other extract form (`text`, `raw_text`, `attr=NAME`, `PATH.prop`) yields content and is withheld under either. Attributes count as content, so `attr=` is withheld under `mask` even for an attribute that looks like state.
+`exists:PATH` is an exception, reporting presence rather than content: it MAY be surfaced under `mask`, which already permits structure, and MUST NOT under `block`. `text`, `raw_text` and `PATH.prop` yield content and are withheld under either.
+
+**Attributes under `mask`.** An attribute can be structure or content, so the line is drawn here rather than left to each consumer. Under `mask` a consumer MUST withhold the value of any attribute the corpus reads via an `attr=` extract **anywhere in the corpus** — naming an attribute in an extract is a declaration that it carries a value worth reading — and the value of any `data-*` attribute, and of `value`, `title`, `alt`, `placeholder` and `aria-label`. A consumer MAY retain the four interactive-state attributes [SEP-0013](https://github.com/sightmap/sightmap/blob/main/spec/seps/0013-richer-node-data.md) defines (`checked`, `selected`, `disabled`, `expanded`), which are a closed set carrying state rather than a value, and presentational attributes needed to render the element's shape (`class`, `style`, `id`). `attr=` extraction of those four state attributes resolves normally under `mask`; every other `attr=` is withheld. Under `block` nothing resolves.
+
+A `class` or `id` built from user data survives a `mask`, and the spec cannot close that without making `mask` unimplementable for replay. An author carrying user data in a presentational attribute should use `block`.
 
 A withheld property is **absent**, exactly as if it had not resolved, so [silent value omission](#component-properties) covers it and a consumer cannot distinguish the two cases.
 

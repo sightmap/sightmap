@@ -58,6 +58,19 @@ components:
       - name: PostcodeField
         selector: 'input[name="zip"]'
 
+  # Attributes under mask: the four SEP-0013 interactive-state names still resolve
+  # (a closed set carrying state, not a value), while a data-* attribute does not.
+  # Naming data-account-id in an attr= extract is itself the declaration that it
+  # carries content, which is what makes the rule self-closing.
+  - name: SubscribeToggle
+    selector: '[role="switch"]'
+    privacy: mask
+    properties:
+      - name: on
+        extract: attr=checked
+      - name: account
+        extract: attr=data-account-id
+
 views:
   - name: Checkout
     route: /checkout/**
