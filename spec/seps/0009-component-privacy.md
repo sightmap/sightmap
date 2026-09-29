@@ -18,7 +18,9 @@ analysis, may retain the matched element's content. `block` withholds the elemen
 `mask` retains its shape but not its text, and `unmask` retains it in full, overriding a
 broader `block` or `mask` that would otherwise cover it. The directive applies to the matched
 element and its subtree, and the nearest enclosing declaration wins, so the common shape is a
-`mask` on a form with an `unmask` on the one field inside it that is safe to keep.
+`mask` on a form with an `unmask` on the one field inside it that is safe to keep. It governs
+[extracted properties](0010-tree-closed-component-properties.md) as well as captured content, at
+the node each value is read from rather than at the component that declared it.
 
 ## Motivation
 
@@ -122,6 +124,47 @@ something the corpus marked `block` or `mask`. An `unmask` is a statement by the
 the element is safe, not an instruction that overrides the consumer's own policy; a consumer that
 blocks the element for its own reasons MUST continue to.
 
+**Extracted properties are governed too, at the node the value is read from.** A `properties[]`
+entry ([SEP-0010](0010-tree-closed-component-properties.md)) produces a named value that travels
+separately from captured content, so a directive covering only the recording would leak the same
+text through the other path. A property whose value resolves from a node whose effective privacy
+is `block` or `mask` MUST NOT be surfaced.
+
+The node that matters is the one the value is **read from**, not the component that declared the
+property. SEP-0010 extraction is tree-closed, so a `PATH.prop` directive resolves against a
+descendant component, and that descendant's own resolved privacy governs. A component with no
+declaration of its own therefore cannot launder a value out of a blocked descendant:
+
+```yaml
+- name: CheckoutSummary
+  selector: '.summary'
+  properties:
+    - name: card                      # declared on an unrestricted component...
+      extract: CardNumberInput.value  # ...but read from a blocked one, so it is withheld
+  children:
+    - name: CardNumberInput
+      selector: 'input[name="cc"]'
+      privacy: block
+      properties:
+        - name: value
+          extract: attr=value
+```
+
+`exists:PATH` is the one exception, because it reports presence rather than content. Under `mask`
+it MAY be surfaced, since `mask` already permits structure. Under `block` it MUST NOT be, since a
+blocked element is not reported at all. Every other extract form (`text`, `raw_text`, `attr=NAME`,
+`PATH.prop`) yields content and is withheld under either.
+
+Attributes count as content rather than structure, so `attr=` is withheld under `mask` even for an
+attribute that looks like state. Splitting them would mean maintaining an allowlist of safe
+attribute names, and an allowlist that is wrong once leaks.
+
+Withholding follows the existing omission rule: the property is **absent**, exactly as if it had
+not resolved. SEP-0010 already requires consumers to treat omission as normal rather than as an
+error, so this introduces no new failure mode, and a consumer cannot distinguish "withheld" from
+"did not resolve". That is deliberate; the distinction would itself disclose something about the
+element.
+
 **This is a capture-time directive, not a matching input.** `privacy` does not participate in route
 matching, component identity, or specificity. Two components differing only in `privacy` are the
 same component for every other purpose.
@@ -137,6 +180,9 @@ A conforming capture consumer MUST:
   one for the inner component's subtree.
 - Treat an absent `privacy` as declaring nothing, and leave its own default behavior unchanged.
 - Never capture content the resolved value marks `block` or `mask`, regardless of its own defaults.
+- Withhold any `properties[]` value whose node resolves to `block` or `mask`, judged at the node
+  the value is read from rather than at the declaring component, and omit it the way an unresolved
+  property is omitted. `exists:PATH` MAY still resolve under `mask`; nothing resolves under `block`.
 
 A conforming consumer that does not capture page content at all, such as an offline matcher or a
 documentation generator, MUST accept and ignore the field.

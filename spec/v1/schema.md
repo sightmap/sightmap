@@ -539,6 +539,14 @@ A declaration applies to the matched element **and its entire subtree**, so mask
 
 **The corpus is a floor, not a ceiling.** A consumer MAY withhold more than the corpus asks. A consumer MUST NOT capture content the resolved value marks `block` or `mask`. An `unmask` states that the corpus author considers the element safe; it does not override a consumer's own policy, and a consumer that blocks the element for its own reasons MUST continue to.
 
+**Extracted properties are governed too**, at the node the value is read from. A [`properties[]`](#component-properties) entry produces a named value that travels separately from captured content, so a directive covering only the recording would leak the same text through the other path. A property whose value resolves from a node whose effective privacy is `block` or `mask` MUST NOT be surfaced.
+
+The governing node is the one the value is **read from**, not the component that declared the property. Extraction is tree-closed, so a `PATH.prop` directive resolves against a descendant component and that descendant's own resolved privacy applies — a component with no declaration of its own cannot launder a value out of a blocked descendant.
+
+`exists:PATH` is the exception, reporting presence rather than content: it MAY be surfaced under `mask`, which already permits structure, and MUST NOT under `block`. Every other extract form (`text`, `raw_text`, `attr=NAME`, `PATH.prop`) yields content and is withheld under either. Attributes count as content, so `attr=` is withheld under `mask` even for an attribute that looks like state.
+
+A withheld property is **absent**, exactly as if it had not resolved, so [silent value omission](#component-properties) covers it and a consumer cannot distinguish the two cases.
+
 `privacy` takes no part in route matching, component identity, or specificity. Two components differing only in `privacy` are the same component for every other purpose. A consumer that does not capture page content MUST accept and ignore the field.
 
 See [SEP-0009](../seps/0009-component-privacy.md).
