@@ -339,8 +339,14 @@ origin reference MUST name an origin defined in some environment or in the share
 
 #### Absent or empty means unconstrained
 
-A view or request with no `environments` exists in every environment; with no `origins`, it declares
-no host. An empty list, `[]`, means the same as an absent one: an accidentally emptied list should
+A view or request with no `environments` exists in every environment; with no `origins`, it is not
+pinned to a surface and may be served from any origin its environment defines, that environment
+being the one the session's own page URL resolves to. So a corpus whose environments each define a
+single origin never annotates an entity at all, and one with several surfaces annotates only the
+entities that sit somewhere other than where a reader would assume. Where a consumer needs exactly
+one host for an entity and its environment defines several, the entity has to say which.
+
+An empty list, `[]`, means the same as an absent one: an accidentally emptied list should
 not flip an entity from matching everywhere to matching nothing. A conforming SDK SHOULD warn on an
 explicit empty list (`environments-empty`, `origins-empty`).
 
@@ -586,18 +592,14 @@ conforming corpus produces spurious `unknown-field` warnings.
 
 ## Open questions
 
-1. **Default origins.** Most views are served from `app` and most requests go to `api`, so explicit
-   lists repeat. A corpus-wide default per entity kind (`views: app`, `requests: api`) would remove
-   the repetition at the cost of making where an entity runs implicit. Deferred until real corpora
-   show how much repetition there is.
-2. **Broad patterns.** `https://**.com` and `https://*.netlify.app` are valid and match far more than
+1. **Broad patterns.** `https://**.com` and `https://*.netlify.app` are valid and match far more than
    one product. Should a pattern require a minimum literal suffix, or should SDKs only warn?
-3. **IPv6 literals.** The origin grammar has no bracketed form, so `http://[::1]:3000` is invalid.
+2. **IPv6 literals.** The origin grammar has no bracketed form, so `http://[::1]:3000` is invalid.
    Adding one means a second host grammar that host wildcards would have to answer for. `localhost`
    and `127.0.0.1` cover most local dev, so this is deferred unless a real corpus needs it.
-4. **A native view key.** Views match by URL route, which native screens don't have. Native screen
+3. **A native view key.** Views match by URL route, which native screens don't have. Native screen
    matching needs its own SEP; this one only lets native environments be referenced.
-5. **Opt-in environment- or origin-aware matching.** What a separate match entry point would look
+4. **Opt-in environment- or origin-aware matching.** What a separate match entry point would look
    like, and whether it covers requests as well as views.
 
 ## References
