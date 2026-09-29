@@ -13,8 +13,8 @@ related-discussions: []
 ## Summary
 
 Add an optional `watch: true` field to `Component` entries. It asks a capture consumer to report
-this component's **visibility lifecycle** — that it rendered, that it came into view, that it went
-away — rather than only reporting it when someone interacts with it. A watched component is
+that this component **became visible to the user**, rather than reporting it only when someone
+interacts with it. The surrounding lifecycle, rendered and removed, is optional. A watched component is
 reported whether or not a user ever touches it, which is the point: the interesting fact about a
 promotional banner, an error state, or an empty-results message is usually that it appeared at all.
 
@@ -85,11 +85,25 @@ components:
 
 ### Semantics
 
-**`watch: true` asks for visibility reporting.** A consumer that reports visibility SHOULD report,
-for each matched element: that it was rendered into the page, that it became visible to the user,
-and that it stopped being present or visible. The three are a lifecycle, not an enumeration — a
-consumer reports them under whatever names and granularity it already uses, and a consumer with
-only a coarser notion of "seen" satisfies this with that.
+**`watch: true` asks for visibility reporting.** For each matched element, a consumer that reports
+visibility MUST report that the element **became visible to the user**, and MAY report the rest of
+the lifecycle around it: that it was rendered into the page, that it stopped being visible, that it
+was removed.
+
+The split is deliberate, and it follows what a reference consumer actually keeps. Becoming visible
+is the only moment that answers the question the field exists for — *did the user see this* — and
+the surrounding render and removal events are mostly churn: an element can render far off-screen,
+re-render on every state change, and be removed by a route transition, none of which a reader of
+the session cares about. A consumer is free to report them, and a consumer whose only notion is a
+coarse "seen" conforms with that alone.
+
+**Repeat reports SHOULD be collapsed.** An element that leaves and re-enters the viewport, or whose
+visibility observer fires several times for one appearance, is one appearance. A consumer that
+cannot distinguish the two MUST NOT let the difference change the record's meaning.
+
+**Visibility is passive.** An element scrolling into view is a layout side effect, not something the
+user did. A consumer that ranks or attributes activity MUST NOT treat a visibility report as an
+interaction.
 
 **`watch` does not apply to the subtree.** It marks the component it is written on, and nothing
 else. This is the opposite of [SEP-0009](0009-component-privacy.md) `privacy`, and the difference is
@@ -126,7 +140,9 @@ A conforming consumer that reports visibility MUST:
 
 - Accept `watch` as an optional boolean `Component` property, at every depth including recursive
   `children`.
-- Report the visibility lifecycle of each element matched by a component with `watch: true`.
+- Report that each element matched by a component with `watch: true` became visible, and MAY report
+  the surrounding render and removal events.
+- Collapse repeat reports of one appearance, and never treat a visibility report as an interaction.
 - Report a watched component regardless of whether it is interactive, and regardless of whether any
   interaction with it ever occurs.
 - Treat `watch: false` and an absent `watch` identically.
@@ -207,8 +223,12 @@ This appendix is illustrative. It is not part of the specification, and a confor
 under no obligation to resemble it.
 
 Fullstory expresses this as an element watch, registered against a named element it already holds
-an identifier for, and emits an element-seen event with three states: `RENDERED`, `VISIBLE`, and
-`END`. A compiler mapping `watch: true` therefore chains onto whatever it already does for the
+an identifier for, and emits a lifecycle of `RENDERED`, `ENTERED_VIEWPORT`, `EXITED_VIEWPORT` and
+`UNRENDERED`. Its own session-review consumer keeps only `ENTERED_VIEWPORT`, drops the rest at
+projection as churn, and then collapses runs on element identity because the watcher re-fires for
+one appearance in tight bursts. That behavior is what the MUST/MAY split in Semantics is drawn
+from: the reference consumer discards two thirds of the lifecycle, so requiring all of it would
+have specified something nobody wants. A compiler mapping `watch: true` therefore chains onto whatever it already does for the
 component itself — it creates the named element first, then registers the watch against that
 element's identifier.
 
