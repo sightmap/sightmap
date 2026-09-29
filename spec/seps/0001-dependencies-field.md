@@ -2,13 +2,25 @@
 sep: 0001
 title: Additive `dependencies[]` field on view + component entries
 author: Chip Lay (@chiplay)
-status: Draft
+status: Rejected
 created: 2026-05-19
-updated: 2026-05-20
+updated: 2026-09-29
 spec-version-target: 1
 related-issues: []
 related-discussions: []
 ---
+
+> **Rejected 2026-09-29.** The field asks a curator to hand-maintain a
+> dependency graph that static import analysis derives more accurately, and
+> for free. The reverse-lookup consumer it exists to serve, `match --path`,
+> was never built, and no SDK has ever read the field. Its coordinated-release
+> plan below targets `sightmap-js`, `@sightmap/plugin` and `sightmap-python`,
+> all three archived on 2026-09-02 and folded into this monorepo, so the
+> rollout it describes can no longer happen as written.
+>
+> This document stays as the record of the decision. `dependencies` is removed
+> from the schema, from the Go unknown-field allowlist, from conformance
+> fixtures 008 and 108, and from the example corpora in the same change.
 
 ## Summary
 

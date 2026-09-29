@@ -38,8 +38,6 @@ views:
       - name: BuildingBillboard
         selector: '[data-component="BuildingBillboard"]'
         source: src/components/BuildingBillboard.tsx
-        dependencies:
-          - src/components/building/BillboardScene.tsx
         description: Billboard for the /building tour — headline, subcopy, CTA, and a live slice of the 3D building that orbits slowly through a day/night cycle
         memory:
           - Rendered inside the Hero section, between the hero copy and the date-picker diff, so it sits inside `[data-component="Hero"]` in the DOM
@@ -358,9 +356,6 @@ views:
     route: /building
     description: Scroll-driven 3D tour of the app-as-a-building metaphor — code as blueprint, the running app as the building, the sightmap as its wayfinding, agents as the people inside
     source: src/pages/Building.tsx
-    dependencies:
-      - src/components/building/**
-      - src/building.css
     memory:
       - The WebGL scene (src/components/building/Scene.tsx) mounts only after a client effect and is code-split; the prerendered HTML carries the SVG poster and the full chapter text, so the page reads without JS or WebGL
       - Scroll position drives the scene — each `.bld-chapter` section is one chapter and the active one carries `data-active="true"`; the canvas itself is aria-hidden and has no interactive nodes

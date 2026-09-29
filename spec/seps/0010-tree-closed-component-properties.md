@@ -4,12 +4,18 @@ title: Tree-closed component property extraction
 author: Joel Webber (@joelgwebber)
 status: Accepted
 created: 2026-08-27
-updated: 2026-08-27
+updated: 2026-09-29
 spec-version-target: 1
 related-issues:
   - https://github.com/sightmap/sightmap/issues/282
 related-discussions: []
 ---
+
+> **Both deferred open questions now have draft proposals.** Path predicates
+> are proposed by SEP-0012 (PR #405), which also adds an all-match collector
+> for the aggregates question. A separate capture mechanism, `pattern` on a
+> component property, is proposed by SEP-0011 (PR #404). Both are Draft and
+> unreviewed.
 
 ## Summary
 

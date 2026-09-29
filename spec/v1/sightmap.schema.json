@@ -102,11 +102,6 @@
         },
         "description": { "type": "string" },
         "source": { "type": "string" },
-        "dependencies": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Optional list of supplementary files (minimatch globs, '!' negation, project-root-anchored) whose changes should trigger re-curation of this view. See spec/v1/schema.md#dependencies for semantics."
-        },
         "memory": { "$ref": "#/$defs/memory" },
         "tags": {
           "type": "array",
@@ -152,11 +147,6 @@
         "name": { "type": "string", "minLength": 1 },
         "selector": { "$ref": "#/$defs/selector" },
         "source": { "type": "string" },
-        "dependencies": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Optional list of supplementary files (minimatch globs, '!' negation, project-root-anchored) whose changes should trigger re-curation of this component. See spec/v1/schema.md#dependencies for semantics."
-        },
         "description": { "type": "string" },
         "stability": {
           "type": "string",

@@ -46,8 +46,8 @@ Explicit per entry type. Unknown keys preserved at the end in original order.
 | Entry type | Canonical key order |
 |---|---|
 | Top-level | `version, memory, views, components, requests` |
-| View | `name, route, description, source, dependencies, components, memory, requests` |
-| Component | `name, selector, description, source, dependencies, children, memory` |
+| View | `name, route, description, source, components, memory, requests` |
+| Component | `name, selector, description, source, children, memory` |
 | Request | `name, route, method, description, source, request, response, headers, memory` |
 
 ### List ordering
@@ -55,7 +55,7 @@ Explicit per entry type. Unknown keys preserved at the end in original order.
 - **Top-level sequences** (`views`, top-level `components`, top-level `requests`) are alphabetized: `views` and `components` by `name`, `requests` by `(route, method)` — lexicographic on the tuple, both elements compared as YAML scalar strings byte-by-byte (no Unicode normalization, no case folding). Sort keys are required and unique per schema; missing or duplicate sort keys are schema-invalid (caught by `fmt.schema-invalid` before sorting).
 - **Nested sequences** (e.g. `view.components`, `component.children`) preserve insertion order. Nesting order can carry meaning (parent-child relationships, intentional declaration order); the formatter does not reorder.
 - **`memory` lists** preserve insertion order. Agent-authored entries are not reordered, since order can carry meaning (recency, priority).
-- **String arrays whose order is not semantically significant** — currently `dependencies` on view and component entries — are canonicalized by lexicographic sort followed by deduplication (byte-by-byte comparison, no Unicode normalization, no case folding). SDKs MUST emit `fmt.not-canonical` when an array of this kind is unsorted or contains duplicates.
+- **String arrays whose order is not semantically significant** are canonicalized by lexicographic sort followed by deduplication (byte-by-byte comparison, no Unicode normalization, no case folding). SDKs MUST emit `fmt.not-canonical` when an array of this kind is unsorted or contains duplicates. No field in the current schema is of this kind; the rule is retained because [SEP-0014](../seps/0014-environments-and-origins.md) relies on it for view- and request-level reference lists.
 
 ### Blank lines
 

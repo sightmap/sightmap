@@ -45,7 +45,6 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 005 | `selector-array` | `selector` accepts array; alternates tried in order |
 | 006 | `view-scoped-vs-global` | Global components match everywhere; scoped only on their view |
 | 007 | `request-method-filter` | `match` filters requests by HTTP method |
-| 008 | `dependencies-binding` | `dependencies` globs bind definitions to source files ([SEP-0001](../seps/0001-dependencies.md)) |
 | 010 | `component-ref` | `$ref` expansion, view attestation, and global+view-scoped dedup ([SEP-0002](../seps/0002-component-ref.md)) |
 | 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
 | 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
@@ -68,7 +67,6 @@ The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byt
 | 104 | `fmt-header-preservation` | File header block survives rewriting |
 | 105 | `fmt-idempotent` | Formatting is idempotent |
 | 106 | `fmt-invalid-untouched` | Invalid files are refused, not rewritten |
-| 108 | `fmt-dependencies-canonical` | `dependencies` lists sorted + deduped |
 
 ## Consumers
 

@@ -13,17 +13,12 @@ views:
     route: /search
     description: Main search page with date and origin/destination pickers
     source: src/pages/FlightSearch.tsx
-    dependencies:
-      - src/hooks/useFlightSearch.ts
-      - src/stores/flightFilterStore.ts
     memory:
       - The search form lives inside a modal on mobile; selectors differ
     components:
       - name: DepartureDatePicker
         selector: '[data-picker="departure"]'
         source: src/components/DatePicker.tsx
-        dependencies:
-          - src/components/DatePicker.module.css
         memory:
           - Accepts typed YYYY-MM-DD — skips the calendar
           - Arrow keys navigate; Enter selects; Esc closes
