@@ -13,12 +13,16 @@ related-discussions: []
 ## Summary
 
 Add a file-root `environments` registry of named deploy targets and a file-root `origins` map of
-hosts that are the same everywhere, and let views and requests reference both by name. A web
+hosts that are the same across them, and let views and requests reference both by name. A web
 environment maps surface names (`app`, `api`) to the `scheme://host[:port]` URL each surface has in
-that environment. A native environment is identified by its app ID and build type, and borrows a
-web environment's origins through `backend`. Third-party hosts, like a tracking pixel or a regional
-telemetry endpoint, go in the file-root `origins` map. An origin name resolves per environment, so
-`origins: [api]` means the API host of whichever environment a session belongs to. References are
+that environment, overriding any shared entry of the same name. A native environment is identified
+by its app ID and build type, and borrows a web environment's origins through `backend`.
+Third-party hosts, like a tracking pixel or a regional telemetry endpoint, go in the file-root
+`origins` map, as do backends shared by most deploy targets. An origin name resolves per
+environment, so
+`origins: [api]` means the API host of whichever environment a session belongs to. An origin can be
+a pattern (`https://deploy-preview-*--acme.netlify.app`, `http://localhost:*`), so preview deploys
+and local dev servers belong to an environment without being enumerated. References are
 declarative: they don't change route matching, and an entity that references none declares no
 constraint.
 
@@ -42,13 +46,16 @@ corpora never set it. Tools built on a corpus keep needing the missing piece:
 5. **Not every host is yours.** A page fires a tracking pixel at `www.facebook.com`; an app sends
    telemetry to a vendor with separate US and EU hosts. Those hosts are the same in every one of your
    deploy targets.
+6. **Some hosts can't be enumerated.** A preview deploy gets a new host per pull request, and a local
+   dev server binds whichever port is free. A list of literal origins can't describe either.
 
 A deploy target (`staging`, `ios-beta`) and a surface (`app`, `api`) are different things. A session
 belongs to a deploy target, and a corpus is published to one. A surface is a host a deploy target
 serves pages from or calls: the same surface in two targets is the same part of the product on two
 hosts, and an API surface has no sessions of its own. Defining first-party surfaces inside each web
 deploy target captures both facts: `api` is one name, and each environment says what its API host
-is. Third-party hosts don't vary by deploy target, so they are defined once, outside any environment.
+is. A host that is the same across deploy targets, whether a third party's or a backend of your own,
+is defined once outside any environment, and overridden in the few environments where it differs.
 
 Native deploy targets have no page hosts. Their identifier is an app ID, and an app ID alone can
 under-determine the target: an iOS beta and its release build ship under one app ID, so only the
@@ -77,8 +84,12 @@ environments:
     backend: prod
   - name: local
     origins:
-      api: https://api.acme.test:8443
-      app: https://app.acme.test:8443
+      api: http://localhost:8080
+      app: http://localhost:*
+  - name: preview
+    origins:
+      api: https://api.staging.acme.com
+      app: https://deploy-preview-*--acme.netlify.app
   - name: prod
     origins:
       api: https://api.acme.com
@@ -102,7 +113,7 @@ version: 1
 views:
   - name: OrderHistory
     route: "/ui/*/settings/orders/history"
-    environments: [local, prod, staging]
+    environments: [local, preview, prod, staging]
     origins: [app]
     requests:
       - name: ListOrders
@@ -133,19 +144,22 @@ stands in for a native screen key, which is outside this SEP.
 
 How each entity resolves:
 
-| | local | staging | prod | ios-beta | ios-prod |
-|---|---|---|---|---|---|
-| `OrderHistory` | `app.acme.test:8443` | `app.staging.acme.com` | `app.acme.com` | not present | not present |
-| `ListOrders` | `api.acme.test:8443` | `api.staging.acme.com` | `api.acme.com` | not present | not present |
-| `FacebookPixel` | `www.facebook.com` | `www.facebook.com` | `www.facebook.com` | not present | not present |
-| `OrderHistoryScreen` | not present | not present | not present | no surface | no surface |
-| `SyncOrders` | not present | not present | not present | `api.staging.acme.com` | `api.acme.com` |
-| `SendTelemetry` | EU or US | EU or US | EU or US | EU or US | EU or US |
+| | local | preview | staging | prod | ios-beta | ios-prod |
+|---|---|---|---|---|---|---|
+| `OrderHistory` | `localhost:*` (pattern) | `deploy-preview-*--acme.netlify.app` (pattern) | `app.staging.acme.com` | `app.acme.com` | not present | not present |
+| `ListOrders` | `localhost:8080` | `api.staging.acme.com` | `api.staging.acme.com` | `api.acme.com` | not present | not present |
+| `FacebookPixel` | `www.facebook.com` | `www.facebook.com` | `www.facebook.com` | `www.facebook.com` | not present | not present |
+| `OrderHistoryScreen` | not present | not present | not present | not present | no surface | no surface |
+| `SyncOrders` | not present | not present | not present | not present | `api.staging.acme.com` | `api.acme.com` |
+| `SendTelemetry` | EU or US | EU or US | EU or US | EU or US | EU or US | EU or US |
 
 `ListOrders` and `FacebookPixel` are absent from the iOS environments because their view is.
-`SyncOrders` resolves `api` through each iOS environment's `backend`. A session on
-`app.staging.acme.com` belongs to `staging`; an iOS session from `com.acme.app` belongs to `ios-beta`
-or `ios-prod` by its build type.
+`SyncOrders` resolves `api` through each iOS environment's `backend`.
+
+Which environment a session belongs to: `http://localhost:5173` belongs to `local`,
+`https://deploy-preview-464--acme.netlify.app` to `preview`, and `https://app.staging.acme.com` to
+`staging`. `preview` and `staging` share an API host, which is harmless because no session runs on
+it. An iOS session from `com.acme.app` belongs to `ios-beta` or `ios-prod` by its build type.
 
 ### Field reference
 
@@ -166,11 +180,12 @@ An environment definition:
 | `platform` | `web` \| `ios` \| `android` | all | no, default `web` | Which kind of deploy target this is. |
 | `origins` | map of origin name to URL | all | web: yes; native: no | Each surface's URL in this environment. |
 | `app_id` | string | native | yes | The bundle ID (iOS) or application ID (Android) the app reports. |
-| `build_type` | string | native | no | Build variant (`release`, `beta`, `debug`). Separates environments that share one `app_id`. |
+| `build_type` | string | native | no | The build variant or configuration name the app reports, matched verbatim. Separates environments that share one `app_id`. Android composes a variant from a flavor and a build type, so a shop shipping `stagingRelease` and `prodRelease` writes those, not `release`. |
 | `backend` | environment name | native | no | A web environment whose origins this environment borrows. |
 
 Origin names match `^[a-z][a-z0-9_-]*$`. Origin URLs are `scheme://host[:port]` with `http` or
-`https` and no path, query, or fragment. A web environment MUST NOT set `app_id`, `build_type`, or
+`https` and no path, query, or fragment, optionally with wildcards in the host or port (see
+[Origin patterns](#origin-patterns)). A web environment MUST NOT set `app_id`, `build_type`, or
 `backend`.
 
 ### Semantics
@@ -197,8 +212,9 @@ sharing a `name`, or two shared origins sharing a name, collide: the one from th
 source path wins, and a conforming SDK SHOULD warn (`environment-name-collision`,
 `origin-name-collision`).
 
-An origin name is defined either inside environments or in the shared map, never both. A name in both
-places is invalid (`origin-name-collision`), so every origin reference has one definition site.
+A name in the shared map may also appear in an environment's own `origins`, which overrides it for
+that environment. That is how a host shared by most deploy targets but not all is written once: put
+it in the shared map, and override it where it differs.
 
 #### Origin resolution
 
@@ -208,21 +224,73 @@ An origin name resolves, for a given environment, by checking in order:
 2. for a native environment, its `backend`'s `origins`;
 3. the shared `origins` map.
 
-The first match is the URL; with no match, the name resolves to nothing in that environment. A
-native environment's own `origins` take precedence over its backend's, which lets one native build
-override a single host. `backend` MUST name a web environment (`environment-backend-invalid`), so
-backends never chain and resolution has no cycles.
+The first match is the URL; with no match, the name resolves to nothing in that environment. Each
+step overrides the ones below it, so a native build can point one host somewhere other than its
+backend's, and any environment can override a shared-map entry:
 
-A conforming SDK SHOULD warn when an origin name is defined in some web environments' own `origins`
-but not others (`origin-environment-gap`): an entity called on that surface has no URL in the rest.
+```yaml
+origins:
+  api: https://api.acme.com          # every environment, unless overridden
+
+environments:
+  - name: local
+    origins:
+      app: http://localhost:*
+      api: http://localhost:8080     # overrides the shared api
+  - name: prod
+    origins:
+      app: https://app.acme.com      # api comes from the shared map
+```
+
+Because the shared map never identifies a session, hoisting a passive host like a backend API into
+it also keeps it out of session membership, even when several deploy targets call it.
+
+`backend` MUST name a web environment (`environment-backend-invalid`), so backends never chain and
+resolution has no cycles.
+
+A conforming SDK SHOULD warn when an origin name resolves in some web environments but not others
+(`origin-environment-gap`): an entity called on that surface has no URL in the rest. A name in the
+shared map resolves everywhere, so it never produces this warning.
+
+#### Origin patterns
+
+An origin URL can name a set of origins instead of one, with wildcards in exactly three positions:
+
+- **`*` inside the leftmost host label** matches one or more characters within that label:
+  `https://deploy-preview-*--acme.netlify.app`, `https://*.preview.acme.com`.
+- **`**` as the whole leftmost host label** matches one or more labels:
+  `https://**.acme.com` matches `app.acme.com` and `app.staging.acme.com`.
+- **`*` as the port** matches any port, or none: `http://localhost:*`.
+
+The scheme is always literal, and a host pattern never matches its own bare suffix
+(`https://*.acme.com` does not match `https://acme.com`). Host wildcards anchor at the right, so the
+literal suffix is what a pattern commits to. `*` and `**` mean what they mean in routes, applied to
+`.`-separated labels instead of `/`-separated segments.
+
+A pattern is something to match against, not an address. A consumer can test a session's origin
+against it, or anchor a request matcher with it, but can't navigate to it.
 
 #### Which environment a session belongs to
 
-A web session belongs to the web environment whose own `origins` include the session's hostname.
-Shared origins and native environments' origins never identify a session. Several web environments
-can legitimately share a host that serves no sessions, like an API host; if a session's hostname
-matches more than one web environment, the session belongs to none of them, and a conforming SDK
-MAY warn when two web environments share a hostname (`origin-host-shared`).
+A web session belongs to the web environment with the most specific origin matching the session's
+origin. Shared origins and native environments' origins never identify a session. Specificity
+follows route matching's rule:
+
+1. A literal origin beats any pattern.
+2. Between patterns, compare host labels from the right. At the first label where they differ, a
+   literal label beats a label containing `*`, which beats a bare `*`, which beats `**`. A pattern
+   with more labels beats one with fewer when every shared label is equally specific.
+3. A literal port beats `:*`.
+
+If the most specific matches belong to more than one web environment, the session belongs to none
+of them. Several web environments can legitimately share an origin that serves no sessions, like an
+API host, so sharing alone is not an error; a conforming SDK MAY warn when two web environments
+define the same origin (`origin-host-shared`). An origin that several environments genuinely share,
+like a backend API, belongs in the shared `origins` map, where it never identifies a session at all.
+
+Ports are part of the comparison, so `http://localhost:3000` and `http://localhost:3001` are
+different environments. A consumer that cannot observe a session's port compares scheme and host
+only, and resolves to nothing when that is ambiguous.
 
 A native session belongs to the environment whose `platform` and `app_id` match its app, preferring
 one whose `build_type` matches the session's build variant; an environment with no `build_type`
@@ -230,8 +298,15 @@ covers every variant of its `app_id`. Two native environments with the same `pla
 and `build_type` are the same target under two names, and a conforming SDK SHOULD warn
 (`environment-duplicate`).
 
-Web hostnames compare case-insensitively; app IDs compare byte-for-byte. Origin URLs compare after
+Web hostnames compare case-insensitively; app IDs compare byte-for-byte. Origins compare after
 lowercasing the scheme and host and dropping a port equal to the scheme's default.
+
+#### Publishing is out of scope
+
+A consumer that publishes corpora typically registers a corpus once and points environments at it,
+so promoting from staging to production moves a pointer instead of rebuilding. That model, and which
+corpus a session resolves when several were published over time, belong to the consumer. This SEP
+defines only the names a publish targets and how a session maps to one.
 
 #### Reference resolution
 
@@ -260,7 +335,8 @@ vendor's regional endpoint, is a shared origin: defined once in the file-root `o
 referenced by name like any other. A vendor with several regional hosts is one shared origin per
 region, and a request that can be sent to any of them lists them all. Because shared origins depend
 on no environment, a reusable set of third-party definitions (their origins and their requests) can
-be dropped into any corpus unchanged.
+be dropped into any corpus unchanged, and an environment that reaches a different host for one of
+them overrides that name locally.
 
 #### Not a route-matching input
 
@@ -285,20 +361,20 @@ so would constrain every existing corpus that sets `url:`.
 - MUST reject a web environment without `origins` or with `app_id`, `build_type`, or `backend`, and a
   native environment without `app_id` or with an `app_id` that isn't a dot-separated identifier
   (`environment-invalid`).
-- MUST reject an origin URL that isn't `scheme://host[:port]` (`origin-invalid`).
+- MUST reject an origin URL that isn't `scheme://host[:port]`, or that places a wildcard anywhere
+  other than the leftmost host label or the port (`origin-invalid`).
 - MUST reject a `backend` that names no environment or a native one (`environment-backend-invalid`).
 - MUST build one project-wide environment registry and one shared-origin registry. SHOULD warn on a
   collision within either; the first by source-file path wins (`environment-name-collision`,
   `origin-name-collision`).
-- MUST reject an origin name defined both inside an environment and in the shared map
-  (`origin-name-collision`).
 - MUST resolve an origin for an environment from its own `origins`, then its `backend`'s, then the
-  shared map.
+  shared map, each step overriding the ones below it.
 - MUST reject an environment reference that names no environment (`environment-ref-unresolved`), and
   an origin reference defined nowhere (`origin-ref-unresolved`).
-- MUST assign a web session to the one web environment whose own `origins` include its hostname, and
-  to none if several do. MAY warn when two web environments share a hostname (`origin-host-shared`).
-- SHOULD warn when an origin name is defined in some web environments but not others
+- MUST assign a web session to the web environment with the most specific origin matching the
+  session's origin, and to none if the most specific matches span several environments. MAY warn
+  when two web environments define the same origin (`origin-host-shared`).
+- SHOULD warn when an origin name resolves in some web environments but not others
   (`origin-environment-gap`), and when two native environments share `platform`, `app_id`, and
   `build_type` (`environment-duplicate`).
 - MUST treat an absent or empty view- or request-level list as unconstrained. SHOULD warn on an
@@ -317,12 +393,13 @@ so would constrain every existing corpus that sets `url:`.
     type: string
     pattern: "^[a-z][a-z0-9_-]*$"
   ```
-- `$defs.originUrl`: **new**. The pattern bounds the port to 1-5 digits with no leading zero;
-  rejecting a port above 65535 is `origin-invalid`'s job.
+- `$defs.originUrl`: **new**. An optional wildcard leftmost label (`**`, or a label with one `*`),
+  then at least one literal label, then an optional port that is 1-5 digits with no leading zero or
+  `*`. Rejecting a port above 65535 is `origin-invalid`'s job.
   ```
   $defs.originUrl:
     type: string
-    pattern: "^https?://[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:[1-9][0-9]{0,4})?$"
+    pattern: "^https?://(\\*\\*\\.|[A-Za-z0-9-]*\\*[A-Za-z0-9-]*\\.)?[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:([1-9][0-9]{0,4}|\\*))?$"
   ```
 - `$defs.originMap`: **new**.
   ```
@@ -404,7 +481,7 @@ Define origins at the top level as `{name, environment, url}`, several definitio
 **Ruled out:** a web environment's identity would be split across its own entry and every origin
 entry that names it, so reading one deploy target means scanning the whole origin list. Nesting
 first-party origins inside the environment keeps each deploy target in one place. The shared map
-covers only hosts that don't vary by environment, so it never needs a qualifier.
+needs no qualifier either, because an environment that differs overrides the name directly.
 
 ### 5. Third-party hosts repeated inside every environment
 
@@ -438,6 +515,40 @@ Filter view and request lookups on environment or origin as well as path.
 entity would silently change what traffic it matches. An opt-in matching mode could come in a later
 SEP as a separate entry point, so adopting it is a call-site change rather than a corpus change.
 
+### 9. Regular expressions, or several match kinds
+
+Let an origin be a literal, a glob, a URL pattern, or a regular expression, each in its own field.
+
+**Ruled out:** a regular expression can't be ranked by specificity against another or checked for
+overlap before a session arrives, so membership between two regex-defined environments would come
+down to declaration order. One grammar with wildcards bounded to the leftmost host label and the
+port covers preview hosts and local ports, and every pair of patterns has a defined winner.
+
+### 10. Templated hosts
+
+Write a preview host as a template with named variables, such as
+`https://{branch}.preview.acme.com`, in the style of API description servers.
+
+**Ruled out:** a template needs a value for each variable from somewhere, and the only question
+membership asks is whether a host belongs to an environment. A wildcard answers that without
+variables. Capturing the branch name for publishing is a consumer concern.
+
+### 11. A fallback environment
+
+Name an environment that a session matching no environment belongs to.
+
+**Ruled out:** a session that resolves to an unrelated environment gets another target's
+definitions with no sign they're wrong, while a session that resolves to none is visibly
+unannotated. A consumer that wants a fallback can apply one itself.
+
+### 12. Environments in `.sightmap/config.yaml`
+
+Keep environments in the tooling config file instead of the corpus.
+
+**Ruled out:** `config.yaml` is tooling configuration outside this spec, and views and requests
+reference environments and origins by name, so the definitions have to live in the corpus for those
+references to validate.
+
 ## Migration
 
 Both fields are additive: no existing corpus declares either, so no existing file changes meaning or
@@ -452,11 +563,11 @@ conforming corpus produces spurious `unknown-field` warnings.
    lists repeat. A corpus-wide default per entity kind (`views: app`, `requests: api`) would remove
    the repetition at the cost of making where an entity runs implicit. Deferred until real corpora
    show how much repetition there is.
-2. **Hostname wildcards.** Ephemeral preview hosts (`deploy-preview-464--acme.netlify.app`) can't be
-   enumerated, and one corpus may want to cover every `*.acme.com` host at once. If wildcards are
-   added, they should be a distinct, right-anchored form (`**.acme.com`), not route matching's `*`.
-3. **Ports in session membership.** Membership compares hostnames, so two local environments that
-   differ only by port can't be told apart. Is that a real case?
+2. **Broad patterns.** `https://**.com` and `https://*.netlify.app` are valid and match far more than
+   one product. Should a pattern require a minimum literal suffix, or should SDKs only warn?
+3. **IPv6 literals.** The origin grammar has no bracketed form, so `http://[::1]:3000` is invalid.
+   Adding one means a second host grammar that host wildcards would have to answer for. `localhost`
+   and `127.0.0.1` cover most local dev, so this is deferred unless a real corpus needs it.
 4. **A native view key.** Views match by URL route, which native screens don't have. Native screen
    matching needs its own SEP; this one only lets native environments be referenced.
 5. **Opt-in environment- or origin-aware matching.** What a separate match entry point would look
@@ -471,3 +582,5 @@ conforming corpus produces spurious `unknown-field` warnings.
 - [SEP-0001](0001-dependencies-field.md): the sort-and-deduplicate canonical rule reused for
   reference lists.
 - RFC 6454 (*The Web Origin Concept*): the scheme, host, and port tuple an origin URL carries.
+- Browser extension match patterns and the WHATWG URLPattern standard: prior art for wildcards bounded
+  by URL components, the model for origin patterns.
