@@ -2,7 +2,7 @@
 sep: 0016
 title: Request URL properties — query parameters and bound path segments
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Review
 created: 2026-09-29
 updated: 2026-09-29
 spec-version-target: 1
