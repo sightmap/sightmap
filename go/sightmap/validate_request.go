@@ -88,16 +88,20 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 		})
 	}
 
-	// A headers source has no structure below a header value, so a bare regex
-	// scan across the raw header block is the addressing foot-gun this shape
-	// removes: field must name the header.
-	if validSource && strings.HasSuffix(prop.Source, ".headers") && prop.Field == "" {
+	// Neither a header block nor a query string has structure below one named
+	// value, so a bare regex scan across the whole of either is the addressing
+	// foot-gun this shape removes: field must name the header or parameter.
+	if validSource && (strings.HasSuffix(prop.Source, ".headers") || prop.Source == "req.query") && prop.Field == "" {
+		what, code := "a headers source must name a header in field", "request-property-headers-require-field"
+		if prop.Source == "req.query" {
+			what, code = "req.query must name a query parameter in field", "request-property-query-require-field"
+		}
 		errs = append(errs, ValidationError{
 			Component: reqName,
-			Code:      "request-property-headers-require-field",
+			Code:      code,
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("request %q property %q reads from %q but omits field; a headers source must name a header in field",
-				reqName, prop.Name, prop.Source),
+			Message: fmt.Sprintf("request %q property %q reads from %q but omits field; %s",
+				reqName, prop.Name, prop.Source, what),
 		})
 	}
 

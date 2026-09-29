@@ -229,17 +229,35 @@ A named API endpoint.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
-| `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. |
-| `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). For a `.headers` source, a header name matched case-insensitively; **required** whenever `source` is a headers source. |
+| `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, `rsp.headers`, or `req.query`. |
+| `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). For a `.headers` source, a header name matched case-insensitively. For `req.query`, a query parameter name matched **case-sensitively**. **Required** whenever `source` is a headers source or `req.query`. |
 | `pattern` | string | see below | An [RE2](#regular-expressions) regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
 
-At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source `field` is required too (a bare regex across a raw header block is the addressing foot-gun this shape removes). `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`).
+At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source or `req.query`, `field` is required too (a bare regex across a raw header block or query string is the addressing foot-gun this shape removes). `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`).
 
 **Value omission is silent** — a property that doesn't resolve (a missing key, an out-of-range index, no pattern match) is simply absent; consumers MUST NOT treat omission as an error. Omission is the normal case, not an edge case: whether a body or header is even available to read depends on the capture layer's own payload and privacy settings.
 
 Extraction requires **live traffic**. A tool operating on static corpus definitions alone MUST treat `properties:` as declared-but-unavailable, not an error.
 
 `status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. They sit outside `source` entirely — a consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
+
+#### URL properties
+
+`source: req.query` addresses the request URL's query string, with `field` naming one parameter. Parameter names are compared **case-sensitively** — URLs are case-sensitive below the host, and `?ID=` and `?id=` are different parameters, unlike HTTP header names. Values are percent-decoded, with `+` decoded as a space. A repeated parameter resolves to its **first** occurrence; a present-but-empty parameter resolves to the empty string and is therefore omitted, like any other unresolved property.
+
+A `:name` segment in a request `route` additionally **binds** that segment's percent-decoded value as a property named `name`:
+
+```yaml
+- name: GetOrder
+  route: /api/orders/:order_id      # binds order_id
+  method: GET
+  properties:
+    - name: variant
+      source: req.query
+      field: variant
+```
+
+This changes what `:param` *produces*, never what it *matches*: [route matching](#route-matching) still normalizes `:param` to `*` for requests, so a route matches exactly the URLs it matched before. A bound name must match `^[a-z][a-z0-9_]*$`, MUST NOT collide with a declared property name or with a reserved identity name (`status`, `method`, `duration`), and a `:name` MUST NOT repeat within one route. Bindings need no `properties:` declaration, the same way the reserved identity names need none. See [SEP-0016](../seps/0016-request-url-properties.md).
 
 `properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](../seps/0005-request-properties.md).
 
@@ -525,7 +543,7 @@ A conforming SDK:
 - MUST implement route matching as specified
 - MUST implement global vs view-scoped precedence as specified
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
-- MUST reject a `RequestProperty` with no `source`, or a `source` outside the four-value enum (`req.body`/`rsp.body`/`req.headers`/`rsp.headers`)
+- MUST reject a `RequestProperty` with no `source`, or a `source` outside the five-value enum (`req.body`/`rsp.body`/`req.headers`/`rsp.headers`/`req.query`)
 - MUST reject a `RequestProperty` that declares neither `field` nor `pattern`
 - MUST reject a `RequestProperty` whose `source` is a headers source but omits `field`
 - MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))

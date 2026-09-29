@@ -72,8 +72,31 @@ func TestValidate_RequestPropertyInvalidName(t *testing.T) {
 }
 
 // source is required and closed to four values.
+// SEP-0016 adds req.query to the source enum, and requires field alongside it for
+// the same reason a headers source does: neither a query string nor a header block has
+// structure below one named value, so a bare regex across the whole of either is the
+// addressing foot-gun the source/field split exists to remove.
+func TestValidate_RequestPropertyQuerySource(t *testing.T) {
+	ok := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
+		Name: "variant", Source: "req.query", Field: "variant",
+	}))
+	if len(ok) != 0 {
+		t.Errorf("req.query with a field: want no diagnostics, got %v", findingCodes(ok))
+	}
+
+	// pattern alone satisfies the anyOf but not the field requirement.
+	noField := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
+		Name: "variant", Source: "req.query", Pattern: "b",
+	}))
+	if !hasCode(noField, "request-property-query-require-field") {
+		t.Errorf("req.query without a field: want request-property-query-require-field, got %v", findingCodes(noField))
+	}
+}
+
 func TestValidate_RequestPropertySourceInvalid(t *testing.T) {
-	for _, src := range []string{"", "rsp", "rsp.cookies", "body", "req.query"} {
+	// req.query was on this list until SEP-0016 added it to the enum. rsp.query is
+	// still invalid: a response has no query string.
+	for _, src := range []string{"", "rsp", "rsp.cookies", "body", "rsp.query"} {
 		errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
 			Name:   "outcome",
 			Source: src,

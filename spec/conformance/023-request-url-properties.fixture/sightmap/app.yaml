@@ -1,0 +1,33 @@
+version: 1
+requests:
+  # A bound path segment alongside query properties. order_id needs no
+  # properties: entry, the same way status/method/duration need none.
+  - name: GetOrder
+    route: /api/orders/:order_id
+    method: GET
+    properties:
+      - name: variant
+        source: req.query
+        field: variant
+      - name: page
+        source: req.query
+        field: page
+
+  # req.query composes with pattern, exactly as the other sources do.
+  - name: SearchFlights
+    route: /api/flights/search
+    method: GET
+    properties:
+      - name: cursor
+        source: req.query
+        field: cursor
+        pattern: '^cur_([a-z0-9]+)$'
+
+  # Several bound segments in one route, mixed with a body source.
+  - name: UpdateOrgSetting
+    route: /api/org/:org_id/settings/:setting_key
+    method: PUT
+    properties:
+      - name: outcome
+        source: rsp.body
+        field: status

@@ -231,7 +231,7 @@
       "required": ["name", "source"],
       "additionalProperties": false,
       "anyOf": [{ "required": ["field"] }, { "required": ["pattern"] }],
-      "if": { "properties": { "source": { "enum": ["req.headers", "rsp.headers"] } } },
+      "if": { "properties": { "source": { "enum": ["req.headers", "rsp.headers", "req.query"] } } },
       "then": { "required": ["field"] },
       "properties": {
         "name": {
@@ -241,13 +241,13 @@
         },
         "source": {
           "type": "string",
-          "enum": ["req.body", "rsp.body", "req.headers", "rsp.headers"],
-          "description": "Which root to read from. See SEP-0005 §Extraction root."
+          "enum": ["req.body", "rsp.body", "req.headers", "rsp.headers", "req.query"],
+          "description": "Which root to read from. req.query is the request URL's query string. See SEP-0005 §Extraction root and SEP-0016."
         },
         "field": {
           "type": "string",
           "minLength": 1,
-          "description": "Value to select within source: an object-key path for a body source, a header name (case-insensitive) for a headers source. Required when source is a headers source. See SEP-0005 §Extraction root."
+          "description": "Value to select within source: an object-key path for a body source, a header name (case-insensitive) for a headers source, a query parameter name (case-sensitive) for req.query. Required for a headers source and for req.query. See SEP-0005 §Extraction root and SEP-0016."
         },
         "pattern": {
           "type": "string",

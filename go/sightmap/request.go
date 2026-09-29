@@ -46,7 +46,7 @@ type RequestDef struct {
 type RequestPropertyDef struct {
 	Name string `json:"name"`
 	// Source is the root to read from: one of RequestPropertySources
-	// ("req.body", "rsp.body", "req.headers", "rsp.headers").
+	// ("req.body", "rsp.body", "req.headers", "rsp.headers", "req.query").
 	Source string `json:"source"`
 	// Field selects a value within Source. For a body source it is a
 	// dot-separated object-key path (a numeric segment indexes an array when the
@@ -62,7 +62,7 @@ type RequestPropertyDef struct {
 
 // RequestPropertySources is the closed set of roots a RequestPropertyDef.Source
 // may name (SEP-0005 §Extraction root).
-var RequestPropertySources = []string{"req.body", "rsp.body", "req.headers", "rsp.headers"}
+var RequestPropertySources = []string{"req.body", "rsp.body", "req.headers", "rsp.headers", "req.query"}
 
 // ReservedRequestPropertyNames are the already-structured identity fields of a
 // request. A consumer may reference these wherever a property name is expected
