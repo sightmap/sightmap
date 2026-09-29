@@ -2,7 +2,7 @@
 sep: 0015
 title: Component visibility reporting via `watch`
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Review
 created: 2026-09-29
 updated: 2026-09-29
 spec-version-target: 1
