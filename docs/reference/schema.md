@@ -98,6 +98,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `stability` | string | no | Authoring-confidence marker: `uncertain` or `unstable`. See [Stability](#stability). |
 | `properties` | [Property](#component-properties)[] | no | Named DOM-value extractions surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Extracted from the live DOM at snapshot time; unavailable to offline tools. See [Component properties](#component-properties). |
 | `tags` | string[] | no | Open-vocabulary classification labels for this component. See [Tags](#tags). |
+| `watch` | boolean | no | Report this component's visibility lifecycle even when it is never interacted with. See [Watch](#watch). |
 | `children` | (Component \| [ComponentRef](#component-references))[] | no | Nested components. Child selectors are scoped to the parent's subtree. Entries may be either inline definitions or `$ref` reference objects. |
 
 ### Component references
@@ -518,6 +519,28 @@ In every case the resolved tag set MUST be deduplicated, and SHOULD be emitted i
 (lexicographically sorted) order wherever it is serialized. A definition that declares no
 `tags` contributes nothing; this is not an error, and `tags: []` is equivalent to omitting
 the field entirely.
+
+## Watch
+
+A component may declare `watch: true`, asking a capture consumer to report its **visibility lifecycle** — that it rendered, that it became visible, that it went away — rather than reporting it only when someone interacts with it.
+
+```yaml
+- name: NoResultsMessage
+  selector: '.search-empty'
+  watch: true
+```
+
+A consumer that reports visibility SHOULD report, for each matched element, that it rendered, that it became visible, and that it ended. These are a lifecycle rather than an enumeration: a consumer reports them under whatever names and granularity it already uses, and one with only a coarser notion of "seen" satisfies this with that. Each matched element is reported separately; a consumer that cannot distinguish instances MUST still report the first.
+
+**`watch` applies to the component it is declared on, never to its `children`.** This is the opposite of [`privacy`](#privacy), deliberately: privacy is a restriction, where covering the subtree is the safe default, while `watch` generates records, where covering a subtree silently would multiply them.
+
+**A consumer's interactivity heuristic MUST NOT suppress a watched component.** A consumer that would otherwise skip an element because it is not interactive MUST report a watched one anyway — without this, the field does nothing for exactly the non-interactive components that motivate it. Other filters a consumer applies for its own correctness are unaffected, but it SHOULD surface that it dropped the request rather than ignoring it.
+
+`watch: false` is identical to omitting the field. `watch` takes no part in route matching, component identity, or specificity.
+
+`watch` and [`privacy`](#privacy) are independent and compose without special rules: a component may be watched and blocked at once, reporting that it appeared while retaining none of its content.
+
+See [SEP-0015](https://github.com/sightmap/sightmap/blob/main/spec/seps/0015-component-watch.md).
 
 ## Reserved tooling fields
 
