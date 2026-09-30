@@ -439,7 +439,6 @@ merged-but-unimplemented spec change.
   offline, cross-language conformance suite has no live DOM or URL router to exercise, so it
   cannot test the union resolution rule itself (the same limitation SEP-0003's `properties`
   extraction ran into); that behavior is asserted by each SDK's own test suite instead.
-- Reference implementation: an internal session-review signal pipeline (Go)
-  implements and unit-tests the component case's union-across-levels resolution today (the
-  view and request cases are new in this SEP, not yet implemented anywhere). Not a public
-  repository — cited here for provenance, not as a checkable link.
+- Reference implementation: the component case's union-across-levels resolution is
+  implemented and unit-tested in a consumer today. The view and request cases are new in
+  this SEP and not yet implemented anywhere. Cited for provenance, not as a checkable link.
