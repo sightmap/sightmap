@@ -45,13 +45,12 @@ Three things follow from the split that a corpus-side field fixes:
   nothing errors: the element is simply captured. A corpus-side declaration fails the other way,
   because a component whose selector stops matching is already a drift signal the corpus reports.
 
-This is not a hypothetical shape. A capture consumer exists today whose local development path
-carries `privacy` in a side file keyed by component name, precisely because the schema has no
-field for it, and that file's own comment records the workaround as "their only source".
+This is not a hypothetical shape: consumers already carry per-component privacy in side files
+keyed by component name, because the schema gives them nowhere else to put it.
 
-Every mainstream session-capture tool has this exact three-way concept, under its own names, and
-each one applies it by CSS selector. Naming it once, on the component, is strictly less work than
-each of them naming it separately against selectors they do not own.
+Every mainstream session-capture tool has this three-way concept under its own names, and each
+applies it by CSS selector. Naming it once, on the component, is less work than each of them
+naming it separately against selectors they do not own.
 
 ## Proposal
 
@@ -290,21 +289,3 @@ migration path that can expose content, and no consumer should take it automatic
 - [`spec/v1/schema.md#component`](../v1/schema.md#component): the entry this SEP extends.
 - [`spec/VERSIONING.md`](../VERSIONING.md): the additive-field pin requirement.
 
-## Appendix: example consumer mapping (non-normative)
-
-This appendix is illustrative. It is not part of the specification, and a conforming consumer is
-under no obligation to resemble it. It is included because a normative directive is easier to
-review against one concrete implementation.
-
-Fullstory expresses element privacy as a `NamedElementBlockRule` carrying a type enum, and as a
-matching set of CSS classes its browser SDK honours directly:
-
-| `privacy` | Block rule type | Browser SDK class |
-|---|---|---|
-| `block` | `BLOCK_EXCLUDE` | `fs-exclude` |
-| `mask` | `BLOCK_MASK` | `fs-mask` |
-| `unmask` | `BLOCK_UNMASK` | `fs-unmask` |
-
-The rule targets selectors rather than a named-element identifier, so a compiler emitting it passes
-the component's selectors through directly and inherits whatever selector-dialect limits that
-consumer already imposes on them.
