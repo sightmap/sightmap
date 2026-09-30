@@ -402,7 +402,7 @@ merged-but-unimplemented spec change.
 1. **Structured/valued tags.** Should a future SEP revisit `{name, value}` tags once real
    demand exists? See Alternative 3. Deliberately left unaddressed here.
 2. ~~**Console/exception classification.**~~ **Resolved by
-   [SEP-0017](0017-message-and-signal-tags.md).** This question assumed console and exception
+   [SEP-0016](0016-message-and-signal-tags.md).** This question assumed console and exception
    events were not a matchable entity, which was true when it was written. SEP-0006 then created
    the `messages` entity, matched by `level` and a `message` regex, so a message now has a
    definition to attach a tag to and needs no separate mechanism after all.

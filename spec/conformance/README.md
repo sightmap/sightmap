@@ -52,11 +52,11 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 014 | `component-properties` | `properties:` (`name`/`extract`, tree-closed grammar `text`/`attr=`/`PATH.prop`/`exists:PATH`) validates ([SEP-0010](../seps/0010-tree-closed-component-properties.md)) |
 | 015 | `view-url` | `url:` on a view (and a file-level default) validates |
 | 016 | `stability-tooling-fields` | `stability:` (view + component) validates; reserved tooling fields `access:`/`snapshots:` are permitted |
-| 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, views, messages, and signals ([SEP-0004](../seps/0004-component-tags.md), [SEP-0017](../seps/0017-message-and-signal-tags.md)) |
+| 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, views, messages, and signals ([SEP-0004](../seps/0004-component-tags.md), [SEP-0016](../seps/0016-message-and-signal-tags.md)) |
 | 018 | `request-properties` | `properties:` on a request validates via `field` (body and header paths) and `pattern`; declaring a reserved identity name warns with `request-property-shadows-reserved` ([SEP-0005](../seps/0005-request-properties.md)) |
 | 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](../seps/0006-message-entity.md)) |
 | 020 | `message-properties` | `properties:` on a message validates via `source: stack` with a `<frame>.<attribute>` `field` and an optional `pattern` ([SEP-0006](../seps/0006-message-entity.md)) |
-| 024 | `message-tags-ambiguity` | Tags resolve as a union across every matching `messages:` entry even where identity is ambiguous, so `message-conflict` warns while the tag union still holds ([SEP-0017](../seps/0017-message-and-signal-tags.md)) |
+| 024 | `message-tags-ambiguity` | Tags resolve as a union across every matching `messages:` entry even where identity is ambiguous, so `message-conflict` warns while the tag union still holds ([SEP-0016](../seps/0016-message-and-signal-tags.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

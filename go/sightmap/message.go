@@ -35,7 +35,7 @@ type MessageDef struct {
 	Description string `json:"description,omitempty"`
 	Source      string `json:"source,omitempty"`
 
-	// Tags are open-vocabulary classification labels (SEP-0017). A record's effective
+	// Tags are open-vocabulary classification labels (SEP-0016). A record's effective
 	// message tags are the union across every entry it matches, so the classification
 	// survives an identity ambiguity that the name does not.
 	Tags []string `json:"tags,omitempty"`

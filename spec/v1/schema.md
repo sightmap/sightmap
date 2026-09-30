@@ -480,7 +480,7 @@ Views, components, requests, messages, and signals may all carry an optional `ta
 classification labels (e.g. `defect`) distinct from `name`. Where `name` (or a view/request's
 identity) answers "what is this," `tags` answers "does this belong to some cross-cutting
 classification I care about." See [SEP-0004](../seps/0004-component-tags.md) for the full
-proposal and rationale, and [SEP-0017](../seps/0017-message-and-signal-tags.md) for messages and
+proposal and rationale, and [SEP-0016](../seps/0016-message-and-signal-tags.md) for messages and
 signals.
 
 Each entity type already has a rule for resolving *identity* when more than one definition

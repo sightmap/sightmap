@@ -106,7 +106,7 @@ func (c *Corpus) ResolveSignal(name string) SignalTarget {
 // sorted. Nil for an unknown signal, or when neither side carries any.
 //
 // A signal is a named classification ABOUT an entity, so the entity's own
-// classification applies to it (SEP-0017). Requiring an author to restate a
+// classification applies to it (SEP-0016). Requiring an author to restate a
 // referenced request's tags on every signal would reintroduce, one level up, the
 // shadowing problem SEP-0004 exists to avoid. Resolution is transitive only
 // through ref, and ref resolves to exactly one entity, so there is no chain to

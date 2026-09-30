@@ -1,5 +1,5 @@
 ---
-sep: 0017
+sep: 0016
 title: Tags on messages and signals
 author: Clint Ayres (@jurassix)
 status: Review

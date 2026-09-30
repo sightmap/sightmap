@@ -290,7 +290,7 @@
         "tags": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
-          "description": "Open-vocabulary classification labels for this message. Resolved as a union across every entry an observed record matches, so the classification survives an identity ambiguity that the name does not. See SEP-0017."
+          "description": "Open-vocabulary classification labels for this message. Resolved as a union across every entry an observed record matches, so the classification survives an identity ambiguity that the name does not. See SEP-0016."
         }
       }
     },
@@ -313,7 +313,7 @@
         "tags": {
           "type": "array",
           "items": { "type": "string", "minLength": 1 },
-          "description": "Open-vocabulary classification labels carried onto the signal, unioned with the resolved tags of the entity named by ref. See SEP-0017."
+          "description": "Open-vocabulary classification labels carried onto the signal, unioned with the resolved tags of the entity named by ref. See SEP-0016."
         }
       }
     },
