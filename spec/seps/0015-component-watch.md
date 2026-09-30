@@ -90,8 +90,8 @@ visibility MUST report that the element **became visible to the user**, and MAY 
 the lifecycle around it: that it was rendered into the page, that it stopped being visible, that it
 was removed.
 
-The split is deliberate, and it follows what a reference consumer actually keeps. Becoming visible
-is the only moment that answers the question the field exists for — *did the user see this* — and
+The split is deliberate. Becoming visible is the only moment that answers the question the field
+exists for — *did the user see this* — and
 the surrounding render and removal events are mostly churn: an element can render far off-screen,
 re-render on every state change, and be removed by a route transition, none of which a reader of
 the session cares about. A consumer is free to report them, and a consumer whose only notion is a
@@ -121,9 +121,16 @@ explicit value so a generated corpus can round-trip, but it declares nothing.
 **A consumer's interactivity heuristic MUST NOT suppress a watched component.** A consumer that
 would otherwise skip an element because it is not interactive MUST report a watched one anyway.
 This is the rule that makes the field worth having: without it, the field silently does nothing for
-exactly the non-interactive components that motivate it. Other filters a consumer applies for its
-own correctness (a selector its engine cannot express, a hard cap on watched elements) are
-unaffected, but such a consumer SHOULD surface that it dropped the request rather than ignoring it.
+exactly the non-interactive components that motivate it.
+
+The failure is structural rather than incidental. A consumer typically has to register an element
+before it can watch one, and a registration step that filters to interactive elements will never
+register a non-interactive watched component, so the watch has nothing to attach to. The rule
+exists so that filter is bypassed for watched components specifically.
+
+Other filters a consumer applies for its own correctness, such as a selector its engine cannot
+express or a cap on watched elements, are unaffected. A consumer that drops the request for one of
+those reasons SHOULD surface it rather than ignoring it.
 
 **`watch` takes no part in matching.** It does not affect route matching, component identity, or
 specificity. Two components differing only in `watch` are the same component for every other
@@ -217,22 +224,3 @@ should mark the ones whose appearance is a signal rather than marking broadly.
 - [`spec/v1/schema.md#component`](../v1/schema.md#component): the entry this SEP extends.
 - [`spec/VERSIONING.md`](../VERSIONING.md): the additive-field pin requirement.
 
-## Appendix: example consumer mapping (non-normative)
-
-This appendix is illustrative. It is not part of the specification, and a conforming consumer is
-under no obligation to resemble it.
-
-Fullstory expresses this as an element watch, registered against a named element it already holds
-an identifier for, and emits a lifecycle of `RENDERED`, `ENTERED_VIEWPORT`, `EXITED_VIEWPORT` and
-`UNRENDERED`. Its own session-review consumer keeps only `ENTERED_VIEWPORT`, drops the rest at
-projection as churn, and then collapses runs on element identity because the watcher re-fires for
-one appearance in tight bursts. That behavior is what the MUST/MAY split in Semantics is drawn
-from: the reference consumer discards two thirds of the lifecycle, so requiring all of it would
-have specified something nobody wants. A compiler mapping `watch: true` therefore chains onto whatever it already does for the
-component itself — it creates the named element first, then registers the watch against that
-element's identifier.
-
-That ordering is the practical reason for the interactivity rule in Semantics: a consumer whose
-element-creation step filters to interactive elements will never create the named element for a
-non-interactive watched component, so the watch has nothing to attach to and the field silently
-does nothing. The rule exists so that filter is bypassed for watched components specifically.
