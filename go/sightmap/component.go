@@ -13,7 +13,11 @@ type ComponentDef struct {
 	// "unmask". It applies to the matched element and its subtree, and the nearest
 	// enclosing declaration wins. Undeclared means the corpus says nothing, not "capture
 	// this". See SEP-0009.
-	Privacy     string                 `json:"privacy,omitempty"`
+	Privacy string `json:"privacy,omitempty"`
+	// Watch asks a capture consumer to report this component's visibility lifecycle even
+	// when it is never interacted with. Applies to this component only, never its
+	// children. See SEP-0015.
+	Watch       bool                   `json:"watch,omitempty"`
 	Properties  []ComponentPropertyDef `json:"properties,omitempty"`
 	ParentChain []string               `json:"parentChain,omitempty"` // ancestor component names, root-first
 	Stability   string                 `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"

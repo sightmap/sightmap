@@ -57,6 +57,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](../seps/0006-message-entity.md)) |
 | 020 | `message-properties` | `properties:` on a message validates via `source: stack` with a `<frame>.<attribute>` `field` and an optional `pattern` ([SEP-0006](../seps/0006-message-entity.md)) |
 | 021 | `component-privacy` | `privacy:` validates on components at every nesting depth, global and view-scoped, with `block`/`mask`/`unmask` nested under one another ([SEP-0009](../seps/0009-component-privacy.md)) |
+| 022 | `component-watch` | `watch:` validates on components at every nesting depth, global and view-scoped, including an explicit `false` ([SEP-0015](../seps/0015-component-watch.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

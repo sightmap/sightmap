@@ -123,6 +123,47 @@ components:
 	}
 }
 
+// A component's watch: flattens onto its ComponentDef and is NOT inherited by children.
+// Non-inheritance is normative here, not incidental: SEP-0015 scopes watch to the component
+// it is declared on precisely because it generates records, so cascading it to a subtree
+// would multiply them silently. This is the opposite of SEP-0009 privacy, which does cover
+// the subtree because a restriction is safe to over-apply and a record is not.
+func TestLoadDir_ComponentWatchIsNotInherited(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `
+version: 1
+components:
+  - name: ResultsList
+    selector: .results
+    watch: true
+    children:
+      - name: ResultRow
+        selector: .result-row
+  - name: RetrySearchButton
+    selector: button.retry
+    watch: false
+`
+	if err := os.WriteFile(filepath.Join(dir, "a.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	corpus, err := loadDir(dir)
+	if err != nil {
+		t.Fatalf("loadDir: %v", err)
+	}
+	got := map[string]bool{}
+	for _, c := range corpus.GlobalComponents {
+		got[c.Name] = c.Watch
+	}
+	want := map[string]bool{
+		"ResultsList":       true,
+		"ResultRow":         false, // declared on the parent only
+		"RetrySearchButton": false, // explicit false is the same as omitting
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("watch by component = %v, want %v", got, want)
+	}
+}
+
 func TestSplitSelectors_ParenAware(t *testing.T) {
 	cases := []struct {
 		input string
