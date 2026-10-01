@@ -149,20 +149,25 @@ func lookupHeader(headers []Header, name string) (string, bool) {
 	return strings.Join(vals, ", "), true
 }
 
-// walkJSONPath parses content as JSON and walks a dot-separated path, returning
-// the addressed value as a string. An object key indexes a map; a numeric
-// segment indexes an array when the value at that level is one. A scalar leaf is
-// stringified plainly (numbers without a trailing ".0", booleans as true/false);
-// a non-scalar leaf (object/array) is re-encoded as JSON so a pattern can still
-// scan it. Returns false when the content isn't JSON, a segment doesn't resolve,
-// or the leaf is JSON null.
+// walkJSONPath parses content as JSON and walks a dot-separated path (see
+// SplitFieldPath for the escaping rules), returning the addressed value as a
+// string. An object key indexes a map; a numeric segment indexes an array
+// when the value at that level is one. A scalar leaf is stringified plainly
+// (numbers without a trailing ".0", booleans as true/false); a non-scalar
+// leaf (object/array) is re-encoded as JSON so a pattern can still scan it.
+// Returns false when the content isn't JSON, path doesn't parse (e.g. a bad
+// escape), a segment doesn't resolve, or the leaf is JSON null.
 func walkJSONPath(content, path string) (string, bool) {
 	var root any
 	if err := json.Unmarshal([]byte(content), &root); err != nil {
 		return "", false
 	}
+	segs, err := SplitFieldPath(path)
+	if err != nil {
+		return "", false
+	}
 	cur := root
-	for _, seg := range strings.Split(path, ".") {
+	for _, seg := range segs {
 		switch node := cur.(type) {
 		case map[string]any:
 			v, ok := node[seg]
