@@ -35,7 +35,7 @@ type Result struct {
 	// Empty when there's no ambiguity.
 	TiedViews []string
 	// ComponentConflicts holds DOM nodes claimed by more than one distinct
-	// component name (first-match-wins keeps only one; the rest are dropped).
+	// component definition (first-match-wins keeps only one; the rest are dropped).
 	ComponentConflicts []sightmap.Conflict
 }
 
@@ -80,7 +80,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 
 	// Runtime conflicts: ambiguities only visible against this page. TiedViews
 	// flags >=2 views matching the URL at equal specificity; ComponentConflicts
-	// flags a single node claimed by multiple distinct component names.
+	// flags a single node claimed by multiple distinct component definitions.
 	res.TiedViews = corpus.TiedViews(url)
 	res.ComponentConflicts = m.Conflicts(root, url)
 

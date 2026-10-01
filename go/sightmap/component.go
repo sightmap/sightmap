@@ -12,6 +12,12 @@ type ComponentDef struct {
 	Properties  []ComponentPropertyDef `json:"properties,omitempty"`
 	ParentChain []string               `json:"parentChain,omitempty"` // ancestor component names, root-first
 	Stability   string                 `json:"stability,omitempty"`   // "" (default), "uncertain", or "unstable"
+	// Origin identifies the global definition this def was instantiated from: its
+	// address within that global, NUL-joined. The root global and every $ref
+	// expansion of it are separate ComponentDefs with the same Origin, because
+	// flattening deep-copies the global at each reference site. Empty for
+	// components authored inline in a view.
+	Origin string `json:"-"`
 }
 
 // ComponentPropertyDef describes a value extracted from a matched component,
@@ -42,10 +48,18 @@ func (m *ComponentMatch) Property(name string) (PropertyValue, bool) {
 }
 
 // Conflict records a DOM node directly matched by more than one DISTINCT
-// component name. Component matching is first-match-wins, so only Names[0]
-// actually claims the node; the rest are silently dropped. Names are in
+// component DEFINITION. Component matching is first-match-wins, so only the
+// first actually claims the node; the rest are silently dropped. Entries are in
 // first-seen (definition) order.
 type Conflict struct {
 	Node  *ComponentNode
 	Names []string
+	// Defs are the definitions that claimed the node, index-aligned with Names.
+	//
+	// Names alone cannot identify a claimant: a component name is unique only
+	// WITHIN ITS PARENT, so a genuine conflict may legitimately list the same name
+	// twice — two definitions at different points in the tree whose selectors both
+	// reach one node. Consumers that need to tell claimants apart (to report them,
+	// or to decide which is over-broad) must use Defs.
+	Defs []*ComponentDef
 }

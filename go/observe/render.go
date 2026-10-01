@@ -217,10 +217,33 @@ func writeConflicts(w io.Writer, r *Result) {
 			len(r.TiedViews), strings.Join(r.TiedViews, ", "), r.TiedViews[0])
 	}
 	for _, c := range r.ComponentConflicts {
+		labels := conflictClaimLabels(c)
 		fmt.Fprintf(w, "⚠ %s matched by %d components (%s) — only %s applied\n",
-			conflictNodeLabel(c.Node), len(c.Names), strings.Join(c.Names, ", "), c.Names[0])
+			conflictNodeLabel(c.Node), len(labels), strings.Join(labels, ", "), labels[0])
 	}
 	fmt.Fprintln(w)
+}
+
+// conflictClaimLabels names each claimant, disambiguating by selector when two
+// of them share a name.
+//
+// Two claimants CAN share a name — a component name is unique only within its
+// parent — and that is precisely the case a name-keyed report used to hide
+// entirely. Printing "Foo, Foo" without saying which two definitions are meant
+// would report the conflict while still making it unactionable.
+func conflictClaimLabels(c sightmap.Conflict) []string {
+	count := make(map[string]int, len(c.Names))
+	for _, n := range c.Names {
+		count[n]++
+	}
+	out := make([]string, len(c.Names))
+	for i, n := range c.Names {
+		out[i] = n
+		if count[n] > 1 && i < len(c.Defs) && c.Defs[i] != nil && len(c.Defs[i].Selectors) > 0 {
+			out[i] = n + " (" + c.Defs[i].Selectors[0] + ")"
+		}
+	}
+	return out
 }
 
 // conflictNodeLabel formats a node for a conflict line: its probe id plus role
