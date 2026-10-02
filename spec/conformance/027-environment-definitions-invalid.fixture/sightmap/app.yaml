@@ -1,0 +1,25 @@
+version: 1
+# Every file here is schema-valid; each problem is one only the reference
+# validator can see.
+environments:
+  - name: prod
+    origins:
+      api: https://api.acme.com
+      # The schema's port pattern admits up to five digits; rejecting a port
+      # above 65535 is origin-invalid's job.
+      app: https://app.acme.com:70000
+  - name: android-prod
+    platform: android
+    app_id: com.acme.app
+    backend: prod
+  # backend names no environment: environment-backend-invalid.
+  - name: android-beta
+    platform: android
+    app_id: com.acme.app.beta
+    backend: prd
+  # backend names a native environment, which would let backends chain:
+  # environment-backend-invalid.
+  - name: ios-prod
+    platform: ios
+    app_id: com.acme.ios
+    backend: android-prod

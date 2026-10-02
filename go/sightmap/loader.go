@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -38,15 +39,26 @@ func DirLoader(path string) Loader {
 // ---- raw YAML types (unexported) --------------------------------------------
 
 type rawFile struct {
-	Version    int            `yaml:"version"`
-	Memory     []string       `yaml:"memory"`
-	Components []rawComponent `yaml:"components"`
-	Views      []rawView      `yaml:"views"`
-	Requests   []rawRequest   `yaml:"requests"`
-	Messages   []rawMessage   `yaml:"messages"`
-	Signals    []rawSignal    `yaml:"signals"`
-	URL        string         `yaml:"url"`
-	Snapshots  []rawSnapshot  `yaml:"snapshots"`
+	Version      int               `yaml:"version"`
+	Environments []rawEnvironment  `yaml:"environments"`
+	Origins      map[string]string `yaml:"origins"`
+	Memory       []string          `yaml:"memory"`
+	Components   []rawComponent    `yaml:"components"`
+	Views        []rawView         `yaml:"views"`
+	Requests     []rawRequest      `yaml:"requests"`
+	Messages     []rawMessage      `yaml:"messages"`
+	Signals      []rawSignal       `yaml:"signals"`
+	URL          string            `yaml:"url"`
+	Snapshots    []rawSnapshot     `yaml:"snapshots"`
+}
+
+type rawEnvironment struct {
+	Name      string            `yaml:"name"`
+	Platform  string            `yaml:"platform"`
+	AppID     string            `yaml:"app_id"`
+	BuildType string            `yaml:"build_type"`
+	Backend   string            `yaml:"backend"`
+	Origins   map[string]string `yaml:"origins"`
 }
 
 type rawSignal struct {
@@ -89,6 +101,10 @@ type rawView struct {
 	Stability   string         `yaml:"stability"`
 	Tags        []string       `yaml:"tags"`
 	Access      *rawAccess     `yaml:"access"`
+	// An explicit `[]` decodes to a non-nil empty slice and an absent key to
+	// nil, which is how validation tells environments-empty from omission.
+	Environments []string `yaml:"environments"`
+	Origins      []string `yaml:"origins"`
 }
 
 type rawAccess struct {
@@ -102,17 +118,19 @@ type rawProperty struct {
 }
 
 type rawRequest struct {
-	Name        string               `yaml:"name"`
-	Route       string               `yaml:"route"`
-	Method      string               `yaml:"method"`
-	Description string               `yaml:"description"`
-	Source      string               `yaml:"source"`
-	Request     *rawPayload          `yaml:"request"`
-	Response    *rawPayload          `yaml:"response"`
-	Headers     []string             `yaml:"headers"`
-	Memory      []string             `yaml:"memory"`
-	Tags        []string             `yaml:"tags"`
-	Properties  []rawRequestProperty `yaml:"properties"`
+	Name         string               `yaml:"name"`
+	Route        string               `yaml:"route"`
+	Method       string               `yaml:"method"`
+	Description  string               `yaml:"description"`
+	Source       string               `yaml:"source"`
+	Request      *rawPayload          `yaml:"request"`
+	Response     *rawPayload          `yaml:"response"`
+	Headers      []string             `yaml:"headers"`
+	Memory       []string             `yaml:"memory"`
+	Tags         []string             `yaml:"tags"`
+	Properties   []rawRequestProperty `yaml:"properties"`
+	Environments []string             `yaml:"environments"`
+	Origins      []string             `yaml:"origins"`
 }
 
 type rawRequestProperty struct {
@@ -206,6 +224,7 @@ func loadDir(path string) (*Corpus, error) {
 	}
 	var viewFiles []viewFileWithPath
 	var fieldDiags []ValidationError
+	envReg := newEnvironmentRegistry()
 
 	for _, p := range yamlPaths {
 		data, err := os.ReadFile(p)
@@ -222,6 +241,7 @@ func loadDir(path string) (*Corpus, error) {
 			fieldDiags = append(fieldDiags, unknownFieldWarnings(data, base)...)
 		}
 		memory = append(memory, rf.Memory...)
+		envReg.add(rf, filepath.Base(p))
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
 		}
@@ -293,17 +313,19 @@ func loadDir(path string) (*Corpus, error) {
 				viewURL = vf.URL
 			}
 			views = append(views, ViewDef{
-				Name:       rv.Name,
-				Route:      rv.Route,
-				Memory:     rv.Memory,
-				Components: flattenAll(rv.Components, ctx, -1),
-				Requests:   toRequestDefs(rv.Requests, ctx),
-				Tags:       rv.Tags,
-				Stability:  rv.Stability,
-				Access:     access,
-				URL:        viewURL,
-				Snapshots:  snapshots,
-				SourceFile: basename,
+				Name:         rv.Name,
+				Route:        rv.Route,
+				Memory:       rv.Memory,
+				Components:   flattenAll(rv.Components, ctx, -1),
+				Requests:     toRequestDefs(rv.Requests, ctx),
+				Tags:         rv.Tags,
+				Environments: rv.Environments,
+				Origins:      rv.Origins,
+				Stability:    rv.Stability,
+				Access:       access,
+				URL:          viewURL,
+				Snapshots:    snapshots,
+				SourceFile:   basename,
 			})
 		}
 	}
@@ -315,8 +337,84 @@ func loadDir(path string) (*Corpus, error) {
 		Requests:         globalRequests,
 		Messages:         toMessageDefs(messageRaws),
 		Signals:          toSignalDefs(signalRaws),
-		loadDiagnostics:  append(ctx.diagnostics, fieldDiags...),
+		Environments:     envReg.envs,
+		SharedOrigins:    envReg.shared,
+		loadDiagnostics:  append(append(ctx.diagnostics, envReg.diags...), fieldDiags...),
 	}, nil
+}
+
+// environmentRegistry merges file-root environments and shared origins into the
+// project-wide registries SEP-0014 requires. Unlike the component $ref registry,
+// the first definition of a name wins, so add must be called in file-path order.
+type environmentRegistry struct {
+	envs      []EnvironmentDef
+	envFile   map[string]string // environment name -> file that won it
+	shared    map[string]string
+	sharedSrc map[string]string // shared origin name -> file that won it
+	diags     []ValidationError
+}
+
+func newEnvironmentRegistry() *environmentRegistry {
+	return &environmentRegistry{envFile: map[string]string{}, sharedSrc: map[string]string{}}
+}
+
+func (r *environmentRegistry) add(rf rawFile, file string) {
+	for _, re := range rf.Environments {
+		// Nameless entries are kept so validation can report them.
+		if re.Name != "" {
+			if winner, dup := r.envFile[re.Name]; dup {
+				r.diags = append(r.diags, ValidationError{
+					File:      file,
+					Component: re.Name,
+					Code:      "environment-name-collision",
+					Severity:  SeverityWarning,
+					Message:   fmt.Sprintf("environment %q is already defined in %s; the first definition by source path wins and this one is ignored", re.Name, winner),
+				})
+				continue
+			}
+			r.envFile[re.Name] = file
+		}
+		platform := re.Platform
+		if platform == "" {
+			platform = PlatformWeb
+		}
+		r.envs = append(r.envs, EnvironmentDef{
+			Name:       re.Name,
+			Platform:   platform,
+			AppID:      re.AppID,
+			BuildType:  re.BuildType,
+			Backend:    re.Backend,
+			Origins:    re.Origins,
+			SourceFile: file,
+		})
+	}
+	// Sorted so collision diagnostics come out in a stable order.
+	for _, name := range sortedKeys(rf.Origins) {
+		if winner, dup := r.sharedSrc[name]; dup {
+			r.diags = append(r.diags, ValidationError{
+				File:      file,
+				Component: name,
+				Code:      "origin-name-collision",
+				Severity:  SeverityWarning,
+				Message:   fmt.Sprintf("shared origin %q is already defined in %s; the first definition by source path wins and this one is ignored", name, winner),
+			})
+			continue
+		}
+		if r.shared == nil {
+			r.shared = map[string]string{}
+		}
+		r.shared[name] = rf.Origins[name]
+		r.sharedSrc[name] = file
+	}
+}
+
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // ---- flattening helpers -----------------------------------------------------
@@ -360,17 +458,19 @@ func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
 			continue
 		}
 		out = append(out, RequestDef{
-			Name:        rr.Name,
-			Route:       rr.Route,
-			Method:      rr.Method,
-			Description: rr.Description,
-			Source:      rr.Source,
-			Request:     toPayload(rr.Request),
-			Response:    toPayload(rr.Response),
-			Headers:     rr.Headers,
-			Memory:      rr.Memory,
-			Tags:        rr.Tags,
-			Properties:  toRequestProperties(rr.Properties),
+			Name:         rr.Name,
+			Route:        rr.Route,
+			Method:       rr.Method,
+			Description:  rr.Description,
+			Source:       rr.Source,
+			Request:      toPayload(rr.Request),
+			Response:     toPayload(rr.Response),
+			Headers:      rr.Headers,
+			Memory:       rr.Memory,
+			Tags:         rr.Tags,
+			Properties:   toRequestProperties(rr.Properties),
+			Environments: rr.Environments,
+			Origins:      rr.Origins,
 		})
 	}
 	return out

@@ -31,6 +31,11 @@ type RequestDef struct {
 	Memory      []string             `json:"memory,omitempty"`   // request-level memory entries
 	Tags        []string             `json:"tags,omitempty"`     // open-vocabulary labels (SEP-0004)
 	Properties  []RequestPropertyDef `json:"properties,omitempty"`
+	// Environments and Origins name where this endpoint runs (SEP-0014). They
+	// never narrow RequestsForURL. Origins are not inherited from an enclosing
+	// view; for environments, see RequestEnvironments.
+	Environments []string `json:"environments,omitempty"`
+	Origins      []string `json:"origins,omitempty"`
 }
 
 // RequestPropertyDef declares a named value to extract from a live request/response

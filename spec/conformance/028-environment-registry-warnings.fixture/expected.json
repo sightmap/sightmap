@@ -1,0 +1,19 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": true,
+        "diagnostics": [
+          { "code": "environment-duplicate", "severity": "warning" },
+          { "code": "environment-name-collision", "severity": "warning" },
+          { "code": "environments-empty", "severity": "warning" },
+          { "code": "origin-environment-gap", "severity": "warning" },
+          { "code": "origin-name-collision", "severity": "warning" },
+          { "code": "origins-empty", "severity": "warning" }
+        ]
+      }
+    }
+  ]
+}

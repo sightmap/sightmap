@@ -1,0 +1,28 @@
+version: 1
+environments:
+  - name: prod
+    origins:
+      api: https://api.acme.com
+      app: https://app.acme.com
+
+origins:
+  facebook: https://www.facebook.com
+
+views:
+  - name: Dashboard
+    route: /dashboard
+    # qa is not defined anywhere: environment-ref-unresolved.
+    environments: [prod, qa]
+    origins: [app]
+    requests:
+      # A view-scoped request is checked like a global one.
+      - name: LoadWidgets
+        route: /widgets
+        environments: [canary]
+        origins: [api]
+
+requests:
+  # cdn is neither an environment's origin nor a shared one: origin-ref-unresolved.
+  - name: FetchAsset
+    route: /assets/*
+    origins: [cdn, facebook]

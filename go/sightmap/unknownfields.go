@@ -22,11 +22,11 @@ import (
 // stability/access/snapshots/url/properties are all recognized here.
 
 var (
-	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "messages", "signals", "snapshots")
-	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "memory", "tags", "components", "requests")
+	fileRootFields  = set("version", "environments", "origins", "url", "memory", "views", "components", "requests", "messages", "signals", "snapshots")
+	viewFields      = set("name", "route", "environments", "origins", "url", "stability", "access", "description", "source", "memory", "tags", "components", "requests")
 	componentFields = set("name", "selector", "source", "description", "stability", "memory", "tags", "watch", "privacy", "properties", "children")
 	refFields       = set("$ref")
-	requestFields   = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
+	requestFields   = set("name", "route", "method", "environments", "origins", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
 	payloadFields   = set("fields")
 	fieldFields     = set("name", "type", "description")
 	propertyFields  = set("name", "extract")
@@ -37,6 +37,7 @@ var (
 	messageFields         = set("name", "level", "message", "description", "source", "tags", "properties")
 	signalFields          = set("name", "ref", "tags")
 	messagePropertyFields = set("name", "source", "field", "pattern")
+	environmentFields     = set("name", "platform", "app_id", "build_type", "backend", "origins")
 )
 
 func set(keys ...string) map[string]bool {
@@ -131,6 +132,7 @@ func walkFile(node *yaml.Node, file string, out *[]ValidationError) {
 		known = fileRootDiagnostics(node, file, out)
 	}
 	v := checkKeys(node, known, file, out)
+	forEachItem(v["environments"], func(n *yaml.Node) { walkEnvironment(n, file, out) })
 	forEachItem(v["views"], func(n *yaml.Node) { walkView(n, file, out) })
 	forEachItem(v["components"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 	forEachItem(v["requests"], func(n *yaml.Node) { walkRequest(n, file, out) })
@@ -267,6 +269,15 @@ func walkMessage(node *yaml.Node, file string, out *[]ValidationError) {
 		pv := checkKeys(n, messagePropertyFields, file, out)
 		checkStringScalars(pv, []string{"name", "source", "field", "pattern"}, file, out)
 	})
+}
+
+// walkEnvironment checks an environment definition's keys. Origin maps are not
+// walked because their keys are author-chosen names, checked by validation.
+// build_type is compared verbatim, so an unquoted `build_type: 1` must not load
+// as "1" while ajv rejects it.
+func walkEnvironment(node *yaml.Node, file string, out *[]ValidationError) {
+	v := checkKeys(node, environmentFields, file, out)
+	checkStringScalars(v, []string{"name", "platform", "app_id", "build_type", "backend"}, file, out)
 }
 
 func walkPayload(node *yaml.Node, file string, out *[]ValidationError) {

@@ -43,6 +43,17 @@ type Corpus struct {
 	// ResolveSignal / SignalByName. Corpus-root only; no view-scoped form.
 	Signals []SignalDef `json:"signals,omitempty"`
 
+	// Environments is the project-wide registry of deploy targets (SEP-0014),
+	// merged from every file's root `environments:`. On a name collision the
+	// first file by source path wins and later definitions are dropped with an
+	// environment-name-collision warning, so each name appears once.
+	Environments []EnvironmentDef `json:"environments,omitempty"`
+
+	// SharedOrigins is the project-wide map of origins that are the same in
+	// every environment (a file root's `origins:`), merged first-file-wins like
+	// Environments. Resolve a name for an environment with ResolveOrigin.
+	SharedOrigins map[string]string `json:"origins,omitempty"`
+
 	// loadDiagnostics holds structural problems detected while loading that are
 	// no longer visible in the flattened data (e.g. a circular $ref chain, which
 	// is expanded away). Validate surfaces these alongside its own checks.
@@ -74,6 +85,11 @@ type ViewDef struct {
 	// across every view whose route matches, not only the most-specific winner that
 	// supplies identity: see Corpus.TagsForURL.
 	Tags []string `json:"tags,omitempty"`
+	// Environments and Origins name where this view runs (SEP-0014). Empty
+	// means unconstrained. They are metadata for consumers and never narrow
+	// ViewForURL, which matches on the path alone.
+	Environments []string `json:"environments,omitempty"`
+	Origins      []string `json:"origins,omitempty"`
 
 	// Authoring/tooling fields — kept out of the serialized wire form.
 	Stability  string     `json:"-"` // "" (default/active), "stub", or "deferred"
