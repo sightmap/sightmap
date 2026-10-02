@@ -119,3 +119,26 @@ func TestMessagesForRecord_InvalidRegexSkipped(t *testing.T) {
 		t.Errorf("MessagesForRecord() = %v, want %v", got, want)
 	}
 }
+
+// Fixture 024's record matches both messages, so its identity is ambiguous, yet
+// its tags still resolve to the union of both.
+func TestTagsForRecord_UnionSurvivesAmbiguity(t *testing.T) {
+	corpus, err := sightmap.Load("../../spec/conformance/024-message-tags-ambiguity.fixture/sightmap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := sightmap.Message{Level: "error", Text: "cart version mismatch"}
+	if got := msgNames(corpus.MessagesForRecord(rec)); len(got) != 2 {
+		t.Fatalf("MessagesForRecord() = %v, want both entries", got)
+	}
+	if got, want := corpus.TagsForRecord(rec), []string{"checkout", "defect"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("TagsForRecord() = %v, want %v", got, want)
+	}
+	other := sightmap.Message{Level: "error", Text: "payment declined"}
+	if got, want := corpus.TagsForRecord(other), []string{"checkout"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("TagsForRecord(other) = %v, want %v", got, want)
+	}
+	if got := corpus.TagsForRecord(sightmap.Message{Level: "info", Text: "x"}); got != nil {
+		t.Errorf("TagsForRecord(unmatched) = %v, want nil", got)
+	}
+}
