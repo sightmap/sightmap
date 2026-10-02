@@ -24,6 +24,7 @@ type ProbeComponent struct {
 	Bounds        *sightmap.Bounds  `json:"bounds"`
 	Selector      string            `json:"selector"`   // CSS selector string
 	Attributes    map[string]string `json:"attributes"` // full attribute set (minus data-sightmap-*)
+	State         map[string]string `json:"state"`      // current interactive state (SEP-0013), from native properties
 	OnTop         bool              `json:"onTop"`
 	IsVisible     bool              `json:"isVisible"`
 	InViewport    bool              `json:"inViewport"`
