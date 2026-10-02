@@ -64,6 +64,7 @@ A named screen in the app, identified by a URL route.
 | `source` | string | no | Relative path to the source file. |
 | `memory` | string[] | no | View-level memory entries. |
 | `tags` | string[] | no | Open-vocabulary classification labels for this view. See [Tags](#tags). |
+| `properties` | [URLProperty](#url-properties)[] | no | Named values read from the matched URL. See [URL properties](#url-properties). |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | View-scoped components. Additive with globals (but a view-scoped `$ref` subsumes the matching global for that view — see [Component references](#component-references)). |
 | `requests` | [Request](#request)[] | no | View-scoped requests. Additive with globals. |
 
@@ -275,6 +276,8 @@ Extraction requires **live traffic**. A tool operating on static corpus definiti
 
 `status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. They sit outside `extract` entirely — a consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
 
+A request property entry is one of two shapes, and a request may carry both side by side: a **URL-shaped** entry (`name` + `extract`) reads the request URL, described under [URL properties](#url-properties); a **payload-shaped** entry (`name` + `source` + `field`/`pattern`) reads a body or header block, described above. One entry cannot mix the two.
+
 `properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](../seps/0005-request-properties.md).
 
 ### Payload
@@ -412,7 +415,7 @@ Every property that extracts a value (component, request, message) declares how 
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `from` | string | yes | The source to read from. Which sources are valid depends on the entity: see [Component properties](#component-properties), [Request properties](#request-properties), [Message properties](#message-properties). `url.query` and `url.path` are reserved for URL-shaped properties. |
+| `from` | string | yes | The source to read from. Which sources are valid depends on the entity: see [Component properties](#component-properties), [Request properties](#request-properties), [Message properties](#message-properties). `url.query` and `url.path` read the matched URL, on views and requests (see [URL properties](#url-properties)). |
 | `path` | string | per source | The value within the source. Required or forbidden depending on `from`. |
 | `pattern` | string | no | An [RE2](#regular-expressions) regex applied to the resolved value. Capture group 1 is the value when the pattern has one, otherwise the entire match. A value the pattern does not match is omitted. Not valid with `component.exists`. |
 | `join` | string | no | Valid only with `from: component`. Each segment of `path` resolves to every match in document order instead of the first; each value is read and refined by `pattern`, empty values are dropped, and the rest are joined with this string. No surviving value omits the property. Must be non-empty. |
@@ -456,6 +459,59 @@ Design points:
 - File-level entries apply whenever any definition from that file is active.
 - Entries on a request apply in the network-trace detail view.
 - Conforming SDKs SHOULD surface applicable memory entries in a `[Guide]` section at the top of enriched output.
+
+## URL properties
+
+A `:name` segment in a view or request `route` **binds** that segment's percent-decoded value as a property named `name`. An optional `properties[]` array names query-string values and renames bound segments, using the [Extract](#extract) object with `from: url.query` or `from: url.path`. The same grammar applies to both entities: both carry a `route`, both are matched against a URL, and the value an author wants out of that URL is the same kind of thing in each case.
+
+```yaml
+views:
+  - name: ProductDetail
+    route: /shop/p/:product_id        # binds product_id
+    properties:
+      - name: variant
+        extract: { from: url.query, path: variant }
+requests:
+  - name: GetOrder
+    route: /api/orders/:order_id      # binds order_id
+    method: GET
+    properties:
+      - name: variant
+        extract: { from: url.query, path: variant }   # reads the URL
+      - name: outcome
+        extract: { from: rsp.body, path: status }     # reads the body, see Request properties
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. An entry whose name matches an implicit route binding overrides that binding. |
+| `extract` | [Extract](#extract) | yes | `from: url.path` with `path: <segment_name>` reads a `:name` bound by this entity's own route; `from: url.query` with `path: <key>` reads a query-string parameter. `path` is required; `pattern` refines the value; `join` is not valid. |
+
+Given `route: /shop/p/:product_id` and a property `{ name: variant, extract: { from: url.query, path: variant } }`:
+
+| URL | Matches? | Properties |
+|---|---|---|
+| `/shop/p/12345` | yes | `product_id="12345"` |
+| `/shop/p/12345?variant=blue` | yes | `product_id="12345"`, `variant="blue"` |
+| `/shop/p/12345?VARIANT=blue` | yes | `product_id="12345"` (keys are case-sensitive) |
+| `/shop/p/12345?variant=` | yes | `product_id="12345"` (empty resolves to nothing) |
+| `/shop/p/12345?variant=a&variant=b` | yes | `product_id="12345"`, `variant="a"` (first occurrence) |
+| `/shop/p/blue%20suede` | yes | `product_id="blue suede"` (percent-decoded) |
+| `/shop/p/12345#reviews` | yes | `product_id="12345"` (the fragment is ignored) |
+| `/shop/p/12345/reviews` | no | `:product_id` binds exactly one segment |
+| `/shop/p/` | no | a `:name` requires a segment to be present |
+
+`url.query` keys are matched **case-sensitively** — URLs are case-sensitive below the host — and resolve to the first occurrence, percent-decoded.
+
+**Binding is implicit**: a `:name` needs no `properties[]` entry, the same way a request's reserved identity names do not. Declaring one is the escape hatch for renaming. A `:name` MUST NOT repeat within one route, and on a request a bound name colliding with a reserved identity name (`status`, `method`, `duration`) is an error rather than a silent precedence rule.
+
+**This changes what `:param` produces, never what it matches.** [Route matching](#route-matching) still normalizes `:param` to `*` for requests, and a view `:param` still scores specificity `2`, so every existing route matches exactly the URL set it matched before. `**` cannot bind: it spans a variable number of segments, so there is no single value to name.
+
+**These resolve statically.** Both sources read a URL string rather than live DOM state or live traffic, so a saved session, a coverage report, or a lint pass over a URL alone produces every declared URL property with no live observation.
+
+**A declaration is also a retention request.** A consumer that scrubs captured URLs SHOULD retain the parts its corpus names, and SHOULD surface the case where it dropped one anyway — a scrubbed parameter makes the property permanently unresolvable, and omission is otherwise silent. Naming a part is **not** a privacy grant: a consumer MUST NOT treat a declaration as authorization to retain a value its own policy, or [`privacy`](#privacy), would withhold. A URL property also promotes whatever the parameter holds into a named value that flows onward, so naming a parameter carrying personal data spreads it rather than containing it.
+
+See [SEP-0008](../seps/0008-url-properties.md).
 
 ## Route matching
 

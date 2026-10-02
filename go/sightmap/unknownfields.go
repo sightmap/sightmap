@@ -22,16 +22,18 @@ import (
 // stability/access/snapshots/url/properties are all recognized here.
 
 var (
-	fileRootFields  = set("version", "environments", "origins", "url", "memory", "views", "components", "requests", "messages", "signals", "snapshots")
-	viewFields      = set("name", "route", "environments", "origins", "url", "stability", "access", "description", "source", "memory", "tags", "components", "requests")
-	componentFields = set("name", "selector", "source", "description", "stability", "memory", "tags", "watch", "privacy", "properties", "children")
-	refFields       = set("$ref")
-	requestFields   = set("name", "route", "method", "environments", "origins", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
-	payloadFields   = set("fields")
-	fieldFields     = set("name", "type", "description")
-	propertyFields  = set("name", "extract")
-	accessFields    = set("status", "reason")
-	snapshotFields  = set("name", "notes", "url")
+	fileRootFields    = set("version", "environments", "origins", "url", "memory", "views", "components", "requests", "messages", "signals", "snapshots")
+	viewFields        = set("name", "route", "environments", "origins", "url", "stability", "access", "description", "source", "memory", "tags", "properties", "components", "requests")
+	componentFields   = set("name", "selector", "source", "description", "stability", "memory", "tags", "watch", "privacy", "properties", "children")
+	refFields         = set("$ref")
+	requestFields     = set("name", "route", "method", "environments", "origins", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
+	payloadFields     = set("fields")
+	fieldFields       = set("name", "type", "description")
+	propertyFields    = set("name", "extract")
+	urlPropertyFields = set("name", "extract")
+
+	accessFields   = set("status", "reason")
+	snapshotFields = set("name", "notes", "url")
 
 	requestPropertyFields = set("name", "extract", "source", "field", "pattern")
 	messageFields         = set("name", "level", "message", "description", "source", "tags", "properties")
@@ -220,6 +222,7 @@ func walkView(node *yaml.Node, file string, out *[]ValidationError) {
 	if a := v["access"]; a != nil {
 		checkKeys(a, accessFields, file, out)
 	}
+	forEachItem(v["properties"], func(n *yaml.Node) { walkExtract(checkKeys(n, urlPropertyFields, file, out), file, out) })
 	forEachItem(v["components"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 	forEachItem(v["requests"], func(n *yaml.Node) { walkRequest(n, file, out) })
 }

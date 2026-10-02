@@ -23,7 +23,13 @@ const (
 	FromReqHeaders      = "req.headers"
 	FromRspHeaders      = "rsp.headers"
 	FromStack           = "stack"
+	FromURLQuery        = "url.query"
+	FromURLPath         = "url.path"
 )
+
+// URLExtractSources is the closed set of sources a view property may read, and
+// the URL-shaped sources a request property may read (SEP-0008).
+var URLExtractSources = []string{FromURLQuery, FromURLPath}
 
 // ComponentExtractSources is the closed set of sources a component property may
 // read.
@@ -171,6 +177,14 @@ func (r rawExtract) object() Extract {
 		e.Join, e.joinSet = *r.obj.Join, true
 	}
 	return e
+}
+
+// url lowers a view URL property, which has no string form.
+func (r rawExtract) url() Extract {
+	if r.legacy != "" {
+		return Extract{Legacy: strings.TrimSpace(r.legacy)}
+	}
+	return r.object()
 }
 
 // sourced lowers a request or message property, which may carry the object
