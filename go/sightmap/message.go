@@ -2,6 +2,7 @@ package sightmap
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -125,6 +126,7 @@ type MessageMatch struct {
 	Name        string
 	Description string
 	Source      string
+	Tags        []string
 	Properties  []PropertyValue
 }
 
@@ -169,8 +171,31 @@ func (c *Corpus) MessagesForRecord(rec Message) []MessageMatch {
 			Name:        m.Name,
 			Description: m.Description,
 			Source:      m.Source,
+			Tags:        m.Tags,
 			Properties:  m.ExtractProperties(rec),
 		})
 	}
+	return out
+}
+
+// TagsForRecord returns the union of tags across every MessageDef that matches
+// rec, deduplicated and lexicographically sorted. Nil when none carry tags.
+//
+// The union holds even when rec matches several defs and its identity is an
+// ambiguity a consumer must surface (SEP-0016): which message a record is can
+// stay undecided while its classification is not.
+func (c *Corpus) TagsForRecord(rec Message) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, m := range c.MessagesForRecord(rec) {
+		for _, t := range m.Tags {
+			if t == "" || seen[t] {
+				continue
+			}
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	sort.Strings(out)
 	return out
 }
