@@ -442,18 +442,6 @@ func resolveTimeoutMs(args []string, def time.Duration) (timeout time.Duration, 
 	return def, args
 }
 
-func dial(addr string) (*browser.CDPConn, error) {
-	ctx := context.Background()
-	conn, err := browser.DialCDP(ctx, addr)
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to Chrome at %s\n"+
-			"Start a session first:\n"+
-			"  sightmap browser start\n"+
-			"  sightmap browser start --url https://...\n", addr)
-	}
-	return conn, nil
-}
-
 // crashUnresponsiveHint is appended when a tab is diagnosed unresponsive.
 const crashUnresponsiveHint = "\n  the tab is UNRESPONSIVE — a trivial follow-up probe also timed out, so the " +
 	"renderer has likely CRASHED (e.g. RESULT_CODE_KILLED_BAD_MESSAGE from a bad Mojo message) " +
