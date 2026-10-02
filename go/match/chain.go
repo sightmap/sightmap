@@ -62,7 +62,7 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 	}
 
 	var out []ChainMatch
-	FindAllMatches(nodes[0], entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
+	findAllMatches(nodes[0], entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		cm := ChainMatch{Depth: depthOf[node], Name: q.Name}
 		if q.Def != nil {
 			cm.Tags = q.Def.Tags
