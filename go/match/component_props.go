@@ -65,8 +65,12 @@ func resolveExtract(
 		return refine(e, node.Element.Attrs[e.Path])
 
 	case sightmap.FromDOMState:
-		// Interactive state as the accessibility layer reports it, never the
-		// markup attribute of the same name, which records only initial state.
+		// Current interactive state, never the markup attribute of the same
+		// name, which records only initial state. A tree captured before State
+		// existed still carries the accessibility layer's value in Properties.
+		if v := node.State[e.Path]; v != "" {
+			return refine(e, v)
+		}
 		return refine(e, node.Properties[e.Path])
 
 	case sightmap.FromComponentExists:
