@@ -13,6 +13,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -20,6 +21,10 @@ import (
 )
 
 func runCapturePrune(args []string) error {
+	return runCapturePruneOut(args, os.Stdout)
+}
+
+func runCapturePruneOut(args []string, out io.Writer) error {
 	fs := flag.NewFlagSet("capture-prune", flag.ContinueOnError)
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	dryRunFlag := fs.Bool("dry-run", false, "Report what would be pruned without deleting")
@@ -28,7 +33,7 @@ func runCapturePrune(args []string) error {
 		return err
 	}
 	rest := fs.Args()
-	if (*allFlag) == (len(rest) == 1) {
+	if !(*allFlag && len(rest) == 0) && !(!*allFlag && len(rest) == 1) {
 		return fmt.Errorf("usage: sightmap capture-prune [--dry-run] (<view> | --all)")
 	}
 
@@ -50,10 +55,10 @@ func runCapturePrune(args []string) error {
 
 	totalPruned := 0
 	for _, view := range views {
-		totalPruned += pruneView(view, sets[view], corpus, *dryRunFlag)
+		totalPruned += pruneView(view, sets[view], corpus, *dryRunFlag, out)
 	}
 	if *dryRunFlag && totalPruned > 0 {
-		fmt.Printf("\n(dry run \u2014 nothing deleted; re-run without --dry-run to prune)\n")
+		fmt.Fprintf(out, "\n(dry run \u2014 nothing deleted; re-run without --dry-run to prune)\n")
 	}
 	return nil
 }
@@ -61,7 +66,7 @@ func runCapturePrune(args []string) error {
 // pruneView re-matches a view's captures against the current corpus and removes
 // the subsumed ones. Returns how many were pruned (or would be, under
 // --dry-run).
-func pruneView(view string, entries []viewset.Entry, corpus *sightmap.Corpus, dryRun bool) int {
+func pruneView(view string, entries []viewset.Entry, corpus *sightmap.Corpus, dryRun bool, out io.Writer) int {
 	paths := make([]string, 0, len(entries))
 	caps := make([]viewset.Slots, 0, len(entries))
 	for _, e := range entries {
@@ -79,7 +84,7 @@ func pruneView(view string, entries []viewset.Entry, corpus *sightmap.Corpus, dr
 
 	prune := viewset.PlanPrune(caps)
 	if len(prune) == 0 {
-		fmt.Printf("%s: %d capture(s), nothing redundant \u2014 kept all\n", view, len(caps))
+		fmt.Fprintf(out, "%s: %d capture(s), nothing redundant \u2014 kept all\n", view, len(caps))
 		return 0
 	}
 
@@ -87,13 +92,13 @@ func pruneView(view string, entries []viewset.Entry, corpus *sightmap.Corpus, dr
 	if dryRun {
 		verb = "would prune"
 	}
-	fmt.Printf("%s: %d capture(s) \u2192 keep %d, %s %d\n", view, len(caps), len(caps)-len(prune), verb, len(prune))
+	fmt.Fprintf(out, "%s: %d capture(s) \u2192 keep %d, %s %d\n", view, len(caps), len(caps)-len(prune), verb, len(prune))
 	for _, idx := range prune {
 		stamp := viewset.FormatStamp(caps[idx].Stamp)
 		if stamp == "" {
 			stamp = "(untimestamped)"
 		}
-		fmt.Printf("  %s %s\n", verb, stamp)
+		fmt.Fprintf(out, "  %s %s\n", verb, stamp)
 		if !dryRun {
 			if err := os.Remove(paths[idx]); err != nil && !os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
