@@ -56,6 +56,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 018 | `request-properties` | `properties:` on a request validates via `field` (body and header paths) and `pattern`; declaring a reserved identity name warns with `request-property-shadows-reserved` ([SEP-0005](../seps/0005-request-properties.md)) |
 | 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](../seps/0006-message-entity.md)) |
 | 020 | `message-properties` | `properties:` on a message validates via `source: stack` with a `<frame>.<attribute>` `field` and an optional `pattern` ([SEP-0006](../seps/0006-message-entity.md)) |
+| 021 | `component-privacy` | `privacy:` validates on components at every nesting depth, global and view-scoped, with `block`/`mask`/`unmask` nested under one another ([SEP-0009](../seps/0009-component-privacy.md)) |
 | 022 | `component-watch` | `watch:` validates on components at every nesting depth, global and view-scoped, including an explicit `false` ([SEP-0015](../seps/0015-component-watch.md)) |
 | 024 | `message-tags-ambiguity` | Tags resolve as a union across every matching `messages:` entry even where identity is ambiguous, so `message-conflict` warns while the tag union still holds ([SEP-0016](../seps/0016-message-and-signal-tags.md)) |
 

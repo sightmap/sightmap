@@ -99,6 +99,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `properties` | [Property](#component-properties)[] | no | Named DOM-value extractions surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Extracted from the live DOM at snapshot time; unavailable to offline tools. See [Component properties](#component-properties). |
 | `tags` | string[] | no | Open-vocabulary classification labels for this component. See [Tags](#tags). |
 | `watch` | boolean | no | Report this component's visibility lifecycle even when it is never interacted with. See [Watch](#watch). |
+| `privacy` | string | no | Whether a capture consumer may retain this element's content: `block`, `mask`, or `unmask`. See [Privacy](#privacy). |
 | `children` | (Component \| [ComponentRef](#component-references))[] | no | Nested components. Child selectors are scoped to the parent's subtree. Entries may be either inline definitions or `$ref` reference objects. |
 
 ### Component references
@@ -545,6 +546,52 @@ Repeat reports SHOULD be collapsed: an element that leaves and re-enters the vie
 `watch` and [`privacy`](#privacy) are independent and compose without special rules: a component may be watched and blocked at once, reporting that it appeared while retaining none of its content.
 
 See [SEP-0015](https://github.com/sightmap/sightmap/blob/main/spec/seps/0015-component-watch.md).
+## Privacy
+
+A component may declare `privacy`, stating whether a capture consumer — anything that records the page for later replay or analysis — may retain the matched element's content.
+
+```yaml
+- name: CheckoutForm
+  selector: '.checkout-form'
+  privacy: mask
+  children:
+    - name: CardNumberInput
+      selector: 'input[name="cc"]'
+      privacy: block
+    - name: OrderTotal
+      selector: '.order-total'
+      privacy: unmask
+```
+
+| Value | Meaning |
+|---|---|
+| `block` | The element and its subtree MUST NOT be captured. Neither content nor structure is retained. |
+| `mask` | The element's structure and layout MAY be captured; its text, input values, and attribute values MUST NOT be, except the interactive-state attributes noted below. |
+| `unmask` | The element and its subtree are captured in full, overriding any enclosing `block` or `mask`. |
+
+A declaration applies to the matched element **and its entire subtree**, so masking a form masks the fields inside it without naming each one.
+
+**Resolution is nearest-enclosing wins** — the same rule component identity follows, and deliberately *not* the union rule [`tags`](#tags) uses. A union is right for classification, where more labels are additive; it is wrong for a directive, where two applicable values are a contradiction that must be decided rather than merged. This is also what makes `unmask` meaningful: it is inert in isolation and exists to carve one safe element out of a broader restriction.
+
+**Omission declares nothing.** A component with no `privacy` field makes no statement, and the consumer's own default is unchanged. A corpus can adopt the field one component at a time without implying anything about the rest.
+
+**The corpus is a floor, not a ceiling.** A consumer MAY withhold more than the corpus asks. A consumer MUST NOT capture content the resolved value marks `block` or `mask`. An `unmask` states that the corpus author considers the element safe; it does not override a consumer's own policy, and a consumer that blocks the element for its own reasons MUST continue to.
+
+**Extracted properties are governed too**, at the node the value is read from. A [`properties[]`](#component-properties) entry produces a named value that travels separately from captured content, so a directive covering only the recording would leak the same text through the other path. A property whose value resolves from a node whose effective privacy is `block` or `mask` MUST NOT be surfaced.
+
+The governing node is the one the value is **read from**, not the component that declared the property. Extraction is tree-closed, so a `PATH.prop` directive resolves against a descendant component and that descendant's own resolved privacy applies — a component with no declaration of its own cannot launder a value out of a blocked descendant.
+
+`exists:PATH` is an exception, reporting presence rather than content: it MAY be surfaced under `mask`, which already permits structure, and MUST NOT under `block`. `text`, `raw_text` and `PATH.prop` yield content and are withheld under either.
+
+**Attributes under `mask`.** An attribute can be structure or content, so the line is drawn here rather than left to each consumer. Under `mask` a consumer MUST withhold the value of any attribute the corpus reads via an `attr=` extract **anywhere in the corpus** — naming an attribute in an extract is a declaration that it carries a value worth reading — and the value of any `data-*` attribute, and of `value`, `title`, `alt`, `placeholder` and `aria-label`. A consumer MAY retain the four interactive-state attributes [SEP-0013](https://github.com/sightmap/sightmap/blob/main/spec/seps/0013-richer-node-data.md) defines (`checked`, `selected`, `disabled`, `expanded`), which are a closed set carrying state rather than a value, and presentational attributes needed to render the element's shape (`class`, `style`, `id`). `attr=` extraction of those four state attributes resolves normally under `mask`; every other `attr=` is withheld. Under `block` nothing resolves.
+
+A `class` or `id` built from user data survives a `mask`, and the spec cannot close that without making `mask` unimplementable for replay. An author carrying user data in a presentational attribute should use `block`.
+
+A withheld property is **absent**, exactly as if it had not resolved, so [silent value omission](#component-properties) covers it and a consumer cannot distinguish the two cases.
+
+`privacy` takes no part in route matching, component identity, or specificity. Two components differing only in `privacy` are the same component for every other purpose. A consumer that does not capture page content MUST accept and ignore the field.
+
+See [SEP-0009](https://github.com/sightmap/sightmap/blob/main/spec/seps/0009-component-privacy.md).
 
 ## Reserved tooling fields
 
