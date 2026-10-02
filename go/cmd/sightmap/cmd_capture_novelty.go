@@ -46,14 +46,14 @@ func runCaptureNovelty(args []string) error {
 		return fmt.Errorf("capture-novelty: load corpus: %v", err)
 	}
 
-	candSlots, ok := viewset.SlotsForCapture(candidate, corpus)
+	candSlots, ok := viewset.SlotsForCapture(candidate, corpus, true)
 	if !ok {
 		return fmt.Errorf("capture-novelty: cannot read candidate tree (%s.tree.json)", candidate)
 	}
 
 	// The rest of the candidate's view set, re-matched against the current corpus
 	// (the candidate itself excluded).
-	others := viewset.ViewSlots(*sightmapDirFlag, view, corpus, candidate)
+	others := viewset.ViewSlots(*sightmapDirFlag, view, corpus, candidate, true)
 
 	res := viewset.ComputeNovelty(candSlots, others)
 	printNovelty(view, filepath.Base(candidate), res)

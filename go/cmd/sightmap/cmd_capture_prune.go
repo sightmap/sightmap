@@ -65,7 +65,7 @@ func pruneView(view string, entries []viewset.Entry, corpus *sightmap.Corpus, dr
 	paths := make([]string, 0, len(entries))
 	caps := make([]viewset.Slots, 0, len(entries))
 	for _, e := range entries {
-		cs, ok := viewset.SlotsForCapture(e.Path, corpus)
+		cs, ok := viewset.SlotsForCapture(e.Path, corpus, true)
 		if !ok {
 			continue
 		}
