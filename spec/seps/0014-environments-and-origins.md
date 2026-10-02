@@ -10,9 +10,6 @@ related-issues: []
 related-discussions: []
 ---
 
-> **Accepted 2026-09-29. Not yet implemented.** Neither `environments` nor
-> `origins` exists in `spec/v1/sightmap.schema.json` or in the Go SDK.
-
 ## Summary
 
 Add a file-root `environments` registry of named deploy targets and a file-root `origins` map of
