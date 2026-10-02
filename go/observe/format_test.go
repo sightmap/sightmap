@@ -134,3 +134,23 @@ func TestFormat_NoCorpus(t *testing.T) {
 		t.Errorf("did not expect a [Coverage] line without a corpus, got:\n%s", out)
 	}
 }
+
+// TestObserve_ViewTagsUnionAcrossMatchingViews: the winning view is the narrower
+// untagged one, yet the broad view's tag still applies (SEP-0004).
+func TestObserve_ViewTagsUnionAcrossMatchingViews(t *testing.T) {
+	corpus := &sightmap.Corpus{Views: []sightmap.ViewDef{
+		{Name: "Checkout", Route: "/checkout/**", Tags: []string{"revenue"}},
+		{Name: "Payment", Route: "/checkout/payment"},
+	}}
+	root := &sightmap.ComponentNode{Id: "1", Role: "document", IsVisible: true}
+	r := apply(root, "https://app.example.com/checkout/payment", corpus, Options{})
+	if r.View == nil || r.View.Name != "Payment" {
+		t.Fatalf("View = %v, want Payment", r.View)
+	}
+	if len(r.ViewTags) != 1 || r.ViewTags[0] != "revenue" {
+		t.Errorf("ViewTags = %v, want [revenue]", r.ViewTags)
+	}
+	if out := renderResult(r); !strings.Contains(out, "tags: revenue\n") {
+		t.Errorf("expected a tags line under the view, got:\n%s", out)
+	}
+}

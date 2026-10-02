@@ -34,6 +34,9 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 	if r.View != nil {
 		fmt.Fprintf(w, "[View: %s]\n", r.View.Name)
 		fmt.Fprintf(w, "route: %s\n", r.View.Route)
+		if len(r.ViewTags) > 0 {
+			fmt.Fprintf(w, "tags: %s\n", strings.Join(r.ViewTags, ", "))
+		}
 		if len(r.View.Memory) > 0 {
 			fmt.Fprintf(w, "memory:\n")
 			for _, m := range r.View.Memory {
