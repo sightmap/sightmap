@@ -401,10 +401,11 @@ merged-but-unimplemented spec change.
 
 1. **Structured/valued tags.** Should a future SEP revisit `{name, value}` tags once real
    demand exists? See Alternative 3. Deliberately left unaddressed here.
-2. **Console/exception classification.** Console and exception events aren't a matchable
-   entity in the spec today (no selector or route to attach a definition to). Tags there
-   would need a different mechanism than this SEP proposes — left to a follow-on SEP if a
-   real use case emerges.
+2. ~~**Console/exception classification.**~~ **Resolved by
+   [SEP-0016](0016-message-and-signal-tags.md).** This question assumed console and exception
+   events were not a matchable entity, which was true when it was written. SEP-0006 then created
+   the `messages` entity, matched by `level` and a `message` regex, so a message now has a
+   definition to attach a tag to and needs no separate mechanism after all.
 3. **Canonical formatting.** `canonical-format.md` defines a sort-and-deduplicate rule for
    unordered string arrays. Its only instance, `dependencies[]`, went away with SEP-0001, so
    the rule currently applies to no field. Should `tags[]`, being an unordered set
@@ -438,7 +439,6 @@ merged-but-unimplemented spec change.
   offline, cross-language conformance suite has no live DOM or URL router to exercise, so it
   cannot test the union resolution rule itself (the same limitation SEP-0003's `properties`
   extraction ran into); that behavior is asserted by each SDK's own test suite instead.
-- Reference implementation: an internal session-review signal pipeline (Go)
-  implements and unit-tests the component case's union-across-levels resolution today (the
-  view and request cases are new in this SEP, not yet implemented anywhere). Not a public
-  repository — cited here for provenance, not as a checkable link.
+- Reference implementation: the component case's union-across-levels resolution is
+  implemented and unit-tested in a consumer today. The view and request cases are new in
+  this SEP and not yet implemented anywhere. Cited for provenance, not as a checkable link.

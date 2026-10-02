@@ -3,6 +3,7 @@ package sightmap
 import (
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -69,6 +70,10 @@ type ViewDef struct {
 	Memory     []string       `json:"memory,omitempty"`
 	Components []ComponentDef `json:"components,omitempty"`
 	Requests   []RequestDef   `json:"requests,omitempty"` // view-scoped API request definitions
+	// Tags are open-vocabulary classification labels (SEP-0004). Resolved as a union
+	// across every view whose route matches, not only the most-specific winner that
+	// supplies identity: see Corpus.TagsForURL.
+	Tags []string `json:"tags,omitempty"`
 
 	// Authoring/tooling fields — kept out of the serialized wire form.
 	Stability  string     `json:"-"` // "" (default/active), "stub", or "deferred"
@@ -335,4 +340,36 @@ func routeSpecificity(pattern string) int {
 		}
 	}
 	return score
+}
+
+// TagsForURL returns the union of tags across EVERY view whose route matches
+// pageURL, deduplicated and lexicographically sorted. Nil when none carry tags.
+//
+// This is deliberately not ViewForURL's rule. Identity is most-specific-wins, but
+// SEP-0004 resolves tags as a union across every applicable definition, so that a
+// broad tagged view is never shadowed by a narrower untagged one that happens to
+// win identity. Matching follows TiedViews: same parse, same path normalization,
+// so all three agree on trailing slashes and param segments.
+func (c *Corpus) TagsForURL(pageURL string) []string {
+	u, err := url.Parse(pageURL)
+	if err != nil {
+		return nil
+	}
+	path := normalizeRoutePath(u.Path)
+	seen := map[string]bool{}
+	var out []string
+	for i := range c.Views {
+		if !MatchRoute(c.Views[i].Route, path) {
+			continue
+		}
+		for _, t := range c.Views[i].Tags {
+			if t == "" || seen[t] {
+				continue
+			}
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	sort.Strings(out)
+	return out
 }

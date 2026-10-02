@@ -27,3 +27,24 @@ views:
     tags: [defect]
   - name: CheckoutPayment
     route: /checkout/payment
+
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    tags: [defect, checkout]
+  # Untagged, to prove omission stays clean.
+  - name: SlowNetworkWarning
+    level: WARN
+    message: 'request .* took over \d+ms'
+
+signals:
+  # A signal's own tag, unioned with the tags of the component it references:
+  # CheckoutForm carries [defect, ui-risk], so this resolves to
+  # [defect, state-risk, ui-risk].
+  - name: checkout.form.present
+    ref: CheckoutForm
+    tags: [state-risk]
+  # No tags of its own: it still inherits the referenced view's.
+  - name: checkout.active
+    ref: Checkout

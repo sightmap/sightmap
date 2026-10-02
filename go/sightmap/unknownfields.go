@@ -23,7 +23,7 @@ import (
 
 var (
 	fileRootFields  = set("version", "url", "memory", "views", "components", "requests", "messages", "signals", "snapshots")
-	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "memory", "components", "requests")
+	viewFields      = set("name", "route", "url", "stability", "access", "description", "source", "memory", "tags", "components", "requests")
 	componentFields = set("name", "selector", "source", "description", "stability", "memory", "tags", "properties", "children")
 	refFields       = set("$ref")
 	requestFields   = set("name", "route", "method", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
@@ -34,7 +34,7 @@ var (
 	snapshotFields  = set("name", "notes", "url")
 
 	requestPropertyFields = set("name", "source", "field", "pattern")
-	messageFields         = set("name", "level", "message", "description", "source", "properties")
+	messageFields         = set("name", "level", "message", "description", "source", "tags", "properties")
 	signalFields          = set("name", "ref", "tags")
 	messagePropertyFields = set("name", "source", "field", "pattern")
 )

@@ -1,5 +1,7 @@
 package sightmap
 
+import "sort"
+
 // SignalDef is a named, reference-based STATE predicate — the Component/View
 // subset of SEP-0007 point signals. A signal names an existing corpus entity by
 // `ref`; evaluated online it is the boolean "does that entity's state currently
@@ -97,4 +99,41 @@ func (c *Corpus) ResolveSignal(name string) SignalTarget {
 		return SignalTarget{Kind: SignalRefUnresolved}
 	}
 	return c.ResolveSignalRef(s.Ref)
+}
+
+// TagsForSignal returns a signal's effective tags: its own, unioned with the
+// resolved tags of the entity its ref names, deduplicated and lexicographically
+// sorted. Nil for an unknown signal, or when neither side carries any.
+//
+// A signal is a named classification ABOUT an entity, so the entity's own
+// classification applies to it (SEP-0016). Requiring an author to restate a
+// referenced request's tags on every signal would reintroduce, one level up, the
+// shadowing problem SEP-0004 exists to avoid. Resolution is transitive only
+// through ref, and ref resolves to exactly one entity, so there is no chain to
+// walk and no cycle to detect.
+func (c *Corpus) TagsForSignal(name string) []string {
+	s := c.SignalByName(name)
+	if s == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(tags []string) {
+		for _, t := range tags {
+			if t == "" || seen[t] {
+				continue
+			}
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	add(s.Tags)
+	switch target := c.ResolveSignalRef(s.Ref); target.Kind {
+	case SignalRefComponent:
+		add(target.Component.Tags)
+	case SignalRefView:
+		add(target.View.Tags)
+	}
+	sort.Strings(out)
+	return out
 }
