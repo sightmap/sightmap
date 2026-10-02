@@ -141,6 +141,7 @@ type rawComponent struct {
 	Memory      []string       `yaml:"memory"`
 	Tags        []string       `yaml:"tags"`
 	Watch       bool           `yaml:"watch"`
+	Privacy     string         `yaml:"privacy"`
 	Children    []rawComponent `yaml:"children"`
 	Properties  []rawProperty  `yaml:"properties"`
 	Stability   string         `yaml:"stability"`
@@ -641,6 +642,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		Memory:      rc.Memory,
 		Tags:        rc.Tags,
 		Watch:       rc.Watch,
+		Privacy:     rc.Privacy,
 		Properties:  rawPropsToMatch(rc.Properties),
 		ParentChain: parentChain, // nil for top-level; omitted from JSON
 		Stability:   rc.Stability,

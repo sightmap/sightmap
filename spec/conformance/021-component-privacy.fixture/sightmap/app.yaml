@@ -1,0 +1,80 @@
+version: 1
+components:
+  # A mask on the form, overridden two ways beneath it: block tightens,
+  # unmask carves out the one element that is safe to keep.
+  - name: CheckoutForm
+    selector: '.checkout-form'
+    privacy: mask
+    children:
+      - name: CardNumberInput
+        selector: 'input[name="cc"]'
+        privacy: block
+      - name: OrderTotal
+        selector: '.order-total'
+        privacy: unmask
+      # No declaration: inherits the enclosing mask.
+      - name: SubmitButton
+        selector: 'button[type="submit"]'
+
+  # Omission at the top level declares nothing at all.
+  - name: NavFooter
+    selector: '#footer'
+
+  # A block with no children, and a component carrying both privacy and tags
+  # to show they are independent axes.
+  - name: SocialSecurityInput
+    selector: 'input[name="ssn"]'
+    privacy: block
+    tags: [pii]
+
+  # Extracted properties are governed at the node the value is READ FROM, not at
+  # the component that declares them. CheckoutSummary is unrestricted, so `card`
+  # is still withheld: it resolves against a blocked descendant.
+  - name: CheckoutSummary
+    selector: '.summary'
+    properties:
+      - name: card
+        extract: CardNumber.value
+      - name: has_card
+        extract: 'exists:CardNumber'
+    children:
+      - name: CardNumber
+        selector: 'input[name="cc"]'
+        privacy: block
+        properties:
+          - name: value
+            extract: attr=value
+
+  # Under mask, exists: still resolves (presence is structure) while text does not.
+  - name: BillingAddress
+    selector: '.billing'
+    privacy: mask
+    properties:
+      - name: line1
+        extract: text
+      - name: present
+        extract: 'exists:PostcodeField'
+    children:
+      - name: PostcodeField
+        selector: 'input[name="zip"]'
+
+  # Attributes under mask: the four SEP-0013 interactive-state names still resolve
+  # (a closed set carrying state, not a value), while a data-* attribute does not.
+  # Naming data-account-id in an attr= extract is itself the declaration that it
+  # carries content, which is what makes the rule self-closing.
+  - name: SubscribeToggle
+    selector: '[role="switch"]'
+    privacy: mask
+    properties:
+      - name: on
+        extract: attr=checked
+      - name: account
+        extract: attr=data-account-id
+
+views:
+  - name: Checkout
+    route: /checkout/**
+    components:
+      - name: GuestEmailInput
+        selector: 'input[name="email"]'
+        privacy: mask
