@@ -1,0 +1,41 @@
+version: 1
+views:
+  # A bound path segment needs no properties: entry. The entry here names a
+  # query parameter, which the route cannot reach.
+  - name: ProductDetail
+    route: /shop/p/:product_id
+    properties:
+      - name: variant
+        extract: { from: url.query, path: variant }
+
+  # Renaming a bound segment: the explicit entry overrides the implicit binding.
+  - name: OrgSettings
+    route: /org/:org_id/settings
+    properties:
+      - name: tenant
+        extract: { from: url.path, path: org_id }
+
+  # Several bindings in one route, with no properties: at all.
+  - name: OrderLine
+    route: /orders/:order_id/lines/:line_id
+
+requests:
+  # One request carrying both entry shapes: URL-shaped and payload-shaped.
+  - name: GetOrder
+    route: /api/orders/:order_id
+    method: GET
+    properties:
+      - name: variant
+        extract: { from: url.query, path: variant }
+      - name: page
+        extract: { from: url.query, path: page }
+      - name: outcome
+        extract: { from: rsp.body, path: status }
+
+  # Payload-shaped only, unchanged from SEP-0005.
+  - name: SubmitPayment
+    route: /api/checkout/payment
+    method: POST
+    properties:
+      - name: rate_limit_remaining
+        extract: { from: rsp.headers, path: X-RateLimit-Remaining }

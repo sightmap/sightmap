@@ -18,10 +18,10 @@ related-discussions: []
 > PR #171, which introduced `source` and made `field` required whenever
 > `source` is a headers block; that PR is superseded and should be closed.
 >
-> One addressing gap is still open, as issue #187: `properties[]` can reach a
-> body or a header block, but not a query parameter or a path segment. PR #166
-> (SEP-0008) proposes the view-side half of that; the request-side half has no
-> proposal yet.
+> The URL case, deferred from that review as issue #187 so the `source` enum
+> could grow compatibly, is proposed by [SEP-0008](0008-url-properties.md)
+> (PR #166), which covers views and requests with one grammar: the `url.query`
+> and `url.path` sources of the SEP-0017 extract object.
 
 > **Amended by [SEP-0010](0010-tree-closed-component-properties.md):** the
 > `transform` field is removed from request `properties[]`. Fold any
@@ -234,7 +234,7 @@ Existing SDKs that encounter a `properties:` entry under a `request:` MUST treat
 ## Open questions
 
 1. **This SEP does not resolve** `schema.md`'s existing open question on validating `response.fields[]`'s *shape* against real traffic (enforcement, not extraction) — that's a distinct problem (type-checking a declared shape vs. naming a value to pull out) and stays open for a future SEP.
-2. **Dotted JSON keys in `field`.** A dot-separated path can't address a JSON key that itself contains a dot — `field: flags.checkout.new_flow` against `{"flags": {"checkout.new_flow": true}}` splits into three segments and misses, silently, at the second one. One option: let `field` accept a segment array (`field: [flags, "checkout.new_flow"]`) as an escape hatch alongside the dot-string form, so an author who hits this can opt into explicit segments instead of escaping syntax. Fullstory's own equivalent (`NetworkBodySelection.path`, a `repeated string` of pre-split segments — no dot-string at all) took the array-only route for exactly this reason, and has a passing test asserting a literal `"meta.version"` key resolves correctly. A consumer lowering this SEP's `field` into that type would lose expressiveness the backend already supports if `field` stays string-only.
+2. **Dotted JSON keys in `field`.** A dot-separated path can't address a JSON key that itself contains a dot — `field: flags.checkout.new_flow` against `{"flags": {"checkout.new_flow": true}}` splits into three segments and misses, silently, at the second one. One option: let `field` accept a segment array (`field: [flags, "checkout.new_flow"]`) as an escape hatch alongside the dot-string form, so an author who hits this can opt into explicit segments instead of escaping syntax. Some consumers already model the path as a list of pre-split segments rather than a dot-string, for exactly this reason. A consumer lowering this SEP's `field` into such a type would lose expressiveness it already has if `field` stays string-only.
 3. **Does `pattern` subsume `transform:`?** A regex with a capture group generalizes every case SEP-0003's fixed `transform:` enum handles (`first_number` ⊂ `pattern: '(\d[\d,.]*)'`, etc.), which raises whether the enum could be retired in favor of `pattern` alone. That's a change to SEP-0003 (already Accepted and implemented), not this SEP, and belongs in its own proposal. Worth noting the case is already half-proven in the implementation: `sightmap`'s Go `ApplyTransform` (`go/sightmap/property.go`) implements an undocumented seventh transform, `match:REGEX`, with capture-group-1 semantics, mirrored in `go/observe/properties.go` and both extension extractors and covered by `go/sightmap/property_test.go` — but it's absent from both SEP-0003's prose and `sightmap.schema.json`'s `transform` enum, so the Go loader currently accepts syntax the schema would reject.
 4. **Addressing URL path/query components.** `source` covers request/response bodies and header blocks, but not the request URL's own path segments or query parameters — there is no way to extract, say, a `?variant=` query value or an `/orders/:id` path-segment value as a property. `route` matches the path structurally and `status`/`method`/`duration` cover identity, but neither surfaces a query/path *value*. Deferred from v1; tracked in [issue #187](https://github.com/sightmap/sightmap/issues/187), so the `source` enum can grow compatibly later.
 
