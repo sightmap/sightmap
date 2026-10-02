@@ -2,9 +2,9 @@
 sep: 0016
 title: Tags on messages and signals
 author: Clint Ayres (@jurassix)
-status: Review
+status: Accepted
 created: 2026-09-29
-updated: 2026-09-29
+updated: 2026-10-02
 spec-version-target: 1
 related-issues: []
 related-discussions: []

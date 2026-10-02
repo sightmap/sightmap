@@ -2,7 +2,7 @@
 "@sightmap/sightmap": minor
 ---
 
-Add `privacy` to component entries (SEP-0009, Draft).
+Add `privacy` to component entries (SEP-0009).
 
 `privacy: block | mask | unmask` declares whether a capture consumer may retain the matched element's content. It applies to the element **and its subtree**, and the nearest enclosing declaration wins, so the common shape is a `mask` on a form with an `unmask` on the one field inside it that is safe to keep.
 
