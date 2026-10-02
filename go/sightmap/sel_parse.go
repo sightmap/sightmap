@@ -474,6 +474,16 @@ func (p *parser) parsePseudo(part *SelectorPart) error {
 			}
 			p.i++ // consume ','
 		}
+		// Reject a second :is()/:where() on the same compound selector
+		// instead of silently overwriting the first. The data model holds a
+		// single alternatives slice shared by :is() and :where(), so multiple
+		// occurrences (of either or mixed) cannot be represented; mirror the
+		// explicit rejection used for other out-of-scope CSS (sibling
+		// combinators, :nth-child()).
+		if len(part.Is) > 0 {
+			return fmt.Errorf("multiple :is()/:where() pseudo-classes on one compound selector are not supported" +
+				" — only one :is() or :where() is allowed per compound selector")
+		}
 		part.Is = alts
 		return nil
 
