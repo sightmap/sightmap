@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": false,
+        "diagnostics": [
+          { "code": "environment-ref-unresolved", "severity": "error" },
+          { "code": "environment-ref-unresolved", "severity": "error" },
+          { "code": "origin-ref-unresolved", "severity": "error" }
+        ]
+      }
+    }
+  ]
+}

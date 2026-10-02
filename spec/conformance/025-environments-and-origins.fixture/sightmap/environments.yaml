@@ -1,0 +1,45 @@
+version: 1
+# The SEP-0014 example corpus: four web environments (one with pattern
+# origins), three native ones sharing an app_id, and shared origins for
+# third-party hosts.
+environments:
+  - name: android-beta
+    platform: android
+    app_id: com.acme.app
+    build_type: beta
+    backend: staging
+  - name: android-prod
+    platform: android
+    app_id: com.acme.app
+    build_type: release
+    backend: prod
+  # No build_type: covers every variant of its app_id.
+  - name: ios-prod
+    platform: ios
+    app_id: com.acme.app
+    backend: prod
+  # platform omitted: defaults to web.
+  - name: local
+    origins:
+      api: http://localhost:8080
+      app: http://localhost:*
+  # preview and staging share an API host. Legal, but it identifies no
+  # session, so the validator notes it (origin-host-shared, a warning).
+  - name: preview
+    origins:
+      api: https://api.staging.acme.com
+      app: https://deploy-preview-*--acme.netlify.app
+  - name: prod
+    platform: web
+    origins:
+      api: https://api.acme.com
+      app: https://app.acme.com
+  - name: staging
+    origins:
+      api: https://api.staging.acme.com
+      app: https://app.staging.acme.com
+
+origins:
+  facebook: https://www.facebook.com
+  telemetry-eu: https://eu.telemetry.example.com
+  telemetry-us: https://us.telemetry.example.com
