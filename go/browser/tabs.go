@@ -139,13 +139,6 @@ func CreateTab(ctx context.Context, addr, url string) (targetID string, conn *CD
 	return target.ID, conn, err
 }
 
-// NewTab opens a new browser tab navigated to url (or about:blank if empty),
-// and returns a *CDPConn connected to it.
-func NewTab(ctx context.Context, addr, tabURL string) (*CDPConn, error) {
-	_, conn, err := CreateTab(ctx, addr, tabURL)
-	return conn, err
-}
-
 // CloseTab closes the tab identified by targetID.
 func CloseTab(ctx context.Context, addr, targetID string) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", "http://"+addr+"/json/close/"+targetID, nil)
