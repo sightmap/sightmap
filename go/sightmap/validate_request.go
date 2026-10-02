@@ -24,6 +24,21 @@ var requestPropertyNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 // Requests are read from Corpus.Requests and each View.Requests directly rather
 // than through a whole-corpus accessor: those dedupe by first-seen name, which
 // would skip a view-scoped request whose name matches a global one.
+// checkRequestRouteBindings applies the SEP-0008 binding rules to request routes.
+// Unlike views, requests have reserved identity names a binding must not shadow.
+func checkRequestRouteBindings(c *Corpus) []ValidationError {
+	var errs []ValidationError
+	for _, r := range c.Requests {
+		errs = append(errs, checkRouteBindings(r.Name, r.Route, ReservedRequestPropertyNames)...)
+	}
+	for _, v := range c.Views {
+		for _, r := range v.Requests {
+			errs = append(errs, checkRouteBindings(r.Name, r.Route, ReservedRequestPropertyNames)...)
+		}
+	}
+	return errs
+}
+
 func checkRequestProperties(c *Corpus) []ValidationError {
 	var errs []ValidationError
 	seen := map[string]bool{}
@@ -31,7 +46,7 @@ func checkRequestProperties(c *Corpus) []ValidationError {
 	check := func(reqs []RequestDef) {
 		for _, req := range reqs {
 			for _, prop := range req.Properties {
-				for _, e := range validateRequestProperty(req.Name, prop) {
+				for _, e := range validateRequestProperty(req.Name, req.Route, prop) {
 					// Dedupe on code + request + property so a request declared
 					// both globally and under a view reports once.
 					key := e.Code + "\x00" + req.Name + "\x00" + prop.Name
@@ -52,7 +67,7 @@ func checkRequestProperties(c *Corpus) []ValidationError {
 	return errs
 }
 
-func validateRequestProperty(reqName string, prop RequestPropertyDef) []ValidationError {
+func validateRequestProperty(reqName, route string, prop RequestPropertyDef) []ValidationError {
 	var errs []ValidationError
 
 	if !requestPropertyNamePattern.MatchString(prop.Name) {
@@ -70,6 +85,12 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 		return errs
 	}
 
+	// A URL-shaped entry (SEP-0008) reads the request URL, so none of the payload
+	// checks below apply.
+	if slices.Contains(URLExtractSources, prop.Extract.From) {
+		return append(errs, validateURLExtract(reqName, prop.Name, prop.Extract, route)...)
+	}
+
 	// from is required and closed. path+pattern compose, so both together is
 	// legal; only declaring neither is an error.
 	validSource := slices.Contains(RequestPropertySources, prop.Extract.From)
@@ -79,7 +100,7 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 			Code:      "request-property-source-invalid",
 			Severity:  SeverityError,
 			Message: fmt.Sprintf("request %q property %q reads from %q; must be one of %s",
-				reqName, prop.Name, prop.Extract.From, strings.Join(RequestPropertySources, ", ")),
+				reqName, prop.Name, prop.Extract.From, strings.Join(append(RequestPropertySources, URLExtractSources...), ", ")),
 		})
 	}
 

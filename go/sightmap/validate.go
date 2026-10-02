@@ -130,6 +130,8 @@ func Validate(c *Corpus) []ValidationError {
 
 	// State signals (SEP-0007 Component/View subset); see validate_signal.go.
 	errs = append(errs, checkSignals(c)...)
+	errs = append(errs, checkViewProperties(c)...)
+	errs = append(errs, checkRequestRouteBindings(c)...)
 
 	// Environments and origins (SEP-0014); see validate_environment.go.
 	errs = append(errs, checkEnvironments(c)...)

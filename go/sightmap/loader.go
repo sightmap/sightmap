@@ -92,16 +92,18 @@ type rawSnapshot struct {
 }
 
 type rawView struct {
-	Name        string         `yaml:"name"`
-	Route       string         `yaml:"route"`
-	URL         string         `yaml:"url"`
-	Description string         `yaml:"description"`
-	Memory      []string       `yaml:"memory"`
-	Components  []rawComponent `yaml:"components"`
-	Requests    []rawRequest   `yaml:"requests"`
-	Stability   string         `yaml:"stability"`
-	Tags        []string       `yaml:"tags"`
-	Access      *rawAccess     `yaml:"access"`
+	Name        string           `yaml:"name"`
+	Route       string           `yaml:"route"`
+	URL         string           `yaml:"url"`
+	Description string           `yaml:"description"`
+	Memory      []string         `yaml:"memory"`
+	Components  []rawComponent   `yaml:"components"`
+	Requests    []rawRequest     `yaml:"requests"`
+	Stability   string           `yaml:"stability"`
+	Tags        []string         `yaml:"tags"`
+	Properties  []rawURLProperty `yaml:"properties"`
+
+	Access *rawAccess `yaml:"access"`
 	// An explicit `[]` decodes to a non-nil empty slice and an absent key to
 	// nil, which is how validation tells environments-empty from omission.
 	Environments []string `yaml:"environments"`
@@ -132,6 +134,24 @@ type rawRequest struct {
 	Properties   []rawRequestProperty `yaml:"properties"`
 	Environments []string             `yaml:"environments"`
 	Origins      []string             `yaml:"origins"`
+}
+
+// toURLPropertyDefs converts raw view URL properties verbatim. Nil when none are
+// declared: a :name segment in the route binds implicitly and needs no entry.
+func toURLPropertyDefs(raws []rawURLProperty) []URLPropertyDef {
+	if len(raws) == 0 {
+		return nil
+	}
+	out := make([]URLPropertyDef, 0, len(raws))
+	for _, rp := range raws {
+		out = append(out, URLPropertyDef{Name: rp.Name, Extract: rp.Extract.url()})
+	}
+	return out
+}
+
+type rawURLProperty struct {
+	Name    string     `yaml:"name"`
+	Extract rawExtract `yaml:"extract"`
 }
 
 type rawRequestProperty struct {
@@ -315,12 +335,14 @@ func loadDir(path string) (*Corpus, error) {
 				viewURL = vf.URL
 			}
 			views = append(views, ViewDef{
-				Name:         rv.Name,
-				Route:        rv.Route,
-				Memory:       rv.Memory,
-				Components:   flattenAll(rv.Components, ctx, -1),
-				Requests:     toRequestDefs(rv.Requests, ctx),
-				Tags:         rv.Tags,
+				Name:       rv.Name,
+				Route:      rv.Route,
+				Memory:     rv.Memory,
+				Components: flattenAll(rv.Components, ctx, -1),
+				Requests:   toRequestDefs(rv.Requests, ctx),
+				Tags:       rv.Tags,
+				Properties: toURLPropertyDefs(rv.Properties),
+
 				Environments: rv.Environments,
 				Origins:      rv.Origins,
 				Stability:    rv.Stability,
