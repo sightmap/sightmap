@@ -1,0 +1,10 @@
+version: 1
+# a.yaml sorts first by source path, so its prod and cdn win and these lose:
+# environment-name-collision and origin-name-collision.
+environments:
+  - name: prod
+    origins:
+      app: https://www.acme.com
+
+origins:
+  cdn: https://static.acme.com

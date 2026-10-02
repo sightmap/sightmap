@@ -11,6 +11,15 @@
       "const": 1,
       "description": "Must be 1 for files that conform to this version of the spec."
     },
+    "environments": {
+      "type": "array",
+      "description": "Named deploy targets and each one's per-surface origins. Merged across every loaded file into one project-wide registry; on a name collision the first file by source path wins. See SEP-0014.",
+      "items": { "$ref": "#/$defs/environment" }
+    },
+    "origins": {
+      "$ref": "#/$defs/originMap",
+      "description": "Shared origins: hosts with the same URL in every environment, such as third-party endpoints. An environment's own origins override a shared entry of the same name. Never identifies a session. See SEP-0014."
+    },
     "url": {
       "type": "string",
       "description": "File-level default representative URL, applied to every view in this file that does not declare its own. See the per-view `url`."
@@ -51,6 +60,61 @@
     }
   },
   "$defs": {
+    "definitionName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "An environment or origin name. See SEP-0014."
+    },
+    "originUrl": {
+      "type": "string",
+      "pattern": "^https?://(\\*\\*\\.|[A-Za-z0-9-]*\\*[A-Za-z0-9-]*\\.)?[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*(:([1-9][0-9]{0,4}|\\*))?$",
+      "description": "scheme://host[:port] with http or https and no path, query, or fragment. Wildcards are allowed only in the leftmost host label (a label containing one *, or ** as the whole label) and as the port (*). See SEP-0014 Origin patterns."
+    },
+    "originMap": {
+      "type": "object",
+      "description": "Map of origin name to origin URL. See SEP-0014.",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/definitionName" },
+      "additionalProperties": { "$ref": "#/$defs/originUrl" }
+    },
+    "environment": {
+      "type": "object",
+      "description": "A named deploy target. A web environment (the default platform) is identified by its origins; a native one (ios, android) by its app_id and optional build_type, and borrows a web environment's origins through backend. See SEP-0014.",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/definitionName" },
+        "platform": {
+          "type": "string",
+          "enum": ["web", "ios", "android"],
+          "default": "web",
+          "description": "Which kind of deploy target this is. Defaults to web."
+        },
+        "app_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)*$",
+          "description": "Native only: the bundle ID (iOS) or application ID (Android) the app reports. Compared byte-for-byte."
+        },
+        "build_type": {
+          "type": "string",
+          "description": "Native only: the build variant or configuration name the app reports, matched verbatim. Separates environments that share one app_id; absent covers every variant."
+        },
+        "backend": {
+          "$ref": "#/$defs/definitionName",
+          "description": "Native only: the name of a web environment whose origins this environment borrows."
+        },
+        "origins": {
+          "$ref": "#/$defs/originMap",
+          "description": "Each surface's URL in this environment. Required for web; on a native environment, overrides the backend's entry of the same name."
+        }
+      },
+      "if": { "required": ["platform"], "properties": { "platform": { "enum": ["ios", "android"] } } },
+      "then": { "required": ["app_id"] },
+      "else": {
+        "required": ["origins"],
+        "not": { "anyOf": [{ "required": ["app_id"] }, { "required": ["build_type"] }, { "required": ["backend"] }] }
+      }
+    },
     "memory": {
       "type": "array",
       "description": "Freeform notes surfaced to agents at runtime in the [Guide] section.",
@@ -80,6 +144,16 @@
           "type": "string",
           "minLength": 1,
           "description": "Glob pattern matched against the URL pathname. * matches one segment, ** matches any depth."
+        },
+        "environments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/definitionName" },
+          "description": "Names of the environments this view exists in. Absent or empty means every environment. Declarative only: not a route-matching input. See SEP-0014."
+        },
+        "origins": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/definitionName" },
+          "description": "Names of the origins (surfaces) this view is served from, resolved per environment. Absent or empty means unconstrained. Declarative only: not a route-matching input. See SEP-0014."
         },
         "url": {
           "type": "string",
@@ -212,6 +286,16 @@
         "method": {
           "type": "string",
           "description": "HTTP method filter. Case-insensitive; commonly GET, POST, PUT, PATCH, DELETE."
+        },
+        "environments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/definitionName" },
+          "description": "Names of the environments this endpoint exists in. Absent or empty means every environment. A view-scoped request's effective environments are this list intersected with its view's. Declarative only: not a route-matching input. See SEP-0014."
+        },
+        "origins": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/definitionName" },
+          "description": "Names of the origins this endpoint is called on, resolved per environment. Absent or empty means unconstrained. Not inherited from an enclosing view. Declarative only: not a route-matching input. See SEP-0014."
         },
         "description": { "type": "string" },
         "source": { "type": "string" },

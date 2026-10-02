@@ -47,6 +47,10 @@ func TestSpecConformance_ComponentWatchFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-component-watch.fixture")
 }
 
+func TestSpecConformance_EnvironmentFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-environment*.fixture")
+}
+
 func runSpecValidateFixtures(t *testing.T, glob string) {
 	t.Helper()
 	const root = "../../spec/conformance"

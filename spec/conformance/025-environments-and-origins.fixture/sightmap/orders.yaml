@@ -1,0 +1,33 @@
+version: 1
+# References resolve across files: every environment and origin named here is
+# defined in environments.yaml.
+views:
+  - name: OrderHistory
+    route: "/ui/*/settings/orders/history"
+    environments: [local, preview, prod, staging]
+    origins: [app]
+    requests:
+      - name: ListOrders
+        route: /orders
+        method: GET
+        origins: [api]
+      # A shared origin, referenced exactly like a per-environment one.
+      - name: FacebookPixel
+        route: /tr
+        method: GET
+        origins: [facebook]
+  - name: OrderHistoryScreen
+    route: /orders/history
+    environments: [android-beta, android-prod, ios-prod]
+    requests:
+      # api resolves through each native environment's backend.
+      - name: SyncOrders
+        route: /orders/sync
+        method: POST
+        origins: [api]
+requests:
+  # No environments: exists everywhere. Sent to either regional host.
+  - name: SendTelemetry
+    route: /v1/events
+    method: POST
+    origins: [telemetry-eu, telemetry-us]

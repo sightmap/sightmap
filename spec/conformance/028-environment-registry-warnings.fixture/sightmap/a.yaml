@@ -1,0 +1,38 @@
+version: 1
+environments:
+  # admin resolves in prod but not staging, and is not in the shared map:
+  # origin-environment-gap.
+  - name: prod
+    origins:
+      admin: https://admin.acme.com
+      app: https://app.acme.com
+  - name: staging
+    origins:
+      app: https://app.staging.acme.com
+  # Same platform, app_id, and build_type: the same target under two names
+  # (environment-duplicate).
+  - name: android-release
+    platform: android
+    app_id: com.acme.app
+    build_type: release
+    backend: prod
+  - name: android-store
+    platform: android
+    app_id: com.acme.app
+    build_type: release
+    backend: prod
+
+origins:
+  cdn: https://cdn.acme.com
+
+views:
+  - name: Settings
+    route: /settings
+    # Explicit empty lists mean the same as absent ones: environments-empty
+    # and origins-empty.
+    environments: []
+    requests:
+      - name: SaveSettings
+        route: /settings
+        method: PUT
+        origins: []

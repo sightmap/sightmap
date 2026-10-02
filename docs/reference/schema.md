@@ -25,6 +25,8 @@ This document is the human-readable reference. The machine-readable contract is 
 
 ```yaml
 version: 1
+environments: # optional, Environment[]: named deploy targets (see "Environments and origins")
+origins:     # optional, map of origin name to URL: shared origins
 memory:      # optional, string[] — file-level notes (see "Memory")
 views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
@@ -35,6 +37,8 @@ messages:    # optional, Message[] — console/exception patterns
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `version` | integer | yes | Must be `1`. |
+| `environments` | [Environment](#environment)[] | no | Named deploy targets and each one's per-surface origins. Merged across files into one project-wide registry. See [Environments and origins](#environments-and-origins). |
+| `origins` | map of name to [origin URL](#origin-urls) | no | Shared origins: hosts with the same URL in every environment. See [Environments and origins](#environments-and-origins). |
 | `memory` | string[] | no | File-level memory entries. Surfaced as context to the agent for any view in this file. |
 | `views` | [View](#view)[] | no | Views defined in this file. |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
@@ -60,6 +64,8 @@ A named screen in the app, identified by a URL route.
 |---|---|---|---|
 | `name` | string | yes | Shown in the snapshot header. Should be unique across the sightmap. |
 | `route` | string | yes | Glob pattern matched against the URL pathname. See [Route matching](#route-matching). |
+| `environments` | string[] | no | Names of the environments this view exists in. Absent or empty means every environment. See [Environments and origins](#environments-and-origins). |
+| `origins` | string[] | no | Names of the origins this view is served from, resolved per environment. Absent or empty means unconstrained. |
 | `url` | string | no | Representative URL for this view — a concrete address that resolves to it. Tooling uses it to navigate to the view (e.g. coverage reporting and bulk capture/probe). A file-root `url` supplies a default for every view in the file that omits its own. |
 | `stability` | string | no | Authoring-confidence marker: `stub` or `deferred`. See [Stability](#stability). |
 | `description` | string | no | Free-text. Not surfaced at runtime but useful for PR review and future maintenance. |
@@ -193,6 +199,8 @@ A named API endpoint.
 | `name` | string | yes | Shown in network list and detail output. |
 | `route` | string | yes | Glob pattern. Express-style `:param` segments are normalized to `*`. See [Route matching](#route-matching). |
 | `method` | string | no | HTTP method filter (`GET`, `POST`, …). Match-any if omitted. |
+| `environments` | string[] | no | Names of the environments this endpoint exists in. Absent or empty means every environment; a view-scoped request is further limited to its view's. See [Environments and origins](#environments-and-origins). |
+| `origins` | string[] | no | Names of the origins this endpoint is called on, resolved per environment. Absent or empty means unconstrained. Never inherited from the enclosing view. |
 | `description` | string | no | What the endpoint does. |
 | `source` | string | no | Relative path to the source file. |
 | `request` | [Payload](#payload) | no | Expected payload shape. |
@@ -451,6 +459,133 @@ For example, given `/users/*` (score 4) and `/users/admin` (score 6), the URL `/
 
 Requests are matched independently. Every request whose `route` matches the URL — and whose optional `method` matches the request method — is applied. There is no "winning" request; all matches contribute to the enriched output.
 
+## Environments and origins
+
+A corpus can say *where* its views and requests run, not only what they are. A file-root `environments` array defines named **deploy targets** (`staging`, `prod`, `android-beta`), and a file-root `origins` map defines **shared origins**: hosts that are the same in every deploy target, like a tracking pixel or a vendor endpoint. Views and requests then reference both by name. See [SEP-0014](https://github.com/sightmap/sightmap/blob/main/spec/seps/0014-environments-and-origins.md) for the full proposal and rationale.
+
+```yaml
+version: 1
+environments:
+  - name: android-prod
+    platform: android
+    app_id: com.acme.app
+    build_type: release
+    backend: prod
+  - name: preview
+    origins:
+      api: https://api.staging.acme.com
+      app: https://deploy-preview-*--acme.netlify.app
+  - name: prod
+    origins:
+      api: https://api.acme.com
+      app: https://app.acme.com
+  - name: staging
+    origins:
+      api: https://api.staging.acme.com
+      app: https://app.staging.acme.com
+
+origins:
+  facebook: https://www.facebook.com
+
+views:
+  - name: OrderHistory
+    route: /orders/history
+    environments: [preview, prod, staging]
+    origins: [app]
+    requests:
+      - name: ListOrders
+        route: /orders
+        method: GET
+        origins: [api]
+      - name: FacebookPixel
+        route: /tr
+        method: GET
+        origins: [facebook]
+```
+
+An environment answers "which deploy target"; an origin answers "which host". A deploy target is what a session belongs to and what a corpus is published to. A **surface** (`app`, `api`) is a host a deploy target serves pages from or calls, so `api` is one name and each environment says what its API host is.
+
+### Environment
+
+| Field | Type | Applies to | Required | Description |
+|---|---|---|---|---|
+| `name` | string | all | yes | Matches `^[a-z][a-z0-9_-]*$`. Unique among environments. |
+| `platform` | `web` \| `ios` \| `android` | all | no, default `web` | Which kind of deploy target this is. |
+| `origins` | map of name to [origin URL](#origin-urls) | all | web: yes; native: no | Each surface's URL in this environment. On a native environment it overrides the `backend`'s entry of the same name. |
+| `app_id` | string | native | yes | The bundle ID (iOS) or application ID (Android) the app reports: dot-separated segments of `[A-Za-z0-9_-]`. |
+| `build_type` | string | native | no | The build variant or configuration name the app reports, matched verbatim. Separates environments that share one `app_id`. |
+| `backend` | string | native | no | The name of a **web** environment whose origins this environment borrows. |
+
+A web environment (`platform` absent or `web`) is identified by its origins, MUST define `origins`, and MUST NOT set `app_id`, `build_type`, or `backend`. A native environment (`ios` or `android`) is identified by its `app_id` and optional `build_type`; it has no page hosts of its own and borrows a web environment's origins through `backend`. `backend` MUST name a web environment, so backends never chain.
+
+### Origin URLs
+
+Origin names match `^[a-z][a-z0-9_-]*$`. An origin URL is `scheme://host[:port]` with an `http` or `https` scheme and no path, query, or fragment. The port, when present, is 1 to 65535.
+
+An origin URL can be a **pattern** naming a set of origins, with wildcards in exactly three positions:
+
+- **`*` inside the leftmost host label** matches one or more characters within that label: `https://deploy-preview-*--acme.netlify.app`, `https://*.preview.acme.com`.
+- **`**` as the whole leftmost host label** matches one or more labels: `https://**.acme.com` matches `app.acme.com` and `app.staging.acme.com`.
+- **`*` as the port** matches any port, or none: `http://localhost:*`.
+
+The scheme never carries a wildcard, and a host pattern never matches its own bare suffix (`https://*.acme.com` does not match `https://acme.com`). A pattern is something to match against, not an address: a consumer can test a session's origin against it or anchor a request matcher with it, but cannot navigate to it.
+
+### Registries and references
+
+Environment definitions from every loaded file form one project-wide registry, and shared origins another, with the same lookup scope [component references](#component-references) use. Two environments sharing a `name`, or two shared origins sharing a name, collide: the one from the first file by source path wins.
+
+A view's or request's `environments` and `origins` hold bare names, never definitions; a file root holds definitions, never bare names. Every environment reference MUST name a defined environment, and every origin reference MUST name an origin defined in some environment's `origins` or in the shared map.
+
+**Absent or empty means unconstrained.** A view or request with no `environments` exists in every environment; with no `origins`, it may be served from any origin its environment defines. An explicit `[]` means the same as an absent list, so an accidentally emptied list does not flip an entity from matching everywhere to matching nothing.
+
+**View-scoped requests.** A view-scoped request exists only where its view exists: its effective environments are its own list intersected with its view's, where an absent list on either side contributes no constraint. `origins` are **not** inherited, because a page and the endpoints it calls routinely live on different hosts.
+
+### Origin resolution
+
+An origin name resolves, for a given environment, by checking in order:
+
+1. the environment's own `origins`;
+2. for a native environment, its `backend`'s `origins`;
+3. the shared `origins` map.
+
+The first match is the URL; with no match, the name resolves to nothing in that environment. Each step overrides the ones below it, so any environment can override a shared entry, and a native build can point one host somewhere other than its backend's.
+
+### Session membership
+
+A **web** session belongs to the web environment with the most specific origin matching the session's origin. Shared origins and native environments' origins never identify a session. Specificity follows route matching's rule:
+
+1. A literal origin beats any pattern.
+2. Between patterns, compare host labels from the right. At the first label where they differ, a literal label beats a label containing `*`, which beats a bare `*`, which beats `**`. A pattern with more labels beats one with fewer when every shared label is equally specific.
+3. A literal port beats `:*`.
+
+If the most specific matches belong to more than one web environment, the session belongs to none of them. Matching compares host and port only, not scheme, after lowercasing the host and dropping a port of 80 or 443. A consumer that cannot observe a session's port compares the host alone and resolves to nothing when that is ambiguous.
+
+A **native** session belongs to the environment whose `platform` and `app_id` match its app, preferring one whose `build_type` matches the session's build variant verbatim; an environment with no `build_type` covers every variant of its `app_id`. App IDs compare byte-for-byte. Where a platform reports no build variant, a declared `build_type` matches nothing, so declare at most one environment per `app_id` on such a platform.
+
+### Not a route-matching input
+
+A URL matches a view or request by path alone, exactly as in [Route matching](#route-matching). A session outside an entity's environments, or a URL outside its origins, still matches that entity's route. Environments and origins are data about an entity for consumers to use as they need: choosing a publish target, compiling host-scoped page definitions per environment, anchoring request matchers.
+
+`url:` is complementary. It is one concrete, navigable address and implies neither an environment nor an origin; a consumer MUST NOT derive either from it.
+
+### Diagnostics
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `environment-invalid` | error | An environment breaks the web/native shape rules: a web environment without `origins` or with `app_id`, `build_type`, or `backend`; a native one without a valid `app_id`; or an invalid `name` or `platform`. |
+| `origin-invalid` | error | An origin name or URL breaks the [origin URL](#origin-urls) grammar, including a port above 65535. |
+| `environment-backend-invalid` | error | A `backend` names no environment, or names a native one. |
+| `environment-ref-unresolved` | error | A view or request names an environment that is not defined. |
+| `origin-ref-unresolved` | error | A view or request names an origin that no environment and no shared map defines. |
+| `environment-name-collision` | warning | Two environments share a `name`; the first by source-file path wins. |
+| `origin-name-collision` | warning | Two shared origins share a name; the first by source-file path wins. |
+| `origin-environment-gap` | warning | An origin name resolves in some web environments but not others. A name in the shared map resolves everywhere and never produces this. |
+| `origin-host-shared` | warning | Two web environments define the same origin, compared on host and port. Sharing alone is legal, but that host identifies no session; a host several environments call belongs in the shared map. |
+| `environment-duplicate` | warning | Two native environments share `platform`, `app_id`, and `build_type`: the same target under two names. |
+| `environments-empty`, `origins-empty` | warning | A view or request declares an explicit empty list, which means the same as omitting it. |
+
+A corpus that declares neither field anywhere produces none of these.
+
 ## Global vs view-scoped
 
 Components and requests can be declared at the file root or nested inside a view.
@@ -619,6 +754,10 @@ A conforming SDK:
 - MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
 - MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
 - MUST reject a `MessageProperty` with a `source` other than `stack`, or one that omits `field`, or whose `pattern` is not a valid RE2 regular expression
+- MUST reject an environment that breaks the web/native shape rules, an invalid origin URL, a `backend` that names no environment or a native one, and an environment or origin reference that resolves to no definition (see [Environments and origins](#environments-and-origins))
+- MUST build one project-wide environment registry and one shared-origin registry, the first by source-file path winning on a name collision, and MUST resolve an origin for an environment from its own `origins`, then its `backend`'s, then the shared map
+- MUST treat an absent or empty view- or request-level `environments`/`origins` list as unconstrained, MUST intersect a view-scoped request's environments with its view's, and MUST NOT inherit a view's `origins` into its requests
+- MUST NOT treat `environments` or `origins` as an input to route matching, and MUST NOT derive either from `url:`
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. a consumer that never surfaces `description` at runtime)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
@@ -631,8 +770,9 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
 - MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
+- MUST assign a session to an environment as specified in [Session membership](#session-membership): a web session to the web environment with the most specific matching origin (and to none when the most specific matches span several), comparing host and port only; a native session by `platform` and `app_id`, matching `build_type` verbatim and treating an environment with no `build_type` as covering every variant
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern` and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern`, matches no `messages:` entry against a console record, and assigns no session to an environment. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

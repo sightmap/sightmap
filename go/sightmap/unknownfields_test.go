@@ -299,3 +299,70 @@ messages:
 		t.Fatalf("want 1 unknown-field for the typo, got %d: %v", len(w), w)
 	}
 }
+
+// Each SEP-0014 allowlist must be complete, or a conforming corpus warns.
+func TestUnknownField_EnvironmentsNoFalsePositives(t *testing.T) {
+	w := unknownWarnings(t, `
+version: 1
+environments:
+  - name: prod
+    platform: web
+    origins:
+      api: https://api.acme.com
+  - name: android-prod
+    platform: android
+    app_id: com.acme.app
+    build_type: release
+    backend: prod
+    origins:
+      api: https://api.android.acme.com
+origins:
+  facebook: https://www.facebook.com
+requests:
+  - name: Pixel
+    route: /tr
+    method: GET
+    environments: [prod]
+    origins: [facebook]
+views:
+  - name: Home
+    route: /
+    environments: [prod]
+    origins: [api]
+    requests:
+      - name: List
+        route: /list
+        environments: [prod]
+        origins: [api]
+`)
+	if len(w) != 0 {
+		t.Fatalf("valid environments/origins must not warn: %v", w)
+	}
+}
+
+func TestUnknownField_EnvironmentTypo(t *testing.T) {
+	w := unknownWarnings(t, `
+version: 1
+environments:
+  - name: ios-prod
+    platform: ios
+    appid: com.acme.app
+`)
+	if len(w) != 1 {
+		t.Fatalf("want 1 unknown-field for the typo, got %d: %v", len(w), w)
+	}
+}
+
+func TestFieldTypeInvalid_EnvironmentBuildTypeUnquoted(t *testing.T) {
+	got := findingsWithCode(t, "field-type-invalid", `
+version: 1
+environments:
+  - name: android-1
+    platform: android
+    app_id: com.acme.app
+    build_type: 1
+`)
+	if len(got) != 1 {
+		t.Fatalf("want 1 field-type-invalid for an unquoted build_type, got %v", got)
+	}
+}
