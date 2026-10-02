@@ -10,13 +10,6 @@ related-issues: []
 related-discussions: []
 ---
 
-> **Accepted 2026-09-29. Partially implemented.** `tags` on `Component` and
-> `Request` ship end to end, covered by conformance fixture 017. `View.tags` is
-> in `spec/v1/sightmap.schema.json` but absent from the Go SDK: `ViewDef`
-> carries no `Tags` field, and the loader's view field allowlist omits `tags`,
-> so a corpus carrying a view tag validates under ajv and is rejected by the Go
-> loader. Closing that divergence is outstanding.
-
 ## Summary
 
 Add an optional `tags: string[]` field to `Component`, `View`, and `Request` entries. A tag
@@ -441,4 +434,4 @@ merged-but-unimplemented spec change.
   extraction ran into); that behavior is asserted by each SDK's own test suite instead.
 - Reference implementation: the component case's union-across-levels resolution is
   implemented and unit-tested in a consumer today. The view and request cases are new in
-  this SEP and not yet implemented anywhere. Cited for provenance, not as a checkable link.
+  this SEP; the reference Go SDK implements all three (`Corpus.TagsForURL` for views).

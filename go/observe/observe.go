@@ -15,10 +15,13 @@ import (
 // ComponentMatch in Matches carries any resolved property values
 // (ComponentMatch.Properties), computed offline by the matcher over the tree.
 type Result struct {
-	Root        *sightmap.ComponentNode
-	URL         string
-	Matches     map[*sightmap.ComponentNode]*sightmap.ComponentMatch
-	View        *sightmap.ViewDef
+	Root    *sightmap.ComponentNode
+	URL     string
+	Matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch
+	View    *sightmap.ViewDef
+	// ViewTags is the union of tags across every view matching the URL (SEP-0004),
+	// not only View's, so a broad tagged view is never shadowed by the winner.
+	ViewTags    []string
 	Components  []sightmap.ComponentDef
 	GlobalNames map[string]bool
 
@@ -65,15 +68,22 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 		return nil, err
 	}
 
+	return apply(root, url, corpus, opts), nil
+}
+
+// apply annotates an extracted tree with corpus (when non-nil). It is the
+// browser-free half of Page.
+func apply(root *sightmap.ComponentNode, url string, corpus *sightmap.Corpus, opts Options) *Result {
 	res := &Result{Root: root, URL: url}
 	if corpus == nil {
-		return res, nil
+		return res
 	}
 	res.CorpusApplied = true
 
 	m := match.NewMatcher(corpus)
 	res.Matches = m.Match(root, url)
 	res.View = corpus.ViewForURL(url)
+	res.ViewTags = corpus.TagsForURL(url)
 	res.Components = m.Components(url)
 	res.GlobalNames = corpus.GlobalComponentNames()
 	res.Coverage = coverage.Score(root, res.Matches, coverage.Options{VisibleOnly: opts.VisibleOnly})
@@ -84,5 +94,5 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	res.TiedViews = corpus.TiedViews(url)
 	res.ComponentConflicts = m.Conflicts(root, url)
 
-	return res, nil
+	return res
 }
