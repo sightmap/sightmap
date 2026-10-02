@@ -68,6 +68,7 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 		if q.Def != nil {
 			cm.Memory = q.Def.Memory
 			cm.Tags = q.Def.Tags
+			cm.Watch = q.Def.Watch
 			defByNode[node] = q.Def
 		}
 		result[node] = cm
@@ -76,7 +77,11 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 	// Resolve declared component properties over the matched tree (SEP-0010):
 	// text/attr read the node itself; PATH.prop and exists:PATH resolve a
 	// descendant matched component. No live DOM is required.
-	resolveComponentProperties(result, defByNode)
+	privacy := effectivePrivacy(root, defByNode)
+	for node, cm := range result {
+		cm.Privacy = privacy[node]
+	}
+	resolveComponentProperties(result, defByNode, privacy)
 	return result
 }
 

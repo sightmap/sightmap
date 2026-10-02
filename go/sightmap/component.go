@@ -40,9 +40,15 @@ type ComponentPropertyDef struct {
 // its resolved property values (Properties, in the definition's order; nil
 // unless the component declares properties that resolved).
 type ComponentMatch struct {
-	Name       string
-	Memory     []string
-	Tags       []string
+	Name   string
+	Memory []string
+	Tags   []string
+	// Privacy is the node's effective capture directive (SEP-0009): the declaration
+	// of the nearest enclosing matched component, this one included. "" when no
+	// enclosing component declares one.
+	Privacy string
+	// Watch is this component's own declaration (SEP-0015); it never inherits.
+	Watch      bool
 	Properties []PropertyValue
 }
 

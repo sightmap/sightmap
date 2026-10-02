@@ -13,11 +13,12 @@ import (
 // see sibling and descendant matches.
 //
 // A property is dropped silently when it does not resolve: empty text, an
-// attribute the node does not carry, or a PATH that matches no descendant
-// component.
+// attribute the node does not carry, a PATH that matches no descendant
+// component, or a value read from a node whose effective privacy withholds it.
 func resolveComponentProperties(
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
+	privacy map[*sightmap.ComponentNode]string,
 ) {
 	for node, cm := range result {
 		def := defByNode[node]
@@ -26,7 +27,7 @@ func resolveComponentProperties(
 		}
 		var props []sightmap.PropertyValue
 		for _, p := range def.Properties {
-			if v, ok := resolveExtract(node, p.Extract, result, defByNode); ok {
+			if v, ok := resolveExtract(node, p.Extract, result, defByNode, privacy); ok {
 				props = append(props, sightmap.PropertyValue{Name: p.Name, Value: v})
 			}
 		}
@@ -34,14 +35,63 @@ func resolveComponentProperties(
 	}
 }
 
+// effectivePrivacy resolves SEP-0009 privacy for every node under root: a
+// matched component's declaration applies to its subtree, and the nearest
+// enclosing declaration wins. Nodes with no enclosing declaration are absent.
+func effectivePrivacy(
+	root *sightmap.ComponentNode,
+	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
+) map[*sightmap.ComponentNode]string {
+	out := map[*sightmap.ComponentNode]string{}
+	var walk func(n *sightmap.ComponentNode, inherited string)
+	walk = func(n *sightmap.ComponentNode, inherited string) {
+		if def := defByNode[n]; def != nil && def.Privacy != "" {
+			inherited = def.Privacy
+		}
+		if inherited != "" {
+			out[n] = inherited
+		}
+		for _, c := range n.Children {
+			walk(c, inherited)
+		}
+	}
+	walk(root, "")
+	return out
+}
+
+// withholds reports whether a value read locally from a node with effective
+// privacy p must not be surfaced (SEP-0009): content is withheld under block and
+// mask, except that mask permits the interactive-state attributes. PATH.prop and
+// exists: read another node and are judged there instead.
+func withholds(p, extract string) bool {
+	if p != "block" && p != "mask" {
+		return false
+	}
+	switch {
+	case extract == "text", extract == "raw_text":
+		return true
+	case strings.HasPrefix(extract, "attr="):
+		return p == "block" || !sightmap.IsStateAttr(extract[len("attr="):])
+	}
+	return false
+}
+
 // resolveExtract resolves one extract directive against node. References descend
 // only, so recursion strictly enters smaller subtrees and always terminates.
+//
+// Privacy is judged at the node a value is read from: a PATH.prop recurses into
+// the target, whose own effective privacy then applies, so an unrestricted
+// ancestor cannot surface a value out of a blocked descendant.
 func resolveExtract(
 	node *sightmap.ComponentNode,
 	extract string,
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
+	privacy map[*sightmap.ComponentNode]string,
 ) (string, bool) {
+	if withholds(privacy[node], extract) {
+		return "", false
+	}
 	switch {
 	case extract == "text":
 		// Prefer the accessible name; fall back to the node's rendered text
@@ -77,10 +127,11 @@ func resolveExtract(
 		return v, ok && v != ""
 
 	case strings.HasPrefix(extract, "exists:"):
-		if resolvePath(node, extract[len("exists:"):], result) != nil {
-			return "true", true
+		target := resolvePath(node, extract[len("exists:"):], result)
+		if target == nil || privacy[target] == "block" {
+			return "", false
 		}
-		return "", false
+		return "true", true
 
 	default: // PATH.prop
 		dot := strings.LastIndex(extract, ".")
@@ -98,7 +149,7 @@ func resolveExtract(
 		prop := extract[dot+1:]
 		for _, tp := range tdef.Properties {
 			if tp.Name == prop {
-				return resolveExtract(target, tp.Extract, result, defByNode)
+				return resolveExtract(target, tp.Extract, result, defByNode, privacy)
 			}
 		}
 		return "", false
