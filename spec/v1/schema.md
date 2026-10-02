@@ -136,25 +136,50 @@ A component may declare `properties: Property[]` — named values surfaced along
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Key used in the annotation (`name="value"`). Must match `^[a-z][a-z0-9_]*$`, and must be unique within a component. The name `value` is reserved: it may be declared to override the AX built-in, and SDKs MUST prefer a declared `value` over the AX tree's own value. |
-| `extract` | string | yes | Extraction directive (see below). |
+| `extract` | [Extract](#extract) | yes | How the value is read. A component reads one of the sources below. |
 
-**Extract grammar.** The `extract` value is exactly one of the following forms; any other value is invalid and MUST be rejected by validation.
+**Sources.** A component property's `extract.from` is one of the following; any other value is invalid and MUST be rejected by validation.
 
-| Form | Resolves to |
-|---|---|
-| `text` | the node's accessible text (implementation-defined accessible name) |
-| `raw_text` | the node's own literal text: its direct text-node children, whitespace-normalized. Excludes descendant-element text and CSS `::before`/`::after` (which are not child nodes). See [SEP-0013](../seps/0013-richer-node-data.md). |
-| `attr=NAME` | the value of attribute `NAME` carried on the node's observed attribute set; omitted if the node does not carry it |
-| `PATH.prop` | the value extracted for property `prop` of the descendant component addressed by `PATH` |
-| `exists:PATH` | `"true"` if `PATH` resolves to at least one matched component; omitted otherwise (boolean state flag) |
+| `from` | `path` | Resolves to |
+|---|---|---|
+| `dom.text` | none | the node's accessible text (implementation-defined accessible name) |
+| `dom.raw_text` | none | the node's own literal text: its direct text-node children, whitespace-normalized. Excludes descendant-element text and CSS `::before`/`::after` (which are not child nodes). See [SEP-0013](../seps/0013-richer-node-data.md). |
+| `dom.attr` | attribute name | the value of that attribute as carried on the node's observed attribute set; omitted if the node does not carry it |
+| `dom.state` | `checked`, `selected`, `disabled` or `expanded` | the node's current interactive state, `"true"`/`"false"` (`"mixed"` for an indeterminate checkbox), where the consumer carries it; omitted otherwise. See [SEP-0013](../seps/0013-richer-node-data.md). |
+| `component` | `PATH.prop` | the value extracted for property `prop` of the descendant component addressed by `PATH` |
+| `component.exists` | `PATH` | `"true"` if `PATH` resolves to at least one matched component; omitted otherwise (boolean state flag) |
 
-`PATH` is a dotted sequence of component names naming a descendant, each segment resolved first-match (in document order) within the previous segment's matched subtree (`Price`, `Row.Price`). In a `PATH.prop` value reference the final segment is a property name; in `exists:PATH` the whole path names components. References descend only — a property may address a component nested beneath the one declaring it, never a parent, sibling, or cousin — so resolution is a bottom-up pass over a DAG. To surface a value from a sub-element, promote that sub-element to a declared child component and reference it.
+```yaml
+- name: ProductCard
+  selector: '.product'
+  properties:
+    - name: title
+      extract: { from: dom.text }
+    - name: price                       # "$10.95" out of "Add to cart · $10.95"
+      extract: { from: dom.raw_text, pattern: '\$([\d.]+)' }
+    - name: tags                        # every Tag, joined: "sale,featured"
+      extract: { from: component, path: Tag.value, join: ',' }
+    - name: sold_out
+      extract: { from: component.exists, path: SoldOutBadge }
+  children:
+    - name: Tag
+      selector: '.tag'
+      properties:
+        - name: value
+          extract: { from: dom.text }
+    - name: SoldOutBadge
+      selector: '.sold-out'
+```
 
-The observed attribute set read by `attr=NAME` is implementation-defined: which attributes a node carries depends on the consumer (a web SDK may carry a fixed allowlist plus `aria-*`/`data-*`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
+`PATH` is a dotted sequence of component names naming a descendant, each segment resolved first-match (in document order) within the previous segment's matched subtree (`Price`, `Row.Price`). With `join`, each segment resolves to every match instead, and the values are joined (see [Extract](#extract)). For `from: component` the final segment of `path` is a property name; for `component.exists` the whole path names components. References descend only — a property may address a component nested beneath the one declaring it, never a parent, sibling, or cousin — so resolution is a bottom-up pass over a DAG. To pick one match out of several, declare a component whose selector matches only that one (`.tab[aria-selected="true"]`) and read it.
 
-**`text` vs `raw_text`.** `text` is the node's accessible name — what a user perceives as its label, which may weld in text from `aria-label`, an associated `<label>`, or CSS pseudo-content. `raw_text` is the node's own author-written text (its direct text-node children only), computed identically on every consumer, live or offline: the deterministic escape for when the accessible name is polluted, or when the literal source text is what you want. The two are the ends of a spectrum — everything perceived, versus the literal author text. See [SEP-0013](../seps/0013-richer-node-data.md).
+The observed attribute set read by `dom.attr` is implementation-defined: which attributes a node carries depends on the consumer (a web SDK may carry a fixed allowlist plus `aria-*`/`data-*`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
 
-**Value omission is silent** — a property whose `text` is empty, whose attribute is not carried, or whose `PATH` matches nothing is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
+**`dom.text` vs `dom.raw_text`.** `dom.text` is the node's accessible name — what a user perceives as its label, which may weld in text from `aria-label`, an associated `<label>`, or CSS pseudo-content. `dom.raw_text` is the node's own author-written text (its direct text-node children only), computed identically on every consumer, live or offline: the deterministic escape for when the accessible name is polluted, or when the literal source text is what you want. The two are the ends of a spectrum — everything perceived, versus the literal author text. See [SEP-0013](../seps/0013-richer-node-data.md).
+
+**`dom.attr` vs `dom.state`.** `dom.attr` reads the markup: `path: checked` is the `checked` attribute as authored, which records a control's initial state. `dom.state` reads the control's current state from the consumer's accessibility layer. They are different stores and never stand in for each other.
+
+**Value omission is silent** — a property whose text is empty, whose attribute is not carried, whose `pattern` does not match, or whose `PATH` matches nothing is simply dropped from the annotation; consumers MUST NOT treat omission as an error.
 
 ## Request
 
@@ -209,47 +234,46 @@ A named API endpoint.
   route: /api/checkout/pay
   method: POST
   properties:
-    # A JSON body value: `field` is an object-key path within `source`.
+    # A JSON body value: `path` is an object-key path within the body.
     - name: outcome
-      source: rsp.body
-      field: status
+      extract: { from: rsp.body, path: status }
 
 - name: CheckoutRetryPayment
   route: /api/checkout/pay/retry
   method: POST
   properties:
-    # A header value refined by a regex: `field` names the header, `pattern`
+    # A header value refined by a regex: `path` names the header, `pattern`
     # extracts a substring from what it resolves to.
     - name: rate_limit_remaining
-      source: rsp.headers
-      field: X-RateLimit-Remaining
-      pattern: '(\d+)'
+      extract: { from: rsp.headers, path: X-RateLimit-Remaining, pattern: '(\d+)' }
 
 - name: LegacyCheckoutCallback
   route: /api/checkout/callback
   method: POST
   properties:
-    # No `field`: the response is form-encoded, so there's no JSON body to
-    # traverse — `pattern` scans the raw source text directly.
+    # No `path`: the response is form-encoded, so there's no JSON body to
+    # traverse; `pattern` scans the raw body text directly.
     - name: legacy_outcome
-      source: rsp.body
-      pattern: '(?:declined|approved|deferred)'
+      extract: { from: rsp.body, pattern: '(?:declined|approved|deferred)' }
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
-| `source` | string | yes | Which root to read from: `req.body`, `rsp.body`, `req.headers`, or `rsp.headers`. |
-| `field` | string | see below | The value to select within `source`. For a `.body` source, an object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). For a `.headers` source, a header name matched case-insensitively; **required** whenever `source` is a headers source. |
-| `pattern` | string | see below | An [RE2](#regular-expressions) regex applied to whatever `field` resolved, or to the raw source text when `field` is absent. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
+| `extract` | [Extract](#extract) | yes | How the value is read. A request reads one of the sources below. |
 
-At least one of `field`/`pattern` is required — the two compose: `field` selects a value, `pattern` optionally extracts a substring from it. `source` is always required, and when it names a headers source `field` is required too (a bare regex across a raw header block is the addressing foot-gun this shape removes). `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`).
+| `from` | `path` |
+|---|---|
+| `req.body`, `rsp.body` | An object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). Optional when `pattern` is set, in which case the pattern scans the raw body text. |
+| `req.headers`, `rsp.headers` | A header name, matched case-insensitively. **Required**: a bare regex across a raw header block is the addressing foot-gun this shape removes. |
+
+At least one of `path`/`pattern` is required. The two compose: `path` selects a value, `pattern` optionally extracts a substring from it. `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`). `join` is not valid on a request property.
 
 **Value omission is silent** — a property that doesn't resolve (a missing key, an out-of-range index, no pattern match) is simply absent; consumers MUST NOT treat omission as an error. Omission is the normal case, not an edge case: whether a body or header is even available to read depends on the capture layer's own payload and privacy settings.
 
 Extraction requires **live traffic**. A tool operating on static corpus definitions alone MUST treat `properties:` as declared-but-unavailable, not an error.
 
-`status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. They sit outside `source` entirely — a consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
+`status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. They sit outside `extract` entirely — a consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
 
 `properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](../seps/0005-request-properties.md).
 
@@ -310,7 +334,7 @@ A record matches when every declared constraint holds. Declaring neither `level`
 
 ### Message properties
 
-`properties:` declares named values to pull out of an uncaught exception's **stack trace**, so a corpus can classify an exception by where it came from and extract the failing location — the message-side analogue of a request's [`properties:`](#request-properties). It reuses that mechanism's `source` / `field` / `pattern` shape.
+`properties:` declares named values to pull out of an uncaught exception's **stack trace**, so a corpus can classify an exception by where it came from and extract the failing location — the message-side analogue of a request's [`properties:`](#request-properties), using the same [Extract](#extract) object.
 
 ```yaml
 messages:
@@ -320,24 +344,20 @@ messages:
     properties:
       # The throwing frame's source file and function.
       - name: origin_file
-        source: stack
-        field: top.file
+        extract: { from: stack, path: top.file }
       - name: origin_fn
-        source: stack
-        field: top.function
+        extract: { from: stack, path: top.function }
       # A specific frame by index, refined by a pattern to just the basename.
       - name: caller_base
-        source: stack
-        field: 1.file
-        pattern: '([^/]+)$'
+        extract: { from: stack, path: 1.file, pattern: '([^/]+)$' }
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
-| `source` | string | yes | Which root to read from. The only value in v1 is `stack` (the exception's call stack). |
-| `field` | string | yes | The frame and attribute to select, `<frame>.<attribute>`: `<frame>` is `top` (an alias for `0`) or a non-negative frame index (`0`, `1`, …), throwing frame first; `<attribute>` is one of `function`, `file`, `line`, or `column`. Required — a `stack` source has no meaningful bare-regex scan, the same reasoning that requires `field` for a request's headers source. |
-| `pattern` | string | no | An [RE2](#regular-expressions) regex applied to whatever `field` resolved. Capture group 1 is the extracted value when the pattern has one, otherwise the entire match. |
+| `extract` | [Extract](#extract) | yes | How the value is read. The only source is `stack`, the exception's call stack. |
+
+`path` is required and addresses a frame and attribute, `<frame>.<attribute>`: `<frame>` is `top` (an alias for `0`) or a non-negative frame index (`0`, `1`, …), throwing frame first; `<attribute>` is one of `function`, `file`, `line`, or `column`. A `stack` source has no meaningful bare-regex scan, the same reasoning that requires `path` for a request's headers source. `join` is not valid on a message property.
 
 Extraction requires **live traffic** and **value omission is silent**, exactly as for [request properties](#request-properties): a property that doesn't resolve (a plain console record with no stack, a frame index out of range, an unknown attribute, no pattern match) is simply absent, never an error. See [SEP-0006](../seps/0006-message-entity.md).
 
@@ -385,6 +405,32 @@ signals:
 | `tags` | string[] | no | Open-vocabulary classification labels carried onto the signal. |
 
 `ref` must resolve to exactly one entity. A name that matches nothing is reported as `signal-ref-unresolved`; a name that matches **both** a component and a view is `signal-ref-ambiguous` (there is no adjacency rule to prefer one, so it is rejected rather than silently resolved). Signal names must be unique across the corpus. `signals:` is corpus-root only — there is no view-scoped form. See [SEP-0007](../seps/0007-signals.md).
+
+## Extract
+
+Every property that extracts a value (component, request, message) declares how with one object. See [SEP-0017](../seps/0017-extract-object.md).
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `from` | string | yes | The source to read from. Which sources are valid depends on the entity: see [Component properties](#component-properties), [Request properties](#request-properties), [Message properties](#message-properties). `url.query` and `url.path` are reserved for URL-shaped properties. |
+| `path` | string | per source | The value within the source. Required or forbidden depending on `from`. |
+| `pattern` | string | no | An [RE2](#regular-expressions) regex applied to the resolved value. Capture group 1 is the value when the pattern has one, otherwise the entire match. A value the pattern does not match is omitted. Not valid with `component.exists`. |
+| `join` | string | no | Valid only with `from: component`. Each segment of `path` resolves to every match in document order instead of the first; each value is read and refined by `pattern`, empty values are dropped, and the rest are joined with this string. No surviving value omits the property. Must be non-empty. |
+
+No other keys are allowed.
+
+**Deprecated string forms.** Earlier versions of this spec spelled extraction per entity. Those forms remain valid during a deprecation window, are lowered exactly to the object, and draw an `extract-legacy-form` warning. They will be removed in a later release.
+
+| Deprecated | Object |
+|---|---|
+| `extract: text` | `{ from: dom.text }` |
+| `extract: raw_text` | `{ from: dom.raw_text }` |
+| `extract: attr=NAME` | `{ from: dom.attr, path: NAME }` |
+| `extract: PATH.prop` | `{ from: component, path: PATH.prop }` |
+| `extract: exists:PATH` | `{ from: component.exists, path: PATH }` |
+| `source: S`, `field: F`, `pattern: P` (request, message) | `{ from: S, path: F, pattern: P }` |
+
+`attr=NAME` always lowers to `dom.attr`, including for the interactive-state names. A property may not combine `extract` with `source`, `field` or `pattern` (`extract-shape-mixed`).
 
 ## Regular expressions
 
@@ -706,11 +752,13 @@ A declaration applies to the matched element **and its entire subtree**, so mask
 
 **Extracted properties are governed too**, at the node the value is read from. A [`properties[]`](#component-properties) entry produces a named value that travels separately from captured content, so a directive covering only the recording would leak the same text through the other path. A property whose value resolves from a node whose effective privacy is `block` or `mask` MUST NOT be surfaced.
 
-The governing node is the one the value is **read from**, not the component that declared the property. Extraction is tree-closed, so a `PATH.prop` directive resolves against a descendant component and that descendant's own resolved privacy applies — a component with no declaration of its own cannot launder a value out of a blocked descendant.
+The governing node is the one the value is **read from**, not the component that declared the property. Extraction is tree-closed, so a `from: component` read resolves against a descendant component and that descendant's own resolved privacy applies — a component with no declaration of its own cannot launder a value out of a blocked descendant.
 
-`exists:PATH` is an exception, reporting presence rather than content: it MAY be surfaced under `mask`, which already permits structure, and MUST NOT under `block`. `text`, `raw_text` and `PATH.prop` yield content and are withheld under either.
+`component.exists` is an exception, reporting presence rather than content: it MAY be surfaced under `mask`, which already permits structure, and MUST NOT when the target is `block`. `dom.text`, `dom.raw_text` and `dom.attr` yield content and are withheld under either. `dom.state` carries state rather than a value and MAY be surfaced under `mask`; under `block` nothing resolves.
 
-**Attributes under `mask`.** An attribute can be structure or content, so the line is drawn here rather than left to each consumer. Under `mask` a consumer MUST withhold the value of any attribute the corpus reads via an `attr=` extract **anywhere in the corpus** — naming an attribute in an extract is a declaration that it carries a value worth reading — and the value of any `data-*` attribute, and of `value`, `title`, `alt`, `placeholder` and `aria-label`. A consumer MAY retain the four interactive-state attributes [SEP-0013](../seps/0013-richer-node-data.md) defines (`checked`, `selected`, `disabled`, `expanded`), which are a closed set carrying state rather than a value, and presentational attributes needed to render the element's shape (`class`, `style`, `id`). `attr=` extraction of those four state attributes resolves normally under `mask`; every other `attr=` is withheld. Under `block` nothing resolves.
+A property that reads `dom.text`, `dom.raw_text` or `dom.attr` from a component whose own `privacy` is `block` or `mask`, or `dom.state` from one whose own `privacy` is `block`, is withheld by every capture consumer, so the reference CLI warns (`extract-privacy-withheld`). The remedy is to change the component's privacy, where a privacy review sees it.
+
+**Attributes under `mask`.** An attribute can be structure or content, so the line is drawn here rather than left to each consumer. Under `mask` a consumer MUST withhold the value of any attribute the corpus reads via a `dom.attr` extract **anywhere in the corpus** — naming an attribute in an extract is a declaration that it carries a value worth reading — and the value of any `data-*` attribute, and of `value`, `title`, `alt`, `placeholder` and `aria-label`. A consumer MAY retain the four interactive-state attributes [SEP-0013](../seps/0013-richer-node-data.md) defines (`checked`, `selected`, `disabled`, `expanded`), which are a closed set carrying state rather than a value, and presentational attributes needed to render the element's shape (`class`, `style`, `id`). Every `dom.attr` read is withheld under `mask`; the state itself is read with `dom.state`. Under `block` nothing resolves.
 
 A `class` or `id` built from user data survives a `mask`, and the spec cannot close that without making `mask` unimplementable for replay. An author carrying user data in a presentational attribute should use `block`.
 
@@ -738,12 +786,11 @@ A conforming SDK:
 - MUST implement route matching as specified
 - MUST implement global vs view-scoped precedence as specified
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)
-- MUST reject a `RequestProperty` with no `source`, or a `source` outside the four-value enum (`req.body`/`rsp.body`/`req.headers`/`rsp.headers`)
-- MUST reject a `RequestProperty` that declares neither `field` nor `pattern`
-- MUST reject a `RequestProperty` whose `source` is a headers source but omits `field`
-- MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
+- MUST reject an [Extract](#extract) whose `from` is not valid on its entity, whose `path` is missing where its source requires one or present where its source forbids one, whose `pattern` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions)), or that carries `join` with any source but `component`
+- MUST reject a `RequestProperty` that declares neither `path` nor `pattern`, or reads a headers source without `path`
+- MUST accept the deprecated extract string forms during the deprecation window, lowered exactly as [Extract](#extract) tables, and SHOULD warn on each
 - MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
-- MUST reject a `MessageProperty` with a `source` other than `stack`, or one that omits `field`, or whose `pattern` is not a valid RE2 regular expression
+- MUST reject a `MessageProperty` that reads any source but `stack`, or omits `path`
 - MUST reject an environment that breaks the web/native shape rules, an invalid origin URL, a `backend` that names no environment or a native one, and an environment or origin reference that resolves to no definition (see [Environments and origins](#environments-and-origins))
 - MUST build one project-wide environment registry and one shared-origin registry, the first by source-file path winning on a name collision, and MUST resolve an origin for an environment from its own `origins`, then its `backend`'s, then the shared map
 - MUST treat an absent or empty view- or request-level `environments`/`origins` list as unconstrained, MUST intersect a view-scoped request's environments with its view's, and MUST NOT inherit a view's `origins` into its requests
@@ -756,13 +803,13 @@ An SDK that also **evaluates live activity** (observed network requests, console
 
 - MUST resolve `properties:` only from live traffic, and MUST NOT error when a `properties:`-declaring request is used in a static context — omit the value instead
 - MUST omit an unresolved property value silently, without a diagnostic
-- MUST apply `pattern` to the value `field` resolved (not the whole source) when both are present, taking capture group 1 as the value when the pattern has one, else the entire match
+- MUST apply `pattern` to the value `path` resolved (not the whole source) when both are present, taking capture group 1 as the value when the pattern has one, else the entire match
 - MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
 - MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
 - MUST assign a session to an environment as specified in [Session membership](#session-membership): a web session to the web environment with the most specific matching origin (and to none when the most specific matches span several), comparing host and port only; a native session by `platform` and `app_id`, matching `build_type` verbatim and treating an environment with no `build_type` as covering every variant
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern`, matches no `messages:` entry against a console record, and assigns no session to an environment. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, and resolves request and message properties and `messages:` matches against a record handed to it, but observes no live traffic itself and assigns no session to an environment. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

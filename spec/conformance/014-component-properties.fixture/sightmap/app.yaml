@@ -7,16 +7,16 @@ views:
         selector: '[data-testid="product-pod"]'
         properties:
           - name: price
-            extract: Price.text
+            extract: { from: component, path: Price.text }
           - name: sold_out
-            extract: exists:SoldOutBadge
+            extract: { from: component.exists, path: SoldOutBadge }
           - name: label
-            extract: text
+            extract: { from: dom.text }
         children:
           - name: Price
             selector: '[data-testid="price"]'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: SoldOutBadge
             selector: '[aria-label="Sold Out"]'

@@ -1,0 +1,21 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": true,
+        "diagnostics": [
+          { "code": "extract-legacy-form", "severity": "warning" },
+          { "code": "extract-legacy-form", "severity": "warning" },
+          { "code": "extract-legacy-form", "severity": "warning" },
+          { "code": "extract-legacy-form", "severity": "warning" },
+          { "code": "extract-legacy-form", "severity": "warning" },
+          { "code": "extract-legacy-form", "severity": "warning" },
+          { "code": "extract-legacy-form", "severity": "warning" },
+          { "code": "extract-legacy-form", "severity": "warning" }
+        ]
+      }
+    }
+  ]
+}

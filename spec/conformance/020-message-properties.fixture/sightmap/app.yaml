@@ -7,12 +7,8 @@ messages:
     message: 'Cannot read propert(y|ies) .* of (null|undefined)'
     properties:
       - name: origin_file
-        source: stack
-        field: top.file
+        extract: { from: stack, path: top.file }
       - name: origin_fn
-        source: stack
-        field: top.function
+        extract: { from: stack, path: top.function }
       - name: caller_base
-        source: stack
-        field: 1.file
-        pattern: '([^/]+)$'
+        extract: { from: stack, path: 1.file, pattern: '([^/]+)$' }

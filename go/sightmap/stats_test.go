@@ -51,7 +51,7 @@ func TestStats_DedupesSharedGlobals(t *testing.T) {
 				Components: []ComponentDef{
 					nav, // same global, reused by a second view
 					{Name: "ActivityFeed", Selectors: []string{`[data-component="ActivityFeed"]`},
-						Properties: []ComponentPropertyDef{{Name: "count", Extract: "text"}}},
+						Properties: []ComponentPropertyDef{{Name: "count", Extract: Extract{From: FromDOMText}}}},
 				},
 			},
 		},
@@ -110,7 +110,7 @@ func TestStats_SameNamedViewComponents(t *testing.T) {
 					Name:       "Card",
 					Selectors:  []string{`[data-component="ProductCard"]`},
 					Memory:     []string{"price hides while the quote refreshes"},
-					Properties: []ComponentPropertyDef{{Name: "title", Extract: "text"}},
+					Properties: []ComponentPropertyDef{{Name: "title", Extract: Extract{From: FromDOMText}}},
 				}},
 			},
 			{
@@ -121,8 +121,8 @@ func TestStats_SameNamedViewComponents(t *testing.T) {
 					Selectors: []string{`[data-component="PostCard"]`},
 					Memory:    []string{"excerpt is truncated server-side"},
 					Properties: []ComponentPropertyDef{
-						{Name: "headline", Extract: "text"},
-						{Name: "author", Extract: "attr=data-author"},
+						{Name: "headline", Extract: Extract{From: FromDOMText}},
+						{Name: "author", Extract: Extract{From: FromDOMAttr, Path: "data-author"}},
 					},
 				}},
 			},
@@ -151,7 +151,7 @@ func TestStats_GlobalsOnlyCorpus(t *testing.T) {
 	corpus := &Corpus{
 		GlobalComponents: []ComponentDef{
 			{Name: "Header", Selectors: []string{"#header"},
-				Properties: []ComponentPropertyDef{{Name: "brand", Extract: "text"}}},
+				Properties: []ComponentPropertyDef{{Name: "brand", Extract: Extract{From: FromDOMText}}}},
 		},
 		Requests: []RequestDef{
 			{Name: "Ping", Route: "/api/ping"},

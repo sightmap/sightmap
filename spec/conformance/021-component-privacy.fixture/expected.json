@@ -3,7 +3,14 @@
     {
       "command": "validate",
       "args": {},
-      "expected": { "ok": true, "diagnostics": [] }
+      "expected": {
+        "ok": true,
+        "diagnostics": [
+          { "code": "extract-privacy-withheld", "severity": "warning" },
+          { "code": "extract-privacy-withheld", "severity": "warning" },
+          { "code": "extract-privacy-withheld", "severity": "warning" }
+        ]
+      }
     }
   ]
 }

@@ -93,7 +93,7 @@ global one), e.g.:
   selector: '[data-testid="product-pod"] button[data-testid="atc"]'
   properties:
     - name: label
-      extract: attr=aria-label
+      extract: { from: dom.attr, path: aria-label }
 ```
 
 Re-run `snapshot --coverage --url` and repeat until `0 orphaned T3 ✓`.

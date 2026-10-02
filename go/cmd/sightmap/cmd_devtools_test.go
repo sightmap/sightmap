@@ -60,7 +60,7 @@ func TestAnnotateNetwork_ExtractsProperties(t *testing.T) {
 		Requests: []sightmap.RequestDef{{
 			Name: "CheckoutPayment", Route: "/api/checkout/pay", Method: "POST",
 			Properties: []sightmap.RequestPropertyDef{
-				{Name: "outcome", Source: "rsp.body", Field: "status"},
+				{Name: "outcome", Extract: sightmap.Extract{From: "rsp.body", Path: "status"}},
 			},
 		}},
 	}
@@ -86,7 +86,7 @@ func TestAnnotateConsole_ExtractsStackProperties(t *testing.T) {
 		Messages: []sightmap.MessageDef{{
 			Name: "UncaughtCheckoutError", Level: "exception",
 			Properties: []sightmap.MessagePropertyDef{
-				{Name: "origin_file", Source: "stack", Field: "top.file"},
+				{Name: "origin_file", Extract: sightmap.Extract{From: "stack", Path: "top.file"}},
 			},
 		}},
 	}
