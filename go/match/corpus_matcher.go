@@ -29,6 +29,7 @@ func NewMatcher(corpus *sightmap.Corpus) *Matcher {
 type queryCacheEntry struct {
 	components []sightmap.ComponentDef
 	queries    []MatchQuery
+	index      *firstPartIndex
 }
 
 // entryFor returns the cached (or freshly compiled) queries for pageURL.
@@ -43,7 +44,7 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	}
 	compList := m.corpus.ComponentsForURL(pageURL)
 	queries, _ := ParseQueries(compList)
-	e := &queryCacheEntry{components: compList, queries: queries}
+	e := &queryCacheEntry{components: compList, queries: queries, index: newFirstPartIndex(queries)}
 	m.cache[pageURL] = e
 	return e
 }
@@ -60,7 +61,7 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 
 	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
-	FindAllMatches(root, entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
+	findAllMatches(root, entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		if _, already := result[node]; already {
 			return // first-match-wins
 		}
@@ -114,7 +115,7 @@ func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sigh
 	}
 	byNode := make(map[*sightmap.ComponentNode]*claims)
 	var order []*sightmap.ComponentNode
-	FindAllMatches(root, entry.queries, func(node *sightmap.ComponentNode, q *MatchQuery) {
+	findAllMatches(root, entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		c := byNode[node]
 		if c == nil {
 			c = &claims{}
