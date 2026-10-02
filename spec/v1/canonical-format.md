@@ -45,17 +45,20 @@ Explicit per entry type. Unknown keys preserved at the end in original order.
 
 | Entry type | Canonical key order |
 |---|---|
-| Top-level | `version, memory, views, components, requests` |
-| View | `name, route, description, source, components, memory, requests` |
+| Top-level | `version, environments, origins, memory, views, components, requests` |
+| View | `name, route, environments, origins, description, source, components, memory, requests` |
 | Component | `name, selector, description, source, children, memory` |
-| Request | `name, route, method, description, source, request, response, headers, memory` |
+| Request | `name, route, method, environments, origins, description, source, request, response, headers, memory` |
+| Environment | `name, platform, app_id, build_type, backend, origins` |
+
+Keys within any origin map (the top-level `origins` and an environment's `origins`) are alphabetized.
 
 ### List ordering
 
-- **Top-level sequences** (`views`, top-level `components`, top-level `requests`) are alphabetized: `views` and `components` by `name`, `requests` by `(route, method)` — lexicographic on the tuple, both elements compared as YAML scalar strings byte-by-byte (no Unicode normalization, no case folding). Sort keys are required and unique per schema; missing or duplicate sort keys are schema-invalid (caught by `fmt.schema-invalid` before sorting).
+- **Top-level sequences** (`environments`, `views`, top-level `components`, top-level `requests`) are alphabetized: `environments`, `views` and `components` by `name`, `requests` by `(route, method)` — lexicographic on the tuple, both elements compared as YAML scalar strings byte-by-byte (no Unicode normalization, no case folding). Sort keys are required and unique per schema; missing or duplicate sort keys are schema-invalid (caught by `fmt.schema-invalid` before sorting).
 - **Nested sequences** (e.g. `view.components`, `component.children`) preserve insertion order. Nesting order can carry meaning (parent-child relationships, intentional declaration order); the formatter does not reorder.
 - **`memory` lists** preserve insertion order. Agent-authored entries are not reordered, since order can carry meaning (recency, priority).
-- **String arrays whose order is not semantically significant** are canonicalized by lexicographic sort followed by deduplication (byte-by-byte comparison, no Unicode normalization, no case folding). SDKs MUST emit `fmt.not-canonical` when an array of this kind is unsorted or contains duplicates. No field in the current schema is of this kind; the rule is retained because [SEP-0014](../seps/0014-environments-and-origins.md) relies on it for view- and request-level reference lists.
+- **String arrays whose order is not semantically significant** are canonicalized by lexicographic sort followed by deduplication (byte-by-byte comparison, no Unicode normalization, no case folding). SDKs MUST emit `fmt.not-canonical` when an array of this kind is unsorted or contains duplicates. The view- and request-level `environments` and `origins` reference lists are of this kind ([SEP-0014](../seps/0014-environments-and-origins.md)).
 
 ### Blank lines
 
