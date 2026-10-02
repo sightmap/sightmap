@@ -1,0 +1,32 @@
+version: 1
+components:
+  # The motivating case: non-interactive components whose appearance is the signal.
+  - name: NoResultsMessage
+    selector: '.search-empty'
+    watch: true
+  - name: PromoBanner
+    selector: '[data-promo]'
+    watch: true
+
+  # watch is NOT inherited: the parent is watched, the child is not.
+  - name: ResultsList
+    selector: '.results'
+    watch: true
+    children:
+      - name: ResultRow
+        selector: '.result-row'
+
+  # An explicit false is permitted and declares nothing.
+  - name: RetrySearchButton
+    selector: 'button.retry'
+    watch: false
+
+views:
+  - name: Search
+    route: /search
+    components:
+      # View-scoped, and watched alongside an unrelated tag.
+      - name: ZeroStateIllustration
+        selector: '.zero-state svg'
+        watch: true
+        tags: [ui-risk]

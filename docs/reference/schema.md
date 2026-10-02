@@ -98,6 +98,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 | `stability` | string | no | Authoring-confidence marker: `uncertain` or `unstable`. See [Stability](#stability). |
 | `properties` | [Property](#component-properties)[] | no | Named DOM-value extractions surfaced in enriched snapshots (e.g. `[Card price="$10"]`). Extracted from the live DOM at snapshot time; unavailable to offline tools. See [Component properties](#component-properties). |
 | `tags` | string[] | no | Open-vocabulary classification labels for this component. See [Tags](#tags). |
+| `watch` | boolean | no | Report this component's visibility lifecycle even when it is never interacted with. See [Watch](#watch). |
 | `children` | (Component \| [ComponentRef](#component-references))[] | no | Nested components. Child selectors are scoped to the parent's subtree. Entries may be either inline definitions or `$ref` reference objects. |
 
 ### Component references
@@ -518,6 +519,32 @@ In every case the resolved tag set MUST be deduplicated, and SHOULD be emitted i
 (lexicographically sorted) order wherever it is serialized. A definition that declares no
 `tags` contributes nothing; this is not an error, and `tags: []` is equivalent to omitting
 the field entirely.
+
+## Watch
+
+A component may declare `watch: true`, asking a capture consumer to report its **visibility lifecycle** — that it rendered, that it became visible, that it went away — rather than reporting it only when someone interacts with it.
+
+```yaml
+- name: NoResultsMessage
+  selector: '.search-empty'
+  watch: true
+```
+
+For each matched element, a consumer that reports visibility MUST report that the element **became visible to the user**, and MAY report the rest of the lifecycle around it — rendered, no longer visible, removed. Becoming visible is the only moment that answers the question the field exists for; the surrounding events are largely churn, since an element can render far off-screen, re-render on every state change, and be removed by a route transition. A consumer whose only notion is a coarse "seen" conforms with that alone.
+
+Repeat reports SHOULD be collapsed: an element that leaves and re-enters the viewport, or whose observer fires several times for one appearance, is one appearance. Each matched element is reported separately; a consumer that cannot distinguish instances MUST still report the first.
+
+**Visibility is passive.** An element scrolling into view is a layout side effect, not something the user did, so a consumer that ranks or attributes activity MUST NOT treat a visibility report as an interaction.
+
+**`watch` applies to the component it is declared on, never to its `children`.** This is the opposite of [`privacy`](#privacy), deliberately: privacy is a restriction, where covering the subtree is the safe default, while `watch` generates records, where covering a subtree silently would multiply them.
+
+**A consumer's interactivity heuristic MUST NOT suppress a watched component.** A consumer that would otherwise skip an element because it is not interactive MUST report a watched one anyway — without this, the field does nothing for exactly the non-interactive components that motivate it. Other filters a consumer applies for its own correctness are unaffected, but it SHOULD surface that it dropped the request rather than ignoring it.
+
+`watch: false` is identical to omitting the field. `watch` takes no part in route matching, component identity, or specificity.
+
+`watch` and [`privacy`](#privacy) are independent and compose without special rules: a component may be watched and blocked at once, reporting that it appeared while retaining none of its content.
+
+See [SEP-0015](https://github.com/sightmap/sightmap/blob/main/spec/seps/0015-component-watch.md).
 
 ## Reserved tooling fields
 
