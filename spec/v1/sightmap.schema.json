@@ -256,7 +256,7 @@
     },
     "componentProperty": {
       "type": "object",
-      "description": "A named value extracted from a matched component's node, resolved over the component tree. See SEP-0010.",
+      "description": "A named value extracted from a matched component's node, resolved over the component tree. See SEP-0010 and SEP-0017.",
       "required": ["name", "extract"],
       "additionalProperties": false,
       "properties": {
@@ -266,9 +266,116 @@
           "description": "Key used in the snapshot annotation (name=\"value\"). Must be unique within a component. The name 'value' is reserved: it may be declared to override the AX built-in, but SDKs treat 'value' as the AX-value fallback even without a declaration."
         },
         "extract": {
+          "description": "How the value is read. The object form is SEP-0017; a string (text | raw_text | attr=NAME | PATH.prop | exists:PATH) is the deprecated SEP-0010 form, accepted and lowered to the object during the deprecation window.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/componentExtract"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "deprecated": true
+            }
+          ]
+        }
+      }
+    },
+    "extract": {
+      "type": "object",
+      "description": "An extraction directive: a source and the value within it, with optional refinements. Which `from` values are valid depends on the entity. See SEP-0017.",
+      "required": ["from"],
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "string",
+          "description": "The source to read from. See SEP-0017 Sources."
+        },
+        "path": {
           "type": "string",
           "minLength": 1,
-          "description": "Extraction directive, one of: text | raw_text | attr=NAME | PATH.prop | exists:PATH. The grammar is validated by the SDK. See SEP-0010 Extract grammar (raw_text added by SEP-0013)."
+          "description": "The value within the source: an attribute name, a state name, a component path, a body key path, a header name, or a stack frame address, per source."
+        },
+        "pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "RE2 regex (no backreferences or lookaround) applied to the resolved value. Capture group 1 is the value if present, else the full match. A value the pattern does not match is omitted."
+        },
+        "join": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Collapse every match of a component path into one value, joined with this string. Only valid with from: component."
+        }
+      }
+    },
+    "componentExtract": {
+      "description": "An extract directive on a component property. See SEP-0017.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/extract"
+        },
+        {
+          "if": {
+            "properties": {
+              "from": {
+                "enum": ["dom.text", "dom.raw_text"]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": ["path"]
+            }
+          },
+          "else": {
+            "required": ["path"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "from": {
+                "const": "dom.state"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "path": {
+                "enum": ["checked", "selected", "disabled", "expanded"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "from": {
+                "const": "component.exists"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": ["pattern"]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["join"]
+          },
+          "then": {
+            "properties": {
+              "from": {
+                "const": "component"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "from": {
+          "enum": ["dom.text", "dom.raw_text", "dom.attr", "dom.state", "component", "component.exists"]
         }
       }
     },
@@ -320,32 +427,117 @@
     },
     "requestProperty": {
       "type": "object",
-      "description": "A named value extracted from a live request/response pair. See SEP-0005.",
-      "required": ["name", "source"],
+      "description": "A named value extracted from a live request/response pair. See SEP-0005 and SEP-0017.",
+      "required": ["name"],
       "additionalProperties": false,
-      "anyOf": [{ "required": ["field"] }, { "required": ["pattern"] }],
-      "if": { "properties": { "source": { "enum": ["req.headers", "rsp.headers"] } } },
-      "then": { "required": ["field"] },
+      "oneOf": [
+        {
+          "required": ["extract"],
+          "not": {
+            "anyOf": [
+              {
+                "required": ["source"]
+              },
+              {
+                "required": ["field"]
+              },
+              {
+                "required": ["pattern"]
+              }
+            ]
+          }
+        },
+        {
+          "required": ["source"],
+          "not": {
+            "required": ["extract"]
+          },
+          "anyOf": [
+            {
+              "required": ["field"]
+            },
+            {
+              "required": ["pattern"]
+            }
+          ],
+          "if": {
+            "properties": {
+              "source": {
+                "enum": ["req.headers", "rsp.headers"]
+              }
+            }
+          },
+          "then": {
+            "required": ["field"]
+          }
+        }
+      ],
       "properties": {
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "Key a consumer refers to this value by. Declaring one of the reserved request identity names (status, method, duration) shadows that identity; the reference CLI warns."
         },
+        "extract": {
+          "$ref": "#/$defs/requestExtract"
+        },
         "source": {
           "type": "string",
           "enum": ["req.body", "rsp.body", "req.headers", "rsp.headers"],
-          "description": "Which root to read from. See SEP-0005 §Extraction root."
+          "description": "Deprecated: use extract. Which root to read from. See SEP-0005 §Extraction root.",
+          "deprecated": true
         },
         "field": {
           "type": "string",
           "minLength": 1,
-          "description": "Value to select within source: an object-key path for a body source, a header name (case-insensitive) for a headers source. Required when source is a headers source. See SEP-0005 §Extraction root."
+          "description": "Deprecated: use extract. Value to select within source: an object-key path for a body source, a header name (case-insensitive) for a headers source. Required when source is a headers source. See SEP-0005 §Extraction root.",
+          "deprecated": true
         },
         "pattern": {
           "type": "string",
           "minLength": 1,
-          "description": "RE2 regex (no backreferences or lookaround) applied to what field resolved, or to the raw source text when field is absent. Capture group 1 is the value if present, else the full match."
+          "description": "Deprecated: use extract. RE2 regex (no backreferences or lookaround) applied to what field resolved, or to the raw source text when field is absent. Capture group 1 is the value if present, else the full match.",
+          "deprecated": true
+        }
+      }
+    },
+    "requestExtract": {
+      "description": "An extract directive on a request property. See SEP-0005 and SEP-0017.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/extract"
+        },
+        {
+          "not": {
+            "required": ["join"]
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "required": ["path"]
+            },
+            {
+              "required": ["pattern"]
+            }
+          ]
+        },
+        {
+          "if": {
+            "properties": {
+              "from": {
+                "enum": ["req.headers", "rsp.headers"]
+              }
+            }
+          },
+          "then": {
+            "required": ["path"]
+          }
+        }
+      ],
+      "properties": {
+        "from": {
+          "enum": ["req.body", "rsp.body", "req.headers", "rsp.headers"]
         }
       }
     },
@@ -412,29 +604,78 @@
     },
     "messageProperty": {
       "type": "object",
-      "description": "A named value extracted from an observed exception's stack. See SEP-0006.",
-      "required": ["name", "source", "field"],
+      "description": "A named value extracted from an observed exception's stack. See SEP-0006 and SEP-0017.",
+      "required": ["name"],
       "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": ["extract"],
+          "not": {
+            "anyOf": [
+              {
+                "required": ["source"]
+              },
+              {
+                "required": ["field"]
+              },
+              {
+                "required": ["pattern"]
+              }
+            ]
+          }
+        },
+        {
+          "required": ["source", "field"],
+          "not": {
+            "required": ["extract"]
+          }
+        }
+      ],
       "properties": {
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "Key a consumer refers to this value by."
         },
+        "extract": {
+          "$ref": "#/$defs/messageExtract"
+        },
         "source": {
           "type": "string",
           "enum": ["stack"],
-          "description": "Which root to read from. Only the exception stack is addressable in v1."
+          "description": "Deprecated: use extract. Which root to read from. Only the exception stack is addressable in v1.",
+          "deprecated": true
         },
         "field": {
           "type": "string",
           "minLength": 1,
-          "description": "Frame and attribute to select: \"<frame>.<attribute>\" where <frame> is \"top\" (alias for 0) or a non-negative index and <attribute> is one of function/file/line/column. Required."
+          "description": "Deprecated: use extract. Frame and attribute to select: \"<frame>.<attribute>\" where <frame> is \"top\" (alias for 0) or a non-negative index and <attribute> is one of function/file/line/column. Required.",
+          "deprecated": true
         },
         "pattern": {
           "type": "string",
           "minLength": 1,
-          "description": "RE2 regex (no backreferences or lookaround) applied to what field resolved. Capture group 1 is the value if present, else the full match."
+          "description": "Deprecated: use extract. RE2 regex (no backreferences or lookaround) applied to what field resolved. Capture group 1 is the value if present, else the full match.",
+          "deprecated": true
+        }
+      }
+    },
+    "messageExtract": {
+      "description": "An extract directive on a message property: a stack frame attribute. See SEP-0006 and SEP-0017.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/extract"
+        },
+        {
+          "not": {
+            "required": ["join"]
+          }
+        }
+      ],
+      "required": ["path"],
+      "properties": {
+        "from": {
+          "enum": ["stack"]
         }
       }
     },

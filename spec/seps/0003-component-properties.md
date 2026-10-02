@@ -4,11 +4,13 @@ title: Component property extraction via `properties[]`
 author: Joel Webber (@joelgwebber)
 status: Accepted
 created: 2026-05-27
-updated: 2026-07-27
+updated: 2026-10-02
 spec-version-target: 1
 related-issues: [52]
 related-discussions: []
 ---
+
+> **Extraction syntax superseded by [SEP-0017](0017-extract-object.md).** The `extract` string forms below are written as an `extract: { from, path }` object; their meaning is unchanged.
 
 > **Superseded in part by [SEP-0010](0010-tree-closed-component-properties.md).**
 > The `extract` grammar and live-DOM extraction model described below are

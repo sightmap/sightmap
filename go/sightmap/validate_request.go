@@ -65,47 +65,52 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 		})
 	}
 
-	// source is required and closed. field+pattern compose (anyOf), so both
-	// together is legal; only declaring neither is an error.
-	validSource := slices.Contains(RequestPropertySources, prop.Source)
+	var done bool
+	if errs, done = checkSourcedShape(errs, reqName, prop.Name, prop.Extract); done {
+		return errs
+	}
+
+	// from is required and closed. path+pattern compose, so both together is
+	// legal; only declaring neither is an error.
+	validSource := slices.Contains(RequestPropertySources, prop.Extract.From)
 	if !validSource {
 		errs = append(errs, ValidationError{
 			Component: reqName,
 			Code:      "request-property-source-invalid",
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("request %q property %q has source %q; must be one of %s",
-				reqName, prop.Name, prop.Source, strings.Join(RequestPropertySources, ", ")),
+			Message: fmt.Sprintf("request %q property %q reads from %q; must be one of %s",
+				reqName, prop.Name, prop.Extract.From, strings.Join(RequestPropertySources, ", ")),
 		})
 	}
 
-	if prop.Field == "" && prop.Pattern == "" {
+	if prop.Extract.Path == "" && prop.Extract.Pattern == "" {
 		errs = append(errs, ValidationError{
 			Component: reqName,
 			Code:      "request-property-no-extractor",
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("request %q property %q declares neither field nor pattern; at least one is required",
+			Message: fmt.Sprintf("request %q property %q declares neither path nor pattern; at least one is required",
 				reqName, prop.Name),
 		})
 	}
 
 	// A headers source has no structure below a header value, so a bare regex
 	// scan across the raw header block is the addressing foot-gun this shape
-	// removes: field must name the header.
-	if validSource && strings.HasSuffix(prop.Source, ".headers") && prop.Field == "" {
+	// removes: path must name the header.
+	if validSource && strings.HasSuffix(prop.Extract.From, ".headers") && prop.Extract.Path == "" {
 		errs = append(errs, ValidationError{
 			Component: reqName,
 			Code:      "request-property-headers-require-field",
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("request %q property %q reads from %q but omits field; a headers source must name a header in field",
-				reqName, prop.Name, prop.Source),
+			Message: fmt.Sprintf("request %q property %q reads from %q but omits path; a headers source must name a header in path",
+				reqName, prop.Name, prop.Extract.From),
 		})
 	}
 
 	// pattern is an RE2 regex (SEP-0005). Compile it at validation time, as the
 	// message entity does for its own author-written regex, rather than storing a
 	// pattern nobody has proven is one.
-	if prop.Pattern != "" {
-		if _, err := regexp.Compile(prop.Pattern); err != nil {
+	if prop.Extract.Pattern != "" {
+		if _, err := compilePattern(prop.Extract.Pattern); err != nil {
 			errs = append(errs, ValidationError{
 				Component: reqName,
 				Code:      "request-property-pattern-invalid",
@@ -131,4 +136,28 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 	}
 
 	return errs
+}
+
+// checkSourcedShape reports the SEP-0017 shape problems shared by request and
+// message properties: an entry mixing the object with source/field/pattern, a
+// string extract (strings are component forms only), and join, which these
+// sources do not support. It warns on a deprecated source/field/pattern entry.
+// done is true when the entry is too malformed to check further.
+func checkSourcedShape(errs []ValidationError, owner, prop string, e Extract) ([]ValidationError, bool) {
+	errAt := func(code, msg string) []ValidationError {
+		return append(errs, ValidationError{Component: owner, Code: code, Severity: SeverityError,
+			Message: fmt.Sprintf("property %q: %s", prop, msg)})
+	}
+	switch {
+	case e.mixed:
+		return errAt("extract-shape-mixed", "declares extract alongside source/field/pattern; use extract alone"), true
+	case e.From == "" && e.IsLegacy() && !strings.HasPrefix(e.Legacy, "source:"):
+		return errAt("extract-shape-mixed", fmt.Sprintf("extract must be an object, got the string %q", e.Legacy)), true
+	case e.joinSet:
+		return errAt("extract-join-invalid", "join is only valid with from: component"), true
+	}
+	if e.IsLegacy() {
+		errs = append(errs, legacyExtractWarning(owner, prop, e))
+	}
+	return errs, false
 }

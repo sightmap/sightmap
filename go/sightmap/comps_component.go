@@ -119,7 +119,7 @@ type ComponentNode struct {
 	// Text is the node's rendered text content, normalized to a single clean
 	// shape (whitespace runs collapsed, ends trimmed). It is captured by the
 	// probe (innerText, with a textContent fallback) and is the fallback source
-	// for `extract: text` when the accessible Name is empty (role-less nodes).
+	// for `from: dom.text` when the accessible Name is empty (role-less nodes).
 	// Unlike Name, it is present for role-less leaves/containers. (post-merge)
 	Text string `json:"text,omitempty"`
 
@@ -127,7 +127,7 @@ type ComponentNode struct {
 	// text-node children, whitespace-normalized. Unlike Text (innerText) it is
 	// layout-independent and deterministic, and unlike a subtree textContent it
 	// excludes descendant element text and CSS pseudo content (::before/::after).
-	// It is the source for `extract: raw_text` (SEP-0013): the literal author text,
+	// It is the source for `from: dom.raw_text` (SEP-0013): the literal author text,
 	// distinct from Name (the accessibility name, which may weld in pseudo/aria
 	// text). Empty when the node has no direct text of its own. (post-merge)
 	RawText string `json:"rawText,omitempty"`

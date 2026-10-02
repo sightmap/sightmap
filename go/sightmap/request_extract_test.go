@@ -16,7 +16,7 @@ func TestExtractProperties_BodyField(t *testing.T) {
 	d := &RequestDef{
 		Name: "CheckoutPayment", Route: "/api/checkout/pay", Method: "POST",
 		Properties: []RequestPropertyDef{
-			{Name: "outcome", Source: "rsp.body", Field: "status"},
+			{Name: "outcome", Extract: Extract{From: "rsp.body", Path: "status"}},
 		},
 	}
 	rec := Request{RspBody: jsonBody(`{"status":"declined","amount":42}`)}
@@ -31,9 +31,9 @@ func TestExtractProperties_BodyField(t *testing.T) {
 func TestExtractProperties_BodyNestedAndArrayIndex(t *testing.T) {
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{
-			{Name: "first_item", Source: "rsp.body", Field: "items.0.name"},
-			{Name: "count", Source: "rsp.body", Field: "meta.count"},
-			{Name: "flag", Source: "rsp.body", Field: "meta.ok"},
+			{Name: "first_item", Extract: Extract{From: "rsp.body", Path: "items.0.name"}},
+			{Name: "count", Extract: Extract{From: "rsp.body", Path: "meta.count"}},
+			{Name: "flag", Extract: Extract{From: "rsp.body", Path: "meta.ok"}},
 		},
 	}
 	rec := Request{RspBody: jsonBody(`{"items":[{"name":"widget"},{"name":"gadget"}],"meta":{"count":8,"ok":true}}`)}
@@ -52,7 +52,7 @@ func TestExtractProperties_BodyNestedAndArrayIndex(t *testing.T) {
 func TestExtractProperties_HeaderWithPattern(t *testing.T) {
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{
-			{Name: "rate_limit_remaining", Source: "rsp.headers", Field: "X-RateLimit-Remaining", Pattern: `(\d+)`},
+			{Name: "rate_limit_remaining", Extract: Extract{From: "rsp.headers", Path: "X-RateLimit-Remaining", Pattern: `(\d+)`}},
 		},
 	}
 	// Header name differs in case from the def — lookup is case-insensitive.
@@ -68,7 +68,7 @@ func TestExtractProperties_HeaderWithPattern(t *testing.T) {
 func TestExtractProperties_DuplicateHeadersJoined(t *testing.T) {
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{
-			{Name: "cookies", Source: "rsp.headers", Field: "Set-Cookie"},
+			{Name: "cookies", Extract: Extract{From: "rsp.headers", Path: "Set-Cookie"}},
 		},
 	}
 	rec := Request{RspHeaders: []Header{
@@ -86,7 +86,7 @@ func TestExtractProperties_PatternNoFieldScansRawBody(t *testing.T) {
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{
 			// Form-encoded body: no JSON to walk, pattern scans the raw text.
-			{Name: "legacy_outcome", Source: "rsp.body", Pattern: `(?:declined|approved|deferred)`},
+			{Name: "legacy_outcome", Extract: Extract{From: "rsp.body", Pattern: `(?:declined|approved|deferred)`}},
 		},
 	}
 	rec := Request{RspBody: &Body{Content: "result=declined&code=51", ContentType: "application/x-www-form-urlencoded"}}
@@ -101,13 +101,13 @@ func TestExtractProperties_PatternNoFieldScansRawBody(t *testing.T) {
 func TestExtractProperties_SilentOmission(t *testing.T) {
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{
-			{Name: "missing_key", Source: "rsp.body", Field: "nope"},
-			{Name: "missing_body", Source: "req.body", Field: "x"}, // ReqBody nil
-			{Name: "missing_header", Source: "rsp.headers", Field: "X-Absent"},
-			{Name: "not_json", Source: "rsp.body", Field: "a.b"}, // body isn't JSON
-			{Name: "no_pattern_match", Source: "rsp.body", Field: "status", Pattern: `zzz`},
-			{Name: "null_leaf", Source: "rsp.body", Field: "maybe"}, // JSON null → absent
-			{Name: "resolved", Source: "rsp.body", Field: "status"}, // the one that should survive
+			{Name: "missing_key", Extract: Extract{From: "rsp.body", Path: "nope"}},
+			{Name: "missing_body", Extract: Extract{From: "req.body", Path: "x"}}, // ReqBody nil
+			{Name: "missing_header", Extract: Extract{From: "rsp.headers", Path: "X-Absent"}},
+			{Name: "not_json", Extract: Extract{From: "rsp.body", Path: "a.b"}}, // body isn't JSON
+			{Name: "no_pattern_match", Extract: Extract{From: "rsp.body", Path: "status", Pattern: `zzz`}},
+			{Name: "null_leaf", Extract: Extract{From: "rsp.body", Path: "maybe"}}, // JSON null → absent
+			{Name: "resolved", Extract: Extract{From: "rsp.body", Path: "status"}}, // the one that should survive
 		},
 	}
 	rec := Request{RspBody: jsonBody(`{"status":"ok","maybe":null}`)}
@@ -123,7 +123,7 @@ func TestExtractProperties_CompositeLeafEncodedForPattern(t *testing.T) {
 	// A field resolving to an object, refined by a pattern scanning its JSON.
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{
-			{Name: "err_code", Source: "rsp.body", Field: "error", Pattern: `"code":"([A-Z0-9_]+)"`},
+			{Name: "err_code", Extract: Extract{From: "rsp.body", Path: "error", Pattern: `"code":"([A-Z0-9_]+)"`}},
 		},
 	}
 	rec := Request{RspBody: jsonBody(`{"error":{"code":"CARD_DECLINED","msg":"no"}}`)}
@@ -139,7 +139,7 @@ func TestExtractProperties_InvalidPatternOmits(t *testing.T) {
 	// omit silently, not panic.
 	d := &RequestDef{
 		Properties: []RequestPropertyDef{
-			{Name: "x", Source: "rsp.body", Field: "status", Pattern: `(unclosed`},
+			{Name: "x", Extract: Extract{From: "rsp.body", Path: "status", Pattern: `(unclosed`}},
 		},
 	}
 	rec := Request{RspBody: jsonBody(`{"status":"ok"}`)}
@@ -154,7 +154,7 @@ func TestRequestsForRecord_IdentityPlusExtraction(t *testing.T) {
 			{
 				Name: "CheckoutPayment", Route: "/api/checkout/pay", Method: "POST",
 				Tags: []string{"defect-prone"}, Memory: []string{"declines look like 200s"},
-				Properties: []RequestPropertyDef{{Name: "outcome", Source: "rsp.body", Field: "status"}},
+				Properties: []RequestPropertyDef{{Name: "outcome", Extract: Extract{From: "rsp.body", Path: "status"}}},
 			},
 			{Name: "GetUser", Route: "/api/me", Method: "GET"}, // different route, shouldn't match
 		},

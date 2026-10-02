@@ -4,11 +4,13 @@ title: Request property extraction via `properties[]`
 author: Clint Ayres (@jurassix)
 status: Accepted
 created: 2026-07-31
-updated: 2026-09-29
+updated: 2026-10-02
 spec-version-target: 1
 related-issues: [157]
 related-discussions: []
 ---
+
+> **Extraction syntax superseded by [SEP-0017](0017-extract-object.md).** `source`/`field`/`pattern` are written as `extract: { from, path, pattern }`; their meaning is unchanged.
 
 > **Accepted 2026-09-29. Implemented.** The `source` / `field` / `pattern`
 > extraction described below ships in the Go SDK, covered by conformance

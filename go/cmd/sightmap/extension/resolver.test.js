@@ -65,6 +65,42 @@ describe("extractProperties", () => {
     expect(result).toEqual({});
   });
 
+  test("the extract object resolves every source with pattern and join", () => {
+    document.body.innerHTML =
+      '<div id="card" data-sku="A1">Add to cart · $10.95' +
+      '<span class="tag">sale</span><span class="tag"></span><span class="tag">featured</span>' +
+      '<input class="opt" type="checkbox" checked></div>';
+    const card = document.getElementById("card");
+    card.querySelector(".opt").checked = false;
+    const components = [
+      { name: "Tag", selector: ".tag", properties: [{ name: "value", extract: { from: "dom.text" } }] },
+      { name: "Badge", selector: ".badge" },
+    ];
+    const props = [
+      { name: "price", extract: { from: "dom.raw_text", pattern: "\\$([\\d.]+)" } },
+      { name: "sku", extract: { from: "dom.attr", path: "data-sku" } },
+      { name: "tags", extract: { from: "component", path: "Tag.value", join: "," } },
+      { name: "first", extract: { from: "component", path: "Tag.value" } },
+      { name: "has_tag", extract: { from: "component.exists", path: "Tag" } },
+      { name: "has_badge", extract: { from: "component.exists", path: "Badge" } },
+      { name: "off", extract: { from: "dom.state", path: "disabled" } },
+    ];
+    expect(extractProperties(card, props, components)).toEqual({
+      price: "10.95",
+      sku: "A1",
+      tags: "sale,featured",
+      first: "sale",
+      has_tag: "true",
+    });
+    const box = card.querySelector(".opt");
+    expect(
+      extractProperties(box, [
+        { name: "on", extract: { from: "dom.state", path: "checked" } },
+        { name: "markup", extract: { from: "dom.attr", path: "checked" } },
+      ], []),
+    ).toEqual({ on: "false" });
+  });
+
   test("PATH.prop reads a descendant component's own extracted property", () => {
     document.body.innerHTML =
       '<div id="card"><span class="price">$12.00</span></div>';

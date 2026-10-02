@@ -125,20 +125,20 @@ views:
         description: One post summary — topic, date, title, excerpt
         properties:
           - name: title
-            extract: blog-card-title.text
+            extract: { from: component, path: blog-card-title.text }
           - name: topic
-            extract: blog-card-topic.text
+            extract: { from: component, path: blog-card-topic.text }
         children:
           - name: blog-card-title
             selector: '.blog-card__title'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: blog-card-topic
             selector: '.blog-card__meta span'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: blog-card-excerpt
             selector: '.blog-card__excerpt'
 
@@ -217,9 +217,9 @@ views:
         description: One entry summary — screenshot, mark, name, method pill, stats, author, updated
         properties:
           - name: site
-            extract: atlas-card-name.text
+            extract: { from: component, path: atlas-card-name.text }
           - name: method
-            extract: atlas-card-method.text
+            extract: { from: component, path: atlas-card-method.text }
         memory:
           - The whole card is the link to /atlas/<slug>; there is no inner call to action
           - An entry with no screenshots renders a typographic fallback panel in place of the image
@@ -229,12 +229,12 @@ views:
             selector: '.atlas-card__name'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: atlas-card-method
             selector: '.atlas-card__method'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: atlas-card-stats
             selector: '.atlas-card__stats'
 
@@ -267,7 +267,7 @@ views:
         description: The `sightmap atlas add <slug>` command with a copy button
         properties:
           - name: command
-            extract: atlas-install-cmd.text
+            extract: { from: component, path: atlas-install-cmd.text }
         memory:
           - The button label toggles to "Copied" for 2s and only on a copy that actually succeeded
         children:
@@ -275,7 +275,7 @@ views:
             selector: '.atlas-install__cmd'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: atlas-install-copy
             selector: '.atlas-install__copy'
 
@@ -285,9 +285,9 @@ views:
         description: Provenance rail for the entry — how and when it was captured, by whom, against which CLI and spec version
         properties:
           - name: lastVerified
-            extract: atlas-meta-verified.text
+            extract: { from: component, path: atlas-meta-verified.text }
           - name: commit
-            extract: atlas-meta-commit.text
+            extract: { from: component, path: atlas-meta-commit.text }
         memory:
           - A row is omitted entirely rather than left blank when its value is absent, so the rail's row count varies by entry
         children:
@@ -295,12 +295,12 @@ views:
             selector: 'time'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: atlas-meta-commit
             selector: 'code'
             properties:
               - name: text
-                extract: text
+                extract: { from: dom.text }
           - name: AtlasMetaMachine
             selector: '.atlas-meta__machine'
             description: Links to the machine-readable twins of this entry
@@ -380,9 +380,9 @@ views:
         description: One scroll chapter of the story — eyebrow, heading, body, and an optional call to action
         properties:
           - name: chapter
-            extract: attr=data-chapter
+            extract: { from: dom.attr, path: data-chapter }
           - name: active
-            extract: attr=data-active
+            extract: { from: dom.attr, path: data-active }
         children:
           - name: bld-card
             selector: '.bld-card'

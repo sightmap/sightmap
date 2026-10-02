@@ -4,11 +4,13 @@ title: Richer node data for extraction — raw_text and interactive state
 author: Joel Webber (@joelgwebber)
 status: Accepted
 created: 2026-09-08
-updated: 2026-09-10
+updated: 2026-10-02
 spec-version-target: 1
 related-issues: [443]  # interactive-state attrs follow-up (the one unshipped surface)
 related-discussions: []
 ---
+
+> **Spelling superseded by [SEP-0017](0017-extract-object.md).** `raw_text` is written `from: dom.raw_text`, and interactive state is read with `from: dom.state` rather than through `attr=`, which reads only the markup.
 
 ## Summary
 

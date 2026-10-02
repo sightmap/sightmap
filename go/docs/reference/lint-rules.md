@@ -131,9 +131,9 @@ selector: "#modal_12849"
   selector: '[data-component="product-card"]'
   properties:
     - name: sku
-      extract: attr:data-sku
+      extract: { from: dom.attr, path: data-sku }
     - name: label
-      extract: text:h3
+      extract: { from: dom.text }
 
 # DOES NOT TRIGGER — unique selector (data-testid)
 - name: SubmitButton

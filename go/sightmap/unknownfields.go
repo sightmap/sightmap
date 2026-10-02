@@ -33,10 +33,11 @@ var (
 	accessFields    = set("status", "reason")
 	snapshotFields  = set("name", "notes", "url")
 
-	requestPropertyFields = set("name", "source", "field", "pattern")
+	requestPropertyFields = set("name", "extract", "source", "field", "pattern")
 	messageFields         = set("name", "level", "message", "description", "source", "tags", "properties")
 	signalFields          = set("name", "ref", "tags")
-	messagePropertyFields = set("name", "source", "field", "pattern")
+	messagePropertyFields = set("name", "extract", "source", "field", "pattern")
+	extractFields         = set("from", "path", "pattern", "join")
 	environmentFields     = set("name", "platform", "app_id", "build_type", "backend", "origins")
 )
 
@@ -240,7 +241,7 @@ func walkComponentOrRef(node *yaml.Node, file string, out *[]ValidationError) {
 
 func walkComponent(node *yaml.Node, file string, out *[]ValidationError) {
 	v := checkKeys(node, componentFields, file, out)
-	forEachItem(v["properties"], func(n *yaml.Node) { checkKeys(n, propertyFields, file, out) })
+	forEachItem(v["properties"], func(n *yaml.Node) { walkExtract(checkKeys(n, propertyFields, file, out), file, out) })
 	forEachItem(v["children"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 }
 
@@ -255,7 +256,17 @@ func walkRequest(node *yaml.Node, file string, out *[]ValidationError) {
 	forEachItem(v["properties"], func(n *yaml.Node) {
 		pv := checkKeys(n, requestPropertyFields, file, out)
 		checkStringScalars(pv, []string{"name", "source", "field", "pattern"}, file, out)
+		walkExtract(pv, file, out)
 	})
+}
+
+// walkExtract checks the keys of an object-form `extract:` (SEP-0017). A string
+// form is a scalar and has no keys to check.
+func walkExtract(prop map[string]*yaml.Node, file string, out *[]ValidationError) {
+	if e := prop["extract"]; e != nil && e.Kind == yaml.MappingNode {
+		ev := checkKeys(e, extractFields, file, out)
+		checkStringScalars(ev, []string{"from", "path", "pattern", "join"}, file, out)
+	}
 }
 
 func walkMessage(node *yaml.Node, file string, out *[]ValidationError) {
@@ -268,6 +279,7 @@ func walkMessage(node *yaml.Node, file string, out *[]ValidationError) {
 	forEachItem(v["properties"], func(n *yaml.Node) {
 		pv := checkKeys(n, messagePropertyFields, file, out)
 		checkStringScalars(pv, []string{"name", "source", "field", "pattern"}, file, out)
+		walkExtract(pv, file, out)
 	})
 }
 

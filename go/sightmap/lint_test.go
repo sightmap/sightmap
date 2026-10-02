@@ -232,7 +232,7 @@ func TestLint_MultiInstanceWithProperties_NoWarn(t *testing.T) {
 			Name:      "ProductCard",
 			Selectors: []string{`[data-component="product-card"]`},
 			Properties: []sightmap.ComponentPropertyDef{
-				{Name: "sku", Extract: "attr:data-sku"},
+				{Name: "sku", Extract: sightmap.LowerComponentExtract("attr:data-sku")},
 			},
 		},
 	}, nil)
@@ -428,7 +428,7 @@ func TestLint_ChildComponent_NoWarn(t *testing.T) {
 					Name:      "ProductGrid",
 					Selectors: []string{`[data-testid="product-grid"]`},
 					Properties: []sightmap.ComponentPropertyDef{
-						{Name: "ProductCard", Extract: ".product-card"},
+						{Name: "ProductCard", Extract: sightmap.LowerComponentExtract(".product-card")},
 					},
 				},
 			},

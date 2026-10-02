@@ -33,17 +33,17 @@ func (d *MessageDef) ExtractProperties(rec Message) []PropertyValue {
 func resolveMessageProperty(p MessagePropertyDef, rec Message) (string, bool) {
 	var raw string
 	var ok bool
-	switch p.Source {
+	switch p.Extract.From {
 	case "stack":
-		raw, ok = resolveStackField(rec.Stack, p.Field)
+		raw, ok = resolveStackField(rec.Stack, p.Extract.Path)
 	default:
 		return "", false
 	}
 	if !ok {
 		return "", false
 	}
-	if p.Pattern != "" {
-		matched, ok := applyPattern(p.Pattern, raw)
+	if p.Extract.Pattern != "" {
+		matched, ok := applyPattern(p.Extract.Pattern, raw)
 		if !ok {
 			return "", false
 		}

@@ -34,42 +34,45 @@ components:
     selector: '.summary'
     properties:
       - name: card
-        extract: CardNumber.value
+        extract: { from: component, path: CardNumber.value }
       - name: has_card
-        extract: 'exists:CardNumber'
+        extract: { from: component.exists, path: CardNumber }
     children:
       - name: CardNumber
         selector: 'input[name="cc"]'
         privacy: block
         properties:
           - name: value
-            extract: attr=value
+            extract: { from: dom.attr, path: value }
 
-  # Under mask, exists: still resolves (presence is structure) while text does not.
+  # Under mask, component.exists still resolves (presence is structure) while
+  # dom.text does not.
   - name: BillingAddress
     selector: '.billing'
     privacy: mask
     properties:
       - name: line1
-        extract: text
+        extract: { from: dom.text }
       - name: present
-        extract: 'exists:PostcodeField'
+        extract: { from: component.exists, path: PostcodeField }
     children:
       - name: PostcodeField
         selector: 'input[name="zip"]'
 
-  # Attributes under mask: the four SEP-0013 interactive-state names still resolve
-  # (a closed set carrying state, not a value), while a data-* attribute does not.
-  # Naming data-account-id in an attr= extract is itself the declaration that it
-  # carries content, which is what makes the rule self-closing.
+  # Under mask, dom.state still resolves (a closed set carrying state, not a
+  # value), while a dom.attr read does not. Naming data-account-id in a dom.attr
+  # extract is itself the declaration that it carries content.
+  #
+  # The three reads withheld by their component's own privacy (value, line1,
+  # account) each draw an extract-privacy-withheld warning (SEP-0017).
   - name: SubscribeToggle
     selector: '[role="switch"]'
     privacy: mask
     properties:
       - name: on
-        extract: attr=checked
+        extract: { from: dom.state, path: checked }
       - name: account
-        extract: attr=data-account-id
+        extract: { from: dom.attr, path: data-account-id }
 
 views:
   - name: Checkout
