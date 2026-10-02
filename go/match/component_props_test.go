@@ -85,6 +85,38 @@ func TestResolveRawText(t *testing.T) {
 	}
 }
 
+// attr= on a SEP-0013 state name reads the node's current state, not the DOM
+// attribute: `checked` here is the initial-state attribute (still present after
+// the user unchecked the box), and `disabled` is valueless.
+func TestResolveInteractiveState(t *testing.T) {
+	defs := []sightmap.ComponentDef{{
+		Name:      "Optin",
+		Selectors: []string{"input"},
+		Properties: []sightmap.ComponentPropertyDef{
+			{Name: "on", Extract: "attr=checked"},
+			{Name: "off", Extract: "attr=disabled"},
+			{Name: "open", Extract: "attr=expanded"},
+			{Name: "kind", Extract: "attr=type"},
+		},
+	}}
+	box := &sightmap.ComponentNode{
+		Id:    "box",
+		State: map[string]string{"checked": "false", "disabled": "true"},
+		Element: &sightmap.Element{Tag: "input", Attrs: map[string]string{
+			"type": "checkbox", "checked": "", "disabled": "",
+		}},
+	}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(box, "")
+	for name, want := range map[string]string{"on": "false", "off": "true", "kind": "checkbox"} {
+		if v, ok := propVal(res[box], name); !ok || v != want {
+			t.Errorf("%s = %q, %v; want %q, true", name, v, ok, want)
+		}
+	}
+	if v, ok := propVal(res[box], "open"); ok {
+		t.Errorf("open = %q; want omitted (the node has no expanded state)", v)
+	}
+}
+
 func propVal(cm *sightmap.ComponentMatch, name string) (string, bool) {
 	if cm == nil {
 		return "", false

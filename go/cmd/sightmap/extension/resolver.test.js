@@ -33,6 +33,31 @@ describe("extractProperties", () => {
     expect(result).toEqual({ href: "/x" });
   });
 
+  test("attr= on a state name reads current state, not the attribute", () => {
+    document.body.innerHTML =
+      '<input id="box" type="checkbox" checked disabled>' +
+      '<div id="sw" role="switch" aria-checked="true"></div>' +
+      '<details id="more"><summary>More</summary></details>';
+    const box = document.getElementById("box");
+    box.checked = false;
+    const props = [
+      { name: "on", extract: "attr=checked" },
+      { name: "off", extract: "attr=disabled" },
+      { name: "open", extract: "attr=expanded" },
+    ];
+    expect(extractProperties(box, props, [])).toEqual({ on: "false", off: "true" });
+    expect(extractProperties(document.getElementById("sw"), props, [])).toEqual({ on: "true" });
+    expect(extractProperties(document.getElementById("more"), props, [])).toEqual({ open: "false" });
+  });
+
+  test("raw_text reads only the element's own text nodes", () => {
+    document.body.innerHTML = '<h2 id="h">Main <span>Most popular</span></h2>';
+    const h = document.getElementById("h");
+    const props = [{ name: "tier", extract: "raw_text" }];
+    expect(extractProperties(h, props, [])).toEqual({ tier: "Main" });
+    expect(extractProperties(h.querySelector("span"), props, [])).toEqual({ tier: "Most popular" });
+  });
+
   test("attr=NAME on a missing attribute omits the property", () => {
     document.body.innerHTML = '<a id="link">Link</a>';
     const link = document.getElementById("link");

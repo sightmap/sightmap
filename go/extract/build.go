@@ -122,6 +122,7 @@ func walkDOMNode(
 		RawText:       normalizeText(pc.RawText),
 		Value:         value,
 		Properties:    props,
+		State:         nodeState(pc.State, props),
 		Element:       el,
 		Bounds:        pc.Bounds,
 		IsVisible:     pc.IsVisible,
@@ -133,6 +134,28 @@ func walkDOMNode(
 	}
 
 	return compNode, nil
+}
+
+// nodeState merges the probe's native-property state with the accessibility
+// tree's, the AX value winning: it reflects ARIA overrides and custom widgets
+// the probe's tag rules do not know. Empty values are dropped so attr= never
+// surfaces "" for a state the node does not report.
+func nodeState(probe, ax map[string]string) map[string]string {
+	var out map[string]string
+	set := func(name, v string) {
+		if v == "" {
+			return
+		}
+		if out == nil {
+			out = make(map[string]string, len(sightmap.StateAttrNames))
+		}
+		out[name] = v
+	}
+	for _, name := range sightmap.StateAttrNames {
+		set(name, probe[name])
+		set(name, ax[name])
+	}
+	return out
 }
 
 // normalizeText collapses every run of whitespace (spaces, tabs, newlines) to a

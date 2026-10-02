@@ -74,6 +74,7 @@ Viewport bounding box in pixels.
 | Text | string | `text` | post-merge | Rendered text content (`innerText`, `textContent` fallback), normalized to a single clean shape (whitespace runs collapsed, ends trimmed). Present for role-less nodes that have no accessible name; the fallback source for `extract: text`. Omitted when empty. |
 | Value | string | `value` | post-merge | Current value for form controls. |
 | Properties | map[string]string | `properties` | post-merge | Additional A11Y properties (`aria-*` etc.). |
+| State | map[string]string | `state` | post-merge | Current interactive state under the SEP-0013 names (`checked`, `selected`, `disabled`, `expanded`), `"true"`/`"false"` (`"mixed"` for an indeterminate checkbox). Probe native properties, overlaid by the A11Y tree. Read by `extract: attr=NAME` before `Element.Attrs`. |
 | Element | \*Element | `element` | pre-merge | Observed element identity (tag/id/classes/attrs). Nil for virtual nodes. Matched against `SelectorPart` patterns. |
 | Bounds | \*Bounds | `bounds` | pre-merge | Viewport bounding box. |
 | IsVisible | bool | `isVisible` | pre-merge | Effective visibility, computed in-browser via `Element.checkVisibility` — false when the element or any ancestor is hidden (`display:none`, `visibility:hidden`, `opacity:0`, `content-visibility`). |
@@ -83,7 +84,7 @@ Viewport bounding box in pixels.
 | NthChild | int | `nthChild` | pre-merge | 1-based position among parent's children. |
 | Children | []\*ComponentNode | `children` | pre-merge | Direct children in document order. |
 
-`omitempty` applies to: `Properties`, `Element`, `Bounds`, `Children`.
+`omitempty` applies to: `Properties`, `State`, `Element`, `Bounds`, `Children`.
 
 ### Element
 

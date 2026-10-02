@@ -62,7 +62,15 @@ func resolveExtract(
 
 	case strings.HasPrefix(extract, "attr="):
 		name := extract[len("attr="):]
-		if name == "" || node.Element == nil {
+		if name == "" {
+			return "", false
+		}
+		if sightmap.IsStateAttr(name) {
+			if v := node.State[name]; v != "" {
+				return v, true
+			}
+		}
+		if node.Element == nil {
 			return "", false
 		}
 		v, ok := node.Element.Attrs[name]

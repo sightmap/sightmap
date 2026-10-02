@@ -72,3 +72,17 @@ type Conflict struct {
 	// or to decide which is over-broad) must use Defs.
 	Defs []*ComponentDef
 }
+
+// StateAttrNames are the interactive-state names SEP-0013 requires a node to
+// carry, readable via `extract: attr=NAME`.
+var StateAttrNames = []string{"checked", "selected", "disabled", "expanded"}
+
+// IsStateAttr reports whether name is one of StateAttrNames.
+func IsStateAttr(name string) bool {
+	for _, n := range StateAttrNames {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}

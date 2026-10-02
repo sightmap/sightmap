@@ -162,6 +162,52 @@ function resolvePath(el, path, components, ownerAddress) {
   return cur === el ? null : { el: cur, def };
 }
 
+const STATE_ATTRS = ["checked", "selected", "disabled", "expanded"];
+
+/**
+ * A control's current interactive state under the SEP-0013 names, mirroring the
+ * capture probe: native properties rather than attributes, since the `checked`
+ * attribute is the initial state and `<button disabled>` is valueless. Returns
+ * "true"/"false" ("mixed" for an indeterminate checkbox), or null when the
+ * element cannot have that state.
+ */
+function stateOf(el, name) {
+  const tag = el.tagName.toLowerCase();
+  const aria = (attr, values) => {
+    const v = (el.getAttribute(attr) || "").toLowerCase();
+    return values.includes(v) ? v : null;
+  };
+  switch (name) {
+    case "checked": {
+      const type = (el.getAttribute("type") || "").toLowerCase();
+      if (tag === "input" && (type === "checkbox" || type === "radio")) {
+        return el.indeterminate ? "mixed" : String(!!el.checked);
+      }
+      return aria("aria-checked", ["true", "false", "mixed"]);
+    }
+    case "selected":
+      return tag === "option"
+        ? String(!!el.selected)
+        : aria("aria-selected", ["true", "false"]);
+    case "disabled":
+      return /^(button|input|select|textarea|fieldset|optgroup|option)$/.test(tag)
+        ? String(el.matches(":disabled"))
+        : aria("aria-disabled", ["true", "false"]);
+    case "expanded":
+      return tag === "details"
+        ? String(!!el.open)
+        : aria("aria-expanded", ["true", "false"]);
+  }
+  return null;
+}
+
+/** The element's own direct text-node content (SEP-0013 `raw_text`). */
+function rawTextOf(el) {
+  let s = "";
+  for (const n of el.childNodes) if (n.nodeType === 3) s += n.data;
+  return s;
+}
+
 /**
  * Resolve one SEP-0010 extract directive against el, over the component tree.
  * References descend only, so recursion always terminates.
@@ -169,7 +215,12 @@ function resolvePath(el, path, components, ownerAddress) {
 function resolveExtract(el, extract, components, ownerAddress) {
   if (extract === "text") return el.textContent;
   if (typeof extract !== "string") return null;
-  if (extract.startsWith("attr=")) return el.getAttribute(extract.slice(5));
+  if (extract === "raw_text") return rawTextOf(el);
+  if (extract.startsWith("attr=")) {
+    const name = extract.slice(5);
+    const state = STATE_ATTRS.includes(name) ? stateOf(el, name) : null;
+    return state ?? el.getAttribute(name);
+  }
   if (extract.startsWith("exists:")) {
     return resolvePath(el, extract.slice(7), components, ownerAddress)
       ? "true"
@@ -194,7 +245,7 @@ function resolveExtract(el, extract, components, ownerAddress) {
 
 /**
  * Extract property values for a matched element, resolved over the component
- * tree (SEP-0010): text/attr read the element itself; PATH.prop and exists:PATH
+ * tree (SEP-0010): text/raw_text/attr read the element itself; PATH.prop and exists:PATH
  * reference descendant components. `text` is the element's DOM text content — the
  * extension's implementation-defined accessible text.
  *

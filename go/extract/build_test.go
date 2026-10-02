@@ -454,3 +454,21 @@ func TestPruneNonContentNodes(t *testing.T) {
 		t.Errorf("surviving child = %q, want the button %q", root.Children[0].Name, "Submit")
 	}
 }
+
+func TestNodeStateAXWins(t *testing.T) {
+	probe := map[string]string{"checked": "false", "disabled": "false"}
+	ax := map[string]string{"checked": "true", "expanded": "", "focusable": "true"}
+	got := nodeState(probe, ax)
+	want := map[string]string{"checked": "true", "disabled": "false"}
+	if len(got) != len(want) {
+		t.Fatalf("nodeState() = %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("nodeState()[%q] = %q, want %q", k, got[k], v)
+		}
+	}
+	if nodeState(nil, map[string]string{"focusable": "true"}) != nil {
+		t.Error("nodeState() with no state names should be nil")
+	}
+}

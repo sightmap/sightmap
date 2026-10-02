@@ -138,6 +138,13 @@ type ComponentNode struct {
 	// Properties holds additional A11Y properties (aria-* and others). (post-merge)
 	Properties map[string]string `json:"properties,omitempty"`
 
+	// State is the control's current interactive state under the SEP-0013 names
+	// (checked, selected, disabled, expanded), as "true"/"false" ("mixed" for an
+	// indeterminate checkbox). `extract: attr=NAME` reads it before Element.Attrs.
+	// It is kept apart from Attrs because a DOM attribute such as `checked` is the
+	// initial state, and selectors must keep matching what the DOM carries.
+	State map[string]string `json:"state,omitempty"`
+
 	// Element is the observed identity of the underlying DOM element — its
 	// tag/id/classes/attrs. (pre-merge) Nil for nodes that have no corresponding
 	// DOM element (e.g. virtual nodes). It is matched against SelectorPart
