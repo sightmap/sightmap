@@ -57,6 +57,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](../seps/0006-message-entity.md)) |
 | 020 | `message-properties` | `properties:` on a message validates via `source: stack` with a `<frame>.<attribute>` `field` and an optional `pattern` ([SEP-0006](../seps/0006-message-entity.md)) |
 | 024 | `message-tags-ambiguity` | Tags resolve as a union across every matching `messages:` entry even where identity is ambiguous, so `message-conflict` warns while the tag union still holds ([SEP-0016](../seps/0016-message-and-signal-tags.md)) |
+| 025 | `signals` | `signals:` resolves refs to a request, component, message, and view; filter keys resolve against declared properties, reserved request identities, and the built-in `value`; an unquoted integer filter value is accepted ([SEP-0007](../seps/0007-signals.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

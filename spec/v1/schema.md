@@ -22,6 +22,7 @@ views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
 requests:    # optional, Request[] — global, matched on every view
 messages:    # optional, Message[] — console/exception patterns
+signals:     # optional, Signal[] — classifications composed from the above
 ```
 
 | Field | Type | Required | Description |
@@ -32,6 +33,7 @@ messages:    # optional, Message[] — console/exception patterns
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
 | `requests` | [Request](#request)[] | no | **Global** requests — matched against every view. |
 | `messages` | [Message](#message)[] | no | Console-output and exception patterns. Corpus-root only; there is no view-scoped form. |
+| `signals` | [Signal](#signal)[] | no | Classification rules composed from other entities. Corpus-root only; there is no view-scoped form. |
 
 ## View
 
@@ -354,27 +356,69 @@ A consumer evaluating live records MUST surface an ambiguity when a record match
 
 ## Signal
 
-A named, reference-based **state predicate**: a signal names an existing component or view (`ref:`) and denotes the boolean of that entity's *current* state — a component being present, or a view's route being active. It is the smallest, dependency-free slice of [SEP-0007](../seps/0007-signals.md): the point-signal shape restricted to `Component` and `View` refs (a component ref leans only on the existing [component properties](#component-properties); a view ref needs nothing). Request and message refs — and the temporal/window machinery of the fuller signals proposal — are intentionally out of scope in this subset.
-
-Its purpose is to give the rest of the tooling a named boolean to point at: a completion predicate ("done once `checkout.reached` holds"), an availability predicate ("offer the dismiss affordance while `upsell.present` holds"), or a session classification. Because a component ref evaluates exactly like a component match and a view ref like a route match, a signal is the *named* form of a predicate the matcher already computes.
+A named, tagged classification composed from an entity the corpus already defines. A signal references that entity by name and optionally filters on its declared properties. It never declares a selector, route, or body pattern of its own, so a classification cannot drift away from the thing it is about.
 
 ```yaml
-signals:
-  - name: checkout.reached
-    ref: Checkout           # a view -> its route is active
+requests:
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    method: POST
+    properties:
+      - name: outcome
+        source: rsp.body
+        field: status
 
-  - name: upsell.present
-    ref: UpsellModal        # a component -> it currently matches (is present)
-    tags: [interstitial]
+signals:
+  - name: checkout.payment.declined
+    tags: [defect]
+    ref: CheckoutPayment
+    filter:
+      outcome: declined
 ```
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | yes | Semantic identity of the signal — a named boolean predicate, addressable by other tooling. |
-| `ref` | string | yes | Name of an existing component or view this signal is about. Must resolve to exactly one. |
-| `tags` | string[] | no | Open-vocabulary classification labels carried onto the signal. |
+| `name` | string | yes | Semantic identity of the generated classification. |
+| `ref` | string | yes | Name of an existing `components:`/`requests:`/`messages:`/`views:` entry. Must resolve, and must not be ambiguous across entity kinds. |
+| `tags` | string[] | no | Labels carried onto the generated classification. See [Tags](#tags). |
+| `filter` | object | no | Property constraints, ANDed across keys. Omitted means the rule fires on every match of `ref`. |
 
-`ref` must resolve to exactly one entity. A name that matches nothing is reported as `signal-ref-unresolved`; a name that matches **both** a component and a view is `signal-ref-ambiguous` (there is no adjacency rule to prefer one, so it is rejected rather than silently resolved). Signal names must be unique across the corpus. `signals:` is corpus-root only — there is no view-scoped form. See [SEP-0007](../seps/0007-signals.md).
+Omitting `filter` is equivalent to a static `tags:` entry on the referenced entity, so `signals:` is a superset of that mechanism rather than a parallel one. Reach for `filter` only when the entity's mere presence is not itself the classification.
+
+### Filter values
+
+A key's value is either one accepted value (equality) or a list of them (membership). Keys are ANDed; there is no `OR` in v1, so a classification needing one is expressed as several `signals:` entries.
+
+Values compare as canonical text, and an unquoted integer or boolean is accepted so the natural spelling works:
+
+```yaml
+filter:
+  status: 200                    # integer, compares as "200"
+  outcome: [queued, deferred]    # membership
+  rate_limit_remaining: "0"      # quoted, compares as "0"
+```
+
+An integer compares as its **numeric value in decimal**, not as the characters you typed. YAML accepts octal, hexadecimal, and underscore-separated integers, so `0200` is 128, `0x1F` is 31, and `1_000` is 1000. Comparing lexemes instead would make `0x1F` and `31` two different values for one number.
+
+A `null` (a bare `key:`), a float, and an empty list are all invalid: the first has nothing to compare, a float has no single canonical text (`1.50` versus `1.5`), and an empty list can never match.
+
+### Filter key resolution
+
+A filter key must resolve on the referenced entity. In order:
+
+1. A property the entity declares — `properties:` on a [Request](#request-properties) or a [Component](#component-properties).
+2. For a `Request` ref, a reserved identity name: `status`, `method`, `duration`.
+3. For a `Component` ref, the built-in `value`.
+
+A declared property shadows a reserved name of the same name; see [Request properties](#request-properties).
+
+A `Message` or `View` ref accepts **no** filter keys. A message's own `level`/`message` already identify it fully, and a view has no extractable property, so reference either without a filter.
+
+A key resolving to none of the above is an error (`signal-filter-unknown`). This is what keeps a signal tied to its entity: without it, a filter naming a property that was renamed or never existed would pass silently and the rule would simply never fire.
+
+### Multiple matching rules
+
+Each rule is evaluated independently. When more than one references the same entity and both match the same live instance, both fire — nothing is deduped or merged. A consumer sees one classification per firing rule, not one classification with several names. See [SEP-0007](../seps/0007-signals.md).
 
 ## Regular expressions
 
@@ -535,6 +579,8 @@ A conforming SDK:
 - MUST reject a `RequestProperty` whose `pattern` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
 - MUST reject a `messages:` entry whose `message` is not a valid RE2 regular expression (see [Regular expressions](#regular-expressions))
 - MUST reject a `MessageProperty` with a `source` other than `stack`, or one that omits `field`, or whose `pattern` is not a valid RE2 regular expression
+- MUST reject a `signals:` entry whose `ref` does not resolve, or resolves across more than one entity kind
+- MUST reject a `signals:` `filter` key that does not resolve on the referenced entity
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. a consumer that never surfaces `description` at runtime)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
@@ -547,8 +593,10 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - MUST match a `messages:` entry by case-insensitive equality on `level` and by regex on `message`, treating either as match-any when omitted
 - MUST surface an ambiguity when a record matches more than one `messages:` entry, rather than silently resolving to a first match
 - MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
+- MUST evaluate each `signals:` rule independently: a live instance matched by several rules produces one classification per matching rule
+- SHOULD carry the referenced entity's name on the generated classification, so its derivation stays explicit
 
-**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern` and matches no `messages:` entry against a console record. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
+**Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, but does not evaluate live activity: it resolves no `source`/`field`/`pattern`, matches no `messages:` entry against a console record, and evaluates no `signals:` rule. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
 ## Open questions
 

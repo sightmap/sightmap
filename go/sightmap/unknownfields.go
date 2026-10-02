@@ -35,7 +35,7 @@ var (
 
 	requestPropertyFields = set("name", "source", "field", "pattern")
 	messageFields         = set("name", "level", "message", "description", "source", "tags", "properties")
-	signalFields          = set("name", "ref", "tags")
+	signalFields          = set("name", "ref", "tags", "filter")
 	messagePropertyFields = set("name", "source", "field", "pattern")
 )
 
@@ -135,7 +135,7 @@ func walkFile(node *yaml.Node, file string, out *[]ValidationError) {
 	forEachItem(v["components"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 	forEachItem(v["requests"], func(n *yaml.Node) { walkRequest(n, file, out) })
 	forEachItem(v["messages"], func(n *yaml.Node) { walkMessage(n, file, out) })
-	forEachItem(v["signals"], func(n *yaml.Node) { checkKeys(n, signalFields, file, out) })
+	forEachItem(v["signals"], func(n *yaml.Node) { walkSignal(n, file, out) })
 	forEachItem(v["snapshots"], func(n *yaml.Node) { checkKeys(n, snapshotFields, file, out) })
 }
 
@@ -266,6 +266,69 @@ func walkMessage(node *yaml.Node, file string, out *[]ValidationError) {
 	forEachItem(v["properties"], func(n *yaml.Node) {
 		pv := checkKeys(n, messagePropertyFields, file, out)
 		checkStringScalars(pv, []string{"name", "source", "field", "pattern"}, file, out)
+	})
+}
+
+func walkSignal(node *yaml.Node, file string, out *[]ValidationError) {
+	v := checkKeys(node, signalFields, file, out)
+	checkStringScalars(v, []string{"name", "ref"}, file, out)
+	// filter keys are entity property names, not spec vocabulary, so they are
+	// not checked here — checkSignals resolves them against the referenced
+	// entity. Their VALUES are type-checked: a filter accepts a string, an
+	// integer, or a boolean (so `status: 200` reads naturally), and rejects a
+	// null or a float, which is what the JSON Schema says.
+	checkFilterValues(v["filter"], file, out)
+}
+
+// filterValueTags are the scalar tags a filter value may carry. An untagged
+// scalar is a plain string.
+var filterValueTags = map[string]bool{"": true, "!!str": true, "!!int": true, "!!bool": true}
+
+func checkFilterValues(filter *yaml.Node, file string, out *[]ValidationError) {
+	if filter == nil || filter.Kind != yaml.MappingNode {
+		return
+	}
+	for i := 0; i+1 < len(filter.Content); i += 2 {
+		key, val := filter.Content[i], filter.Content[i+1]
+		switch val.Kind {
+		case yaml.ScalarNode:
+			checkFilterScalar(key.Value, val, file, out)
+		case yaml.SequenceNode:
+			if len(val.Content) == 0 {
+				// A membership test against nothing can never match, so it is
+				// always an authoring mistake. The JSON Schema says minItems: 1.
+				*out = append(*out, ValidationError{
+					File:     file,
+					Code:     "field-type-invalid",
+					Severity: SeverityError,
+					Message: fmt.Sprintf("filter %q has an empty value list on line %d, which can never match; give it at least one value or drop the key",
+						key.Value, val.Line),
+				})
+				continue
+			}
+			for _, item := range val.Content {
+				if item.Kind == yaml.ScalarNode {
+					checkFilterScalar(key.Value, item, file, out)
+				}
+			}
+		}
+	}
+}
+
+func checkFilterScalar(key string, n *yaml.Node, file string, out *[]ValidationError) {
+	if filterValueTags[n.Tag] {
+		return
+	}
+	hint := "quote it to compare as text"
+	if n.Tag == "!!null" {
+		hint = "a filter value cannot be empty; give it a value or drop the key"
+	}
+	*out = append(*out, ValidationError{
+		File:     file,
+		Code:     "field-type-invalid",
+		Severity: SeverityError,
+		Message: fmt.Sprintf("filter %q has an invalid value on line %d: %s",
+			key, n.Line, hint),
 	})
 }
 
