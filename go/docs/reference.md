@@ -10,7 +10,7 @@ The reference is split into focused sections under [`reference/`](reference/):
 | Section | Covers |
 |---------|--------|
 | [Coverage model](reference/coverage-model.md) | T1/T2/T3 tiers, the done signal, T2 quality, triage categories |
-| [Component model](reference/component-model.md) | Component types, matching rules, properties & transforms, selector quality, naming, the `stability:` field |
+| [Component model](reference/component-model.md) | Component types, matching rules, properties, selector quality, naming, the `stability:` field |
 | [The outer loop](reference/outer-loop.md) | Session startup → per-page iteration → quality review → cross-page promotion → health check |
 | [Tool reference](reference/tools.md) | Every `sightmap` subcommand: `browser`, `snapshot`, `capture`, `coverage`, `report`, `multi-coverage`, `validate`, `lint`, and more |
 | [Lint rules](reference/lint-rules.md) | `broad-tag-selector`, `deep-nesting`, `id-hash-selector`, `multi-instance-no-property` |
