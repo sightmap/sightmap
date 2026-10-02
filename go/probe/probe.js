@@ -146,6 +146,46 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
      * Computes whether an element is interactive
      * Matches the existing isInteractiveElement() function in cdp_components.go
      */
+    // computeState carries a control's CURRENT interactive state under the four
+    // SEP-0013 names, as "true"/"false" ("mixed" for an indeterminate checkbox).
+    // It reads native properties, not attributes: the checked attribute is the
+    // initial state, and a valueless <button disabled> attribute is the empty
+    // string. A name is present only when the element can have that state.
+    // Kept separate from attributes so selector matching still sees the DOM.
+    function computeState(element, tag) {
+        const state = {};
+        const aria = (name, values) => {
+            const v = (element.getAttribute(name) || '').toLowerCase();
+            return values.indexOf(v) >= 0 ? v : null;
+        };
+        const type = (element.getAttribute('type') || '').toLowerCase();
+        if (tag === 'input' && (type === 'checkbox' || type === 'radio')) {
+            state.checked = element.indeterminate ? 'mixed' : String(!!element.checked);
+        } else {
+            const v = aria('aria-checked', ['true', 'false', 'mixed']);
+            if (v) state.checked = v;
+        }
+        if (tag === 'option') {
+            state.selected = String(!!element.selected);
+        } else {
+            const v = aria('aria-selected', ['true', 'false']);
+            if (v) state.selected = v;
+        }
+        if (/^(button|input|select|textarea|fieldset|optgroup|option)$/.test(tag)) {
+            state.disabled = String(element.matches(':disabled'));
+        } else {
+            const v = aria('aria-disabled', ['true', 'false']);
+            if (v) state.disabled = v;
+        }
+        if (tag === 'details') {
+            state.expanded = String(!!element.open);
+        } else {
+            const v = aria('aria-expanded', ['true', 'false']);
+            if (v) state.expanded = v;
+        }
+        return state;
+    }
+
     function computeInteractivity(element) {
         try {
             const tagName = element.tagName.toLowerCase();
@@ -343,6 +383,7 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
         }
 
         const tag = (element.tagName || '').toLowerCase();
+        const state = computeState(element, tag);
 
         // For iframe/frame elements, use content box instead of border box so
         // embedFrames offsets child content correctly past the border.
@@ -394,6 +435,7 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
             bounds: bounds,
             selector: selector,
             attributes: attributes,
+            state: state,
             onTop: onTop,
             isVisible: isVisible,
             inViewport: inViewport,
