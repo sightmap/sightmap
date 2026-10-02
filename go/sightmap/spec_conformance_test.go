@@ -20,10 +20,8 @@ import (
 // runSpecValidateFixtures closes that gap for `validate` cases: it runs the
 // reference validator (the same sightmap.Validate the `validate` command calls)
 // over each fixture matching glob and asserts its `validate` case's diagnostics
-// exactly. It is scoped by glob on purpose — a whole-suite executor also needs
-// the match/lint/explain commands, and at least one existing fixture (017-tags)
-// currently diverges from its own expected.json, so a full executor is separate
-// work.
+// exactly. It is scoped by glob on purpose: a whole-suite executor also needs the
+// match/lint/explain commands, so a full executor is separate work.
 func TestSpecConformance_RequestPropertyFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-request-properties.fixture")
 }
@@ -38,6 +36,19 @@ func TestSpecConformance_MessagePropertyFixtures(t *testing.T) {
 
 func TestSpecConformance_EnvironmentFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-environment*.fixture")
+}
+
+func TestSpecConformance_TagFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-tags.fixture")
+	runSpecValidateFixtures(t, "*-message-tags-ambiguity.fixture")
+}
+
+func TestSpecConformance_ComponentPrivacyFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-component-privacy.fixture")
+}
+
+func TestSpecConformance_ComponentWatchFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-component-watch.fixture")
 }
 
 func runSpecValidateFixtures(t *testing.T, glob string) {
