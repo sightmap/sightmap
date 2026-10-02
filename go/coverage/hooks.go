@@ -83,6 +83,21 @@ func hasLetter(s string) bool {
 	return false
 }
 
+// isNumeric reports whether s is a non-empty run of decimal digits — the
+// universal per-instance record-id tail ("/orders/42", "/blog/2023/06/15").
+// Such tails are dynamic across captures and never produce a portable suffix.
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 func countDigits(s string) int {
 	n := 0
 	for _, r := range s {
@@ -121,7 +136,7 @@ func hrefSuffix(href string) string {
 		return ""
 	}
 	seg := h[slash+1:]
-	if seg == "" || looksHashed(seg) {
+	if seg == "" || looksHashed(seg) || isNumeric(seg) {
 		return ""
 	}
 	return "/" + seg
