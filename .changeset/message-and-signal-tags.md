@@ -2,7 +2,7 @@
 "@sightmap/sightmap": minor
 ---
 
-Add `tags` to messages, ratify `tags` on signals, and close the `view.tags` gap (SEP-0016, Review).
+Add `tags` to messages, ratify `tags` on signals, and close the `view.tags` gap (SEP-0016).
 
 `tags` now reaches every matchable entity. SEP-0004 deferred messages because console and exception events "aren't a matchable entity in the spec today"; SEP-0006 then created the `messages` entity, matched by `level` and a `message` regex, so that premise no longer holds and no separate mechanism is needed.
 
