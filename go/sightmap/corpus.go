@@ -38,9 +38,9 @@ type Corpus struct {
 	// file-root `messages:` list). There is no view-scoped form.
 	Messages []MessageDef `json:"messages,omitempty"`
 
-	// Signals is the flat list of named state predicates (from a file-root
-	// `signals:` list) — the Component/View subset of SEP-0007. Resolve one with
-	// ResolveSignal / SignalByName. Corpus-root only; no view-scoped form.
+	// Signals is the flat list of classification rules (from a file-root
+	// `signals:` list), each referencing another entity by name. There is no
+	// view-scoped form.
 	Signals []SignalDef `json:"signals,omitempty"`
 
 	// loadDiagnostics holds structural problems detected while loading that are

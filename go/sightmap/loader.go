@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -50,9 +51,59 @@ type rawFile struct {
 }
 
 type rawSignal struct {
-	Name string   `yaml:"name"`
-	Ref  string   `yaml:"ref"`
-	Tags []string `yaml:"tags"`
+	Name   string                    `yaml:"name"`
+	Ref    string                    `yaml:"ref"`
+	Tags   []string                  `yaml:"tags"`
+	Filter map[string]rawFilterValue `yaml:"filter"`
+}
+
+// rawFilterValue accepts either one value or a list of them, and normalizes an
+// unquoted integer or boolean to its canonical text.
+//
+// The normalization matters for cross-SDK agreement. yaml.v3 hands back the raw
+// lexeme, so `code: 0200` would compare as "0200" here while a JSON-based SDK
+// parsing the same corpus sees 200. Re-emitting from the parsed value makes both
+// agree. Tags outside string/int/bool are left verbatim for the walker to report
+// rather than failing the whole file to load.
+type rawFilterValue []string
+
+func (r *rawFilterValue) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.ScalarNode:
+		*r = []string{canonicalFilterScalar(value)}
+		return nil
+	case yaml.SequenceNode:
+		parts := make([]string, 0, len(value.Content))
+		for _, item := range value.Content {
+			if item.Kind != yaml.ScalarNode {
+				return fmt.Errorf("filter list values must be scalars, got node kind %v", item.Kind)
+			}
+			parts = append(parts, canonicalFilterScalar(item))
+		}
+		*r = parts
+		return nil
+	default:
+		return fmt.Errorf("unexpected YAML node kind %v for filter value", value.Kind)
+	}
+}
+
+// canonicalFilterScalar renders a scalar filter value as the text it compares
+// as. An int round-trips through strconv so leading zeros and underscores
+// normalize; a bool becomes "true"/"false"; anything else keeps its lexeme.
+func canonicalFilterScalar(n *yaml.Node) string {
+	switch n.Tag {
+	case "!!int":
+		var i int64
+		if err := n.Decode(&i); err == nil {
+			return strconv.FormatInt(i, 10)
+		}
+	case "!!bool":
+		var b bool
+		if err := n.Decode(&b); err == nil {
+			return strconv.FormatBool(b)
+		}
+	}
+	return n.Value
 }
 
 type rawMessage struct {
@@ -398,21 +449,6 @@ func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 // problems (a missing name, a duplicate, an uncompilable regex) are reported by
 // checkMessages at validation time rather than dropped here, so an author sees
 // every problem at once.
-// toSignalDefs converts raw signal definitions into SignalDefs. Signals are flat
-// (name + ref + tags; no $ref, hierarchy, or selector cascade), so they convert
-// directly; ref resolution and the Component/View restriction are checked by
-// validate_signal.go, not here.
-func toSignalDefs(rss []rawSignal) []SignalDef {
-	if len(rss) == 0 {
-		return nil
-	}
-	out := make([]SignalDef, 0, len(rss))
-	for _, rs := range rss {
-		out = append(out, SignalDef{Name: rs.Name, Ref: rs.Ref, Tags: rs.Tags})
-	}
-	return out
-}
-
 func toMessageDefs(rms []rawMessage) []MessageDef {
 	if len(rms) == 0 {
 		return nil
@@ -449,6 +485,31 @@ func toMessageProperties(rps []rawMessageProperty) []MessagePropertyDef {
 			Source:  rp.Source,
 			Field:   rp.Field,
 			Pattern: rp.Pattern,
+		})
+	}
+	return out
+}
+
+// toSignalDefs converts raw classification rules (SEP-0007). Ref resolution and
+// filter-key checks happen at validation time; see validate_signal.go.
+func toSignalDefs(rss []rawSignal) []SignalDef {
+	if len(rss) == 0 {
+		return nil
+	}
+	out := make([]SignalDef, 0, len(rss))
+	for _, rs := range rss {
+		var filter map[string][]string
+		if len(rs.Filter) > 0 {
+			filter = make(map[string][]string, len(rs.Filter))
+			for k, v := range rs.Filter {
+				filter[k] = v
+			}
+		}
+		out = append(out, SignalDef{
+			Name:   rs.Name,
+			Ref:    rs.Ref,
+			Tags:   rs.Tags,
+			Filter: filter,
 		})
 	}
 	return out
