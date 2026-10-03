@@ -108,24 +108,39 @@ func TestFilter_MatchedInvisible_KeepsWrapper(t *testing.T) {
 	}
 }
 
-// TestFilter_MatchedFullyInvisible_ChildlessComp pins the behavior of a matched
+// TestFilter_MatchedFullyInvisible_RendersNothing pins the behavior of a matched
 // container whose ENTIRE subtree is invisible (e.g. display:none, where probe.js
 // propagates invisibility to all descendants): there are no visible survivors to
-// promote, so the kept node renders as a CHILDLESS [Comp]. This is the same
-// behavior the codebase already has for a VISIBLE empty matched container (see
-// TestFilter_MatchProtectsFromTransparency, which uses a childless matched
-// role="none" node) — the fix removes the asymmetry rather than introducing one.
-func TestFilter_MatchedFullyInvisible_ChildlessComp(t *testing.T) {
+// promote, so the matched node is treated as transparent and renders nothing —
+// no phantom [Comp] entry for a closed modal, collapsed menu, or inactive tab.
+// This keeps the tree in lockstep with coverage, which skips the same invisible
+// nodes under VisibleOnly.
+func TestFilter_MatchedFullyInvisible_RendersNothing(t *testing.T) {
 	nav := node("nav", "generic", "", false /* visible */, false, false,
 		node("a1", "link", "Open", false, true, false), // invisible child
 	)
 	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{nav: {Name: "Navbar"}}
-	comp := Filter(nav, matches)
-	if comp == nil || comp.Role != "Navbar" || comp.Match == nil {
-		t.Fatalf("expected childless [Navbar] comp, got %+v", comp)
+	if comp := Filter(nav, matches); comp != nil {
+		t.Fatalf("expected nil for fully-invisible matched subtree, got %+v", comp)
 	}
-	if len(comp.Children) != 0 {
-		t.Errorf("expected 0 children (fully-invisible subtree), got %d", len(comp.Children))
+}
+
+// TestFilter_MatchedInvisible_NestedUnderInvisibleAncestor extends the
+// fully-invisible case to a matched node nested under a hidden matched ancestor
+// (e.g. a matched menu inside a closed matched dialog). Both the ancestor and
+// the descendant are invisible with no visible survivors, so neither renders —
+// no phantom [Dialog] or [Menu] entry reaches the tree.
+func TestFilter_MatchedInvisible_NestedUnderInvisibleAncestor(t *testing.T) {
+	menu := node("menu", "generic", "", false, false, false,
+		node("i1", "menuitem", "Delete", false, true, false),
+	)
+	dialog := node("dialog", "generic", "", false, false, false, menu)
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
+		dialog: {Name: "Dialog"},
+		menu:   {Name: "Menu"},
+	}
+	if comp := Filter(dialog, matches); comp != nil {
+		t.Fatalf("expected nil for fully-invisible nested matched subtree, got %+v", comp)
 	}
 }
 

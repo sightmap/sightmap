@@ -37,7 +37,9 @@ type FormatOpts struct {
 //   - style/script/noscript tags are dropped (with their subtrees)
 //   - invisible nodes (without a sightmap match) are made transparent (their
 //     visible descendants are promoted); a sightmap-MATCHED invisible node is
-//     kept so its [ComponentName] wrapper survives above the visible descendants
+//     kept only when at least one descendant survives, so its [ComponentName]
+//     wrapper survives above the visible descendants (a fully-hidden matched
+//     subtree renders nothing)
 //   - role="none" structural wrappers (without a sightmap match) are made
 //     transparent (removed; their children are promoted)
 //   - AX-ignored nodes (without a sightmap match) are made transparent
@@ -192,8 +194,9 @@ func decide(node *sightmap.ComponentNode, matched bool) disposition {
 	// its [ComponentName] wrapper survives and the role-replacement block in
 	// convert runs — otherwise the visible descendants are promoted anonymously
 	// while coverage and the T2 trace still attribute them to the matched node,
-	// contradicting the tree. (A fully-invisible matched subtree still renders,
-	// as a childless [Comp], the same as a visible empty matched container.)
+	// contradicting the tree. A matched invisible node with no surviving
+	// descendants is later dropped in convert (rendering nothing), so a fully
+	// hidden subtree (e.g. display:none) produces no phantom [Comp].
 	if !node.IsVisible && !matched {
 		return makeTransparent
 	}
@@ -241,6 +244,16 @@ func convert(node *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*
 
 	// keepNode: recursively build children.
 	children := convertChildren(node, matches)
+	// A matched node that is itself invisible is kept only when at least one
+	// descendant survives the filter. A fully-invisible matched subtree
+	// (e.g. display:none, which probe.js propagates to all descendants) has no
+	// visible survivors, so it renders nothing — the same as before this change —
+	// instead of a phantom childless [Comp] for a closed modal, collapsed menu, or
+	// inactive tab that agents might try to act on. Visible matched containers are
+	// kept unconditionally (including empty ones).
+	if matched && !node.IsVisible && len(children) == 0 {
+		return nil
+	}
 	children = mergeAdjacentStaticText(children)
 
 	// Collapse a solo StaticText child into the parent Name.
