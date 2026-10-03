@@ -75,6 +75,75 @@ func TestFilter_InvisibleAncestor_KeepsVisibleDescendant(t *testing.T) {
 	}
 }
 
+// TestFilter_MatchedInvisible_KeepsWrapper is the matched counterpart to
+// TestFilter_InvisibleAncestor_KeepsVisibleDescendant. The invisible branch of
+// decide() is the only transparency rule that historically lacked a `&& !matched`
+// guard, so a sightmap-matched INVISIBLE container was made transparent instead
+// of kept: convert never built a Comp for it, dropping its [ComponentName]
+// wrapper and promoting its visible children anonymously (under a synthetic
+// `document` root when ≥2 survived). With the guard, a matched invisible node
+// falls through to keepNode, convert runs the role-replacement block
+// (Role = match name), and the visible descendants render beneath the wrapper —
+// keeping the tree in lockstep with coverage and the T2 trace, which attribute
+// those descendants to the same matched node. (See the end-to-end consistency
+// test in go/observe/format_test.go.)
+func TestFilter_MatchedInvisible_KeepsWrapper(t *testing.T) {
+	nav := node("nav", "generic", "", false /* visible */, false, false,
+		node("a1", "link", "Open", true, true, false),
+		node("a2", "link", "Settings", true, true, false),
+	)
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{nav: {Name: "Navbar"}}
+	comp := Filter(nav, matches)
+	if comp == nil {
+		t.Fatal("expected non-nil comp: matched-invisible node should keep its wrapper")
+	}
+	if comp.Role != "Navbar" {
+		t.Errorf("expected role='Navbar' (match name replaces role), got %q", comp.Role)
+	}
+	if comp.Match == nil {
+		t.Error("expected Match to be preserved")
+	}
+	if len(comp.Children) != 2 {
+		t.Fatalf("expected 2 visible children preserved under wrapper, got %d", len(comp.Children))
+	}
+}
+
+// TestFilter_MatchedFullyInvisible_RendersNothing pins the behavior of a matched
+// container whose ENTIRE subtree is invisible (e.g. display:none, where probe.js
+// propagates invisibility to all descendants): there are no visible survivors to
+// promote, so the matched node is treated as transparent and renders nothing —
+// no phantom [Comp] entry for a closed modal, collapsed menu, or inactive tab.
+// This keeps the tree in lockstep with coverage, which skips the same invisible
+// nodes under VisibleOnly.
+func TestFilter_MatchedFullyInvisible_RendersNothing(t *testing.T) {
+	nav := node("nav", "generic", "", false /* visible */, false, false,
+		node("a1", "link", "Open", false, true, false), // invisible child
+	)
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{nav: {Name: "Navbar"}}
+	if comp := Filter(nav, matches); comp != nil {
+		t.Fatalf("expected nil for fully-invisible matched subtree, got %+v", comp)
+	}
+}
+
+// TestFilter_MatchedInvisible_NestedUnderInvisibleAncestor extends the
+// fully-invisible case to a matched node nested under a hidden matched ancestor
+// (e.g. a matched menu inside a closed matched dialog). Both the ancestor and
+// the descendant are invisible with no visible survivors, so neither renders —
+// no phantom [Dialog] or [Menu] entry reaches the tree.
+func TestFilter_MatchedInvisible_NestedUnderInvisibleAncestor(t *testing.T) {
+	menu := node("menu", "generic", "", false, false, false,
+		node("i1", "menuitem", "Delete", false, true, false),
+	)
+	dialog := node("dialog", "generic", "", false, false, false, menu)
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
+		dialog: {Name: "Dialog"},
+		menu:   {Name: "Menu"},
+	}
+	if comp := Filter(dialog, matches); comp != nil {
+		t.Fatalf("expected nil for fully-invisible nested matched subtree, got %+v", comp)
+	}
+}
+
 func TestFilter_Drop_Script(t *testing.T) {
 	root := nodeWithTag("1", "none", "", "script", true, false, false)
 	comp := Filter(root, nil)
