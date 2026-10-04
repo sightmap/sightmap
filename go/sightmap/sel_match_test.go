@@ -308,3 +308,16 @@ func TestMatches_ParsedAndMatched(t *testing.T) {
 		t.Error("wrong tag should not match")
 	}
 }
+
+// Selector attribute keys are lowercased at parse; captured SVG attributes keep
+// their camelCase spelling. The lookup folds case, as a browser does.
+func TestMatchesNode_CamelCaseAttribute(t *testing.T) {
+	ps, err := sightmap.ParseSightmapSelector(`svg[viewBox="0 0 24 24"]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := &sightmap.ComponentNode{Element: &sightmap.Element{Tag: "svg", Attrs: map[string]string{"viewBox": "0 0 24 24"}}}
+	if !sightmap.MatchesNode(n, ps.Parts[0]) {
+		t.Error(`svg[viewBox="0 0 24 24"] should match an svg captured with viewBox="0 0 24 24"`)
+	}
+}

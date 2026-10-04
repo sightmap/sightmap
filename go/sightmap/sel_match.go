@@ -261,6 +261,15 @@ func (el *Element) Attr(key string) (string, bool) {
 	if v, ok := el.Attrs[key]; ok {
 		return v, true
 	}
+	// Selector keys are lowercased at parse time (HTML attribute names are
+	// ASCII case-insensitive), but captures keep the DOM's spelling, which for
+	// SVG is camelCase (viewBox, preserveAspectRatio). Fold the lookup so
+	// [viewBox="0 0 24 24"] matches offline as it does in a browser.
+	for k, v := range el.Attrs {
+		if strings.EqualFold(k, key) {
+			return v, true
+		}
+	}
 	switch key {
 	case "id":
 		if el.Id != "" {
@@ -281,6 +290,11 @@ func (el *Element) Attr(key string) (string, bool) {
 func (el *Element) HasAttr(key string) bool {
 	if _, ok := el.Attrs[key]; ok {
 		return true
+	}
+	for k := range el.Attrs {
+		if strings.EqualFold(k, key) {
+			return true
+		}
 	}
 	switch key {
 	case "id":
