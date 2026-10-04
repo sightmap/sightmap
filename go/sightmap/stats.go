@@ -116,6 +116,9 @@ func (c *Corpus) Stats() Stats {
 	for _, gc := range c.GlobalComponents {
 		countComponent(gc)
 	}
+	for _, dc := range c.Definitions {
+		countComponent(dc)
+	}
 
 	countRequests := func(defs []RequestDef) {
 		s.Requests += len(defs)

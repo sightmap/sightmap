@@ -59,6 +59,12 @@ func Lint(c *Corpus) []LintWarning {
 		warnings = append(warnings, lintComponent(comp, true)...)
 	}
 
+	// Lint definitions (SEP-0019) as scoped: a definition is matched only
+	// where a view references it, so the broad-tag rule does not apply.
+	for _, comp := range c.Definitions {
+		warnings = append(warnings, lintComponent(comp, false)...)
+	}
+
 	// Lint view components (isGlobal=false).
 	for _, view := range c.Views {
 		for _, comp := range view.Components {
@@ -220,6 +226,10 @@ func LintWithCounts(c *Corpus, counts map[string]int) []LintWarning {
 
 	for _, comp := range c.GlobalComponents {
 		warnings = append(warnings, lintComponentWithCounts(comp, true, counts)...)
+	}
+
+	for _, comp := range c.Definitions {
+		warnings = append(warnings, lintComponentWithCounts(comp, false, counts)...)
 	}
 
 	for _, view := range c.Views {

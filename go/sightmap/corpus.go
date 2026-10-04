@@ -24,6 +24,12 @@ type Corpus struct {
 	// (from components.yaml), with children already flattened.
 	GlobalComponents []ComponentDef `json:"globals,omitempty"`
 
+	// Definitions is the flat list of file-root `definitions:` (SEP-0019):
+	// components addressable by $ref but never matched on their own. Views
+	// already carry each referenced definition expanded in place, so matching
+	// never consults this list; it exists for validation, lint and stats.
+	Definitions []ComponentDef `json:"-"`
+
 	// Views contains per-route component lists, with $refs expanded and
 	// children flattened.
 	Views []ViewDef `json:"views,omitempty"`
@@ -175,8 +181,8 @@ func (c *Corpus) ComponentsForURL(pageURL string) []ComponentDef {
 	return result
 }
 
-// AllComponents returns every component definition in the corpus — GlobalComponents plus
-// every View's Components — deduped by first-seen name. View lists include $ref-expanded
+// AllComponents returns every component definition in the corpus — GlobalComponents,
+// file-root Definitions (SEP-0019), and every View's Components — deduped by first-seen name. View lists include $ref-expanded
 // globals, so a global reused in a view would otherwise appear twice; the first occurrence
 // (global list first, then views in corpus order) wins. Route is not considered — this is
 // for a whole-corpus consumer (a linter, a coverage report, an upload payload builder), not
@@ -193,6 +199,9 @@ func (c *Corpus) AllComponents() []ComponentDef {
 	}
 	for _, gc := range c.GlobalComponents {
 		add(gc)
+	}
+	for _, dc := range c.Definitions {
+		add(dc)
 	}
 	for _, v := range c.Views {
 		for _, vc := range v.Components {

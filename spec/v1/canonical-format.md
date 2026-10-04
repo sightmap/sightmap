@@ -45,7 +45,7 @@ Explicit per entry type. Unknown keys preserved at the end in original order.
 
 | Entry type | Canonical key order |
 |---|---|
-| Top-level | `version, environments, origins, memory, views, components, requests` |
+| Top-level | `version, environments, origins, memory, views, components, definitions, requests` |
 | View | `name, route, environments, origins, description, source, components, memory, requests` |
 | Component | `name, selector, description, source, children, memory` |
 | Request | `name, route, method, environments, origins, description, source, request, response, headers, memory` |
@@ -55,7 +55,7 @@ Keys within any origin map (the top-level `origins` and an environment's `origin
 
 ### List ordering
 
-- **Top-level sequences** (`environments`, `views`, top-level `components`, top-level `requests`) are alphabetized: `environments`, `views` and `components` by `name`, `requests` by `(route, method)`, lexicographic on the tuple, both elements compared as YAML scalar strings byte-by-byte (no Unicode normalization, no case folding). Sort keys are required and unique per schema; missing or duplicate sort keys are schema-invalid (caught by `fmt.schema-invalid` before sorting).
+- **Top-level sequences** (`environments`, `views`, top-level `components`, `definitions`, top-level `requests`) are alphabetized: `environments`, `views`, `components` and `definitions` by `name`, `requests` by `(route, method)`, lexicographic on the tuple, both elements compared as YAML scalar strings byte-by-byte (no Unicode normalization, no case folding). Sort keys are required and unique per schema; missing or duplicate sort keys are schema-invalid (caught by `fmt.schema-invalid` before sorting).
 - **Nested sequences** (e.g. `view.components`, `component.children`) preserve insertion order. Nesting order can carry meaning (parent-child relationships, intentional declaration order); the formatter does not reorder.
 - **`memory` lists** preserve insertion order. Agent-authored entries are not reordered, since order can carry meaning (recency, priority).
 - **String arrays whose order is not semantically significant** are canonicalized by lexicographic sort followed by deduplication (byte-by-byte comparison, no Unicode normalization, no case folding). SDKs MUST emit `fmt.not-canonical` when an array of this kind is unsorted or contains duplicates. The view- and request-level `environments` and `origins` reference lists are of this kind ([SEP-0014](../seps/0014-environments-and-origins.md)).
@@ -113,10 +113,12 @@ Structural problems in a `.sightmap/` corpus. **Errors** are inputs with no vali
 | `missing-name` | error | A view or component is missing its required `name`. |
 | `missing-route` | error | A view is missing its required `route`. |
 | `missing-selector` | error | A component is missing its required `selector`. |
-| `ref-unresolved` | error | A `$ref` names a component that no file's root `components:` defines. |
+| `ref-unresolved` | error | A `$ref` names a component that no file's root `components:` or `definitions:` defines. |
 | `ref-circular` | error | A `$ref` chain is circular (e.g. `A → B → A`, or a component referencing itself). |
 | `merge-collision-view` | warning | Two or more views share a `name`. Names should be unique; lookups by name and the snapshot header become ambiguous. |
 | `merge-collision-component` | warning | Two or more root-level global components share a `name` with different selectors. Both match every view; resolution falls back to declaration order. |
+| `merge-collision-definition` | warning | Two or more root-level definitions share a `name`. `$ref` resolves to the first by source-file path. |
+| `definition-shadowed-by-global` | warning | A root-level definition has the same `name` as a root-level global. `$ref` resolves to the global; the definition is unused. |
 | `route-conflict` | warning | Two or more views share the same (normalized) `route`. Only the first-declared view applies to that URL. |
 | `unknown-field` | warning | A key not defined by the spec at its position (a typo like `memroy:`, or an experimental field). Warned rather than rejected so authors can stash work-in-progress fields; recognized fields — including the reserved tooling fields `access` and `snapshots` — are not flagged. |
 
