@@ -125,3 +125,45 @@ func TestMatch_PrivacyWithholdsProperties(t *testing.T) {
 		t.Errorf("Watch: form=%v submit=%v; want true, false (watch never inherits)", res[form].Watch, res[submit].Watch)
 	}
 }
+
+// A Name[] read judges privacy at each match: the blocked tag is dropped from
+// the joined value while the others survive.
+func TestMatch_PrivacyJudgedPerMatchInJoin(t *testing.T) {
+	dir := t.TempDir()
+	corpus := `
+version: 1
+components:
+  - name: Card
+    selector: .card
+    properties:
+      - name: tags
+        extract: { from: component, path: 'Tag[].value', join: ',' }
+    children:
+      - name: Tag
+        selector: .tag
+        properties:
+          - name: value
+            extract: { from: dom.text }
+      - name: SecretTag
+        selector: .secret
+        privacy: block
+`
+	if err := os.WriteFile(filepath.Join(dir, "app.yaml"), []byte(corpus), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tag := func(id, text string) *sightmap.ComponentNode {
+		return &sightmap.ComponentNode{Id: id, Name: text, Element: privEl("span", "tag", nil)}
+	}
+	secret := &sightmap.ComponentNode{Id: "s", Element: privEl("div", "secret", nil),
+		Children: []*sightmap.ComponentNode{tag("t2", "internal")}}
+	card := &sightmap.ComponentNode{Id: "card", Element: privEl("div", "card", nil),
+		Children: []*sightmap.ComponentNode{tag("t1", "sale"), secret, tag("t3", "new")}}
+	res := match.NewMatcher(c).Match(card, "")
+	if v, ok := propVal(res[card], "tags"); !ok || v != "sale,new" {
+		t.Errorf("tags = %q, %v; want \"sale,new\" (the tag inside the blocked node is withheld)", v, ok)
+	}
+}
