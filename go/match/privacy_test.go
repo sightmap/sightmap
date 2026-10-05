@@ -170,3 +170,29 @@ components:
 		t.Errorf("tags = %q, %v; want \"sale,new\" (the tag inside the blocked node is withheld)", v, ok)
 	}
 }
+
+// An unrecognized privacy value fails closed as block, so a typo inside a masked
+// subtree never relaxes it the way unmask would.
+func TestMatch_UnknownPrivacyFailsClosed(t *testing.T) {
+	defs := []sightmap.ComponentDef{
+		{Name: "Form", Selectors: []string{"form"}, Privacy: "mask"},
+		{
+			Name: "Field", Selectors: []string{"input"}, Privacy: "masked",
+			Properties: []sightmap.ComponentPropertyDef{
+				{Name: "label", Extract: sightmap.Extract{From: sightmap.FromDOMText}},
+				{Name: "on", Extract: sightmap.Extract{From: sightmap.FromDOMState, Path: "checked"}},
+			},
+		},
+	}
+	field := &sightmap.ComponentNode{Id: "f", Name: "secret", State: map[string]string{"checked": "true"}, Element: privEl("input", "", nil)}
+	form := &sightmap.ComponentNode{Id: "form", Element: privEl("form", "", nil), Children: []*sightmap.ComponentNode{field}}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(form, "")
+	if got := res[field].Privacy; got != "block" {
+		t.Errorf("Field.Privacy = %q, want block", got)
+	}
+	for _, name := range []string{"label", "on"} {
+		if v, ok := propVal(res[field], name); ok {
+			t.Errorf("%s = %q; want withheld under the fail-closed block", name, v)
+		}
+	}
+}

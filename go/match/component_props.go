@@ -47,7 +47,7 @@ func effectivePrivacy(
 	var walk func(n *sightmap.ComponentNode, inherited string)
 	walk = func(n *sightmap.ComponentNode, inherited string) {
 		if def := defByNode[n]; def != nil && def.Privacy != "" {
-			inherited = def.Privacy
+			inherited = knownPrivacy(def.Privacy)
 		}
 		if inherited != "" {
 			out[n] = inherited
@@ -58,6 +58,17 @@ func effectivePrivacy(
 	}
 	walk(root, "")
 	return out
+}
+
+// knownPrivacy fails closed: an unrecognized value (a typo validation would
+// reject) resolves to block rather than overriding an enclosing restriction the
+// way unmask would. Withholding more than the corpus asks is always allowed.
+func knownPrivacy(p string) string {
+	switch p {
+	case "block", "mask", "unmask":
+		return p
+	}
+	return "block"
 }
 
 // withholds reports whether a read from source on a node with effective privacy
