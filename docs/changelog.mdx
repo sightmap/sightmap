@@ -8,6 +8,159 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.34.0" description="Released October 5, 2026" tags={["cli"]}>
+
+Add `privacy` to component entries (SEP-0009).
+
+`privacy: block | mask | unmask` declares whether a capture consumer may retain the matched element's content. It applies to the element **and its subtree**, and the nearest enclosing declaration wins, so the common shape is a `mask` on a form with an `unmask` on the one field inside it that is safe to keep.
+
+Resolution deliberately differs from `tags`, which union across every applicable definition. A union is right for classification, where more labels are additive; it is wrong for a directive, where two applicable values are a contradiction that has to be decided rather than merged.
+
+It governs extracted properties as well as captured content, at the node each value is read from rather than at the component that declared it. Extraction is tree-closed, so a `PATH.prop` reaching a blocked descendant is withheld even when the declaring component is unrestricted. `exists:` survives `mask` because presence is structure, as do the four interactive-state attributes SEP-0013 defines (`checked`, `selected`, `disabled`, `expanded`) — a closed set carrying state rather than a value, without which a masked form could report no control state at all.
+
+`mask` also covers attribute values in the captured recording, not only text and input values. A consumer must withhold every `data-*` attribute, `value`/`title`/`alt`/`placeholder`/`aria-label`, and any attribute the corpus names in an `attr=` extract anywhere — naming an attribute in an extract is itself the author declaring it carries content, which keeps the rule from going stale. Presentational attributes (`class`, `style`, `id`) may be retained because replay needs them to render, and the SEP states plainly that user data in one of those survives a `mask` and should use `block` instead. A withheld property is absent, indistinguishable from one that did not resolve.
+
+Omission declares nothing: a component with no `privacy` leaves the consumer's own default untouched, so a corpus can adopt the field one component at a time. A consumer may withhold more than the corpus asks, but never less.
+
+The loader carries the authored value onto `ComponentDef.Privacy` verbatim and does not inherit it to children, matching `tags`/`source`/`memory`. Resolution is the consumer's job, over the flattened chain.
+
+Add `watch` to component entries (SEP-0015).
+
+`watch: true` asks a capture consumer to report that a component **became visible to the user**, rather than reporting it only when someone interacts with it. The surrounding lifecycle (rendered, removed) is optional: becoming visible is the only moment that answers the question the field exists for, and the rest is largely churn, since an element can render far off-screen, re-render on every state change, and be removed by a route transition. Repeat reports of one appearance should be collapsed, and a visibility report is passive — never an interaction. The components whose appearance is the signal (an empty state, an error, a promotion) are usually the ones nobody clicks, so an interaction-shaped record contains no trace of them.
+
+`watch` applies to the component it is declared on and never to its `children`, the opposite of SEP-0009 `privacy`. Privacy is a restriction, where covering the subtree is the safe default; `watch` generates records, where covering a subtree silently would multiply them.
+
+A consumer's interactivity heuristic must not suppress a watched component. Without that rule the field does nothing for exactly the non-interactive components that motivate it.
+
+The loader carries the authored value onto `ComponentDef.Watch`. `watch: false` is identical to omitting the field.
+
+Add named environments and origins (SEP-0014).
+
+A file-root `environments` array defines deploy targets. A web environment maps surface names (`app`, `api`) to the `scheme://host[:port]` URL each surface has there; a native one (`platform: ios | android`) is identified by `app_id` and an optional `build_type`, and borrows a web environment's origins through `backend`. A file-root `origins` map holds shared origins, hosts that are the same in every environment such as a tracking pixel or a vendor endpoint, and an environment's own entry of the same name overrides it. Origin URLs may be patterns, with wildcards only in the leftmost host label (`https://deploy-preview-*--acme.netlify.app`, `https://**.acme.com`) or the port (`http://localhost:*`), so preview deploys and local dev servers belong to an environment without being enumerated.
+
+Views and requests reference both by name through `environments: [...]` and `origins: [...]`. Absent or empty means unconstrained. A view-scoped request's environments are intersected with its view's; its origins are never inherited. The fields are declarative only and take no part in route matching, so adding a list to an existing entity never changes what traffic it matches.
+
+Both registries are project-wide, first file by source path wins. The Go SDK loads the new fields (defaulting `platform` to `web`), exposes `Corpus.EnvironmentByName`, `Corpus.ResolveOrigin`, and `RequestEnvironments`, and validates them with new diagnostics: `environment-invalid`, `origin-invalid`, `environment-backend-invalid`, `environment-ref-unresolved`, `origin-ref-unresolved` (errors), and `environment-name-collision`, `origin-name-collision`, `origin-environment-gap`, `origin-host-shared`, `environment-duplicate`, `environments-empty`, `origins-empty` (warnings).
+
+One `extract` object for every property (SEP-0017).
+
+Component, request and message properties now read with `extract: { from, path, pattern, join }`, drawing `from` from one namespace: `dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`, `component`, `component.exists`, `req.body`/`rsp.body`/`req.headers`/`rsp.headers`, and `stack`. Components gain `pattern`, and a path segment written `Name[]` reads every match instead of the first, collapsed into one value by `join`. A bracket with content in a path segment is reserved for future path predicates. `dom.state` reads interactive state separately from the markup attribute of the same name.
+
+The string forms (`extract: text`, `attr=NAME`, `PATH.prop`, `exists:PATH`, and request/message `source`/`field`/`pattern`) still load, lowered to the object, and `validate` warns `extract-legacy-form` with the replacement. They will be removed in a later release. `validate` also warns `extract-privacy-withheld` on a read its component's own `privacy` withholds.
+
+Go API: `ComponentPropertyDef`, `RequestPropertyDef` and `MessagePropertyDef` each carry one `Extract` value in place of their per-entity fields.
+
+The exported corpus JSON (`sightmap export`) changes shape to match: component `extract` becomes an object, and request and message properties carry `extract` in place of `source`/`field`/`pattern`. This SDK still decodes the old shape, but an older reader cannot decode the new one, so upgrade readers before writers.
+
+Carry a node's interactive state for `dom.state` (SEP-0013).
+
+The probe now captures each control's current `checked`, `selected`, `disabled` and `expanded` state from native properties and ARIA, overlaid by the accessibility tree, as `"true"`/`"false"` (`"mixed"` for an indeterminate checkbox). `extract: { from: dom.state, path: checked }` reads it, including where no accessibility tree is available. It is kept apart from the element's attributes, so `dom.attr` and selector matching still see the markup.
+
+Add `tags` to messages, ratify `tags` on signals, and close the `view.tags` gap (SEP-0016).
+
+`tags` now reaches every matchable entity. SEP-0004 deferred messages because console and exception events "aren't a matchable entity in the spec today"; SEP-0006 then created the `messages` entity, matched by `level` and a `message` regex, so that premise no longer holds and no separate mechanism is needed.
+
+Message tags resolve as a union across every matching entry, which matters more here than anywhere else: message _identity_ is a refusal rather than a winner, since SEP-0006 requires a consumer to surface an ambiguity when a record matches several entries. The classification survives that ambiguity even though the name does not.
+
+`signal.tags` already shipped via SEP-0007 with a schema description citing a SEP that never mentions signals. It is now documented, and its resolution defined: a signal's effective tags are its own unioned with the resolved tags of the entity its `ref` names.
+
+Also closes the long-standing `view.tags` divergence. It was in the JSON Schema but absent from `ViewDef` and the Go loader's allowlist, so a corpus carrying a view tag validated under ajv and was rejected by Go. New `Corpus.TagsForURL` resolves view tags as a union across every matching view, and `Corpus.TagsForSignal` does the same for signals.
+
+Resolve a console record's tags as a union (SEP-0016).
+
+`MessageMatch` now carries each matched message's `tags`, and `Corpus.TagsForRecord` returns the union across every message a record matches, deduplicated and sorted. The union holds even when the record matches several messages and its identity is ambiguous.
+
+Show a page's view tags in `observe` (SEP-0004).
+
+The view header now prints a `tags:` line: the union of tags across every view whose route matches the page, so a broad tagged view is not shadowed by the narrower view that wins identity.
+
+Honor component `privacy` when resolving properties (SEP-0009).
+
+The matcher resolves each node's effective privacy (nearest enclosing declaration wins, `unmask` overrides) and withholds any property value read from a `block` or `mask` node, judged at the node the value is read from, so a `from: component` read cannot surface a value out of a blocked descendant. Under `mask`, `component.exists`, `dom.state`, and `dom.attr` reads of the four interactive-state attributes still resolve. `ComponentMatch` now carries the effective `Privacy` and the component's own `Watch`, and `validate` reports an unknown `privacy` value as `invalid-privacy`.
+
+Remove the `dependencies` field from views and components (SEP-0001, Rejected).
+
+`dependencies` asked a curator to hand-maintain a dependency graph that static import analysis derives more accurately and for free, and `match --path`, the reverse-lookup consumer it existed to serve, was never built. No SDK ever read the field.
+
+It is gone from `$defs.view` and `$defs.component` in the schema, from the loader's unknown-field allowlist, from the normative spec, and from conformance fixtures `008-dependencies-binding` and `108-fmt-dependencies-canonical`.
+
+**Breaking for any corpus that carries the field.** Because the schema sets `additionalProperties: false`, a view or component with `dependencies:` is now rejected as schema-invalid rather than silently accepted. Delete the key; nothing consumed it.
+
+`canonical-format.md` keeps its sort-and-deduplicate rule for unordered string arrays. `dependencies` was its only instance, but SEP-0014 relies on the rule for view- and request-level reference lists.
+
+Body paths accept backslash escapes, and `sightmap.SplitFieldPath` is exported.
+
+A request or message property's `extract.path` into a body is dot-separated. `\.` now addresses a literal dot inside a JSON key and `\\` a literal backslash, so a key named `a.b` is reachable. A path with no backslash resolves exactly as before.
+
+This is a behavior change for a path that already contained a backslash. `a\b` used to address the key `a\b` and now fails to parse; `a\.b` used to mean the key `a\` then `b`, and now means the single key `a.b`. `validate` reports a malformed path as `request-property-path-invalid` rather than letting the property resolve to nothing.
+
+`SplitFieldPath` exposes the same splitting for tools that compile a corpus into another schema.
+
+Add URL properties on views and requests (SEP-0008).
+
+A `:name` segment in a view or request `route` now **binds** that segment's percent-decoded value as a property, needing no declaration. An optional `properties[]` array reads with the SEP-0017 extract object, `from: url.query` or `from: url.path`, for naming a query-string value or renaming a bound segment.
+
+One grammar covers both entities. Both carry a `route`, both are matched against a URL, and the value an author wants out of that URL is the same kind of thing in each case. A request property reads `url.query`/`url.path` alongside its body and header sources, so one request may carry URL-shaped and payload-shaped properties side by side.
+
+This changes what `:param` produces, never what it matches: route matching still normalizes `:param` to `*`, so every existing route matches exactly the URL set it matched before.
+
+A declaration is also a **retention request**. A consumer that scrubs captured URLs should retain the parts its corpus names, since a scrubbed parameter makes the property permanently unresolvable and omission is otherwise silent. Naming a part is not a privacy grant: a consumer must not treat it as authorization to retain a value its own policy would withhold.
+
+Removes `transform` from the proposal, which SEP-0010 deleted from every property type.
+
+Extension: address components by their full path, not their leaf name.
+
+Component names are unique only _within a parent_ — that scoping is the whole
+point of `children:`. The overlay treated them as globally unique in three
+places, and on any real page that silently produced wrong answers:
+
+- `activeComponents()` deduplicated the corpus by name, so a production sign-in
+  map of 104 components collapsed to 54. Clicking a text input resolved two
+  levels deep instead of six, because the surviving `Form` was a different form.
+- Parent scoping in `resolveElement()` accepted an unrelated namesake's match as
+  a component's parent.
+- `PATH.prop` extraction resolved each path segment by name across the whole
+  corpus, so a submit button's `Label.label` found a text field's label, matched
+  nothing inside the button, and dropped the property.
+
+All three now key on a component's address (its `parentChain` plus its name).
+`resolveElement` visits components ancestor-first and requires a component's own
+parent to have matched, and each returned match carries its `address`.
+
+A file-root global is still dropped when a matching view declares a component of
+the same name at any depth, as `Corpus.ComponentsForURL` does, so a view-scoped
+`$ref` expansion subsumes its global instead of matching alongside it.
+
+Speed up `match.Matcher.Match` and `match.FindAllMatches` on large trees and corpora.
+
+The matcher tried every query at every node and allocated a map sized to the whole query set per node, so cost grew with nodes × queries. Queries are now indexed by a requirement of their first selector part (id, `attr="value"`, class, attribute name, or tag), so a node only tries queries it could start. Per-node maps and per-child ancestor-chain copies are gone, and class attribute selectors (`[class*="..."]` and friends) no longer join the class list on every check. Matching against a 503-query corpus over a 10,000-node tree drops from 290 ms and 466 MB to 6.7 ms and 0.14 MB. Results and their order are unchanged.
+
+Adds `Element.Attr` and `Element.HasAttr`, which resolve an attribute the way selector matching does (`id` and `class` fall back to their dedicated fields).
+
+`Matcher.Conflicts` now deduplicates claims by component **definition** rather
+than by name, and `sightmap.Conflict` carries the claiming `Defs` alongside
+`Names`.
+
+A component name is unique only within its parent, so two different definitions
+can share one. Deduplicating by name silently discarded every conflict between
+them — on a production sign-in corpus, five nodes were each claimed by two
+definitions and none were reported. Snapshots looked clean while first-match-wins
+quietly dropped one claimant on every one of them.
+
+Names alone cannot identify a claimant in that case, so `Conflict.Defs` is
+index-aligned with `Names`, and the `[Conflicts]` report disambiguates repeated
+names by selector. A definition offering several alternative selectors still
+counts once, and so does a global together with its `$ref` expansions, which
+share the new `ComponentDef.Origin`.
+
+Don't surface a blocked node's accessibility value in the rendered tree.
+
+The matcher withholds a property read from a `block` or `mask` node (SEP-0009), but the renderer then substituted the node's accessibility value as `value`, reintroducing the content the matcher had just withheld: a masked input rendered its own value. The fallback is now withheld under `block` and `mask`; declared properties the matcher did surface, such as a `dom.state` read under `mask`, still render.
+
+SEP-0014: a consumer may fall back to a view's `url:` host, but only for a corpus that declares no environments and no origins, so a corpus that predates both keeps compiling as it did. Once a corpus declares either, every host comes from `origins`, and `url:` still never defines an environment or origin. A page host is a web concept, so a view that runs only in native environments needs none.
+
+</Update>
+
 <Update label="sightmap 0.33.0" description="Released September 25, 2026" tags={["cli"]}>
 
 browser: enable CDP focus emulation (`Emulation.setFocusEmulationEnabled`) on each tab so `document.hasFocus()` is always true regardless of the real OS window focus. Some page widgets gate behavior on page focus — e.g. react-aria date pickers open only on focus _while the page holds OS focus_ — which an agent-, side-panel-, or headless-driven page never has, making them impossible to actuate in-page. Matches Playwright/Puppeteer, which enable the same emulation by default. Best-effort: a transitional target or very old Chrome that rejects the call simply falls back to the prior focus-dependent behavior.
