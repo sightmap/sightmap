@@ -670,7 +670,7 @@ A **native** session belongs to the environment whose `platform` and `app_id` ma
 
 A URL matches a view or request by path alone, exactly as in [Route matching](#route-matching). A session outside an entity's environments, or a URL outside its origins, still matches that entity's route. Environments and origins are data about an entity for consumers to use as they need: choosing a publish target, compiling host-scoped page definitions per environment, anchoring request matchers.
 
-`url:` is complementary. It is one concrete, navigable address and implies neither an environment nor an origin; a consumer MUST NOT derive either from it. A consumer that needs a host MAY fall back to a view's `url:` host, but only for a corpus that declares no environments anywhere; once a corpus declares one, every host comes from `origins`.
+`url:` is complementary. It is one concrete, navigable address and implies neither an environment nor an origin; a consumer MUST NOT derive either from it. A consumer that needs a host MAY fall back to a view's `url:` host, but only for a corpus that declares no environments and no origins anywhere; once a corpus declares either, every host comes from `origins`. A page host is a web concept, so a view that runs only in native environments needs none and the fallback does not apply to it.
 
 ### Diagnostics
 
@@ -862,7 +862,7 @@ A conforming SDK:
 - MUST reject an environment that breaks the web/native shape rules, an invalid origin URL, a `backend` that names no environment or a native one, and an environment or origin reference that resolves to no definition (see [Environments and origins](#environments-and-origins))
 - MUST build one project-wide environment registry and one shared-origin registry, the first by source-file path winning on a name collision, and MUST resolve an origin for an environment from its own `origins`, then its `backend`'s, then the shared map
 - MUST treat an absent or empty view- or request-level `environments`/`origins` list as unconstrained, MUST intersect a view-scoped request's environments with its view's, and MUST NOT inherit a view's `origins` into its requests
-- MUST NOT treat `environments` or `origins` as an input to route matching, and MUST NOT derive either from `url:`; MAY use a view's `url:` host when the corpus declares no environments
+- MUST NOT treat `environments` or `origins` as an input to route matching, and MUST NOT derive either from `url:`; MAY use a view's `url:` host when the corpus declares no environments and no origins
 - SHOULD surface `memory` entries to the agent when the parent definition is active
 - MAY ignore fields it doesn't use (e.g. a consumer that never surfaces `description` at runtime)
 - MAY implement additional, non-standard behavior as long as it doesn't change the meaning of conforming inputs
