@@ -190,6 +190,8 @@ sightmap snapshot --url 'https://example.com/products' --out page.snap --tree-ou
 
 **Common mistake:** Snapping before async content renders (React Suspense, lazy routes). Use `--wait 2` or set `wait: 2` in `.sightmap/config.yaml`.
 
+**Reading the header:** under `[View: …]`, a `tags:` line lists the union of tags across every view whose route matches the page (not just the winning view). A node under a component whose effective `privacy` is `block` or `mask` renders without its content properties or accessibility `value`; that is the corpus withholding it, not a broken extract.
+
 ---
 
 ## `sightmap capture`
@@ -400,7 +402,9 @@ sightmap validate
 ✓ no validation errors
 ```
 
-Checks: valid YAML, required fields present, no unknown keys, selector syntax parseable, route patterns valid.
+Checks: valid YAML, required fields present, selector syntax parseable, route patterns valid, `$ref`s resolve, and every `extract` object is valid for its entity. Also checks `privacy` values, URL-property bindings, environment and origin definitions and references, and message regexes and signal refs. Unknown keys (including the removed `dependencies`) are warnings, not errors.
+
+Warnings to act on: `extract-legacy-form` (a pre-0.34 string form such as `extract: text`; the message names the object to write), `extract-privacy-withheld` (a property its own component's `privacy` would withhold), and `route-param-unbound` (a `:segment` like `:orgId` that matches but binds no property).
 
 Run after every YAML edit and before every commit.
 
@@ -461,6 +465,19 @@ The two rules differ on purpose: `Components` dedupes by name, but `Properties`/
 **Refuses a corpus it cannot count.** The loader drops an unresolved `$ref` or a component missing its `name`/`selector` and records an error, which would make the counts a silent under-report. `stats` therefore runs `validate`'s checks first and exits 1 on any error-severity finding (warnings are advisory). Under `--json` the failure is still one parseable object — `{"error": ..., "diagnostics": [...]}`, with `error` present only on failure and no counts.
 
 **When to use:** Orientation on an unfamiliar corpus, and as the CI numbers that tell you whether a corpus grew or shrank.
+
+---
+
+## `sightmap export` / `sightmap push`
+
+**Solves:** Hand the loaded corpus to another tool as JSON. `export` prints the canonical wire (`json.Marshal(sightmap.Corpus)`, the same shape `serve-sightmap` serves under `corpus`) to stdout, `-o FILE`, or `--url URL` (POST). `push URL [FILE]` POSTs a file or stdin.
+
+```bash
+sightmap export -o corpus.json
+sightmap export | sightmap push "$UPLOAD_URL"
+```
+
+**Gotcha:** from 0.34.0 every property carries an `extract` object (component `extract` was a string; request/message properties had `source`/`field`/`pattern`). New readers decode both shapes, old readers can't decode the new one, so upgrade the reader before the writer.
 
 ---
 

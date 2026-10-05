@@ -1,10 +1,10 @@
 ---
 title: "Sightmap CLI: Integration Tools Reference"
 sidebarTitle: "Integrations"
-description: "Find and install corpora from the community atlas, serve the compiled corpus over HTTP, install the bundled agent skills, and print the CLI version."
+description: "Find and install corpora from the community atlas, serve or export the compiled corpus as JSON, install the bundled agent skills, and print the CLI version."
 ---
 
-`sightmap atlas` finds and installs corpora published in the community atlas. `sightmap serve-sightmap` serves the compiled corpus as JSON and recompiles it when YAML changes. `sightmap skills install` extracts the bundled agent skills. `sightmap version` prints the binary version.
+`sightmap atlas` finds and installs corpora published in the community atlas. `sightmap serve-sightmap` serves the compiled corpus as JSON and recompiles it when YAML changes. `sightmap export` and `sightmap push` write or upload the same corpus JSON once. `sightmap skills install` extracts the bundled agent skills. `sightmap version` prints the binary version.
 
 <Note>
 `sightmap browser start` runs the same HTTP server alongside Chrome. Use `serve-sightmap` when you need the corpus endpoint without a managed browser session. See [Browser](/cli/browser) for session management.
@@ -221,7 +221,7 @@ Compiles the `.sightmap/` corpus and serves it over HTTP on port 7891 by default
 
 | Endpoint | Returns |
 | --- | --- |
-| `GET /sightmap` | The compiled corpus JSON: `site`, `version`, `views` (name and route), `globals`, and `viewComponents` keyed by route |
+| `GET /sightmap` | `site`, `version`, and `corpus`: the [corpus wire](#sightmap-export) that `sightmap export` prints |
 | `GET /sightmap/version` | A version-only response for polling clients: `{"version":"..."}` |
 
 The `version` value is a Unix-millisecond timestamp created with each compile. Both endpoints set `Access-Control-Allow-Origin: *`.
@@ -257,39 +257,67 @@ curl -s localhost:7891/sightmap
 {
   "site": "example-shop",
   "version": "1753208412345",
-  "views": [
-    { "name": "plp", "route": "/b/**" },
-    { "name": "pdp", "route": "/p/**" }
-  ],
-  "globals": [
-    {
-      "name": "SiteHeader",
-      "selector": "header[data-testid=\"site-header\"]",
-      "parentChain": [],
-      "properties": []
-    }
-  ],
-  "viewComponents": {
-    "/b/**": [
+  "corpus": {
+    "globals": [
       {
-        "name": "ProductPod",
-        "selector": "[data-testid=\"product-pod\"]",
-        "parentChain": [],
-        "properties": [
-          { "name": "label", "extract": "h3" }
-        ]
+        "name": "SiteHeader",
+        "selectors": ["header[data-testid=\"site-header\"]"]
       }
     ],
-    "/p/**": []
+    "views": [
+      {
+        "name": "plp",
+        "route": "/b/**",
+        "components": [
+          {
+            "name": "ProductPod",
+            "selectors": ["[data-testid=\"product-pod\"]"],
+            "properties": [
+              { "name": "label", "extract": { "from": "component", "path": "Title.text" } }
+            ]
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
-`site` is the basename of the directory the server was started in. Each component carries its `name`, a comma-joined `selector` string, a `parentChain` (always an array, empty for top-level components), and its `properties`.
+`site` is the basename of the directory the server was started in. `corpus` has the same shape and content as `sightmap export` output for the same directory (compact here, indented there).
+
+---
+
+### `sightmap export`
+
+Loads a `.sightmap/` corpus with the Go loader and prints the canonical corpus wire: `json.Marshal` of the library's `sightmap.Corpus`, the same shape a Go consumer reads. Top-level keys are `memory`, `globals`, `views`, `requests`, `messages`, `signals`, `environments`, and `origins`, each omitted when empty. Components carry `name`, a `selectors` array, `parentChain` for nested components, and `source`, `memory`, `tags`, `privacy`, `watch`, `properties`, and `stability` when set.
+
+```bash
+sightmap export                       # stdout
+sightmap export -o corpus.json        # a file
+sightmap export --url "$UPLOAD_URL"   # POST as application/json
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `-o` | stdout | Write to this file instead (ignored with `--url`) |
+| `--url` | — | POST the corpus to this URL. No auth headers are added; put any token in the URL. |
+| `--sightmap-dir` | nearest `.sightmap/` at or above `[dir]` or the working directory | Path to the `.sightmap/` directory |
+| `--insecure` | off | Skip TLS verification when POSTing (on automatically for `localhost` and `.test` hosts) |
 
 <Warning>
-The `properties` entries reflect property extraction (`properties:` on components), which the CLI implements as a draft extension — it is not part of spec v1 and may change.
+As of 0.34.0 the wire carries every property as an [`extract`](/reference/schema#extract) object: component `extract` is an object rather than a string, and request and message properties carry `extract` in place of `source`/`field`/`pattern`. A 0.34 reader still decodes the old shape, but an older reader cannot decode the new one, so **upgrade readers before writers**.
 </Warning>
+
+### `sightmap push`
+
+POSTs a corpus JSON file, or stdin, to a URL. It is the upload half of `export --url`, so these are equivalent:
+
+```bash
+sightmap export | sightmap push "$UPLOAD_URL"
+sightmap export -o corpus.json && sightmap push "$UPLOAD_URL" corpus.json
+```
+
+A non-2xx response is an error that prints the status and response body. `--insecure` works as it does for `export`.
 
 ---
 

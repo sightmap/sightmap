@@ -81,9 +81,19 @@ export default function SpecSection() {
                   <td>Relative path to the source file</td>
                 </tr>
                 <tr>
-                  <td>dependencies</td>
+                  <td>properties</td>
+                  <td>URLProperty[]</td>
+                  <td>Values read from the URL. A <code>:name</code> route segment binds automatically; add entries for query-string values.</td>
+                </tr>
+                <tr>
+                  <td>tags</td>
                   <td>string[]</td>
-                  <td>Optional globs naming secondary files (hooks, stores, styles) whose changes should also trigger re-curation.</td>
+                  <td>Classification labels, unioned across every view whose route matches</td>
+                </tr>
+                <tr>
+                  <td>environments, origins</td>
+                  <td>string[]</td>
+                  <td>Names of the deploy targets this view exists in and the hosts it's served from. Metadata only; never changes matching.</td>
                 </tr>
                 <tr>
                   <td>components</td>
@@ -122,9 +132,6 @@ export default function SpecSection() {
 {'  '}- <span className="c-key">name</span>: <span className="c-str">DepartureDatePicker</span>{'\n'}
 {'    '}<span className="c-key">selector</span>: <span className="c-str">'[data-picker="departure"]'</span>{'\n'}
 {'    '}<span className="c-key">source</span>: <span className="c-str">src/components/DatePicker.tsx</span>{'\n'}
-{'    '}<span className="c-key">dependencies</span>:{'\n'}
-{'      '}- <span className="c-str">src/components/DatePicker.module.css</span>{'\n'}
-{'      '}- <span className="c-str">src/hooks/useDateRange.ts</span>{'\n'}
 {'    '}<span className="c-key">memory</span>:{'\n'}
 {'      '}- <span className="c-str">Accepts typed YYYY-MM-DD — skips the calendar</span>{'\n'}
 {'      '}- <span className="c-str">Arrow keys navigate; Enter selects; Esc closes</span>{'\n'}
@@ -164,6 +171,10 @@ export default function SpecSection() {
             <strong>Reference shared components by name.</strong> Inside a <code>components:</code> array, <code>{'{ $ref: SiteHeader }'}</code> inserts a deep copy of a root-level component from any sightmap file. Define a header, footer, or chat widget once, then reference it from every view where it should appear. If the component is absent at runtime, drift checks can report it as <em>attested but missing</em>.
           </div>
 
+          <div className="callout">
+            <strong>Tell capture tools what to keep and what to watch.</strong> <code>privacy: mask</code> on a form keeps its layout but withholds its text and values, and <code>unmask</code> carves out the one field that is safe. <code>watch: true</code> asks for a report when an empty state or error banner appears, even if nobody clicks it. See <a href="https://docs.sightmap.org/spec/components#privacy">privacy</a> and <a href="https://docs.sightmap.org/spec/components#watch">watch</a>.
+          </div>
+
           <div className="schema-table-wrap">
             <table className="schema-table">
               <thead>
@@ -186,11 +197,6 @@ export default function SpecSection() {
                   <td>Path to the source file — rendered inline as <code>[src: …]</code></td>
                 </tr>
                 <tr>
-                  <td>dependencies</td>
-                  <td>string[]</td>
-                  <td>Optional globs naming supplementary files (styles, helpers) whose changes should trigger re-curation of this component. Curation-time metadata; not surfaced at runtime.</td>
-                </tr>
-                <tr>
                   <td>description</td>
                   <td>string</td>
                   <td>Optional, not surfaced at runtime</td>
@@ -199,6 +205,26 @@ export default function SpecSection() {
                   <td>memory</td>
                   <td>string[]</td>
                   <td>Notes that appear in the <code>[Guide]</code> section of every matched snapshot</td>
+                </tr>
+                <tr>
+                  <td>properties</td>
+                  <td>Property[]</td>
+                  <td>Named values shown in snapshots, like <code>[Card price="$10"]</code>, read with one <code>extract</code> object</td>
+                </tr>
+                <tr>
+                  <td>tags</td>
+                  <td>string[]</td>
+                  <td>Classification labels, unioned across matching ancestors</td>
+                </tr>
+                <tr>
+                  <td>privacy</td>
+                  <td>string</td>
+                  <td><code>block</code>, <code>mask</code>, or <code>unmask</code>: what capture tools may retain from this element and its subtree</td>
+                </tr>
+                <tr>
+                  <td>watch</td>
+                  <td>boolean</td>
+                  <td>Ask capture tools to report when this component becomes visible, even if nobody clicks it</td>
                 </tr>
                 <tr>
                   <td>children</td>
@@ -320,6 +346,21 @@ Expected response fields:{'\n'}
                   <td>headers</td>
                   <td>string[]</td>
                   <td>Notable header names to highlight in the detail view</td>
+                </tr>
+                <tr>
+                  <td>properties</td>
+                  <td>RequestProperty[]</td>
+                  <td>Values extracted from live traffic: a body path, a header, or the URL. A <code>200</code> can't tell approved from declined; the body can.</td>
+                </tr>
+                <tr>
+                  <td>tags</td>
+                  <td>string[]</td>
+                  <td>Classification labels, unioned across every matching request</td>
+                </tr>
+                <tr>
+                  <td>environments, origins</td>
+                  <td>string[]</td>
+                  <td>Deploy targets the endpoint exists in and hosts it's called on</td>
                 </tr>
               </tbody>
             </table>

@@ -14,7 +14,7 @@ Requires Go 1.25.2 or later.
 
 ## Design goals
 
-- **Shared component model and matcher.** The `comps` and `match` packages give consumers the same types and matching logic.
+- **Shared component model and matcher.** The `sightmap` and `match` packages give consumers the same types and matching logic as the CLI.
 - **Tree-level matching.** Matching operates on a component tree whose nodes carry `SelectorPart` values. This supports offline analysis of saved trees and synthetic selectors for native-mobile nodes.
 - **Embedded browser probe.** The `probe` package exposes the browser-side `probe.js` source as `probe.ProbeJS`, including its bounds, visibility, and interactivity logic.
 
@@ -24,10 +24,8 @@ All import paths are rooted at `github.com/sightmap/sightmap/go/`.
 
 | Package | Purpose |
 |---|---|
-| `sightmap` | Corpus loading and matching (the thread-safe `Corpus` handle), plus `Validate`, `Lint`, and `LoadConfig` |
-| `comps` | Component model types (`ComponentNode`, `SelectorPart`, `Bounds`) and tree operations (`Walk`, `Collect`, `Filter`) |
-| `sel` | CSS selector parsing and single-node matching for the sightmap selector subset |
-| `match` | NFA multi-query matcher that applies component definitions in one tree traversal |
+| `sightmap` | The spec model in one import, with no dependency on any other package here: corpus loading (`Load`, the `Corpus` type and its definitions), `Validate`, `Lint`, `LoadConfig`, the component tree (`ComponentNode`, `Element`, `SelectorPart`, `Bounds`, `Walk`, `Collect`, `Filter`), match results (`ComponentMatch`, `Conflict`), and selector parsing and single-node matching (`ParseSightmapSelector`, `Matches`) |
+| `match` | NFA multi-query matcher that applies component definitions in one tree traversal (`NewMatcher`, `Matcher.Match`, `Matcher.Conflicts`, `FindAllMatches`) |
 | `compquery` | Component-query parser and resolver for queries such as `ProductCard[name^="Weber"]` |
 | `extract` | Post-probe pipeline that merges accessibility data with probe output and rebuilds the tree; no browser dependency |
 | `probe` | Embedded `probe.js` browser-side extractor, exposed as `probe.ProbeJS` |
@@ -42,7 +40,7 @@ All import paths are rooted at `github.com/sightmap/sightmap/go/`.
 
 ## Load a corpus and match a tree
 
-The core flow uses two API calls. `sightmap.Load` parses a `.sightmap/` directory into a `Corpus` (a thread-safe handle with a compiled-query cache), and `Corpus.MatchTree` applies it to a component tree for a page URL.
+`sightmap.Load` parses a `.sightmap/` directory into a `Corpus`, which is plain data. To match against it, wrap it in a `match.Matcher`, which compiles the component definitions per page URL and caches them.
 
 ```go main.go
 package main
@@ -53,7 +51,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/sightmap/sightmap/go/comps"
+	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -69,41 +67,56 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	root := &comps.ComponentNode{}
+	root := &sightmap.ComponentNode{}
 	if err := json.Unmarshal(data, root); err != nil {
 		log.Fatal(err)
 	}
 
-	// Apply the corpus to the tree for this page URL.
-	matches := corpus.MatchTree(root, "https://example.com/")
+	// Build a Matcher once per Corpus and apply it to the tree for this page URL.
+	m := match.NewMatcher(corpus)
+	matches := m.Match(root, "https://example.com/")
 
-	// Walk the tree and print every matched node.
-	comps.Walk(root, func(n *comps.ComponentNode, depth int) bool {
-		if m := matches[n]; m != nil {
-			fmt.Printf("%s -> [%s]\n", n.Role, m.Name)
+	// Walk the tree and print every matched node with its properties.
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, depth int) bool {
+		if cm := matches[n]; cm != nil {
+			fmt.Printf("%s -> [%s] %v\n", n.Role, cm.Name, cm.Properties)
 		}
 		return true
 	})
 }
 ```
 
-`MatchTree` returns `map[*comps.ComponentNode]*match.SightmapMatch`. Each match contains the component `Name` and `Memory` notes. The library selects the most specific view whose route matches the URL pathname, using declaration order only to break equal-specificity ties (per the stream 1 spec). Trailing slashes on the URL path are normalized away before matching. If no view matches, global components still apply.
+`Match` returns `map[*sightmap.ComponentNode]*sightmap.ComponentMatch`. Each match carries the component `Name`, `Memory`, resolved `Tags` (a union across matching ancestors), the node's effective `Privacy` (nearest enclosing declaration), the component's own `Watch`, and extracted `Properties`. A property read from a `block` or `mask` node is already withheld. The library selects the most specific view whose route matches the URL pathname, using declaration order only to break equal-specificity ties. Trailing slashes are normalized away before matching. If no view matches, global components still apply.
 
-## The Corpus handle
+`Matcher` is safe for concurrent use. Create one per `Corpus` and reuse it so the compiled-query cache is shared. `Matcher.Conflicts(root, url)` returns nodes claimed by more than one component definition; each `sightmap.Conflict` carries `Names` and the index-aligned `Defs`, since two definitions can share a name.
 
-`sightmap.Corpus` is the single operational handle: load one with `Load`, then hold it for the life of a run. It is safe for concurrent use and caches compiled match queries by page URL, so repeated `MatchTree` calls reuse the compiled queries. To pick up on-disk edits in a long-lived process, call `Load` again and swap the handle.
+## The Corpus
+
+`sightmap.Corpus` holds the loaded definitions. Hold it for the life of a run; to pick up on-disk edits in a long-lived process, call `Load` again and swap it (and its `Matcher`). Its `json.Marshal` output is the wire `sightmap export` prints.
 
 | Method | Purpose |
 |---|---|
-| `MatchTree(root *comps.ComponentNode, pageURL string) map[*comps.ComponentNode]*match.SightmapMatch` | Apply the corpus to a tree for a URL |
-| `Components(pageURL string) []match.SightmapComponent` | Return the merged component list for a URL without matching a tree |
-| `ViewForURL(pageURL string) *sightmap.View` | Return the most specific matching view, or `nil` when no view matches |
-| `ViewByName(name string) *sightmap.View` | Return the view with the given name, or `nil` |
-| `GlobalComponentNames() map[string]bool` | Return the names declared at global scope |
+| `ViewForURL(pageURL) *ViewDef` | The most specific matching view, or `nil` |
+| `ViewByName(name) *ViewDef` | The view with this name, or `nil` |
+| `TiedViews(pageURL) []string` | Views that tie on specificity for a URL |
+| `ComponentsForURL(pageURL) []ComponentDef` | The merged global and view-scoped component list for a URL |
+| `AllComponents() []ComponentDef` | Every component definition, flattened |
+| `GlobalComponentNames() map[string]bool` | Names declared at global scope |
+| `TagsForURL(pageURL) []string` | View tags unioned across every matching view |
+| `RequestsForURL(url, method) []RequestDef` | Every request definition that matches |
+| `RequestsForRecord(rec Request) []RequestMatch` | Matching requests for an observed request, with extracted properties |
+| `MessagesForRecord(rec Message) []MessageMatch` | Matching messages for a console record, with stack properties |
+| `TagsForRecord(rec Message) []string` | Message tags unioned across every matching entry |
+| `SignalByName`, `ResolveSignal`, `ResolveSignalRef`, `TagsForSignal` | Look up a signal and the component or view its `ref` names |
+| `EnvironmentByName(name) *EnvironmentDef` | An environment from the project-wide registry |
+| `ResolveOrigin(environment, origin) (string, bool)` | An origin's URL in an environment: its own map, then its backend's, then the shared map |
+| `Stats() Stats` | The counts `sightmap stats` prints |
+
+Package-level helpers include `RequestEnvironments(view, request)`, which intersects a view-scoped request's environments with its view's, and `SplitFieldPath`, which splits a body `path` with `\.` and `\\` escapes. Every property definition (`ComponentPropertyDef`, `RequestPropertyDef`, `MessagePropertyDef`, `URLPropertyDef`) carries one `Extract` value.
 
 `Load(dir)` is shorthand for `DirLoader(dir).Load()`. For an existing in-memory corpus, `StaticLoader(c *Corpus) Loader` wraps it as a `Loader`; the `LoaderFunc` type, `func() (*Corpus, error)`, also implements `Loader`.
 
-Per-site tooling defaults (`.sightmap/config.yaml`) load separately via `sightmap.LoadConfig(dir) SiteConfig` — this is tooling configuration, not part of the spec.
+Per-site tooling defaults (`.sightmap/config.yaml`) load separately via `sightmap.LoadConfig(dir) SiteConfig`. This is tooling configuration, not part of the spec.
 
 ## Validate and lint from Go
 
@@ -115,18 +128,18 @@ if err != nil {
 	log.Fatal(err)
 }
 for _, e := range sightmap.Validate(corpus) {
-	fmt.Println("error:", e)
+	fmt.Println(e.Severity, e.Code, e.Message)
 }
 for _, w := range sightmap.Lint(corpus) {
 	fmt.Println("warning:", w)
 }
 ```
 
-`LintWithCounts(c *Corpus, counts map[string]int) []LintWarning` adds per-component match counts to lint results. The CLI uses it for `sightmap lint --snapshot` and `sightmap lint --all-snapshots`.
+Each `ValidationError` has a `Code` and a `Severity` (`error` or `warning`; empty means error). `LintWithCounts(c *Corpus, counts map[string]int) []LintWarning` adds per-component match counts to lint results. The CLI uses it for `sightmap lint --snapshot` and `sightmap lint --all-snapshots`.
 
 ## Where component trees come from
 
-- **Saved captures.** Auto-organized captures under `.sightmap/snapshots/{view}/` include a sibling `.snap.tree.json` file containing the raw `ComponentNode` tree. `sightmap snapshot --tree-out FILE` writes the tree to an explicit path. Unmarshal either form into `*comps.ComponentNode`, as in the example above.
+- **Saved captures.** Auto-organized captures under `.sightmap/snapshots/{view}/` include a sibling `.snap.tree.json` file containing the raw `ComponentNode` tree. `sightmap snapshot --tree-out FILE` writes the tree to an explicit path. Unmarshal either form into `*sightmap.ComponentNode`, as in the example above.
 - **Live pages.** Call `browser.Connect(addr, tabID)` to attach to a running session's tab, then pass a `browser.Page` to `browser.ExtractComponents` — or use the higher-level `observe.Page`, which connects, extracts, matches the corpus, and computes coverage in one call.
 - **Custom extraction.** Call `extract.BuildTree` with probe, accessibility, and DOM data. Native consumers can create `SelectorPart` values for non-DOM trees.
 

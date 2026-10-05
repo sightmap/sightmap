@@ -18,7 +18,17 @@ Loads the YAML and checks the resulting corpus. It verifies required fields (a v
 
 Warnings flag *corpus conflicts* — two definitions that collide on identity where only one can win and a fallback rule (declaration order) silently resolves it: duplicate view `name` (`merge-collision-view`), two views sharing a `route` (`route-conflict`), and duplicate root-level global component names with different selectors (`merge-collision-component`). The corpus still loads; the warning tells you which definition is shadowing another.
 
-Warnings also flag **unknown fields** (`unknown-field`) — a key the spec doesn't define at its position, such as a typo (`memroy:`) or an experimental field. These warn rather than fail, so you can stash work-in-progress fields during development; recognized fields (including the reserved tooling fields `access` and `snapshots`) are never flagged.
+Warnings also flag **unknown fields** (`unknown-field`) — a key the spec doesn't define at its position, such as a typo (`memroy:`) or an experimental field. These warn rather than fail, so you can stash work-in-progress fields during development; recognized fields (including the reserved tooling fields `access` and `snapshots`) are never flagged. A field the spec has removed is unknown too: `dependencies`, dropped in 0.34.0 ([SEP-0001](https://github.com/sightmap/sightmap/blob/main/spec/seps/0001-dependencies-field.md), Rejected), warns here but fails JSON Schema validation, so delete it.
+
+It also checks the fields added by recent SEPs:
+
+| Area | Errors | Warnings |
+| --- | --- | --- |
+| [`extract`](/reference/schema#extract) on component, request, and message properties | a `from` the entity can't read, a missing or forbidden `path`, an invalid RE2 `pattern`, `join` outside `from: component` or on a single-valued path, `extract` mixed with `source`/`field`/`pattern` (`extract-shape-mixed`), a malformed body path (`request-property-path-invalid`) | `extract-legacy-form` on each deprecated string form, naming the object to write instead |
+| [`privacy`](/spec/components#privacy) | `invalid-privacy` for a value other than `block`, `mask`, or `unmask` | `extract-privacy-withheld` on a property its own component's privacy would withhold |
+| [URL properties](/spec/views#url-properties) | `route-binding-conflict`, `route-param-duplicate`, `route-param-shadows-reserved` | `route-param-unbound` for a `:segment` that matches but binds nothing |
+| [Environments and origins](/spec/environments#diagnostics) | `environment-invalid`, `origin-invalid`, `environment-backend-invalid`, `environment-ref-unresolved`, `origin-ref-unresolved` | name collisions, `origin-environment-gap`, `origin-host-shared`, `environment-duplicate`, explicit empty lists |
+| [Messages and signals](/spec/messages) | `message-regex-invalid`, `signal-ref-unresolved`, `signal-ref-ambiguous` | `message-conflict` |
 
 The command also rejects selector syntax outside Sightmap's supported subset. For example, `:nth-child()` produces a parse error; the supported pseudo-classes are `:not()`, `:is()`, `:where()`, and `:has()`.
 
@@ -86,9 +96,9 @@ warn [broad-tag-selector]: SiteHeader: selector "header": [broad-tag-selector] b
 warn [multi-instance-no-property]: PromoTile: [multi-instance-no-property] selector likely matches multiple instances but defines no properties to differentiate them. Consider adding a property (e.g., label, id, or parent context), narrowing the selector, marking as a child component scoped to a parent, or marking stability: unstable if this is an accepted T2 residual.
 ```
 
-<Warning>
-Property extraction (`properties:` on components) is implemented by the CLI as a draft extension — it is not part of spec v1 and may change. The `multi-instance-no-property` rule reflects the CLI's behavior, not a spec requirement.
-</Warning>
+<Note>
+The `multi-instance-no-property` rule is CLI guidance, not a spec requirement. Component [`properties:`](/spec/components#properties) themselves are part of the spec.
+</Note>
 
 ---
 

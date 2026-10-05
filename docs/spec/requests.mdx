@@ -29,7 +29,7 @@ A request assigns a semantic name to an API endpoint. Consumers can show `Search
   headers: [x-request-id]
 ```
 
-`name` and `route` are required. See [Schema reference](/reference/schema#request) for the full type, including the `Payload` and `Field` sub-types.
+`name` and `route` are required. See [Schema reference](/reference/schema#request) for the full type, including the `Payload` and `Field` sub-types and the `properties`, `tags`, `environments`, and `origins` fields described below.
 
 ## Route patterns
 
@@ -107,6 +107,41 @@ Requests can be declared at the file root or inside a view.
 
 Declare a request at the file root when it applies regardless of the active view. Put it inside a view when it applies only to that view.
 
+## Properties
+
+`properties` names values to pull out of live traffic. An HTTP `200` does not tell an approved payment from a declined one when the outcome lives in the response body. Each entry has a `name` and an `extract` object:
+
+```yaml
+- name: CheckoutPayment
+  route: /api/checkout/pay
+  method: POST
+  properties:
+    - name: outcome
+      extract: { from: rsp.body, path: status }                # a JSON body value
+    - name: rate_limit_remaining
+      extract: { from: rsp.headers, path: X-RateLimit-Remaining, pattern: '(\d+)' }
+```
+
+| `from` | `path` |
+|---|---|
+| `req.body`, `rsp.body` | A dot-path into the JSON body (`items.0.name`). Escape a literal dot or backslash in a key as `\.` or `\\`. Optional when `pattern` is set, in which case the pattern scans the raw body text. |
+| `req.headers`, `rsp.headers` | A header name, matched case-insensitively. Required. |
+| `url.query`, `url.path` | A query-string key, or a `:name` bound by the route. See [URL properties](/spec/views#url-properties). |
+
+`pattern` is an [RE2](/reference/schema#regular-expressions) regex applied to the value `path` selects; capture group 1 is the value when the pattern has one. A property that doesn't resolve is simply absent, never an error. Body and header properties need live traffic, so a static tool treats them as declared but unavailable.
+
+A request route's `:name` segments bind as properties exactly as a view's do. `status`, `method`, and `duration` are reserved names for the request's own HTTP identity: declaring a property under one shadows it (`sightmap validate` warns `request-property-shadows-reserved`), and a route binding with one of those names is an error.
+
+<Note>
+The older `source:` / `field:` / `pattern:` keys still load, lowered to `extract`, with an `extract-legacy-form` warning. They will be removed in a later release.
+</Note>
+
+`properties` and the `request`/`response` payloads answer different questions: payload `fields` document expected shape for a reader, while `properties` names a value to extract. See the [schema reference](/reference/schema#request-properties).
+
+## Tags, environments, and origins
+
+`tags` on a request resolve as a union across every matching request. `environments` names the deploy targets an endpoint exists in, and `origins` the hosts it is called on. A view-scoped request's environments are intersected with its view's, but its origins are **not** inherited, because a page and the APIs it calls usually live on different hosts. None of these change which traffic the route matches. See [Environments and origins](/spec/environments).
+
 ## Next
 
-[Memory](/spec/memory) covers the `memory:` field that any request can carry, surfaced to the agent in the network-trace detail view.
+[Messages and signals](/spec/messages) covers console and exception patterns. [Memory](/spec/memory) covers the `memory:` field that any request can carry, surfaced to the agent in the network-trace detail view.

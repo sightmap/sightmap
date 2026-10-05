@@ -40,7 +40,7 @@ A tool acting in the reader role: it loads a sightmap and applies it to the runn
 
 ### Corpus
 
-The views, components, requests, and memory produced by loading and merging a project's sightmap files. `validate`, `lint`, and `search` load the directory as a corpus. Coverage commands re-match saved captures against that corpus. See [the Go library](/reference/go-library).
+The views, components, requests, messages, signals, environments, and memory produced by loading and merging a project's sightmap files. `validate`, `lint`, and `search` load the directory as a corpus. Coverage commands re-match saved captures against that corpus. See [the Go library](/reference/go-library).
 
 ### Coverage tiers
 
@@ -50,6 +50,14 @@ The classification the CLI assigns to each analyzed interactive node. **T1 direc
 
 A human, an agent, or both working together to author and maintain `.sightmap/`. Curators choose names and selectors, write memory, and update the corpus as the app changes. Contrast with **Consumer**.
 
+### Environment
+
+A named deploy target, such as `staging`, `prod`, or `android-beta`, declared in a file-root `environments` array. A web environment is identified by its origins, a native one by its `app_id`. Views and requests name the environments they exist in. See [Environments and origins](/spec/environments).
+
+### Extract
+
+The `{ from, path, pattern, join }` object every property uses to say where its value comes from: the component's node (`dom.text`, `dom.attr`, `dom.state`, …), a descendant component, a request body or header, a URL, or a stack. See [Extract](/reference/schema#extract).
+
 ### MCP
 
 [Model Context Protocol](https://modelcontextprotocol.io/), a protocol for exposing tools and context to agents. Sightmap does not require MCP; consumers can load its YAML files through any transport.
@@ -58,9 +66,21 @@ A human, an agent, or both working together to author and maintain `.sightmap/`.
 
 Short freeform notes attached at the file root or to a view, component, or request. Memory records runtime context that source code may not state, such as quirks, invariants, and workarounds. See [Memory](/spec/memory).
 
+### Message
+
+A named console-output or uncaught-exception pattern, matched by `level` and a `message` regex, declared at the file root. See [Messages and signals](/spec/messages).
+
 ### Novelty gate
 
 The rule applied when `capture` appends to a view set. The first capture is kept; later captures are kept only when they add a matched component type or uncovered interactive slot. Changes to values such as products, prices, or copy do not count. `sightmap capture --force` bypasses the gate. See [Snapshots](/cli/snapshots).
+
+### Origin
+
+A named host, written `scheme://host[:port]` and optionally a pattern such as `https://deploy-preview-*--acme.netlify.app`. Each environment maps origin names like `app` and `api` to its own URLs; the file-root `origins` map holds hosts shared by every environment. See [Environments and origins](/spec/environments).
+
+### Privacy
+
+A component field (`block`, `mask`, or `unmask`) telling capture tools what content they may retain from the element and its subtree. The nearest enclosing declaration wins. See [Privacy](/spec/components#privacy).
 
 ### Project semver
 
@@ -86,6 +106,10 @@ A corpus YAML document under `.sightmap/` that conforms to the stream 1 schema. 
 
 The `.sightmap/` directory at the project root. Sightmap discovers and merges corpus `*.yaml` and `*.yml` files recursively. The Go loader skips the `snapshots/` and `review/` subdirectories because they hold non-corpus artifacts.
 
+### Signal
+
+A named boolean over the current state of one component (present) or view (route active), declared at the file root with `ref`. See [Messages and signals](/spec/messages#signals).
+
 ### Stream version
 
 The integer in a sightmap file's `version` field, currently `1`. It selects the spec stream used to interpret the file and changes only for a breaking change to the YAML format. It is independent of project SemVer. See [Versioning policy](/reference/versioning).
@@ -94,6 +118,10 @@ The integer in a sightmap file's `version` field, currently `1`. It selects the 
 
 A live browser page in a **session**, identified by the `--tab` ID printed by `browser start`. Distinct from a sightmap **view**: a tab is a running page; a view is a route-scoped definition in the corpus. When two or more tabs are open, page commands require `--tab` to avoid cross-agent crosstalk.
 
+### Tags
+
+Open-vocabulary classification labels on views, components, requests, messages, and signals. Unlike a name, tags resolve as a union across every applicable definition. See [Tags](/reference/schema#tags).
+
 ### View
 
 A named screen identified by a URL route glob. Sightmap matches the current URL to one active view. A view is a corpus definition, not a live browser **tab**. See [Views](/spec/views).
@@ -101,3 +129,7 @@ A named screen identified by a URL route glob. Sightmap matches the current URL 
 ### View set
 
 All saved captures for one view. `coverage` reports T1/T2/T3 for each capture and evaluates component presence across the set. `report` aggregates the set into one row, while `multi-coverage` uses the highest component count found in the set. See [Snapshots](/cli/snapshots).
+
+### Watch
+
+A component field (`watch: true`) asking capture tools to report when the component becomes visible, even if nobody interacts with it. It applies to the declaring component only, never its children. See [Watch](/spec/components#watch).

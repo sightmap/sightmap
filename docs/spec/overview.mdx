@@ -1,7 +1,7 @@
 ---
 title: "The Sightmap Specification: YAML Format Overview"
 sidebarTitle: "Overview"
-description: "Learn how YAML files under .sightmap/ define views, components, requests, and memory."
+description: "Learn how YAML files under .sightmap/ define views, components, requests, messages, environments, and memory."
 ---
 
 A sightmap is a directory of YAML files at the root of a project, under `.sightmap/`. It describes the app's **views**, **components**, and **requests**, with optional **memory** entries that carry notes agents can use at runtime.
@@ -10,7 +10,7 @@ These pages explain the format. The [Schema reference](/reference/schema) provid
 
 ## What's in a sightmap
 
-Four kinds of definitions, all optional:
+The main kinds of definitions, all optional:
 
 <CardGroup cols={2}>
   <Card title="Views" icon="window-maximize" href="/spec/views">
@@ -22,8 +22,14 @@ Four kinds of definitions, all optional:
   <Card title="Requests" icon="arrow-right-arrow-left" href="/spec/requests">
     Named API endpoints identified by route patterns.
   </Card>
+  <Card title="Messages and signals" icon="terminal" href="/spec/messages">
+    Named console and exception patterns, and named predicates over page state.
+  </Card>
+  <Card title="Environments and origins" icon="server" href="/spec/environments">
+    Named deploy targets and hosts that views and requests run on.
+  </Card>
   <Card title="Memory" icon="brain" href="/spec/memory">
-    Short freeform notes attached to any of the above.
+    Short freeform notes attached to any definition.
   </Card>
 </CardGroup>
 
@@ -35,13 +41,17 @@ Every file begins with `version: 1`. All other top-level keys are optional.
 
 ```yaml
 version: 1
-memory:      # string[] — file-level notes
-views:       # View[]
-components:  # Component[] — global, matched on every view
-requests:    # Request[] — global, matched on every view
+environments: # Environment[] — named deploy targets
+origins:      # map of name to URL — hosts shared by every environment
+memory:       # string[] — file-level notes
+views:        # View[]
+components:   # Component[] — global, matched on every view
+requests:     # Request[] — global, matched on every view
+messages:     # Message[] — console and exception patterns
+signals:      # Signal[] — named state predicates
 ```
 
-`components` and `requests` at the file root are global and match against every view. Nest them inside a view to limit them to that view. Scoped definitions are additive with globals, except that a view-scoped `$ref` subsumes a global component with the same name. Entries in any `components:` array may be `$ref` references to shared definitions. See [Components](/spec/components) and [Requests](/spec/requests) for the matching rules.
+`components` and `requests` at the file root are global and match against every view. Nest them inside a view to limit them to that view. Scoped definitions are additive with globals, except that a view-scoped `$ref` subsumes a global component with the same name. Entries in any `components:` array may be `$ref` references to shared definitions. See [Components](/spec/components) and [Requests](/spec/requests) for the matching rules. `messages` and `signals` exist only at the file root, and `environments` and `origins` merge into project-wide registries; see [Messages and signals](/spec/messages) and [Environments and origins](/spec/environments).
 
 ## Two versioning axes
 

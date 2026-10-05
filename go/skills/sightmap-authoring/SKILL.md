@@ -476,6 +476,58 @@ this to your advantage — a well-named property makes the annotation clean.
 
 ---
 
+## Privacy, watch, and tags
+
+Three optional component fields carry intent for downstream tools. None of them
+changes matching or identity. Add them when you know the intent; don't guess.
+
+**`privacy: block | mask | unmask`** tells a capture tool (session replay,
+analytics) what content it may keep. It covers the element **and its subtree**,
+and the **nearest enclosing** declaration wins.
+
+```yaml
+- name: CheckoutForm
+  selector: '[data-component="CheckoutForm"]'
+  privacy: mask                    # structure kept, text/values/attributes withheld
+  children:
+    - name: CardNumberInput
+      selector: 'input[name="cc"]'
+      privacy: block               # nothing captured
+    - name: OrderTotal
+      selector: '.order-total'
+      privacy: unmask              # the one value that is safe to keep
+```
+
+- Omitting `privacy` says nothing; the consumer's default applies. Don't add
+  `unmask` "to be safe"; it exists only to carve a safe field out of a `mask`.
+- **It governs your `properties:` too.** A value read from a `block`/`mask` node
+  is dropped, and so is that node's AX `value` in the snapshot. Under `mask`,
+  `component.exists` and `dom.state` still resolve, so read a masked toggle with
+  `{ from: dom.state, path: checked }`, not its text. `validate` warns
+  `extract-privacy-withheld` when a property reads content its own component's
+  privacy withholds.
+- `class`, `style`, and `id` survive `mask`. If one of them holds user data, use
+  `block`.
+
+**`watch: true`** asks a capture tool to report when the component **becomes
+visible**, even if nobody interacts with it. Use it for components whose
+*appearance* is the signal: empty states, error banners, upsells. It applies to
+the declaring component only, never its children.
+
+```yaml
+- name: NoResultsMessage
+  selector: '.search-empty'
+  watch: true
+```
+
+**`tags: [..]`** are open-vocabulary labels (`defect`, `checkout`) on views,
+components, requests, messages, and signals. Tags resolve as a **union** across
+every applicable definition (every matching ancestor component, every matching
+view), so tag the broad container rather than each child. `snapshot` prints a
+page's view tags on a `tags:` line under the view header.
+
+---
+
 ## Requests and messages
 
 Components and views describe the DOM. Two more top-level entities describe a
@@ -543,11 +595,31 @@ or header is even captured depends on the runtime layer. `status`, `method`, and
 `duration` are already-structured request identity and need no `properties:`
 declaration.
 
+**URL properties.** A `:name` segment in a request **or view** route binds that
+segment as a property with no declaration (`route: /api/orders/:order_id` gives
+`order_id="123"`). Read a query value with `{ from: url.query, path: KEY }`, or
+rename a binding with `{ from: url.path, path: order_id }`. Binding names must
+match `^[a-z][a-z0-9_]*$`: `:orderId` still matches but binds nothing
+(`validate` warns `route-param-unbound`), so prefer snake_case params when you
+author the route. Binding never changes what the route matches.
+
+```yaml
+views:
+  - name: ProductDetail
+    route: /shop/p/:product_id      # binds product_id
+    properties:
+      - name: variant
+        extract: { from: url.query, path: variant }
+```
+
 ### `messages:` — name a console/exception pattern
 
 A `messages:` entry classifies console output and runtime exceptions by `level`
-and/or a `message` regex. An exception folds in as an ERROR/`exception`-level
-record — there is no separate entity.
+and/or a `message` regex. An uncaught exception arrives with level `exception`,
+**not** `error`, so `level: ERROR` won't match it; write `level: EXCEPTION`.
+There is no separate exception entity. Message `tags:` union across every entry a
+record matches, so a classification survives even when two entries both match
+(which `validate` warns about as `message-conflict`).
 
 ```yaml
 version: 1
@@ -573,6 +645,44 @@ messages:
       - name: origin_fn
         extract: { from: stack, path: top.function }   # <frame>.<attr>; frame = top|<index>, attr = function|file|line|column
 ```
+
+---
+
+## Environments and origins
+
+When a corpus has to say *where* things run (a consumer compiles per deploy
+target, or the app spans hosts), declare file-root `environments` and shared
+`origins`, then reference them by name from views and requests. Skip this
+entirely for a single-host app; a corpus with neither field is fine.
+
+```yaml
+version: 1
+environments:
+  - name: android-prod
+    platform: android
+    app_id: com.acme.app
+    backend: prod                   # borrows prod's origins
+  - name: preview
+    origins: { app: 'https://deploy-preview-*--acme.netlify.app', api: https://api.staging.acme.com }
+  - name: prod
+    origins: { app: https://app.acme.com, api: https://api.acme.com }
+origins:
+  facebook: https://www.facebook.com   # same host in every environment
+views:
+  - name: OrderHistory
+    route: /orders/history
+    origins: [app]
+    requests:
+      - name: ListOrders
+        route: /orders
+        origins: [api]              # never inherited from the view
+```
+
+- Absent or empty lists mean unconstrained; don't write `[]`.
+- These are metadata only. They never change what a route matches, and `url:`
+  must not stand in for an origin.
+- Keep the definitions in one file (e.g. `.sightmap/environments.yaml`). On a
+  duplicate name the first file by path wins, with a warning.
 
 ---
 
