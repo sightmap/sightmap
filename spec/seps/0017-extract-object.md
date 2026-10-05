@@ -19,13 +19,18 @@ extract:
   from: rsp.body        # a source, from one shared namespace
   path: order.ref.id    # the value within it
   pattern: '^ORD-(\d+)' # optional RE2 refinement
-  join: ','             # optional, collapses a multi-match
+
+extract:
+  from: component
+  path: 'Tag[].value'   # Tag[] reads every match, not the first
+  join: ','             # collapses the matches into one value
 ```
 
 Every entity draws `from` values from one namespace; which values an entity accepts is a property
 of the entity, not of the syntax. The existing string forms are lowered to the object, keep working
 for a deprecation window, and are then removed. This SEP changes how extraction is written and adds
-two refinements to components (`pattern`, `join`); it does not change what a source resolves to.
+two refinements to components (`pattern`, and `join` over a `Name[]` path); it does not change what a
+source resolves to.
 
 ## Motivation
 
@@ -41,7 +46,7 @@ was designed on its own:
 An author learns three spellings for one operation. A consumer that reasons about extraction across
 entities special-cases each one. Every new source means inventing another spelling rather than
 adding one value to a shared list, and open proposals were each about to add one: `query:` and
-`param:` for URLs, a `pattern` suffix for components, a predicate syntax for picking among matches.
+`param:` for URLs, a `pattern` suffix for components, a predicate and multi-match syntax for paths.
 
 The string forms also hide a collision. SEP-0013 accepted reading a control's interactive state with
 `attr=checked`, which would make `attr=` read the accessibility layer for four names and the DOM for
@@ -98,19 +103,31 @@ body source with no `path`, the pattern scans the raw body text, as SEP-0005 alr
 Requests and messages already carry `pattern`. Components gain it here: a price inside a label such
 as `Add to cart · $10.95` is reachable without promoting a sub-element to a child component.
 
-**`join`** collapses a multi-match into one value, and is valid only with `from: component`.
-Without `join`, each segment of the path resolves to its first match in document order, as
-SEP-0010 defines. With `join`, each segment resolves to every match in document order, each matched
-value is read (and refined by `pattern`, when present), empty values are dropped, and the rest are
-concatenated with the `join` string. No surviving value omits the property. `join` must be
-non-empty.
+**Multi-valued paths and `join`.** A component path states its shape. Each segment resolves within
+the node or nodes the previous segment produced, in document order:
+
+- A plain segment, `Tag`, takes the **first** match, as SEP-0010 defines. A path of plain segments
+  is single-valued and yields one value.
+- A segment written **`Tag[]`** takes **every** match. A path with one or more `[]` segments is
+  multi-valued, and resolves to one value per node it reaches.
+
+`Row[].Price.amount` reads the first `Price` in every `Row`; `Row.Price[].amount` reads every
+`Price` in the first `Row`; `Row[].Price[].amount` reads every `Price` in every `Row`.
+
+A multi-valued path requires **`join`**, which collapses it into one value: each value is read (and
+refined by `pattern`, when present), empty values are dropped, and the rest are concatenated with
+the `join` string. No surviving value omits the property. `join` is valid only with
+`from: component`, must be non-empty, and requires a `[]` segment to collect. A multi-valued path
+without `join` is reserved for array-valued results, which a later SEP may define.
 
 ```yaml
 - name: ProductCard
   selector: '.product'
   properties:
+    - name: first_tag
+      extract: { from: component, path: Tag.value }                 # "sale"
     - name: tags
-      extract: { from: component, path: Tag.value, join: ',' }   # "sale,new,featured"
+      extract: { from: component, path: 'Tag[].value', join: ',' }  # "sale,new,featured"
   children:
     - name: Tag
       selector: '.tag'
@@ -119,18 +136,14 @@ non-empty.
           extract: { from: dom.text }
 ```
 
-**Picking one match is a selector, not a refinement.** To read the selected tab from a row of tabs,
-declare a component whose selector matches only that tab, and read it:
+`[` and `]` are flow indicators in YAML, so a path containing `[]` must be quoted inside a flow
+mapping (`{ ... }`), as above. In block style it needs no quotes.
 
-```yaml
-- name: ActiveTab
-  selector: '.tab[aria-selected="true"]'
-  properties:
-    - name: label
-      extract: { from: dom.text }
-```
+**Predicates are reserved.** Picking one match by what it is, such as the selected tab
+(`Tab[selected=true].label`), needs a predicate on a path segment. This SEP does not define one. A
+bracket with content inside a path segment is reserved for it and is rejected by validation, so a
+predicate syntax along the lines of SEP-0012 can be added without changing any valid path.
 
-The matcher already resolves components by selector, so selection needs no runtime step of its own.
 A joined scalar is a value every consumer can store, where an array is not.
 
 ### Privacy
@@ -180,7 +193,10 @@ A conforming SDK MUST:
   entity.
 - Resolve each source as its defining SEP specifies, `dom.state` as SEP-0013's interactive-state
   set, and `dom.attr` as the authored attribute.
-- Apply `pattern` on every source except `component.exists`, and `join` on `component` as specified.
+- Resolve plain path segments to their first match and `Name[]` segments to every match, require
+  `join` on a multi-valued path, reject `join` on a single-valued one, and reject a bracket with
+  content in a path segment.
+- Apply `pattern` on every source except `component.exists`.
 - Apply SEP-0009 per the privacy table, and warn with `extract-privacy-withheld`.
 - During the deprecation window, accept the string forms, lower them exactly as tabled, and warn with
   `extract-legacy-form`. Report `extract-shape-mixed` for a property mixing both.
@@ -191,8 +207,13 @@ A conforming SDK MUST pass the conformance fixtures this SEP adds and updates.
 
 - **Keep per-entity grammars and add new string forms as needed.** Rejected: each new source would
   add a spelling, and `attr=` would keep reading two different stores.
-- **A predicate or array syntax for multi-match.** Rejected in favour of a narrower selector for "which
-  one" and `join` for "how many": both reuse mechanisms the spec already has, and both yield scalars.
+- **Picking one match with a narrower component** (an `ActiveTab` whose selector matches only the
+  selected `Tab`). Rejected: one node matching both `Tab` and `ActiveTab` breaks the one-match-per-node
+  model the rest of the design assumes. A predicate on the path is the right tool; its syntax is
+  reserved here and deferred.
+- **Collecting every match whenever `join` is present**, with no marker in the path. Rejected: the
+  path should state whether it is single- or multi-valued, and in a multi-segment path a single
+  `join` cannot say which segments fan out.
 - **Allow `join` on every source.** Deferred. No other source on main produces a multi-match; a source
   that does (repeated query parameters, say) can enable it in its own SEP.
 - **A hard cut with no deprecation window.** Rejected. Lowering is mechanical and exact, so a window
@@ -212,9 +233,10 @@ used.
 
 ## Open questions
 
-- **State held only in script.** A narrower selector reaches only state the DOM reflects
-  (`aria-selected`, `[data-active]`). State that is never reflected has no selector to write; whether
-  the spec should serve that case is open.
+- **Path predicates.** What a predicate inside `Name[...]` may test (a property value, a state, an
+  attribute) and how it composes with `[]`. The syntax is reserved; SEP-0012 is the starting point.
+- **Array-valued results.** A multi-valued path without `join` is reserved for a result that keeps
+  each value separate, which consumers that store scalars cannot represent today.
 
 ## References
 

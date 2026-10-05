@@ -26,7 +26,7 @@ components:
     selector: .card
     properties:
       - name: a
-        extract: { from: component, path: Tag.value, join: ',' }
+        extract: { from: component, path: 'Tag[].value', join: ',' }
       - name: b
         extract: attr=data-sku
 requests:
@@ -47,7 +47,7 @@ messages:
         field: top.file
 `)
 	props := c.GlobalComponents[0].Properties
-	if e := props[0].Extract; e.From != FromComponent || e.Path != "Tag.value" || e.Join != "," || e.IsLegacy() {
+	if e := props[0].Extract; e.From != FromComponent || e.Path != "Tag[].value" || e.Join != "," || e.IsLegacy() {
 		t.Errorf("object component extract = %+v", e)
 	}
 	if e := props[1].Extract; e.From != FromDOMAttr || e.Path != "data-sku" || e.Legacy != "attr=data-sku" {
@@ -72,7 +72,7 @@ components:
     selector: .card
     properties:
       - name: a
-        extract: { from: component, path: Tag.value, join: '' }
+        extract: { from: component, path: 'Tag[].value', join: '' }
       - name: b
         extract: { from: dom.attr, path: x, select: first }
 requests:

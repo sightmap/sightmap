@@ -4,7 +4,7 @@
 
 One `extract` object for every property (SEP-0017).
 
-Component, request and message properties now read with `extract: { from, path, pattern, join }`, drawing `from` from one namespace: `dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`, `component`, `component.exists`, `req.body`/`rsp.body`/`req.headers`/`rsp.headers`, and `stack`. Components gain `pattern` and `join`, and `dom.state` reads interactive state separately from the markup attribute of the same name.
+Component, request and message properties now read with `extract: { from, path, pattern, join }`, drawing `from` from one namespace: `dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`, `component`, `component.exists`, `req.body`/`rsp.body`/`req.headers`/`rsp.headers`, and `stack`. Components gain `pattern`, and a path segment written `Name[]` reads every match instead of the first, collapsed into one value by `join`. A bracket with content in a path segment is reserved for future path predicates. `dom.state` reads interactive state separately from the markup attribute of the same name.
 
 The string forms (`extract: text`, `attr=NAME`, `PATH.prop`, `exists:PATH`, and request/message `source`/`field`/`pattern`) still load, lowered to the object, and `validate` warns `extract-legacy-form` with the replacement. They will be removed in a later release. `validate` also warns `extract-privacy-withheld` on a read its component's own `privacy` withholds.
 

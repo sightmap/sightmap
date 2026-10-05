@@ -81,7 +81,7 @@ func resolveExtract(
 			return "", false
 		}
 		path, prop := e.Path[:dot], e.Path[dot+1:]
-		if e.Join == "" {
+		if !strings.Contains(path, "[]") {
 			target := resolvePath(node, path, result)
 			if target == nil {
 				return "", false
@@ -91,6 +91,9 @@ func resolveExtract(
 				return "", false
 			}
 			return refine(e, v)
+		}
+		if e.Join == "" {
+			return "", false // an array-valued result is reserved; validation rejects it
 		}
 		var vals []string
 		for _, target := range resolvePathAll(node, path, result) {
@@ -139,28 +142,37 @@ func readProperty(
 	return "", false
 }
 
-// resolvePathAll is resolvePath with every match at each segment rather than the
-// first, in document order without duplicates; it backs `join`.
+// resolvePathAll resolves a multi-valued component path, backing `join`. A segment
+// written Name[] collects every match within each node the previous segment
+// produced; any other segment takes the first match within each. Results are in
+// document order without duplicates.
 func resolvePathAll(
 	node *sightmap.ComponentNode,
 	path string,
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 ) []*sightmap.ComponentNode {
 	cur := []*sightmap.ComponentNode{node}
-	for _, seg := range strings.Split(path, ".") {
-		if seg == "" {
+	for _, seg := range sightmap.ParseComponentPath(path) {
+		if seg.Name == "" {
 			return nil
 		}
 		seen := map[*sightmap.ComponentNode]bool{}
 		var next []*sightmap.ComponentNode
+		add := func(m *sightmap.ComponentNode) {
+			if !seen[m] {
+				seen[m] = true
+				next = append(next, m)
+			}
+		}
 		for _, n := range cur {
+			if !seg.Multi {
+				if m := firstDescendantNamed(n, seg.Name, result); m != nil {
+					add(m)
+				}
+				continue
+			}
 			for _, child := range n.Children {
-				collectNamed(child, seg, result, func(m *sightmap.ComponentNode) {
-					if !seen[m] {
-						seen[m] = true
-						next = append(next, m)
-					}
-				})
+				collectNamed(child, seg.Name, result, add)
 			}
 		}
 		if len(next) == 0 {

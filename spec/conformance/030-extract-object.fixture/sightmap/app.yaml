@@ -1,6 +1,6 @@
 version: 1
 # The extract object (SEP-0017) on every entity: each component source, pattern
-# on a component read, join across every match of a component path, and the
+# on a component read, join across every match of a Name[] path segment, and the
 # request and message sources.
 components:
   - name: ProductCard
@@ -13,7 +13,7 @@ components:
       - name: sku
         extract: { from: dom.attr, path: data-sku }
       - name: tags
-        extract: { from: component, path: Tag.value, join: ',' }
+        extract: { from: component, path: 'Tag[].value', join: ',' }
       - name: sold_out
         extract: { from: component.exists, path: SoldOutBadge }
     children:
@@ -24,12 +24,6 @@ components:
             extract: { from: dom.text }
       - name: SoldOutBadge
         selector: '.sold-out'
-
-  - name: ActiveTab
-    selector: '.tab[aria-selected="true"]'
-    properties:
-      - name: label
-        extract: { from: dom.text }
 
   - name: SubscribeToggle
     selector: '[role="switch"]'

@@ -13,11 +13,11 @@ related-discussions: []
 
 > **Extraction syntax superseded by [SEP-0017](0017-extract-object.md).** `text`, `attr=NAME`, `PATH.prop` and `exists:PATH` are written as `extract: { from, path }` with `from` one of `dom.text`, `dom.attr`, `component`, `component.exists`; resolution is unchanged.
 
-> **Both deferred open questions are answered by SEP-0017.** Picking one match
-> is a narrower selector, and `join` collects every match into one value; a
-> `pattern` refinement on any component read captures a substring. SEP-0017
-> supersedes the drafts that first proposed these, SEP-0011 (PR #404) and
-> SEP-0012 (PR #405).
+> **SEP-0017 answers the aggregates question and reserves room for
+> predicates.** A `Name[]` path segment collects every match and `join`
+> collapses them into one value; a `pattern` refinement captures a substring,
+> covering SEP-0011 (PR #404). Path predicates, the subject of SEP-0012 (PR
+> #405), stay open, with their bracket syntax reserved.
 
 ## Summary
 

@@ -191,6 +191,25 @@ func (r rawExtract) sourced(source, field, pattern string) Extract {
 	return e
 }
 
+// PathSegment is one component name in a component path. Multi marks a segment
+// written Name[], which resolves to every match instead of the first.
+type PathSegment struct {
+	Name  string
+	Multi bool
+}
+
+// ParseComponentPath splits a component path into its segments. It does not
+// validate; see validation for the accepted forms.
+func ParseComponentPath(path string) []PathSegment {
+	parts := strings.Split(path, ".")
+	out := make([]PathSegment, len(parts))
+	for i, p := range parts {
+		name, multi := strings.CutSuffix(p, "[]")
+		out[i] = PathSegment{Name: name, Multi: multi}
+	}
+	return out
+}
+
 func containsString(set []string, s string) bool {
 	for _, v := range set {
 		if v == s {

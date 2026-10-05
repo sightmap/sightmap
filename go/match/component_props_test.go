@@ -241,9 +241,9 @@ func TestResolveExtractObject(t *testing.T) {
 			Selectors: []string{".card"},
 			Properties: []sightmap.ComponentPropertyDef{
 				{Name: "price", Extract: sightmap.Extract{From: sightmap.FromDOMText, Pattern: `\$([\d.]+)`}},
-				{Name: "tags", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Tag.value", Join: ","}},
+				{Name: "tags", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Tag[].value", Join: ","}},
 				{Name: "first_tag", Extract: ex(sightmap.FromComponent, "Tag.value")},
-				{Name: "short_tags", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Tag.value", Pattern: `^(\w{3})`, Join: "|"}},
+				{Name: "short_tags", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Tag[].value", Pattern: `^(\w{3})`, Join: "|"}},
 				{Name: "has_tag", Extract: ex(sightmap.FromComponentExists, "Tag")},
 				{Name: "has_badge", Extract: ex(sightmap.FromComponentExists, "Badge")},
 				{Name: "on", Extract: ex(sightmap.FromDOMState, "checked")},
@@ -283,6 +283,47 @@ func TestResolveExtractObject(t *testing.T) {
 	for _, name := range []string{"has_badge", "markup", "missing"} {
 		if v, ok := propVal(res[card], name); ok {
 			t.Errorf("%s = %q; want omitted", name, v)
+		}
+	}
+}
+
+// Only a segment written Name[] fans out; every other segment takes its first
+// match within each node the previous segment produced.
+func TestResolveMultiValuedPathFansOutPerSegment(t *testing.T) {
+	text := sightmap.Extract{From: sightmap.FromDOMText}
+	defs := []sightmap.ComponentDef{
+		{
+			Name: "List", Selectors: []string{".list"},
+			Properties: []sightmap.ComponentPropertyDef{
+				{Name: "every_row_first_price", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Row[].Price.v", Join: ","}},
+				{Name: "first_row_every_price", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Row.Price[].v", Join: ","}},
+				{Name: "every_price", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Row[].Price[].v", Join: ","}},
+			},
+		},
+		{Name: "Row", Selectors: []string{".row"}},
+		{Name: "Price", Selectors: []string{".price"}, Properties: []sightmap.ComponentPropertyDef{{Name: "v", Extract: text}}},
+	}
+	el := func(class string) *sightmap.Element {
+		return &sightmap.Element{Tag: "div", Classes: []string{class}, Attrs: map[string]string{"class": class}}
+	}
+	price := func(id, v string) *sightmap.ComponentNode {
+		return &sightmap.ComponentNode{Id: id, Name: v, Element: el("price")}
+	}
+	row := func(id string, prices ...*sightmap.ComponentNode) *sightmap.ComponentNode {
+		return &sightmap.ComponentNode{Id: id, Element: el("row"), Children: prices}
+	}
+	list := &sightmap.ComponentNode{Id: "list", Element: el("list"), Children: []*sightmap.ComponentNode{
+		row("r1", price("p1", "1"), price("p2", "2")),
+		row("r2", price("p3", "3"), price("p4", "4")),
+	}}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(list, "")
+	for name, want := range map[string]string{
+		"every_row_first_price": "1,3",
+		"first_row_every_price": "1,2",
+		"every_price":           "1,2,3,4",
+	} {
+		if v, ok := propVal(res[list], name); !ok || v != want {
+			t.Errorf("%s = %q, %v; want %q", name, v, ok, want)
 		}
 	}
 }

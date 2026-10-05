@@ -79,7 +79,7 @@ describe("extractProperties", () => {
     const props = [
       { name: "price", extract: { from: "dom.raw_text", pattern: "\\$([\\d.]+)" } },
       { name: "sku", extract: { from: "dom.attr", path: "data-sku" } },
-      { name: "tags", extract: { from: "component", path: "Tag.value", join: "," } },
+      { name: "tags", extract: { from: "component", path: "Tag[].value", join: "," } },
       { name: "first", extract: { from: "component", path: "Tag.value" } },
       { name: "has_tag", extract: { from: "component.exists", path: "Tag" } },
       { name: "has_badge", extract: { from: "component.exists", path: "Badge" } },

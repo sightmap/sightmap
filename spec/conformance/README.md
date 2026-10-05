@@ -64,7 +64,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 027 | `environment-definitions-invalid` | Schema-valid definitions only the validator can reject: a `backend` naming no environment or a native one → `environment-backend-invalid`; a port above 65535 → `origin-invalid` ([SEP-0014](../seps/0014-environments-and-origins.md)) |
 | 028 | `environment-registry-warnings` | First-by-path wins across files (`environment-name-collision`, `origin-name-collision`), `environment-duplicate`, `origin-environment-gap`, and explicit empty reference lists (`environments-empty`, `origins-empty`) ([SEP-0014](../seps/0014-environments-and-origins.md)) |
 | 029 | `extract-legacy-forms` | Every deprecated string extract form (component `text`/`raw_text`/`attr=`/`PATH.prop`/`exists:`, request and message `source`/`field`) loads lowered to its object equivalent and warns `extract-legacy-form` ([SEP-0017](../seps/0017-extract-object.md)) |
-| 030 | `extract-object` | The `extract` object on components (every `dom.*` source, `component` with `join`, `component.exists`, `pattern` on a component read), requests and messages validates clean ([SEP-0017](../seps/0017-extract-object.md)) |
+| 030 | `extract-object` | The `extract` object on components (every `dom.*` source, a `Name[]` path with `join`, `component.exists`, `pattern` on a component read), requests and messages validates clean ([SEP-0017](../seps/0017-extract-object.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

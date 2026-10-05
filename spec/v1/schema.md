@@ -158,7 +158,7 @@ A component may declare `properties: Property[]` — named values surfaced along
     - name: price                       # "$10.95" out of "Add to cart · $10.95"
       extract: { from: dom.raw_text, pattern: '\$([\d.]+)' }
     - name: tags                        # every Tag, joined: "sale,featured"
-      extract: { from: component, path: Tag.value, join: ',' }
+      extract: { from: component, path: 'Tag[].value', join: ',' }
     - name: sold_out
       extract: { from: component.exists, path: SoldOutBadge }
   children:
@@ -171,7 +171,9 @@ A component may declare `properties: Property[]` — named values surfaced along
       selector: '.sold-out'
 ```
 
-`PATH` is a dotted sequence of component names naming a descendant, each segment resolved first-match (in document order) within the previous segment's matched subtree (`Price`, `Row.Price`). With `join`, each segment resolves to every match instead, and the values are joined (see [Extract](#extract)). For `from: component` the final segment of `path` is a property name; for `component.exists` the whole path names components. References descend only — a property may address a component nested beneath the one declaring it, never a parent, sibling, or cousin — so resolution is a bottom-up pass over a DAG. To pick one match out of several, declare a component whose selector matches only that one (`.tab[aria-selected="true"]`) and read it.
+`PATH` is a dotted sequence of component names naming a descendant, each segment resolved within the previous segment's matched subtree (`Price`, `Row.Price`). A plain segment takes the **first** match in document order. A segment written **`Name[]`** takes **every** match, which makes the path multi-valued: `Row[].Price.amount` reads the first `Price` in every `Row`, and `Row.Price[].amount` reads every `Price` in the first `Row`. A multi-valued path requires `join` (see [Extract](#extract)); without it the path is reserved for array-valued results and is invalid. For `from: component` the final segment of `path` is a property name; for `component.exists` the whole path names components, with no `[]`. A bracket with content in a segment (`Tab[selected=true]`) is reserved for path predicates and is invalid. References descend only — a property may address a component nested beneath the one declaring it, never a parent, sibling, or cousin — so resolution is a bottom-up pass over a DAG. To surface a value from a sub-element, promote that sub-element to a declared child component and reference it.
+
+`[` and `]` are flow indicators in YAML, so quote a path containing `[]` inside a flow mapping: `{ from: component, path: 'Tag[].value', join: ',' }`.
 
 The observed attribute set read by `dom.attr` is implementation-defined: which attributes a node carries depends on the consumer (a web SDK may carry a fixed allowlist plus `aria-*`/`data-*`; other platforms carry synthetic attributes). An attribute the consumer did not carry is indistinguishable from one that was absent.
 
@@ -415,7 +417,7 @@ Every property that extracts a value (component, request, message) declares how 
 | `from` | string | yes | The source to read from. Which sources are valid depends on the entity: see [Component properties](#component-properties), [Request properties](#request-properties), [Message properties](#message-properties). `url.query` and `url.path` are reserved for URL-shaped properties. |
 | `path` | string | per source | The value within the source. Required or forbidden depending on `from`. |
 | `pattern` | string | no | An [RE2](#regular-expressions) regex applied to the resolved value. Capture group 1 is the value when the pattern has one, otherwise the entire match. A value the pattern does not match is omitted. Not valid with `component.exists`. |
-| `join` | string | no | Valid only with `from: component`. Each segment of `path` resolves to every match in document order instead of the first; each value is read and refined by `pattern`, empty values are dropped, and the rest are joined with this string. No surviving value omits the property. Must be non-empty. |
+| `join` | string | no | Valid only with `from: component`, and required by a multi-valued path (one with a `Name[]` segment), which it collapses into one value: each value is read and refined by `pattern`, empty values are dropped, and the rest are joined with this string. No surviving value omits the property. Invalid on a single-valued path. Must be non-empty. |
 
 No other keys are allowed.
 

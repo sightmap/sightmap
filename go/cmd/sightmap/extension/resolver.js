@@ -139,8 +139,10 @@ function resolvePath(el, path, components, ownerAddress) {
 }
 
 /**
- * resolvePath with every match at each segment, in document order; backs
- * `join` (SEP-0017). `firstOnly` keeps only the first match per segment.
+ * Resolve a component path, in document order without duplicates; backs `join`
+ * (SEP-0017). A segment written `Name[]` collects every match within each element
+ * the previous segment produced; any other segment takes the first match within
+ * each. `firstOnly` treats every segment as single-valued.
  *
  * @returns {{el: Element, def: object}[]}
  */
@@ -148,7 +150,9 @@ function resolvePathAll(el, path, components, ownerAddress, firstOnly = false) {
   let cur = [el];
   let addr = ownerAddress;
   let def = null;
-  for (const seg of path.split(".")) {
+  for (const raw of path.split(".")) {
+    const multi = !firstOnly && raw.endsWith("[]");
+    const seg = multi ? raw.slice(0, -2) : raw;
     if (!seg) return [];
     def = childNamed(components, addr, seg);
     if (!def || !def.selector) return [];
@@ -156,16 +160,16 @@ function resolvePathAll(el, path, components, ownerAddress, firstOnly = false) {
     for (const c of cur) {
       let found = [];
       try {
-        found = [...c.querySelectorAll(def.selector)];
+        found = [...c.querySelectorAll(def.selector)].filter((f) => f !== el);
       } catch {
         return [];
       }
-      for (const f of firstOnly ? found.slice(0, 1) : found) {
-        if (f !== el && !next.includes(f)) next.push(f);
+      for (const f of multi ? found : found.slice(0, 1)) {
+        if (!next.includes(f)) next.push(f);
       }
     }
     if (!next.length) return [];
-    cur = firstOnly ? next.slice(0, 1) : next;
+    cur = next;
     addr = componentAddress(def);
   }
   return cur.map((e) => ({ el: e, def }));
@@ -280,10 +284,11 @@ function resolveExtract(el, extract, components, ownerAddress) {
       const dot = path.lastIndexOf(".");
       if (dot <= 0 || dot === path.length - 1) return null;
       const prop = path.slice(dot + 1);
-      if (!e.join) {
+      if (!path.includes("[]")) {
         const hit = resolvePath(el, path.slice(0, dot), components, ownerAddress);
         return hit ? refine(e, readProperty(hit, prop, components)) : null;
       }
+      if (!e.join) return null; // an array-valued result is reserved
       const vals = resolvePathAll(el, path.slice(0, dot), components, ownerAddress)
         .map((hit) => refine(e, readProperty(hit, prop, components)))
         .filter((v) => v != null && v !== "");

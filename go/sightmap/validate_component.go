@@ -97,11 +97,18 @@ func checkComponentExtract(e Extract) (code, msg string) {
 		if dot <= 0 || dot == len(e.Path)-1 {
 			return invalid, fmt.Sprintf("from: component requires path: Component(.Component)*.property, got %q", e.Path)
 		}
-		if m := checkComponentPath(e.Path[:dot]); m != "" {
+		multi, m := checkMultiPath(e.Path[:dot])
+		if m != "" {
 			return invalid, m
 		}
 		if prop := e.Path[dot+1:]; !propertyNameRe.MatchString(prop) {
 			return invalid, fmt.Sprintf("invalid referenced property name %q in %q", prop, e.Path)
+		}
+		if multi && !e.joinSet {
+			return invalid, fmt.Sprintf("path %q is multi-valued (Name[]), so it requires join; array-valued results are reserved", e.Path)
+		}
+		if !multi && e.joinSet {
+			return "extract-join-invalid", fmt.Sprintf("join needs a multi-valued segment to collect, written Name[] (e.g. %s)", suggestMulti(e.Path))
 		}
 	case FromComponentExists:
 		if m := checkComponentPath(e.Path); m != "" {
@@ -149,6 +156,34 @@ func legacyExtractWarning(owner, prop string, e Extract) ValidationError {
 		Severity:  SeverityWarning,
 		Message:   fmt.Sprintf("property %q uses the deprecated string form %q; write extract: %s", prop, e.Legacy, e),
 	}
+}
+
+// checkMultiPath validates a component path that may mark segments Name[], and
+// reports whether any does. A bracket with content is reserved for predicates.
+func checkMultiPath(path string) (multi bool, msg string) {
+	if path == "" {
+		return false, "empty component path"
+	}
+	for _, seg := range strings.Split(path, ".") {
+		name, isMulti := strings.CutSuffix(seg, "[]")
+		if strings.ContainsAny(name, "[]") {
+			return false, fmt.Sprintf("segment %q in path %q: a bracket with content is reserved for path predicates", seg, path)
+		}
+		if !pathSegmentRe.MatchString(name) {
+			return false, fmt.Sprintf("invalid component name %q in path %q", seg, path)
+		}
+		multi = multi || isMulti
+	}
+	return multi, ""
+}
+
+// suggestMulti marks the first segment of a component path multi-valued, for a
+// fix hint: Tag.value becomes Tag[].value.
+func suggestMulti(path string) string {
+	if i := strings.Index(path, "."); i > 0 {
+		return path[:i] + "[]" + path[i:]
+	}
+	return path
 }
 
 func checkComponentPath(path string) string {

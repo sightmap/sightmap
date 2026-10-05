@@ -110,8 +110,10 @@ properties (which is also what the component-query DSL matches on):
       extract: { from: dom.text, pattern: '(FREE|\$[\d,.]+)' }
 ```
 
-`join` (with `from: component` only) collects every match of the path instead
-of the first and joins the values: `{ from: component, path: Tag.text, join: ',' }`.
+A path step takes the first match; mark it `Name[]` to take every match. A path
+with a `[]` step must carry `join`, which joins the values:
+`{ from: component, path: 'Tag[].text', join: ',' }`. Quote the path inside a
+flow mapping, since `[` and `]` are YAML syntax there.
 
 The deprecated string forms (`extract: text`, `attr=NAME`, `Child.prop`,
 `exists:Child`) still load, with an `extract-legacy-form` warning naming the

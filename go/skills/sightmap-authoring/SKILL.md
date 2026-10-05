@@ -423,19 +423,21 @@ name + label discriminator beats a false-specific name.
 | `component.exists` | `Child` | `"true"` if descendant component `Child` matched, else omitted (a boolean flag) |
 
 Two optional refinements: `pattern` (an RE2 regex; capture group 1, else the
-whole match) pulls a substring out of any value, and `join` (with `from:
-component` only) collapses every match of the path into one value instead of the
-first.
+whole match) pulls a substring out of any value, and `join` collapses a
+multi-valued component path into one value.
 
 Extraction is **tree-closed**: `dom.*` sources read the matched node itself;
 `component` and `component.exists` reference a component nested beneath it. A
 path may descend through several declared children (`Row.Price.amount`), taking
-the first match at each step (every match, with `join`). There is no raw-CSS
-sub-selector: to surface a value from a sub-element, **promote it to a child
-component** and reference it. This is also how you disambiguate a repeated
-identical leaf (rule 2): give the container a discriminator and nest the leaf.
-To read one match out of several (the selected tab), declare a component whose
-selector matches only that one (`.tab[aria-selected="true"]`).
+the first match at each step. Mark a step `Name[]` to take every match instead
+(`Tag[].text`); a path with a `[]` step must carry `join`, and `join` needs one.
+Quote such a path inside `{ ... }` (`path: 'Tag[].text'`): `[` and `]` are YAML
+syntax there. There is no raw-CSS sub-selector: to surface a value from a
+sub-element, **promote it to a child component** and reference it. This is also
+how you disambiguate a repeated identical leaf (rule 2): give the container a
+discriminator and nest the leaf. Don't declare a second component to pick one
+match out of several (an `ActiveTab` beside `Tab`): one node should match one
+component.
 
 ```yaml
 - name: ProductCard
@@ -446,7 +448,7 @@ selector matches only that one (`.tab[aria-selected="true"]`).
     - name: price                                      # "$10.95" out of "Add to cart · $10.95"
       extract: { from: dom.text, pattern: '\$([\d.]+)' }
     - name: tags                                       # every Tag: "sale,new"
-      extract: { from: component, path: Tag.text, join: ',' }
+      extract: { from: component, path: 'Tag[].text', join: ',' }
     - name: on_sale
       extract: { from: component.exists, path: SaleBadge }   # boolean flag: "true" or omitted
   children:
