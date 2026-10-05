@@ -327,3 +327,52 @@ func TestResolveMultiValuedPathFansOutPerSegment(t *testing.T) {
 		}
 	}
 }
+
+// dom.state reads the node's merged State (native property overlaid by the AX
+// tree) ahead of the raw AX Properties, and never the markup attribute.
+func TestResolveDOMStatePrefersState(t *testing.T) {
+	defs := []sightmap.ComponentDef{{
+		Name:      "Optin",
+		Selectors: []string{"input"},
+		Properties: []sightmap.ComponentPropertyDef{
+			{Name: "on", Extract: sightmap.Extract{From: sightmap.FromDOMState, Path: "checked"}},
+			{Name: "off", Extract: sightmap.Extract{From: sightmap.FromDOMState, Path: "disabled"}},
+			{Name: "open", Extract: sightmap.Extract{From: sightmap.FromDOMState, Path: "expanded"}},
+		},
+	}}
+	box := &sightmap.ComponentNode{
+		Id:         "box",
+		State:      map[string]string{"checked": "false", "disabled": "true"},
+		Properties: map[string]string{"checked": "true"},
+		Element:    &sightmap.Element{Tag: "input", Attrs: map[string]string{"type": "checkbox", "checked": "", "disabled": ""}},
+	}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(box, "")
+	for name, want := range map[string]string{"on": "false", "off": "true"} {
+		if v, ok := propVal(res[box], name); !ok || v != want {
+			t.Errorf("%s = %q, %v; want %q", name, v, ok, want)
+		}
+	}
+	if v, ok := propVal(res[box], "open"); ok {
+		t.Errorf("open = %q; want omitted (the node has no expanded state)", v)
+	}
+}
+
+// An enabled control reports disabled="false" once the probe's native state is
+// carried, even though the AX tree omits disabled for it. This is what keeps
+// dom.state identical between the Go matcher and the browser extension.
+func TestResolveDOMStateEnabledControl(t *testing.T) {
+	defs := []sightmap.ComponentDef{{
+		Name:       "Go",
+		Selectors:  []string{"button"},
+		Properties: []sightmap.ComponentPropertyDef{{Name: "off", Extract: sightmap.Extract{From: sightmap.FromDOMState, Path: "disabled"}}},
+	}}
+	btn := &sightmap.ComponentNode{
+		Id:      "b",
+		State:   map[string]string{"disabled": "false"}, // probe: native :disabled is false
+		Element: &sightmap.Element{Tag: "button"},
+	}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(btn, "")
+	if v, ok := propVal(res[btn], "off"); !ok || v != "false" {
+		t.Errorf("off = %q, %v; want \"false\"", v, ok)
+	}
+}
