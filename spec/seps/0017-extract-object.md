@@ -2,9 +2,9 @@
 sep: 0017
 title: One extract object across components, requests and messages
 author: Clint Ayres (@jurassix)
-status: Review
+status: Accepted
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-05
 spec-version-target: 1
 related-issues: [443]
 related-discussions: []

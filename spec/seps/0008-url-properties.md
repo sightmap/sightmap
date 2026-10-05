@@ -2,9 +2,9 @@
 sep: 0008
 title: URL properties on views and requests
 author: Clint Ayres (@jurassix)
-status: Review
+status: Accepted
 created: 2026-08-05
-updated: 2026-09-29
+updated: 2026-10-05
 spec-version-target: 1
 related-issues: [187]
 related-discussions: []
