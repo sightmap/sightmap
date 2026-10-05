@@ -1,6 +1,7 @@
 package match
 
 import (
+	"slices"
 	"sort"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -17,11 +18,16 @@ type ChainMatch struct {
 	Tags   []string
 	Memory []string
 	// Privacy is the chain node's effective capture directive (SEP-0009),
-	// resolved exactly as Match resolves ComponentMatch.Privacy: the declaration
-	// of the nearest enclosing matched component, this node included, with the
-	// first matching definition per node deciding. "" when none declares one.
-	// Every ChainMatch at one depth carries the same value. Pass it to Withholds
-	// to decide whether a value read from this node may be surfaced.
+	// resolved as Match resolves ComponentMatch.Privacy: the declaration of the
+	// nearest enclosing matched component, this node included, with the first
+	// matching definition per node deciding. "" when none declares one. Every
+	// ChainMatch at one depth carries the same value. Pass it to Withholds to
+	// decide whether a value read from this node may be surfaced.
+	//
+	// It is never less restrictive than Match. A definition whose selector
+	// needs the node's subtree (:has()) cannot be located on a chain, so it
+	// fails closed: a block or mask one applies to every chain node, and an
+	// unmask one is never honored.
 	Privacy string
 }
 
@@ -81,9 +87,24 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 		}
 		out = append(out, cm)
 	})
+	opaque := ""
+	for i := range entry.queries {
+		q := &entry.queries[i]
+		if q.Def == nil || q.Def.Privacy == "" || !queryNeedsSubtree(q) {
+			continue
+		}
+		if p := knownPrivacy(q.Def.Privacy); p != "unmask" {
+			opaque = stricterPrivacy(opaque, p)
+		}
+		for n, d := range defByNode {
+			if d == q.Def {
+				delete(defByNode, n) // a subtree-dependent match is unreliable here
+			}
+		}
+	}
 	privacy := effectivePrivacy(nodes[0], defByNode)
 	for i := range out {
-		out[i].Privacy = privacy[nodes[out[i].Depth]]
+		out[i].Privacy = stricterPrivacy(privacy[nodes[out[i].Depth]], opaque)
 	}
 	// FindAllMatches visits the linear spine depth-first, so out already runs
 	// root -> leaf; a defensive stable sort keeps the contract explicit without
@@ -138,4 +159,41 @@ func (m *Matcher) TagsForChain(chain []sightmap.Element, pageURL string) []strin
 	}
 	sort.Strings(tags)
 	return tags
+}
+
+// queryNeedsSubtree reports whether q's selector uses :has() anywhere, including
+// inside :is() or :not(). A chain carries a node's ancestors but not its
+// subtree, so such a selector can neither be confirmed nor ruled out there.
+func queryNeedsSubtree(q *MatchQuery) bool {
+	return slices.ContainsFunc(q.Parts, partNeedsSubtree)
+}
+
+func partNeedsSubtree(p *sightmap.SelectorPart) bool {
+	if p == nil {
+		return false
+	}
+	if len(p.Has) > 0 || slices.ContainsFunc(p.Is, partNeedsSubtree) {
+		return true
+	}
+	return slices.ContainsFunc(p.Not, func(n sightmap.ParsedSelector) bool {
+		return slices.ContainsFunc(n.Parts, partNeedsSubtree)
+	})
+}
+
+// stricterPrivacy returns the more restrictive of two resolved directives:
+// block over mask over unmask or none.
+func stricterPrivacy(a, b string) string {
+	rank := func(p string) int {
+		switch p {
+		case "block":
+			return 2
+		case "mask":
+			return 1
+		}
+		return 0
+	}
+	if rank(b) > rank(a) {
+		return b
+	}
+	return a
 }

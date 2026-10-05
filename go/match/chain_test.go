@@ -264,3 +264,30 @@ func TestWithholds(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchChain_SubtreeSelectorPrivacyFailsClosed(t *testing.T) {
+	// The card input sits off the spine, so section:has(input.cc) cannot match
+	// the chain. Its block still reaches every chain node rather than leaving
+	// the span in the blocked region unrestricted.
+	m := chainMatcher(
+		sightmap.ComponentDef{Name: "PaymentSection", Selectors: []string{"section:has(input.cc)"}, Privacy: "block"},
+		sightmap.ComponentDef{Name: "Note", Selectors: []string{"span.note"}},
+	)
+	for _, cm := range m.MatchChain([]sightmap.Element{el("section"), el("div"), el("span", "note")}, "") {
+		if cm.Privacy != "block" {
+			t.Errorf("%s: privacy %q, want block", cm.Name, cm.Privacy)
+		}
+	}
+
+	// An unmask that needs the subtree is never honored on a chain: the form's
+	// mask stands even where Match might have re-opened the field.
+	m = chainMatcher(
+		sightmap.ComponentDef{Name: "Form", Selectors: []string{"form"}, Privacy: "mask"},
+		sightmap.ComponentDef{Name: "SafeField", Selectors: []string{"div:not(:has(input.cc))"}, Privacy: "unmask"},
+	)
+	for _, cm := range m.MatchChain([]sightmap.Element{el("form"), el("div")}, "") {
+		if cm.Privacy != "mask" {
+			t.Errorf("%s: privacy %q, want mask", cm.Name, cm.Privacy)
+		}
+	}
+}
