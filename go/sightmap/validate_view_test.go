@@ -121,3 +121,33 @@ func TestValidate_RequestBothPropertyShapes(t *testing.T) {
 		t.Errorf("want no diagnostics, got %v", findingCodes(errs))
 	}
 }
+
+// A declared property sharing a name with a binding the route still produces is
+// a conflict; renaming the binding with url.path, or restating it, is not.
+func TestValidate_RouteBindingConflict(t *testing.T) {
+	q := func(key string) sightmap.Extract { return sightmap.Extract{From: sightmap.FromURLQuery, Path: key} }
+	p := func(seg string) sightmap.Extract { return sightmap.Extract{From: sightmap.FromURLPath, Path: seg} }
+	for _, tc := range []struct {
+		name  string
+		props []sightmap.URLPropertyDef
+		want  bool
+	}{
+		{"query under a bound name", []sightmap.URLPropertyDef{{Name: "org_id", Extract: q("org")}}, true},
+		{"rename", []sightmap.URLPropertyDef{{Name: "tenant", Extract: p("org_id")}}, false},
+		{"restate", []sightmap.URLPropertyDef{{Name: "org_id", Extract: p("org_id")}}, false},
+		{"rename frees the name", []sightmap.URLPropertyDef{{Name: "tenant", Extract: p("org_id")}, {Name: "org_id", Extract: q("org")}}, false},
+		{"unrelated name", []sightmap.URLPropertyDef{{Name: "variant", Extract: q("variant")}}, false},
+	} {
+		errs := sightmap.Validate(viewCorpus(sightmap.ViewDef{Name: "V", Route: "/org/:org_id/settings", Properties: tc.props}))
+		if got := hasCode(errs, "route-binding-conflict"); got != tc.want {
+			t.Errorf("%s: route-binding-conflict = %v, want %v (all: %v)", tc.name, got, tc.want, findingCodes(errs))
+		}
+	}
+	errs := sightmap.Validate(&sightmap.Corpus{Requests: []sightmap.RequestDef{{
+		Name: "GetOrder", Route: "/api/orders/:order_id",
+		Properties: []sightmap.RequestPropertyDef{{Name: "order_id", Extract: sightmap.Extract{From: sightmap.FromRspBody, Path: "id"}}},
+	}}})
+	if !hasCode(errs, "route-binding-conflict") {
+		t.Errorf("request: a payload property named like a binding should conflict, got %v", findingCodes(errs))
+	}
+}

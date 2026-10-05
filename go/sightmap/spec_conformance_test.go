@@ -57,6 +57,7 @@ func TestSpecConformance_ExtractFixtures(t *testing.T) {
 
 func TestSpecConformance_URLPropertyFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-url-properties.fixture")
+	runSpecValidateFixtures(t, "*-route-binding-conflict.fixture")
 }
 
 func runSpecValidateFixtures(t *testing.T, glob string) {

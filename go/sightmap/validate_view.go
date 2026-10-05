@@ -30,6 +30,11 @@ func checkViewProperties(c *Corpus) []ValidationError {
 	var errs []ValidationError
 	for _, v := range c.Views {
 		errs = append(errs, checkRouteBindings(v.Name, v.Route, nil)...)
+		props := make([]namedExtract, len(v.Properties))
+		for i, p := range v.Properties {
+			props[i] = namedExtract{p.Name, p.Extract}
+		}
+		errs = append(errs, checkBindingConflicts(v.Name, v.Route, props)...)
 		seen := map[string]bool{}
 		for _, p := range v.Properties {
 			errs = append(errs, validateURLProperty(v.Name, p, v.Route)...)
@@ -43,6 +48,38 @@ func checkViewProperties(c *Corpus) []ValidationError {
 			}
 			seen[p.Name] = true
 		}
+	}
+	return errs
+}
+
+type namedExtract struct {
+	name    string
+	extract Extract
+}
+
+// checkBindingConflicts reports a declared property whose name equals a :name
+// binding the entity still produces, since both would arrive under one name. An
+// entry reading `from: url.path` renames that segment, so its implicit name is
+// no longer produced, and an entry may restate its own binding.
+func checkBindingConflicts(owner, route string, props []namedExtract) []ValidationError {
+	renamed := map[string]bool{}
+	for _, p := range props {
+		if p.extract.From == FromURLPath {
+			renamed[p.extract.Path] = true
+		}
+	}
+	var errs []ValidationError
+	for _, p := range props {
+		if renamed[p.name] || !slices.Contains(routeParams(route), p.name) {
+			continue
+		}
+		errs = append(errs, ValidationError{
+			Component: owner,
+			Code:      "route-binding-conflict",
+			Severity:  SeverityError,
+			Message: fmt.Sprintf("%q property %q has the same name as the :%s binding in route %q, so two values would share it; rename the property, or rename the binding with { from: url.path, path: %s }",
+				owner, p.name, p.name, route, p.name),
+		})
 	}
 	return errs
 }

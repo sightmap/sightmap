@@ -439,7 +439,7 @@
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "Key a consumer refers to this value by. An entry whose name matches an implicit route binding overrides that binding."
+          "description": "Key a consumer refers to this value by. Must not equal a :name binding the entity still produces; an entry reading from: url.path renames that binding instead."
         },
         "extract": {
           "$ref": "#/$defs/urlExtract"

@@ -28,12 +28,20 @@ var requestPropertyNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 // Unlike views, requests have reserved identity names a binding must not shadow.
 func checkRequestRouteBindings(c *Corpus) []ValidationError {
 	var errs []ValidationError
-	for _, r := range c.Requests {
+	check := func(r RequestDef) {
 		errs = append(errs, checkRouteBindings(r.Name, r.Route, ReservedRequestPropertyNames)...)
+		props := make([]namedExtract, len(r.Properties))
+		for i, p := range r.Properties {
+			props[i] = namedExtract{p.Name, p.Extract}
+		}
+		errs = append(errs, checkBindingConflicts(r.Name, r.Route, props)...)
+	}
+	for _, r := range c.Requests {
+		check(r)
 	}
 	for _, v := range c.Views {
 		for _, r := range v.Requests {
-			errs = append(errs, checkRouteBindings(r.Name, r.Route, ReservedRequestPropertyNames)...)
+			check(r)
 		}
 	}
 	return errs

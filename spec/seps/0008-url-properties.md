@@ -171,7 +171,7 @@ requests:
 
 | URL | Properties produced |
 |---|---|
-| `/org/acme/settings` | `tenant="acme"` — the explicit entry overrides the implicit `org_id` binding |
+| `/org/acme/settings` | `tenant="acme"`; the `url.path` entry renames the `org_id` binding, so `org_id` is not produced |
 | `GET /api/orders/8891?variant=b` | `order_id="8891"`, `variant="b"`, plus `outcome` from the response body |
 | `GET /api/orders/8891` | `order_id="8891"`, plus `outcome`; `variant` is absent |
 
@@ -275,10 +275,28 @@ identity names (`status`, `method`, `duration`) need none. Declaring one is the 
 renaming, and `extract` is required on any entry that is declared, which avoids a defaulting rule
 for the plain case.
 
-**Collision rule.** An explicit `properties:` entry whose `name` matches an implicit route binding
-overrides that binding. On a request, a bound name colliding with a **reserved identity name** is an
-error rather than a silent precedence rule, because both readings are defensible and refusing beats
-guessing. A `:name` MUST NOT repeat within one route.
+**Renaming and collisions.** An entry reading `from: url.path` *renames* that segment: its value
+arrives under the entry's name, and the implicit `:name` is no longer produced. An entry may also
+restate its own binding (`{ name: org_id, extract: { from: url.path, path: org_id } }`), which
+changes nothing.
+
+Every name an entity produces must be unique. A declared property, of any source, whose `name`
+equals a `:name` binding the entity still produces is therefore an error (`route-binding-conflict`):
+`{ name: org_id, extract: { from: url.query, path: org } }` beside `route: /org/:org_id` would put
+two values under one name. Renaming the binding first resolves it:
+
+```yaml
+route: /org/:org_id
+properties:
+  - name: tenant
+    extract: { from: url.path, path: org_id }   # renames the binding, freeing org_id
+  - name: org_id
+    extract: { from: url.query, path: org }     # no conflict
+```
+
+On a request, a bound name colliding with a **reserved identity name** is an error for the same
+reason: both readings are defensible, and refusing beats guessing. A `:name` MUST NOT repeat within
+one route.
 
 **Names** must match `^[a-z][a-z0-9_]*$`, the pattern `componentProperty.name` and
 `requestProperty.name` already use.
@@ -336,8 +354,10 @@ A conforming SDK MUST:
 - Resolve `url.path` against a `:param` present in the entity's own route, and `url.query`
   against the matched URL's query string, case-sensitively, first occurrence, percent-decoded.
 - Continue to normalize `:param` to `*` for route *matching*, unchanged, on both entities.
+- Treat a `url.path` entry as renaming its segment, so the implicit `:name` is not produced.
 - Report a validation error when `url.path` names a segment absent from the route, when a `:name`
-  repeats within one route, and when a bound name collides with a reserved request identity name.
+  repeats within one route, when a bound name collides with a reserved request identity name, and
+  when a declared property's name equals a binding the entity still produces.
 - Omit an unresolved property silently rather than erroring.
 
 A conforming SDK that scrubs captured URLs SHOULD retain the parts its corpus names, SHOULD surface

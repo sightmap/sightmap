@@ -494,7 +494,7 @@ requests:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. An entry whose name matches an implicit route binding overrides that binding. |
+| `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. Must not equal a `:name` binding the entity still produces (see below). |
 | `extract` | [Extract](#extract) | yes | `from: url.path` with `path: <segment_name>` reads a `:name` bound by this entity's own route; `from: url.query` with `path: <key>` reads a query-string parameter. `path` is required; `pattern` refines the value; `join` is not valid. |
 
 Given `route: /shop/p/:product_id` and a property `{ name: variant, extract: { from: url.query, path: variant } }`:
@@ -513,7 +513,7 @@ Given `route: /shop/p/:product_id` and a property `{ name: variant, extract: { f
 
 `url.query` keys are matched **case-sensitively** — URLs are case-sensitive below the host — and resolve to the first occurrence, percent-decoded.
 
-**Binding is implicit**: a `:name` needs no `properties[]` entry, the same way a request's reserved identity names do not. Declaring one is the escape hatch for renaming. A `:name` MUST NOT repeat within one route, and on a request a bound name colliding with a reserved identity name (`status`, `method`, `duration`) is an error rather than a silent precedence rule.
+**Binding is implicit**: a `:name` needs no `properties[]` entry, the same way a request's reserved identity names do not. An entry reading `from: url.path` renames that segment: its value arrives under the entry's name and the implicit `:name` is no longer produced. Every name an entity produces must be unique, so a declared property, of any source, named like a binding the entity still produces is an error (`route-binding-conflict`); rename the binding first to free its name. A `:name` MUST NOT repeat within one route, and on a request a bound name colliding with a reserved identity name (`status`, `method`, `duration`) is an error rather than a silent precedence rule.
 
 **This changes what `:param` produces, never what it matches.** [Route matching](#route-matching) still normalizes `:param` to `*` for requests, and a view `:param` still scores specificity `2`, so every existing route matches exactly the URL set it matched before. `**` cannot bind: it spans a variable number of segments, so there is no single value to name.
 
