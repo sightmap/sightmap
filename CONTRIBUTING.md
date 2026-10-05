@@ -111,8 +111,8 @@ versions, `CHANGELOG.md`, or the plugin manifest versions — the tooling does i
    generated `.changeset/*.md`.
 
 2. **On merge to `main`**, the `release` workflow opens a "Version Packages"
-   PR that bumps `go/npm/package.json`, writes `go/npm/CHANGELOG.md`, and syncs
-   the plugin manifest versions.
+   PR that bumps `go/npm/package.json`, writes `go/npm/CHANGELOG.md` (mirrored
+   to the root `CHANGELOG.md`), and syncs the plugin manifest versions.
 
 3. **A maintainer merges that PR.** That merge triggers the `release` workflow
    again; with no changesets left to consume, it tags the release, runs

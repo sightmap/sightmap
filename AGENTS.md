@@ -118,8 +118,9 @@ scoped to the `@sightmap/sightmap` package (the `go/npm` workspace). The flow:
    changes that don't affect the package can skip it.
 2. **Per release (automatic):** when changesets land on `main`, the `release`
    workflow opens a "Version Packages" PR that bumps `go/npm/package.json`, writes
-   `go/npm/CHANGELOG.md`, runs `scripts/sync-manifest-versions.mjs`, and deletes
-   the consumed changesets.
+   `go/npm/CHANGELOG.md` (mirrored to the root `CHANGELOG.md` by
+   `scripts/sync-root-changelog.mjs`), runs `scripts/sync-manifest-versions.mjs`,
+   and deletes the consumed changesets.
 3. **Per release (automatic):** merging that PR is itself a push to `main`, so
    `release` runs again; with no changesets left to consume, it tags the commit,
    runs goreleaser, and publishes the npm packages, all in that same run.

@@ -6,9 +6,9 @@ name: docs
 on:
   push:
     branches: [main]
-    paths: ['docs/**', 'spec/v1/**', 'go/npm/CHANGELOG.md', 'scripts/changelog-entry.mjs', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'spec/v1/**', 'go/npm/CHANGELOG.md', 'CHANGELOG.md', 'scripts/changelog-entry.mjs', 'scripts/sync-root-changelog.mjs', '.github/workflows/docs.yml']
   pull_request:
-    paths: ['docs/**', 'spec/v1/**', 'go/npm/CHANGELOG.md', 'scripts/changelog-entry.mjs', '.github/workflows/docs.yml']
+    paths: ['docs/**', 'spec/v1/**', 'go/npm/CHANGELOG.md', 'CHANGELOG.md', 'scripts/changelog-entry.mjs', 'scripts/sync-root-changelog.mjs', '.github/workflows/docs.yml']
 
 permissions:
   contents: read
@@ -52,6 +52,11 @@ jobs:
       # every released version in go/npm/CHANGELOG.md has an entry.
       - name: Every release has a changelog entry
         run: node scripts/changelog-entry.mjs --check
+
+      # The root CHANGELOG.md mirrors go/npm/CHANGELOG.md (where changesets
+      # writes it). Fail when the copy drifts or is hand-edited.
+      - name: Root changelog in sync
+        run: node scripts/sync-root-changelog.mjs --check
 
       - name: Install Mintlify CLI
         run: npm i -g mint

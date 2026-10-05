@@ -4,7 +4,8 @@ name: release
 #
 #   1. version: while changesets are pending, changesets/action opens/updates
 #      a "Version Packages" PR that bumps go/npm/package.json, writes
-#      go/npm/CHANGELOG.md, and syncs the plugin manifest versions
+#      go/npm/CHANGELOG.md (mirrored to the root CHANGELOG.md by
+#      scripts/sync-root-changelog.mjs), and syncs the plugin manifest versions
 #      (scripts/sync-manifest-versions.mjs). Nothing is tagged or published
 #      yet. Once that PR merges (no changesets left), this job also tags the
 #      release and pushes the tag — both a bare vX.Y.Z (what goreleaser/npm/
