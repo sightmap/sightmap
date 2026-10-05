@@ -30,6 +30,7 @@ type queryCacheEntry struct {
 	components []sightmap.ComponentDef
 	queries    []MatchQuery
 	index      *firstPartIndex
+	chain      chainPrivacy
 }
 
 // entryFor returns the cached (or freshly compiled) queries for pageURL.
@@ -44,7 +45,7 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	}
 	compList := m.corpus.ComponentsForURL(pageURL)
 	queries, _ := ParseQueries(compList)
-	e := &queryCacheEntry{components: compList, queries: queries, index: newFirstPartIndex(queries)}
+	e := &queryCacheEntry{components: compList, queries: queries, index: newFirstPartIndex(queries), chain: newChainPrivacy(queries)}
 	m.cache[pageURL] = e
 	return e
 }

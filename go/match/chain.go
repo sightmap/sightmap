@@ -74,37 +74,45 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 		}
 	}
 
+	// Privacy needs only the first matching definition per depth (first-match
+	// wins, as in Match), and only when some definition declares privacy.
+	cp := entry.chain
+	// declared[d] is "" until depth d's first match decides it, then that
+	// definition's privacy, or noDeclaration when it declares none.
+	const noDeclaration = "\x00"
+	var declared []string
+	if cp.any {
+		declared = make([]string, len(nodes))
+	}
 	var out []ChainMatch
-	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
 	findAllMatches(nodes[0], entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
-		cm := ChainMatch{Depth: depthOf[node], Name: q.Name}
+		d := depthOf[node]
+		cm := ChainMatch{Depth: d, Name: q.Name}
 		if q.Def != nil {
 			cm.Tags = q.Def.Tags
 			cm.Memory = q.Def.Memory
-			if _, seen := defByNode[node]; !seen {
-				defByNode[node] = q.Def // first-match-wins, as in Match
+			if cp.any && declared[d] == "" {
+				declared[d] = noDeclaration
+				if q.Def.Privacy != "" && !cp.unreliable[q.Def] {
+					declared[d] = q.Def.Privacy
+				}
 			}
 		}
 		out = append(out, cm)
 	})
-	opaque := ""
-	for i := range entry.queries {
-		q := &entry.queries[i]
-		if q.Def == nil || q.Def.Privacy == "" || !queryNeedsSubtree(q) {
-			continue
-		}
-		if p := knownPrivacy(q.Def.Privacy); p != "unmask" {
-			opaque = stricterPrivacy(opaque, p)
-		}
-		for n, d := range defByNode {
-			if d == q.Def {
-				delete(defByNode, n) // a subtree-dependent match is unreliable here
+	if cp.any {
+		// Nearest enclosing declaration wins down the spine; the opaque
+		// directive from subtree-dependent definitions is a floor on every node.
+		resolved, inherited := declared, ""
+		for d, p := range declared {
+			if p != "" && p != noDeclaration {
+				inherited = knownPrivacy(p)
 			}
+			resolved[d] = stricterPrivacy(inherited, cp.opaque)
 		}
-	}
-	privacy := effectivePrivacy(nodes[0], defByNode)
-	for i := range out {
-		out[i].Privacy = stricterPrivacy(privacy[nodes[out[i].Depth]], opaque)
+		for i := range out {
+			out[i].Privacy = resolved[out[i].Depth]
+		}
 	}
 	// FindAllMatches visits the linear spine depth-first, so out already runs
 	// root -> leaf; a defensive stable sort keeps the contract explicit without
@@ -159,6 +167,39 @@ func (m *Matcher) TagsForChain(chain []sightmap.Element, pageURL string) []strin
 	}
 	sort.Strings(tags)
 	return tags
+}
+
+// chainPrivacy is what MatchChain needs to resolve privacy, computed once per
+// compiled query set. any is false when no definition declares privacy, which
+// skips resolution entirely. A definition whose selector needs a subtree is
+// unreliable on a chain: its own match is ignored, and if it is block or mask its
+// directive becomes opaque, a floor applied to every chain node.
+type chainPrivacy struct {
+	any        bool
+	opaque     string
+	unreliable map[*sightmap.ComponentDef]bool
+}
+
+func newChainPrivacy(queries []MatchQuery) chainPrivacy {
+	var cp chainPrivacy
+	for i := range queries {
+		q := &queries[i]
+		if q.Def == nil || q.Def.Privacy == "" {
+			continue
+		}
+		cp.any = true
+		if !queryNeedsSubtree(q) {
+			continue
+		}
+		if cp.unreliable == nil {
+			cp.unreliable = map[*sightmap.ComponentDef]bool{}
+		}
+		cp.unreliable[q.Def] = true
+		if p := knownPrivacy(q.Def.Privacy); p != "unmask" {
+			cp.opaque = stricterPrivacy(cp.opaque, p)
+		}
+	}
+	return cp
 }
 
 // queryNeedsSubtree reports whether q's selector uses :has() anywhere, including
