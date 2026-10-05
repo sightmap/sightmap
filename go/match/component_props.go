@@ -1,6 +1,7 @@
 package match
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -13,11 +14,12 @@ import (
 // see sibling and descendant matches.
 //
 // A property is dropped silently when it does not resolve: empty text, an
-// attribute the node does not carry, or a PATH that matches no descendant
-// component.
+// attribute the node does not carry, a PATH that matches no descendant
+// component, or a value read from a node whose effective privacy withholds it.
 func resolveComponentProperties(
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
+	privacy map[*sightmap.ComponentNode]string,
 ) {
 	for node, cm := range result {
 		def := defByNode[node]
@@ -26,7 +28,7 @@ func resolveComponentProperties(
 		}
 		var props []sightmap.PropertyValue
 		for _, p := range def.Properties {
-			if v, ok := resolveExtract(node, p.Extract, result, defByNode); ok {
+			if v, ok := resolveExtract(node, p.Extract, result, defByNode, privacy); ok {
 				props = append(props, sightmap.PropertyValue{Name: p.Name, Value: v})
 			}
 		}
@@ -34,14 +36,74 @@ func resolveComponentProperties(
 	}
 }
 
+// effectivePrivacy resolves SEP-0009 privacy for every node under root: a
+// matched component's declaration applies to its subtree, and the nearest
+// enclosing declaration wins. Nodes with no enclosing declaration are absent.
+func effectivePrivacy(
+	root *sightmap.ComponentNode,
+	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
+) map[*sightmap.ComponentNode]string {
+	out := map[*sightmap.ComponentNode]string{}
+	var walk func(n *sightmap.ComponentNode, inherited string)
+	walk = func(n *sightmap.ComponentNode, inherited string) {
+		if def := defByNode[n]; def != nil && def.Privacy != "" {
+			inherited = knownPrivacy(def.Privacy)
+		}
+		if inherited != "" {
+			out[n] = inherited
+		}
+		for _, c := range n.Children {
+			walk(c, inherited)
+		}
+	}
+	walk(root, "")
+	return out
+}
+
+// knownPrivacy fails closed: an unrecognized value (a typo validation would
+// reject) resolves to block rather than overriding an enclosing restriction the
+// way unmask would. Withholding more than the corpus asks is always allowed.
+func knownPrivacy(p string) string {
+	switch p {
+	case "block", "mask", "unmask":
+		return p
+	}
+	return "block"
+}
+
+// withholds reports whether a read from source on a node with effective privacy
+// p must not be surfaced (SEP-0009, per SEP-0017). Content is withheld under
+// block and mask; mask still permits state. component and component.exists read
+// another node and are judged there instead.
+func withholds(p string, e sightmap.Extract) bool {
+	switch e.From {
+	case sightmap.FromDOMText, sightmap.FromDOMRawText:
+		return p == "block" || p == "mask"
+	case sightmap.FromDOMAttr:
+		// SEP-0009 retains the interactive-state attributes under mask.
+		return p == "block" || (p == "mask" && !slices.Contains(sightmap.StateNames, e.Path))
+	case sightmap.FromDOMState:
+		return p == "block"
+	}
+	return false
+}
+
 // resolveExtract resolves one SEP-0017 directive against node. References descend
 // only, so recursion strictly enters smaller subtrees and always terminates.
+//
+// Privacy is judged at the node a value is read from: a component read recurses
+// into the target, whose own effective privacy then applies, so an unrestricted
+// ancestor cannot surface a value out of a blocked descendant.
 func resolveExtract(
 	node *sightmap.ComponentNode,
 	e sightmap.Extract,
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
+	privacy map[*sightmap.ComponentNode]string,
 ) (string, bool) {
+	if withholds(privacy[node], e) {
+		return "", false
+	}
 	switch e.From {
 	case sightmap.FromDOMText:
 		// Prefer the accessible name; fall back to the node's rendered text
@@ -74,10 +136,11 @@ func resolveExtract(
 		return refine(e, node.Properties[e.Path])
 
 	case sightmap.FromComponentExists:
-		if resolvePath(node, e.Path, result) != nil {
-			return "true", true
+		target := resolvePath(node, e.Path, result)
+		if target == nil || privacy[target] == "block" {
+			return "", false
 		}
-		return "", false
+		return "true", true
 
 	case sightmap.FromComponent:
 		dot := strings.LastIndex(e.Path, ".")
@@ -90,7 +153,7 @@ func resolveExtract(
 			if target == nil {
 				return "", false
 			}
-			v, ok := readProperty(target, prop, result, defByNode)
+			v, ok := readProperty(target, prop, result, defByNode, privacy)
 			if !ok {
 				return "", false
 			}
@@ -101,7 +164,7 @@ func resolveExtract(
 		}
 		var vals []string
 		for _, target := range resolvePathAll(node, path, result) {
-			v, ok := readProperty(target, prop, result, defByNode)
+			v, ok := readProperty(target, prop, result, defByNode, privacy)
 			if !ok {
 				continue
 			}
@@ -133,6 +196,7 @@ func readProperty(
 	prop string,
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
+	privacy map[*sightmap.ComponentNode]string,
 ) (string, bool) {
 	tdef := defByNode[target]
 	if tdef == nil {
@@ -140,7 +204,7 @@ func readProperty(
 	}
 	for _, tp := range tdef.Properties {
 		if tp.Name == prop {
-			return resolveExtract(target, tp.Extract, result, defByNode)
+			return resolveExtract(target, tp.Extract, result, defByNode, privacy)
 		}
 	}
 	return "", false

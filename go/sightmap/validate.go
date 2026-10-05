@@ -242,6 +242,17 @@ func validateComponent(comp ComponentDef, seen map[string]string) []ValidationEr
 		})
 	}
 
+	// invalid-privacy
+	switch comp.Privacy {
+	case "", "block", "mask", "unmask":
+	default:
+		errs = append(errs, ValidationError{
+			Component: comp.Name,
+			Code:      "invalid-privacy",
+			Message:   fmt.Sprintf(`invalid privacy value %q (must be "block", "mask", or "unmask")`, comp.Privacy),
+		})
+	}
+
 	// no-selector
 	if len(comp.Selectors) == 0 {
 		errs = append(errs, ValidationError{
