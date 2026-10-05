@@ -161,6 +161,21 @@ func validateRequestProperty(reqName, route string, prop RequestPropertyDef) []V
 		})
 	}
 
+	// A body path carries backslash escapes, so a malformed one resolves to
+	// nothing at runtime. Report it here rather than letting the property be
+	// silently absent.
+	if validSource && strings.HasSuffix(prop.Extract.From, ".body") && prop.Extract.Path != "" {
+		if _, err := SplitFieldPath(prop.Extract.Path); err != nil {
+			errs = append(errs, ValidationError{
+				Component: reqName,
+				Code:      "request-property-path-invalid",
+				Severity:  SeverityError,
+				Message: fmt.Sprintf("request %q property %q: %s; write %q for a literal dot in a key and %q for a literal backslash",
+					reqName, prop.Name, err.Error(), `\.`, `\\`),
+			})
+		}
+	}
+
 	// pattern is an RE2 regex (SEP-0005). Compile it at validation time, as the
 	// message entity does for its own author-written regex, rather than storing a
 	// pattern nobody has proven is one.

@@ -41,7 +41,8 @@ type RequestDef struct {
 // RequestPropertyDef declares a named value to extract from a live request/response
 // pair (SEP-0005, spelled per SEP-0017). Extract.From names the root to read (one of
 // RequestPropertySources); Extract.Path selects a value within it: a dot-separated
-// object-key path for a body (a numeric segment indexes an array), or a header name,
+// object-key path for a body (a numeric segment indexes an array; a literal dot or
+// backslash in a key is escaped "\." / "\\", see SplitFieldPath), or a header name,
 // matched case-insensitively and required, for headers. Extract.Pattern optionally
 // refines what Path resolved, or scans the raw body text when Path is absent.
 //

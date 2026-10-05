@@ -269,7 +269,7 @@ A named API endpoint.
 
 | `from` | `path` |
 |---|---|
-| `req.body`, `rsp.body` | An object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). Optional when `pattern` is set, in which case the pattern scans the raw body text. |
+| `req.body`, `rsp.body` | An object-key dot-path (a numeric segment indexes an array when the value there is one — `items.0.name`). A literal dot or backslash inside a key is escaped as `\.` or `\\` (`flags.checkout\.new_flow`). Optional when `pattern` is set, in which case the pattern scans the raw body text. |
 | `req.headers`, `rsp.headers` | A header name, matched case-insensitively. **Required**: a bare regex across a raw header block is the addressing foot-gun this shape removes. |
 
 At least one of `path`/`pattern` is required. The two compose: `path` selects a value, `pattern` optionally extracts a substring from it. `pattern` is an [RE2 regular expression](#regular-expressions); the reference CLI rejects an invalid one (`request-property-pattern-invalid`). `join` is not valid on a request property.
