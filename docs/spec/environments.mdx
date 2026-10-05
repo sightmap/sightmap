@@ -17,7 +17,7 @@ environments:
     backend: prod
   - name: preview
     origins:
-      api: https://api.staging.acme.com
+      api: https://api.staging.acme.com   # shared with staging: validate warns origin-host-shared
       app: https://deploy-preview-*--acme.netlify.app
   - name: prod
     origins:
@@ -46,6 +46,8 @@ views:
         method: GET
         origins: [facebook]
 ```
+
+`preview` and `staging` call the same API host, which is legal; `sightmap validate` warns `origin-host-shared` because that host can't tell the two apart when assigning a session.
 
 An environment answers "which deploy target." An origin answers "which host." A **surface** such as `app` or `api` is one name, and each environment says what that surface's URL is there.
 
