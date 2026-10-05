@@ -88,6 +88,18 @@ func checkBindingConflicts(owner, route string, props []namedExtract) []Validati
 // collides with a reserved name. reserved is nil for views, which have none.
 func checkRouteBindings(owner, route string, reserved []string) []ValidationError {
 	var errs []ValidationError
+	// Route matching treats any :segment as a parameter, but only a name that is
+	// also a valid property name binds; say so rather than bind nothing silently.
+	for _, seg := range strings.Split(route, "/") {
+		if strings.HasPrefix(seg, ":") && !routeParamPattern.MatchString(seg) {
+			errs = append(errs, ValidationError{
+				Component: owner,
+				Code:      "route-param-unbound",
+				Severity:  SeverityWarning,
+				Message:   fmt.Sprintf("%q route segment %q matches as a parameter but binds no property; a binding name must match ^[a-z][a-z0-9_]*$", owner, seg),
+			})
+		}
+	}
 	seen := map[string]bool{}
 	for _, name := range routeParams(route) {
 		if seen[name] {

@@ -222,7 +222,11 @@ func walkView(node *yaml.Node, file string, out *[]ValidationError) {
 	if a := v["access"]; a != nil {
 		checkKeys(a, accessFields, file, out)
 	}
-	forEachItem(v["properties"], func(n *yaml.Node) { walkExtract(checkKeys(n, urlPropertyFields, file, out), file, out) })
+	forEachItem(v["properties"], func(n *yaml.Node) {
+		pv := checkKeys(n, urlPropertyFields, file, out)
+		checkStringScalars(pv, []string{"name"}, file, out)
+		walkExtract(pv, file, out)
+	})
 	forEachItem(v["components"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 	forEachItem(v["requests"], func(n *yaml.Node) { walkRequest(n, file, out) })
 }

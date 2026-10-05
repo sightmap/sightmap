@@ -88,6 +88,32 @@ func validateRequestProperty(reqName, route string, prop RequestPropertyDef) []V
 		})
 	}
 
+	// A declared property shadows the reserved identity name, which is legal and
+	// is what SEP-0005's own motivating example does (`name: status` extracting
+	// `rsp.body.status`). It is worth a warning because the HTTP identity then
+	// becomes unreachable from a signal filter.
+	if slices.Contains(ReservedRequestPropertyNames, prop.Name) {
+		errs = append(errs, ValidationError{
+			Component: reqName,
+			Code:      "request-property-shadows-reserved",
+			Severity:  SeverityWarning,
+			Message: fmt.Sprintf("request %q declares a property named %q, shadowing the reserved request identity of the same name; a signal filtering on %q will see the extracted value, not the HTTP %s",
+				reqName, prop.Name, prop.Name, prop.Name),
+		})
+	}
+
+	// The deprecated source key never accepted a URL source, so url.query and
+	// url.path are reachable only through the extract object.
+	if prop.Extract.IsLegacy() && slices.Contains(URLExtractSources, prop.Extract.From) {
+		return append(errs, ValidationError{
+			Component: reqName,
+			Code:      "request-property-source-invalid",
+			Severity:  SeverityError,
+			Message: fmt.Sprintf("request %q property %q reads %s through the deprecated source key, which accepts only %s; write extract: %s",
+				reqName, prop.Name, prop.Extract.From, strings.Join(RequestPropertySources, ", "), prop.Extract),
+		})
+	}
+
 	var done bool
 	if errs, done = checkSourcedShape(errs, reqName, prop.Name, prop.Extract); done {
 		return errs
@@ -148,20 +174,6 @@ func validateRequestProperty(reqName, route string, prop RequestPropertyDef) []V
 					reqName, prop.Name, err),
 			})
 		}
-	}
-
-	// A declared property shadows the reserved identity name, which is legal and
-	// is what SEP-0005's own motivating example does (`name: status` extracting
-	// `rsp.body.status`). It is worth a warning because the HTTP identity then
-	// becomes unreachable from a signal filter.
-	if slices.Contains(ReservedRequestPropertyNames, prop.Name) {
-		errs = append(errs, ValidationError{
-			Component: reqName,
-			Code:      "request-property-shadows-reserved",
-			Severity:  SeverityWarning,
-			Message: fmt.Sprintf("request %q declares a property named %q, shadowing the reserved request identity of the same name; a signal filtering on %q will see the extracted value, not the HTTP %s",
-				reqName, prop.Name, prop.Name, prop.Name),
-		})
 	}
 
 	return errs

@@ -151,3 +151,61 @@ func TestValidate_RouteBindingConflict(t *testing.T) {
 		t.Errorf("request: a payload property named like a binding should conflict, got %v", findingCodes(errs))
 	}
 }
+
+func loadAndValidate(t *testing.T, yaml string) []sightmap.ValidationError {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "app.yaml"), []byte("version: 1\n"+yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sightmap.Validate(c)
+}
+
+// A :segment that is not a valid property name still matches, but binds
+// nothing, so it is surfaced rather than silently ignored.
+func TestValidate_RouteParamUnbound(t *testing.T) {
+	for route, want := range map[string]bool{
+		"/org/:orgId":    true,
+		"/org/:org-id":   true,
+		"/org/:org_id":   false,
+		"/org/**":        false,
+		"/org/:id/:Name": true,
+	} {
+		errs := sightmap.Validate(viewCorpus(sightmap.ViewDef{Name: "V", Route: route}))
+		if got := hasCode(errs, "route-param-unbound"); got != want {
+			t.Errorf("route %q: route-param-unbound = %v, want %v (%v)", route, got, want, findingCodes(errs))
+		}
+	}
+}
+
+// url.query and url.path are reachable only through the extract object; the
+// deprecated source key never accepted them.
+func TestValidate_LegacySourceRejectsURL(t *testing.T) {
+	errs := loadAndValidate(t, "requests:\n  - name: R\n    route: /r\n    properties:\n      - name: v\n        source: url.query\n        field: v\n")
+	if !hasCode(errs, "request-property-source-invalid") {
+		t.Errorf("want request-property-source-invalid, got %v", findingCodes(errs))
+	}
+}
+
+// A URL-sourced request property under a reserved name still warns.
+func TestValidate_URLRequestPropertyShadowsReserved(t *testing.T) {
+	errs := sightmap.Validate(&sightmap.Corpus{Requests: []sightmap.RequestDef{{
+		Name: "R", Route: "/r",
+		Properties: []sightmap.RequestPropertyDef{{Name: "status", Extract: sightmap.Extract{From: sightmap.FromURLQuery, Path: "status"}}},
+	}}})
+	if !hasCode(errs, "request-property-shadows-reserved") {
+		t.Errorf("want request-property-shadows-reserved, got %v", findingCodes(errs))
+	}
+}
+
+// A view property name must be a string, as the JSON Schema requires.
+func TestValidate_ViewPropertyNameIsString(t *testing.T) {
+	errs := loadAndValidate(t, "views:\n  - name: V\n    route: /v\n    properties:\n      - name: true\n        extract: { from: url.query, path: v }\n")
+	if !hasCode(errs, "field-type-invalid") {
+		t.Errorf("want field-type-invalid, got %v", findingCodes(errs))
+	}
+}

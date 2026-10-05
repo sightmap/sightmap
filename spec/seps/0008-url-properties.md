@@ -299,7 +299,10 @@ reason: both readings are defensible, and refusing beats guessing. A `:name` MUS
 one route.
 
 **Names** must match `^[a-z][a-z0-9_]*$`, the pattern `componentProperty.name` and
-`requestProperty.name` already use.
+`requestProperty.name` already use. That includes binding names: route matching treats any
+`:segment` as a parameter, but only a segment whose name matches the pattern binds. `:orgId` and
+`:org-id` still match and bind nothing, and validation warns (`route-param-unbound`) rather than
+dropping the binding silently.
 
 `url.query` reads the matched URL's query string independent of route matching; matching
 continues to ignore the query string and fragment entirely.
@@ -355,6 +358,8 @@ A conforming SDK MUST:
   against the matched URL's query string, case-sensitively, first occurrence, percent-decoded.
 - Continue to normalize `:param` to `*` for route *matching*, unchanged, on both entities.
 - Treat a `url.path` entry as renaming its segment, so the implicit `:name` is not produced.
+- Warn when a `:segment` name does not match `^[a-z][a-z0-9_]*$`, since it matches but binds
+  nothing.
 - Report a validation error when `url.path` names a segment absent from the route, when a `:name`
   repeats within one route, when a bound name collides with a reserved request identity name, and
   when a declared property's name equals a binding the entity still produces.
@@ -368,16 +373,18 @@ A conforming SDK MUST pass `spec/conformance/023-url-properties.fixture/`.
 
 ### JSON Schema
 
+- `$defs.urlExtract`: **new**. The [SEP-0017](0017-extract-object.md) `extract` object restricted
+  to `from: url.query | url.path`, with `path` required and `join` disallowed.
 - `$defs.urlProperty`: **new**. `{ type: object, required: [name, extract], additionalProperties:
-  false, properties: { name: {pattern: "^[a-z][a-z0-9_]*$"}, extract: {pattern:
-  "^(param|query):[^\\s]+$"} } }`.
+  false, properties: { name: { pattern: "^[a-z][a-z0-9_]*$" }, extract: { $ref:
+  "#/$defs/urlExtract" } } }`.
 - `$defs.view.properties.properties`: **added**, optional,
   `{ type: array, items: { $ref: "#/$defs/urlProperty" } }`.
-- `$defs.request.properties.properties.items`: **changed** from `{ $ref: "#/$defs/requestProperty" }`
-  to `{ oneOf: [ { $ref: "#/$defs/urlProperty" }, { $ref: "#/$defs/requestProperty" } ] }`. A
-  request property is now either URL-shaped or payload-shaped; both keep
-  `additionalProperties: false`, so the two cannot be mixed in one entry.
-- No change to `$defs.requestProperty` itself, and no change to `required` anywhere.
+- `$defs.requestExtract.properties.from.enum`: **widened** with `url.query` and `url.path`, which
+  require `path` like a headers source. Request property items stay `{ $ref:
+  "#/$defs/requestProperty" }`; the deprecated `source` key's enum is unchanged, so URL sources are
+  reachable only through `extract`.
+- No change to `required` anywhere.
 - The Go SDK's `viewFields` allowlist gains `"properties"`.
 
 ## Alternatives considered
