@@ -202,3 +202,29 @@ func TestValidate_RequestPropertyDedupedAcrossScopes(t *testing.T) {
 		t.Fatalf("want 1 request-property-no-extractor, got %d", n)
 	}
 }
+
+// A malformed escape in a body path resolves to nothing at runtime, so
+// validation reports it rather than leaving the property silently absent.
+func TestValidate_RequestPropertyBodyPathEscapes(t *testing.T) {
+	for path, want := range map[string]bool{
+		`order.ref.id`: false,
+		`flags.a\.b`:   false,
+		`a\\b`:         false,
+		`a\b`:          true,
+		`token\`:       true,
+	} {
+		errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
+			Name: "v", Extract: sightmap.Extract{From: sightmap.FromRspBody, Path: path},
+		}))
+		if got := hasCode(errs, "request-property-path-invalid"); got != want {
+			t.Errorf("path %q: request-property-path-invalid = %v, want %v (%v)", path, got, want, findingCodes(errs))
+		}
+	}
+	// A header path is not a dot-path, so a backslash in a header name is fine.
+	errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
+		Name: "v", Extract: sightmap.Extract{From: sightmap.FromRspHeaders, Path: `X-Odd\Name`},
+	}))
+	if hasCode(errs, "request-property-path-invalid") {
+		t.Errorf("a header name is not a body path: %v", findingCodes(errs))
+	}
+}
