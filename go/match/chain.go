@@ -1,7 +1,6 @@
 package match
 
 import (
-	"slices"
 	"sort"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -24,10 +23,10 @@ type ChainMatch struct {
 	// ChainMatch at one depth carries the same value. Pass it to Withholds to
 	// decide whether a value read from this node may be surfaced.
 	//
-	// It is never less restrictive than Match. A definition whose selector
-	// needs the node's subtree (:has()) cannot be located on a chain, so it
-	// fails closed: a block or mask one applies to every chain node, and an
-	// unmask one is never honored.
+	// A chain carries a node's ancestors but not its subtree, so a definition
+	// whose selector uses :has() matches only when the :has() argument lies on
+	// the chain. When it does not, that definition's privacy is not applied and
+	// Privacy can be less restrictive than Match would resolve on the full tree.
 	Privacy string
 }
 
@@ -76,12 +75,12 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 
 	// Privacy needs only the first matching definition per depth (first-match
 	// wins, as in Match), and only when some definition declares privacy.
-	cp := entry.chain
+	anyPrivacy := entry.anyPrivacy
 	// declared[d] is "" until depth d's first match decides it, then that
 	// definition's privacy, or noDeclaration when it declares none.
 	const noDeclaration = "\x00"
 	var declared []string
-	if cp.any {
+	if anyPrivacy {
 		declared = make([]string, len(nodes))
 	}
 	var out []ChainMatch
@@ -91,24 +90,23 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 		if q.Def != nil {
 			cm.Tags = q.Def.Tags
 			cm.Memory = q.Def.Memory
-			if cp.any && declared[d] == "" {
+			if anyPrivacy && declared[d] == "" {
 				declared[d] = noDeclaration
-				if q.Def.Privacy != "" && !cp.unreliable[q.Def] {
+				if q.Def.Privacy != "" {
 					declared[d] = q.Def.Privacy
 				}
 			}
 		}
 		out = append(out, cm)
 	})
-	if cp.any {
-		// Nearest enclosing declaration wins down the spine; the opaque
-		// directive from subtree-dependent definitions is a floor on every node.
+	if anyPrivacy {
+		// Nearest enclosing declaration wins down the spine.
 		resolved, inherited := declared, ""
 		for d, p := range declared {
 			if p != "" && p != noDeclaration {
 				inherited = knownPrivacy(p)
 			}
-			resolved[d] = stricterPrivacy(inherited, cp.opaque)
+			resolved[d] = inherited
 		}
 		for i := range out {
 			out[i].Privacy = resolved[out[i].Depth]
@@ -167,74 +165,4 @@ func (m *Matcher) TagsForChain(chain []sightmap.Element, pageURL string) []strin
 	}
 	sort.Strings(tags)
 	return tags
-}
-
-// chainPrivacy is what MatchChain needs to resolve privacy, computed once per
-// compiled query set. any is false when no definition declares privacy, which
-// skips resolution entirely. A definition whose selector needs a subtree is
-// unreliable on a chain: its own match is ignored, and if it is block or mask its
-// directive becomes opaque, a floor applied to every chain node.
-type chainPrivacy struct {
-	any        bool
-	opaque     string
-	unreliable map[*sightmap.ComponentDef]bool
-}
-
-func newChainPrivacy(queries []MatchQuery) chainPrivacy {
-	var cp chainPrivacy
-	for i := range queries {
-		q := &queries[i]
-		if q.Def == nil || q.Def.Privacy == "" {
-			continue
-		}
-		cp.any = true
-		if !queryNeedsSubtree(q) {
-			continue
-		}
-		if cp.unreliable == nil {
-			cp.unreliable = map[*sightmap.ComponentDef]bool{}
-		}
-		cp.unreliable[q.Def] = true
-		if p := knownPrivacy(q.Def.Privacy); p != "unmask" {
-			cp.opaque = stricterPrivacy(cp.opaque, p)
-		}
-	}
-	return cp
-}
-
-// queryNeedsSubtree reports whether q's selector uses :has() anywhere, including
-// inside :is() or :not(). A chain carries a node's ancestors but not its
-// subtree, so such a selector can neither be confirmed nor ruled out there.
-func queryNeedsSubtree(q *MatchQuery) bool {
-	return slices.ContainsFunc(q.Parts, partNeedsSubtree)
-}
-
-func partNeedsSubtree(p *sightmap.SelectorPart) bool {
-	if p == nil {
-		return false
-	}
-	if len(p.Has) > 0 || slices.ContainsFunc(p.Is, partNeedsSubtree) {
-		return true
-	}
-	return slices.ContainsFunc(p.Not, func(n sightmap.ParsedSelector) bool {
-		return slices.ContainsFunc(n.Parts, partNeedsSubtree)
-	})
-}
-
-// stricterPrivacy returns the more restrictive of two resolved directives:
-// block over mask over unmask or none.
-func stricterPrivacy(a, b string) string {
-	rank := func(p string) int {
-		switch p {
-		case "block":
-			return 2
-		case "mask":
-			return 1
-		}
-		return 0
-	}
-	if rank(b) > rank(a) {
-		return b
-	}
-	return a
 }

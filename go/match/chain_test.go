@@ -265,29 +265,27 @@ func TestWithholds(t *testing.T) {
 	}
 }
 
-func TestMatchChain_SubtreeSelectorPrivacyFailsClosed(t *testing.T) {
-	// The card input sits off the spine, so section:has(input.cc) cannot match
-	// the chain. Its block still reaches every chain node rather than leaving
-	// the span in the blocked region unrestricted.
+func TestMatchChain_SubtreeSelectorPrivacyNeedsItsArgumentOnTheChain(t *testing.T) {
+	// A chain has no subtree, so section:has(input.cc) matches only when the
+	// input is on the chain. Off the chain its block is not applied.
 	m := chainMatcher(
 		sightmap.ComponentDef{Name: "PaymentSection", Selectors: []string{"section:has(input.cc)"}, Privacy: "block"},
 		sightmap.ComponentDef{Name: "Note", Selectors: []string{"span.note"}},
+		sightmap.ComponentDef{Name: "Card", Selectors: []string{"input.cc"}},
 	)
-	for _, cm := range m.MatchChain([]sightmap.Element{el("section"), el("div"), el("span", "note")}, "") {
-		if cm.Privacy != "block" {
-			t.Errorf("%s: privacy %q, want block", cm.Name, cm.Privacy)
+	privacyOf := func(chain []sightmap.Element, name string) string {
+		for _, cm := range m.MatchChain(chain, "") {
+			if cm.Name == name {
+				return cm.Privacy
+			}
 		}
+		t.Fatalf("%s did not match", name)
+		return ""
 	}
-
-	// An unmask that needs the subtree is never honored on a chain: the form's
-	// mask stands even where Match might have re-opened the field.
-	m = chainMatcher(
-		sightmap.ComponentDef{Name: "Form", Selectors: []string{"form"}, Privacy: "mask"},
-		sightmap.ComponentDef{Name: "SafeField", Selectors: []string{"div:not(:has(input.cc))"}, Privacy: "unmask"},
-	)
-	for _, cm := range m.MatchChain([]sightmap.Element{el("form"), el("div")}, "") {
-		if cm.Privacy != "mask" {
-			t.Errorf("%s: privacy %q, want mask", cm.Name, cm.Privacy)
-		}
+	if got := privacyOf([]sightmap.Element{el("section"), el("input", "cc")}, "Card"); got != "block" {
+		t.Errorf("argument on the chain: privacy %q, want block", got)
+	}
+	if got := privacyOf([]sightmap.Element{el("section"), el("div"), el("span", "note")}, "Note"); got != "" {
+		t.Errorf("argument off the chain: privacy %q, want \"\"", got)
 	}
 }

@@ -1,6 +1,7 @@
 package match
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -30,7 +31,9 @@ type queryCacheEntry struct {
 	components []sightmap.ComponentDef
 	queries    []MatchQuery
 	index      *firstPartIndex
-	chain      chainPrivacy
+	// anyPrivacy is whether any definition declares privacy; MatchChain skips
+	// privacy resolution entirely when none does.
+	anyPrivacy bool
 }
 
 // entryFor returns the cached (or freshly compiled) queries for pageURL.
@@ -45,7 +48,8 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	}
 	compList := m.corpus.ComponentsForURL(pageURL)
 	queries, _ := ParseQueries(compList)
-	e := &queryCacheEntry{components: compList, queries: queries, index: newFirstPartIndex(queries), chain: newChainPrivacy(queries)}
+	e := &queryCacheEntry{components: compList, queries: queries, index: newFirstPartIndex(queries)}
+	e.anyPrivacy = slices.ContainsFunc(compList, func(c sightmap.ComponentDef) bool { return c.Privacy != "" })
 	m.cache[pageURL] = e
 	return e
 }
