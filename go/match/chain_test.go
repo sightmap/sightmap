@@ -192,3 +192,75 @@ func TestMatchChain_NoDefs(t *testing.T) {
 		t.Errorf("MatchChain = %v, want nil", got)
 	}
 }
+
+func TestMatchChain_EffectivePrivacy(t *testing.T) {
+	// The form's block reaches the undeclared input below it, a nearer unmask
+	// replaces it for the total, and an unrelated sibling chain stays "".
+	m := chainMatcher(
+		sightmap.ComponentDef{Name: "CheckoutForm", Selectors: []string{"form.checkout"}, Privacy: "block"},
+		sightmap.ComponentDef{Name: "CardNumber", Selectors: []string{"input.cc"}},
+		sightmap.ComponentDef{Name: "OrderTotal", Selectors: []string{"span.total"}, Privacy: "unmask"},
+		sightmap.ComponentDef{Name: "BuyButton", Selectors: []string{"button.buy"}},
+	)
+	privacyAt := func(chain []sightmap.Element) map[string]string {
+		out := map[string]string{}
+		for _, cm := range m.MatchChain(chain, "") {
+			out[cm.Name] = cm.Privacy
+		}
+		return out
+	}
+	if got, want := privacyAt([]sightmap.Element{el("form", "checkout"), el("div"), el("input", "cc")}),
+		map[string]string{"CheckoutForm": "block", "CardNumber": "block"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("inherited block: got %v, want %v", got, want)
+	}
+	if got, want := privacyAt([]sightmap.Element{el("form", "checkout"), el("span", "total")}),
+		map[string]string{"CheckoutForm": "block", "OrderTotal": "unmask"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("nearer unmask: got %v, want %v", got, want)
+	}
+	if got, want := privacyAt([]sightmap.Element{el("main"), el("button", "buy")}),
+		map[string]string{"BuyButton": ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("no declaration: got %v, want %v", got, want)
+	}
+}
+
+func TestMatchChain_PrivacyAgreesWithMatch(t *testing.T) {
+	// Two definitions match the same node with different privacy. The chain
+	// resolves it as Match does (first matching definition decides), and every
+	// ChainMatch at that depth carries the one resolved value.
+	m := chainMatcher(
+		sightmap.ComponentDef{Name: "Masked", Selectors: []string{"div.panel"}, Privacy: "mask"},
+		sightmap.ComponentDef{Name: "Open", Selectors: []string{"div.panel"}, Privacy: "unmask"},
+	)
+	chain := []sightmap.Element{el("div", "panel")}
+	tree := &sightmap.ComponentNode{Element: &chain[0]}
+	want := m.Match(tree, "")[tree].Privacy
+	for _, cm := range m.MatchChain(chain, "") {
+		if cm.Privacy != want {
+			t.Errorf("%s: chain privacy %q, Match privacy %q", cm.Name, cm.Privacy, want)
+		}
+	}
+}
+
+func TestWithholds(t *testing.T) {
+	ex := func(from, path string) sightmap.Extract { return sightmap.Extract{From: from, Path: path} }
+	for _, tc := range []struct {
+		privacy string
+		e       sightmap.Extract
+		want    bool
+	}{
+		{"", ex(sightmap.FromDOMText, ""), false},
+		{"unmask", ex(sightmap.FromDOMText, ""), false},
+		{"mask", ex(sightmap.FromDOMText, ""), true},
+		{"block", ex(sightmap.FromDOMRawText, ""), true},
+		{"mask", ex(sightmap.FromDOMAttr, "data-sku"), true},
+		{"mask", ex(sightmap.FromDOMAttr, "checked"), false},
+		{"block", ex(sightmap.FromDOMAttr, "checked"), true},
+		{"mask", ex(sightmap.FromDOMState, "expanded"), false},
+		{"block", ex(sightmap.FromDOMState, "expanded"), true},
+		{"block", ex(sightmap.FromComponent, "Price.text"), false},
+	} {
+		if got := match.Withholds(tc.privacy, tc.e); got != tc.want {
+			t.Errorf("Withholds(%q, %s %s) = %v, want %v", tc.privacy, tc.e.From, tc.e.Path, got, tc.want)
+		}
+	}
+}

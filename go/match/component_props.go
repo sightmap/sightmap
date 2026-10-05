@@ -71,11 +71,13 @@ func knownPrivacy(p string) string {
 	return "block"
 }
 
-// withholds reports whether a read from source on a node with effective privacy
-// p must not be surfaced (SEP-0009, per SEP-0017). Content is withheld under
-// block and mask; mask still permits state. component and component.exists read
-// another node and are judged there instead.
-func withholds(p string, e sightmap.Extract) bool {
+// Withholds reports whether a value read by e from a node whose effective privacy
+// is p must not be surfaced (SEP-0009, per SEP-0017). Content is withheld under
+// block and mask; mask still permits state, including a dom.attr read of an
+// interactive-state attribute. component and component.exists read another node
+// and are judged there instead, so they never withhold here. p is a resolved
+// directive such as ComponentMatch.Privacy or ChainMatch.Privacy.
+func Withholds(p string, e sightmap.Extract) bool {
 	switch e.From {
 	case sightmap.FromDOMText, sightmap.FromDOMRawText:
 		return p == "block" || p == "mask"
@@ -101,7 +103,7 @@ func resolveExtract(
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
 	privacy map[*sightmap.ComponentNode]string,
 ) (string, bool) {
-	if withholds(privacy[node], e) {
+	if Withholds(privacy[node], e) {
 		return "", false
 	}
 	switch e.From {

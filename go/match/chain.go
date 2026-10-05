@@ -16,6 +16,13 @@ type ChainMatch struct {
 	Name   string
 	Tags   []string
 	Memory []string
+	// Privacy is the chain node's effective capture directive (SEP-0009),
+	// resolved exactly as Match resolves ComponentMatch.Privacy: the declaration
+	// of the nearest enclosing matched component, this node included, with the
+	// first matching definition per node deciding. "" when none declares one.
+	// Every ChainMatch at one depth carries the same value. Pass it to Withholds
+	// to decide whether a value read from this node may be surfaced.
+	Privacy string
 }
 
 // MatchChain resolves the component definitions that apply along a single
@@ -62,14 +69,22 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 	}
 
 	var out []ChainMatch
+	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
 	findAllMatches(nodes[0], entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		cm := ChainMatch{Depth: depthOf[node], Name: q.Name}
 		if q.Def != nil {
 			cm.Tags = q.Def.Tags
 			cm.Memory = q.Def.Memory
+			if _, seen := defByNode[node]; !seen {
+				defByNode[node] = q.Def // first-match-wins, as in Match
+			}
 		}
 		out = append(out, cm)
 	})
+	privacy := effectivePrivacy(nodes[0], defByNode)
+	for i := range out {
+		out[i].Privacy = privacy[nodes[out[i].Depth]]
+	}
 	// FindAllMatches visits the linear spine depth-first, so out already runs
 	// root -> leaf; a defensive stable sort keeps the contract explicit without
 	// disturbing within-depth (definition) order.
