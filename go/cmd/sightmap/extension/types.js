@@ -37,8 +37,9 @@
 /**
  * @typedef {Object} PropertyDescriptor
  * @property {string}  name    - Output key, e.g. "price"
- * @property {string}  extract - Tree-closed extract form (SEP-0010):
- *                               "text" | "attr=NAME" | "PATH.prop" | "exists:PATH"
+ * @property {{from: string, path?: string, pattern?: string, join?: string}|string} extract
+ *   SEP-0017 extract object, or a deprecated SEP-0010 string form
+ *   ("text" | "raw_text" | "attr=NAME" | "PATH.prop" | "exists:PATH")
  */
 
 /**

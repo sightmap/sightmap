@@ -18,9 +18,9 @@ func TestMessageExtract_TopFrameAttributes(t *testing.T) {
 	d := &MessageDef{
 		Name: "UncaughtCheckoutError", Level: "exception",
 		Properties: []MessagePropertyDef{
-			{Name: "origin_file", Source: "stack", Field: "top.file"},
-			{Name: "origin_fn", Source: "stack", Field: "top.function"},
-			{Name: "origin_line", Source: "stack", Field: "top.line"},
+			{Name: "origin_file", Extract: Extract{From: "stack", Path: "top.file"}},
+			{Name: "origin_fn", Extract: Extract{From: "stack", Path: "top.function"}},
+			{Name: "origin_line", Extract: Extract{From: "stack", Path: "top.line"}},
 		},
 	}
 	rec := Message{Level: "exception", Text: "boom", Stack: excStack()}
@@ -39,7 +39,7 @@ func TestMessageExtract_TopFrameAttributes(t *testing.T) {
 func TestMessageExtract_NumericFrameIndex(t *testing.T) {
 	d := &MessageDef{
 		Properties: []MessagePropertyDef{
-			{Name: "caller_file", Source: "stack", Field: "1.file"},
+			{Name: "caller_file", Extract: Extract{From: "stack", Path: "1.file"}},
 		},
 	}
 	got := d.ExtractProperties(Message{Stack: excStack()})
@@ -53,7 +53,7 @@ func TestMessageExtract_Pattern(t *testing.T) {
 	// Extract just the basename via a pattern's capture group.
 	d := &MessageDef{
 		Properties: []MessagePropertyDef{
-			{Name: "file_base", Source: "stack", Field: "top.file", Pattern: `([^/]+)$`},
+			{Name: "file_base", Extract: Extract{From: "stack", Path: "top.file", Pattern: `([^/]+)$`}},
 		},
 	}
 	got := d.ExtractProperties(Message{Stack: excStack()})
@@ -66,11 +66,11 @@ func TestMessageExtract_Pattern(t *testing.T) {
 func TestMessageExtract_SilentOmission(t *testing.T) {
 	d := &MessageDef{
 		Properties: []MessagePropertyDef{
-			{Name: "oob_frame", Source: "stack", Field: "9.file"},      // index out of range
-			{Name: "bad_attr", Source: "stack", Field: "top.garbage"},  // unknown attribute
-			{Name: "malformed", Source: "stack", Field: "topfile"},     // no "." separator
-			{Name: "empty_fn", Source: "stack", Field: "top.function"}, // frame has no function name
-			{Name: "no_match", Source: "stack", Field: "top.file", Pattern: `zzz`},
+			{Name: "oob_frame", Extract: Extract{From: "stack", Path: "9.file"}},      // index out of range
+			{Name: "bad_attr", Extract: Extract{From: "stack", Path: "top.garbage"}},  // unknown attribute
+			{Name: "malformed", Extract: Extract{From: "stack", Path: "topfile"}},     // no "." separator
+			{Name: "empty_fn", Extract: Extract{From: "stack", Path: "top.function"}}, // frame has no function name
+			{Name: "no_match", Extract: Extract{From: "stack", Path: "top.file", Pattern: `zzz`}},
 		},
 	}
 	// A single frame with only a file — no function, so empty_fn omits; every
@@ -84,7 +84,7 @@ func TestMessageExtract_SilentOmission(t *testing.T) {
 func TestMessageExtract_CapturedZeroLineIsValueNotAbsent(t *testing.T) {
 	// CDP line numbers are 0-based, so a captured line 0 is a real location and
 	// must resolve to "0" — not be treated as absent.
-	d := &MessageDef{Properties: []MessagePropertyDef{{Name: "ln", Source: "stack", Field: "top.line"}}}
+	d := &MessageDef{Properties: []MessagePropertyDef{{Name: "ln", Extract: Extract{From: "stack", Path: "top.line"}}}}
 	rec := Message{Stack: []Frame{{File: "a.ts", Line: intp(0)}}}
 	got := d.ExtractProperties(rec)
 	want := []PropertyValue{{Name: "ln", Value: "0"}}
@@ -97,8 +97,8 @@ func TestMessageExtract_UnsetLineOmits(t *testing.T) {
 	// A frame whose Line/Column the capture didn't supply (nil) omits, distinct
 	// from a captured 0.
 	d := &MessageDef{Properties: []MessagePropertyDef{
-		{Name: "ln", Source: "stack", Field: "top.line"},
-		{Name: "col", Source: "stack", Field: "top.column"},
+		{Name: "ln", Extract: Extract{From: "stack", Path: "top.line"}},
+		{Name: "col", Extract: Extract{From: "stack", Path: "top.column"}},
 	}}
 	rec := Message{Stack: []Frame{{File: "a.ts"}}} // Line/Column nil
 	if got := d.ExtractProperties(rec); got != nil {
@@ -107,7 +107,7 @@ func TestMessageExtract_UnsetLineOmits(t *testing.T) {
 }
 
 func TestMessageExtract_PlainConsoleRecordNoStack(t *testing.T) {
-	d := &MessageDef{Properties: []MessagePropertyDef{{Name: "x", Source: "stack", Field: "top.file"}}}
+	d := &MessageDef{Properties: []MessagePropertyDef{{Name: "x", Extract: Extract{From: "stack", Path: "top.file"}}}}
 	if got := d.ExtractProperties(Message{Level: "error", Text: "plain log"}); got != nil {
 		t.Fatalf("plain console record should extract nothing, got %+v", got)
 	}
@@ -119,7 +119,7 @@ func TestMessagesForRecord_FoldsStackProperties(t *testing.T) {
 			Name: "UncaughtCheckoutError", Level: "exception",
 			Message:     `Cannot read propert`,
 			Description: "null deref in checkout",
-			Properties:  []MessagePropertyDef{{Name: "origin_file", Source: "stack", Field: "top.file"}},
+			Properties:  []MessagePropertyDef{{Name: "origin_file", Extract: Extract{From: "stack", Path: "top.file"}}},
 		},
 	}}
 	c.Messages[0].precompile()
@@ -140,10 +140,10 @@ func TestMessagesForRecord_FoldsStackProperties(t *testing.T) {
 func TestMessageProperties_Validation(t *testing.T) {
 	c := &Corpus{Messages: []MessageDef{
 		{Name: "M", Level: "exception", Properties: []MessagePropertyDef{
-			{Name: "Bad-Name", Source: "stack", Field: "top.file"},    // invalid name
-			{Name: "wrong_src", Source: "console", Field: "top.file"}, // bad source
-			{Name: "no_field", Source: "stack"},                       // stack requires field
-			{Name: "bad_re", Source: "stack", Field: "top.file", Pattern: `(unclosed`},
+			{Name: "Bad-Name", Extract: Extract{From: "stack", Path: "top.file"}},    // invalid name
+			{Name: "wrong_src", Extract: Extract{From: "console", Path: "top.file"}}, // bad source
+			{Name: "no_field", Extract: Extract{From: "stack"}},                      // stack requires field
+			{Name: "bad_re", Extract: Extract{From: "stack", Path: "top.file", Pattern: `(unclosed`}},
 		}},
 	}}
 	diags := Validate(c)

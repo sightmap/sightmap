@@ -139,18 +139,25 @@ A component can declare `properties:` — named values pulled from its matched e
   selector: '[data-testid="date-filter-button"]'
   properties:
     - name: label
-      extract: text          # → [DateFilterButton label="This Weekend"]
+      extract: { from: dom.text }          # → [DateFilterButton label="This Weekend"]
 - name: ProductCard
   selector: '[data-testid="product-pod"]'
   properties:
     - name: price
-      extract: '[data-testid="price"]'   # a CSS sub-selector, read from the child
-      transform: first_dollar
+      extract: { from: component, path: Price.text, pattern: '\$([\d.]+)' }
     - name: sold_out
-      extract: 'exists:[aria-label="Sold Out"]'   # boolean flag; omitted when absent
+      extract: { from: component.exists, path: SoldOutBadge }   # boolean flag; omitted when absent
+  children:
+    - name: Price
+      selector: '[data-testid="price"]'
+      properties:
+        - name: text
+          extract: { from: dom.text }
+    - name: SoldOutBadge
+      selector: '[aria-label="Sold Out"]'
 ```
 
-Each property has a `name` (the annotation key), an `extract` directive (`text`, `inner_text`, `text_only`, `inner_html`, `attr=NAME`, `exists:SEL`, or a CSS sub-selector), and an optional `transform` (`first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`). Extraction runs on the exact matched element, from the live DOM at snapshot time — offline tools omit the values. A value that comes back empty (or an `exists:`/sub-selector that finds nothing) is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0003](https://github.com/sightmap/sightmap/blob/main/spec/seps/0003-component-properties.md).
+Each property has a `name` (the annotation key) and an `extract` object: a `from` source and, where the source needs one, a `path`. A component reads its own node (`dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`) or a descendant component (`component`, `component.exists`), so values resolve over the component tree, offline as well as live. `pattern` refines any value with a regex, and `join` collects every match of a component path. A value that comes back empty is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-extract-object.md).
 
 ## Next
 

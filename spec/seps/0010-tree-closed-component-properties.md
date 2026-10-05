@@ -4,18 +4,20 @@ title: Tree-closed component property extraction
 author: Joel Webber (@joelgwebber)
 status: Accepted
 created: 2026-08-27
-updated: 2026-09-29
+updated: 2026-10-02
 spec-version-target: 1
 related-issues:
   - https://github.com/sightmap/sightmap/issues/282
 related-discussions: []
 ---
 
-> **Both deferred open questions now have draft proposals.** Path predicates
-> are proposed by SEP-0012 (PR #405), which also adds an all-match collector
-> for the aggregates question. A separate capture mechanism, `pattern` on a
-> component property, is proposed by SEP-0011 (PR #404). Both are Draft and
-> unreviewed.
+> **Extraction syntax superseded by [SEP-0017](0017-extract-object.md).** `text`, `attr=NAME`, `PATH.prop` and `exists:PATH` are written as `extract: { from, path }` with `from` one of `dom.text`, `dom.attr`, `component`, `component.exists`; resolution is unchanged.
+
+> **SEP-0017 answers the aggregates question and reserves room for
+> predicates.** A `Name[]` path segment collects every match and `join`
+> collapses them into one value; a `pattern` refinement captures a substring,
+> covering SEP-0011 (PR #404). Path predicates, the subject of SEP-0012 (PR
+> #405), stay open, with their bracket syntax reserved.
 
 ## Summary
 

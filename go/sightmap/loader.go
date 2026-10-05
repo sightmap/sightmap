@@ -78,10 +78,11 @@ type rawMessage struct {
 }
 
 type rawMessageProperty struct {
-	Name    string `yaml:"name"`
-	Source  string `yaml:"source"`
-	Field   string `yaml:"field"`
-	Pattern string `yaml:"pattern"`
+	Name    string     `yaml:"name"`
+	Extract rawExtract `yaml:"extract"`
+	Source  string     `yaml:"source"`
+	Field   string     `yaml:"field"`
+	Pattern string     `yaml:"pattern"`
 }
 
 type rawSnapshot struct {
@@ -113,8 +114,8 @@ type rawAccess struct {
 }
 
 type rawProperty struct {
-	Name    string `yaml:"name"`
-	Extract string `yaml:"extract"`
+	Name    string     `yaml:"name"`
+	Extract rawExtract `yaml:"extract"`
 }
 
 type rawRequest struct {
@@ -134,10 +135,11 @@ type rawRequest struct {
 }
 
 type rawRequestProperty struct {
-	Name    string `yaml:"name"`
-	Source  string `yaml:"source"`
-	Field   string `yaml:"field"`
-	Pattern string `yaml:"pattern"`
+	Name    string     `yaml:"name"`
+	Extract rawExtract `yaml:"extract"`
+	Source  string     `yaml:"source"`
+	Field   string     `yaml:"field"`
+	Pattern string     `yaml:"pattern"`
 }
 
 type rawPayload struct {
@@ -426,7 +428,7 @@ func rawPropsToMatch(rps []rawProperty) []ComponentPropertyDef {
 	}
 	ps := make([]ComponentPropertyDef, len(rps))
 	for i, rp := range rps {
-		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract}
+		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract.component()}
 	}
 	return ps
 }
@@ -488,9 +490,7 @@ func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 	for _, rp := range rps {
 		out = append(out, RequestPropertyDef{
 			Name:    rp.Name,
-			Source:  rp.Source,
-			Field:   rp.Field,
-			Pattern: rp.Pattern,
+			Extract: rp.Extract.sourced(rp.Source, rp.Field, rp.Pattern),
 		})
 	}
 	return out
@@ -548,9 +548,7 @@ func toMessageProperties(rps []rawMessageProperty) []MessagePropertyDef {
 	for _, rp := range rps {
 		out = append(out, MessagePropertyDef{
 			Name:    rp.Name,
-			Source:  rp.Source,
-			Field:   rp.Field,
-			Pattern: rp.Pattern,
+			Extract: rp.Extract.sourced(rp.Source, rp.Field, rp.Pattern),
 		})
 	}
 	return out

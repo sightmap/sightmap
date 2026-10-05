@@ -32,8 +32,8 @@ type ComponentDef struct {
 // ComponentPropertyDef describes a value extracted from a matched component,
 // resolved over the component tree (SEP-0010).
 type ComponentPropertyDef struct {
-	Name    string `json:"name"`
-	Extract string `json:"extract"` // SEP-0010: text | attr=NAME | PATH.prop | exists:PATH
+	Name    string  `json:"name"`
+	Extract Extract `json:"extract"` // SEP-0017; From is one of ComponentExtractSources
 }
 
 // ComponentMatch records which component definition matched a node, and carries

@@ -39,30 +39,19 @@ type RequestDef struct {
 }
 
 // RequestPropertyDef declares a named value to extract from a live request/response
-// pair (SEP-0005). Source names which root to read (a request/response body or
-// header block); Field selects a value within it; Pattern optionally refines
-// what Field resolved (or scans the raw source text when Field is absent). At
-// least one of Field or Pattern is set.
+// pair (SEP-0005, spelled per SEP-0017). Extract.From names the root to read (one of
+// RequestPropertySources); Extract.Path selects a value within it: a dot-separated
+// object-key path for a body (a numeric segment indexes an array), or a header name,
+// matched case-insensitively and required, for headers. Extract.Pattern optionally
+// refines what Path resolved, or scans the raw body text when Path is absent.
 //
 // Extraction is a live-traffic concern: these declarations name where a value
 // lives, and a consumer observing real traffic resolves them. A tool working
 // from static corpus definitions alone treats every property as
 // declared-but-unavailable rather than an error.
 type RequestPropertyDef struct {
-	Name string `json:"name"`
-	// Source is the root to read from: one of RequestPropertySources
-	// ("req.body", "rsp.body", "req.headers", "rsp.headers").
-	Source string `json:"source"`
-	// Field selects a value within Source. For a body source it is a
-	// dot-separated object-key path (a numeric segment indexes an array when the
-	// value at that level is one). For a headers source it is a header name,
-	// matched case-insensitively, and is required.
-	Field string `json:"field,omitempty"`
-	// Pattern is an RE2 regex (Go's regexp; no backreferences or lookaround)
-	// applied to what Field resolved, or to the raw source text when Field is
-	// absent. Capture group 1 is the extracted value when present, else the
-	// entire match.
-	Pattern string `json:"pattern,omitempty"`
+	Name    string  `json:"name"`
+	Extract Extract `json:"extract"`
 }
 
 // RequestPropertySources is the closed set of roots a RequestPropertyDef.Source

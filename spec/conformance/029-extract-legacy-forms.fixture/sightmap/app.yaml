@@ -1,0 +1,44 @@
+version: 1
+# Every deprecated string form (SEP-0017) still loads, lowered to its object
+# equivalent, and each draws one extract-legacy-form warning naming that
+# equivalent. attr=checked lowers to dom.attr (the markup), never dom.state.
+components:
+  - name: ProductCard
+    selector: '.product'
+    properties:
+      - name: title
+        extract: text
+      - name: tier
+        extract: raw_text
+      - name: sku
+        extract: attr=data-sku
+      - name: default_on
+        extract: attr=checked
+      - name: price
+        extract: Price.amount
+      - name: sold_out
+        extract: exists:SoldOutBadge
+    children:
+      - name: Price
+        selector: '.price'
+        properties:
+          - name: amount
+            extract: { from: dom.text }
+      - name: SoldOutBadge
+        selector: '.sold-out'
+
+requests:
+  - name: CheckoutPayment
+    route: /api/checkout/payment
+    properties:
+      - name: outcome
+        source: rsp.body
+        field: status
+
+messages:
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        source: stack
+        field: top.file

@@ -42,9 +42,7 @@ func requestCorpus(props ...sightmap.RequestPropertyDef) *sightmap.Corpus {
 func TestValidate_RequestPropertyBothExtractorsCompose(t *testing.T) {
 	errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
 		Name:    "outcome",
-		Source:  "rsp.body",
-		Field:   "status",
-		Pattern: `(\w+)`,
+		Extract: sightmap.Extract{From: "rsp.body", Path: "status", Pattern: `(\w+)`},
 	}))
 	if len(errs) != 0 {
 		t.Fatalf("field+pattern must compose cleanly, got %v", findingCodes(errs))
@@ -52,7 +50,7 @@ func TestValidate_RequestPropertyBothExtractorsCompose(t *testing.T) {
 }
 
 func TestValidate_RequestPropertyNoExtractor(t *testing.T) {
-	errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{Name: "outcome", Source: "rsp.body"}))
+	errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{Name: "outcome", Extract: sightmap.Extract{From: "rsp.body"}}))
 	if !hasCode(errs, "request-property-no-extractor") {
 		t.Fatalf("want request-property-no-extractor, got %v", findingCodes(errs))
 	}
@@ -61,9 +59,8 @@ func TestValidate_RequestPropertyNoExtractor(t *testing.T) {
 func TestValidate_RequestPropertyInvalidName(t *testing.T) {
 	for _, name := range []string{"", "Outcome", "1st", "out-come", "out.come"} {
 		errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
-			Name:   name,
-			Source: "rsp.body",
-			Field:  "status",
+			Name:    name,
+			Extract: sightmap.Extract{From: "rsp.body", Path: "status"},
 		}))
 		if !hasCode(errs, "request-property-invalid-name") {
 			t.Errorf("name %q: want request-property-invalid-name, got %v", name, findingCodes(errs))
@@ -75,9 +72,8 @@ func TestValidate_RequestPropertyInvalidName(t *testing.T) {
 func TestValidate_RequestPropertySourceInvalid(t *testing.T) {
 	for _, src := range []string{"", "rsp", "rsp.cookies", "body", "req.query"} {
 		errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
-			Name:   "outcome",
-			Source: src,
-			Field:  "status",
+			Name:    "outcome",
+			Extract: sightmap.Extract{From: src, Path: "status"},
 		}))
 		if !hasCode(errs, "request-property-source-invalid") {
 			t.Errorf("source %q: want request-property-source-invalid, got %v", src, findingCodes(errs))
@@ -92,8 +88,7 @@ func TestValidate_RequestPropertyHeadersRequireField(t *testing.T) {
 	for _, src := range []string{"req.headers", "rsp.headers"} {
 		errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
 			Name:    "rate_limit_remaining",
-			Source:  src,
-			Pattern: `(\d+)`,
+			Extract: sightmap.Extract{From: src, Pattern: `(\d+)`},
 		}))
 		if !hasCode(errs, "request-property-headers-require-field") {
 			t.Errorf("source %q: want request-property-headers-require-field, got %v", src, findingCodes(errs))
@@ -106,9 +101,7 @@ func TestValidate_RequestPropertyHeadersRequireField(t *testing.T) {
 func TestValidate_RequestPropertyHeaderFieldIsClean(t *testing.T) {
 	errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
 		Name:    "rate_limit_remaining",
-		Source:  "rsp.headers",
-		Field:   "X-RateLimit-Remaining",
-		Pattern: `(\d+)`,
+		Extract: sightmap.Extract{From: "rsp.headers", Path: "X-RateLimit-Remaining", Pattern: `(\d+)`},
 	}))
 	if len(errs) != 0 {
 		t.Fatalf("want no findings, got %v", findingCodes(errs))
@@ -119,8 +112,7 @@ func TestValidate_RequestPropertyHeaderFieldIsClean(t *testing.T) {
 func TestValidate_RequestPropertyPatternOnlyIsClean(t *testing.T) {
 	errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
 		Name:    "outcome",
-		Source:  "rsp.body",
-		Pattern: `(?:declined|approved)`,
+		Extract: sightmap.Extract{From: "rsp.body", Pattern: `(?:declined|approved)`},
 	}))
 	if len(errs) != 0 {
 		t.Fatalf("want no findings, got %v", findingCodes(errs))
@@ -133,8 +125,7 @@ func TestValidate_RequestPropertyPatternInvalid(t *testing.T) {
 	for _, pat := range []string{"(", "[a-", `a{2,1}`} {
 		errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
 			Name:    "outcome",
-			Source:  "rsp.body",
-			Pattern: pat,
+			Extract: sightmap.Extract{From: "rsp.body", Pattern: pat},
 		}))
 		if !hasCode(errs, "request-property-pattern-invalid") {
 			t.Errorf("pattern %q: want request-property-pattern-invalid, got %v", pat, findingCodes(errs))
@@ -147,9 +138,8 @@ func TestValidate_RequestPropertyPatternInvalid(t *testing.T) {
 func TestValidate_RequestPropertyShadowsReserved(t *testing.T) {
 	for _, name := range []string{"status", "method", "duration"} {
 		errs := sightmap.Validate(requestCorpus(sightmap.RequestPropertyDef{
-			Name:   name,
-			Source: "rsp.body",
-			Field:  name,
+			Name:    name,
+			Extract: sightmap.Extract{From: "rsp.body", Path: name},
 		}))
 		var found *sightmap.ValidationError
 		for i := range errs {
@@ -180,7 +170,7 @@ func TestValidate_RequestPropertyViewScoped(t *testing.T) {
 				Name:  "ViewScoped",
 				Route: "/api/x",
 				Properties: []sightmap.RequestPropertyDef{
-					{Name: "outcome", Source: "rsp.body"}, // no extractor
+					{Name: "outcome", Extract: sightmap.Extract{From: "rsp.body"}}, // no extractor
 				},
 			}},
 		}},
@@ -193,7 +183,7 @@ func TestValidate_RequestPropertyViewScoped(t *testing.T) {
 // The same request name declared globally and under a view must report once,
 // not once per copy.
 func TestValidate_RequestPropertyDedupedAcrossScopes(t *testing.T) {
-	bad := []sightmap.RequestPropertyDef{{Name: "outcome", Source: "rsp.body"}}
+	bad := []sightmap.RequestPropertyDef{{Name: "outcome", Extract: sightmap.Extract{From: "rsp.body"}}}
 	c := &sightmap.Corpus{
 		Requests: []sightmap.RequestDef{{Name: "Shared", Route: "/api/x", Properties: bad}},
 		Views: []sightmap.ViewDef{{

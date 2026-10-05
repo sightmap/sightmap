@@ -102,7 +102,7 @@ func TestExport_ToFile_CanonicalWire(t *testing.T) {
 	}
 	// View-scoped request + its property survive (the lossy collector dropped both).
 	vr := corp.Views[0].Requests
-	if len(vr) != 1 || vr[0].Name != "CheckoutPayment" || len(vr[0].Properties) != 1 || vr[0].Properties[0].Field != "status" {
+	if len(vr) != 1 || vr[0].Name != "CheckoutPayment" || len(vr[0].Properties) != 1 || vr[0].Properties[0].Extract.Path != "status" {
 		t.Errorf("view-scoped request/property: got %+v", vr)
 	}
 }

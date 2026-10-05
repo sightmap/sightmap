@@ -4,11 +4,13 @@ title: A console/exception message entity (`messages[]`)
 author: Clint Ayres (@jurassix)
 status: Accepted
 created: 2026-07-31
-updated: 2026-09-10
+updated: 2026-10-02
 spec-version-target: 1
 related-issues: [158]
 related-discussions: []
 ---
+
+> **Property syntax superseded by [SEP-0017](0017-extract-object.md).** A message property's `source: stack`/`field`/`pattern` is written as `extract: { from: stack, path, pattern }`; its meaning is unchanged.
 
 > **Amended by [SEP-0010](0010-tree-closed-component-properties.md):** the
 > `transform` field is removed from message `properties[]`. Fold any

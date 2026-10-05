@@ -379,7 +379,7 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
             // and unlike textContent it excludes descendant element text (no
             // <style>/<script> bleed, no subtree concatenation) and CSS pseudo
             // content (::before/::after are not child nodes). This is the pinned
-            // source for `extract: raw_text` (SEP-0013) — the literal author text
+            // source for `from: dom.raw_text` (SEP-0013) — the literal author text
             // of the node, distinct from its (possibly welded) accessible name.
             rawText: noTextTags.has(tag) ? '' : (function () {
                 var s = '';

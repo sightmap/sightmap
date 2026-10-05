@@ -143,19 +143,6 @@ function childNamed(components, ownerAddress, name) {
 // ── Property extraction ───────────────────────────────────────────────────────
 
 /**
- * First element in el's subtree (document order, excluding el) matched by `def`.
- * Mirrors the Go matcher's "first descendant matched component named X".
- */
-function firstDescendantEl(el, def) {
-  if (!def || !def.selector) return null;
-  try {
-    return el.querySelectorAll(def.selector)[0] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Walk a dotted component-name path down from `el`, resolving each segment among
  * the CHILDREN of the component reached so far — starting from `ownerAddress`.
  *
@@ -167,56 +154,183 @@ function firstDescendantEl(el, def) {
  * @returns {{el: Element, def: object}|null} the deepest segment's element + def
  */
 function resolvePath(el, path, components, ownerAddress) {
-  let cur = el;
-  let addr = ownerAddress;
-  let def = null;
-  for (const seg of path.split(".")) {
-    if (!seg) return null;
-    def = childNamed(components, addr, seg);
-    if (!def) return null;
-    const next = firstDescendantEl(cur, def);
-    if (!next) return null;
-    cur = next;
-    addr = componentAddress(def);
-  }
-  return cur === el ? null : { el: cur, def };
+  const hits = resolvePathAll(el, path, components, ownerAddress, true);
+  return hits.length ? hits[0] : null;
 }
 
 /**
- * Resolve one SEP-0010 extract directive against el, over the component tree.
- * References descend only, so recursion always terminates.
+ * Resolve a component path, in document order without duplicates; backs `join`
+ * (SEP-0017). A segment written `Name[]` collects every match within each element
+ * the previous segment produced; any other segment takes the first match within
+ * each. `firstOnly` treats every segment as single-valued.
+ *
+ * @returns {{el: Element, def: object}[]}
+ */
+function resolvePathAll(el, path, components, ownerAddress, firstOnly = false) {
+  let cur = [el];
+  let addr = ownerAddress;
+  let def = null;
+  for (const raw of path.split(".")) {
+    const multi = !firstOnly && raw.endsWith("[]");
+    const seg = multi ? raw.slice(0, -2) : raw;
+    if (!seg) return [];
+    def = childNamed(components, addr, seg);
+    if (!def || !def.selector) return [];
+    const next = [];
+    for (const c of cur) {
+      let found = [];
+      try {
+        found = [...c.querySelectorAll(def.selector)].filter((f) => f !== el);
+      } catch {
+        return [];
+      }
+      for (const f of multi ? found : found.slice(0, 1)) {
+        if (!next.includes(f)) next.push(f);
+      }
+    }
+    if (!next.length) return [];
+    cur = next;
+    addr = componentAddress(def);
+  }
+  return cur.map((e) => ({ el: e, def }));
+}
+
+const STATE_NAMES = ["checked", "selected", "disabled", "expanded"];
+
+/**
+ * Lower a deprecated string extract (SEP-0010) to the SEP-0017 object, so both
+ * forms resolve through one path. An object passes through unchanged.
+ */
+function lowerExtract(x) {
+  if (x && typeof x === "object") return x;
+  if (typeof x !== "string") return null;
+  if (x === "text") return { from: "dom.text" };
+  if (x === "raw_text") return { from: "dom.raw_text" };
+  if (x.startsWith("attr=")) return { from: "dom.attr", path: x.slice(5) };
+  if (x.startsWith("exists:")) {
+    return { from: "component.exists", path: x.slice(7) };
+  }
+  const dot = x.lastIndexOf(".");
+  if (dot > 0 && dot < x.length - 1) return { from: "component", path: x };
+  return null;
+}
+
+/**
+ * A control's current interactive state (SEP-0013), from native properties
+ * rather than attributes: the `checked` attribute is the initial state and
+ * `<button disabled>` is valueless. Returns "true"/"false" ("mixed" for an
+ * indeterminate checkbox), or null when the element cannot have that state.
+ */
+function stateOf(el, name) {
+  const tag = el.tagName.toLowerCase();
+  const aria = (attr, values) => {
+    const v = (el.getAttribute(attr) || "").toLowerCase();
+    return values.includes(v) ? v : null;
+  };
+  switch (name) {
+    case "checked": {
+      const type = (el.getAttribute("type") || "").toLowerCase();
+      if (tag === "input" && (type === "checkbox" || type === "radio")) {
+        return el.indeterminate ? "mixed" : String(!!el.checked);
+      }
+      return aria("aria-checked", ["true", "false", "mixed"]);
+    }
+    case "selected":
+      return tag === "option"
+        ? String(!!el.selected)
+        : aria("aria-selected", ["true", "false"]);
+    case "disabled":
+      return /^(button|input|select|textarea|fieldset|optgroup|option)$/.test(tag)
+        ? String(el.matches(":disabled"))
+        : aria("aria-disabled", ["true", "false"]);
+    case "expanded":
+      return tag === "details"
+        ? String(!!el.open)
+        : aria("aria-expanded", ["true", "false"]);
+  }
+  return null;
+}
+
+/** The element's own direct text-node content (SEP-0013 `raw_text`). */
+function rawTextOf(el) {
+  let s = "";
+  for (const n of el.childNodes) if (n.nodeType === 3) s += n.data;
+  return s;
+}
+
+/**
+ * Collapse whitespace as the Go capture does for node text, so `pattern` sees
+ * the same string on both sides.
+ */
+function normalizeText(v) {
+  return v == null ? v : String(v).trim().replace(/\s+/g, " ");
+}
+
+/** Apply an extract's `pattern`: capture group 1 if present, else the match. */
+function refine(e, v) {
+  if (v == null || v === "") return null;
+  if (!e.pattern) return v;
+  try {
+    const m = new RegExp(e.pattern).exec(String(v));
+    if (!m) return null;
+    return m.length > 1 ? m[1] : m[0];
+  } catch {
+    return null;
+  }
+}
+
+/** Read the property `prop` declared on a resolved descendant component. */
+function readProperty(hit, prop, components) {
+  const pd = (hit.def.properties || []).find((p) => p.name === prop);
+  if (!pd) return null;
+  return resolveExtract(hit.el, pd.extract, components, componentAddress(hit.def));
+}
+
+/**
+ * Resolve one extract directive (SEP-0017 object, or a deprecated string form)
+ * against el, over the component tree. References descend only, so recursion
+ * always terminates.
  */
 function resolveExtract(el, extract, components, ownerAddress) {
-  if (extract === "text") return el.textContent;
-  if (typeof extract !== "string") return null;
-  if (extract.startsWith("attr=")) return el.getAttribute(extract.slice(5));
-  if (extract.startsWith("exists:")) {
-    return resolvePath(el, extract.slice(7), components, ownerAddress)
-      ? "true"
-      : null;
+  const e = lowerExtract(extract);
+  if (!e) return null;
+  switch (e.from) {
+    case "dom.text":
+      return refine(e, normalizeText(el.textContent));
+    case "dom.raw_text":
+      return refine(e, normalizeText(rawTextOf(el)));
+    case "dom.attr":
+      return refine(e, el.getAttribute(e.path));
+    case "dom.state":
+      return refine(e, STATE_NAMES.includes(e.path) ? stateOf(el, e.path) : null);
+    case "component.exists":
+      return resolvePath(el, e.path || "", components, ownerAddress)
+        ? "true"
+        : null;
+    case "component": {
+      const path = e.path || "";
+      const dot = path.lastIndexOf(".");
+      if (dot <= 0 || dot === path.length - 1) return null;
+      const prop = path.slice(dot + 1);
+      if (!path.includes("[]")) {
+        const hit = resolvePath(el, path.slice(0, dot), components, ownerAddress);
+        return hit ? refine(e, readProperty(hit, prop, components)) : null;
+      }
+      if (!e.join) return null; // an array-valued result is reserved
+      const vals = resolvePathAll(el, path.slice(0, dot), components, ownerAddress)
+        .map((hit) => refine(e, readProperty(hit, prop, components)))
+        .filter((v) => v != null && v !== "");
+      return vals.length ? vals.join(e.join) : null;
+    }
   }
-  // PATH.prop — the descendant component's own extracted property.
-  const dot = extract.lastIndexOf(".");
-  if (dot <= 0 || dot === extract.length - 1) return null;
-  const hit = resolvePath(el, extract.slice(0, dot), components, ownerAddress);
-  if (!hit) return null;
-  const pd = (hit.def.properties || []).find(
-    (p) => p.name === extract.slice(dot + 1),
-  );
-  if (!pd) return null;
-  return resolveExtract(
-    hit.el,
-    pd.extract,
-    components,
-    componentAddress(hit.def),
-  );
+  return null;
 }
 
 /**
  * Extract property values for a matched element, resolved over the component
- * tree (SEP-0010): text/attr read the element itself; PATH.prop and exists:PATH
- * reference descendant components. `text` is the element's DOM text content — the
- * extension's implementation-defined accessible text.
+ * tree (SEP-0017): dom.* sources read the element itself; component and
+ * component.exists reference descendant components. `dom.text` is the element's
+ * DOM text content, the extension's implementation-defined accessible text.
  *
  * `ownerAddress` is the address of the component these descriptors belong to;
  * descendant references resolve among ITS children. It defaults to "" (a root

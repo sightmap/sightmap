@@ -2,7 +2,6 @@ package sightmap
 
 import (
 	"encoding/json"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -85,8 +84,8 @@ func resolveRequestProperty(p RequestPropertyDef, rec Request) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	if p.Pattern != "" {
-		matched, ok := applyPattern(p.Pattern, raw)
+	if p.Extract.Pattern != "" {
+		matched, ok := applyPattern(p.Extract.Pattern, raw)
 		if !ok {
 			return "", false
 		}
@@ -103,27 +102,27 @@ func resolveRequestProperty(p RequestPropertyDef, rec Request) (string, bool) {
 // JSON dot-path; with no field it returns the whole raw body for a pattern to
 // scan. For a header source it looks up the (required) named header.
 func resolveSourceValue(p RequestPropertyDef, rec Request) (string, bool) {
-	switch p.Source {
+	switch p.Extract.From {
 	case "req.body", "rsp.body":
 		body := rec.RspBody
-		if p.Source == "req.body" {
+		if p.Extract.From == "req.body" {
 			body = rec.ReqBody
 		}
 		if body == nil {
 			return "", false
 		}
-		if p.Field == "" {
+		if p.Extract.Path == "" {
 			// No field: the pattern (which validation requires when field is
 			// absent) scans the raw body text.
 			return body.Content, true
 		}
-		return walkJSONPath(body.Content, p.Field)
+		return walkJSONPath(body.Content, p.Extract.Path)
 	case "req.headers", "rsp.headers":
 		headers := rec.RspHeaders
-		if p.Source == "req.headers" {
+		if p.Extract.From == "req.headers" {
 			headers = rec.ReqHeaders
 		}
-		return lookupHeader(headers, p.Field)
+		return lookupHeader(headers, p.Extract.Path)
 	default:
 		return "", false
 	}
@@ -211,7 +210,7 @@ func stringifyJSON(v any) (string, bool) {
 // matching stays silent the way value omission does; validation reports a
 // malformed pattern separately (request-property-pattern-invalid).
 func applyPattern(pattern, s string) (string, bool) {
-	re, err := regexp.Compile(pattern)
+	re, err := compilePattern(pattern)
 	if err != nil {
 		return "", false
 	}

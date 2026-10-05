@@ -140,7 +140,7 @@ count: that is what the corpus will see. Wrong match count = corrupt coverage.
 **Every attribute matches offline**, the same as live: the offline element model
 captures the full attribute set the DOM carries — minus injected sightmap ids and
 framework `_ng*`-style scoping attrs — so `[class*=…]`, `[id^=…]`, `[value=…]`,
-`[data-*=…]` and `extract: attr=NAME` all resolve offline for standard **and**
+`[data-*=…]` and `extract: { from: dom.attr, path: NAME }` all resolve offline for standard **and**
 non-standard attributes (e.g. `value` on a `role="option"` `<li>`). `class` and
 `id` are captured for every element (SVG included) and resolve to the same fields
 `.classname` / `#id` use. Prefer `.classname` / `#id` when a full class or id is
@@ -162,7 +162,7 @@ whole offer:
   selector: '[data-testid="form-group"]:has(input[type="checkbox"])'
   properties:
     - name: label               # the whole offer, e.g. "In-Home Assembly $179.00"
-      extract: text
+      extract: { from: dom.text }
 ```
 Always `sel-probe`/`sel-check` first — `:has()` now agrees across the live and
 offline matchers.
@@ -391,7 +391,7 @@ Two property rules are **mandatory**:
   selector: 'a'
   properties:
     - name: label
-      extract: text
+      extract: { from: dom.text }
 
 # Repeated container: one selector, many instances → needs a per-instance
 # discriminator so `Card[title^="Today"]` can resolve exactly one.
@@ -399,7 +399,7 @@ Two property rules are **mandatory**:
   selector: 'article.card'
   properties:
     - name: title
-      extract: attr=aria-label
+      extract: { from: dom.attr, path: aria-label }
 ```
 
 A `label` restating the accessible name is noise **only when the component's
@@ -411,40 +411,64 @@ can't back up (`ExploreMoreFlights` on `a.rounded-button`). Fixing the selector
 to a stable, specific hook is the better end state; until then, an honest generic
 name + label discriminator beats a false-specific name.
 
-**Extract modes** — exactly one of four forms:
+**Extract** — every property reads with one object, `extract: { from, path, pattern, join }`:
 
-| Mode | Resolves to |
-|------|-------------|
-| `text` | the matched node's accessible name (the default), falling back to its rendered `innerText` when it has no accessible name — so role-less `<span>`s / custom elements resolve their visible value offline, not empty |
-| `attr=NAME` | the value of attribute `NAME` on the matched node |
-| `Child.prop` | the extracted `prop` of a descendant *component* `Child` |
-| `exists:Child` | `"true"` if descendant component `Child` matched, else omitted (a boolean flag) |
+| `from` | `path` | Resolves to |
+|--------|--------|-------------|
+| `dom.text` | — | the matched node's accessible name (the default), falling back to its rendered `innerText` when it has no accessible name, so role-less `<span>`s / custom elements resolve their visible value offline, not empty |
+| `dom.raw_text` | — | the node's own text nodes only: the escape when the accessible name welds in extra text |
+| `dom.attr` | attribute name | the value of that attribute on the matched node, as the markup states it |
+| `dom.state` | `checked` / `selected` / `disabled` / `expanded` | the control's *current* state, `"true"`/`"false"`; `dom.attr` with `checked` reads only the initial markup |
+| `component` | `Child.prop` | the extracted `prop` of a descendant *component* `Child` |
+| `component.exists` | `Child` | `"true"` if descendant component `Child` matched, else omitted (a boolean flag) |
 
-Extraction is **tree-closed**: `text` and `attr=` read the matched node itself;
-`Child.prop` and `exists:Child` reference a component nested beneath it. A path
-may descend through several declared children (`Row.Price.amount`), taking the
-first match at each step. There is no raw-CSS sub-selector and no text-splitting
-transform — to surface a value from a sub-element, **promote it to a child
-component** and reference it. This is also how you disambiguate a repeated
-identical leaf (rule 2): give the container a discriminator and nest the leaf.
+Two optional refinements: `pattern` (an RE2 regex; capture group 1, else the
+whole match) pulls a substring out of any value, and `join` collapses a
+multi-valued component path into one value.
+
+Extraction is **tree-closed**: `dom.*` sources read the matched node itself;
+`component` and `component.exists` reference a component nested beneath it. A
+path may descend through several declared children (`Row.Price.amount`), taking
+the first match at each step. Mark a step `Name[]` to take every match instead
+(`Tag[].text`); a path with a `[]` step must carry `join`, and `join` needs one.
+Quote such a path inside `{ ... }` (`path: 'Tag[].text'`): `[` and `]` are YAML
+syntax there. There is no raw-CSS sub-selector: to surface a value from a
+sub-element, **promote it to a child component** and reference it. This is also
+how you disambiguate a repeated identical leaf (rule 2): give the container a
+discriminator and nest the leaf. Don't declare a second component to pick one
+match out of several (an `ActiveTab` beside `Tab`): one node should match one
+component.
 
 ```yaml
 - name: ProductCard
   selector: 'article.card'
   properties:
     - name: title
-      extract: Title.text          # a child component, not a raw CSS sub-selector
+      extract: { from: component, path: Title.text }   # a child component, not a raw CSS sub-selector
+    - name: price                                      # "$10.95" out of "Add to cart · $10.95"
+      extract: { from: dom.text, pattern: '\$([\d.]+)' }
+    - name: tags                                       # every Tag: "sale,new"
+      extract: { from: component, path: 'Tag[].text', join: ',' }
     - name: on_sale
-      extract: exists:SaleBadge    # boolean flag: "true" or omitted
+      extract: { from: component.exists, path: SaleBadge }   # boolean flag: "true" or omitted
   children:
     - name: Title
       selector: '.card__title'
       properties:
         - name: text
-          extract: text
+          extract: { from: dom.text }
+    - name: Tag
+      selector: '.card__tag'
+      properties:
+        - name: text
+          extract: { from: dom.text }
     - name: SaleBadge
       selector: '.badge--sale'
 ```
+
+The older string forms (`extract: text`, `attr=NAME`, `Child.prop`,
+`exists:Child`, and request/message `source:`/`field:`) still load but are
+deprecated: `validate` warns `extract-legacy-form` and names the object to write.
 
 **Text deduplication (automatic):** If a property value exactly equals the
 accessible name, the accessible name is suppressed from the annotation. Use
@@ -485,16 +509,16 @@ traffic reads `[--]`.
 The HTTP status often lies: an endpoint returns `200 OK` while the real outcome
 lives inside the body. A request `properties:` entry pulls a named value out of
 the live request/response so a consumer can reason about it (the SEP-0005 "200 OK
-but the body says declined" case). Each property is resolved
-**source → field → pattern**:
+but the body says declined" case). Each property is an
+`extract` object resolved **from → path → pattern**:
 
-- **`source:`** — which half to read: `rsp.body`, `req.body`, `rsp.headers`, or
+- **`from:`** — which half to read: `rsp.body`, `req.body`, `rsp.headers`, or
   `req.headers`.
-- **`field:`** — where inside it. For a body, a dot-path into the parsed JSON; a
+- **`path:`** — where inside it. For a body, a dot-path into the parsed JSON; a
   numeric segment indexes an array (`actions.0.state`). For headers, the header
   name (case-insensitive).
-- **`pattern:`** *(optional)* — an RE2 regex refining what `field` resolved (or
-  scanning the raw source when `field` is omitted). Capture group 1 is the value
+- **`pattern:`** *(optional)* — an RE2 regex refining what `path` resolved (or
+  scanning the raw body when `path` is omitted). Capture group 1 is the value
   when present, else the whole match.
 
 ```yaml
@@ -506,8 +530,7 @@ requests:
       # Aura returns HTTP 200 even when an action fails; the real per-action
       # outcome (SUCCESS | ERROR | INCOMPLETE) is inside the JSON body.
       - name: first_action_state
-        source: rsp.body
-        field: actions.0.state
+        extract: { from: rsp.body, path: actions.0.state }
 ```
 
 Live, matched requests carry the extracted value:
@@ -515,7 +538,7 @@ Live, matched requests carry the extracted value:
 one call that actually failed behind the same 200, `{first_action_state=ERROR}`.
 
 Extraction is **silently omitted** (never an error) when the source isn't
-present, the field doesn't resolve, or the pattern doesn't match — whether a body
+present, the path doesn't resolve, or the pattern doesn't match — whether a body
 or header is even captured depends on the runtime layer. `status`, `method`, and
 `duration` are already-structured request identity and need no `properties:`
 declaration.
@@ -540,7 +563,7 @@ unmatched reads `[--]`. Declare at least one of `level`/`message` (an entry
 matching everything isn't useful).
 
 An exception's **stack frames** are addressable with message `properties:`
-(`source: stack` is the only source in v1):
+(`from: stack` is the only source in v1):
 
 ```yaml
 messages:
@@ -548,8 +571,7 @@ messages:
     message: cart version mismatch
     properties:
       - name: origin_fn
-        source: stack
-        field: top.function       # <frame>.<attr>; frame = top|<index>, attr = function|file|line|column
+        extract: { from: stack, path: top.function }   # <frame>.<attr>; frame = top|<index>, attr = function|file|line|column
 ```
 
 ---
@@ -718,16 +740,16 @@ raw selector:
   selector: 'article.event'
   properties:
     - name: date
-      extract: DateLabel.text
+      extract: { from: component, path: DateLabel.text }
     - name: venue
-      extract: Venue.text
+      extract: { from: component, path: Venue.text }
   children:
     - name: DateLabel
       selector: 'time'
-      properties: [{ name: text, extract: text }]
+      properties: [{ name: text, extract: { from: dom.text } }]
     - name: Venue
       selector: '[data-testid="venue-name"]'
-      properties: [{ name: text, extract: text }]
+      properties: [{ name: text, extract: { from: dom.text } }]
 ```
 
 **3. T2 triage**

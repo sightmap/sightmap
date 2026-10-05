@@ -39,12 +39,12 @@ Child selectors only need to discriminate within their parent's DOM subtree. The
       selector: "a"         # Fine: only 'a' tags inside #footer-static
       properties:
         - name: label
-          extract: text
+          extract: { from: dom.text }
     - name: FooterSocialLink
       selector: 'a[aria-label]'
       properties:
         - name: platform
-          extract: attr:aria-label
+          extract: { from: dom.attr, path: aria-label }
 ```
 
 ## Rule 3 — Full-chain matching
@@ -64,51 +64,60 @@ Both are needed for full event attribution. A component with no `properties:` pr
   selector: '[data-testid="product-pod"]'
   properties:
     - name: label
-      extract: h3             # CSS sub-selector → text of the first matching child
+      extract: { from: component, path: Title.text }   # a child component's value
     - name: sku
-      extract: attr=data-sku
+      extract: { from: dom.attr, path: data-sku }
+  children:
+    - name: Title
+      selector: h3
+      properties:
+        - name: text
+          extract: { from: dom.text }
 ```
 
-### Extraction modes
+### Extract sources
 
-| `extract:` | Result |
-|------------|--------|
-| `text` | `textContent` (whitespace-collapsed) — the default |
-| `inner_text` | rendered `innerText` (visible text only) |
-| `text_only` | `textContent` with `img,svg,[alt]` stripped (avoids alt-text bleed) |
-| `inner_html` | element's `innerHTML` |
-| `attr=NAME` | the `NAME` attribute, e.g. `attr=aria-label` (note `=`, not `:`) |
-| `exists:SEL` | `"true"` if a descendant matches `SEL`, else the property is omitted (boolean state flag) |
-| `SEL` (any other CSS) | text of the first descendant matching `SEL` |
+Every property reads with one object, `extract: { from, path, pattern, join }`
+(SEP-0017). A component reads:
 
-### Transforms
+| `from` | `path` | Result |
+|--------|--------|--------|
+| `dom.text` | — | the node's accessible name, falling back to its rendered text |
+| `dom.raw_text` | — | the node's own text nodes only |
+| `dom.attr` | attribute name | that attribute as the markup states it |
+| `dom.state` | `checked` / `selected` / `disabled` / `expanded` | the control's current state, `"true"`/`"false"` |
+| `component` | `Child.prop` | a descendant component's own extracted property |
+| `component.exists` | `Child` | `"true"` if the descendant matched, else omitted (boolean state flag) |
 
-An optional `transform:` post-processes the extracted string:
-`first_word`, `last_word`, `first_number`, `first_dollar`, `number`, `slug`,
-`match:REGEX`.
+Extraction is tree-closed: there is no CSS sub-selector. To read a sub-element,
+promote it to a child component and reference it.
 
-`match:REGEX` captures an arbitrary substring/enum: capture group 1 if the
-pattern has one, else the full match; on no match (or an invalid pattern) the
-value passes through unchanged. Use it to split one concatenated label into
-several structured, queryable properties (which is also what the component-query
-DSL matches on). Write patterns in the Go-RE2 ∩ JS-RegExp common subset
-(alternation, character classes, anchors, quantifiers, groups) — no inline `(?i)`
-flags or backreferences. The same canonical transform set is implemented in
-`sightmap/property.go` (offline) and mirrored in the snapshot extractor and the
-overlay extension.
+### Refinements
+
+`pattern` is an RE2 regex applied to the resolved value: capture group 1 if the
+pattern has one, else the full match; on no match the property is omitted. Use
+it to split one concatenated label into several structured, queryable
+properties (which is also what the component-query DSL matches on):
 
 ```yaml
 # "Add In-Store Assembly / FREE"  vs  "Add In-Home Assembly / +$179.00"
 - name: AssemblyOption
   selector: '[data-testid="form-group"]:has(input[type="checkbox"])'
   properties:
-    - name: assemblyType        # → In-Store | In-Home
-      extract: text
-      transform: 'match:(In-Store|In-Home)'
+    - name: assembly_type       # → In-Store | In-Home
+      extract: { from: dom.text, pattern: '(In-Store|In-Home)' }
     - name: price               # → FREE | $179.00
-      extract: text
-      transform: 'match:(FREE|\$[\d,.]+)'
+      extract: { from: dom.text, pattern: '(FREE|\$[\d,.]+)' }
 ```
+
+A path step takes the first match; mark it `Name[]` to take every match. A path
+with a `[]` step must carry `join`, which joins the values:
+`{ from: component, path: 'Tag[].text', join: ',' }`. Quote the path inside a
+flow mapping, since `[` and `]` are YAML syntax there.
+
+The deprecated string forms (`extract: text`, `attr=NAME`, `Child.prop`,
+`exists:Child`) still load, with an `extract-legacy-form` warning naming the
+object to write.
 
 ## Selector quality hierarchy
 

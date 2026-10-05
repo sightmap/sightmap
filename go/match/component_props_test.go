@@ -17,16 +17,16 @@ func productCardDefs() []sightmap.ComponentDef {
 			Name:      "ProductCard",
 			Selectors: []string{"[data-testid=pod]"},
 			Properties: []sightmap.ComponentPropertyDef{
-				{Name: "label", Extract: "text"},
-				{Name: "price", Extract: "Price.text"},
-				{Name: "sold_out", Extract: "exists:SoldOutBadge"},
+				{Name: "label", Extract: sightmap.Extract{From: sightmap.FromDOMText}},
+				{Name: "price", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Price.text"}},
+				{Name: "sold_out", Extract: sightmap.Extract{From: sightmap.FromComponentExists, Path: "SoldOutBadge"}},
 			},
 		},
 		{
 			Name:        "Price",
 			Selectors:   []string{"[data-testid=pod] [data-testid=price]"},
 			ParentChain: []string{"ProductCard"},
-			Properties:  []sightmap.ComponentPropertyDef{{Name: "text", Extract: "text"}},
+			Properties:  []sightmap.ComponentPropertyDef{{Name: "text", Extract: sightmap.Extract{From: sightmap.FromDOMText}}},
 		},
 		{
 			Name:        "SoldOutBadge",
@@ -37,7 +37,7 @@ func productCardDefs() []sightmap.ComponentDef {
 			Name:        "Link",
 			Selectors:   []string{"[data-testid=pod] a"},
 			ParentChain: []string{"ProductCard"},
-			Properties:  []sightmap.ComponentPropertyDef{{Name: "href", Extract: "attr=href"}},
+			Properties:  []sightmap.ComponentPropertyDef{{Name: "href", Extract: sightmap.Extract{From: sightmap.FromDOMAttr, Path: "href"}}},
 		},
 	}
 }
@@ -52,8 +52,8 @@ func TestResolveRawText(t *testing.T) {
 		Name:      "SubFare",
 		Selectors: []string{"[data-testid=tile]"},
 		Properties: []sightmap.ComponentPropertyDef{
-			{Name: "welded", Extract: "text"},   // AX name (welded)
-			{Name: "tier", Extract: "raw_text"}, // raw text (clean)
+			{Name: "welded", Extract: sightmap.Extract{From: sightmap.FromDOMText}},  // AX name (welded)
+			{Name: "tier", Extract: sightmap.Extract{From: sightmap.FromDOMRawText}}, // raw text (clean)
 		},
 	}}
 	tile := &sightmap.ComponentNode{
@@ -128,10 +128,10 @@ func TestResolveComponentProperties(t *testing.T) {
 		{
 			Name:       "Row",
 			Selectors:  []string{"[data-testid=row]"},
-			Properties: []sightmap.ComponentPropertyDef{{Name: "amount", Extract: "Price.Amount.text"}},
+			Properties: []sightmap.ComponentPropertyDef{{Name: "amount", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Price.Amount.text"}}},
 		},
 		{Name: "Price", Selectors: []string{"[data-testid=row] [data-testid=price]"}, ParentChain: []string{"Row"}},
-		{Name: "Amount", Selectors: []string{"[data-testid=row] [data-testid=price] [data-testid=amount]"}, ParentChain: []string{"Row", "Price"}, Properties: []sightmap.ComponentPropertyDef{{Name: "text", Extract: "text"}}},
+		{Name: "Amount", Selectors: []string{"[data-testid=row] [data-testid=price] [data-testid=amount]"}, ParentChain: []string{"Row", "Price"}, Properties: []sightmap.ComponentPropertyDef{{Name: "text", Extract: sightmap.Extract{From: sightmap.FromDOMText}}}},
 	}
 
 	// Role-less nodes carry no accessible Name but do carry rendered Text.
@@ -230,5 +230,100 @@ func TestResolveComponentProperties(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestResolveExtractObject(t *testing.T) {
+	ex := func(from, path string) sightmap.Extract { return sightmap.Extract{From: from, Path: path} }
+	defs := []sightmap.ComponentDef{
+		{
+			Name:      "Card",
+			Selectors: []string{".card"},
+			Properties: []sightmap.ComponentPropertyDef{
+				{Name: "price", Extract: sightmap.Extract{From: sightmap.FromDOMText, Pattern: `\$([\d.]+)`}},
+				{Name: "tags", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Tag[].value", Join: ","}},
+				{Name: "first_tag", Extract: ex(sightmap.FromComponent, "Tag.value")},
+				{Name: "short_tags", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Tag[].value", Pattern: `^(\w{3})`, Join: "|"}},
+				{Name: "has_tag", Extract: ex(sightmap.FromComponentExists, "Tag")},
+				{Name: "has_badge", Extract: ex(sightmap.FromComponentExists, "Badge")},
+				{Name: "on", Extract: ex(sightmap.FromDOMState, "checked")},
+				{Name: "markup", Extract: ex(sightmap.FromDOMAttr, "checked")},
+				{Name: "missing", Extract: sightmap.Extract{From: sightmap.FromDOMText, Pattern: `^nope$`}},
+			},
+		},
+		{
+			Name:       "Tag",
+			Selectors:  []string{".tag"},
+			Properties: []sightmap.ComponentPropertyDef{{Name: "value", Extract: sightmap.Extract{From: sightmap.FromDOMText}}},
+		},
+	}
+	tag := func(id, text string) *sightmap.ComponentNode {
+		return &sightmap.ComponentNode{Id: id, Name: text, Element: &sightmap.Element{Tag: "span", Classes: []string{"tag"}, Attrs: map[string]string{"class": "tag"}}}
+	}
+	card := &sightmap.ComponentNode{
+		Id:         "card",
+		Name:       "Add to cart · $10.95",
+		Properties: map[string]string{"checked": "false"},
+		Element:    &sightmap.Element{Tag: "div", Classes: []string{"card"}, Attrs: map[string]string{"class": "card", "checked": ""}},
+		Children:   []*sightmap.ComponentNode{tag("t1", "sale"), tag("t2", ""), tag("t3", "featured")},
+	}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(card, "")
+	for name, want := range map[string]string{
+		"price":      "10.95",
+		"tags":       "sale,featured", // the empty tag is dropped
+		"first_tag":  "sale",
+		"short_tags": "sal|fea",
+		"has_tag":    "true",
+		"on":         "false", // state, not the valueless markup attribute
+	} {
+		if v, ok := propVal(res[card], name); !ok || v != want {
+			t.Errorf("%s = %q, %v; want %q", name, v, ok, want)
+		}
+	}
+	for _, name := range []string{"has_badge", "markup", "missing"} {
+		if v, ok := propVal(res[card], name); ok {
+			t.Errorf("%s = %q; want omitted", name, v)
+		}
+	}
+}
+
+// Only a segment written Name[] fans out; every other segment takes its first
+// match within each node the previous segment produced.
+func TestResolveMultiValuedPathFansOutPerSegment(t *testing.T) {
+	text := sightmap.Extract{From: sightmap.FromDOMText}
+	defs := []sightmap.ComponentDef{
+		{
+			Name: "List", Selectors: []string{".list"},
+			Properties: []sightmap.ComponentPropertyDef{
+				{Name: "every_row_first_price", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Row[].Price.v", Join: ","}},
+				{Name: "first_row_every_price", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Row.Price[].v", Join: ","}},
+				{Name: "every_price", Extract: sightmap.Extract{From: sightmap.FromComponent, Path: "Row[].Price[].v", Join: ","}},
+			},
+		},
+		{Name: "Row", Selectors: []string{".row"}},
+		{Name: "Price", Selectors: []string{".price"}, Properties: []sightmap.ComponentPropertyDef{{Name: "v", Extract: text}}},
+	}
+	el := func(class string) *sightmap.Element {
+		return &sightmap.Element{Tag: "div", Classes: []string{class}, Attrs: map[string]string{"class": class}}
+	}
+	price := func(id, v string) *sightmap.ComponentNode {
+		return &sightmap.ComponentNode{Id: id, Name: v, Element: el("price")}
+	}
+	row := func(id string, prices ...*sightmap.ComponentNode) *sightmap.ComponentNode {
+		return &sightmap.ComponentNode{Id: id, Element: el("row"), Children: prices}
+	}
+	list := &sightmap.ComponentNode{Id: "list", Element: el("list"), Children: []*sightmap.ComponentNode{
+		row("r1", price("p1", "1"), price("p2", "2")),
+		row("r2", price("p3", "3"), price("p4", "4")),
+	}}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(list, "")
+	for name, want := range map[string]string{
+		"every_row_first_price": "1,3",
+		"first_row_every_price": "1,2",
+		"every_price":           "1,2,3,4",
+	} {
+		if v, ok := propVal(res[list], name); !ok || v != want {
+			t.Errorf("%s = %q, %v; want %q", name, v, ok, want)
+		}
 	}
 }

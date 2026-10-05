@@ -1,0 +1,51 @@
+version: 1
+# The extract object (SEP-0017) on every entity: each component source, pattern
+# on a component read, join across every match of a Name[] path segment, and the
+# request and message sources.
+components:
+  - name: ProductCard
+    selector: '.product'
+    properties:
+      - name: title
+        extract: { from: dom.text }
+      - name: price
+        extract: { from: dom.raw_text, pattern: '\$([\d.]+)' }
+      - name: sku
+        extract: { from: dom.attr, path: data-sku }
+      - name: tags
+        extract: { from: component, path: 'Tag[].value', join: ',' }
+      - name: sold_out
+        extract: { from: component.exists, path: SoldOutBadge }
+    children:
+      - name: Tag
+        selector: '.tag'
+        properties:
+          - name: value
+            extract: { from: dom.text }
+      - name: SoldOutBadge
+        selector: '.sold-out'
+
+  - name: SubscribeToggle
+    selector: '[role="switch"]'
+    properties:
+      - name: on
+        extract: { from: dom.state, path: checked }
+
+requests:
+  - name: CheckoutPayment
+    route: /api/checkout/payment
+    properties:
+      - name: outcome
+        extract: { from: rsp.body, path: status }
+      - name: rate_limit_remaining
+        extract:
+          from: rsp.headers
+          path: X-RateLimit-Remaining
+          pattern: '(\d+)'
+
+messages:
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        extract: { from: stack, path: top.file, pattern: '([^/]+)$' }

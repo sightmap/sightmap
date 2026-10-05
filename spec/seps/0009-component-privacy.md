@@ -10,6 +10,8 @@ related-issues: []
 related-discussions: []
 ---
 
+> **Extract forms restated by [SEP-0017](0017-extract-object.md).** The rules below name the string extract forms; SEP-0017 restates them per `from` source (`dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`, `component`, `component.exists`) without changing them.
+
 ## Summary
 
 Add an optional `privacy: block | mask | unmask` field to `Component` entries. It declares

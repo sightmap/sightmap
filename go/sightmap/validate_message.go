@@ -79,32 +79,37 @@ func validateMessageProperty(msgName string, p MessagePropertyDef) []ValidationE
 		})
 	}
 
-	validSource := slices.Contains(MessagePropertySources, p.Source)
+	var done bool
+	if errs, done = checkSourcedShape(errs, msgName, p.Name, p.Extract); done {
+		return errs
+	}
+
+	validSource := slices.Contains(MessagePropertySources, p.Extract.From)
 	if !validSource {
 		errs = append(errs, ValidationError{
 			Component: msgName,
 			Code:      "message-property-source-invalid",
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("message %q property %q has source %q; must be one of %s",
-				msgName, p.Name, p.Source, strings.Join(MessagePropertySources, ", ")),
+			Message: fmt.Sprintf("message %q property %q reads from %q; must be one of %s",
+				msgName, p.Name, p.Extract.From, strings.Join(MessagePropertySources, ", ")),
 		})
 	}
 
-	// A stack source addresses a specific frame+attribute, so field is required —
+	// A stack source addresses a specific frame+attribute, so path is required:
 	// there is no meaningful bare-regex scan over a structured call stack (the
 	// same reasoning that requires field for a headers source in SEP-0005).
-	if validSource && p.Field == "" {
+	if validSource && p.Extract.Path == "" {
 		errs = append(errs, ValidationError{
 			Component: msgName,
 			Code:      "message-property-no-field",
 			Severity:  SeverityError,
-			Message: fmt.Sprintf("message %q property %q reads from %q but omits field; name a frame and attribute, e.g. field: top.file",
-				msgName, p.Name, p.Source),
+			Message: fmt.Sprintf("message %q property %q reads from %q but omits path; name a frame and attribute, e.g. path: top.file",
+				msgName, p.Name, p.Extract.From),
 		})
 	}
 
-	if p.Pattern != "" {
-		if _, err := regexp.Compile(p.Pattern); err != nil {
+	if p.Extract.Pattern != "" {
+		if _, err := compilePattern(p.Extract.Pattern); err != nil {
 			errs = append(errs, ValidationError{
 				Component: msgName,
 				Code:      "message-property-pattern-invalid",
