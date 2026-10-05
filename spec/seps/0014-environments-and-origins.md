@@ -4,7 +4,7 @@ title: Named environments and origins, referenced by views and requests
 author: Clint Ayres (@jurassix)
 status: Accepted
 created: 2026-09-08
-updated: 2026-09-29
+updated: 2026-10-05
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -382,6 +382,15 @@ anchoring request matchers.
 runs. `url:` implies neither, and a consumer MUST NOT derive an environment or origin from it: doing
 so would constrain every existing corpus that sets `url:`.
 
+A consumer that needs a host MAY fall back to the host of a view's `url:`, but **only for a corpus
+that declares no environments and no origins anywhere**. This keeps a corpus that predates both
+fields compiling as it did. Once a corpus declares either, every host comes from `origins`, so a
+view that resolves none is a gap to report rather than one to paper over with a host from another
+environment.
+
+A page host is a web concept: a native environment has none of its own, so a view that runs only in
+native environments needs no host and the fallback does not apply to it.
+
 ### Conformance
 
 - MUST accept `environments` and `origins` at the file root (definitions), and `environments` and
@@ -415,7 +424,8 @@ so would constrain every existing corpus that sets `url:`.
 - MUST intersect a view-scoped request's environments with its view's. MUST NOT inherit a view's
   `origins` into its view-scoped requests.
 - **MUST NOT treat `environments` or `origins` as an input to route matching.**
-- MUST NOT derive an environment or origin from `url:`.
+- MUST NOT derive an environment or origin from `url:`. MAY use a view's `url:` host when the
+  corpus declares no environments and no origins.
 - MUST NOT emit any diagnostic for a corpus that declares neither field anywhere.
 
 ### JSON Schema diff
