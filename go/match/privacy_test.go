@@ -39,6 +39,8 @@ components:
             extract: { from: dom.attr, path: data-plan }
           - name: hasSubmit
             extract: { from: component.exists, path: SubmitButton }
+          - name: initially_on
+            extract: { from: dom.attr, path: checked }
         children:
           - name: SubmitButton
             selector: button
@@ -82,7 +84,7 @@ func TestMatch_PrivacyWithholdsProperties(t *testing.T) {
 		Element: privEl("button", "", nil)}
 	total := &sightmap.ComponentNode{Id: "total", RawText: "$10.95", Element: privEl("div", "total", nil)}
 	form := &sightmap.ComponentNode{Id: "form", Name: "Checkout", Children: []*sightmap.ComponentNode{submit, total},
-		Element: privEl("form", "", map[string]string{"data-plan": "pro"})}
+		Element: privEl("form", "", map[string]string{"data-plan": "pro", "checked": "true"})}
 	summary := &sightmap.ComponentNode{Id: "summary", Children: []*sightmap.ComponentNode{cc, form},
 		Element: privEl("div", "summary", nil)}
 
@@ -93,16 +95,17 @@ func TestMatch_PrivacyWithholdsProperties(t *testing.T) {
 		prop string
 		want string // "" means withheld
 	}{
-		{cc, "value", ""},            // read from a blocked node
-		{summary, "card", ""},        // laundering out of a blocked descendant
-		{summary, "hasCard", ""},     // exists: on a blocked target
-		{summary, "total", "$10.95"}, // unmask carves the total out of the mask
-		{form, "label", ""},          // text under mask
-		{form, "plan", ""},           // attr= under mask
-		{form, "hasSubmit", "true"},  // exists: under mask reports structure
-		{submit, "off", "true"},      // state attribute under mask
-		{submit, "label", ""},        // raw_text under an inherited mask
-		{total, "amount", "$10.95"},  // unmask
+		{cc, "value", ""},              // read from a blocked node
+		{summary, "card", ""},          // laundering out of a blocked descendant
+		{summary, "hasCard", ""},       // exists: on a blocked target
+		{summary, "total", "$10.95"},   // unmask carves the total out of the mask
+		{form, "label", ""},            // text under mask
+		{form, "plan", ""},             // attr= under mask
+		{form, "hasSubmit", "true"},    // exists: under mask reports structure
+		{form, "initially_on", "true"}, // a state attribute name under mask
+		{submit, "off", "true"},        // state attribute under mask
+		{submit, "label", ""},          // raw_text under an inherited mask
+		{total, "amount", "$10.95"},    // unmask
 	}
 	for _, c := range cases {
 		got, ok := propVal(res[c.node], c.prop)

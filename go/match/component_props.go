@@ -1,6 +1,7 @@
 package match
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -63,10 +64,13 @@ func effectivePrivacy(
 // p must not be surfaced (SEP-0009, per SEP-0017). Content is withheld under
 // block and mask; mask still permits state. component and component.exists read
 // another node and are judged there instead.
-func withholds(p, source string) bool {
-	switch source {
-	case sightmap.FromDOMText, sightmap.FromDOMRawText, sightmap.FromDOMAttr:
+func withholds(p string, e sightmap.Extract) bool {
+	switch e.From {
+	case sightmap.FromDOMText, sightmap.FromDOMRawText:
 		return p == "block" || p == "mask"
+	case sightmap.FromDOMAttr:
+		// SEP-0009 retains the interactive-state attributes under mask.
+		return p == "block" || (p == "mask" && !slices.Contains(sightmap.StateNames, e.Path))
 	case sightmap.FromDOMState:
 		return p == "block"
 	}
@@ -86,7 +90,7 @@ func resolveExtract(
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
 	privacy map[*sightmap.ComponentNode]string,
 ) (string, bool) {
-	if withholds(privacy[node], e.From) {
+	if withholds(privacy[node], e) {
 		return "", false
 	}
 	switch e.From {
