@@ -238,6 +238,14 @@ function rawTextOf(el) {
   return s;
 }
 
+/**
+ * Collapse whitespace as the Go capture does for node text, so `pattern` sees
+ * the same string on both sides.
+ */
+function normalizeText(v) {
+  return v == null ? v : String(v).trim().replace(/\s+/g, " ");
+}
+
 /** Apply an extract's `pattern`: capture group 1 if present, else the match. */
 function refine(e, v) {
   if (v == null || v === "") return null;
@@ -268,9 +276,9 @@ function resolveExtract(el, extract, components, ownerAddress) {
   if (!e) return null;
   switch (e.from) {
     case "dom.text":
-      return refine(e, el.textContent);
+      return refine(e, normalizeText(el.textContent));
     case "dom.raw_text":
-      return refine(e, rawTextOf(el));
+      return refine(e, normalizeText(rawTextOf(el)));
     case "dom.attr":
       return refine(e, el.getAttribute(e.path));
     case "dom.state":

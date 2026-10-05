@@ -49,7 +49,7 @@ func checkComponentProperties(c *Corpus) []ValidationError {
 			if p.Extract.IsLegacy() {
 				errs = append(errs, legacyExtractWarning(comp.Name, p.Name, p.Extract))
 			}
-			if msg := privacyWithholds(comp.Privacy, p.Extract.From); msg != "" {
+			if msg := privacyWithholds(comp.Privacy, p.Extract); msg != "" {
 				errs = append(errs, ValidationError{
 					Component: comp.Name,
 					Code:      "extract-privacy-withheld",
@@ -132,11 +132,16 @@ func checkComponentExtract(e Extract) (code, msg string) {
 // that a capture consumer withholds a read from source (SEP-0009, per SEP-0017),
 // else "". A warning, not an error: a consumer that captures no content ignores
 // privacy and still resolves the value.
-func privacyWithholds(privacy, source string) string {
+func privacyWithholds(privacy string, e Extract) string {
 	const hint = "change the component's privacy to extract it"
-	switch source {
-	case FromDOMText, FromDOMRawText, FromDOMAttr:
+	switch e.From {
+	case FromDOMText, FromDOMRawText:
 		if privacy == "block" || privacy == "mask" {
+			return hint
+		}
+	case FromDOMAttr:
+		// SEP-0009 retains the interactive-state attributes under mask.
+		if privacy == "block" || (privacy == "mask" && !containsString(StateNames, e.Path)) {
 			return hint
 		}
 	case FromDOMState:

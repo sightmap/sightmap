@@ -1,6 +1,7 @@
 package sightmap
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -196,6 +197,67 @@ func (r rawExtract) sourced(source, field, pattern string) Extract {
 type PathSegment struct {
 	Name  string
 	Multi bool
+}
+
+// UnmarshalJSON reads the object form, and also a bare string: the component
+// extract shape written before SEP-0017, so a corpus exported by an older SDK
+// still decodes. The string is lowered as the loader lowers YAML.
+func (e *Extract) UnmarshalJSON(data []byte) error {
+	var legacy string
+	if err := json.Unmarshal(data, &legacy); err == nil {
+		*e = LowerComponentExtract(legacy)
+		return nil
+	}
+	type wire Extract
+	var w wire
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	*e = Extract(w)
+	e.joinSet = e.Join != ""
+	return nil
+}
+
+// sourcedJSON is a request or message property as either SDK wrote it: the
+// object form, or the source/field/pattern keys written before SEP-0017.
+type sourcedJSON struct {
+	Name    string   `json:"name"`
+	Extract *Extract `json:"extract"`
+	Source  string   `json:"source"`
+	Field   string   `json:"field"`
+	Pattern string   `json:"pattern"`
+}
+
+func (w sourcedJSON) lower() Extract {
+	if w.Extract != nil {
+		return *w.Extract
+	}
+	if w.Source == "" && w.Field == "" && w.Pattern == "" {
+		return Extract{}
+	}
+	return lowerSourceField(w.Source, w.Field, w.Pattern)
+}
+
+// UnmarshalJSON also accepts the source/field/pattern shape written before
+// SEP-0017.
+func (d *RequestPropertyDef) UnmarshalJSON(data []byte) error {
+	var w sourcedJSON
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	*d = RequestPropertyDef{Name: w.Name, Extract: w.lower()}
+	return nil
+}
+
+// UnmarshalJSON also accepts the source/field/pattern shape written before
+// SEP-0017.
+func (d *MessagePropertyDef) UnmarshalJSON(data []byte) error {
+	var w sourcedJSON
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+	*d = MessagePropertyDef{Name: w.Name, Extract: w.lower()}
+	return nil
 }
 
 // ParseComponentPath splits a component path into its segments. It does not

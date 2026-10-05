@@ -1,6 +1,7 @@
 package sightmap
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -92,5 +93,52 @@ requests:
 		if codes[code] != n {
 			t.Errorf("%s: got %d, want %d (all: %v)", code, codes[code], n, codes)
 		}
+	}
+}
+
+// A corpus exported before SEP-0017 still decodes: a string component extract,
+// and source/field/pattern on request and message properties.
+func TestExtract_DecodesPreObjectJSON(t *testing.T) {
+	old := `{
+	  "globals": [{"name": "Card", "selectors": [".card"], "properties": [
+	    {"name": "sku", "extract": "attr=data-sku"},
+	    {"name": "price", "extract": "Price.text"}
+	  ]}],
+	  "requests": [{"name": "Pay", "route": "/pay", "properties": [
+	    {"name": "outcome", "source": "rsp.body", "field": "status"}
+	  ]}],
+	  "messages": [{"name": "Boom", "properties": [
+	    {"name": "file", "source": "stack", "field": "top.file", "pattern": "([^/]+)$"}
+	  ]}]
+	}`
+	var c Corpus
+	if err := json.Unmarshal([]byte(old), &c); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	props := c.GlobalComponents[0].Properties
+	if e := props[0].Extract; e.From != FromDOMAttr || e.Path != "data-sku" {
+		t.Errorf("sku = %+v", e)
+	}
+	if e := props[1].Extract; e.From != FromComponent || e.Path != "Price.text" {
+		t.Errorf("price = %+v", e)
+	}
+	if e := c.Requests[0].Properties[0].Extract; e.From != FromRspBody || e.Path != "status" {
+		t.Errorf("request = %+v", e)
+	}
+	if e := c.Messages[0].Properties[0].Extract; e.From != FromStack || e.Path != "top.file" || e.Pattern != "([^/]+)$" {
+		t.Errorf("message = %+v", e)
+	}
+
+	// The current shape round-trips.
+	data, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var again Corpus
+	if err := json.Unmarshal(data, &again); err != nil {
+		t.Fatalf("round trip: %v", err)
+	}
+	if got := again.Requests[0].Properties[0].Extract.String(); got != c.Requests[0].Properties[0].Extract.String() {
+		t.Errorf("round trip changed the request extract: %s", got)
 	}
 }

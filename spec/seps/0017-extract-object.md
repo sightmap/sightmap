@@ -152,14 +152,19 @@ SEP-0009 governs extracted values, judged at the node a value is read from. Rest
 
 | `from` | Withheld when |
 |---|---|
-| `dom.text`, `dom.raw_text`, `dom.attr` | the node's effective privacy is `mask` or `block` |
+| `dom.text`, `dom.raw_text` | the node's effective privacy is `mask` or `block` |
+| `dom.attr` | `block`; or `mask`, unless `path` is `checked`, `selected`, `disabled` or `expanded` |
 | `dom.state` | the node's effective privacy is `block` |
 | `component` | the target's own property is withheld, judged at the target node |
 | `component.exists` | the target node's effective privacy is `block` |
 
-A property that reads `dom.text`, `dom.raw_text` or `dom.attr` from a component whose own `privacy`
-is `block` or `mask`, or `dom.state` from one whose own `privacy` is `block`, is withheld by every
-capture consumer. Validation warns (`extract-privacy-withheld`) rather than letting it fail silently
+SEP-0009 lets a consumer retain the four interactive-state attributes under `mask`, so a `dom.attr`
+read of one of those names resolves there, as `attr=` of the same name did; every other `dom.attr`
+read is withheld.
+
+A property is withheld by every capture consumer when it reads `dom.text` or `dom.raw_text` from a
+component whose own `privacy` is `block` or `mask`, `dom.attr` under the same rule as the table, or
+`dom.state` from one whose own `privacy` is `block`. Validation warns (`extract-privacy-withheld`) rather than letting it fail silently
 at runtime. It is a warning, not an error, because a consumer that captures no content ignores
 `privacy` (SEP-0009) and still resolves the value. The fix is to change the component's privacy, a
 field a privacy review reads, so relaxing privacy for the sake of an extraction stays visible.

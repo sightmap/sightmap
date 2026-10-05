@@ -65,6 +65,18 @@ describe("extractProperties", () => {
     expect(result).toEqual({});
   });
 
+  test("pattern sees whitespace-normalized text, matching the Go capture", () => {
+    document.body.innerHTML = '<span id="p">\n    $12.00\n  </span>';
+    const props = [{ name: "price", extract: { from: "dom.text", pattern: "^\\$([\\d.]+)$" } }];
+    expect(extractProperties(document.getElementById("p"), props, [])).toEqual({ price: "12.00" });
+  });
+
+  test("dom.state reports disabled=false on an enabled control", () => {
+    document.body.innerHTML = '<button id="b">Go</button>';
+    const props = [{ name: "off", extract: { from: "dom.state", path: "disabled" } }];
+    expect(extractProperties(document.getElementById("b"), props, [])).toEqual({ off: "false" });
+  });
+
   test("the extract object resolves every source with pattern and join", () => {
     document.body.innerHTML =
       '<div id="card" data-sku="A1">Add to cart · $10.95' +
