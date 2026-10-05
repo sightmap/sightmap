@@ -1,8 +1,13 @@
 package sightmap
 
 import (
+	"slices"
 	"strings"
 )
+
+// emptyElement stands in for a node with no Element, so matching a bare node
+// does not allocate. Matching only reads it.
+var emptyElement Element
 
 // MatchesNode reports whether a tree node satisfies rule, including the
 // relational pseudo-classes that need the node's subtree (:has()) or its
@@ -44,7 +49,7 @@ func matchesNodeChain(chain []*ComponentNode, i int, rule *SelectorPart) bool {
 	node := chain[i]
 	el := node.Element
 	if el == nil {
-		el = &Element{}
+		el = &emptyElement
 	}
 	// Flat identity: tag, id, classes, attributes.
 	if !matchesIdentity(el, rule) {
@@ -202,13 +207,12 @@ func matchesIdentity(el *Element, rule *SelectorPart) bool {
 		return false
 	}
 
-	// Class match: every class in rule.Classes must appear in el.Classes.
-	if len(rule.Classes) > 0 {
-		nodeClasses := sliceToSet(el.Classes)
-		for _, cls := range rule.Classes {
-			if !nodeClasses[cls] {
-				return false
-			}
+	// Class match: every class in rule.Classes must appear in el.Classes. A
+	// linear scan: elements carry a handful of classes, and this runs once per
+	// (node, candidate rule), so building a set here dominated matching.
+	for _, cls := range rule.Classes {
+		if !slices.Contains(el.Classes, cls) {
+			return false
 		}
 	}
 
@@ -221,13 +225,24 @@ func matchesIdentity(el *Element, rule *SelectorPart) bool {
 			}
 		}
 
-		nodeVal, present := effectiveAttrValue(el, key)
-		if !present {
+		if !el.HasAttr(key) {
 			// Attribute not present on node — only "[]" (presence-only) would
 			// logically not care, but absence means presence check fails too.
 			return false
 		}
 
+		if key == "class" && len(el.Classes) > 1 {
+			if _, inAttrs := el.Attrs["class"]; !inAttrs {
+				if matched, ok := classAttrMatches(op, el.Classes, ruleVal); ok {
+					if !matched {
+						return false
+					}
+					continue
+				}
+			}
+		}
+
+		nodeVal, _ := el.Attr(key)
 		if !attrMatches(op, nodeVal, ruleVal) {
 			return false
 		}
@@ -236,13 +251,13 @@ func matchesIdentity(el *Element, rule *SelectorPart) bool {
 	return true
 }
 
-// effectiveAttrValue resolves an attribute value on an observed Element for
-// matching. id and class live in dedicated fields (Id, Classes) — not always in
+// Attr resolves an attribute value on an observed Element the way selector
+// matching sees it. id and class live in dedicated fields (Id, Classes) — not always in
 // Attrs — so attribute selectors like [id^="issue_"] or [class*="card"] must see
 // them there to match offline the way the browser matches them live. Attrs is
 // consulted first (it wins when populated); id/class then fall back to their
 // dedicated fields. All other attributes come straight from Attrs.
-func effectiveAttrValue(el *Element, key string) (string, bool) {
+func (el *Element) Attr(key string) (string, bool) {
 	if v, ok := el.Attrs[key]; ok {
 		return v, true
 	}
@@ -252,11 +267,63 @@ func effectiveAttrValue(el *Element, key string) (string, bool) {
 			return el.Id, true
 		}
 	case "class":
-		if len(el.Classes) > 0 {
+		if len(el.Classes) == 1 {
+			return el.Classes[0], true
+		}
+		if len(el.Classes) > 1 {
 			return strings.Join(el.Classes, " "), true
 		}
 	}
 	return "", false
+}
+
+// HasAttr reports whether Attr would find key, without building its value.
+func (el *Element) HasAttr(key string) bool {
+	if _, ok := el.Attrs[key]; ok {
+		return true
+	}
+	switch key {
+	case "id":
+		return el.Id != ""
+	case "class":
+		return len(el.Classes) > 0
+	}
+	return false
+}
+
+// classAttrMatches evaluates a class attribute selector against classes as
+// attrMatches would against strings.Join(classes, " "), without the join: it
+// runs once per (element, candidate rule) and the join dominated matching
+// against corpora with [class*=...] selectors. When ruleVal has no space, a
+// match in the joined string cannot cross the separator, so each operator
+// reduces to a per-class check. ok is false when that reduction does not hold
+// (ruleVal empty or containing a space); the caller must join instead.
+func classAttrMatches(op string, classes []string, ruleVal string) (matched, ok bool) {
+	if ruleVal == "" || strings.IndexByte(ruleVal, ' ') >= 0 {
+		return false, false
+	}
+	switch op {
+	case "=":
+		// The joined value of two or more classes contains a space; ruleVal does not.
+		return len(classes) == 1 && classes[0] == ruleVal, true
+	case "[]":
+		return true, true
+	case "^=":
+		return strings.HasPrefix(classes[0], ruleVal), true
+	case "$=":
+		return strings.HasSuffix(classes[len(classes)-1], ruleVal), true
+	case "*=", "~=":
+		for _, c := range classes {
+			if attrMatches(op, c, ruleVal) {
+				return true, true
+			}
+		}
+		return false, true
+	case "|=":
+		return (len(classes) == 1 && classes[0] == ruleVal) || strings.HasPrefix(classes[0], ruleVal+"-"), true
+	default:
+		return false, true
+	}
 }
 
 // attrMatches returns whether a node attribute value satisfies the operator
@@ -302,16 +369,4 @@ func includesWord(s, word string) bool {
 		}
 	}
 	return false
-}
-
-// sliceToSet converts a string slice to a presence map.
-func sliceToSet(ss []string) map[string]bool {
-	if len(ss) == 0 {
-		return nil
-	}
-	m := make(map[string]bool, len(ss))
-	for _, s := range ss {
-		m[s] = true
-	}
-	return m
 }
