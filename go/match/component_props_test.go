@@ -356,3 +356,23 @@ func TestResolveDOMStatePrefersState(t *testing.T) {
 		t.Errorf("open = %q; want omitted (the node has no expanded state)", v)
 	}
 }
+
+// An enabled control reports disabled="false" once the probe's native state is
+// carried, even though the AX tree omits disabled for it. This is what keeps
+// dom.state identical between the Go matcher and the browser extension.
+func TestResolveDOMStateEnabledControl(t *testing.T) {
+	defs := []sightmap.ComponentDef{{
+		Name:       "Go",
+		Selectors:  []string{"button"},
+		Properties: []sightmap.ComponentPropertyDef{{Name: "off", Extract: sightmap.Extract{From: sightmap.FromDOMState, Path: "disabled"}}},
+	}}
+	btn := &sightmap.ComponentNode{
+		Id:      "b",
+		State:   map[string]string{"disabled": "false"}, // probe: native :disabled is false
+		Element: &sightmap.Element{Tag: "button"},
+	}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(btn, "")
+	if v, ok := propVal(res[btn], "off"); !ok || v != "false" {
+		t.Errorf("off = %q, %v; want \"false\"", v, ok)
+	}
+}
