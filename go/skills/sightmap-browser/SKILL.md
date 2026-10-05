@@ -90,8 +90,9 @@ brackets when not suppressed (an exact match with a property value).
 The `[View: …]` header may be followed by a `tags:` line: the union of tags
 across every view whose route matches the page. A component the corpus marks
 `privacy: block` or `mask` renders **without** its content properties or AX
-`value`. That is deliberate withholding, not a broken extract, so read such a
-control's state from a `dom.state` property (e.g. `checked`) instead of its text.
+`value`. That is deliberate withholding, not a broken extract. Under `mask`,
+read a control's state from a `dom.state` property (e.g. `checked`) instead of
+its text; under `block` nothing resolves.
 
 If the page has **0 interactive nodes**, coverage renders `∅` (not `✓`) and
 `snapshot` exits non-zero — the page is blank or still loading. Wait for it with
