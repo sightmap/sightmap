@@ -341,21 +341,26 @@ func markInteractive(c *Comp, set map[*Comp]bool) bool {
 // mergedProps builds the combined property map for a matched Comp node.
 // Sightmap-extracted properties (c.Match.Properties) take precedence.
 // If no "value" key is present and the AX Comp.Value is non-empty, it is
-// added as "value" (reserved-but-overridable built-in).
+// added as "value" (reserved-but-overridable built-in), unless the node's
+// effective privacy withholds its content: the AX value of a blocked or masked
+// node is exactly the content SEP-0009 refuses, and surfacing it here would
+// reintroduce the value the matcher just withheld.
 // Returns nil when there are no props and no AX value.
 func mergedProps(c *Comp) map[string]string {
 	var match []sightmap.PropertyValue
+	var privacy string
 	if c.Match != nil {
-		match = c.Match.Properties
+		match, privacy = c.Match.Properties, c.Match.Privacy
 	}
-	if len(match) == 0 && c.Value == "" {
+	withheld := privacy == "block" || privacy == "mask"
+	if len(match) == 0 && (c.Value == "" || withheld) {
 		return nil
 	}
 	props := make(map[string]string, len(match)+1)
 	for _, pv := range match {
 		props[pv.Name] = pv.Value
 	}
-	if _, hasValue := props["value"]; !hasValue && c.Value != "" {
+	if _, hasValue := props["value"]; !hasValue && c.Value != "" && !withheld {
 		props["value"] = c.Value
 	}
 	return props
