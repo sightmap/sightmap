@@ -90,6 +90,10 @@ type ViewDef struct {
 	// ViewForURL, which matches on the path alone.
 	Environments []string `json:"environments,omitempty"`
 	Origins      []string `json:"origins,omitempty"`
+	// Properties are named values read from the matched URL (SEP-0008). A :name
+	// segment in Route binds implicitly and needs no entry here; an entry names a
+	// query parameter or renames a bound segment.
+	Properties []URLPropertyDef `json:"properties,omitempty"`
 
 	// Authoring/tooling fields — kept out of the serialized wire form.
 	Stability  string     `json:"-"` // "" (default/active), "stub", or "deferred"
@@ -97,6 +101,14 @@ type ViewDef struct {
 	URL        string     `json:"-"` // Representative URL for this view
 	Snapshots  []Snapshot `json:"-"` // List of snapshots for this view
 	SourceFile string     `json:"-"` // Source YAML filename (without .yaml extension)
+}
+
+// URLPropertyDef is a named value a view reads from its matched URL (SEP-0008):
+// Extract.From is url.path (a segment bound by a :name in the view's route) or
+// url.query (a query-string parameter).
+type URLPropertyDef struct {
+	Name    string  `json:"name"`
+	Extract Extract `json:"extract"`
 }
 
 // ViewByName returns a pointer to the first View with the given name, or nil.

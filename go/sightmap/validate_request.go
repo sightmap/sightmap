@@ -24,6 +24,29 @@ var requestPropertyNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 // Requests are read from Corpus.Requests and each View.Requests directly rather
 // than through a whole-corpus accessor: those dedupe by first-seen name, which
 // would skip a view-scoped request whose name matches a global one.
+// checkRequestRouteBindings applies the SEP-0008 binding rules to request routes.
+// Unlike views, requests have reserved identity names a binding must not shadow.
+func checkRequestRouteBindings(c *Corpus) []ValidationError {
+	var errs []ValidationError
+	check := func(r RequestDef) {
+		errs = append(errs, checkRouteBindings(r.Name, r.Route, ReservedRequestPropertyNames)...)
+		props := make([]namedExtract, len(r.Properties))
+		for i, p := range r.Properties {
+			props[i] = namedExtract{p.Name, p.Extract}
+		}
+		errs = append(errs, checkBindingConflicts(r.Name, r.Route, props)...)
+	}
+	for _, r := range c.Requests {
+		check(r)
+	}
+	for _, v := range c.Views {
+		for _, r := range v.Requests {
+			check(r)
+		}
+	}
+	return errs
+}
+
 func checkRequestProperties(c *Corpus) []ValidationError {
 	var errs []ValidationError
 	seen := map[string]bool{}
@@ -31,7 +54,7 @@ func checkRequestProperties(c *Corpus) []ValidationError {
 	check := func(reqs []RequestDef) {
 		for _, req := range reqs {
 			for _, prop := range req.Properties {
-				for _, e := range validateRequestProperty(req.Name, prop) {
+				for _, e := range validateRequestProperty(req.Name, req.Route, prop) {
 					// Dedupe on code + request + property so a request declared
 					// both globally and under a view reports once.
 					key := e.Code + "\x00" + req.Name + "\x00" + prop.Name
@@ -52,7 +75,7 @@ func checkRequestProperties(c *Corpus) []ValidationError {
 	return errs
 }
 
-func validateRequestProperty(reqName string, prop RequestPropertyDef) []ValidationError {
+func validateRequestProperty(reqName, route string, prop RequestPropertyDef) []ValidationError {
 	var errs []ValidationError
 
 	if !requestPropertyNamePattern.MatchString(prop.Name) {
@@ -65,9 +88,41 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 		})
 	}
 
+	// A declared property shadows the reserved identity name, which is legal and
+	// is what SEP-0005's own motivating example does (`name: status` extracting
+	// `rsp.body.status`). It is worth a warning because the HTTP identity then
+	// becomes unreachable from a signal filter.
+	if slices.Contains(ReservedRequestPropertyNames, prop.Name) {
+		errs = append(errs, ValidationError{
+			Component: reqName,
+			Code:      "request-property-shadows-reserved",
+			Severity:  SeverityWarning,
+			Message: fmt.Sprintf("request %q declares a property named %q, shadowing the reserved request identity of the same name; a signal filtering on %q will see the extracted value, not the HTTP %s",
+				reqName, prop.Name, prop.Name, prop.Name),
+		})
+	}
+
+	// The deprecated source key never accepted a URL source, so url.query and
+	// url.path are reachable only through the extract object.
+	if prop.Extract.IsLegacy() && slices.Contains(URLExtractSources, prop.Extract.From) {
+		return append(errs, ValidationError{
+			Component: reqName,
+			Code:      "request-property-source-invalid",
+			Severity:  SeverityError,
+			Message: fmt.Sprintf("request %q property %q reads %s through the deprecated source key, which accepts only %s; write extract: %s",
+				reqName, prop.Name, prop.Extract.From, strings.Join(RequestPropertySources, ", "), prop.Extract),
+		})
+	}
+
 	var done bool
 	if errs, done = checkSourcedShape(errs, reqName, prop.Name, prop.Extract); done {
 		return errs
+	}
+
+	// A URL-shaped entry (SEP-0008) reads the request URL, so none of the payload
+	// checks below apply.
+	if slices.Contains(URLExtractSources, prop.Extract.From) {
+		return append(errs, validateURLExtract(reqName, prop.Name, prop.Extract, route)...)
 	}
 
 	// from is required and closed. path+pattern compose, so both together is
@@ -79,7 +134,7 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 			Code:      "request-property-source-invalid",
 			Severity:  SeverityError,
 			Message: fmt.Sprintf("request %q property %q reads from %q; must be one of %s",
-				reqName, prop.Name, prop.Extract.From, strings.Join(RequestPropertySources, ", ")),
+				reqName, prop.Name, prop.Extract.From, strings.Join(append(RequestPropertySources, URLExtractSources...), ", ")),
 		})
 	}
 
@@ -119,20 +174,6 @@ func validateRequestProperty(reqName string, prop RequestPropertyDef) []Validati
 					reqName, prop.Name, err),
 			})
 		}
-	}
-
-	// A declared property shadows the reserved identity name, which is legal and
-	// is what SEP-0005's own motivating example does (`name: status` extracting
-	// `rsp.body.status`). It is worth a warning because the HTTP identity then
-	// becomes unreachable from a signal filter.
-	if slices.Contains(ReservedRequestPropertyNames, prop.Name) {
-		errs = append(errs, ValidationError{
-			Component: reqName,
-			Code:      "request-property-shadows-reserved",
-			Severity:  SeverityWarning,
-			Message: fmt.Sprintf("request %q declares a property named %q, shadowing the reserved request identity of the same name; a signal filtering on %q will see the extracted value, not the HTTP %s",
-				reqName, prop.Name, prop.Name, prop.Name),
-		})
 	}
 
 	return errs

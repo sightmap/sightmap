@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": false,
+        "diagnostics": [
+          { "code": "route-binding-conflict", "severity": "error" },
+          { "code": "route-binding-conflict", "severity": "error" }
+        ]
+      }
+    }
+  ]
+}

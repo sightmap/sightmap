@@ -58,6 +58,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 020 | `message-properties` | `properties:` on a message validates via `source: stack` with a `<frame>.<attribute>` `field` and an optional `pattern` ([SEP-0006](../seps/0006-message-entity.md)) |
 | 021 | `component-privacy` | `privacy:` validates on components at every nesting depth, global and view-scoped, with `block`/`mask`/`unmask` nested under one another ([SEP-0009](../seps/0009-component-privacy.md)) |
 | 022 | `component-watch` | `watch:` validates on components at every nesting depth, global and view-scoped, including an explicit `false` ([SEP-0015](../seps/0015-component-watch.md)) |
+| 023 | `url-properties` | `:name` route segments bind on views and requests with no `properties:` entry; `from: url.query`/`url.path` validates on both, and a request carries URL and payload sources side by side ([SEP-0008](../seps/0008-url-properties.md)) |
 | 024 | `message-tags-ambiguity` | Tags resolve as a union across every matching `messages:` entry even where identity is ambiguous, so `message-conflict` warns while the tag union still holds ([SEP-0016](../seps/0016-message-and-signal-tags.md)) |
 | 025 | `environments-and-origins` | File-root `environments` (web with literal and pattern origins, native with `app_id`/`build_type`/`backend`, `platform` defaulted) and shared `origins`, referenced across files by views and requests; two web environments sharing an API host warns with `origin-host-shared` ([SEP-0014](../seps/0014-environments-and-origins.md)) |
 | 026 | `environment-refs-unresolved` | A view or request (global or view-scoped) naming an undefined environment → `environment-ref-unresolved`; an origin defined nowhere → `origin-ref-unresolved` ([SEP-0014](../seps/0014-environments-and-origins.md)) |
@@ -65,6 +66,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 028 | `environment-registry-warnings` | First-by-path wins across files (`environment-name-collision`, `origin-name-collision`), `environment-duplicate`, `origin-environment-gap`, and explicit empty reference lists (`environments-empty`, `origins-empty`) ([SEP-0014](../seps/0014-environments-and-origins.md)) |
 | 029 | `extract-legacy-forms` | Every deprecated string extract form (component `text`/`raw_text`/`attr=`/`PATH.prop`/`exists:`, request and message `source`/`field`) loads lowered to its object equivalent and warns `extract-legacy-form` ([SEP-0017](../seps/0017-extract-object.md)) |
 | 030 | `extract-object` | The `extract` object on components (every `dom.*` source, a `Name[]` path with `join`, `component.exists`, `pattern` on a component read), requests and messages validates clean ([SEP-0017](../seps/0017-extract-object.md)) |
+| 031 | `route-binding-conflict` | A property named like a `:name` binding the view or request still produces → `route-binding-conflict`, whatever its source; a `url.path` entry renames its segment and frees the name ([SEP-0008](../seps/0008-url-properties.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

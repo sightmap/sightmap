@@ -1,0 +1,25 @@
+version: 1
+# Every name an entity produces must be unique (SEP-0008). A url.path entry
+# renames its segment, freeing the bound name; a property named like a binding
+# the entity still produces is route-binding-conflict.
+views:
+  - name: OrgSettings
+    route: /org/:org_id/settings
+    properties:
+      - name: org_id                              # conflict: org_id is still bound
+        extract: { from: url.query, path: org }
+  - name: TenantSettings
+    route: /tenant/:org_id/settings
+    properties:
+      - name: tenant                              # renames the binding
+        extract: { from: url.path, path: org_id }
+      - name: org_id                              # so this is free
+        extract: { from: url.query, path: org }
+
+requests:
+  - name: GetOrder
+    route: /api/orders/:order_id
+    method: GET
+    properties:
+      - name: order_id                            # conflict, whatever the source
+        extract: { from: rsp.body, path: id }

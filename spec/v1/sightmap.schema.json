@@ -182,6 +182,11 @@
           "items": { "type": "string", "minLength": 1 },
           "description": "Open-vocabulary classification labels for this view. Resolved as a union across every view whose route matches the URL, not just the most-specific-wins view that supplies the active view identity. See SEP-0004."
         },
+        "properties": {
+          "type": "array",
+          "description": "Named values read from the matched URL. A :name segment in the route binds implicitly and needs no entry here; an entry names a query parameter or renames a bound segment. See SEP-0008.",
+          "items": { "$ref": "#/$defs/urlProperty" }
+        },
         "components": {
           "type": "array",
           "description": "View-scoped components. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",
@@ -421,7 +426,42 @@
         "properties": {
           "type": "array",
           "items": { "$ref": "#/$defs/requestProperty" },
-          "description": "Ordered list of live-traffic value extractions, for a consumer to filter or reason about. See SEP-0005."
+          "description": "Ordered list of value extractions, from the request URL (SEP-0008) or a body or header block (SEP-0005)."
+        }
+      }
+    },
+    "urlProperty": {
+      "type": "object",
+      "description": "A named value a view reads from its matched URL: a bound route segment or a query-string parameter. See SEP-0008 and SEP-0017.",
+      "required": ["name", "extract"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Key a consumer refers to this value by. Must not equal a :name binding the entity still produces; an entry reading from: url.path renames that binding instead."
+        },
+        "extract": {
+          "$ref": "#/$defs/urlExtract"
+        }
+      }
+    },
+    "urlExtract": {
+      "description": "An extract directive reading the matched URL: url.path names a :name bound by the entity's own route; url.query names a query-string parameter, matched case-sensitively, first occurrence, percent-decoded. See SEP-0008 and SEP-0017.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/extract"
+        },
+        {
+          "not": {
+            "required": ["join"]
+          }
+        }
+      ],
+      "required": ["path"],
+      "properties": {
+        "from": {
+          "enum": ["url.query", "url.path"]
         }
       }
     },
@@ -502,7 +542,7 @@
       }
     },
     "requestExtract": {
-      "description": "An extract directive on a request property. See SEP-0005 and SEP-0017.",
+      "description": "An extract directive on a request property: a body or header block (SEP-0005) or the request URL (SEP-0008). See SEP-0017.",
       "allOf": [
         {
           "$ref": "#/$defs/extract"
@@ -526,7 +566,7 @@
           "if": {
             "properties": {
               "from": {
-                "enum": ["req.headers", "rsp.headers"]
+                "enum": ["req.headers", "rsp.headers", "url.query", "url.path"]
               }
             }
           },
@@ -537,7 +577,7 @@
       ],
       "properties": {
         "from": {
-          "enum": ["req.body", "rsp.body", "req.headers", "rsp.headers"]
+          "enum": ["req.body", "rsp.body", "req.headers", "rsp.headers", "url.query", "url.path"]
         }
       }
     },

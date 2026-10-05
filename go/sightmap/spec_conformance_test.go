@@ -55,6 +55,11 @@ func TestSpecConformance_ExtractFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-extract-*.fixture")
 }
 
+func TestSpecConformance_URLPropertyFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-url-properties.fixture")
+	runSpecValidateFixtures(t, "*-route-binding-conflict.fixture")
+}
+
 func runSpecValidateFixtures(t *testing.T, glob string) {
 	t.Helper()
 	const root = "../../spec/conformance"
