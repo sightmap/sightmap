@@ -905,3 +905,42 @@ func TestQuoteName_EscapesBackslash(t *testing.T) {
 		t.Errorf("expected escaped backslash, got %q", got)
 	}
 }
+
+// The AX value of a blocked or masked node is exactly the content SEP-0009
+// refuses, so it must not stand in for a withheld `value` property.
+func TestMergedProps_PrivacyWithholdsTheAXValueFallback(t *testing.T) {
+	for _, tc := range []struct {
+		privacy string
+		want    string // "" means no value key at all
+	}{
+		{"", "4111"},
+		{"unmask", "4111"},
+		{"mask", ""},
+		{"block", ""},
+	} {
+		c := &Comp{Value: "4111", Match: &sightmap.ComponentMatch{Name: "CardNumberInput", Privacy: tc.privacy}}
+		got := mergedProps(c)
+		if tc.want == "" {
+			if _, ok := got["value"]; ok {
+				t.Errorf("privacy %q: value surfaced as %q, want withheld", tc.privacy, got["value"])
+			}
+			continue
+		}
+		if got["value"] != tc.want {
+			t.Errorf("privacy %q: value = %q, want %q", tc.privacy, got["value"], tc.want)
+		}
+	}
+
+	// A declared property still renders; only the AX fallback is withheld.
+	c := &Comp{Value: "4111", Match: &sightmap.ComponentMatch{
+		Name: "Optin", Privacy: "mask",
+		Properties: []sightmap.PropertyValue{{Name: "checked", Value: "false"}},
+	}}
+	got := mergedProps(c)
+	if got["checked"] != "false" {
+		t.Errorf("checked = %q, want false", got["checked"])
+	}
+	if _, ok := got["value"]; ok {
+		t.Errorf("value should stay withheld alongside a surfaced property")
+	}
+}
