@@ -19,7 +19,7 @@ This document is the human-readable reference. The machine-readable contract is 
 - Every `*.yaml` and `*.yml` file under `.sightmap/` is discovered recursively.
 - All files are loaded and merged at load time. The directory layout is a convenience for authors; it has no semantic meaning.
 - Every file must begin with `version: 1`.
-- Merging is shallow-append per top-level collection (`views`, `components`, `requests`). Two files may define the same view; the runtime behavior in that case is implementation-defined and SDKs SHOULD emit a warning.
+- Merging is shallow-append per top-level collection (`views`, `components`, `requests`, `messages`, `signals`). Two files may define the same view; the runtime behavior in that case is implementation-defined and SDKs SHOULD emit a warning. `environments` and `origins` merge into project-wide registries instead (see [Registries and references](#registries-and-references)).
 
 ## File root
 
@@ -32,6 +32,7 @@ views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
 requests:    # optional, Request[] — global, matched on every view
 messages:    # optional, Message[] — console/exception patterns
+signals:     # optional, Signal[] — named state predicates (see "Signal")
 ```
 
 | Field | Type | Required | Description |
@@ -44,6 +45,7 @@ messages:    # optional, Message[] — console/exception patterns
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
 | `requests` | [Request](#request)[] | no | **Global** requests — matched against every view. |
 | `messages` | [Message](#message)[] | no | Console-output and exception patterns. Corpus-root only; there is no view-scoped form. |
+| `signals` | [Signal](#signal)[] | no | Named state predicates over a component or view. Corpus-root only. |
 
 ## View
 
@@ -288,7 +290,7 @@ Extraction requires **live traffic**. A tool operating on static corpus definiti
 
 `status`, `method`, and `duration` are **reserved identity names**, addressing the request's own already-structured HTTP identity. They sit outside `extract` entirely — a consumer may reference them wherever a property name is expected with no `properties:` declaration at all. Declaring a property under one of those names is legal and shadows the identity: the name then resolves to the extracted value, and the HTTP identity becomes unreachable. The reference CLI warns (`request-property-shadows-reserved`). Prefer a distinct name such as `outcome` unless shadowing is what you want.
 
-A request property entry is one of two shapes, and a request may carry both side by side: a **URL-shaped** entry (`name` + `extract`) reads the request URL, described under [URL properties](#url-properties); a **payload-shaped** entry (`name` + `source` + `field`/`pattern`) reads a body or header block, described above. One entry cannot mix the two.
+A request property reads either the request URL (`from: url.query` or `url.path`, described under [URL properties](#url-properties)) or a body or header block (the sources above). Both use the same `name` + `extract` entry, so a request may carry URL-shaped and payload-shaped properties side by side.
 
 `properties:` and `request:`/`response:` (Payload) answer different questions: `Payload.fields[]` documents expected shape for a reader and is not enforced; `properties:` names a value to extract from live traffic. The two lists are independent. See [SEP-0005](https://github.com/sightmap/sightmap/blob/main/spec/seps/0005-request-properties.md).
 
@@ -787,6 +789,7 @@ Repeat reports SHOULD be collapsed: an element that leaves and re-enters the vie
 `watch` and [`privacy`](#privacy) are independent and compose without special rules: a component may be watched and blocked at once, reporting that it appeared while retaining none of its content.
 
 See [SEP-0015](https://github.com/sightmap/sightmap/blob/main/spec/seps/0015-component-watch.md).
+
 ## Privacy
 
 A component may declare `privacy`, stating whether a capture consumer — anything that records the page for later replay or analysis — may retain the matched element's content.

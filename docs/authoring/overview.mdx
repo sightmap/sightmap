@@ -138,6 +138,19 @@ The matrix shows which components appear in each view. Move a component to the r
 
 See [Coverage](/cli/coverage) for capture requirements and the full cross-view report.
 
+## Add what names alone don't say
+
+Once a page is covered, a few optional fields carry more than identity. Add them where a consumer needs them, one component at a time:
+
+- **[`properties`](/spec/components#properties)** read a value off each instance (a card's title, a toggle's `checked` state) so `ProductCard[title^="Weber"]` resolves to exactly one.
+- **[`privacy`](/spec/components#privacy)** tells capture tools what not to retain: `mask` on a form, `block` on a card number, `unmask` on the one field that is safe.
+- **[`watch: true`](/spec/components#watch)** asks capture tools to report when a component appears, for empty states, errors, and promotions nobody clicks.
+- **[`tags`](/reference/schema#tags)** classify views, components, requests, and messages across names, such as `defect`.
+- **[URL properties](/spec/views#url-properties)** name the IDs in a route (`/orders/:order_id`) and the query values that matter.
+- **[Environments and origins](/spec/environments)** say which deploy targets and hosts a view or request runs on.
+
+`sightmap validate` checks each of these, and warns `extract-legacy-form` on any property still written in the pre-0.34 string form.
+
 ## Validate and maintain the corpus
 
 Run the structural and style checks before committing:

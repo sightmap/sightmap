@@ -1,0 +1,76 @@
+---
+title: "Sightmap Messages and Signals: Console Patterns and Named Predicates"
+sidebarTitle: "Messages and signals"
+description: "Name console output and exceptions, extract values from a stack, and define named boolean predicates over components and views."
+---
+
+`messages` does for console activity what `requests` does for network activity: it gives a console line or an uncaught exception a name the rest of the corpus can point at. `signals` names a boolean about the page's current state. Both live at the file root only; neither has a view-scoped form.
+
+## Messages
+
+```yaml
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+    description: The cart was mutated by another tab; checkout will fail.
+    source: src/cart/sync.ts
+    tags: [defect]
+
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    message: 'Cannot read propert(y|ies) .* of (null|undefined)'
+```
+
+A record matches when every declared constraint holds. `level` is an exact, case-insensitive match against the record's level, and `message` is an [RE2](/reference/schema#regular-expressions) regex against its text. Either one is match-any when omitted.
+
+The reference capture emits `log`, `debug`, `info`, `warn`, `error`, and `exception`. **An uncaught exception or unhandled rejection arrives as `exception`, not `error`**, so a corpus that wants exceptions must say `level: EXCEPTION`. The level vocabulary is open, so a typo such as `WARNING` matches nothing rather than being rejected.
+
+### Ambiguity
+
+When a live record matches more than one entry, a consumer must report the ambiguity instead of picking the first match. `sightmap validate` warns `message-conflict` when two entries can match the same record and that is statically decidable: the same `level` (or one omitting it) with an identical or absent `message`.
+
+### Stack properties
+
+`properties` extracts values from an exception's stack, using the same `extract` object as components and requests. The only source is `stack`, and `path` is required: `<frame>.<attribute>`, where the frame is `top` (an alias for `0`) or an index, and the attribute is `function`, `file`, `line`, or `column`.
+
+```yaml
+messages:
+  - name: UncaughtCheckoutError
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        extract: { from: stack, path: top.file }
+      - name: caller_base
+        extract: { from: stack, path: 1.file, pattern: '([^/]+)$' }
+```
+
+A property that doesn't resolve (no stack, a frame out of range, no pattern match) is absent, never an error.
+
+## Signals
+
+A signal names an existing component or view with `ref` and stands for the boolean of its *current* state: a component being present, or a view's route being active.
+
+```yaml
+signals:
+  - name: checkout.reached
+    ref: Checkout           # a view: its route is active
+  - name: upsell.present
+    ref: UpsellModal        # a component: it currently matches
+    tags: [interstitial]
+```
+
+`ref` must resolve to exactly one entity. A name that matches nothing is `signal-ref-unresolved`, and one that matches both a component and a view is `signal-ref-ambiguous`. Signal names must be unique across the corpus. This is a subset of [SEP-0007](https://github.com/sightmap/sightmap/blob/main/spec/seps/0007-signals.md): request and message refs, and windows over time, are not part of it.
+
+## Tags
+
+Messages and signals both carry `tags`:
+
+- A record's message tags are the **union across every matching entry**. The classification survives an ambiguity that the name does not: a consumer that can't say *which* message a record is can still say it is tagged `defect`.
+- A signal's tags are its own unioned with the resolved tags of the entity its `ref` names.
+
+See [Tags](/reference/schema#tags) and [SEP-0016](https://github.com/sightmap/sightmap/blob/main/spec/seps/0016-message-and-signal-tags.md).
+
+## Next
+
+[Memory](/spec/memory) covers the notes agents read at runtime. The full field list is in the [schema reference](/reference/schema#message).

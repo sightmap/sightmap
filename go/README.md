@@ -155,9 +155,9 @@ selector matching, and browser-side component extraction. Its goals:
 
 | Package | Description |
 |---|---|
-| `comps/` | `ComponentNode`, `SelectorPart`, `Bounds` types and tree operations |
-| `sel/` | CSS selector string parsing and single-node `SelectorPart` matching |
-| `match/` | NFA sightmap rule matching against component trees |
+| `sightmap/` | The spec model: corpus loading and validation, `ComponentNode`/`Element`/`SelectorPart`/`Bounds` and tree operations, match result types, and selector parsing and single-node matching |
+| `match/` | NFA sightmap rule matching against component trees (`NewMatcher`) |
+| `compquery/` | The component-query DSL (`ProductCard[name^="Weber"]`) |
 | `extract/` | A11Y merge and tree-build logic (no browser dependency) |
 | `browser/` | Thin `Page` interface and direct-CDP adapter |
 | `probe/` | Canonical `cdp-probe.js` (embedded; downstream consumers import from here) |

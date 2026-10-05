@@ -36,9 +36,9 @@ sightmap browser: query FulfillmentTileButton is ambiguous: 2 components match. 
   #1  id=118  FulfillmentTileButton label="Delivery"
 ```
 
-<Warning>
-Property predicates depend on `properties:` extraction. The Go CLI implements `properties:`, but it is a draft extension rather than part of Sightmap spec v1. A component without properties can be addressed only by name or `#N` index.
-</Warning>
+<Note>
+Property predicates filter on the component's declared [`properties:`](/spec/components#properties). A component without properties can be addressed only by name or `#N` index, and a property withheld by [`privacy`](/spec/components#privacy) is absent, so a predicate on it matches nothing.
+</Note>
 
 ---
 

@@ -1,0 +1,114 @@
+---
+title: "Sightmap Environments and Origins: Deploy Targets and Hosts"
+sidebarTitle: "Environments"
+description: "Name your deploy targets and the hosts each one serves, then say which views and requests run where."
+---
+
+A corpus can say *where* its views and requests run, not only what they are. A file-root `environments` array names **deploy targets** (`staging`, `prod`, `android-beta`), and a file-root `origins` map names **shared origins**: hosts that are the same in every deploy target, such as a tracking pixel or a vendor API. Views and requests then reference both by name.
+
+```yaml .sightmap/environments.yaml
+version: 1
+
+environments:
+  - name: android-prod
+    platform: android
+    app_id: com.acme.app
+    build_type: release
+    backend: prod
+  - name: preview
+    origins:
+      api: https://api.staging.acme.com
+      app: https://deploy-preview-*--acme.netlify.app
+  - name: prod
+    origins:
+      api: https://api.acme.com
+      app: https://app.acme.com
+  - name: staging
+    origins:
+      api: https://api.staging.acme.com
+      app: https://app.staging.acme.com
+
+origins:
+  facebook: https://www.facebook.com
+
+views:
+  - name: OrderHistory
+    route: /orders/history
+    environments: [preview, prod, staging]
+    origins: [app]
+    requests:
+      - name: ListOrders
+        route: /orders
+        method: GET
+        origins: [api]
+      - name: FacebookPixel
+        route: /tr
+        method: GET
+        origins: [facebook]
+```
+
+An environment answers "which deploy target." An origin answers "which host." A **surface** such as `app` or `api` is one name, and each environment says what that surface's URL is there.
+
+## Environments
+
+A **web** environment (`platform` absent or `web`) is identified by its `origins` map, which it must define. It must not set `app_id`, `build_type`, or `backend`.
+
+A **native** environment (`platform: ios` or `android`) is identified by its `app_id` (bundle ID or application ID) and an optional `build_type`. It has no page hosts of its own, and borrows a web environment's origins through `backend`. Its own `origins` entries, if any, override the backend's. `backend` must name a web environment, so backends never chain.
+
+| Field | Applies to | Required |
+|---|---|---|
+| `name` | all | yes. Matches `^[a-z][a-z0-9_-]*$`. |
+| `platform` | all | no, default `web` |
+| `origins` | all | web: yes; native: no |
+| `app_id` | native | yes |
+| `build_type` | native | no |
+| `backend` | native | no |
+
+## Origin URLs
+
+An origin URL is `scheme://host[:port]`, `http` or `https`, with no path, query, or fragment. It can be a **pattern**, so preview deploys and local dev servers belong to an environment without being listed one by one. Wildcards are allowed in three places only:
+
+- `*` inside the leftmost host label: `https://deploy-preview-*--acme.netlify.app`
+- `**` as the whole leftmost label, matching one or more labels: `https://**.acme.com`
+- `*` as the port: `http://localhost:*`
+
+A host pattern never matches its own bare suffix: `https://*.acme.com` does not match `https://acme.com`. A pattern is something to match against, not an address to navigate to.
+
+## Referencing them
+
+Views and requests list environment and origin **names**:
+
+- **Absent or empty means unconstrained.** No `environments` means every environment. `[]` means the same as omitting the list, and `sightmap validate` warns about it.
+- **View-scoped requests** exist only where their view exists: their environments are intersected with the view's. Their `origins` are **not** inherited, because a page and the endpoints it calls usually live on different hosts.
+- **An origin name resolves per environment**: the environment's own `origins` first, then (for a native environment) its backend's, then the shared map.
+
+Both registries are project-wide. When two files define the same environment or shared-origin name, the first by source-file path wins and `validate` warns.
+
+## Not a matching input
+
+Environments and origins are data about an entity. They never change route matching: a URL outside an entity's origins still matches its route, and adding a list to an existing view changes nothing about what it matches. Consumers use them to pick a publish target, compile host-scoped definitions per environment, or anchor request matchers.
+
+`url:` stays separate. It is one concrete address a tool can navigate to, and a consumer must not derive an environment or origin from it. A consumer that needs a host may fall back to a view's `url:` host, but only when the corpus declares no environments and no origins at all.
+
+## Diagnostics
+
+`sightmap validate` checks the definitions and every reference:
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `environment-invalid` | error | An environment breaks the web/native shape rules, or has an invalid `name` or `platform` |
+| `origin-invalid` | error | An origin name or URL breaks the grammar above, including a port above 65535 |
+| `environment-backend-invalid` | error | `backend` names no environment, or a native one |
+| `environment-ref-unresolved` | error | A view or request names an undefined environment |
+| `origin-ref-unresolved` | error | A view or request names an origin no environment or shared map defines |
+| `environment-name-collision`, `origin-name-collision` | warning | Two files define the same name; the first by path wins |
+| `origin-environment-gap` | warning | An origin name resolves in some web environments but not others |
+| `origin-host-shared` | warning | Two web environments define the same host; it belongs in the shared map |
+| `environment-duplicate` | warning | Two native environments share `platform`, `app_id`, and `build_type` |
+| `environments-empty`, `origins-empty` | warning | An explicit empty list, which means the same as omitting it |
+
+A corpus that declares neither field produces none of these. Session membership, the rules for assigning a live session to an environment, is in the [schema reference](/reference/schema#session-membership). See also [SEP-0014](https://github.com/sightmap/sightmap/blob/main/spec/seps/0014-environments-and-origins.md).
+
+## Next
+
+[Messages and signals](/spec/messages) covers console patterns and named predicates. [Memory](/spec/memory) covers notes for agents.

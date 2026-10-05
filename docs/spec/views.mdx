@@ -23,7 +23,7 @@ views:
         method: POST
 ```
 
-`name` and `route` are required. `url` gives the view a representative URL — a concrete address that resolves to it — which tooling uses to navigate to the view (coverage reporting, bulk capture, and probing); a file-level `url` supplies a default for views that omit their own. `description` records the view's purpose, and `source` links it to a source file. See [Schema reference](/reference/schema#view) for every field.
+`name` and `route` are required. `url` gives the view a representative URL — a concrete address that resolves to it — which tooling uses to navigate to the view (coverage reporting, bulk capture, and probing); a file-level `url` supplies a default for views that omit their own. `description` records the view's purpose, and `source` links it to a source file. `properties`, `tags`, `environments`, and `origins` are covered below. See [Schema reference](/reference/schema#view) for every field.
 
 ## Route matching
 
@@ -90,6 +90,39 @@ views:
 View names should be unique across the sightmap. Runtime behavior is implementation-defined when two files define the same view name. Conforming implementations SHOULD emit a warning.
 </Warning>
 
+## URL properties
+
+A `:name` segment in a view route **binds** that segment's value as a property, with no declaration needed. An optional `properties` list names query-string values, or renames a bound segment, using the same `extract` object components use:
+
+```yaml
+views:
+  - name: ProductDetail
+    route: /shop/p/:product_id        # binds product_id
+    properties:
+      - name: variant
+        extract: { from: url.query, path: variant }
+```
+
+On `/shop/p/12345?variant=blue` the view carries `product_id="12345"` and `variant="blue"`. Values are percent-decoded, query keys are case-sensitive, and a repeated key resolves to its first occurrence. An `extract: { from: url.path, path: product_id }` entry renames the binding, and the original `product_id` name is no longer produced.
+
+Binding changes what `:param` produces, never what it matches: the route scores and matches exactly as before. URL properties read only the URL string, so they resolve offline, from a saved session or a coverage report.
+
+A binding name must match `^[a-z][a-z0-9_]*$`. A segment like `:orgId` still matches but binds nothing, and `sightmap validate` warns `route-param-unbound`. A declared property that reuses a name the route still binds is an error (`route-binding-conflict`).
+
+<Note>
+Naming a URL part asks a consumer that scrubs URLs to keep it, but it is not a privacy grant. A consumer must not retain a value its own policy, or the corpus's [`privacy`](/spec/components#privacy), would withhold.
+</Note>
+
+See the [schema reference](/reference/schema#url-properties) and [SEP-0008](https://github.com/sightmap/sightmap/blob/main/spec/seps/0008-url-properties.md).
+
+## Tags
+
+A view's `tags` resolve as a union across **every** view whose route matches the URL, not only the most specific one. A broad `/checkout/**` view tagged `defect` therefore tags `/checkout/payment` too, even when a narrower, untagged view wins identity there. `sightmap snapshot` prints the resolved set on a `tags:` line under the view header. See [Tags](/reference/schema#tags).
+
+## Environments and origins
+
+`environments` and `origins` on a view name the deploy targets it exists in and the hosts it is served from. They are declarative metadata and never change which URLs the route matches. See [Environments and origins](/spec/environments).
+
 ## Next
 
-[Components](/spec/components) covers selector strings, arrays, and nesting rules. [Requests](/spec/requests) covers method filters and route normalization.
+[Components](/spec/components) covers selector strings, arrays, and nesting rules. [Requests](/spec/requests) covers method filters, route normalization, and request properties. [Environments and origins](/spec/environments) covers deploy targets and hosts.

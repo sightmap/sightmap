@@ -21,7 +21,7 @@ The `command` values in `expected.json` (`match`, `explain`, `fmt`, `validate`, 
 
 ## Runtime-semantics fixtures (`0NN`)
 
-The `0NN` series covers loading, route matching, and diagnostics:
+The `0NN` series covers loading, route matching, field validation, and diagnostics:
 
 | # | Name | Exercises |
 |---|---|---|
@@ -35,6 +35,25 @@ The `0NN` series covers loading, route matching, and diagnostics:
 | 010 | `component-ref` | `$ref` expansion, view attestation, global+view dedup (SEP-0002) |
 | 011 | `component-ref-unresolved` | `$ref` to an unknown component → `ref-unresolved` error |
 | 012 | `component-ref-circular` | Self-referential `$ref` chain → `ref-circular` error |
+| 013 | `route-trailing-slash` | Trailing slashes on the URL path are normalized away before matching |
+| 014 | `component-properties` | `properties:` with the tree-closed `extract` object (`dom.text`, `component` `PATH.prop`, `component.exists`) validates ([SEP-0010](https://github.com/sightmap/sightmap/blob/main/spec/seps/0010-tree-closed-component-properties.md), [SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-extract-object.md)) |
+| 015 | `view-url` | `url:` on a view (and a file-level default) validates |
+| 016 | `stability-tooling-fields` | `stability:` (view + component) validates; reserved tooling fields `access:`/`snapshots:` are permitted |
+| 017 | `tags` | `tags:` validates on components (at multiple nesting levels), requests, views, messages, and signals ([SEP-0004](https://github.com/sightmap/sightmap/blob/main/spec/seps/0004-component-tags.md), [SEP-0016](https://github.com/sightmap/sightmap/blob/main/spec/seps/0016-message-and-signal-tags.md)) |
+| 018 | `request-properties` | `properties:` on a request validates via `extract` (body and header `path`s, and `pattern`); declaring a reserved identity name warns with `request-property-shadows-reserved` ([SEP-0005](https://github.com/sightmap/sightmap/blob/main/spec/seps/0005-request-properties.md)) |
+| 019 | `messages` | `messages:` validates with `level`/`message`/`description`/`source`, including `level: EXCEPTION`; a level-only entry overlapping a level+message entry warns with `message-conflict` ([SEP-0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md)) |
+| 020 | `message-properties` | `properties:` on a message validates via `extract: { from: stack }` with a `<frame>.<attribute>` `path` and an optional `pattern` ([SEP-0006](https://github.com/sightmap/sightmap/blob/main/spec/seps/0006-message-entity.md)) |
+| 021 | `component-privacy` | `privacy:` validates on components at every nesting depth, global and view-scoped, with `block`/`mask`/`unmask` nested under one another ([SEP-0009](https://github.com/sightmap/sightmap/blob/main/spec/seps/0009-component-privacy.md)) |
+| 022 | `component-watch` | `watch:` validates on components at every nesting depth, global and view-scoped, including an explicit `false` ([SEP-0015](https://github.com/sightmap/sightmap/blob/main/spec/seps/0015-component-watch.md)) |
+| 023 | `url-properties` | `:name` route segments bind on views and requests with no `properties:` entry; `from: url.query`/`url.path` validates on both, and a request carries URL and payload sources side by side ([SEP-0008](https://github.com/sightmap/sightmap/blob/main/spec/seps/0008-url-properties.md)) |
+| 024 | `message-tags-ambiguity` | Tags resolve as a union across every matching `messages:` entry even where identity is ambiguous, so `message-conflict` warns while the tag union still holds ([SEP-0016](https://github.com/sightmap/sightmap/blob/main/spec/seps/0016-message-and-signal-tags.md)) |
+| 025 | `environments-and-origins` | File-root `environments` (web with literal and pattern origins, native with `app_id`/`build_type`/`backend`, `platform` defaulted) and shared `origins`, referenced across files by views and requests; two web environments sharing an API host warns with `origin-host-shared` ([SEP-0014](https://github.com/sightmap/sightmap/blob/main/spec/seps/0014-environments-and-origins.md)) |
+| 026 | `environment-refs-unresolved` | A view or request (global or view-scoped) naming an undefined environment → `environment-ref-unresolved`; an origin defined nowhere → `origin-ref-unresolved` ([SEP-0014](https://github.com/sightmap/sightmap/blob/main/spec/seps/0014-environments-and-origins.md)) |
+| 027 | `environment-definitions-invalid` | Schema-valid definitions only the validator can reject: a `backend` naming no environment or a native one → `environment-backend-invalid`; a port above 65535 → `origin-invalid` ([SEP-0014](https://github.com/sightmap/sightmap/blob/main/spec/seps/0014-environments-and-origins.md)) |
+| 028 | `environment-registry-warnings` | First-by-path wins across files (`environment-name-collision`, `origin-name-collision`), `environment-duplicate`, `origin-environment-gap`, and explicit empty reference lists (`environments-empty`, `origins-empty`) ([SEP-0014](https://github.com/sightmap/sightmap/blob/main/spec/seps/0014-environments-and-origins.md)) |
+| 029 | `extract-legacy-forms` | Every deprecated string extract form (component `text`/`raw_text`/`attr=`/`PATH.prop`/`exists:`, request and message `source`/`field`) loads lowered to its object equivalent and warns `extract-legacy-form` ([SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-extract-object.md)) |
+| 030 | `extract-object` | The `extract` object on components (every `dom.*` source, a `Name[]` path with `join`, `component.exists`, `pattern` on a component read), requests and messages validates clean ([SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-extract-object.md)) |
+| 031 | `route-binding-conflict` | A property named like a `:name` binding the view or request still produces → `route-binding-conflict`, whatever its source; a `url.path` entry renames its segment and frees the name ([SEP-0008](https://github.com/sightmap/sightmap/blob/main/spec/seps/0008-url-properties.md)) |
 
 ## Canonical-format fixtures (`1NN`)
 

@@ -17,7 +17,7 @@ A component is a named DOM subtree, identified by one or more CSS selectors. Nam
       selector: '[role="gridcell"]'
 ```
 
-`name` and `selector` are required. See [Schema reference](/reference/schema#component) for the full field list, including `description`, `source`, `memory`, and `properties`.
+`name` and `selector` are required. See [Schema reference](/reference/schema#component) for the full field list, including `description`, `source`, `memory`, `properties`, `tags`, `privacy`, and `watch`.
 
 ## Selectors
 
@@ -158,6 +158,72 @@ A component can declare `properties:` — named values pulled from its matched e
 ```
 
 Each property has a `name` (the annotation key) and an `extract` object: a `from` source and, where the source needs one, a `path`. A component reads its own node (`dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`) or a descendant component (`component`, `component.exists`), so values resolve over the component tree, offline as well as live. `pattern` refines any value with a regex, and `join` collects every match of a component path. A value that comes back empty is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-extract-object.md).
+
+## Tags
+
+`tags` is an open-vocabulary list of classification labels, such as `defect` or `checkout`, separate from the component's name. Where `name` answers "what is this," `tags` answers "does this belong to a classification I care about."
+
+```yaml
+- name: CheckoutForm
+  selector: '[data-component="CheckoutForm"]'
+  tags: [defect]
+  children:
+    - name: SubmitButton
+      selector: 'button[type="submit"]'
+```
+
+Tags resolve as a **union** across every matching ancestor, not by the nearest-wins rule that decides a node's name. A click on `SubmitButton` above resolves `name: SubmitButton` and `tags: [defect]`, inherited from the tagged form. Views, requests, messages, and signals carry `tags` with the same union rule; see the [schema reference](/reference/schema#tags).
+
+## Privacy
+
+`privacy` tells a capture consumer (anything that records the page for replay or analysis) whether it may retain the matched element's content:
+
+| Value | Meaning |
+|---|---|
+| `block` | Capture nothing of the element or its subtree, content or structure. |
+| `mask` | Structure and layout may be captured. Text, input values, and attribute values may not, except the four interactive-state attributes (`checked`, `selected`, `disabled`, `expanded`). |
+| `unmask` | Capture in full, overriding an enclosing `block` or `mask`. |
+
+```yaml
+- name: CheckoutForm
+  selector: '.checkout-form'
+  privacy: mask                 # masks every field inside
+  children:
+    - name: CardNumberInput
+      selector: 'input[name="cc"]'
+      privacy: block
+    - name: OrderTotal
+      selector: '.order-total'
+      privacy: unmask           # the one value that is safe to keep
+```
+
+A declaration covers the element **and its subtree**, and the **nearest enclosing** declaration wins. That is deliberately not the union rule `tags` uses: two privacy values are a contradiction to decide, not labels to merge. The usual shape is a `mask` on a form with an `unmask` on the one field inside it that is safe to keep.
+
+Rules worth knowing before you add the field:
+
+- **Omission declares nothing.** A component with no `privacy` leaves the consumer's own default unchanged, so you can adopt the field one component at a time.
+- **The corpus is a floor.** A consumer may withhold more than the corpus asks, never less. `unmask` does not override a consumer's own policy.
+- **Properties are governed too**, at the node each value is read from. A property that reads a blocked or masked node is dropped, exactly as if it had not resolved. `component.exists` and `dom.state` may still resolve under `mask`, because they report structure and state rather than content. `sightmap validate` warns `extract-privacy-withheld` on a property its own component's `privacy` would withhold.
+- **`class`, `style`, and `id` survive `mask`**, because replay needs them to render. If one of them carries user data, use `block`.
+
+`privacy` takes no part in matching or identity. See the [schema reference](/reference/schema#privacy) and [SEP-0009](https://github.com/sightmap/sightmap/blob/main/spec/seps/0009-component-privacy.md).
+
+## Watch
+
+`watch: true` asks a capture consumer to report when the component **becomes visible to the user**, not only when someone interacts with it. Empty states, error banners, and promotions are often the components nobody clicks, so a record of interactions alone has no trace of them.
+
+```yaml
+- name: NoResultsMessage
+  selector: '.search-empty'
+  watch: true
+```
+
+- `watch` applies to the component it is declared on and **never to its children**. Covering a subtree would multiply records, so it is the opposite of `privacy`.
+- A visibility report is passive. Consumers must not treat it as an interaction.
+- A consumer's "is this interactive?" filter must not suppress a watched component.
+- `watch: false` is the same as omitting the field. `watch` and `privacy` compose: a component can be watched and blocked, reporting that it appeared while retaining none of its content.
+
+See the [schema reference](/reference/schema#watch) and [SEP-0015](https://github.com/sightmap/sightmap/blob/main/spec/seps/0015-component-watch.md).
 
 ## Next
 
