@@ -1,8 +1,11 @@
 package match_test
 
 import (
+	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -274,6 +277,9 @@ func TestMatch_PrivacyResolution(t *testing.T) {
 			if cm.Privacy != c.want {
 				t.Errorf("Match privacy = %q, want %q", cm.Privacy, c.want)
 			}
+			if got := m.Privacy(c.tree, c.url)[node]; got != c.want {
+				t.Errorf("Privacy = %q, want %q", got, c.want)
+			}
 		})
 	}
 }
@@ -300,4 +306,183 @@ func TestMatch_WatchResolution(t *testing.T) {
 	if cm := got[find(tree, "info")]; cm == nil || cm.Watch {
 		t.Errorf("an info message matches no watched component and must not be watched: %v", cm)
 	}
+	if cm := got[find(tree, "declined")]; cm == nil || !reflect.DeepEqual(cm.Watched, []string{"PaymentDeclined"}) {
+		t.Errorf("the declined banner must report PaymentDeclined, got %v", cm)
+	}
+}
+
+func TestWatched_ViewSharingAGlobalName(t *testing.T) {
+	m := match.NewMatcher(loadCorpus(t, `components:
+  - name: PromoBanner
+    selector: '.promo'
+    watch: true
+views:
+  - name: Sale
+    route: /sale
+    components:
+      - name: PromoBanner
+        selector: '.sale-header .promo-title'
+`))
+	tree := n("body", n("div.promo"))
+	if got := m.Watched(tree, "/sale")[find(tree, "promo")]; !reflect.DeepEqual(got, []string{"PromoBanner"}) {
+		t.Errorf("the global PromoBanner must stay watched on /sale, got %v", got)
+	}
+}
+
+func TestWatched_EveryWatchedComponentOnOneElement(t *testing.T) {
+	m := match.NewMatcher(loadCorpus(t, `components:
+  - name: OutOfStock
+    selector: '.notice.out-of-stock'
+    watch: true
+  - name: Notice
+    selector: '.notice'
+    watch: true
+`))
+	tree := n("body", n("div.notice.out-of-stock"))
+	node := find(tree, "notice")
+	want := []string{"Notice", "OutOfStock"}
+	if got := m.Watched(tree, "")[node]; !reflect.DeepEqual(got, want) {
+		t.Errorf("Watched = %v, want %v", got, want)
+	}
+	if cm := m.Match(tree, "")[node]; cm == nil || !reflect.DeepEqual(cm.Watched, want) {
+		t.Errorf("Match Watched = %v, want %v", cm, want)
+	}
+}
+
+func TestWithholds(t *testing.T) {
+	ex := func(from, path string) sightmap.Extract { return sightmap.Extract{From: from, Path: path} }
+	for _, tc := range []struct {
+		privacy string
+		e       sightmap.Extract
+		want    bool
+	}{
+		{"", ex(sightmap.FromDOMText, ""), false},
+		{"unmask", ex(sightmap.FromDOMText, ""), false},
+		{"mask", ex(sightmap.FromDOMText, ""), true},
+		{"block", ex(sightmap.FromDOMRawText, ""), true},
+		{"mask", ex(sightmap.FromDOMAttr, "data-sku"), true},
+		{"mask", ex(sightmap.FromDOMAttr, "checked"), false},
+		{"block", ex(sightmap.FromDOMAttr, "checked"), true},
+		{"mask", ex(sightmap.FromDOMState, "expanded"), false},
+		{"block", ex(sightmap.FromDOMState, "expanded"), true},
+		{"block", ex(sightmap.FromComponent, "Price.text"), false},
+	} {
+		if got := match.Withholds(tc.privacy, tc.e); got != tc.want {
+			t.Errorf("Withholds(%q, %s %s) = %v, want %v", tc.privacy, tc.e.From, tc.e.Path, got, tc.want)
+		}
+	}
+}
+
+// randomCaptureCorpus is benchCorpus with random privacy and watch on its
+// definitions, including an unrecognized privacy value.
+func randomCaptureCorpus(seed uint64, comps int, exotic bool) *sightmap.Corpus {
+	c := benchCorpus(seed, comps, exotic)
+	r := rand.New(rand.NewPCG(seed, 3))
+	choices := []string{"", "", "", "block", "mask", "unmask", "unmask", "secret"}
+	for i := range c.GlobalComponents {
+		c.GlobalComponents[i].Privacy = choices[r.IntN(len(choices))]
+		c.GlobalComponents[i].Watch = r.IntN(4) == 0
+	}
+	return c
+}
+
+// oracle resolves privacy and watch independently of the package: the
+// pre-index reference matcher, and SEP-0009's fold written out longhand.
+func oracle(root *sightmap.ComponentNode, defs []sightmap.ComponentDef) (map[*sightmap.ComponentNode]string, map[*sightmap.ComponentNode][]string) {
+	rank := map[string]int{"unmask": 1, "mask": 2, "block": 3}
+	var queries []match.MatchQuery
+	for _, d := range defs {
+		if d.Privacy == "" && !d.Watch {
+			continue
+		}
+		for _, sel := range d.Selectors {
+			if ps, err := sightmap.ParseSightmapSelector(sel); err == nil {
+				queries = append(queries, match.MatchQuery{Name: d.Name, Parts: ps.Parts, Combinators: ps.Combinators, Def: &d})
+			}
+		}
+	}
+	local := map[*sightmap.ComponentNode]int{}
+	watched := map[*sightmap.ComponentNode][]string{}
+	referenceFindAllMatches(root, queries, func(node *sightmap.ComponentNode, q *match.MatchQuery) {
+		if p := q.Def.Privacy; p != "" {
+			r, ok := rank[p]
+			if !ok {
+				r = 3
+			}
+			if r > local[node] {
+				local[node] = r
+			}
+		}
+		if q.Def.Watch && !slices.Contains(watched[node], q.Name) {
+			watched[node] = append(watched[node], q.Name)
+		}
+	})
+	for _, w := range watched {
+		slices.Sort(w)
+	}
+	names := []string{"", "unmask", "mask", "block"}
+	privacy := map[*sightmap.ComponentNode]string{}
+	var walk func(n *sightmap.ComponentNode, parent int)
+	walk = func(n *sightmap.ComponentNode, parent int) {
+		e := parent
+		if parent == 3 || local[n] == 3 {
+			e = 3
+		} else if local[n] != 0 {
+			e = local[n]
+		}
+		if e > 0 {
+			privacy[n] = names[e]
+		}
+		for _, c := range n.Children {
+			walk(c, e)
+		}
+	}
+	walk(root, 0)
+	return privacy, watched
+}
+
+// TestCapture_EqualsOracle: across seeded pages and corpora with random privacy
+// and watch, Privacy and Watched equal the oracle on every node, and Match
+// reports the same on every node it names.
+func TestCapture_EqualsOracle(t *testing.T) {
+	seen := map[string]int{}
+	nodes, watchedNodes := 0, 0
+	for seed := uint64(1); seed <= 40; seed++ {
+		for _, exotic := range []bool{false, true} {
+			corpus := randomCaptureCorpus(seed, 10+int(seed)*3, exotic)
+			root := benchTree(seed, 300, 10+int(seed)*3, exotic)
+			m := match.NewMatcher(corpus)
+			privacy, watched := m.Privacy(root, ""), m.Watched(root, "")
+			wantP, wantW := oracle(root, corpus.GlobalComponents)
+			var walk func(n *sightmap.ComponentNode)
+			walk = func(n *sightmap.ComponentNode) {
+				if privacy[n] != wantP[n] || !slices.Equal(watched[n], wantW[n]) {
+					t.Fatalf("seed %d exotic %v: privacy %q watched %v, oracle %q %v", seed, exotic, privacy[n], watched[n], wantP[n], wantW[n])
+				}
+				seen[privacy[n]]++
+				nodes++
+				if len(watched[n]) > 0 {
+					watchedNodes++
+				}
+				for _, c := range n.Children {
+					walk(c)
+				}
+			}
+			walk(root)
+			for node, cm := range m.Match(root, "") {
+				if cm.Privacy != privacy[node] || !slices.Equal(cm.Watched, watched[node]) {
+					t.Fatalf("seed %d exotic %v: Match %q %v, Privacy/Watched %q %v", seed, exotic, cm.Privacy, cm.Watched, privacy[node], watched[node])
+				}
+			}
+		}
+	}
+	for _, p := range []string{"", "unmask", "mask", "block"} {
+		if seen[p] == 0 {
+			t.Errorf("no node resolved to %q", p)
+		}
+	}
+	if watchedNodes == 0 {
+		t.Error("no node was watched")
+	}
+	t.Logf("%d nodes agree with the oracle (%d watched); privacy %v", nodes, watchedNodes, seen)
 }
