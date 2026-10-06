@@ -6,15 +6,15 @@
       "expected": {
         "ok": false,
         "diagnostics": [
-          { "code": "selector-not-chain-evaluable", "severity": "error" },
+          { "code": "selector-not-in-profile", "severity": "error" },
           { "code": "selector-not-in-profile", "severity": "error" },
           { "code": "selector-universal-subject", "severity": "error" },
-          { "code": "selector-not-chain-evaluable", "severity": "error" },
+          { "code": "selector-not-in-profile", "severity": "error" },
           { "code": "privacy-unmask-broad", "severity": "warning" },
-          { "code": "selector-not-chain-evaluable", "severity": "warning" },
+          { "code": "selector-not-in-profile", "severity": "warning" },
           { "code": "selector-universal-subject", "severity": "warning" },
-          { "code": "selector-not-chain-evaluable", "severity": "warning" },
-          { "code": "selector-not-chain-evaluable", "severity": "error" }
+          { "code": "selector-not-in-profile", "severity": "warning" },
+          { "code": "selector-not-in-profile", "severity": "error" }
         ]
       }
     }
