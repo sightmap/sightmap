@@ -1,0 +1,38 @@
+version: 1
+
+components:
+  # Capture directives: findings are errors.
+  - name: CardNumber
+    selector: 'input[name="cc"]'
+    privacy: block
+  - name: PaymentSection
+    selector: 'section:has(input.cc)'
+    privacy: block
+  - name: SafeHint
+    selector: ':is(.hint, .note)'
+    privacy: unmask
+  - name: Everything
+    selector: '.card *'
+    privacy: mask
+  - name: WatchedBanner
+    selector: '.banner + .promo'
+    watch: true
+  - name: PageBody
+    selector: 'body'
+    privacy: unmask
+
+  # Naming only: findings are warnings during the deprecation window.
+  - name: Toolbar
+    selector: 'header:has(nav)'
+  - name: AnyRow
+    selector: '.table > *'
+  - name: SubmitButton
+    selector: 'button[type="submit"]'
+
+  # A child's flattened selector includes its parent's.
+  - name: Checkout
+    selector: 'form:has(.pay)'
+    children:
+      - name: CardCvc
+        selector: 'input.cvc'
+        privacy: block
