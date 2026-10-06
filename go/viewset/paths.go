@@ -16,6 +16,12 @@ func TreePath(snapPath string) string {
 	return snapPath + ".tree.json"
 }
 
+// ScreenshotPath returns the full-page screenshot path for a given snapshot path.
+// Example: ".sightmap/snapshots/app-home/base.snap" → ".sightmap/snapshots/app-home/base.snap.png"
+func ScreenshotPath(snapPath string) string {
+	return snapPath + ".png"
+}
+
 // ParsePath extracts the view name and capture stamp from a snapshot path
 // (or its .snap.tree.json sibling). Since we dropped the named-state
 // segment, a capture lives at snapshots/<view>/<stamp>.snap: the view is the first

@@ -484,11 +484,15 @@ func runScreenshot(args []string) error {
 	componentFlag := fs.String("component", "", "Clip to the bounding box of this sightmap component (by name)")
 	selectorFlag := fs.String("selector", "", "Clip to the bounding box of elements matching this CSS selector")
 	expandPctFlag := fs.Float64("expand-pct", 0, "Grow the clip outward on all sides by this percent of its size (only with --component/--selector)")
+	fullPageFlag := fs.Bool("full-page", false, "Capture the whole scrollable page, not just the viewport")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for --component)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
 
+	if *fullPageFlag && (*componentFlag != "" || *selectorFlag != "") {
+		return fmt.Errorf("screenshot: --full-page cannot be combined with --component or --selector")
+	}
 	if *componentFlag != "" && *selectorFlag != "" {
 		return fmt.Errorf("screenshot: pass only one of --component or --selector")
 	}
@@ -528,6 +532,7 @@ func runScreenshot(args []string) error {
 			PauseAnimations:  true,
 			StopLoading:      true,
 			Clip:             clip,
+			FullPage:         *fullPageFlag,
 		})
 		if err != nil {
 			return crashAnnotated(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag, fmt.Errorf("screenshot: %w", err))
@@ -547,6 +552,7 @@ func runScreenshot(args []string) error {
 			PauseAnimations: true,
 			StopLoading:     true,
 			Clip:            clip,
+			FullPage:        *fullPageFlag,
 		})
 		if err != nil {
 			if !*noRetryFlag && errors.Is(err, context.DeadlineExceeded) {
@@ -565,6 +571,7 @@ func runScreenshot(args []string) error {
 					PauseAnimations:  true,
 					StopLoading:      true,
 					Clip:             clip,
+					FullPage:         *fullPageFlag,
 				})
 				if err != nil {
 					return crashAnnotated(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag, fmt.Errorf("screenshot (JPEG fallback): %w", err))
