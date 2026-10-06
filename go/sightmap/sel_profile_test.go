@@ -103,7 +103,7 @@ func TestParseProfileSelector_Classification(t *testing.T) {
 		{`.--x`, notProfile},
 		{`.2col`, notProfile},
 		{`.a .b .c .d .e .f .g .h .i`, notProfile}, // 9 compounds
-		{strings.Repeat(".a", 520), notProfile},   // 1,040 bytes
+		{strings.Repeat(".a", 520), notProfile},    // 1,040 bytes
 	}
 	for _, c := range cases {
 		t.Run(c.sel, func(t *testing.T) {
