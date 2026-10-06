@@ -60,6 +60,12 @@ func TestSpecConformance_URLPropertyFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-route-binding-conflict.fixture")
 }
 
+// TestSpecConformance_SelectorProfileFixtures covers SEP-0018 selector
+// validation: chain-evaluability, the capture-baseline profile, and breadth.
+func TestSpecConformance_SelectorProfileFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "032-selector-profile.fixture")
+}
+
 func runSpecValidateFixtures(t *testing.T, glob string) {
 	t.Helper()
 	const root = "../../spec/conformance"
