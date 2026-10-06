@@ -20,6 +20,9 @@ type SelectorPart struct {
 	// operator is not exact equality. Omitted entries default to "=".
 	// Valid operators: "=" (default), "^=", "$=", "*=", "~=", "|=", "[]" (presence-only).
 	AttrOps map[string]string `json:"attrOps,omitempty"`
+	// RepeatAttrs holds further tests on an attribute name already in Attrs,
+	// such as the second test in [class*="a"][class*="b"]. Every test must hold.
+	RepeatAttrs []AttrTest `json:"repeatAttrs,omitempty"`
 	// Not, if non-empty, holds the argument(s) of the :not() pseudo-class(es) on
 	// this compound selector as a flat selector list: the element matches only if
 	// it matches NONE of the entries. Each entry is a full complex selector whose
@@ -53,6 +56,14 @@ type HasSelector struct {
 type HasRelative struct {
 	Parts       []*SelectorPart `json:"parts"`
 	Combinators []string        `json:"combinators"`
+}
+
+// AttrTest is one attribute test: Op is "=", "[]" (presence only), "~=",
+// "|=", "^=", "$=" or "*=".
+type AttrTest struct {
+	Key   string `json:"key"`
+	Op    string `json:"op"`
+	Value string `json:"value,omitempty"`
 }
 
 // Element is the observed identity of one DOM element (or a synthetic identity

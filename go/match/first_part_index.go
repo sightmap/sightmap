@@ -25,7 +25,6 @@ type firstPartIndex struct {
 	attrNames  []attrNameBucket
 	byClass    map[string][]int
 	byTag      map[string][]int // ASCII-lowercased tag
-	allTagged  []int            // every byTag query, for a node whose tag is not ASCII
 	universal  []int
 }
 
@@ -69,6 +68,11 @@ func newFirstPartIndex(queries []MatchQuery) *firstPartIndex {
 				attrValues[name] = map[string][]int{}
 			}
 			v := p.Attrs[name]
+			if sightmap.AttrValueCaseInsensitive(name) {
+				// HTML compares this value ASCII case-insensitively; bucket the
+				// folded value and let matching decide (it is exact for SVG).
+				v = asciiLower(v)
+			}
 			attrValues[name][v] = append(attrValues[name][v], qi)
 			continue
 		}
@@ -80,12 +84,11 @@ func newFirstPartIndex(queries []MatchQuery) *firstPartIndex {
 			attrNames[name] = append(attrNames[name], qi)
 			continue
 		}
-		// Tags match case-insensitively (strings.EqualFold). Indexing by ASCII
-		// lowercase is exact only for ASCII tags; anything else stays universal.
+		// Tags match ASCII case-insensitively, so indexing by ASCII lowercase is
+		// exact for ASCII tags; anything else stays universal.
 		if p.Tag != "" && isASCII(p.Tag) {
 			t := strings.ToLower(p.Tag)
 			ix.byTag[t] = append(ix.byTag[t], qi)
-			ix.allTagged = append(ix.allTagged, qi)
 			continue
 		}
 		ix.universal = append(ix.universal, qi)
@@ -113,6 +116,9 @@ func (ix *firstPartIndex) candidates(el *sightmap.Element, out []int) []int {
 	for i := range ix.attrValues {
 		b := &ix.attrValues[i]
 		if v, ok := el.Attr(b.name); ok {
+			if sightmap.AttrValueCaseInsensitive(b.name) {
+				v = asciiLower(v)
+			}
 			out = append(out, b.byValue[v]...)
 		}
 	}
@@ -125,14 +131,9 @@ func (ix *firstPartIndex) candidates(el *sightmap.Element, out []int) []int {
 	for _, c := range el.Classes {
 		out = append(out, ix.byClass[c]...)
 	}
-	if el.Tag != "" && len(ix.allTagged) > 0 {
-		if isASCII(el.Tag) {
-			out = append(out, ix.byTag[asciiLower(el.Tag)]...)
-		} else {
-			// A non-ASCII tag can still EqualFold an ASCII one (e.g. the Kelvin
-			// sign folds to "k"); try every tagged query and let matching decide.
-			out = append(out, ix.allTagged...)
-		}
+	// A non-ASCII tag never ASCII-folds to an indexed (ASCII) one.
+	if el.Tag != "" && isASCII(el.Tag) {
+		out = append(out, ix.byTag[asciiLower(el.Tag)]...)
 	}
 	// Buckets are each in query order but interleave, and a class repeated on
 	// the element hits its bucket twice.

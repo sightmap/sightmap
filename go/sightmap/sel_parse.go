@@ -214,11 +214,18 @@ func (p *parser) parseSimpleSelectors() (*SelectorPart, error) {
 		switch {
 		case c == '*':
 			// Universal selector — contributes nothing to SelectorPart.
+			if sawAny {
+				return nil, fmt.Errorf("universal selector '*' must come first in a compound, at position %d", p.i)
+			}
 			p.i++
 			sawAny = true
 
 		case c == '#':
-			// ID selector
+			// ID selector. A second #id would overwrite the first and match
+			// more than CSS, which requires both.
+			if part.Id != "" {
+				return nil, fmt.Errorf("a compound can have only one #id, at position %d", p.i)
+			}
 			p.i++
 			id, err := p.parseIdentifier()
 			if err != nil {
@@ -253,6 +260,9 @@ func (p *parser) parseSimpleSelectors() (*SelectorPart, error) {
 
 		case nameStart(c) || c == '-' || c == '\\':
 			// Type selector (tag name). Only valid as the first token.
+			if sawAny {
+				return nil, fmt.Errorf("type selector must come first in a compound, at position %d", p.i)
+			}
 			tag, err := p.parseIdentifier()
 			if err != nil {
 				return nil, fmt.Errorf("type selector: %w", err)
@@ -300,14 +310,7 @@ func (p *parser) parseAttr(part *SelectorPart) error {
 	if p.s[p.i] == ']' {
 		// Presence-only: [attr]
 		p.i++
-		if part.Attrs == nil {
-			part.Attrs = make(map[string]string)
-		}
-		if part.AttrOps == nil {
-			part.AttrOps = make(map[string]string)
-		}
-		part.Attrs[key] = ""
-		part.AttrOps[key] = "[]"
+		part.addAttr(key, "[]", "")
 		return nil
 	}
 
@@ -338,6 +341,18 @@ func (p *parser) parseAttr(part *SelectorPart) error {
 	}
 	p.i++ // consume ']'
 
+	part.addAttr(key, op, val)
+	return nil
+}
+
+// addAttr records one attribute test. The first test on a name goes in
+// Attrs/AttrOps; a further test on the same name ([class*="a"][class*="b"])
+// goes in RepeatAttrs, since overwriting would drop a constraint CSS keeps.
+func (part *SelectorPart) addAttr(key, op, val string) {
+	if _, dup := part.Attrs[key]; dup {
+		part.RepeatAttrs = append(part.RepeatAttrs, AttrTest{Key: key, Op: op, Value: val})
+		return
+	}
 	if part.Attrs == nil {
 		part.Attrs = make(map[string]string)
 	}
@@ -348,7 +363,6 @@ func (p *parser) parseAttr(part *SelectorPart) error {
 		}
 		part.AttrOps[key] = op
 	}
-	return nil
 }
 
 // parseAttrOp parses a CSS attribute operator (=, ~=, |=, ^=, $=, *=).
@@ -449,6 +463,10 @@ func (p *parser) parsePseudo(part *SelectorPart) error {
 		return nil
 
 	case "is", "where":
+		if part.Is != nil {
+			// A second list would replace the first rather than also apply.
+			return fmt.Errorf("a compound can have only one :is() or :where()")
+		}
 		if p.i >= len(p.s) || p.s[p.i] != '(' {
 			return fmt.Errorf("expected '(' after :%s", name)
 		}
