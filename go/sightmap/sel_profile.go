@@ -12,20 +12,15 @@ import (
 type SelectorProfile string
 
 // ProfileCaptureBaseline is the CSS3 subset common to the oldest engines a
-// capture consumer commonly still supports: Chrome 38, Firefox 29, Safari 9
-// and Edge 80.
+// capture consumer still has to support (Chrome 38, Firefox 29, Safari 9,
+// Edge 80) whose selectors depend only on an element and its ancestors.
 const ProfileCaptureBaseline SelectorProfile = "capture-baseline"
 
-// Selector diagnostic codes (SEP-0018).
-const (
-	// CodeSelectorNotChainEvaluable marks a construct whose match depends on
-	// something other than the element and its ancestors: :has(), sibling
-	// combinators, positional and state pseudo-classes.
-	CodeSelectorNotChainEvaluable = "selector-not-chain-evaluable"
-	// CodeSelectorNotInProfile marks a chain-evaluable construct, or a form,
-	// that the active profile does not include.
-	CodeSelectorNotInProfile = "selector-not-in-profile"
-)
+// CodeSelectorNotInProfile marks a selector construct, or a form, that the
+// active profile does not include (SEP-0018). The message says why: an engine
+// in the baseline lacks it, or it depends on more than the element and its
+// ancestors.
+const CodeSelectorNotInProfile = "selector-not-in-profile"
 
 const (
 	profileMaxCompounds = 8
@@ -69,7 +64,7 @@ func (s ProfileSelector) Subject() ProfileCompound {
 
 // ProfileError reports why a selector is outside a profile.
 type ProfileError struct {
-	Code string // CodeSelectorNotChainEvaluable or CodeSelectorNotInProfile
+	Code string // CodeSelectorNotInProfile
 	Pos  int    // byte offset into the selector
 	Msg  string
 }
@@ -78,8 +73,8 @@ func (e *ProfileError) Error() string {
 	return fmt.Sprintf("%s at position %d: %s", e.Code, e.Pos, e.Msg)
 }
 
-// notChainEvaluablePseudos depend on siblings, children or live state.
-var notChainEvaluablePseudos = map[string]bool{
+// beyondAncestorPseudos depend on siblings, children or live state.
+var beyondAncestorPseudos = map[string]bool{
 	"has": true, "empty": true,
 	"first-child": true, "last-child": true, "only-child": true,
 	"first-of-type": true, "last-of-type": true, "only-of-type": true,
@@ -175,7 +170,7 @@ func (p *profileParser) combinator() (string, error) {
 		}
 		return ">", nil
 	case '+', '~':
-		return "", p.fail(CodeSelectorNotChainEvaluable, p.i, "sibling combinator %q depends on elements off the ancestor chain", c)
+		return "", p.fail(CodeSelectorNotInProfile, p.i, "sibling combinator %q depends on elements off the ancestor chain", c)
 	case ',':
 		return "", p.notInProfile(p.i, "a selector list; list alternatives as separate selectors")
 	}
@@ -491,8 +486,8 @@ func (p *profileParser) pseudo() ([]string, error) {
 	switch {
 	case name == "":
 		return nil, p.notInProfile(pos, "malformed pseudo-class")
-	case notChainEvaluablePseudos[name]:
-		return nil, p.fail(CodeSelectorNotChainEvaluable, pos, ":%s depends on more than the element and its ancestors", name)
+	case beyondAncestorPseudos[name]:
+		return nil, p.fail(CodeSelectorNotInProfile, pos, ":%s depends on more than the element and its ancestors", name)
 	case name != "not":
 		return nil, p.notInProfile(pos, ":%s is not in the profile; only :not() with one simple selector is", name)
 	case written != name:
