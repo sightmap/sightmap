@@ -267,13 +267,13 @@ func validateComponent(comp ComponentDef, seen map[string]string) []ValidationEr
 			errs = append(errs, ValidationError{
 				Component: comp.Name,
 				Selector:  selStr,
-				Code:      notChainEvaluableCode(selStr),
+				Code:      profileCode(selStr),
 				Message:   "selector parse error: " + err.Error(),
 			})
 		}
 	}
 
-	// SEP-0018: chain-evaluable, in the capture-baseline profile, not universal.
+	// SEP-0018: in the capture-baseline profile, and not universal.
 	errs = append(errs, validateComponentSelectors(comp)...)
 
 	// duplicate-name+selector within scope: same name AND same selector set is
