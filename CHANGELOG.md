@@ -2,6 +2,15 @@
 
 # @sightmap/sightmap
 
+## 0.34.1
+
+### Patch Changes
+
+- bf3cf39: Match attribute selectors against the camelCase SVG and MathML attribute names captures keep, so `[viewBox="0 0 24 24"]` matches offline as it does in a browser.
+- 5ec1568: Skills: teach the fields added in 0.34.0.
+
+  `sightmap-authoring` now covers `privacy`, `watch` and `tags` on components, URL properties on views and requests, and file-root `environments` and `origins`. It also corrects the message guidance: an uncaught exception arrives with level `exception`, so `level: ERROR` does not match it. `sightmap-browser` explains the view `tags:` line in a snapshot, and why a component under `privacy: block` or `mask` renders without its content properties.
+
 ## 0.34.0
 
 ### Minor Changes
