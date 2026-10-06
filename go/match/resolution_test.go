@@ -349,6 +349,41 @@ func TestWatched_EveryWatchedComponentOnOneElement(t *testing.T) {
 	}
 }
 
+// TestWatched_DistinctComponentsSharingAName proves dedup is by definition, not
+// name: two distinct watched components with the same name (names are unique
+// only per parent) are both reported, while one component with several
+// selectors is reported once.
+func TestWatched_DistinctComponentsSharingAName(t *testing.T) {
+	m := match.NewMatcher(loadCorpus(t, `components:
+  - name: Checkout
+    selector: 'form.checkout'
+    children:
+      - name: Banner
+        selector: '.promo'
+        watch: true
+  - name: Account
+    selector: 'section.account'
+    children:
+      - name: Banner
+        selector: '.promo'
+        watch: true
+  - name: Multi
+    selector: ['.promo', 'div.promo']
+    watch: true
+`))
+	// One node inside both scopes: two distinct Banner defs match it, and Multi
+	// matches it through both of its selectors.
+	tree := n("body", n("form.checkout", n("section.account", n("div.promo"))))
+	node := find(tree, "promo")
+	want := []string{"Banner", "Banner", "Multi"}
+	if got := m.Watched(tree, "")[node]; !reflect.DeepEqual(got, want) {
+		t.Errorf("Watched = %v, want %v", got, want)
+	}
+	if cm := m.Match(tree, "")[node]; cm == nil || !reflect.DeepEqual(cm.Watched, want) {
+		t.Errorf("Match Watched = %v, want %v", cm, want)
+	}
+}
+
 func TestWithholds(t *testing.T) {
 	ex := func(from, path string) sightmap.Extract { return sightmap.Extract{From: from, Path: path} }
 	for _, tc := range []struct {

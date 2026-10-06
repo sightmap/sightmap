@@ -48,7 +48,10 @@ type ComponentMatch struct {
 	// "unmask", or "" when none applies.
 	Privacy string
 	// Watched names every watched component (SEP-0015) whose selector matches
-	// the node, sorted, whichever component names it. Watch never inherits.
+	// the node, sorted, whichever component names it. One entry per matching
+	// component definition, so a name appears twice when two distinct
+	// components share it (names are unique only per parent). Watch never
+	// inherits.
 	Watched []string
 	// Watch reports whether Watched is non-empty.
 	Watch      bool
