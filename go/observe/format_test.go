@@ -49,6 +49,9 @@ func TestFormat_CoverageWithZeroMatches(t *testing.T) {
 	if !strings.Contains(out, "[View: Stub]") {
 		t.Errorf("expected the view header, got:\n%s", out)
 	}
+	if !strings.Contains(out, "route: /x\nurl: https://app.example.com/x\n") {
+		t.Errorf("expected the url line after route, got:\n%s", out)
+	}
 	if !strings.Contains(out, "[Coverage]") || !strings.Contains(out, "5 interactive") {
 		t.Errorf("expected a [Coverage] line with 5 interactive, got:\n%s", out)
 	}
