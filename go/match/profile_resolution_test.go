@@ -1,9 +1,11 @@
 package match_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/match"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 // profileCases are SEP-0018's rules for privacy rules it rejects: a rule
@@ -134,7 +136,76 @@ func TestMatch_ProfileResolution(t *testing.T) {
 			if cm.Privacy != c.want {
 				t.Errorf("Match privacy = %q, want %q", cm.Privacy, c.want)
 			}
+			if got := m.Privacy(c.tree, c.url)[node]; got != c.want {
+				t.Errorf("Privacy = %q, want %q", got, c.want)
+			}
+			if got := m.PrivacyForChain(elementsTo(c.tree, node), c.url); got[len(got)-1] != c.want {
+				t.Errorf("PrivacyForChain = %q, want %q at the leaf", got, c.want)
+			}
 		})
+	}
+}
+
+// pathTo returns the nodes from root to target, inclusive.
+func pathTo(root, target *sightmap.ComponentNode) []*sightmap.ComponentNode {
+	if root == target {
+		return []*sightmap.ComponentNode{root}
+	}
+	for _, c := range root.Children {
+		if p := pathTo(c, target); p != nil {
+			return append([]*sightmap.ComponentNode{root}, p...)
+		}
+	}
+	return nil
+}
+
+func elementsTo(root, target *sightmap.ComponentNode) []sightmap.Element {
+	var out []sightmap.Element
+	for _, n := range pathTo(root, target) {
+		out = append(out, *n.Element)
+	}
+	return out
+}
+
+func TestPrivacy_ConsumerRules(t *testing.T) {
+	corpus := loadCorpus(t, `components:
+  - name: Ok
+    selector: '.ok'
+    privacy: unmask
+  - name: Other
+    selector: 'p.other'
+`)
+	tree := n("body", n("div.no-capture", n("p.ok")), n("p.other"))
+	ok, other := find(tree, "ok"), find(tree, "other")
+	for _, c := range []struct {
+		name      string
+		rule      match.PrivacyRule
+		ok, other string
+	}{
+		{"a consumer block applies, and a corpus unmask cannot reopen it", match.PrivacyRule{Selector: ".no-capture", Privacy: "block"}, "block", ""},
+		{"a consumer unmask is ignored", match.PrivacyRule{Selector: "p.other", Privacy: "unmask"}, "unmask", ""},
+		{"a consumer mask outside the profile covers the document", match.PrivacyRule{Selector: "p:hover", Privacy: "mask"}, "mask", "mask"},
+	} {
+		got := match.NewMatcher(corpus, match.WithPrivacyRules(c.rule)).Privacy(tree, "")
+		if got[ok] != c.ok || got[other] != c.other {
+			t.Errorf("%s: ok=%q other=%q, want %q and %q", c.name, got[ok], got[other], c.ok, c.other)
+		}
+	}
+}
+
+func TestPrivacyAttributes(t *testing.T) {
+	m := match.NewMatcher(loadCorpus(t, `components:
+  - name: Card
+    selector: 'form[data-form] input[name="cc"]:not([type=hidden])'
+    privacy: block
+  - name: Banner
+    selector: '[data-banner]'
+    watch: true
+  - name: Named
+    selector: '[data-ignored]'
+`))
+	if got, want := m.PrivacyAttributes(""), []string{"data-banner", "data-form", "name", "type"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("PrivacyAttributes = %v, want %v", got, want)
 	}
 }
 

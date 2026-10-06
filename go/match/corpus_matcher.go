@@ -15,14 +15,19 @@ import (
 // A Matcher holds a per-URL compiled-query cache and is safe for concurrent use.
 // Create one per Corpus and reuse it so the cache is shared across calls.
 type Matcher struct {
-	corpus *sightmap.Corpus
-	mu     sync.Mutex
-	cache  map[string]*queryCacheEntry
+	corpus        *sightmap.Corpus
+	consumerRules []PrivacyRule
+	mu            sync.Mutex
+	cache         map[string]*queryCacheEntry
 }
 
 // NewMatcher returns a Matcher bound to corpus.
-func NewMatcher(corpus *sightmap.Corpus) *Matcher {
-	return &Matcher{corpus: corpus}
+func NewMatcher(corpus *sightmap.Corpus, opts ...Option) *Matcher {
+	m := &Matcher{corpus: corpus}
+	for _, o := range opts {
+		o(m)
+	}
+	return m
 }
 
 // queryCacheEntry stores the merged component list and compiled queries for one
@@ -54,7 +59,7 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 		components: compList,
 		queries:    queries,
 		index:      newFirstPartIndex(queries),
-		capture:    compileCapture(captureDefsForURL(m.corpus, pageURL)),
+		capture:    compileCapture(captureDefsForURL(m.corpus, pageURL), m.consumerRules),
 	}
 	e.combined = append(append([]MatchQuery(nil), queries...), e.capture.queries...)
 	e.combinedIndex = newFirstPartIndex(e.combined)
@@ -114,7 +119,7 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 		if depth > 0 {
 			parent = eff[depth-1]
 		}
-		e := foldRank(parent, local)
+		e := max(foldRank(parent, local), entry.capture.floor)
 		eff = append(eff[:depth], e)
 		if named != nil {
 			named.Privacy = rankNames[e]
