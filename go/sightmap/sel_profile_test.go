@@ -8,10 +8,7 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-const (
-	notChain   = sightmap.CodeSelectorNotChainEvaluable
-	notProfile = sightmap.CodeSelectorNotInProfile
-)
+const notProfile = sightmap.CodeSelectorNotInProfile
 
 // TestParseProfileSelector_Classification maps each construct to the code the
 // capture-baseline profile gives it ("" = accepted).
@@ -50,19 +47,19 @@ func TestParseProfileSelector_Classification(t *testing.T) {
 		{`.-x`, ""},
 		{`.a .b .c .d .e .f .g .h`, ""}, // 8 compounds
 
-		// Not chain-evaluable.
-		{`section:has(input)`, notChain},
-		{`.a + .b`, notChain},
-		{`.a ~ .b`, notChain},
-		{`li:first-child`, notChain},
-		{`li:nth-child(2)`, notChain},
-		{`p:empty`, notChain},
-		{`a:hover`, notChain},
-		{`input:checked`, notChain},
-		{`input:not(:checked)`, notChain},
-		{`div:not(:has(.x))`, notChain},
+		// Depend on more than the element and its ancestors.
+		{`section:has(input)`, notProfile},
+		{`.a + .b`, notProfile},
+		{`.a ~ .b`, notProfile},
+		{`li:first-child`, notProfile},
+		{`li:nth-child(2)`, notProfile},
+		{`p:empty`, notProfile},
+		{`a:hover`, notProfile},
+		{`input:checked`, notProfile},
+		{`input:not(:checked)`, notProfile},
+		{`div:not(:has(.x))`, notProfile},
 
-		// Not in the profile.
+		// Not supported by every baseline engine, or malformed.
 		{``, notProfile},
 		{`   `, notProfile},
 		{`:is(.a, .b)`, notProfile},
