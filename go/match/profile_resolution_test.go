@@ -134,6 +134,9 @@ func TestMatch_ProfileResolution(t *testing.T) {
 			if cm.Privacy != c.want {
 				t.Errorf("Match privacy = %q, want %q", cm.Privacy, c.want)
 			}
+			if got := m.Privacy(c.tree, c.url)[node]; got != c.want {
+				t.Errorf("Privacy = %q, want %q", got, c.want)
+			}
 		})
 	}
 }

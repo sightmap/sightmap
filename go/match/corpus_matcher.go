@@ -114,7 +114,7 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 		if depth > 0 {
 			parent = eff[depth-1]
 		}
-		e := foldRank(parent, local)
+		e := max(foldRank(parent, local), entry.capture.floor)
 		eff = append(eff[:depth], e)
 		if named != nil {
 			named.Privacy = rankNames[e]
