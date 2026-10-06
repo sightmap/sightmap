@@ -116,9 +116,10 @@ func (c *Corpus) Stats() Stats {
 	for _, gc := range c.GlobalComponents {
 		countComponent(gc)
 	}
-	for _, dc := range c.Definitions {
-		countComponent(dc)
-	}
+	// File-root definitions (SEP-0019) are counted only through the view
+	// expansions below: a definition is never matched on its own, so its
+	// unscoped root form is not an extraction site, and one no view
+	// references contributes nothing.
 
 	countRequests := func(defs []RequestDef) {
 		s.Requests += len(defs)

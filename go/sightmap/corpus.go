@@ -27,7 +27,7 @@ type Corpus struct {
 	// Definitions is the flat list of file-root `definitions:` (SEP-0019):
 	// components addressable by $ref but never matched on their own. Views
 	// already carry each referenced definition expanded in place, so matching
-	// never consults this list; it exists for validation, lint and stats.
+	// never consults this list; it exists for validation, lint and search.
 	Definitions []ComponentDef `json:"-"`
 
 	// Views contains per-route component lists, with $refs expanded and

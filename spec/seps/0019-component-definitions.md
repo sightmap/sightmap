@@ -4,7 +4,7 @@ title: Shared component definitions that are not globals
 author: Joel Webber (@joelgwebber)
 status: Draft
 created: 2026-10-04
-updated: 2026-10-04
+updated: 2026-10-06
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -75,7 +75,9 @@ views:
   - A name declared both as a global and as a definition resolves to the global, so adding a definition never changes what an existing `$ref` expands to. The SDK emits `definition-shadowed-by-global` (warning).
   - A definition name declared twice resolves to the first by source-file path, and the SDK emits `merge-collision-definition` (warning).
 - **Validation.** Definitions are validated (selectors, properties, unknown fields) even when nothing references them.
-- **Lint.** Definitions are linted as scoped components, so rules aimed at broad global selectors do not apply to them.
+- **Lint.** Definitions are linted as scoped components, so rules aimed at broad or unscoped selectors (`broad-tag-selector`, `multi-instance-no-property` on the definition's root) do not apply to them. Each view expansion is linted where it lands.
+- **Counts.** Tools that total properties or memory (`stats`) count a definition through its view expansions, once per extraction site, never for its unscoped form; an unreferenced definition contributes nothing.
+- **Search.** Tools that search authored fields (`search`) search `definitions:` too, since a definition's name, selector and memory appear only there.
 
 ### Conformance
 
@@ -89,7 +91,7 @@ Fixture `033-component-definitions` covers referenced-versus-unreferenced matchi
 
 ## Alternatives considered
 
-- **`global: false` on a root-level component.** This also works, but it overloads one list with two semantics, and a reader has to inspect every entry to know what a file matches. A separate list makes "matched everywhere" versus "matched where referenced" visible at a glance, and it keeps the formatter's per-list sort and the schema simple.
+- **One root list with a discriminator** (`global: false` on a root-level component, or a `kind:` field). This also works, but it overloads one list with two semantics, and a reader has to inspect every entry to know what a file matches. A separate list makes "matched everywhere" versus "matched where referenced" visible at a glance, and it keeps the formatter's per-list sort and the schema simple. It also keeps every existing consumer that walks `components:` as globals (coverage, export, extensions) correct without change: they never see a non-global there. A per-entry flag defaulting to global would be silently ignored by every consumer that predates it, matching the definition everywhere: the exact failure this SEP removes.
 - **Make root-level components non-global, and add an explicit `global: true`.** This is the cleaner end state, but it is a breaking change to every existing corpus, which relies on root-level `components:` matching everywhere.
 - **Allow `$ref` to a view-scoped component.** This couples views to one another, and the registry would depend on view order and routing. Shared structure belongs at the root.
 - **Do nothing.** The status quo forces the inline-everywhere and pad-every-selector workarounds described in Motivation.

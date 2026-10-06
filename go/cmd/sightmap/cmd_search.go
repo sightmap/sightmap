@@ -16,8 +16,11 @@ import (
 type srchFile struct {
 	Version    int        `yaml:"version"`
 	Components []srchComp `yaml:"components"`
-	Views      []srchView `yaml:"views"`
-	Requests   []srchReq  `yaml:"requests"`
+	// Definitions (SEP-0019) are authored like components; views hold only
+	// $refs to them, so their fields are searchable only here.
+	Definitions []srchComp `yaml:"definitions"`
+	Views       []srchView `yaml:"views"`
+	Requests    []srchReq  `yaml:"requests"`
 }
 
 type srchReq struct {
@@ -118,9 +121,13 @@ func runSearch(args []string) error {
 			return nil
 		}
 
-		// Walk top-level components.
+		// Walk top-level components and definitions.
 		for _, comp := range sf.Components {
 			n := searchComp(comp, re, *field, []string{relPath}, relPath, "", "")
+			matchCount += n
+		}
+		for _, comp := range sf.Definitions {
+			n := searchComp(comp, re, *field, []string{relPath + " [definitions]"}, relPath, "", "")
 			matchCount += n
 		}
 

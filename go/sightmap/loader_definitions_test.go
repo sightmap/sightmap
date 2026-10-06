@@ -154,3 +154,118 @@ definitions:
 		t.Errorf("want exactly the nested bogus key flagged (definitions itself is known), got %v", unknown)
 	}
 }
+
+// Duplicate global names resolve $ref to the first by source-file path (spec
+// "Lookup scope"; merge-collision-component warns). Before SEP-0019 the loader
+// let the last one win, contradicting the spec.
+func TestDuplicateGlobalRefFirstByPath(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.yaml"), `
+version: 1
+components:
+  - name: Nav
+    selector: nav.a
+`)
+	writeFile(t, filepath.Join(dir, "b.yaml"), `
+version: 1
+components:
+  - name: Nav
+    selector: nav.b
+views:
+  - name: V
+    route: /
+    components:
+      - name: Shell
+        selector: .shell
+        children:
+          - $ref: Nav
+`)
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sel string
+	for _, d := range c.Views[0].Components {
+		if d.Name == "Nav" {
+			sel = d.Selectors[0]
+		}
+	}
+	if sel != ".shell nav.a" {
+		t.Errorf("$ref Nav expanded to %q, want the first by path (.shell nav.a)", sel)
+	}
+}
+
+// A definition's root is matched only where a view references it, scoped by
+// the reference, so lint does not flag its bare selector as multi-instance.
+func TestDefinitionRootNotLintedAsUnscoped(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "components.yaml"), `
+version: 1
+components:
+  - name: Chip
+    selector: span
+definitions:
+  - name: AddToCart
+    selector: button
+views:
+  - name: V
+    route: /
+    components:
+      - name: Card
+        selector: .card
+        children:
+          - $ref: AddToCart
+`)
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flagged := map[string]bool{}
+	for _, w := range sightmap.Lint(c) {
+		if w.Rule == "multi-instance-no-property" {
+			flagged[w.Component] = true
+		}
+	}
+	if flagged["AddToCart"] {
+		t.Error("definition root AddToCart flagged multi-instance-no-property; it is only matched scoped")
+	}
+	if !flagged["Chip"] {
+		t.Error("global Chip (bare span) should still be flagged: the rule must keep working for globals")
+	}
+}
+
+// Stats counts a definition's properties and memory once per extraction site
+// (each scoped expansion), never for its unscoped root form, and not at all
+// when no view references it.
+func TestStatsCountsDefinitionsThroughExpansions(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "components.yaml"), `
+version: 1
+definitions:
+  - name: ProductCard
+    selector: '[data-component="ProductCard"]'
+    memory: [one memory]
+    properties:
+      - name: title
+        extract: text
+  - name: Unused
+    selector: .unused
+    memory: [never counted]
+views:
+  - name: Search
+    route: /s
+    components:
+      - name: Results
+        selector: ul.results
+        children:
+          - $ref: ProductCard
+`)
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := c.Stats()
+	if s.Properties != 1 || s.Memory != 1 {
+		t.Errorf("Properties=%d Memory=%d, want 1 and 1 (the one scoped expansion)", s.Properties, s.Memory)
+	}
+}

@@ -62,7 +62,7 @@ func Lint(c *Corpus) []LintWarning {
 	// Lint definitions (SEP-0019) as scoped: a definition is matched only
 	// where a view references it, so the broad-tag rule does not apply.
 	for _, comp := range c.Definitions {
-		warnings = append(warnings, lintComponent(comp, false)...)
+		warnings = append(warnings, lintDefinition(comp, nil)...)
 	}
 
 	// Lint view components (isGlobal=false).
@@ -229,7 +229,7 @@ func LintWithCounts(c *Corpus, counts map[string]int) []LintWarning {
 	}
 
 	for _, comp := range c.Definitions {
-		warnings = append(warnings, lintComponentWithCounts(comp, false, counts)...)
+		warnings = append(warnings, lintDefinition(comp, counts)...)
 	}
 
 	for _, view := range c.Views {
@@ -286,6 +286,25 @@ func lintMessageLevels(msgs []MessageDef) []LintWarning {
 // global controls whether rules restricted to global scope are applied.
 func lintComponent(comp ComponentDef, global bool) []LintWarning {
 	return lintComponentWithCounts(comp, global, nil)
+}
+
+// lintDefinition lints one flattened file-root definition (SEP-0019). A
+// definition is matched only through a $ref, scoped by the reference, so its
+// root's selector is never applied unscoped: multi-instance-no-property does
+// not apply to the root (each view expansion carries a parent chain and is
+// linted as such). Its descendants already carry a parent chain.
+func lintDefinition(comp ComponentDef, counts map[string]int) []LintWarning {
+	ws := lintComponentWithCounts(comp, false, counts)
+	if len(comp.ParentChain) > 0 {
+		return ws
+	}
+	out := ws[:0]
+	for _, w := range ws {
+		if w.Rule != "multi-instance-no-property" {
+			out = append(out, w)
+		}
+	}
+	return out
 }
 
 // lintComponentWithCounts is the full implementation of per-component lint
