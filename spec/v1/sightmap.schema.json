@@ -37,6 +37,11 @@
       "description": "Global components — matched against every view. Entries may be either inline definitions or {\"$ref\": ComponentName} reference objects (see SEP-0002).",
       "items": { "$ref": "#/$defs/componentOrRef" }
     },
+    "definitions": {
+      "type": "array",
+      "description": "Shared component definitions — addressable by {\"$ref\": ComponentName} from any components: or children: list, but never matched on their own. A view receives a definition only where it references one, scoped by the reference's position. See SEP-0019.",
+      "items": { "$ref": "#/$defs/componentOrRef" }
+    },
     "requests": {
       "type": "array",
       "description": "Global requests — matched against every view.",

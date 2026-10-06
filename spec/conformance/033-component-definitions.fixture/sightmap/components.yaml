@@ -1,0 +1,10 @@
+version: 1
+components:
+  - name: SiteHeader
+    selector: '#header'
+definitions:
+  - name: ProductCard
+    selector: '[data-component="ProductCard"]'
+    children:
+      - name: Title
+        selector: h3

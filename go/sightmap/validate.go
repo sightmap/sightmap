@@ -62,6 +62,14 @@ func Validate(c *Corpus) []ValidationError {
 		errs = append(errs, validateComponent(comp, globalNames)...)
 	}
 
+	// Check file-root definitions (SEP-0019). They are validated even when no
+	// view references them, so a broken shared definition surfaces before its
+	// first use.
+	defNames := make(map[string]string)
+	for _, comp := range c.Definitions {
+		errs = append(errs, validateComponent(comp, defNames)...)
+	}
+
 	// Check views.
 	for _, view := range c.Views {
 		if view.Name == "" {

@@ -44,6 +44,7 @@ type rawFile struct {
 	Origins      map[string]string `yaml:"origins"`
 	Memory       []string          `yaml:"memory"`
 	Components   []rawComponent    `yaml:"components"`
+	Definitions  []rawComponent    `yaml:"definitions"`
 	Views        []rawView         `yaml:"views"`
 	Requests     []rawRequest      `yaml:"requests"`
 	Messages     []rawMessage      `yaml:"messages"`
@@ -237,6 +238,7 @@ func loadDir(path string) (*Corpus, error) {
 
 	var memory []string
 	var globalRaws []rawComponent
+	var definitionRaws []rawComponent
 	var globalRequestRaws []rawRequest
 	var messageRaws []rawMessage
 	var signalRaws []rawSignal
@@ -267,6 +269,9 @@ func loadDir(path string) (*Corpus, error) {
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
 		}
+		if len(rf.Definitions) > 0 {
+			definitionRaws = append(definitionRaws, rf.Definitions...)
+		}
 		if len(rf.Requests) > 0 {
 			globalRequestRaws = append(globalRequestRaws, rf.Requests...)
 		}
@@ -281,11 +286,23 @@ func loadDir(path string) (*Corpus, error) {
 		}
 	}
 
-	// Build the global registry used for $ref resolution.
-	reg := make(map[string]rawComponent, len(globalRaws))
+	// Build the registry used for $ref resolution: file-root globals and
+	// file-root definitions (SEP-0019) share one namespace. A global wins a
+	// name clash, so adding a definition never changes what an existing $ref
+	// expands to.
+	reg := make(map[string]rawComponent, len(globalRaws)+len(definitionRaws))
 	for _, gc := range globalRaws {
 		if gc.Name != "" {
-			reg[gc.Name] = gc
+			if _, dup := reg[gc.Name]; !dup {
+				reg[gc.Name] = gc
+			}
+		}
+	}
+	for _, dc := range definitionRaws {
+		if dc.Name != "" {
+			if _, dup := reg[dc.Name]; !dup {
+				reg[dc.Name] = dc
+			}
 		}
 	}
 
@@ -298,9 +315,15 @@ func loadDir(path string) (*Corpus, error) {
 	// under several parents yields multiple same-name entries, which would
 	// otherwise look like a collision.
 	ctx.diagnostics = append(ctx.diagnostics, globalNameCollisions(globalRaws)...)
+	ctx.diagnostics = append(ctx.diagnostics, definitionNameCollisions(globalRaws, definitionRaws)...)
 
 	// Flatten global components (hierarchy → compound descendant selectors).
 	globalComps := flattenAll(globalRaws, ctx, 0)
+
+	// Flatten definitions too, so validation and lint see a definition no view
+	// references yet. They are never matched on their own (not in
+	// GlobalComponents); a view receives one only through a $ref.
+	definitionComps := flattenAll(definitionRaws, ctx, 0)
 
 	// Global (file-root) request definitions. Requests are flat — no $ref,
 	// hierarchy, or selector cascade — so they convert directly.
@@ -357,6 +380,7 @@ func loadDir(path string) (*Corpus, error) {
 	return &Corpus{
 		Memory:           memory,
 		GlobalComponents: globalComps,
+		Definitions:      definitionComps,
 		Views:            views,
 		Requests:         globalRequests,
 		Messages:         toMessageDefs(messageRaws),
@@ -630,6 +654,41 @@ func globalNameCollisions(globals []rawComponent) []ValidationError {
 	return out
 }
 
+// definitionNameCollisions warns when a file-root definition shares a name
+// with another definition (first by path wins) or with a file-root global
+// (the global wins, and stays matched on every view).
+func definitionNameCollisions(globals, defs []rawComponent) []ValidationError {
+	isGlobal := map[string]bool{}
+	for _, g := range globals {
+		isGlobal[g.Name] = true
+	}
+	seen := map[string]bool{}
+	var out []ValidationError
+	for _, d := range defs {
+		if d.Name == "" {
+			continue
+		}
+		switch {
+		case isGlobal[d.Name]:
+			out = append(out, ValidationError{
+				Component: d.Name,
+				Code:      "definition-shadowed-by-global",
+				Severity:  SeverityWarning,
+				Message:   fmt.Sprintf("definition %q has the same name as a global component; $ref resolves to the global, and the definition is unused", d.Name),
+			})
+		case seen[d.Name]:
+			out = append(out, ValidationError{
+				Component: d.Name,
+				Code:      "merge-collision-definition",
+				Severity:  SeverityWarning,
+				Message:   fmt.Sprintf("definition name %q is defined more than once; $ref resolves to the first (by source-file path)", d.Name),
+			})
+		}
+		seen[d.Name] = true
+	}
+	return out
+}
+
 // flattenCtx carries the shared state for a flattening pass: the $ref registry
 // and any structural diagnostics discovered along the way (currently circular
 // $ref chains, which are expanded away and so invisible downstream).
@@ -705,7 +764,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 				Component: rc.Ref,
 				Code:      "ref-unresolved",
 				Severity:  SeverityError,
-				Message:   fmt.Sprintf("$ref %q does not resolve to any global component", rc.Ref),
+				Message:   fmt.Sprintf("$ref %q does not resolve to any global component or definition", rc.Ref),
 			})
 			return nil
 		}

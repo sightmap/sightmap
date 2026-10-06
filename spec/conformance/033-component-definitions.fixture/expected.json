@@ -1,0 +1,37 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": { "valid": true, "diagnostics": [] }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/s/drills" },
+      "expected": {
+        "result": {
+          "view": { "name": "Search" },
+          "components": [
+            { "name": "Results", "scope": "view-scoped", "scopedToView": "Search" },
+            { "name": "ProductCard", "scope": "view-scoped", "scopedToView": "Search" },
+            { "name": "Title", "scope": "view-scoped", "scopedToView": "Search" },
+            { "name": "SiteHeader", "scope": "global" }
+          ]
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/" },
+      "expected": {
+        "result": {
+          "view": { "name": "Home" },
+          "components": [
+            { "name": "Hero", "scope": "view-scoped", "scopedToView": "Home" },
+            { "name": "SiteHeader", "scope": "global" }
+          ]
+        }
+      }
+    }
+  ]
+}

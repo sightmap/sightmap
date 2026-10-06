@@ -22,6 +22,7 @@ origins:     # optional, map of origin name to URL: shared origins
 memory:      # optional, string[] — file-level notes (see "Memory")
 views:       # optional, View[]
 components:  # optional, Component[] — global, matched on every view
+definitions: # optional, Component[] — shared, matched only where $ref'd
 requests:    # optional, Request[] — global, matched on every view
 messages:    # optional, Message[] — console/exception patterns
 signals:     # optional, Signal[] — named state predicates (see "Signal")
@@ -35,6 +36,7 @@ signals:     # optional, Signal[] — named state predicates (see "Signal")
 | `memory` | string[] | no | File-level memory entries. Surfaced as context to the agent for any view in this file. |
 | `views` | [View](#view)[] | no | Views defined in this file. |
 | `components` | (Component \| [ComponentRef](#component-references))[] | no | **Global** components — matched against every view. Entries may be either inline definitions or `$ref` reference objects. |
+| `definitions` | (Component \| [ComponentRef](#component-references))[] | no | **Shared** component definitions — addressable by `$ref`, never matched on their own. See [Definitions](#definitions). |
 | `requests` | [Request](#request)[] | no | **Global** requests — matched against every view. |
 | `messages` | [Message](#message)[] | no | Console-output and exception patterns. Corpus-root only; there is no view-scoped form. |
 | `signals` | [Signal](#signal)[] | no | Named state predicates over a component or view. Corpus-root only. |
@@ -111,13 +113,13 @@ Any entry in a `components:` array — at file root, within a view, or under `ch
 - $ref: ComponentName
 ```
 
-A reference is expanded inline (deep copy) to the named component's full definition before matching. The name is resolved against a **registry** built from the root-level `components:` arrays of all loaded files. Nested children of an inlined definition are themselves re-expanded if they contain further `$ref` entries.
+A reference is expanded inline (deep copy) to the named component's full definition before matching. The name is resolved against a **registry** built from the root-level `components:` and `definitions:` arrays of all loaded files. Nested children of an inlined definition are themselves re-expanded if they contain further `$ref` entries.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `$ref` | string | yes | Name of a component defined at file root. The entry MUST contain no other keys. |
+| `$ref` | string | yes | Name of a component defined at file root (`components:` or `definitions:`). The entry MUST contain no other keys. |
 
-**Lookup scope.** Only components defined at the **root** of some file's `components:` array are addressable. Components nested under `children:`, or defined inside a view's `components:`, are not in the registry. First-seen wins on duplicate names (sorted by source-file path); SDKs SHOULD emit a `merge-collision-component` warning.
+**Lookup scope.** Only components defined at the **root** of some file's `components:` or `definitions:` array are addressable. Globals and definitions share one namespace; on a clash the global wins (SDKs SHOULD emit `definition-shadowed-by-global`). Components nested under `children:`, or defined inside a view's `components:`, are not in the registry. First-seen wins on duplicate names (sorted by source-file path); SDKs SHOULD emit a `merge-collision-component` warning.
 
 **Conformance.** SDKs MUST expand `$ref` entries before matching, MUST emit `ref-unresolved` (error) for an unknown name, MUST emit `ref-circular` (error) for a self-referential chain, and MUST NOT produce two matches for the same view when a view-scoped `$ref` and a file-root global share a name (the view-scoped expansion subsumes the global for that view).
 
@@ -684,12 +686,39 @@ A URL matches a view or request by path alone, exactly as in [Route matching](#r
 
 A corpus that declares neither field anywhere produces none of these.
 
+## Definitions
+
+A file-root `definitions:` list declares components that are **shared but not global**: each one is addressable by `$ref` exactly like a root-level component, but is never matched on its own. A view receives a definition only where it references one, and the reference's position scopes it — a `$ref` under `children:` inherits its parent's selector, just like an inline child.
+
+```yaml
+definitions:
+  - name: ProductCard               # shared — matched only where referenced
+    selector: '[data-component="ProductCard"]'
+    children:
+      - name: Title
+        selector: h3
+
+views:
+  - name: Search
+    route: /s/**
+    components:
+      - name: Results
+        selector: ul.results
+        children:
+          - $ref: ProductCard       # matched as "ul.results [data-component=ProductCard]"
+```
+
+Use a definition when one structure recurs under several parents or views but its selector is only unambiguous in context (a bare `img`, `button`, or `h3` inside a card). As a global, such a selector would claim every matching element on every page.
+
+**Conformance.** SDKs MUST include `definitions:` in the `$ref` registry, MUST NOT match a definition except through a `$ref` expansion, MUST resolve a name defined both as a global and as a definition to the global, and SHOULD emit `merge-collision-definition` (warning) for a definition name declared more than once (first by source-file path wins). See [SEP-0019](../seps/0019-component-definitions.md).
+
 ## Global vs view-scoped
 
 Components and requests can be declared at the file root or nested inside a view.
 
 - **Global** (`components:` or `requests:` at file root): matched against every view.
 - **View-scoped** (nested inside a `view`): matched only when that view is active.
+- **Definitions** (`definitions:` at file root): never matched on their own; see [Definitions](#definitions).
 - They are **additive**. A view that defines its own components receives both the global components and its own.
 
 ```yaml

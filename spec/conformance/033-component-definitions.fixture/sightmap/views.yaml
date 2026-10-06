@@ -1,0 +1,14 @@
+version: 1
+views:
+  - name: Search
+    route: /s/**
+    components:
+      - name: Results
+        selector: ul.results
+        children:
+          - $ref: ProductCard
+  - name: Home
+    route: /
+    components:
+      - name: Hero
+        selector: .hero
