@@ -67,6 +67,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 029 | `extract-legacy-forms` | Every deprecated string extract form (component `text`/`raw_text`/`attr=`/`PATH.prop`/`exists:`, request and message `source`/`field`) loads lowered to its object equivalent and warns `extract-legacy-form` ([SEP-0017](../seps/0017-extract-object.md)) |
 | 030 | `extract-object` | The `extract` object on components (every `dom.*` source, a `Name[]` path with `join`, `component.exists`, `pattern` on a component read), requests and messages validates clean ([SEP-0017](../seps/0017-extract-object.md)) |
 | 031 | `route-binding-conflict` | A property named like a `:name` binding the view or request still produces → `route-binding-conflict`, whatever its source; a `url.path` entry renames its segment and frees the name ([SEP-0008](../seps/0008-url-properties.md)) |
+| 032 | `selector-profile` | Every selector must be chain-evaluable and in the `capture-baseline` profile, and must not select nearly every element: errors on a component declaring `privacy` or `watch` (including a child whose flattened selector inherits a parent's `:has()`), warnings otherwise; `privacy-unmask-broad` on an `unmask` of a bare type ([SEP-0018](../seps/0018-chain-evaluable-selectors.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 
