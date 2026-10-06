@@ -4,11 +4,13 @@ title: Component visibility reporting via `watch`
 author: Clint Ayres (@jurassix)
 status: Accepted
 created: 2026-09-29
-updated: 2026-10-02
+updated: 2026-10-07
 spec-version-target: 1
 related-issues: []
 related-discussions: []
 ---
+
+> **Amended 2026-10-07.** A watched component is reported wherever its selector matches, whichever component names the element, and an element several watched components match is reported for each, under each component's name.
 
 ## Summary
 
@@ -111,6 +113,10 @@ deliberate: privacy is a restriction, where covering the subtree is the safe def
 generates records, where covering a subtree silently would multiply them. Watching children means
 marking the children.
 
+**`watch` does not depend on naming.** A watched component is reported wherever its selector
+matches, even when another component names the element. An element that several watched components
+match is reported once for each, under each component's own name.
+
 **Each matched element is reported separately.** A component matching several elements on a page
 yields one lifecycle per element, not one for the component. A consumer that cannot distinguish
 instances MUST still report at least the first.
@@ -154,6 +160,8 @@ A conforming consumer that reports visibility MUST:
   interaction with it ever occurs.
 - Treat `watch: false` and an absent `watch` identically.
 - Apply `watch` to the component it is declared on only, never to its `children`.
+- Report a watched component wherever its selector matches, independent of which component names
+  the element, and report an element once for each watched component that matches it.
 
 A conforming consumer that does not report visibility at all, such as an offline matcher or a
 documentation generator, MUST accept and ignore the field.

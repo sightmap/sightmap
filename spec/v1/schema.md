@@ -774,6 +774,8 @@ Repeat reports SHOULD be collapsed: an element that leaves and re-enters the vie
 
 **`watch` applies to the component it is declared on, never to its `children`.** This is the opposite of [`privacy`](#privacy), deliberately: privacy is a restriction, where covering the subtree is the safe default, while `watch` generates records, where covering a subtree silently would multiply them.
 
+**`watch` does not depend on naming.** A watched component is reported wherever its selector matches, even when another component names the element, and an element several watched components match is reported once for each, under each component's name.
+
 **A consumer's interactivity heuristic MUST NOT suppress a watched component.** A consumer that would otherwise skip an element because it is not interactive MUST report a watched one anyway — without this, the field does nothing for exactly the non-interactive components that motivate it. Other filters a consumer applies for its own correctness are unaffected, but it SHOULD surface that it dropped the request rather than ignoring it.
 
 `watch: false` is identical to omitting the field. `watch` takes no part in route matching, component identity, or specificity.
@@ -803,11 +805,13 @@ A component may declare `privacy`, stating whether a capture consumer — anythi
 |---|---|
 | `block` | The element and its subtree MUST NOT be captured. Neither content nor structure is retained. |
 | `mask` | The element's structure and layout MAY be captured; its text, input values, and attribute values MUST NOT be, except the interactive-state attributes noted below. |
-| `unmask` | The element and its subtree are captured in full, overriding any enclosing `block` or `mask`. |
+| `unmask` | The element and its subtree are captured in full, overriding an enclosing `mask`. It never overrides a `block`. |
 
 A declaration applies to the matched element **and its entire subtree**, so masking a form masks the fields inside it without naming each one.
 
-**Resolution is nearest-enclosing wins** — the same rule component identity follows, and deliberately *not* the union rule [`tags`](#tags) uses. A union is right for classification, where more labels are additive; it is wrong for a directive, where two applicable values are a contradiction that must be decided rather than merged. This is also what makes `unmask` meaningful: it is inert in isolation and exists to carve one safe element out of a broader restriction.
+**Every matching component declares.** A component's declaration applies wherever its selector matches, whichever component names the element, so a broader component that names an element never discards a narrower component's declaration on it. Where several components declare on one element, the strictest wins: `block` over `mask` over `unmask`. An unrecognized value is treated as `block`.
+
+**Across ancestors, the nearest declaration wins, except that `block` is absolute.** An `unmask` inside a `mask` reopens its subtree and a `mask` inside that closes it again, but nothing reopens a `block`: a recording client that never records a blocked subtree cannot honor an `unmask` inside it. Two applicable directives are decided this way rather than merged, deliberately unlike the union rule [`tags`](#tags) uses: a union is right for classification, where more labels are additive, and wrong for a directive, where two values contradict.
 
 **Omission declares nothing.** A component with no `privacy` field makes no statement, and the consumer's own default is unchanged. A corpus can adopt the field one component at a time without implying anything about the rest.
 
