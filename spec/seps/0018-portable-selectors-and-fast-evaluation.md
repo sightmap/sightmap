@@ -205,23 +205,25 @@ New conformance fixture: `032-selector-profile` (validation and diagnostics).
 ## Evidence
 
 The reference implementation: #495 (`ParseProfileSelector`, the profile grammar with coded
-rejections), #496 (validation, fixture `032-selector-profile`), and the out-of-profile handling,
-consumer rules and ancestor-path resolution built on them.
+rejections), #496 (validation, fixture `032-selector-profile`), and a PR stacked on them with the
+out-of-profile handling, consumer rules and ancestor-path resolution (`PrivacyForChain`,
+`WatchedForChain`, `PrivacyAttributes`).
 
 **Ancestor path equals the whole page.** For every node of 80 seeded pages, each with a random
-corpus in which about half the components declare privacy (some of it outside the profile), the
-privacy resolved from the node's ancestor path alone, the privacy resolved over the whole page, and an
-independent oracle agree: 24,000 nodes.
+corpus in which about half the components declare privacy and a quarter declare watch (some of both
+outside the profile), the privacy and watch resolved from the node's ancestor path alone, those
+resolved over the whole page, and an independent oracle agree: 24,000 nodes.
 
-**Cost per interaction.** Apple M5 Pro, Go 1.26.7, resolving one element from its ancestor path:
+**Cost per interaction.** Apple M5 Pro, Go 1.26.7, resolving one element's privacy from its ancestor
+path:
 
 | Ancestor depth | 10 rules | 100 rules | 1,000 rules |
 |---|---|---|---|
-| 8 | 0.57 µs | 0.56 µs | 2.1 µs |
-| 32 | 2.1 µs | 2.1 µs | 7.6 µs |
-| 128 | 8.0 µs | 10.0 µs | 45.6 µs |
+| 8 | 0.52 µs | 0.50 µs | 1.96 µs |
+| 32 | 1.74 µs | 1.74 µs | 6.76 µs |
+| 128 | 7.22 µs | 8.37 µs | 46.0 µs |
 
-Allocations stay between 11 and 38 per call.
+Allocations stay between 11 and 36 per call.
 
 **Existing corpora.** None of the 37 corpora in this repository gains a diagnostic. One real corpus
 tests one attribute twice (`[class*="..."][class*="..."]`) to target generated class names, which is
