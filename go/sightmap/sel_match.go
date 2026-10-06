@@ -261,6 +261,17 @@ func (el *Element) Attr(key string) (string, bool) {
 	if v, ok := el.Attrs[key]; ok {
 		return v, true
 	}
+	// Selector keys are lowercased at parse time (HTML attribute names are
+	// ASCII case-insensitive), but captures keep the DOM's spelling, which for
+	// SVG is camelCase (viewBox, preserveAspectRatio). Retry under that
+	// spelling so [viewBox="0 0 24 24"] matches offline as it does in a browser.
+	if len(el.Attrs) > 0 {
+		if dom := foreignAttrName(key); dom != "" {
+			if v, ok := el.Attrs[dom]; ok {
+				return v, true
+			}
+		}
+	}
 	switch key {
 	case "id":
 		if el.Id != "" {
@@ -281,6 +292,13 @@ func (el *Element) Attr(key string) (string, bool) {
 func (el *Element) HasAttr(key string) bool {
 	if _, ok := el.Attrs[key]; ok {
 		return true
+	}
+	if len(el.Attrs) > 0 {
+		if dom := foreignAttrName(key); dom != "" {
+			if _, ok := el.Attrs[dom]; ok {
+				return true
+			}
+		}
 	}
 	switch key {
 	case "id":
@@ -369,4 +387,134 @@ func includesWord(s, word string) bool {
 		}
 	}
 	return false
+}
+
+// foreignAttrName returns the mixed-case spelling the HTML parser gives key on
+// SVG and MathML elements ("adjust SVG attributes" and "adjust MathML
+// attributes" in the HTML spec), or "" when it has none. These are the only
+// mixed-case attribute names a parsed HTML document produces. A switch rather
+// than a map: most Attr calls miss, and hashing key on each miss showed up in
+// BenchmarkFindAllMatches.
+func foreignAttrName(key string) string {
+	switch key {
+	case "attributename":
+		return "attributeName"
+	case "attributetype":
+		return "attributeType"
+	case "basefrequency":
+		return "baseFrequency"
+	case "baseprofile":
+		return "baseProfile"
+	case "calcmode":
+		return "calcMode"
+	case "clippathunits":
+		return "clipPathUnits"
+	case "definitionurl":
+		return "definitionURL"
+	case "diffuseconstant":
+		return "diffuseConstant"
+	case "edgemode":
+		return "edgeMode"
+	case "filterunits":
+		return "filterUnits"
+	case "glyphref":
+		return "glyphRef"
+	case "gradienttransform":
+		return "gradientTransform"
+	case "gradientunits":
+		return "gradientUnits"
+	case "kernelmatrix":
+		return "kernelMatrix"
+	case "kernelunitlength":
+		return "kernelUnitLength"
+	case "keypoints":
+		return "keyPoints"
+	case "keysplines":
+		return "keySplines"
+	case "keytimes":
+		return "keyTimes"
+	case "lengthadjust":
+		return "lengthAdjust"
+	case "limitingconeangle":
+		return "limitingConeAngle"
+	case "markerheight":
+		return "markerHeight"
+	case "markerunits":
+		return "markerUnits"
+	case "markerwidth":
+		return "markerWidth"
+	case "maskcontentunits":
+		return "maskContentUnits"
+	case "maskunits":
+		return "maskUnits"
+	case "numoctaves":
+		return "numOctaves"
+	case "pathlength":
+		return "pathLength"
+	case "patterncontentunits":
+		return "patternContentUnits"
+	case "patterntransform":
+		return "patternTransform"
+	case "patternunits":
+		return "patternUnits"
+	case "pointsatx":
+		return "pointsAtX"
+	case "pointsaty":
+		return "pointsAtY"
+	case "pointsatz":
+		return "pointsAtZ"
+	case "preservealpha":
+		return "preserveAlpha"
+	case "preserveaspectratio":
+		return "preserveAspectRatio"
+	case "primitiveunits":
+		return "primitiveUnits"
+	case "refx":
+		return "refX"
+	case "refy":
+		return "refY"
+	case "repeatcount":
+		return "repeatCount"
+	case "repeatdur":
+		return "repeatDur"
+	case "requiredextensions":
+		return "requiredExtensions"
+	case "requiredfeatures":
+		return "requiredFeatures"
+	case "specularconstant":
+		return "specularConstant"
+	case "specularexponent":
+		return "specularExponent"
+	case "spreadmethod":
+		return "spreadMethod"
+	case "startoffset":
+		return "startOffset"
+	case "stddeviation":
+		return "stdDeviation"
+	case "stitchtiles":
+		return "stitchTiles"
+	case "surfacescale":
+		return "surfaceScale"
+	case "systemlanguage":
+		return "systemLanguage"
+	case "tablevalues":
+		return "tableValues"
+	case "targetx":
+		return "targetX"
+	case "targety":
+		return "targetY"
+	case "textlength":
+		return "textLength"
+	case "viewbox":
+		return "viewBox"
+	case "viewtarget":
+		return "viewTarget"
+	case "xchannelselector":
+		return "xChannelSelector"
+	case "ychannelselector":
+		return "yChannelSelector"
+	case "zoomandpan":
+		return "zoomAndPan"
+	}
+	return ""
 }

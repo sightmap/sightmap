@@ -192,3 +192,17 @@ func TestMatchChain_NoDefs(t *testing.T) {
 		t.Errorf("MatchChain = %v, want nil", got)
 	}
 }
+
+// A captured SVG keeps the DOM's camelCase attribute name, while selector
+// attribute keys are lowercased at parse. Both the presence-only and the
+// value forms must still reach the node through the first-part index.
+func TestMatchChain_CamelCaseSVGAttribute(t *testing.T) {
+	icon := sightmap.Element{Tag: "svg", Attrs: map[string]string{"viewBox": "0 0 24 24"}}
+	for _, sel := range []string{`svg[viewBox="0 0 24 24"]`, `[viewBox]`} {
+		m := chainMatcher(sightmap.ComponentDef{Name: "Icon", Selectors: []string{sel}})
+		got := m.NamesForChain([]sightmap.Element{icon}, "")
+		if want := []string{"Icon"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: NamesForChain = %v, want %v", sel, got, want)
+		}
+	}
+}
