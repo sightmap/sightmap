@@ -245,12 +245,12 @@
         },
         "watch": {
           "type": "boolean",
-          "description": "Ask a capture consumer to report this component's visibility lifecycle (rendered, visible, gone) even when it is never interacted with. Applies to this component only, never its children. A consumer's interactivity filter must not suppress it. See SEP-0015."
+          "description": "Ask a capture consumer to report this component's visibility lifecycle (rendered, visible, gone) even when it is never interacted with. Applies to this component only, never its children, wherever its selector matches, whichever component names the element. A consumer's interactivity filter must not suppress it. See SEP-0015."
         },
         "privacy": {
           "type": "string",
           "enum": ["block", "mask", "unmask"],
-          "description": "Whether a capture consumer may retain this element's content: block withholds it entirely, mask retains structure but not text, unmask overrides an enclosing block/mask. Applies to the matched element and its subtree; nearest-enclosing declaration wins. Omission declares nothing. See SEP-0009."
+          "description": "Whether a capture consumer may retain this element's content: block withholds it entirely, mask retains structure but not text, unmask overrides an enclosing mask (never a block). Applies to the matched element and its subtree, wherever the selector matches, whichever component names the element. The strictest declaration on an element wins; across ancestors the nearest wins, and block is absolute. Omission declares nothing. See SEP-0009."
         },
         "children": {
           "type": "array",

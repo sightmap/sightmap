@@ -4,7 +4,7 @@ title: Component capture privacy via `privacy`
 author: Clint Ayres (@jurassix)
 status: Accepted
 created: 2026-09-29
-updated: 2026-10-02
+updated: 2026-10-07
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -12,14 +12,17 @@ related-discussions: []
 
 > **Extract forms restated by [SEP-0017](0017-extract-object.md).** The rules below name the string extract forms; SEP-0017 restates them per `from` source (`dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`, `component`, `component.exists`) without changing them.
 
+> **Amended 2026-10-07.** Two points of resolution are made precise. Every component whose selector matches an element contributes its declaration, whichever component names the element, and where several declare on one element the strictest wins. And `block` is absolute: an `unmask` overrides an enclosing `mask`, never a `block`.
+
 ## Summary
 
 Add an optional `privacy: block | mask | unmask` field to `Component` entries. It declares
 whether a capture consumer, meaning anything that records the page for later replay or
 analysis, may retain the matched element's content. `block` withholds the element entirely,
 `mask` retains its shape but not its text, and `unmask` retains it in full, overriding a
-broader `block` or `mask` that would otherwise cover it. The directive applies to the matched
-element and its subtree, and the nearest enclosing declaration wins, so the common shape is a
+broader `mask` that would otherwise cover it. The directive applies to the matched element and
+its subtree, the nearest enclosing declaration wins, and a `block` cannot be overridden, so the
+common shape is a
 `mask` on a form with an `unmask` on the one field inside it that is safe to keep. It governs
 [extracted properties](0010-tree-closed-component-properties.md) as well as captured content, at
 the node each value is read from rather than at the component that declared it, and it draws an
@@ -89,7 +92,7 @@ components:
 |---|---|
 | `block` | The element and its subtree MUST NOT be captured. Neither content nor structure is retained. |
 | `mask` | The element's structure and layout MAY be captured; its text, input values, and attribute values MUST NOT be, except the interactive-state attributes named under [Attributes](#attributes-under-mask). |
-| `unmask` | The element and its subtree are captured in full, overriding any enclosing `block` or `mask`. |
+| `unmask` | The element and its subtree are captured in full, overriding an enclosing `mask`. It never overrides a `block`. |
 
 ### JSON Schema
 
@@ -104,11 +107,20 @@ components:
 **Scope.** A declaration applies to the matched element and every descendant of it, not only to
 the element itself. Masking a form masks the fields inside it without naming each one.
 
-**Resolution is nearest-enclosing wins**, the same rule component *identity* already follows.
-Where several declarations cover one element, the one on the innermost matching component decides,
-and it decides for that component's whole subtree until another declaration overrides it again.
-This is what makes `unmask` meaningful: it has no effect in isolation, and exists so an author can
-carve one safe element out of a broader restriction.
+**Every matching component declares.** A component's declaration applies wherever its selector
+matches, whichever component names the element. Naming picks one component per element; privacy
+does not, so a broader component that names an element never discards a narrower component's
+declaration on it. Where several components declare on one element, the strictest wins: `block`
+over `mask` over `unmask`, consistent with a consumer always being free to withhold more. A
+consumer that meets an unrecognized value treats it as `block`.
+
+**Across ancestors, the nearest declaration wins, except that `block` is absolute.** A declaration
+decides for the element's whole subtree until a nearer one overrides it: an `unmask` inside a
+`mask` reopens its subtree, and a `mask` inside that `unmask` closes it again. Nothing reopens a
+`block`. A recording client that never records a blocked subtree cannot honor an `unmask` inside
+it, so a corpus that relied on one would promise what such a client cannot deliver. This is what
+keeps `unmask` meaningful: it has no effect in isolation, and exists so an author can carve one
+safe element out of a broader `mask`.
 
 Note this deliberately differs from `tags` ([SEP-0004](0004-component-tags.md)), which resolve as a
 union across every applicable definition. A union is right for classification, where more labels
@@ -209,8 +221,11 @@ A conforming capture consumer MUST:
 - Accept `privacy` as an optional `Component` property with the three enumerated values, at every
   depth including recursive `children`.
 - Apply a declaration to the matched element and its entire subtree.
-- Resolve competing declarations by nearest-enclosing, so an inner declaration overrides an outer
-  one for the inner component's subtree.
+- Apply the declaration of every component whose selector matches an element, independent of which
+  component names it, and resolve several declarations on one element to the strictest.
+- Resolve declarations across ancestors by nearest-enclosing, so an inner `mask` or `unmask`
+  overrides an outer one for its subtree, except that nothing overrides a `block`.
+- Treat an unrecognized value as `block`.
 - Treat an absent `privacy` as declaring nothing, and leave its own default behavior unchanged.
 - Never capture content the resolved value marks `block` or `mask`, regardless of its own defaults.
 - Withhold any `properties[]` value whose node resolves to `block` or `mask`, judged at the node
