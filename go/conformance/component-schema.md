@@ -16,9 +16,29 @@ identity for native mobile elements).
 | Classes | []string | `classes` | CSS class list in document order |
 | Attrs | map[string]string | `attrs` | Attribute key→value pairs |
 | AttrOps | map[string]string | `attrOps` | Operator for each Attrs entry where not `"="`. See operators below |
+| RepeatAttrs | []AttrTest | `repeatAttrs` | Further tests on an attribute name already in Attrs, and a repeated `#id`. See below |
 | Not | \*SelectorPart | `not` | If non-nil, the element must NOT match this sub-selector (`:not()`) |
+| Is | []\*SelectorPart | `is` | Alternatives of the first `:is()`/`:where()` on this compound |
+| AndIs | [][]\*SelectorPart | `andIs` | Alternatives of each further `:is()`/`:where()` on the same compound |
 
 All fields are `omitempty` — absent from JSON when zero/nil.
+
+### Repeated tests in one compound
+
+CSS requires every test in a compound to hold, so a name tested twice keeps
+both tests rather than the last. `Attrs`/`AttrOps` hold the first test on each
+attribute name; every further test goes in `RepeatAttrs`, as does a second
+`#id` (`#a#a` matches, `#a#b` matches nothing). `Is` holds the first
+`:is()`/`:where()` list and `AndIs` each further one; the element must match at
+least one alternative of every list.
+
+**AttrTest**
+
+| Field | Type | JSON key | Description |
+|---|---|---|---|
+| Key | string | `key` | Attribute name, lowercase (`"id"` for a repeated `#id`) |
+| Op | string | `op` | One of the operators below |
+| Value | string | `value` | Compared value; absent for `"[]"` |
 
 ### Attribute operators
 
@@ -40,7 +60,7 @@ All others produce a parse error at `sightmap validate` time.
 | Pseudo-class | Notes |
 |---|---|
 | `:not(sel)` | Negation — element must NOT match `sel` |
-| `:is(sel, ...)` | Matches if element matches any of the alternatives |
+| `:is(sel, ...)` | Matches if element matches any of the alternatives. Several on one compound are ANDed (see AndIs) |
 | `:where(sel, ...)` | Same as `:is()` (zero specificity; treated identically here) |
 | `:has(sel)` | Matches if a descendant satisfies `sel` |
 

@@ -15,8 +15,9 @@ func TestMatchChain_LegacyCaseInsensitiveAttributeThroughIndex(t *testing.T) {
 	if got, want := m.NamesForChain([]sightmap.Element{pw}, ""), []string{"Password"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("NamesForChain = %v, want %v", got, want)
 	}
+	// In an HTML document the legacy list applies inside SVG too.
 	inSVG := []sightmap.Element{{Tag: "svg"}, {Tag: "input", Attrs: map[string]string{"type": "PASSWORD"}}}
-	if got := m.NamesForChain(inSVG, ""); got != nil {
-		t.Errorf("inside svg the value is case-sensitive: NamesForChain = %v, want none", got)
+	if got, want := m.NamesForChain(inSVG, ""), []string{"Password"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("inside svg: NamesForChain = %v, want %v", got, want)
 	}
 }

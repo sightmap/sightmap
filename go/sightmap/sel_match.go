@@ -52,14 +52,15 @@ func matchesNodeChain(chain []*ComponentNode, i int, rule *SelectorPart) bool {
 		el = &emptyElement
 	}
 	// Flat identity: tag, id, classes, attributes.
-	if !matchesIdentity(chain[:i+1], el, rule) {
+	if !matchesIdentity(el, rule) {
 		return false
 	}
-	// :is() / :where() — the subject must match at least one alternative.
-	// Evaluated node-aware so an alternative may itself carry :has()/:not().
-	if len(rule.Is) > 0 {
+	// :is() / :where() — the subject must match at least one alternative of
+	// every list on the compound. Evaluated node-aware so an alternative may
+	// itself carry :has()/:not().
+	for _, alts := range isLists(rule) {
 		anyMatch := false
-		for _, alt := range rule.Is {
+		for _, alt := range alts {
 			if matchesNodeChain(chain, i, alt) {
 				anyMatch = true
 				break
@@ -162,14 +163,14 @@ func Matches(el *Element, rule *SelectorPart) bool {
 	if rule == nil {
 		return true
 	}
-	if !matchesIdentity(nil, el, rule) {
+	if !matchesIdentity(el, rule) {
 		return false
 	}
 
-	// :is() / :where() — node must match at least one alternative.
-	if len(rule.Is) > 0 {
+	// :is() / :where() — node must match at least one alternative of every list.
+	for _, alts := range isLists(rule) {
 		anyMatch := false
-		for _, alt := range rule.Is {
+		for _, alt := range alts {
 			if Matches(el, alt) {
 				anyMatch = true
 				break
@@ -196,10 +197,7 @@ func Matches(el *Element, rule *SelectorPart) bool {
 // matchesIdentity checks the identity of el against rule: tag, id, classes,
 // and attribute operators. It ignores the logical/relational pseudos
 // (:is/:not/:has), which the callers layer on with the appropriate context.
-// ancestors is el's root-first chain ending at el's own node, or nil when only
-// el is known; it is consulted only to tell HTML elements from SVG and MathML
-// ones for the attributes whose values HTML compares case-insensitively.
-func matchesIdentity(ancestors []*ComponentNode, el *Element, rule *SelectorPart) bool {
+func matchesIdentity(el *Element, rule *SelectorPart) bool {
 	// Type selectors compare ASCII case-insensitively, as CSS does for HTML
 	// (and as synthetic mobile tags rely on). Unicode folding would also equate
 	// tags CSS keeps apart, such as "a-s" and "a-ſ".
@@ -229,12 +227,12 @@ func matchesIdentity(ancestors []*ComponentNode, el *Element, rule *SelectorPart
 				op = o
 			}
 		}
-		if !attrTestHolds(ancestors, el, key, op, ruleVal) {
+		if !attrTestHolds(el, key, op, ruleVal) {
 			return false
 		}
 	}
 	for _, at := range rule.RepeatAttrs {
-		if !attrTestHolds(ancestors, el, at.Key, at.Op, at.Value) {
+		if !attrTestHolds(el, at.Key, at.Op, at.Value) {
 			return false
 		}
 	}
@@ -242,9 +240,8 @@ func matchesIdentity(ancestors []*ComponentNode, el *Element, rule *SelectorPart
 	return true
 }
 
-// attrTestHolds reports whether el satisfies one attribute test. ancestors is
-// as for matchesIdentity.
-func attrTestHolds(ancestors []*ComponentNode, el *Element, key, op, ruleVal string) bool {
+// attrTestHolds reports whether el satisfies one attribute test.
+func attrTestHolds(el *Element, key, op, ruleVal string) bool {
 	// Every operator, presence-only included, requires the attribute.
 	if !el.HasAttr(key) {
 		return false
@@ -262,12 +259,14 @@ func attrTestHolds(ancestors []*ComponentNode, el *Element, key, op, ruleVal str
 	if attrMatches(op, nodeVal, ruleVal) {
 		return true
 	}
-	// HTML compares some attribute values ASCII case-insensitively on HTML
-	// elements, so input[type=password] matches type="PASSWORD". Checked only
-	// after a case-sensitive miss, so the common path never walks ancestors.
+	// HTML documents compare the values of a fixed list of attributes ASCII
+	// case-insensitively, so input[type=password] matches type="PASSWORD". The
+	// list applies to every element in the document, SVG and MathML included
+	// (verified against Chrome), and never covers a camelCase SVG or MathML
+	// attribute name (foreignAttrName). Checked only after a case-sensitive
+	// miss, so the common path never folds.
 	return AttrValueCaseInsensitive(key) &&
-		attrMatches(op, asciiLower(nodeVal), asciiLower(ruleVal)) &&
-		!isForeign(ancestors, el)
+		attrMatches(op, asciiLower(nodeVal), asciiLower(ruleVal))
 }
 
 // Attr resolves an attribute value on an observed Element the way selector
@@ -564,29 +563,6 @@ func AttrValueCaseInsensitive(name string) bool {
 	return legacyCaseInsensitiveAttrs[name]
 }
 
-// isForeign reports whether el is an SVG or MathML element: the nearest svg,
-// math or foreignObject among el and its ancestors is svg or math. el itself
-// being foreignObject counts as SVG; its content is HTML. ancestors is el's
-// root-first chain ending at el's own node; nil means only el is known.
-func isForeign(ancestors []*ComponentNode, el *Element) bool {
-	switch asciiLower(el.Tag) {
-	case "svg", "math", "foreignobject":
-		return true
-	}
-	for i := len(ancestors) - 2; i >= 0; i-- {
-		if ancestors[i].Element == nil {
-			continue
-		}
-		switch asciiLower(ancestors[i].Element.Tag) {
-		case "foreignobject":
-			return false
-		case "svg", "math":
-			return true
-		}
-	}
-	return false
-}
-
 // asciiEqualFold reports whether a and b are equal under ASCII case folding.
 func asciiEqualFold(a, b string) bool {
 	if len(a) != len(b) {
@@ -621,4 +597,17 @@ func asciiLower(s string) string {
 		}
 	}
 	return s
+}
+
+// isLists returns every :is()/:where() alternative list on rule: the first in
+// Is, the rest in AndIs. Each list must match (CSS ANDs them), while the
+// alternatives within one list are alternatives.
+func isLists(rule *SelectorPart) [][]*SelectorPart {
+	if len(rule.Is) == 0 {
+		return nil
+	}
+	if len(rule.AndIs) == 0 {
+		return [][]*SelectorPart{rule.Is}
+	}
+	return append([][]*SelectorPart{rule.Is}, rule.AndIs...)
 }

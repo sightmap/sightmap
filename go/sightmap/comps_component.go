@@ -32,9 +32,13 @@ type SelectorPart struct {
 	// list inside one :not() both flatten here (both mean "exclude if ANY match").
 	// A plain :not(.foo) is a single entry whose Parts has length 1.
 	Not []ParsedSelector `json:"not,omitempty"`
-	// Is, if non-empty, contains the alternatives from a :is() or :where()
-	// pseudo-class. The element must match at least one alternative.
+	// Is, if non-empty, contains the alternatives from the first :is() or
+	// :where() pseudo-class on this compound. The element must match at least
+	// one alternative.
 	Is []*SelectorPart `json:"is,omitempty"`
+	// AndIs holds the alternatives of each further :is()/:where() on the same
+	// compound (`:is(.a):is(.b)`). Every list must match, as CSS requires.
+	AndIs [][]*SelectorPart `json:"andIs,omitempty"`
 	// Has, if non-empty, contains one entry per :has() pseudo-class on this
 	// compound selector. The element matches only if its subtree satisfies
 	// EVERY entry (multiple :has() are AND-ed). Evaluating :has() requires tree

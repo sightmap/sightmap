@@ -221,17 +221,19 @@ func (p *parser) parseSimpleSelectors() (*SelectorPart, error) {
 			sawAny = true
 
 		case c == '#':
-			// ID selector. A second #id would overwrite the first and match
-			// more than CSS, which requires both.
-			if part.Id != "" {
-				return nil, fmt.Errorf("a compound can have only one #id, at position %d", p.i)
-			}
+			// ID selector. CSS requires every #id in a compound to hold, so a
+			// second one becomes an id attribute test rather than overwriting
+			// the first: #a#a matches, #a#b matches nothing.
 			p.i++
 			id, err := p.parseIdentifier()
 			if err != nil {
 				return nil, fmt.Errorf("id selector: %w", err)
 			}
-			part.Id = id
+			if part.Id != "" {
+				part.RepeatAttrs = append(part.RepeatAttrs, AttrTest{Key: "id", Op: "=", Value: id})
+			} else {
+				part.Id = id
+			}
 			sawAny = true
 
 		case c == '.':
@@ -463,10 +465,6 @@ func (p *parser) parsePseudo(part *SelectorPart) error {
 		return nil
 
 	case "is", "where":
-		if part.Is != nil {
-			// A second list would replace the first rather than also apply.
-			return fmt.Errorf("a compound can have only one :is() or :where()")
-		}
 		if p.i >= len(p.s) || p.s[p.i] != '(' {
 			return fmt.Errorf("expected '(' after :%s", name)
 		}
@@ -492,7 +490,13 @@ func (p *parser) parsePseudo(part *SelectorPart) error {
 			}
 			p.i++ // consume ','
 		}
-		part.Is = alts
+		// CSS requires every :is()/:where() list in a compound to hold, so a
+		// second list is ANDed with the first rather than replacing it.
+		if part.Is == nil {
+			part.Is = alts
+		} else {
+			part.AndIs = append(part.AndIs, alts)
+		}
 		return nil
 
 	default:
