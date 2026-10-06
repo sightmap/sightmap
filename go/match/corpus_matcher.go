@@ -1,6 +1,7 @@
 package match
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -30,6 +31,11 @@ type queryCacheEntry struct {
 	components []sightmap.ComponentDef
 	queries    []MatchQuery
 	index      *firstPartIndex
+	capture    *captureSet
+	// combined is queries followed by the capture rules, so Match resolves
+	// names, privacy and watch in one traversal.
+	combined      []MatchQuery
+	combinedIndex *firstPartIndex
 }
 
 // entryFor returns the cached (or freshly compiled) queries for pageURL.
@@ -44,7 +50,14 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	}
 	compList := m.corpus.ComponentsForURL(pageURL)
 	queries, _ := ParseQueries(compList)
-	e := &queryCacheEntry{components: compList, queries: queries, index: newFirstPartIndex(queries)}
+	e := &queryCacheEntry{
+		components: compList,
+		queries:    queries,
+		index:      newFirstPartIndex(queries),
+		capture:    compileCapture(captureDefsForURL(m.corpus, pageURL)),
+	}
+	e.combined = append(append([]MatchQuery(nil), queries...), e.capture.queries...)
+	e.combinedIndex = newFirstPartIndex(e.combined)
 	m.cache[pageURL] = e
 	return e
 }
@@ -61,26 +74,67 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 
 	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
-	findAllMatches(root, entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
-		if _, already := result[node]; already {
+
+	// Names, privacy and watch resolve in one traversal. A node's matches all
+	// arrive before onNode fires for it, so per-node state needs no maps, and
+	// privacy folds down a depth-indexed stack (SEP-0009). A capture rule never
+	// names a node, whatever its order.
+	var (
+		named    *sightmap.ComponentMatch // the node's first naming match
+		local    int                      // strictest privacy declared on the node
+		watched  []string                 // watched components matching the node
+		watchDef []*sightmap.ComponentDef // their definitions, for identity dedup
+		eff      []int                    // effective privacy by depth
+	)
+	onMatch := func(node *sightmap.ComponentNode, q *MatchQuery) {
+		if q.privacyRank != rankNone || q.watch {
+			local = max(local, q.privacyRank)
+			// Dedupe by definition, not name: a component with several
+			// selectors is recorded once, and two distinct components sharing a
+			// name are both recorded.
+			if q.watch && !slices.Contains(watchDef, q.Def) {
+				watchDef = append(watchDef, q.Def)
+				watched = append(watched, q.Name)
+			}
+			return
+		}
+		if named != nil {
 			return // first-match-wins
 		}
-		cm := &sightmap.ComponentMatch{Name: q.Name}
+		named = &sightmap.ComponentMatch{Name: q.Name}
 		if q.Def != nil {
-			cm.Memory = q.Def.Memory
-			cm.Tags = q.Def.Tags
-			cm.Watch = q.Def.Watch
+			named.Memory = q.Def.Memory
+			named.Tags = q.Def.Tags
 			defByNode[node] = q.Def
 		}
-		result[node] = cm
-	})
+		result[node] = named
+	}
+	onNode := func(_ *sightmap.ComponentNode, depth int) {
+		parent := rankNone
+		if depth > 0 {
+			parent = eff[depth-1]
+		}
+		e := foldRank(parent, local)
+		eff = append(eff[:depth], e)
+		if named != nil {
+			named.Privacy = rankNames[e]
+			if len(watched) > 0 {
+				slices.Sort(watched)
+				named.Watched, named.Watch = watched, true
+			}
+		}
+		named, local, watched, watchDef = nil, rankNone, nil, nil
+	}
+	walkMatches(root, entry.combined, entry.combinedIndex, onMatch, onNode)
 
-	// Resolve declared component properties over the matched tree (SEP-0010):
-	// dom.* sources read the node itself; component and component.exists resolve a
-	// descendant matched component. No live DOM is required.
-	privacy := effectivePrivacy(root, defByNode)
-	for node, cm := range result {
-		cm.Privacy = privacy[node]
+	// Declared component properties resolve over the matched tree (SEP-0010):
+	// dom.* sources read the node itself; component and component.exists resolve
+	// a descendant matched component. No live DOM is required.
+	privacy := func(n *sightmap.ComponentNode) string {
+		if cm := result[n]; cm != nil {
+			return cm.Privacy
+		}
+		return ""
 	}
 	resolveComponentProperties(result, defByNode, privacy)
 	return result

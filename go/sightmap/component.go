@@ -43,11 +43,17 @@ type ComponentMatch struct {
 	Name   string
 	Memory []string
 	Tags   []string
-	// Privacy is the node's effective capture directive (SEP-0009): the declaration
-	// of the nearest enclosing matched component, this one included. "" when no
-	// enclosing component declares one.
+	// Privacy is the node's effective capture directive (SEP-0009), resolved
+	// from every matching component, whichever names the node: "block", "mask",
+	// "unmask", or "" when none applies.
 	Privacy string
-	// Watch is this component's own declaration (SEP-0015); it never inherits.
+	// Watched names every watched component (SEP-0015) whose selector matches
+	// the node, sorted, whichever component names it. One entry per matching
+	// component definition, so a name appears twice when two distinct
+	// components share it (names are unique only per parent). Watch never
+	// inherits.
+	Watched []string
+	// Watch reports whether Watched is non-empty.
 	Watch      bool
 	Properties []PropertyValue
 }

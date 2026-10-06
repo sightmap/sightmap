@@ -19,7 +19,7 @@ import (
 func resolveComponentProperties(
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
-	privacy map[*sightmap.ComponentNode]string,
+	privacy func(*sightmap.ComponentNode) string,
 ) {
 	for node, cm := range result {
 		def := defByNode[node]
@@ -36,46 +36,13 @@ func resolveComponentProperties(
 	}
 }
 
-// effectivePrivacy resolves SEP-0009 privacy for every node under root: a
-// matched component's declaration applies to its subtree, and the nearest
-// enclosing declaration wins. Nodes with no enclosing declaration are absent.
-func effectivePrivacy(
-	root *sightmap.ComponentNode,
-	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
-) map[*sightmap.ComponentNode]string {
-	out := map[*sightmap.ComponentNode]string{}
-	var walk func(n *sightmap.ComponentNode, inherited string)
-	walk = func(n *sightmap.ComponentNode, inherited string) {
-		if def := defByNode[n]; def != nil && def.Privacy != "" {
-			inherited = knownPrivacy(def.Privacy)
-		}
-		if inherited != "" {
-			out[n] = inherited
-		}
-		for _, c := range n.Children {
-			walk(c, inherited)
-		}
-	}
-	walk(root, "")
-	return out
-}
-
-// knownPrivacy fails closed: an unrecognized value (a typo validation would
-// reject) resolves to block rather than overriding an enclosing restriction the
-// way unmask would. Withholding more than the corpus asks is always allowed.
-func knownPrivacy(p string) string {
-	switch p {
-	case "block", "mask", "unmask":
-		return p
-	}
-	return "block"
-}
-
-// withholds reports whether a read from source on a node with effective privacy
-// p must not be surfaced (SEP-0009, per SEP-0017). Content is withheld under
-// block and mask; mask still permits state. component and component.exists read
-// another node and are judged there instead.
-func withholds(p string, e sightmap.Extract) bool {
+// Withholds reports whether a value read by e from a node whose effective privacy
+// is p must not be surfaced (SEP-0009, per SEP-0017). Content is withheld under
+// block and mask; mask still permits state, including a dom.attr read of an
+// interactive-state attribute. component and component.exists read another node
+// and are judged there instead, so they never withhold here. p is a resolved
+// directive, as Matcher.Privacy or ComponentMatch.Privacy report it.
+func Withholds(p string, e sightmap.Extract) bool {
 	switch e.From {
 	case sightmap.FromDOMText, sightmap.FromDOMRawText:
 		return p == "block" || p == "mask"
@@ -99,9 +66,9 @@ func resolveExtract(
 	e sightmap.Extract,
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
-	privacy map[*sightmap.ComponentNode]string,
+	privacy func(*sightmap.ComponentNode) string,
 ) (string, bool) {
-	if withholds(privacy[node], e) {
+	if Withholds(privacy(node), e) {
 		return "", false
 	}
 	switch e.From {
@@ -137,7 +104,7 @@ func resolveExtract(
 
 	case sightmap.FromComponentExists:
 		target := resolvePath(node, e.Path, result)
-		if target == nil || privacy[target] == "block" {
+		if target == nil || privacy(target) == "block" {
 			return "", false
 		}
 		return "true", true
@@ -196,7 +163,7 @@ func readProperty(
 	prop string,
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef,
-	privacy map[*sightmap.ComponentNode]string,
+	privacy func(*sightmap.ComponentNode) string,
 ) (string, bool) {
 	tdef := defByNode[target]
 	if tdef == nil {
