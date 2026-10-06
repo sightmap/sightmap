@@ -14,15 +14,15 @@ func TestValidateComponentSelectors(t *testing.T) {
 	}{
 		{"portable privacy selector is clean", ComponentDef{Name: "A", Selectors: []string{`input[name="cc"]`}, Privacy: "block"}, nil},
 		{"portable naming selector is clean", ComponentDef{Name: "A", Selectors: []string{`.card > .title`}}, nil},
-		{"privacy with :has is an error", ComponentDef{Name: "A", Selectors: []string{`section:has(.x)`}, Privacy: "mask"}, []want{{CodeSelectorNotChainEvaluable, "error"}}},
+		{"privacy with :has is an error", ComponentDef{Name: "A", Selectors: []string{`section:has(.x)`}, Privacy: "mask"}, []want{{CodeSelectorNotInProfile, "error"}}},
 		{"watch with :is is an error", ComponentDef{Name: "A", Selectors: []string{`:is(.a, .b)`}, Watch: true}, []want{{CodeSelectorNotInProfile, "error"}}},
-		{"naming with :has is a warning", ComponentDef{Name: "A", Selectors: []string{`section:has(.x)`}}, []want{{CodeSelectorNotChainEvaluable, "warning"}}},
+		{"naming with :has is a warning", ComponentDef{Name: "A", Selectors: []string{`section:has(.x)`}}, []want{{CodeSelectorNotInProfile, "warning"}}},
 		{"privacy universal subject is an error", ComponentDef{Name: "A", Selectors: []string{`.card > *`}, Privacy: "unmask"}, []want{{CodeSelectorUniversalSubject, "error"}}},
 		{"naming universal subject is a warning", ComponentDef{Name: "A", Selectors: []string{`*`}}, []want{{CodeSelectorUniversalSubject, "warning"}}},
 		{"bare :not subject is universal", ComponentDef{Name: "A", Selectors: []string{`:not(.x)`}, Privacy: "block"}, []want{{CodeSelectorUniversalSubject, "error"}}},
 		{"unmask on a bare type warns", ComponentDef{Name: "A", Selectors: []string{`body`}, Privacy: "unmask"}, []want{{CodePrivacyUnmaskBroad, "warning"}}},
 		{"block on a bare type is fine", ComponentDef{Name: "A", Selectors: []string{`form`}, Privacy: "block"}, nil},
-		{"each alternative is checked", ComponentDef{Name: "A", Selectors: []string{`.ok`, `li:has(.x)`}, Privacy: "block"}, []want{{CodeSelectorNotChainEvaluable, "error"}}},
+		{"each alternative is checked", ComponentDef{Name: "A", Selectors: []string{`.ok`, `li:has(.x)`}, Privacy: "block"}, []want{{CodeSelectorNotInProfile, "error"}}},
 		{"parse failures are reported elsewhere", ComponentDef{Name: "A", Selectors: []string{`[unclosed`}, Privacy: "block"}, nil},
 	}
 	for _, c := range cases {
@@ -52,9 +52,9 @@ func TestValidateComponentSelectors_NamesParentsForAChild(t *testing.T) {
 	}
 }
 
-func TestValidate_SiblingCombinatorParseErrorIsCoded(t *testing.T) {
+func TestValidate_SiblingCombinatorParseErrorHasTheProfileCode(t *testing.T) {
 	errs := validateComponent(ComponentDef{Name: "A", Selectors: []string{`.a + .b`}}, map[string]string{})
-	if len(errs) != 1 || errs[0].Code != CodeSelectorNotChainEvaluable || !errs[0].IsError() {
+	if len(errs) != 1 || errs[0].Code != CodeSelectorNotInProfile || !errs[0].IsError() {
 		t.Fatalf("want one coded parse error, got %v", errs)
 	}
 }

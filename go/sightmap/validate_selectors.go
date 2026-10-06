@@ -17,8 +17,8 @@ const (
 )
 
 // validateComponentSelectors checks each of a component's selectors, after
-// flattening, against SEP-0018: every selector must be chain-evaluable and in
-// the capture-baseline profile, and must not select nearly every element.
+// flattening, against SEP-0018: every selector must be in the capture-baseline
+// profile, and must not select nearly every element.
 // A component that declares privacy or watch is a capture directive, so its
 // findings are errors; on any other component they are warnings for the
 // deprecation window. Selectors the general parser rejects are already
@@ -80,14 +80,16 @@ func inheritedFrom(comp ComponentDef) string {
 	return " (this selector includes its parents' selectors: " + strings.Join(comp.ParentChain, " > ") + ")"
 }
 
-// notChainEvaluableCode returns CodeSelectorNotChainEvaluable when a selector
-// the general parser rejects is rejected because it is not chain-evaluable
-// (a sibling combinator, a positional or state pseudo-class), so the finding
-// says why it can never be supported; otherwise "".
-func notChainEvaluableCode(sel string) string {
-	var pe *ProfileError
-	if _, err := ParseProfileSelector(sel, ProfileCaptureBaseline); errors.As(err, &pe) && pe.Code == CodeSelectorNotChainEvaluable {
-		return pe.Code
+// profileCode returns CodeSelectorNotInProfile when the profile parser also
+// rejects a selector the general parser rejects (a sibling combinator, a
+// positional pseudo-class), so the finding carries the profile's code;
+// otherwise "".
+func profileCode(sel string) string {
+	if _, err := ParseProfileSelector(sel, ProfileCaptureBaseline); err != nil {
+		var pe *ProfileError
+		if errors.As(err, &pe) {
+			return pe.Code
+		}
 	}
 	return ""
 }
