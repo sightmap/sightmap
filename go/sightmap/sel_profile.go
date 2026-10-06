@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-// SelectorProfile names a set of chain-evaluable selector features that every
+// SelectorProfile names the selector features a corpus may use: ones every
 // engine in the profile's baseline implements identically (SEP-0018).
 type SelectorProfile string
 
