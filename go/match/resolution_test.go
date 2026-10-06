@@ -422,33 +422,62 @@ func randomCaptureCorpus(seed uint64, comps int, exotic bool) *sightmap.Corpus {
 }
 
 // oracle resolves privacy and watch independently of the package: the
-// pre-index reference matcher, and SEP-0009's fold written out longhand.
+// pre-index reference matcher, SEP-0009's fold written out longhand, and
+// SEP-0018's handling of rules outside the capture-baseline profile.
 func oracle(root *sightmap.ComponentNode, defs []sightmap.ComponentDef) (map[*sightmap.ComponentNode]string, map[*sightmap.ComponentNode][]string) {
 	rank := map[string]int{"unmask": 1, "mask": 2, "block": 3}
+	floor := 0
 	var queries []match.MatchQuery
+	privacyOf := map[*match.MatchQuery]int{}
+	watchOf := map[*match.MatchQuery]bool{}
+	type pending struct {
+		q     match.MatchQuery
+		r     int
+		watch bool
+	}
+	var ps []pending
 	for _, d := range defs {
 		if d.Privacy == "" && !d.Watch {
 			continue
 		}
-		for _, sel := range d.Selectors {
-			if ps, err := sightmap.ParseSightmapSelector(sel); err == nil {
-				queries = append(queries, match.MatchQuery{Name: d.Name, Parts: ps.Parts, Combinators: ps.Combinators, Def: &d})
+		r := 0
+		if d.Privacy != "" {
+			var ok bool
+			if r, ok = rank[d.Privacy]; !ok {
+				r = 3
 			}
 		}
+		for _, sel := range d.Selectors {
+			parsed, err := sightmap.ParseSightmapSelector(sel)
+			prof, perr := sightmap.ParseProfileSelector(sel, sightmap.ProfileCaptureBaseline)
+			valid := err == nil && perr == nil
+			pr, w := r, d.Watch && valid
+			if pr != 0 && (!valid || prof.Subject().Constraint == sightmap.ConstraintNone) {
+				if pr != 1 && pr > floor {
+					floor = pr
+				}
+				pr = 0
+			}
+			if pr == 0 && !w {
+				continue
+			}
+			ps = append(ps, pending{match.MatchQuery{Name: d.Name, Parts: parsed.Parts, Combinators: parsed.Combinators}, pr, w})
+		}
+	}
+	for _, p := range ps {
+		queries = append(queries, p.q)
+	}
+	for i := range queries {
+		privacyOf[&queries[i]] = ps[i].r
+		watchOf[&queries[i]] = ps[i].watch
 	}
 	local := map[*sightmap.ComponentNode]int{}
 	watched := map[*sightmap.ComponentNode][]string{}
 	referenceFindAllMatches(root, queries, func(node *sightmap.ComponentNode, q *match.MatchQuery) {
-		if p := q.Def.Privacy; p != "" {
-			r, ok := rank[p]
-			if !ok {
-				r = 3
-			}
-			if r > local[node] {
-				local[node] = r
-			}
+		if privacyOf[q] > local[node] {
+			local[node] = privacyOf[q]
 		}
-		if q.Def.Watch && !slices.Contains(watched[node], q.Name) {
+		if watchOf[q] && !slices.Contains(watched[node], q.Name) {
 			watched[node] = append(watched[node], q.Name)
 		}
 	})
@@ -465,6 +494,9 @@ func oracle(root *sightmap.ComponentNode, defs []sightmap.ComponentDef) (map[*si
 		} else if local[n] != 0 {
 			e = local[n]
 		}
+		if floor > e {
+			e = floor
+		}
 		if e > 0 {
 			privacy[n] = names[e]
 		}
@@ -477,8 +509,9 @@ func oracle(root *sightmap.ComponentNode, defs []sightmap.ComponentDef) (map[*si
 }
 
 // TestCapture_EqualsOracle: across seeded pages and corpora with random privacy
-// and watch, Privacy and Watched equal the oracle on every node, and Match
-// reports the same on every node it names.
+// and watch, Privacy and Watched equal the oracle on every node, resolving from
+// each node's ancestor chain alone gives the same answer, and Match reports the
+// same on every node it names.
 func TestCapture_EqualsOracle(t *testing.T) {
 	seen := map[string]int{}
 	nodes, watchedNodes := 0, 0
@@ -489,10 +522,15 @@ func TestCapture_EqualsOracle(t *testing.T) {
 			m := match.NewMatcher(corpus)
 			privacy, watched := m.Privacy(root, ""), m.Watched(root, "")
 			wantP, wantW := oracle(root, corpus.GlobalComponents)
-			var walk func(n *sightmap.ComponentNode)
-			walk = func(n *sightmap.ComponentNode) {
+			var walk func(n *sightmap.ComponentNode, chain []sightmap.Element)
+			walk = func(n *sightmap.ComponentNode, chain []sightmap.Element) {
+				chain = append(slices.Clip(chain), *n.Element)
 				if privacy[n] != wantP[n] || !slices.Equal(watched[n], wantW[n]) {
 					t.Fatalf("seed %d exotic %v: privacy %q watched %v, oracle %q %v", seed, exotic, privacy[n], watched[n], wantP[n], wantW[n])
+				}
+				cp, cw := m.PrivacyForChain(chain, ""), m.WatchedForChain(chain, "")
+				if cp[len(cp)-1] != privacy[n] || !slices.Equal(cw[len(cw)-1], watched[n]) {
+					t.Fatalf("seed %d exotic %v: chain %q %v, tree %q %v", seed, exotic, cp[len(cp)-1], cw[len(cw)-1], privacy[n], watched[n])
 				}
 				seen[privacy[n]]++
 				nodes++
@@ -500,10 +538,10 @@ func TestCapture_EqualsOracle(t *testing.T) {
 					watchedNodes++
 				}
 				for _, c := range n.Children {
-					walk(c)
+					walk(c, chain)
 				}
 			}
-			walk(root)
+			walk(root, nil)
 			for node, cm := range m.Match(root, "") {
 				if cm.Privacy != privacy[node] || !slices.Equal(cm.Watched, watched[node]) {
 					t.Fatalf("seed %d exotic %v: Match %q %v, Privacy/Watched %q %v", seed, exotic, cm.Privacy, cm.Watched, privacy[node], watched[node])
