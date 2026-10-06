@@ -80,15 +80,20 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 	// privacy folds down a depth-indexed stack (SEP-0009). A capture rule never
 	// names a node, whatever its order.
 	var (
-		named   *sightmap.ComponentMatch // the node's first naming match
-		local   int                      // strictest privacy declared on the node
-		watched []string                 // watched components matching the node
-		eff     []int                    // effective privacy by depth
+		named    *sightmap.ComponentMatch // the node's first naming match
+		local    int                      // strictest privacy declared on the node
+		watched  []string                 // watched components matching the node
+		watchDef []*sightmap.ComponentDef // their definitions, for identity dedup
+		eff      []int                    // effective privacy by depth
 	)
 	onMatch := func(node *sightmap.ComponentNode, q *MatchQuery) {
 		if q.privacyRank != rankNone || q.watch {
 			local = max(local, q.privacyRank)
-			if q.watch && !slices.Contains(watched, q.Name) {
+			// Dedupe by definition, not name: a component with several
+			// selectors is recorded once, and two distinct components sharing a
+			// name are both recorded.
+			if q.watch && !slices.Contains(watchDef, q.Def) {
+				watchDef = append(watchDef, q.Def)
 				watched = append(watched, q.Name)
 			}
 			return
@@ -118,7 +123,7 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 				named.Watched, named.Watch = watched, true
 			}
 		}
-		named, local, watched = nil, rankNone, nil
+		named, local, watched, watchDef = nil, rankNone, nil, nil
 	}
 	walkMatches(root, entry.combined, entry.combinedIndex, onMatch, onNode)
 

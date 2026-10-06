@@ -92,17 +92,32 @@ func captureDefsForURL(c *sightmap.Corpus, pageURL string) []sightmap.ComponentD
 // captured accumulates the watched components matching each node.
 type captured struct {
 	watched map[*sightmap.ComponentNode][]string
+	// seen keys a node's already-recorded definitions, so a component with
+	// several selectors is recorded once while two distinct components sharing
+	// a name are both recorded (names are unique only per parent).
+	seen map[watchKey]bool
+}
+
+type watchKey struct {
+	node *sightmap.ComponentNode
+	def  *sightmap.ComponentDef
 }
 
 func newCaptured() captured {
-	return captured{watched: map[*sightmap.ComponentNode][]string{}}
+	return captured{watched: map[*sightmap.ComponentNode][]string{}, seen: map[watchKey]bool{}}
 }
 
 // add records a watch rule's match.
 func (c captured) add(node *sightmap.ComponentNode, q *MatchQuery) {
-	if q.watch && !slices.Contains(c.watched[node], q.Name) {
-		c.watched[node] = append(c.watched[node], q.Name)
+	if !q.watch {
+		return
 	}
+	k := watchKey{node, q.Def}
+	if c.seen[k] {
+		return
+	}
+	c.seen[k] = true
+	c.watched[node] = append(c.watched[node], q.Name)
 }
 
 func (cs *captureSet) collect(root *sightmap.ComponentNode) captured {
@@ -150,8 +165,10 @@ func (m *Matcher) Privacy(root *sightmap.ComponentNode, pageURL string) map[*sig
 }
 
 // Watched returns, for every node under root that a watched component matches
-// on pageURL, those components' names, sorted. Unlike Match, it covers nodes no
-// component names.
+// on pageURL, those components' names, sorted. One entry per matching
+// component definition, so a name appears twice when two distinct components
+// share it (component names are unique only per parent). Unlike Match, it
+// covers nodes no component names.
 func (m *Matcher) Watched(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode][]string {
 	return m.entryFor(pageURL).capture.collect(root).watched
 }
