@@ -191,6 +191,47 @@ func BenchmarkMatcherMatch(b *testing.B) {
 	}
 }
 
+// benchCaptureAttrs gives every node the attribute load of a real capture:
+// class mirrored into Attrs (as extract does), a handful of common attributes,
+// and camelCase viewBox/preserveAspectRatio on svg. benchTree alone leaves most
+// nodes without Attrs, which hides the cost of attribute lookups that miss.
+func benchCaptureAttrs(n *sightmap.ComponentNode) {
+	el := n.Element
+	if el.Attrs == nil {
+		el.Attrs = map[string]string{}
+	}
+	if len(el.Classes) > 0 {
+		el.Attrs["class"] = strings.Join(el.Classes, " ")
+	}
+	el.Attrs["role"] = "presentation"
+	el.Attrs["aria-hidden"] = "false"
+	el.Attrs["style"] = "display:block"
+	el.Attrs["data-reactid"] = n.Id
+	el.Attrs["tabindex"] = "-1"
+	if el.Tag == "svg" {
+		el.Attrs["viewBox"] = "0 0 24 24"
+		el.Attrs["preserveAspectRatio"] = "xMidYMid"
+	}
+	for _, c := range n.Children {
+		benchCaptureAttrs(c)
+	}
+}
+
+func BenchmarkMatcherMatchCaptureAttrs(b *testing.B) {
+	for _, s := range benchShapes {
+		root := benchTree(1, s.nodes, s.comps, false)
+		benchCaptureAttrs(root)
+		m := match.NewMatcher(benchCorpus(1, s.comps, false))
+		m.Match(root, "") // compile and cache the queries outside the timed loop
+		b.Run(fmt.Sprintf("nodes=%d/comps=%d", s.nodes, s.comps), func(b *testing.B) {
+			b.ReportAllocs()
+			for range b.N {
+				m.Match(root, "")
+			}
+		})
+	}
+}
+
 // BenchmarkFindAllMatches compares the matcher against referenceFindAllMatches,
 // the pre-index implementation, on identical inputs.
 func BenchmarkFindAllMatches(b *testing.B) {
