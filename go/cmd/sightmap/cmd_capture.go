@@ -253,12 +253,15 @@ func runCaptureAll(
 
 // writeCaptureScreenshot saves a full-page PNG of the page as captured, beside
 // snapPath. Best effort: a failed screenshot warns and leaves the capture intact.
+// FullPage forces captureBeyondViewport, which can hang on ad/iframe-heavy pages;
+// StopLoading prevents that and is safe because observation is finished.
 func writeCaptureScreenshot(ctx context.Context, conn *browser.CDPConn, snapPath string) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	png, err := browser.ScreenshotWithOptions(ctx, conn, browser.ScreenshotOptions{
 		Format:          "png",
 		PauseAnimations: true,
+		StopLoading:     true,
 		FullPage:        true,
 	})
 	if err == nil {
