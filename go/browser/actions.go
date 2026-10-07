@@ -324,6 +324,7 @@ type ScreenshotOptions struct {
 	PauseAnimations  bool            // send Animation.setPlaybackRate(0) before capture
 	StopLoading      bool            // call Page.stopLoading() before capture to halt ad/iframe repaints
 	Clip             *ScreenshotClip // nil = full viewport; otherwise clip to this (viewport-relative) box
+	FullPage         bool            // capture the whole scrollable document, not just the viewport (excludes Clip)
 }
 
 // Screenshot captures the viewport as PNG, returns raw bytes.
@@ -390,6 +391,31 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 			"y":      opts.Clip.Y + sy,
 			"width":  opts.Clip.Width,
 			"height": opts.Clip.Height,
+			"scale":  1,
+		}
+		params["captureBeyondViewport"] = true
+	}
+
+	// A full-page capture clips to the document's content size, which is already
+	// in document coordinates (no scroll offset), from the beyond-viewport surface.
+	if opts.FullPage {
+		raw, err := conn.call(ctx, "Page.getLayoutMetrics", map[string]interface{}{})
+		if err != nil {
+			return nil, fmt.Errorf("Screenshot: layout metrics: %w", err)
+		}
+		var m struct {
+			CSSContentSize struct {
+				Width  float64 `json:"width"`
+				Height float64 `json:"height"`
+			} `json:"cssContentSize"`
+		}
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return nil, fmt.Errorf("Screenshot: layout metrics: %w", err)
+		}
+		params["clip"] = map[string]interface{}{
+			"x": 0, "y": 0,
+			"width":  m.CSSContentSize.Width,
+			"height": m.CSSContentSize.Height,
 			"scale":  1,
 		}
 		params["captureBeyondViewport"] = true

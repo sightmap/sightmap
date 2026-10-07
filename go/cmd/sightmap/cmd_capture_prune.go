@@ -98,9 +98,10 @@ func pruneView(view string, entries []viewset.Entry, corpus *sightmap.Corpus, dr
 			if err := os.Remove(paths[idx]); err != nil && !os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
 			}
-			tree := viewset.TreePath(paths[idx])
-			if err := os.Remove(tree); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
+			for _, sib := range []string{viewset.TreePath(paths[idx]), viewset.ScreenshotPath(paths[idx])} {
+				if err := os.Remove(sib); err != nil && !os.IsNotExist(err) {
+					fmt.Fprintf(os.Stderr, "  warning: %v\n", err)
+				}
 			}
 		}
 	}

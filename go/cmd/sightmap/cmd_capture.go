@@ -36,6 +36,7 @@ func runCapture(args []string) error {
 	selectorsFlag := fs.Bool("selectors", false, "Show tag #id [data-testid] selector hints in the saved capture")
 	includeHiddenFlag := fs.Bool("include-hidden", false, "Include hidden/off-screen nodes in analysis")
 	jsonOutFlag := fs.Bool("json", false, "Also write an annotated JSON sibling next to each capture")
+	screenshotFlag := fs.Bool("screenshot", false, "Also write a full-page PNG sibling (<stamp>.snap.png) next to each capture")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -60,7 +61,7 @@ func runCapture(args []string) error {
 
 	if *allFlag {
 		return runCaptureAll(*lf.sightmapDir, *lf.addr, *lf.tab, *lf.wait,
-			visible, *selectorsFlag, *jsonOutFlag, *forceFlag)
+			visible, *selectorsFlag, *jsonOutFlag, *screenshotFlag, *forceFlag)
 	}
 
 	ctx := context.Background()
@@ -122,6 +123,9 @@ func runCapture(args []string) error {
 			fmt.Fprintf(os.Stderr, "capture: json: %v\n", err)
 		}
 	}
+	if *screenshotFlag {
+		writeCaptureScreenshot(ctx, conn, snapPath)
+	}
 
 	fmt.Fprintf(os.Stderr, "capture saved: %s\n  %d interactive · T1 %d%% · T2 %d%% · T3 %d\n",
 		snapPath, cov.Total, coverage.Pct(cov.T1, cov.Total), coverage.Pct(cov.T2, cov.Total), cov.T3)
@@ -136,6 +140,7 @@ func runCaptureAll(
 	visible bool,
 	selectors bool,
 	jsonOut bool,
+	screenshot bool,
 	force bool,
 ) error {
 	corpus, err := sightmap.Load(sightmapDir)
@@ -211,6 +216,9 @@ func runCaptureAll(
 			jsonPath := strings.TrimSuffix(snapPath, ".snap") + ".snap.annotated.json"
 			writeAnnotatedJSON(res.Root, jsonPath, res.View, res.Matches)
 		}
+		if screenshot {
+			writeCaptureScreenshot(ctx, conn, snapPath)
+		}
 
 		results = append(results, result{name: label, t1: cov.T1, t2: cov.T2, t3: cov.T3, total: cov.Total})
 	}
@@ -241,6 +249,27 @@ func runCaptureAll(
 		)
 	}
 	return nil
+}
+
+// writeCaptureScreenshot saves a full-page PNG of the page as captured, beside
+// snapPath. Best effort: a failed screenshot warns and leaves the capture intact.
+// FullPage forces captureBeyondViewport, which can hang on ad/iframe-heavy pages;
+// StopLoading prevents that and is safe because observation is finished.
+func writeCaptureScreenshot(ctx context.Context, conn *browser.CDPConn, snapPath string) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	png, err := browser.ScreenshotWithOptions(ctx, conn, browser.ScreenshotOptions{
+		Format:          "png",
+		PauseAnimations: true,
+		StopLoading:     true,
+		FullPage:        true,
+	})
+	if err == nil {
+		err = os.WriteFile(viewset.ScreenshotPath(snapPath), png, 0o644)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "capture: screenshot: %v\n", err)
+	}
 }
 
 // writeCapture renders a capture to snapPath (atomically) plus its .tree.json
