@@ -7,14 +7,16 @@
 // writing without an account, and the docs site already publishes a changelog
 // feed. llms.txt is the same idea aimed at agents, which is most of this
 // project's audience: one plain-text table of contents for the whole site,
-// with a line per atlas entry (P4.3).
+// with a line per atlas entry and a line per WebMCP directory listing.
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { loadPosts } from './lib/posts'
 import { loadAtlas } from './lib/atlas'
+import { loadDirectory } from './lib/directory'
 import { primaryDomain } from '../src/lib/atlas'
 import type { AtlasStats } from '../src/types/atlas'
+import type { DirectoryListing } from '../src/types/directory'
 import {
   SITE_URL,
   SITE_NAME,
@@ -29,6 +31,7 @@ import {
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
 const ATLAS_DIR = path.resolve('src/data/atlas')
+const DIRECTORY_DIR = path.resolve('src/data/directory')
 
 export interface FeedPost {
   slug: string
@@ -53,6 +56,42 @@ export interface FeedAtlasEntry {
   last_verified: string
   /** Enough of `stats` to say how much of the site the entry covers. */
   stats: Pick<AtlasStats, 'views' | 'components' | 'requests'>
+}
+
+/**
+ * The subset of a WebMCP directory listing the sitemap and llms.txt need.
+ *
+ * `host` is the field an agent matches on, the same role `domains[]` plays for
+ * an entry — a listing covers exactly one host, so it is a string rather than
+ * a list. `tool_count` is here because it is the one number that decides
+ * whether a listing is worth a second fetch at all.
+ */
+export interface FeedDirectoryListing {
+  slug: string
+  name: string
+  host: string
+  description: string
+  type: 'live' | 'demo'
+  tool_count: number
+  updated: string
+}
+
+/**
+ * The projection itself. Both feed generators need exactly these fields from a
+ * loaded listing, and a hand-copied object literal in each is one field-rename
+ * away from the two disagreeing — llms.txt and the markdown twin would then
+ * describe the same listing differently.
+ */
+export function toFeedListing(listing: DirectoryListing): FeedDirectoryListing {
+  return {
+    slug: listing.slug,
+    name: listing.name,
+    host: listing.host,
+    description: listing.description,
+    type: listing.type,
+    tool_count: listing.counts.tools,
+    updated: listing.updated,
+  }
 }
 
 // Feed readers expect RFC 822. Posts carry a date but no time, so they are
@@ -89,8 +128,19 @@ ${items}
 `
 }
 
-export function buildSitemap(posts: FeedPost[], atlas: FeedAtlasEntry[], now: Date): string {
+export function buildSitemap(
+  posts: FeedPost[],
+  atlas: FeedAtlasEntry[],
+  now: Date,
+  listings: FeedDirectoryListing[] = []
+): string {
   const today = now.toISOString().slice(0, 10)
+  // /atlas lists entries and listings together, so it changes whenever either
+  // side's newest item does. Both arrays arrive sorted newest-first.
+  const atlasIndexLastmod = [atlas[0]?.updated, listings[0]?.updated]
+    .filter((d): d is string => Boolean(d))
+    .sort()
+    .pop()
   const urls = [
     { loc: `${SITE_URL}/`, lastmod: today, priority: '1.0' },
     { loc: `${SITE_URL}/developers`, lastmod: today, priority: '0.8' },
@@ -102,12 +152,17 @@ export function buildSitemap(posts: FeedPost[], atlas: FeedAtlasEntry[], now: Da
       lastmod: p.date,
       priority: '0.7',
     })),
-    // The atlas index moves whenever any entry does, so its lastmod is the
-    // most recent entry's — loadAtlas() sorts newest-first, so that is [0].
-    { loc: `${SITE_URL}/atlas`, lastmod: atlas[0]?.updated ?? today, priority: '0.8' },
+    { loc: `${SITE_URL}/atlas`, lastmod: atlasIndexLastmod ?? today, priority: '0.8' },
     ...atlas.map((e) => ({
       loc: `${SITE_URL}/atlas/${e.slug}`,
       lastmod: e.updated,
+      priority: '0.7',
+    })),
+    // Listings render at /atlas/<slug> too — slugs are unique across both —
+    // so they are the same kind of URL, listed the same way.
+    ...listings.map((l) => ({
+      loc: `${SITE_URL}/atlas/${l.slug}`,
+      lastmod: l.updated,
       priority: '0.7',
     })),
   ]
@@ -181,15 +236,47 @@ function atlasLine(entry: FeedAtlasEntry): string {
 }
 
 /**
+ * The WebMCP directory section's summary. Same job as atlasSummary(), aimed at
+ * the other question an agent arrives with: not "has anyone mapped this site"
+ * but "can I call anything on it". Both machine indexes are named here because
+ * this section is where an agent learns they exist — directory.json to resolve
+ * a host to a listing, stats.json to see the shape of the whole set without
+ * fetching it.
+ */
+const directorySummary = (): string[] => [
+  'Sites that expose callable WebMCP tools, enumerated by a scan and reviewed by a maintainer.',
+  'A listing records what was found on a date. Nothing here was executed, and no listing is a safety certification.',
+  '',
+  `Index:  ${SITE_URL}/atlas/directory.json    every listing, with tool counts and machine URLs`,
+  `Totals: ${SITE_URL}/atlas/stats.json        listings, tools by kind, surfaces, categories`,
+  `Lookup: ${SITE_URL}/api/atlas/lookup/<host> one host, from the stored index (never fetched live)`,
+]
+
+/**
+ * One listing line: the host first, for the same reason an entry line leads
+ * with its domains, then the tool count — the number that decides whether the
+ * site is worth another fetch — and the JSON document to fetch next.
+ */
+function directoryLine(listing: FeedDirectoryListing): string {
+  const parts = [
+    sentence(listing.host),
+    sentence(listing.description),
+    `${count(listing.tool_count, 'WebMCP tool')}, ${oneLine(listing.type)}.`,
+    `JSON: ${SITE_URL}/atlas/sites/${listing.slug}.json`,
+  ].filter(Boolean)
+  return `- [${oneLine(listing.name)}](${SITE_URL}/atlas/${listing.slug}.md): ${parts.join(' ')}`
+}
+
+/**
  * dist/llms.txt, in the llmstxt.org shape: an H1, a blockquote summary, then
  * link sections. Handwritten for the fixed parts of the site and generated for
  * the two that grow — one line per post, one line per atlas entry.
- *
- * No file to append to: the site had no llms.txt before this change, so P4.3's
- * "append a line per entry" is satisfied by creating it with the atlas section
- * already in place rather than by editing something that did not exist.
  */
-export function buildLlmsTxt(posts: FeedPost[], atlas: FeedAtlasEntry[]): string {
+export function buildLlmsTxt(
+  posts: FeedPost[],
+  atlas: FeedAtlasEntry[],
+  listings: FeedDirectoryListing[] = []
+): string {
   const lines = [
     `# ${SITE_NAME}`,
     '',
@@ -219,6 +306,14 @@ export function buildLlmsTxt(posts: FeedPost[], atlas: FeedAtlasEntry[]): string
     lines.push('- No entries published yet.', '')
   } else {
     for (const e of atlas) lines.push(atlasLine(e))
+    lines.push('')
+  }
+
+  lines.push('## WebMCP directory', '', ...directorySummary().map(quote), '')
+  if (listings.length === 0) {
+    lines.push('- No listings published yet.', '')
+  } else {
+    for (const l of listings) lines.push(directoryLine(l))
     lines.push('')
   }
 
@@ -258,16 +353,25 @@ async function main() {
     stats: e.stats,
   }))
 
+  // Both halves of /atlas render at /atlas/<slug>, so both belong in the
+  // sitemap. Loaded with the entry slugs reserved, the same way the build and
+  // the prerender load it.
+  const listings: FeedDirectoryListing[] = loadDirectory(
+    DIRECTORY_DIR,
+    atlas.map((e) => e.slug)
+  ).listings.map(toFeedListing)
+
   // Build time, not post time — only affects lastBuildDate and the homepage
   // lastmod, both of which are meant to move on every deploy.
   const now = new Date()
 
   fs.mkdirSync(DIST, { recursive: true })
   fs.writeFileSync(path.join(DIST, 'rss.xml'), buildRss(posts, now))
-  fs.writeFileSync(path.join(DIST, 'sitemap.xml'), buildSitemap(posts, atlas, now))
-  fs.writeFileSync(path.join(DIST, 'llms.txt'), buildLlmsTxt(posts, atlas))
+  fs.writeFileSync(path.join(DIST, 'sitemap.xml'), buildSitemap(posts, atlas, now, listings))
+  fs.writeFileSync(path.join(DIST, 'llms.txt'), buildLlmsTxt(posts, atlas, listings))
   console.log(
-    `  wrote dist/rss.xml, dist/sitemap.xml and dist/llms.txt (${posts.length} post(s), ${atlas.length} atlas entry(s))`
+    `  wrote dist/rss.xml, dist/sitemap.xml and dist/llms.txt (${posts.length} post(s), ` +
+      `${atlas.length} atlas entry(s), ${listings.length} listing(s))`
   )
 }
 

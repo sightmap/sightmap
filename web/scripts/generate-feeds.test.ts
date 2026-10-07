@@ -4,6 +4,7 @@ import {
   buildRss,
   buildSitemap,
   type FeedAtlasEntry,
+  type FeedDirectoryListing,
   type FeedPost,
 } from './generate-feeds'
 
@@ -44,6 +45,29 @@ const ATLAS: FeedAtlasEntry[] = [
     domains: ['example.test', 'shop.example.test'],
     last_verified: '2026-03-01',
     stats: { views: 1, components: 1, requests: 1 },
+  },
+]
+
+const LISTINGS: FeedDirectoryListing[] = [
+  {
+    slug: 'alpha-tools',
+    name: 'Alpha Tools',
+    host: 'alpha.example.org',
+    description: 'A fixture site with WebMCP tools.',
+    type: 'live',
+    tool_count: 9,
+    updated: '2026-09-08',
+  },
+  {
+    // One tool, a description with no full stop, and a demo — every shape an
+    // entry line has to cope with, on the listing side.
+    slug: 'beta-demo',
+    name: 'Beta Demo',
+    host: 'beta.example.test',
+    description: 'A competition demo',
+    type: 'demo',
+    tool_count: 1,
+    updated: '2026-09-01',
   },
 ]
 
@@ -106,6 +130,21 @@ describe('buildSitemap', () => {
     expect(xml).toContain('<loc>https://sightmap.org/building</loc>')
     expect(xml).toContain('<loc>https://sightmap.org/sightkick</loc>')
     expect(xml.match(/<url>/g)).toHaveLength(10)
+  })
+
+  it('lists every directory listing at /atlas/<slug> too', () => {
+    const xml = buildSitemap(POSTS, ATLAS, NOW, LISTINGS)
+    expect(xml).toContain('<loc>https://sightmap.org/atlas/alpha-tools</loc>')
+    expect(xml).toContain('<loc>https://sightmap.org/atlas/beta-demo</loc>')
+    expect(xml.match(/<url>/g)).toHaveLength(12)
+  })
+
+  it('uses the newest of either kind as the atlas index lastmod', () => {
+    // /atlas renders entries and listings together, so a listing newer than
+    // every entry has to move the index's lastmod as well.
+    const xml = buildSitemap(POSTS, ATLAS, NOW, LISTINGS)
+    const atlasBlock = xml.slice(xml.indexOf('<loc>https://sightmap.org/atlas</loc>'))
+    expect(atlasBlock).toContain('<lastmod>2026-09-08</lastmod>')
   })
 
   it('uses the post date as lastmod for post URLs', () => {
@@ -204,11 +243,34 @@ describe('buildLlmsTxt', () => {
     )
   })
 
+  it('gives the WebMCP directory its own section, led by the host and tool count', () => {
+    const txt = buildLlmsTxt(POSTS, ATLAS, LISTINGS)
+    expect(txt).toContain('## WebMCP directory')
+    expect(txt).toContain(
+      '- [Alpha Tools](https://sightmap.org/atlas/alpha-tools.md): alpha.example.org. A fixture site with WebMCP tools. 9 WebMCP tools, live. JSON: https://sightmap.org/atlas/sites/alpha-tools.json'
+    )
+    // Singular count, and a description with no full stop of its own.
+    expect(txt).toContain(
+      '- [Beta Demo](https://sightmap.org/atlas/beta-demo.md): beta.example.test. A competition demo. 1 WebMCP tool, demo. JSON: https://sightmap.org/atlas/sites/beta-demo.json'
+    )
+  })
+
+  it('names the directory index, the stats file, and the host lookup', () => {
+    const txt = buildLlmsTxt(POSTS, ATLAS, LISTINGS)
+    expect(txt).toContain('https://sightmap.org/atlas/directory.json')
+    expect(txt).toContain('https://sightmap.org/atlas/stats.json')
+    expect(txt).toContain('https://sightmap.org/api/atlas/lookup/<host>')
+    // The listings say what was observed, never that the site is safe to use.
+    expect(txt).toContain('no listing is a safety certification')
+  })
+
   it('says so rather than emitting an empty section when nothing is published', () => {
     const txt = buildLlmsTxt([], [])
     expect(txt).toContain('## Atlas')
+    expect(txt).toContain('## WebMCP directory')
     expect(txt).toContain('## Blog')
     expect(txt).toContain('- No entries published yet.')
+    expect(txt).toContain('- No listings published yet.')
     expect(txt).toContain('- No posts published yet.')
     expect(txt).not.toContain('undefined')
   })
