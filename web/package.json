@@ -11,6 +11,9 @@
     "build:atlas": "tsx scripts/build-atlas.ts",
     "build": "tsx scripts/build-blog.ts && tsx scripts/build-atlas.ts && tsc -b && vite build && tsx scripts/prerender.tsx && tsx scripts/check-route-coverage.ts && tsx scripts/generate-feeds.ts && tsx scripts/generate-agent-files.ts && tsx scripts/upload-sourcemaps.ts",
     "atlas:scan": "tsx scripts/atlas-scan.ts",
+    "atlas:review": "tsx scripts/atlas-review.ts",
+    "atlas:listing": "tsx scripts/atlas-listing.ts",
+    "atlas:intake": "tsx scripts/atlas-intake.ts",
     "sourcemaps:upload": "tsx scripts/upload-sourcemaps.ts",
     "preview": "vite preview",
     "test": "vitest run",
@@ -31,6 +34,7 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "0.124.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^26.1.2",
     "@types/react": "^19.0.0",
