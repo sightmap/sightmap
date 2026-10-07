@@ -7,6 +7,11 @@ export const SITE_NAME = 'Sightmap'
 export const SITE_DESCRIPTION =
   'An open YAML spec and CLI that maps views, components, and API requests to source files, with memory for runtime behavior.'
 
+// Where a reader reports a page the Atlas points at: the unlisted launch card
+// at /try/<host> and, already hard-coded today, the report link on a listing.
+// One constant so a change of address does not have to be found in two places.
+export const REPORT_EMAIL = 'atlas@sightmap.org'
+
 // The blog's own tagline, distinct from SITE_DESCRIPTION (which is the
 // CLI/spec pitch). Used for /blog's meta description, the copy under the /blog
 // heading, and the RSS <channel><description> — feed readers show that as the
