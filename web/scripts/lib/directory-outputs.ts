@@ -1,6 +1,7 @@
 // The public JSON documents the Atlas publishes for its WebMCP listings:
 // /atlas/directory.json, /atlas/stats.json, /atlas/sites/<slug>.json,
-// /atlas/sites/<slug>/tools.json and /atlas/hosts/<host>.json.
+// /atlas/sites/<slug>/tools.json, /atlas/sites/<slug>/blueprint.json and
+// /atlas/hosts/<host>.json.
 //
 // Everything here is a pure listing → document mapping. scripts/build-atlas.ts
 // owns the filesystem (which files, wiped and rewritten on every build); this
@@ -42,6 +43,8 @@ export interface ListingUrls {
   markdown: string
   json: string
   tools: string
+  /** The building derived from the scan: see scripts/lib/blueprint.ts. */
+  blueprint: string
   scan: string
   badge: string
 }
@@ -52,6 +55,7 @@ export function listingUrls(slug: string): ListingUrls {
     markdown: `${SITE_URL}/atlas/${slug}.md`,
     json: `${SITE_URL}/atlas/sites/${slug}.json`,
     tools: `${SITE_URL}/atlas/sites/${slug}/tools.json`,
+    blueprint: `${SITE_URL}/atlas/sites/${slug}/blueprint.json`,
     scan: `${SITE_URL}/atlas/scans/${slug}.json`,
     badge: `${SITE_URL}/atlas/${slug}/badge.svg`,
   }

@@ -1,0 +1,407 @@
+{
+  "version": 1,
+  "url": "https://crowded.example.org/",
+  "finalUrl": "https://crowded.example.org/",
+  "host": "crowded.example.org",
+  "scannedAt": "2026-09-08T10:00:00.000Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "chromium"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://x//",
+      "path": "/",
+      "title": "Console",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "tool_01",
+        "tool_02",
+        "tool_03",
+        "tool_04",
+        "tool_05",
+        "tool_06",
+        "tool_07",
+        "tool_08",
+        "tool_09",
+        "tool_10",
+        "tool_11",
+        "tool_12",
+        "tool_13",
+        "tool_14"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "tool_01",
+      "description": "Fixture tool 1.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_02",
+      "description": "Fixture tool 2.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_03",
+      "description": "Fixture tool 3.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_04",
+      "description": "Fixture tool 4.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          },
+          "p3": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_05",
+      "description": "Fixture tool 5.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "tool_06",
+      "description": "Fixture tool 6.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_07",
+      "description": "Fixture tool 7.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_08",
+      "description": "Fixture tool 8.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_09",
+      "description": "Fixture tool 9.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          },
+          "p3": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_10",
+      "description": "Fixture tool 10.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "tool_11",
+      "description": "Fixture tool 11.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_12",
+      "description": "Fixture tool 12.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_13",
+      "description": "Fixture tool 13.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "tool_14",
+      "description": "Fixture tool 14.",
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "fixture",
+      "warnings": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "p0": {
+            "type": "string"
+          },
+          "p1": {
+            "type": "string"
+          },
+          "p2": {
+            "type": "string"
+          },
+          "p3": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "14/14"
+    }
+  ],
+  "counts": {
+    "tools": 14,
+    "pages": 1,
+    "read": 14,
+    "action": 0,
+    "sensitive": 0,
+    "described": 14,
+    "withInputSchema": 14,
+    "declarative": 0
+  },
+  "hints": {
+    "forms": [],
+    "links": [],
+    "title": "crowded.example.org",
+    "description": ""
+  },
+  "notes": []
+}
