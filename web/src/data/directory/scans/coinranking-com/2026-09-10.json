@@ -1,0 +1,879 @@
+{
+  "version": 1,
+  "url": "https://coinranking.com/",
+  "finalUrl": "https://coinranking.com/",
+  "host": "coinranking.com",
+  "scannedAt": "2026-09-10T00:48:51.997Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "sightmap dev"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://coinranking.com/",
+      "path": "/",
+      "title": "Coinranking | Live Crypto Prices, Market Cap & Ranking List",
+      "status": 200,
+      "surface": "absent",
+      "tools": []
+    },
+    {
+      "url": "https://coinranking.com/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "path": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "title": "Bitcoin (BTC) Price Chart - Pro Drawing & TA | Coinranking",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "coinranking_prochart_list_slots",
+        "coinranking_prochart_set_active_slot",
+        "coinranking_prochart_set_layout",
+        "coinranking_prochart_set_sync",
+        "coinranking_prochart_get_view",
+        "coinranking_prochart_get_stats",
+        "coinranking_prochart_get_series",
+        "coinranking_prochart_get_viewport",
+        "coinranking_prochart_list_drawings",
+        "coinranking_prochart_list_history",
+        "coinranking_prochart_list_charts",
+        "coinranking_prochart_resolve_subject",
+        "coinranking_prochart_configure",
+        "coinranking_prochart_navigate",
+        "coinranking_prochart_set_viewport",
+        "coinranking_prochart_history",
+        "coinranking_prochart_compare",
+        "coinranking_prochart_draw",
+        "coinranking_prochart_export",
+        "coinranking_prochart_share_link",
+        "coinranking_prochart_save"
+      ]
+    },
+    {
+      "url": "https://coinranking.com/coins/favorites",
+      "path": "/coins/favorites",
+      "title": "Your Favorite Coins | Coinranking",
+      "status": 200,
+      "surface": "absent",
+      "tools": []
+    }
+  ],
+  "tools": [
+    {
+      "name": "coinranking_prochart_list_slots",
+      "description": "Read the whole page rather than one chart: how the charts are arranged, which of them is active, whether asset and time sync are on, and for each chart its number, its subject, the kind it plots and the options set on it. Every other tool acts on the active chart only, so call this to find the chart you want and set_active_slot to move to it, then get_view for that chart's full options and availability. A single-chart page reports one slot, which is the normal case.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"list\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_set_active_slot",
+      "description": "Point the interface — and every other tool here — at a different chart in the layout. Only one chart is active at a time: get_view, configure, navigate, draw, set_viewport and the rest all read and write whichever one this selects, so switching the active chart before acting is how you reach the others. In a single-chart page there is only slot 0. This changes nothing about the charts themselves.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "slot": {
+            "description": "The chart to bind to, numbered from 0 in reading order — left to right, then top to bottom. list_slots reports the numbers alongside what each chart holds.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slot"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"set\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_set_layout",
+      "description": "Arrange the page as one chart, two side by side, two stacked, or a 2x2 grid. Growing the layout fills the new slots with copies of the active chart, so the usual next step is set_active_slot plus navigate to point each one somewhere else; shrinking drops the highest-numbered charts. Not every arrangement is available to every viewer: one that isn't is refused with the page left exactly as it was, so read the result rather than assuming it applied. Call list_slots to see the arrangement you ended up with.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "layout": {
+            "description": "\"1\" for one chart, \"2h\" for two side by side, \"2v\" for two stacked, \"4\" for a 2x2 grid.",
+            "enum": [
+              "1",
+              "2h",
+              "2v",
+              "4"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"set\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_set_sync",
+      "description": "Turn the layout's two sync toggles on or off. With asset sync on, every chart follows the active chart's asset while keeping its own kind — BTC price next to BTC market cap. With time sync on, they share the time period, interval and timezone, and pan and zoom together. Turning either on immediately adopts the active chart's settings everywhere, so it is not a no-op. The crosshair is mirrored across charts either way and is not a toggle. Pass one or both; anything you leave out is untouched.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "asset": {
+            "description": "Mirror the subject and the comparison overlays across every chart, so they all follow the same asset. Each chart keeps its own kind, and takes only the overlays that kind can plot.",
+            "type": "boolean"
+          },
+          "time": {
+            "description": "Mirror the time period, interval and timezone across every chart, and mirror panning and zooming.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"set\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_get_view",
+      "description": "Read what the *active* chart is currently showing: its kind and subject, the other kinds this subject has with their labels (and the reason any of them can't be switched to), every option's current value and default, which values can be selected right now (and why the rest can't), the viewer's entitlements, the shareable URL, and whether the view is saved to the account and has unsaved work. It also reports how the page is arranged: `layout.slotCount` above 1 means there are other charts this call does not describe — list_slots surveys them and set_active_slot moves to one. Call this first — it grounds every other tool. Availability is a snapshot of the settings as they stand: an interval listed as unsupported may become usable in the same breath as the time period that unblocks it, which configure accepts as one patch.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_get_stats",
+      "description": "Summary numbers for every series on the chart — high, low, average, first and last value, with the timestamps of the high and low. Prefer this over reading the whole series for questions like \"what is this asset doing\", and use it to anchor drawings: these coordinates are exact, where a downsampled series is not.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_get_series",
+      "description": "The chart's plotted data points as { time, value } pairs in data space — the same coordinates drawings use. Downsampled by default to protect your context; the response says how many points exist and whether it reduced them, and always carries the true high and low so anchoring stays exact. Widen the time period first if you need a range the chart isn't currently showing.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "maxPoints": {
+            "description": "Maximum points to return per series (default 100, hard cap 500). Downsampling preserves extremes, and the true high and low are returned separately regardless.",
+            "type": "number"
+          },
+          "series": {
+            "description": "Dataset keys to include. Omit for every series on the chart.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_get_viewport",
+      "description": "Read the time window currently on screen, the full range the loaded data covers, the value-axis bounds, and whether anyone has panned or zoomed away from the natural range. Worth calling before reading or drawing: the viewer may have zoomed, in which case get_series and get_stats describe more than they are actually looking at.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_list_drawings",
+      "description": "The shapes currently drawn on the chart, with their points in data space ({ time, value }) rather than pixels. Positions here are directly comparable with what get_series and get_stats return. Each shape also carries `onScreen`, which distinguishes a drawing that is missing from one that is merely outside the window the chart is zoomed to — use get_viewport or set_viewport to bring it back into view.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"list\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_list_history",
+      "description": "The chart's undo/redo stack, newest first, with a human-readable label for each step. `past` can be undone, `future` can be redone. The stack covers changes since the last navigation, not the whole session.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"list\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_list_charts",
+      "description": "List the charts this viewer has saved, newest first, with each one's uuid, name, kind and subject. No link is returned — pass the kind and subject to navigate to open one. Use it before saving to avoid duplicating a name, or to find a chart the viewer refers to by name.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"list\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_resolve_subject",
+      "description": "Turn a name, ticker or category into the identifier the other tools take — pass a match's `target` straight to coinranking_prochart_compare, or to coinranking_prochart_navigate's `base`. Call this first whenever the viewer names something in words: no other tool accepts a name, and a guessed identifier plots an unnamed line rather than failing. Matches are ranked, best first, and are not filtered by what this chart can plot — compare and navigate say why if a target doesn't apply here.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "limit": {
+            "description": "How many matches to return per group, 1–10. Defaults to 5.",
+            "type": "number"
+          },
+          "query": {
+            "description": "What to look up: a name (\"Ethereum\"), a ticker (\"ETH\"), a category (\"DeFi\"), a contract address, or an identifier you already hold and want the name for.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "sensitive",
+      "riskReason": "description mentions \"apply\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_configure",
+      "description": "Change one or more chart options — time period, interval, chart type, log scale, indicators, currency, volume, high/low markers. The whole patch applies as a single undoable step. Values that the viewer can't use are refused with a reason rather than partially applied; call get_view to see what's selectable and why. Options that constrain each other are judged as the combination you ask for, not one at a time: send timePeriod and interval together and a pair like 7d + 1day is accepted, even though get_view lists 1day as unavailable while the period is still 24h.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "options": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Option keys mapped to their new values. Call get_view first for the valid keys, each option's allowed values, and which are currently selectable. Everything in the patch is applied together as one undoable step, or nothing is.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "sensitive",
+      "riskReason": "description mentions \"send\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_navigate",
+      "description": "Switch to a different chart kind for the current asset, or point the chart at a different asset, category or the global market. A kind switch happens immediately; a subject change returns a URL to open, because it needs a fresh page load. Drawings are discarded on a kind switch, so draw after navigating rather than before.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "base": {
+            "additionalProperties": false,
+            "description": "A different subject to chart. Returns the destination URL rather than navigating — the caller has to open it.",
+            "properties": {
+              "id": {
+                "description": "A coin uuid, \"global\" for the whole market, or \"category:<slug>\". Not a name — resolve_subject turns one into this.",
+                "type": "string"
+              },
+              "slug": {
+                "description": "The coin's slug, when known. Optional.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "type": "object"
+          },
+          "kind": {
+            "description": "The chart kind to switch to for the current subject — price, market-cap, ranking, and so on. Applied immediately. See get_view for what this chart's subject supports.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"navigate\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_set_viewport",
+      "description": "Zoom or pan the chart to a time window, or reset it to fit all the loaded data. This moves the view only: it is not stored in the URL, so it can't be shared or bookmarked, it does not create an undo step, and the next configure or navigate call clears it — set the time period and options first, then the window. It also cannot show data outside what timePeriod loaded; widen that instead of zooming out past it.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "`set` shows a specific window; `reset` clears any pan or zoom, including the viewer's own, and fits the chart back to its data.",
+            "enum": [
+              "set",
+              "reset"
+            ],
+            "type": "string"
+          },
+          "fromTime": {
+            "description": "For `set`: the left edge, a millisecond timestamp on the same scale get_series and get_stats return.",
+            "type": "number"
+          },
+          "toTime": {
+            "description": "For `set`: the right edge. Must be later than fromTime.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"set\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_history",
+      "description": "Step backwards or forwards through the chart's change history, or jump straight to an entry by index. This is the same stack the undo/redo buttons drive, and it covers changes since the last navigation rather than the whole session. Call list_history for the entries, their labels and their indices.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "Which way to move through the chart's history.",
+            "enum": [
+              "undo",
+              "redo",
+              "jump"
+            ],
+            "type": "string"
+          },
+          "index": {
+            "description": "Required for `jump`: the entry index from list_history. Ignored otherwise.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "description mentions \"change\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_compare",
+      "description": "Add or remove an overlay plotted alongside this chart — another coin, the global market, or a category. Takes an identifier, not a name: resolve_subject turns \"Ethereum\" into one. One target per call, each its own undoable step. Targets that can't be plotted here are refused with the reason: the wrong chart kind for that overlay, the chart itself, a duplicate, or the account's overlay limit.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "Whether to start or stop comparing against the target.",
+            "enum": [
+              "add",
+              "remove"
+            ],
+            "type": "string"
+          },
+          "target": {
+            "description": "What to compare against: a currency uuid, the literal `global` for the whole market, or `category:<slug>` (e.g. `category:defi`). A name or ticker won't resolve — put it through resolve_subject first and pass the `target` it returns. Call get_view to see what's already being compared.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "target"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name contains \"compare\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_draw",
+      "description": "Draw a line, rectangle, circle, text label or pin on the chart, remove, duplicate or restack existing ones, or clear them all. A pin is a labelled guide line spanning the chart: `time-pin` marks a moment (\"halving\", \"listed here\"), `value-pin` marks a level (\"entry\", \"all-time high\"). Anchors are data coordinates (a timestamp and a value), not screen pixels — call get_stats for exact highs and lows to anchor against. Set the chart's kind and time range BEFORE drawing: switching kind discards most annotations, because a shape anchored to price data is meaningless on another scale. A time-pin is the exception and survives, since a date means the same thing on every kind.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "Add one annotation, remove one or more by id, update one by id (move / restyle / retext), duplicate one or more, reorder one or more within the stack, group two or more so they select and move together, ungroup them again, or remove all.",
+            "enum": [
+              "add",
+              "remove",
+              "update",
+              "duplicate",
+              "reorder",
+              "group",
+              "ungroup",
+              "clear"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "For `remove`, `update`, `duplicate` and `reorder`: which annotation, by the `id` list_drawings reports. Stable for as long as the shape exists, so it doesn't shift when another shape is removed — unlike a position. Ids are per-session: they are not carried in a shared URL, so re-read them after a reload.",
+            "type": "string"
+          },
+          "ids": {
+            "description": "For `remove`, `duplicate`, `reorder`, `group` and `ungroup`: several annotations at once, as one change — so one undo puts them all back. Every id must resolve; if one is stale nothing happens, rather than half of what you asked for. Use instead of `id`, not alongside it. `group` needs at least two here.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "placement": {
+            "description": "For `reorder`: whether the named annotations move to the front of the stack (drawn over everything) or the back.",
+            "enum": [
+              "front",
+              "back"
+            ],
+            "type": "string"
+          },
+          "points": {
+            "description": "For `add`, or `update` to move a shape: anchors in DATA coordinates — `time` is a timestamp (Unix ms) and `value` is on the chart's own y-scale, not pixels. A line takes 2 endpoints. A rectangle or circle takes 2 opposite corners, or 4 for an exact quad. A text annotation takes 1 anchor, which becomes the centre of a box sized to the text, or 4 to place the box yourself. A pin takes 1 anchor and reads only one of its coordinates — `time` for a time-pin, `value` for a value-pin — so send the one that matters and pass 0 for the other; whatever you send for the unused one is discarded, not stored. Get exact values from get_stats (true highs/lows) or get_series. Positions are absolute, not a delta — read the current ones from list_drawings.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "time": {
+                  "type": "number"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "time",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "style": {
+            "additionalProperties": false,
+            "description": "For `add`: optional appearance, defaulting to the chart's own drawing style. For `update`: only the keys given change; the rest of the shape's style is kept.",
+            "properties": {
+              "color": {
+                "description": "Hex colour, e.g. #2962ff.",
+                "type": "string"
+              },
+              "dash": {
+                "enum": [
+                  "solid",
+                  "dashed",
+                  "dotted"
+                ],
+                "type": "string"
+              },
+              "fill": {
+                "description": "Body fill for rectangles and circles.",
+                "enum": [
+                  "none",
+                  "light",
+                  "solid"
+                ],
+                "type": "string"
+              },
+              "fontFamily": {
+                "description": "Text annotations only — a pin's caption is drawn in the chart's own label style.",
+                "type": "string"
+              },
+              "fontSize": {
+                "description": "Text annotations only — a pin's caption is drawn in the chart's own label style.",
+                "type": "number"
+              },
+              "thickness": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "text": {
+            "description": "The caption. Required for type `text` (an empty text box is discarded). Optional for a pin, which draws its guide line with or without one. Not accepted for a line, rectangle or circle. On `update`, replaces the existing caption.",
+            "type": "string"
+          },
+          "type": {
+            "description": "For `add`: the shape to draw.",
+            "enum": [
+              "line",
+              "rectangle",
+              "circle",
+              "text",
+              "time-pin",
+              "value-pin"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "description mentions \"set\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_export",
+      "description": "Export the chart's data as CSV or the chart itself as a PNG image. CSV can be returned directly in the result; saving a file or copying to the clipboard asks the user first, since browsers only allow those during a user gesture.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "destination": {
+            "description": "Where the export goes. `return` (CSV only) hands the text back in this result. `download` saves a file and `clipboard` copies — both prompt the user, because the browser only permits them during a user gesture. Defaults to `return` for CSV and `download` for PNG.",
+            "enum": [
+              "return",
+              "download",
+              "clipboard"
+            ],
+            "type": "string"
+          },
+          "format": {
+            "description": "`csv` for the underlying data, `png` for a picture of the chart.",
+            "enum": [
+              "csv",
+              "png"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "unclassified — defaults to action until reviewed",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_share_link",
+      "description": "Get a link that reproduces the chart exactly as it looks now — kind, asset, time range, styling and drawings all travel in the URL. Returns the link by default; set `share` to open the device's share sheet instead, which asks the user first.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "share": {
+            "description": "Open the device's share sheet (or copy the link where there isn't one) instead of just returning the URL. Prompts the user, so only set this when they asked to share rather than to see the link.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"share\"",
+      "warnings": []
+    },
+    {
+      "name": "coinranking_prochart_save",
+      "description": "Save the chart to the viewer's account, save a copy under a new name, rename it, delete it, or discard unsaved edits. Saving needs a name the first time. Deleting asks the viewer to confirm. Call get_view first if you need to know whether the chart is already saved.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "`save` updates the current chart (or creates it, with a name). `save_as` always creates a new one. `rename` retitles it, `delete` removes it, `discard` reverts unsaved edits.",
+            "enum": [
+              "save",
+              "save_as",
+              "rename",
+              "delete",
+              "discard"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "description": "Required for `save_as` and `rename`, and for `save` when the chart has never been saved. Without it the site would open a naming dialog, which a tool call can't sensibly drive.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "page": "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "pages": [
+        "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"save\"",
+      "warnings": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "21/21"
+    },
+    {
+      "id": "described",
+      "label": "Every tool has a description",
+      "ok": true,
+      "detail": "21/21"
+    },
+    {
+      "id": "input-schema",
+      "label": "Every tool has an input schema",
+      "ok": true,
+      "detail": "21/21"
+    },
+    {
+      "id": "snake-case",
+      "label": "Tool names are snake_case",
+      "ok": true,
+      "detail": "21/21"
+    },
+    {
+      "id": "unique",
+      "label": "Tool names are unique",
+      "ok": true,
+      "detail": "21 distinct"
+    },
+    {
+      "id": "no-suspicious",
+      "label": "No suspicious wording in tool metadata",
+      "ok": true,
+      "detail": "none flagged"
+    },
+    {
+      "id": "route-scoped",
+      "label": "Tool set changes with the page",
+      "ok": true,
+      "detail": "2 distinct tool sets across 3 pages"
+    }
+  ],
+  "counts": {
+    "tools": 21,
+    "pages": 3,
+    "read": 9,
+    "action": 10,
+    "sensitive": 2,
+    "described": 21,
+    "withInputSchema": 21,
+    "declarative": 0
+  },
+  "hints": {
+    "forms": [
+      {
+        "page": "/",
+        "action": "",
+        "fields": [
+          "email"
+        ],
+        "method": "get"
+      },
+      {
+        "page": "/coins/favorites",
+        "action": "",
+        "fields": [
+          "email"
+        ],
+        "method": "get"
+      }
+    ],
+    "links": [
+      "/",
+      "/",
+      "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "/coins/favorites",
+      "/portfolio",
+      "https://account.coinranking.com/sign-in",
+      "/",
+      "/chart/coin/Qwsogvtv82FCd+bitcoin-btc/price",
+      "/coins/favorites",
+      "/portfolio",
+      "#top-20",
+      "#favorites",
+      "#trending-coins",
+      "#trending-categories",
+      "#top-gainers",
+      "#futures",
+      "#global-market-cap",
+      "#exchange-listings",
+      "#stats",
+      "#calculator-section",
+      "/coins",
+      "#",
+      "https://serve.coinranking.com/redirect.spark?MID=187834&plid=3500683&setID=821519&channelID=0&CID=1695808&banID=524677275&PID=0&textadID=0&tc=1&rnd=290213&scheduleID=3687753&placementScheduleId=3687753&adItemScheduleId=0&adSize=0x0&data_keys=%7B%22Position%22%3A%22TopCoin%22%2C%22Page%22%3A%22%22%7D&metadata=%5B%5D&mt=1789001335476382&sw=800&sh=600&spr=1&referrer=https%3A%2F%2Fcoinranking.com%2F&request_uuid=49361ec9-47ea-412e-a26f-603d0dedb766&hc=4762c5c4df90995317b034bdf755b22130d9b52a&location=",
+      "/coin/Qwsogvtv82FCd+bitcoin-btc",
+      "/coin/razxDUgYGNAdQ+ethereum-eth",
+      "/coin/HIVsRcGKkPFtW+tetherusd-usdt",
+      "/coin/WcwrkfNI4FUAe+bnb-bnb",
+      "/coin/-l8Mn2pVlRs-p+xrp-xrp",
+      "/coin/aKzUVe4Hh_CON+usdc-usdc",
+      "/coin/zNZHO_Sjf+solana-sol",
+      "/coin/qUhEFk1I61atv+tron-trx",
+      "/coin/T9v5S3hJw+hyperliquid-hype",
+      "/coin/aRGRWLf2RYNq4+zcash-zec",
+      "/coin/a91GCGd_u96cF+dogecoin-doge",
+      "/coin/iCJJM4B36+usds-usds",
+      "/coin/3mVx2FX_iJFp5+monero-xmr",
+      "/coin/VLqpJwogdhHNb+chainlink-link",
+      "/coin/qzawljRxB5bYu+cardano-ada",
+      "/coin/f3iaFeCKEmkaZ+stellar-xlm",
+      "/coin/ZlZpzOJo43mIo+bitcoincash-bch"
+    ],
+    "title": "Coinranking | Live Crypto Prices, Market Cap & Ranking List",
+    "description": "Track live cryptocurrency prices and market data. Get real-time prices, market caps, rankings, trending coins, top gainers, and futures on Coinranking."
+  },
+  "notes": [
+    "operator Chrome flags: --ssl-version-max=tls1.2",
+    "sightmap browser mcp list saw 0 tool(s) on /",
+    "$ sightmap version",
+    "$ sightmap browser start --detach --headless --port 38357 --cdp-port 45695 --profile /tmp/atlas-scan-YaBSak/profile --url about:blank --log-file /tmp/atlas-scan-YaBSak/daemon.log --chrome-flag=--enable-blink-features=ModelContext,ModelC… --chrome-flag=--enable-features=DevToolsWebMCPSupport --chrome-flag=--proxy-server=http://127.0.0.1:41767 --chrome-flag=--proxy-bypass-list=localhost;127.0.0.1;[::1] --chrome-flag=--deny-permission-prompts --chrome-flag=--ssl-version-max=tls1.2 --chrome-binary /opt/pw-browsers/chromium --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap",
+    "$ sightmap browser tabs list --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap ×3",
+    "$ sightmap browser inject --persist --file /tmp/atlas-scan-YaBSak/recorder.js --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap",
+    "$ sightmap browser inject --list --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap ×9",
+    "$ sightmap browser navigate https://coinranking.com/ --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap ×4",
+    "$ sightmap browser mcp list --json --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap",
+    "$ sightmap browser navigate https://coinranking.com/chart/coin/Qwsogvtv82FCd+bitcoin-… --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap ×4",
+    "$ sightmap browser navigate https://coinranking.com/coins/favorites --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab AAFC3BB6131E0895F7335A5F4D28FFAF --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap ×4",
+    "$ sightmap browser stop --sightmap-dir /tmp/atlas-scan-YaBSak/.sightmap"
+  ]
+}

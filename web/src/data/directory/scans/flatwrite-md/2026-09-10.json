@@ -1,0 +1,562 @@
+{
+  "version": 1,
+  "url": "https://flatwrite.md/",
+  "finalUrl": "https://flatwrite.md/",
+  "host": "flatwrite.md",
+  "scannedAt": "2026-09-10T00:48:38.831Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "sightmap dev"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://flatwrite.md/",
+      "path": "/",
+      "title": "flatwrite.md — pretty damn good markdown",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "render_markdown",
+        "list_render_options",
+        "get_document_state",
+        "create_document",
+        "open_document",
+        "update_document_content",
+        "list_recent_documents",
+        "render_markdown_preview",
+        "export_document_html",
+        "export_document_pdf",
+        "create_share_link",
+        "assist_document"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "render_markdown",
+      "description": "Render markdown into FlatWrite-styled HTML <head> and <body> fragments, with optional typography and page-layout controls. Provide either the raw markdown inline (`markdown`) or an allowlisted URL (`markdownUrl`) pointing to raw markdown content. Use this when you need the rendered HTML artifacts.",
+      "inputSchema": {
+        "oneOf": [
+          {
+            "required": [
+              "markdown"
+            ]
+          },
+          {
+            "required": [
+              "markdownUrl"
+            ]
+          }
+        ],
+        "properties": {
+          "appFramework": {
+            "description": "UI framework applied when surfaceMode=\"app\".",
+            "enum": [
+              "spectre",
+              "poshui",
+              "pico",
+              "milligram",
+              "chota"
+            ],
+            "type": "string"
+          },
+          "docEngine": {
+            "description": "Document engine — \"none\" emits plain CSS; \"pagedjs\"/\"vivliostyle\" wrap the output in @page rules.",
+            "enum": [
+              "none",
+              "pagedjs",
+              "vivliostyle"
+            ],
+            "type": "string"
+          },
+          "font": {
+            "description": "Font family — must be a bundled family.",
+            "enum": [
+              "Inter",
+              "JetBrains Mono",
+              "Lato",
+              "Lora",
+              "Merriweather",
+              "Playfair Display",
+              "Comfortaa",
+              "Unbounded"
+            ],
+            "type": "string"
+          },
+          "footer": {
+            "description": "Include a page-number footer in paged output.",
+            "type": "boolean"
+          },
+          "line": {
+            "description": "Line height as a scale token (e.g. \"-1\", \"0\", \"1\").",
+            "maximum": 4,
+            "minimum": 0.8,
+            "oneOf": [
+              {
+                "description": "Scale token (e.g. \"-1\", \"0\", \"1\")",
+                "type": "string"
+              },
+              {
+                "description": "Absolute multiplier (0.8..4.0)",
+                "type": "number"
+              }
+            ]
+          },
+          "marginsLR": {
+            "description": "Left/right page margin preset. Only effective when docEngine is pagedjs or vivliostyle.",
+            "enum": [
+              "narrow",
+              "normal",
+              "wide"
+            ],
+            "type": "string"
+          },
+          "marginsTB": {
+            "description": "Top/bottom page margin preset. Only effective when docEngine is pagedjs or vivliostyle.",
+            "enum": [
+              "narrow",
+              "normal",
+              "wide"
+            ],
+            "type": "string"
+          },
+          "markdown": {
+            "description": "Raw markdown content to render.",
+            "type": "string"
+          },
+          "markdownUrl": {
+            "description": "URL pointing to raw markdown content. Must be on an allowlisted host (raw.githubusercontent.com, raw.gitlab.com, bitbucket.org), http(s) only, and <=1 MB. Host validation is enforced server-side.",
+            "type": "string"
+          },
+          "orientation": {
+            "description": "Page orientation.",
+            "enum": [
+              "portrait",
+              "landscape"
+            ],
+            "type": "string"
+          },
+          "pageSize": {
+            "description": "Page size for paged output. Only effective when docEngine is pagedjs or vivliostyle.",
+            "enum": [
+              "A0",
+              "A1",
+              "A2",
+              "A3",
+              "A4",
+              "A5",
+              "Letter",
+              "Legal"
+            ],
+            "type": "string"
+          },
+          "size": {
+            "description": "Font size as a scale token (e.g. \"-1\", \"0\", \"1\").",
+            "maximum": 72,
+            "minimum": 8,
+            "oneOf": [
+              {
+                "description": "Scale token (e.g. \"-1\", \"0\", \"1\")",
+                "type": "string"
+              },
+              {
+                "description": "Absolute pixel value (8..72)",
+                "type": "number"
+              }
+            ]
+          },
+          "surfaceMode": {
+            "description": "Surface mode hint. \"app\" unlocks the appFramework picker; otherwise this is metadata only.",
+            "enum": [
+              "doc",
+              "app"
+            ],
+            "type": "string"
+          },
+          "theme": {
+            "description": "Theme identifier rendered as body[data-theme=\"...\"] so consumer CSS can theme via attribute selectors. Free-form (alphanumeric, dash, underscore) — common values are \"light\" and \"dark\".",
+            "type": "string"
+          },
+          "uiZoom": {
+            "description": "UI zoom level (1.0 = default; >1 zooms in, <1 zooms out).",
+            "maximum": 4,
+            "minimum": 0.25,
+            "type": "number"
+          },
+          "weight": {
+            "description": "Font weight as a scale token (e.g. \"-1\", \"0\").",
+            "maximum": 900,
+            "minimum": 100,
+            "oneOf": [
+              {
+                "description": "Scale token (e.g. \"-1\", \"0\")",
+                "type": "string"
+              },
+              {
+                "description": "Absolute weight (100..900, multiples of 100)",
+                "type": "number"
+              }
+            ]
+          },
+          "width": {
+            "description": "Content width in pixels (400..1400). Only effective when docEngine=\"none\".",
+            "maximum": 1400,
+            "minimum": 400,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "unclassified — defaults to action until reviewed",
+      "warnings": []
+    },
+    {
+      "name": "list_render_options",
+      "description": "Return the supported fonts, UI frameworks, document engines, page sizes, orientations, margins, and surface modes for the render_markdown tool. Call this before rendering if you need to know which enum values are valid; call render_markdown when you have the options and are ready to render.",
+      "inputSchema": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name starts with \"list\"",
+      "warnings": []
+    },
+    {
+      "name": "get_document_state",
+      "description": "Return the current state of the active document in the FlatWrite editor: title, word count, render mode, unsaved changes flag, and available export formats. Use this before export or share tools to check readiness; use update_document_content to change the content.",
+      "inputSchema": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name starts with \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "create_document",
+      "description": "Create a new blank document in the FlatWrite editor, optionally with initial markdown content. Use this to start a new document; use open_document to load an existing one from a URL or share link.",
+      "inputSchema": {
+        "properties": {
+          "markdown": {
+            "description": "Optional initial markdown content for the new document.",
+            "type": "string"
+          },
+          "title": {
+            "description": "Optional title for the new document.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    },
+    {
+      "name": "open_document",
+      "description": "Open an existing document from a URL or share link in the FlatWrite editor. Use this to load a remote markdown file or a previously shared document; use create_document to start blank.",
+      "inputSchema": {
+        "properties": {
+          "url": {
+            "description": "URL of the markdown file or FlatWrite share link to open.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"open\"",
+      "warnings": []
+    },
+    {
+      "name": "update_document_content",
+      "description": "Update the markdown content of the active document in the FlatWrite editor. Use this to edit the document programmatically; use get_document_state to inspect the result.",
+      "inputSchema": {
+        "properties": {
+          "markdown": {
+            "description": "New markdown content for the document.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "markdown"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"update\"",
+      "warnings": []
+    },
+    {
+      "name": "list_recent_documents",
+      "description": "Return a list of recently opened documents from the editor session. Use this to discover what the user has been working on; use open_document to load one.",
+      "inputSchema": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name starts with \"list\"",
+      "warnings": []
+    },
+    {
+      "name": "render_markdown_preview",
+      "description": "Triggers the editor's built-in preview pane. No HTML is returned — this tool produces a visual side-effect only. Agents that need HTML output must use render_markdown instead.",
+      "inputSchema": {
+        "properties": {
+          "markdown": {
+            "description": "Optional markdown to preview. If omitted, previews the current editor content.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "description mentions \"is\"",
+      "warnings": []
+    },
+    {
+      "name": "export_document_html",
+      "description": "Export the active document as a self-contained HTML file. The export opens in a new browser tab for human users. Completes synchronously. Use export_document_pdf for print-ready output.",
+      "inputSchema": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "unclassified — defaults to action until reviewed",
+      "warnings": []
+    },
+    {
+      "name": "export_document_pdf",
+      "description": "Export the active document as a PDF by triggering the browser print dialog with the rendered preview. Completes synchronously. The print dialog opens for human users. Use export_document_html for a downloadable HTML file.",
+      "inputSchema": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "unclassified — defaults to action until reviewed",
+      "warnings": []
+    },
+    {
+      "name": "create_share_link",
+      "description": "Create a shareable URL for the active document and copy it to the clipboard. Use this to share the document; the link expires after 30 days. Use get_document_state to check canShare before calling.",
+      "inputSchema": {
+        "properties": {},
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"create\"",
+      "warnings": []
+    },
+    {
+      "name": "assist_document",
+      "description": "Rewrite, shorten, fix grammar, or apply a custom instruction to markdown via FlatWrite Assist (Morph: Reflex + Router + Compact + Fast Models). Returns full markdown plus the edited piece. Does not modify the editor — apply with update_document_content if desired. When selectionStart and selectionEnd are provided, only that span is rewritten.",
+      "inputSchema": {
+        "properties": {
+          "instruction": {
+            "description": "Freeform instruction. Required when mode is \"custom\".",
+            "type": "string"
+          },
+          "markdown": {
+            "description": "Full markdown document. Optional in the browser WebMCP path (defaults to the active editor). Required for server MCP.",
+            "type": "string"
+          },
+          "mode": {
+            "description": "Assist mode.",
+            "enum": [
+              "custom",
+              "rewrite",
+              "shorten",
+              "fix_grammar"
+            ],
+            "type": "string"
+          },
+          "selectionEnd": {
+            "description": "Optional selection end index (exclusive) within markdown.",
+            "minimum": 0,
+            "type": "number"
+          },
+          "selectionStart": {
+            "description": "Optional selection start index (inclusive) within markdown.",
+            "minimum": 0,
+            "type": "number"
+          },
+          "selectionText": {
+            "description": "Optional selection text (defaults to markdown.slice(start, end)).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "markdown"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "sensitive",
+      "riskReason": "description mentions \"apply\"",
+      "warnings": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "12/12"
+    },
+    {
+      "id": "described",
+      "label": "Every tool has a description",
+      "ok": true,
+      "detail": "12/12"
+    },
+    {
+      "id": "input-schema",
+      "label": "Every tool has an input schema",
+      "ok": true,
+      "detail": "12/12"
+    },
+    {
+      "id": "snake-case",
+      "label": "Tool names are snake_case",
+      "ok": true,
+      "detail": "12/12"
+    },
+    {
+      "id": "unique",
+      "label": "Tool names are unique",
+      "ok": true,
+      "detail": "12 distinct"
+    },
+    {
+      "id": "no-suspicious",
+      "label": "No suspicious wording in tool metadata",
+      "ok": true,
+      "detail": "none flagged"
+    },
+    {
+      "id": "route-scoped",
+      "label": "Tool set changes with the page",
+      "ok": false,
+      "detail": "only one page checked"
+    }
+  ],
+  "counts": {
+    "tools": 12,
+    "pages": 1,
+    "read": 4,
+    "action": 7,
+    "sensitive": 1,
+    "described": 12,
+    "withInputSchema": 12,
+    "declarative": 0
+  },
+  "hints": {
+    "forms": [],
+    "links": [
+      "https://thecontrarian.in"
+    ],
+    "title": "flatwrite.md — pretty damn good markdown",
+    "description": "A minimalist markdown editor with live preview, paged document layout, and one-click export to HTML, PDF, or shareable URL."
+  },
+  "notes": [
+    "operator Chrome flags: --ssl-version-max=tls1.2",
+    "sightmap browser mcp list saw 12 tool(s) on /",
+    "$ sightmap version",
+    "$ sightmap browser start --detach --headless --port 45483 --cdp-port 46547 --profile /tmp/atlas-scan-0JgRK3/profile --url about:blank --log-file /tmp/atlas-scan-0JgRK3/daemon.log --chrome-flag=--enable-blink-features=ModelContext,ModelC… --chrome-flag=--enable-features=DevToolsWebMCPSupport --chrome-flag=--proxy-server=http://127.0.0.1:41767 --chrome-flag=--proxy-bypass-list=localhost;127.0.0.1;[::1] --chrome-flag=--deny-permission-prompts --chrome-flag=--ssl-version-max=tls1.2 --chrome-binary /opt/pw-browsers/chromium --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap",
+    "$ sightmap browser tabs list --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap ×2",
+    "$ sightmap browser inject --persist --file /tmp/atlas-scan-0JgRK3/recorder.js --tab AE538C04A83FE3EE3DA0A9A2B3166FE7 --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap",
+    "$ sightmap browser inject --list --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap ×9",
+    "$ sightmap browser navigate https://flatwrite.md/ --tab AE538C04A83FE3EE3DA0A9A2B3166FE7 --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab AE538C04A83FE3EE3DA0A9A2B3166FE7 --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap ×4",
+    "$ sightmap browser mcp list --json --tab AE538C04A83FE3EE3DA0A9A2B3166FE7 --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap",
+    "$ sightmap browser stop --sightmap-dir /tmp/atlas-scan-0JgRK3/.sightmap"
+  ]
+}
