@@ -18,6 +18,10 @@ type MatchQuery struct {
 	// def for this match (component names are unique only per parent, so a name
 	// lookup would collide). Consumers read Memory/Tags/Properties from it.
 	Def *sightmap.ComponentDef
+	// privacyRank and watch mark a capture rule (see capture.go), which declares
+	// privacy or watch for the elements it matches and never names one.
+	privacyRank int
+	watch       bool
 }
 
 // FindAllMatches traverses root depth-first, invoking onMatch for every node
@@ -47,10 +51,25 @@ func findAllMatches(
 	if root == nil || len(queries) == 0 {
 		return
 	}
+	walkMatches(root, queries, index, onMatch, nil)
+}
+
+// walkMatches is findAllMatches that also calls onNode, when set, for every
+// node in depth-first order, after all of that node's matches and before any
+// of its descendants', with the node's depth (root 0). It lets a caller fold
+// state down the tree in the same traversal.
+func walkMatches(
+	root *sightmap.ComponentNode,
+	queries []MatchQuery,
+	index *firstPartIndex,
+	onMatch func(*sightmap.ComponentNode, *MatchQuery),
+	onNode func(*sightmap.ComponentNode, int),
+) {
 	w := &nfaWalker{
 		queries: queries,
 		index:   index,
 		onMatch: onMatch,
+		onNode:  onNode,
 		chain:   []*sightmap.ComponentNode{root},
 	}
 	w.visit(nil, nil)
@@ -70,6 +89,7 @@ type nfaWalker struct {
 	queries []MatchQuery
 	index   *firstPartIndex
 	onMatch func(*sightmap.ComponentNode, *MatchQuery)
+	onNode  func(*sightmap.ComponentNode, int)
 	// chain is the root-first path to the node being visited, pushed and popped
 	// as the walk descends. MatchesNodeChain needs the ancestor path to evaluate a
 	// :not() argument that carries a combinator.
@@ -115,6 +135,10 @@ func (w *nfaWalker) visit(descendant, direct []selectorState) {
 	w.fresh = w.index.candidates(node.Element, w.fresh[:0])
 	for _, qi := range w.fresh {
 		nextDescendant, nextDirect = w.step(chain, selectorState{&w.queries[qi], 0}, nextDescendant, nextDirect)
+	}
+
+	if w.onNode != nil {
+		w.onNode(node, len(chain)-1)
 	}
 
 	// Recurse into children. Direct children receive both nextDescendant and
