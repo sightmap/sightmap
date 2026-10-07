@@ -1,0 +1,30 @@
+slug: alpha-tools
+name: Alpha Tools
+url: https://alpha.example.org/
+host: alpha.example.org
+description: A fixture site with three WebMCP tools.
+category: devtools
+type: live
+built_with_sightkick: true
+submitted_by: owner
+labels: [promising]
+collections: [built-with-sightkick]
+added: 2026-09-01
+updated: 2026-09-08
+scan: scans/alpha-tools/2026-09-08.json
+tools:
+  - name: search
+    kind: read
+    description: Search the docs.
+    page: /
+  - name: open_page
+    kind: action
+    description: Open a page by slug.
+    page: /
+suggested_journeys:
+  - intent: Find the pricing page
+    tools: [search, open_page]
+strengths:
+  - Every tool has a schema
+improvements:
+  - open_page returns nothing structured

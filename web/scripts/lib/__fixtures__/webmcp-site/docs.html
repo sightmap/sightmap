@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Fixture Shop — Docs</title></head>
+<body>
+  <main><h1>Docs</h1><a href="/">Home</a></main>
+  <script>
+    if (!navigator.modelContext) navigator.modelContext = { registerTool() {}, provideContext() {} }
+    navigator.modelContext.provideContext({
+      tools: [
+        {
+          name: 'search_products',
+          description: 'Search the catalogue for products matching a query.',
+          inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+          execute: () => ({ content: [] }),
+        },
+        {
+          name: 'get_doc',
+          description: 'Fetch one documentation page by slug.',
+          inputSchema: { type: 'object', properties: { slug: { type: 'string' } } },
+          execute: () => ({ content: [] }),
+        },
+      ],
+    })
+  </script>
+</body>
+</html>

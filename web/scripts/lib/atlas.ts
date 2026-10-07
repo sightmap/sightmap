@@ -15,6 +15,7 @@ import matter from 'gray-matter'
 import { Marked } from 'marked'
 import { z } from 'zod'
 import type { AtlasEntry, AtlasEntryMeta } from '../../src/types/atlas'
+import { issuesOf } from './directory'
 import { esc } from './site'
 import { MAX_MEMBER_NAME_BYTES } from './tar'
 
@@ -162,9 +163,6 @@ export interface LoadedAtlas {
   skipped: string[]
 }
 
-function issuesOf(error: z.ZodError): string {
-  return error.issues.map((i) => `    - ${i.path.join('.') || '(root)'}: ${i.message}`).join('\n')
-}
 
 /**
  * Resolves an entry's index.json screenshot paths to servable URLs.
