@@ -55,11 +55,12 @@ func matchesNodeChain(chain []*ComponentNode, i int, rule *SelectorPart) bool {
 	if !matchesIdentity(el, rule) {
 		return false
 	}
-	// :is() / :where() — the subject must match at least one alternative.
-	// Evaluated node-aware so an alternative may itself carry :has()/:not().
-	if len(rule.Is) > 0 {
+	// :is() / :where() — the subject must match at least one alternative of
+	// every list on the compound. Evaluated node-aware so an alternative may
+	// itself carry :has()/:not().
+	for _, alts := range isLists(rule) {
 		anyMatch := false
-		for _, alt := range rule.Is {
+		for _, alt := range alts {
 			if matchesNodeChain(chain, i, alt) {
 				anyMatch = true
 				break
@@ -166,10 +167,10 @@ func Matches(el *Element, rule *SelectorPart) bool {
 		return false
 	}
 
-	// :is() / :where() — node must match at least one alternative.
-	if len(rule.Is) > 0 {
+	// :is() / :where() — node must match at least one alternative of every list.
+	for _, alts := range isLists(rule) {
 		anyMatch := false
-		for _, alt := range rule.Is {
+		for _, alt := range alts {
 			if Matches(el, alt) {
 				anyMatch = true
 				break
@@ -193,12 +194,14 @@ func Matches(el *Element, rule *SelectorPart) bool {
 	return true
 }
 
-// matchesIdentity checks the tree-free identity of el against rule: tag, id,
-// classes, and attribute operators. It ignores the logical/relational pseudos
+// matchesIdentity checks the identity of el against rule: tag, id, classes,
+// and attribute operators. It ignores the logical/relational pseudos
 // (:is/:not/:has), which the callers layer on with the appropriate context.
 func matchesIdentity(el *Element, rule *SelectorPart) bool {
-	// Tag match (case-insensitive for HTML; case-sensitive for synthetic mobile).
-	if rule.Tag != "" && !strings.EqualFold(el.Tag, rule.Tag) {
+	// Type selectors compare ASCII case-insensitively, as CSS does for HTML
+	// (and as synthetic mobile tags rely on). Unicode folding would also equate
+	// tags CSS keeps apart, such as "a-s" and "a-ſ".
+	if rule.Tag != "" && !asciiEqualFold(el.Tag, rule.Tag) {
 		return false
 	}
 
@@ -224,31 +227,46 @@ func matchesIdentity(el *Element, rule *SelectorPart) bool {
 				op = o
 			}
 		}
-
-		if !el.HasAttr(key) {
-			// Attribute not present on node — only "[]" (presence-only) would
-			// logically not care, but absence means presence check fails too.
+		if !attrTestHolds(el, key, op, ruleVal) {
 			return false
 		}
-
-		if key == "class" && len(el.Classes) > 1 {
-			if _, inAttrs := el.Attrs["class"]; !inAttrs {
-				if matched, ok := classAttrMatches(op, el.Classes, ruleVal); ok {
-					if !matched {
-						return false
-					}
-					continue
-				}
-			}
-		}
-
-		nodeVal, _ := el.Attr(key)
-		if !attrMatches(op, nodeVal, ruleVal) {
+	}
+	for _, at := range rule.RepeatAttrs {
+		if !attrTestHolds(el, at.Key, at.Op, at.Value) {
 			return false
 		}
 	}
 
 	return true
+}
+
+// attrTestHolds reports whether el satisfies one attribute test.
+func attrTestHolds(el *Element, key, op, ruleVal string) bool {
+	// Every operator, presence-only included, requires the attribute.
+	if !el.HasAttr(key) {
+		return false
+	}
+
+	if key == "class" && len(el.Classes) > 1 {
+		if _, inAttrs := el.Attrs["class"]; !inAttrs {
+			if matched, ok := classAttrMatches(op, el.Classes, ruleVal); ok {
+				return matched
+			}
+		}
+	}
+
+	nodeVal, _ := el.Attr(key)
+	if attrMatches(op, nodeVal, ruleVal) {
+		return true
+	}
+	// HTML documents compare the values of a fixed list of attributes ASCII
+	// case-insensitively, so input[type=password] matches type="PASSWORD". The
+	// list applies to every element in the document, SVG and MathML included
+	// (verified against Chrome), and never covers a camelCase SVG or MathML
+	// attribute name (foreignAttrName). Checked only after a case-sensitive
+	// miss, so the common path never folds.
+	return AttrValueCaseInsensitive(key) &&
+		attrMatches(op, asciiLower(nodeVal), asciiLower(ruleVal))
 }
 
 // Attr resolves an attribute value on an observed Element the way selector
@@ -360,7 +378,11 @@ func attrMatches(op, nodeVal, ruleVal string) bool {
 	case "*=":
 		return ruleVal != "" && strings.Contains(nodeVal, ruleVal)
 	case "~=":
-		// Whitespace-separated list includes ruleVal exactly.
+		// Whitespace-separated list includes ruleVal exactly. CSS: a value that
+		// is empty or contains whitespace never matches.
+		if ruleVal == "" || strings.ContainsAny(ruleVal, " \t\r\n\f") {
+			return false
+		}
 		return includesWord(nodeVal, ruleVal)
 	case "|=":
 		// Equals ruleVal or starts with "ruleVal-".
@@ -517,4 +539,75 @@ func foreignAttrName(key string) string {
 		return "zoomAndPan"
 	}
 	return ""
+}
+
+// legacyCaseInsensitiveAttrs are the attributes whose values HTML compares
+// ASCII case-insensitively in selectors, on HTML elements only. See
+// https://html.spec.whatwg.org/multipage/semantics-other.html#case-sensitivity-of-selectors
+var legacyCaseInsensitiveAttrs = map[string]bool{
+	"accept": true, "accept-charset": true, "align": true, "alink": true, "axis": true,
+	"bgcolor": true, "charset": true, "checked": true, "clear": true, "codetype": true,
+	"color": true, "compact": true, "declare": true, "defer": true, "dir": true,
+	"direction": true, "disabled": true, "enctype": true, "face": true, "frame": true,
+	"hreflang": true, "http-equiv": true, "lang": true, "language": true, "link": true,
+	"media": true, "method": true, "multiple": true, "nohref": true, "noresize": true,
+	"noshade": true, "nowrap": true, "readonly": true, "rel": true, "rev": true,
+	"rules": true, "scope": true, "scrolling": true, "selected": true, "shape": true,
+	"target": true, "text": true, "type": true, "valign": true, "valuetype": true,
+	"vlink": true,
+}
+
+// AttrValueCaseInsensitive reports whether HTML compares the value of the named
+// attribute (lowercase) ASCII case-insensitively in selectors on HTML elements.
+func AttrValueCaseInsensitive(name string) bool {
+	return legacyCaseInsensitiveAttrs[name]
+}
+
+// asciiEqualFold reports whether a and b are equal under ASCII case folding.
+func asciiEqualFold(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		ca, cb := a[i], b[i]
+		if 'A' <= ca && ca <= 'Z' {
+			ca += 'a' - 'A'
+		}
+		if 'A' <= cb && cb <= 'Z' {
+			cb += 'a' - 'A'
+		}
+		if ca != cb {
+			return false
+		}
+	}
+	return true
+}
+
+// asciiLower lowercases ASCII letters, returning s itself when it has none.
+func asciiLower(s string) string {
+	for i := 0; i < len(s); i++ {
+		if 'A' <= s[i] && s[i] <= 'Z' {
+			b := []byte(s)
+			for j := i; j < len(b); j++ {
+				if 'A' <= b[j] && b[j] <= 'Z' {
+					b[j] += 'a' - 'A'
+				}
+			}
+			return string(b)
+		}
+	}
+	return s
+}
+
+// isLists returns every :is()/:where() alternative list on rule: the first in
+// Is, the rest in AndIs. Each list must match (CSS ANDs them), while the
+// alternatives within one list are alternatives.
+func isLists(rule *SelectorPart) [][]*SelectorPart {
+	if len(rule.Is) == 0 {
+		return nil
+	}
+	if len(rule.AndIs) == 0 {
+		return [][]*SelectorPart{rule.Is}
+	}
+	return append([][]*SelectorPart{rule.Is}, rule.AndIs...)
 }
