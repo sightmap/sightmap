@@ -1,5 +1,18 @@
 # @sightmap/sightmap
 
+## 0.36.0
+
+### Minor Changes
+
+- 51e558e: Full-page screenshots. `browser screenshot --full-page` captures the whole scrollable page rather than the viewport, and `capture --screenshot` saves a full-page PNG beside each capture as `<stamp>.snap.png` (removed by `capture prune` along with its capture), so a view set keeps a picture of every state it recorded.
+- f4fd8e0: Resolve privacy and watch from every component whose selector matches an element, as SEP-0009 and SEP-0015 now state, instead of from whichever component names it. A broader component naming an element (a `Field` child naming every `input` in a form) no longer discards a narrower component's `block`, a view component sharing a global's name no longer drops the global's privacy or watch, two declarations on one element resolve to the strictest, and `block` is absolute: an `unmask` reopens a `mask`, never a `block`.
+
+  `ComponentMatch.Watched` lists every watched component matching a node, and `ComponentMatch.Watch` reports whether any does. New on `match.Matcher`: `Privacy` and `Watched` resolve every node of a tree, including nodes no component names. `match.Withholds` is exported, so a consumer withholding properties it extracted itself applies the matcher's rule.
+
+### Patch Changes
+
+- 6d58f67: Selectors match exactly what a browser matches. Every test in a compound now applies instead of only the last: a repeated attribute name (`[class*="a"][class*="b"]`), a repeated `#id` (`#a#a` matches, `#a#b` matches nothing), and a second `:is()`/`:where()` (`:is(.a):is(.b)`). The parser rejects a type selector or `*` after other tokens (`[x]div`), which CSS does not allow. Matching compares the values of the attributes HTML lists as case-insensitive (`type`, `rel`, `target`, `lang` and the rest) ASCII case-insensitively, so `input[type=password]` matches `type="PASSWORD"`; in an HTML document that list applies to every element, SVG and MathML included. Type names fold with ASCII rules only, and a `~=` value that is empty or contains whitespace never matches.
+
 ## 0.35.0
 
 ### Minor Changes
