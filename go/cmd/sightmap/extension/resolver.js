@@ -111,6 +111,72 @@ export function activeComponentSet(globals, viewLists) {
   );
 }
 
+// ── View selection ────────────────────────────────────────────────────────────
+//
+// Ported from the Go loader (sightmap/corpus.go) so the overlay picks the same
+// view the CLI does. A hand-rolled matcher that only knew `*` and `**` treated
+// `:param` as literal text, so a view routed `/ui/:org/settings` never matched.
+
+/** Drop trailing slashes; the root stays "/" (Go normalizeRoutePath). */
+function normalizeRoutePath(p) {
+  const trimmed = (p ?? "").replace(/\/+$/, "");
+  return trimmed === "" ? "/" : trimmed;
+}
+
+/**
+ * One route segment as a regex body (Go routeSegBody): `*` and `:param` match
+ * exactly one segment; a `*` run inside a segment matches within it.
+ */
+function routeSegBody(seg) {
+  if (seg === "*" || seg.startsWith(":")) return "[^/]+";
+  return seg.replace(/[.+?()[\]{}\\|^$]/g, "\\$&").replace(/\*+/g, "[^/]*");
+}
+
+/** Whether a view route matches a URL path (Go MatchRoute). */
+export function matchRoute(pattern, pathname) {
+  const pat = normalizeRoutePath(pattern);
+  const path = normalizeRoutePath(pathname);
+  if (pat === "/") return path === "/";
+  let re = "^";
+  pat.split("/").forEach((seg, i) => {
+    if (i === 0 && seg === "") return; // leading slash
+    // A whole `**` segment matches zero or more segments, its slash included.
+    re += seg === "**" ? "(?:/.*)?" : "/" + routeSegBody(seg);
+  });
+  return new RegExp(re + "$").test(path);
+}
+
+/** How specific a route is: literal 3, `:param` 2, `*` 1, `**` 0 (Go routeSpecificity). */
+export function routeSpecificity(pattern) {
+  const pat = normalizeRoutePath(pattern);
+  if (pat === "/") return 1;
+  let score = 0;
+  for (const seg of pat.split("/")) {
+    if (seg === "" || seg === "**") continue;
+    score += seg === "*" ? 1 : seg.startsWith(":") ? 2 : 3;
+  }
+  return score;
+}
+
+/**
+ * The view for a URL path: the most specific matching route, the first declared
+ * on a tie, or null (Go Corpus.ViewForURL). Exactly one view is active, so a
+ * generic route can't add its components to a page a specific route owns.
+ */
+export function viewForPath(views, pathname) {
+  let best = null;
+  let bestScore = -1;
+  for (const v of views ?? []) {
+    if (!matchRoute(v.route, pathname)) continue;
+    const s = routeSpecificity(v.route);
+    if (s > bestScore) {
+      bestScore = s;
+      best = v;
+    }
+  }
+  return best;
+}
+
 /** The component named `name` whose parent is `ownerAddress`, or null. */
 function childNamed(components, ownerAddress, name) {
   return (
