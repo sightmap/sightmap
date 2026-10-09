@@ -103,6 +103,36 @@ func TestValidate_SameNameDifferentSelector_OK(t *testing.T) {
 	}
 }
 
+func TestValidate_SameNameSelectorDifferentParent_OK(t *testing.T) {
+	// Two definitions whose expanded children share a name and a selector: the
+	// definitions scope is flattened, but a child name is scoped to its parent.
+	c := &sightmap.Corpus{Definitions: []sightmap.ComponentDef{
+		{Name: "SaveButton", Selectors: []string{"button.save"}},
+		{Name: "Label", Selectors: []string{"button.save span"}, ParentChain: []string{"SaveButton"}},
+		{Name: "SaveButton2", Selectors: []string{"button.save"}},
+		{Name: "Label", Selectors: []string{"button.save span"}, ParentChain: []string{"SaveButton2"}},
+	}}
+	if errs := sightmap.Validate(c); len(errs) != 0 {
+		t.Errorf("expected no errors for one child name under two parents, got: %v", errs)
+	}
+}
+
+func TestValidate_DuplicateChildSameParent(t *testing.T) {
+	c := corpusFrom(nil, []sightmap.ViewDef{{
+		Name:  "Home",
+		Route: "/",
+		Components: []sightmap.ComponentDef{
+			{Name: "Card", Selectors: []string{".card"}},
+			{Name: "Title", Selectors: []string{".card h2"}, ParentChain: []string{"Card"}},
+			{Name: "Title", Selectors: []string{".card h2"}, ParentChain: []string{"Card"}},
+		},
+	}})
+	errs := sightmap.Validate(c)
+	if len(errs) != 1 || errs[0].Component != "Title" {
+		t.Fatalf("expected 1 duplicate error on Title, got: %v", errs)
+	}
+}
+
 func TestValidate_MissingRoute(t *testing.T) {
 	c := corpusFrom(nil, []sightmap.ViewDef{
 		{
