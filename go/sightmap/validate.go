@@ -231,8 +231,9 @@ func viewLocList(vs []ViewDef) string {
 }
 
 // validateComponent validates a single component against the shared seen map.
-// seen maps component name → sorted-selector fingerprint so that the same
-// name is only flagged as a duplicate when the selector set is also identical.
+// seen maps component address (parent chain + name) → sorted-selector
+// fingerprint so that the same name is only flagged as a duplicate when the
+// parent and the selector set are also identical.
 // Same name + different selectors = intentional child-component reuse = OK.
 func validateComponent(comp ComponentDef, seen map[string]string) []ValidationError {
 	var errs []ValidationError
@@ -280,17 +281,21 @@ func validateComponent(comp ComponentDef, seen map[string]string) []ValidationEr
 		}
 	}
 
-	// duplicate-name+selector within scope: same name AND same selector set is
-	// a true duplicate. Same name with different selectors is intentional reuse
-	// (e.g. CarouselScrollButton as a child of multiple carousel components).
+	// duplicate-name+selector within scope: same name AND same selector set
+	// under the same parent is a true duplicate. Same name with different
+	// selectors is intentional reuse (e.g. CarouselScrollButton as a child of
+	// multiple carousel components), and so is the same name under a different
+	// parent: names are unique only within their parent, and a flattened
+	// scope holds every parent's children.
 	fingerprint := selectorFingerprint(comp.Selectors)
-	if prev, exists := seen[comp.Name]; exists && prev == fingerprint {
+	addr := strings.Join(append(append([]string{}, comp.ParentChain...), comp.Name), "\x00")
+	if prev, exists := seen[addr]; exists && prev == fingerprint {
 		errs = append(errs, ValidationError{
 			Component: comp.Name,
 			Message:   "duplicate component name and selector",
 		})
 	}
-	seen[comp.Name] = fingerprint
+	seen[addr] = fingerprint
 
 	return errs
 }
