@@ -293,11 +293,18 @@ func lintComponent(comp ComponentDef, global bool) []LintWarning {
 // lintComponentIDs flags component declarations without an id once a corpus
 // declares any (SEP-0020): identity can only be tracked across versions for
 // components that carry one, and partial adoption is usually an oversight.
-// Each declaration is visited once: globals and definitions with their
-// children, and view components authored inline. A view's $ref expansions
-// carry an Origin and are those same declarations again.
+// Each declaration is visited once. The flattened global and definition lists
+// also hold the copies their own $refs expand to, so those are skipped, and
+// only inline view components are taken from views.
 func lintComponentIDs(c *Corpus) []LintWarning {
-	decls := append(append([]ComponentDef(nil), c.GlobalComponents...), c.Definitions...)
+	var decls []ComponentDef
+	for _, list := range [][]ComponentDef{c.GlobalComponents, c.Definitions} {
+		for _, comp := range list {
+			if !expandedCopy(comp) {
+				decls = append(decls, comp)
+			}
+		}
+	}
 	for _, v := range c.Views {
 		for _, comp := range v.Components {
 			if comp.Origin == "" {
@@ -327,6 +334,15 @@ func lintComponentIDs(c *Corpus) []LintWarning {
 		}
 	}
 	return out
+}
+
+// expandedCopy reports whether a flattened global or definition entry is a
+// copy produced by one of its own $refs rather than the declaration itself.
+// Expansion restarts Origin at the reference site, so a copy's Origin is
+// shorter than its full name chain; a declaration's covers the whole chain.
+func expandedCopy(comp ComponentDef) bool {
+	full := strings.Join(append(append([]string(nil), comp.ParentChain...), comp.Name), "\x00")
+	return comp.Origin != "" && comp.Origin != full
 }
 
 // lintDefinition lints one flattened file-root definition (SEP-0019). A

@@ -310,3 +310,65 @@ components:
 		t.Errorf("unknown-field findings = %v, want exactly the id on the $ref entry", unknown)
 	}
 }
+
+// A definition placed by $refs inside other globals is one declaration: an
+// id-less one is reported once, not once per expansion.
+func TestLintComponentIDMissingOncePerDeclaration(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "app.yaml"), `
+version: 1
+definitions:
+  - name: Logo
+    selector: .logo
+components:
+  - id: h7gq3n0p
+    name: Header
+    selector: header
+    children:
+      - $ref: Logo
+  - id: f9tz2m4k
+    name: Footer
+    selector: footer
+    children:
+      - $ref: Logo
+`)
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var missing []string
+	for _, w := range sightmap.Lint(c) {
+		if w.Rule == "component-id-missing" {
+			missing = append(missing, w.Component+" "+w.Selector)
+		}
+	}
+	if !reflect.DeepEqual(missing, []string{"Logo .logo"}) {
+		t.Errorf("component-id-missing = %v, want only the Logo declaration", missing)
+	}
+}
+
+// An id must be a YAML string, as the schema requires: an unquoted number or
+// a null is invalid rather than silently coerced or dropped.
+func TestComponentIDMustBeString(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "app.yaml"), `
+version: 1
+components:
+  - id: 12345678
+    name: Number
+    selector: .n
+  - id: ~
+    name: Empty
+    selector: .z
+  - id: '87654321'
+    name: Quoted
+    selector: .q
+`)
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := codes(sightmap.Validate(c)); !reflect.DeepEqual(got, []string{"component-id-invalid", "component-id-invalid"}) {
+		t.Errorf("codes = %v, want two component-id-invalid (the number and the null)", got)
+	}
+}

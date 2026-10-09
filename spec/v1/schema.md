@@ -739,7 +739,7 @@ An id is opaque. It is 4 to 64 letters, digits, `_` or `-`, starting with a lett
 
 **What an id is not.** `id` takes no part in route matching, in selector matching, in which component names an element, or in specificity. Two sightmaps that differ only in their ids match every page identically. A consumer that doesn't track identity across versions MUST accept and ignore `id`.
 
-**Conformance.** SDKs MUST emit `component-id-invalid` (error) for an id of the wrong shape, and `component-id-duplicate` (error) when two declarations share an id. When a sightmap declares any component id, SDKs SHOULD emit `component-id-missing` (warning) from lint for each declaration without one. See [SEP-0020](../seps/0020-component-id.md).
+**Conformance.** SDKs MUST emit `component-id-invalid` (error) for an id of the wrong shape or one that isn't a YAML string (such as an unquoted number or a null), and `component-id-duplicate` (error) when two declarations share an id. When a sightmap declares any component id, SDKs SHOULD emit `component-id-missing` (warning) from lint for each declaration without one. See [SEP-0020](../seps/0020-component-id.md).
 
 ## Global vs view-scoped
 

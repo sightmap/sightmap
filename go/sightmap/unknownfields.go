@@ -249,6 +249,17 @@ func walkComponentOrRef(node *yaml.Node, file string, out *[]ValidationError) {
 
 func walkComponent(node *yaml.Node, file string, out *[]ValidationError) {
 	v := checkKeys(node, componentFields, file, out)
+	// A component id must be a YAML string (SEP-0020). An unquoted number would
+	// decode into the Go string and a null would vanish, where the schema
+	// rejects both.
+	if n := v["id"]; n != nil && (n.Kind != yaml.ScalarNode || (n.Tag != "" && n.Tag != "!!str")) {
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "component-id-invalid",
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("id must be a string (line %d); quote the value: id: %q", n.Line, n.Value),
+		})
+	}
 	forEachItem(v["properties"], func(n *yaml.Node) { walkExtract(checkKeys(n, propertyFields, file, out), file, out) })
 	forEachItem(v["children"], func(n *yaml.Node) { walkComponentOrRef(n, file, out) })
 }

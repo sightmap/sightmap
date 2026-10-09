@@ -145,7 +145,7 @@ Each is detected mechanically. Everything else, including renames, moves and sel
 A conforming SDK:
 
 - MUST accept `id` on components, and MUST accept and ignore it if it doesn't track identity.
-- MUST emit `component-id-invalid` (error) for an id of the wrong shape.
+- MUST emit `component-id-invalid` (error) for an id of the wrong shape, or one that isn't a YAML string, such as an unquoted number or a null.
 - MUST emit `component-id-duplicate` (error) when two component declarations share an id. A definition referenced from several places MUST NOT be reported as a duplicate.
 - SHOULD emit `component-id-missing` (warning) from lint for each component declaration without an id, when the sightmap declares any component id.
 - MUST NOT let `id` affect matching, naming or specificity.
