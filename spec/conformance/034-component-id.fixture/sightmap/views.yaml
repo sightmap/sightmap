@@ -1,0 +1,25 @@
+version: 1
+views:
+  - name: Search
+    route: /s/**
+    components:
+      # Placements are told apart by id path: [r2v8yd5e, kq2m7rta] here.
+      - id: r2v8yd5e
+        name: Results
+        selector: ul.results
+        children:
+          - $ref: ProductCard
+  - name: Home
+    route: /
+    components:
+      # ...and [b3n6pk1s, kq2m7rta] here.
+      - id: b3n6pk1s
+        name: Featured
+        selector: .featured
+        children:
+          - $ref: ProductCard
+      # Hero replaced a removed Banner; formerly records the lineage.
+      - id: m5c9fw4j
+        name: Hero
+        selector: .hero
+        formerly: [p0z8ug3v]

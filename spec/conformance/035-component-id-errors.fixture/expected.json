@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": false,
+        "diagnostics": [
+          { "code": "component-id-duplicate", "severity": "error" },
+          { "code": "component-formerly-invalid", "severity": "error" }
+        ]
+      }
+    }
+  ]
+}

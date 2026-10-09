@@ -223,11 +223,28 @@
         }
       }
     },
+    "componentId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{3,63}$",
+      "description": "A component id: 4 to 64 letters, digits, '_' or '-', starting with a letter or digit. See SEP-0020."
+    },
     "component": {
       "type": "object",
       "required": ["name", "selector"],
       "additionalProperties": false,
+      "dependentRequired": { "formerly": ["id"] },
       "properties": {
+        "id": {
+          "$ref": "#/$defs/componentId",
+          "description": "Stable identity of this component across versions of the sightmap. Opaque, unique among every component declaration in the sightmap, unchanged by a rename, move or edit, and never reused. A $ref placement takes its definition's id. See SEP-0020."
+        },
+        "formerly": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/componentId" },
+          "description": "Ids of components this one replaces, for splits and merges. Requires id, and must not list it. See SEP-0020."
+        },
         "name": { "type": "string", "minLength": 1 },
         "selector": { "$ref": "#/$defs/selector" },
         "source": { "type": "string" },

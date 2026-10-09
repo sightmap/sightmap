@@ -73,6 +73,7 @@ func Lint(c *Corpus) []LintWarning {
 	}
 
 	warnings = append(warnings, lintMessageLevels(c.Messages)...)
+	warnings = append(warnings, lintComponentIDs(c)...)
 
 	// Deduplicate: view lists include $ref-expanded globals, so the same
 	// component can appear multiple times. Keep first occurrence of each
@@ -239,6 +240,7 @@ func LintWithCounts(c *Corpus, counts map[string]int) []LintWarning {
 	}
 
 	warnings = append(warnings, lintMessageLevels(c.Messages)...)
+	warnings = append(warnings, lintComponentIDs(c)...)
 
 	type warnKey struct{ rule, comp, sel string }
 	seen := make(map[warnKey]bool, len(warnings))
@@ -286,6 +288,45 @@ func lintMessageLevels(msgs []MessageDef) []LintWarning {
 // global controls whether rules restricted to global scope are applied.
 func lintComponent(comp ComponentDef, global bool) []LintWarning {
 	return lintComponentWithCounts(comp, global, nil)
+}
+
+// lintComponentIDs flags component declarations without an id once a corpus
+// declares any (SEP-0020): identity can only be tracked across versions for
+// components that carry one, and partial adoption is usually an oversight.
+// Each declaration is visited once: globals and definitions with their
+// children, and view components authored inline. A view's $ref expansions
+// carry an Origin and are those same declarations again.
+func lintComponentIDs(c *Corpus) []LintWarning {
+	decls := append(append([]ComponentDef(nil), c.GlobalComponents...), c.Definitions...)
+	for _, v := range c.Views {
+		for _, comp := range v.Components {
+			if comp.Origin == "" {
+				decls = append(decls, comp)
+			}
+		}
+	}
+	uses := false
+	for _, d := range decls {
+		if d.ID != "" {
+			uses = true
+			break
+		}
+	}
+	if !uses {
+		return nil
+	}
+	var out []LintWarning
+	for _, d := range decls {
+		if d.ID == "" {
+			out = append(out, LintWarning{
+				Component: d.Name,
+				Selector:  strings.Join(d.Selectors, ", "),
+				Rule:      "component-id-missing",
+				Message:   "this corpus declares component ids but this component has none, so its identity can't be tracked across versions",
+			})
+		}
+	}
+	return out
 }
 
 // lintDefinition lints one flattened file-root definition (SEP-0019). A

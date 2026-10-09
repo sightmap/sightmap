@@ -4,6 +4,19 @@ package sightmap
 // Hierarchical YAML selectors should be pre-flattened by the caller into
 // compound descendant selectors before compiling into match queries.
 type ComponentDef struct {
+	// ID is the component's identity across versions of the sightmap (SEP-0020):
+	// opaque, unique among component declarations, unchanged by a rename, move or
+	// edit. "" when the component declares none. A $ref placement carries its
+	// definition's ID, so one ID can appear at several placements; IDPath tells
+	// them apart.
+	ID string `json:"id,omitempty"`
+	// Formerly lists the IDs of components this one replaces, for splits and
+	// merges (SEP-0020).
+	Formerly []string `json:"formerly,omitempty"`
+	// IDPath is the ID of each ancestor, root-first, followed by ID: the identity
+	// of this placement. An ancestor without an ID contributes "". Nil when ID
+	// is "".
+	IDPath    []string `json:"idPath,omitempty"`
 	Name      string   `json:"name"`
 	Selectors []string `json:"selectors"`
 	Source    string   `json:"source,omitempty"`

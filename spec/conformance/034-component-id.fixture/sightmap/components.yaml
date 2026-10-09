@@ -1,0 +1,15 @@
+version: 1
+components:
+  - id: h7gq3n0p
+    name: SiteHeader
+    selector: header
+
+definitions:
+  # One declaration, so one id, however many places reference it.
+  - id: kq2m7rta
+    name: ProductCard
+    selector: '[data-component="ProductCard"]'
+    children:
+      - id: t9w4hx2c
+        name: Title
+        selector: h3
