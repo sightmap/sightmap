@@ -20,7 +20,8 @@ func codes(errs []sightmap.ValidationError) []string {
 }
 
 // SEP-0020: ids load onto every declaration, and IDPath tells a definition's
-// placements apart even though they share its id.
+// placements apart even though they share its id: inside a $ref expansion it
+// is prefixed by the component holding the $ref.
 func TestComponentIDsAndIDPaths(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "components.yaml"), `
@@ -67,40 +68,82 @@ views:
 			paths = append(paths, d.IDPath)
 		}
 	}
-	want := [][]string{{"r2v8yd5e", "kq2m7rta", "t9w4hx2c"}, {"f4j8nz1q", "kq2m7rta", "t9w4hx2c"}}
+	want := [][]string{{"r2v8yd5e", "t9w4hx2c"}, {"f4j8nz1q", "t9w4hx2c"}}
 	if !reflect.DeepEqual(paths, want) {
 		t.Errorf("Title IDPaths = %v, want %v", paths, want)
 	}
 }
 
-// An ancestor without an id contributes "" to IDPath, and a component without
-// an id has none.
-func TestIDPathWithUnidentifiedAncestor(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "app.yaml"), `
+// Outside any $ref expansion IDPath is just the component's own id, so moving
+// a component (or renaming or reselecting an ancestor) doesn't change it. A
+// $ref held by a component without an id gives its expansion an incomplete
+// path, marked by "".
+func TestIDPathStableUnderMoves(t *testing.T) {
+	load := func(yaml string) *sightmap.Corpus {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, "app.yaml"), yaml)
+		c, err := sightmap.Load(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	pathOf := func(c *sightmap.Corpus, name string) []string {
+		for _, d := range c.GlobalComponents {
+			if d.Name == name {
+				return d.IDPath
+			}
+		}
+		t.Fatalf("no component %q", name)
+		return nil
+	}
+	before := load(`
 version: 1
+components:
+  - id: f3n8kq2m
+    name: CheckoutForm
+    selector: form.checkout
+    children:
+      - id: kq2m7rta
+        name: CardDetail
+        selector: .card-detail
+`)
+	after := load(`
+version: 1
+components:
+  - id: f3n8kq2m
+    name: CheckoutForm
+    selector: form.checkout
+  - id: p6sjw3ra
+    name: PaymentSheet
+    selector: '[role="dialog"]'
+    children:
+      - id: kq2m7rta
+        name: CardDetail
+        selector: .card-detail
+`)
+	if b, a := pathOf(before, "CardDetail"), pathOf(after, "CardDetail"); !reflect.DeepEqual(b, a) || !reflect.DeepEqual(a, []string{"kq2m7rta"}) {
+		t.Errorf("CardDetail IDPath before %v, after move %v; want [kq2m7rta] both", b, a)
+	}
+
+	unheld := load(`
+version: 1
+definitions:
+  - id: kq2m7rta
+    name: ProductCard
+    selector: .card
 components:
   - name: Shell
     selector: main
     children:
-      - id: c4mxq2nb
-        name: Card
-        selector: .card
+      - $ref: ProductCard
 `)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, d := range c.GlobalComponents {
-		switch d.Name {
-		case "Shell":
-			if d.IDPath != nil {
-				t.Errorf("Shell IDPath = %v, want nil", d.IDPath)
-			}
-		case "Card":
-			if !reflect.DeepEqual(d.IDPath, []string{"", "c4mxq2nb"}) {
-				t.Errorf("Card IDPath = %v, want [\"\" c4mxq2nb]", d.IDPath)
-			}
+	for _, d := range unheld.GlobalComponents {
+		if d.Name == "ProductCard" && !reflect.DeepEqual(d.IDPath, []string{"", "kq2m7rta"}) {
+			t.Errorf("ProductCard under an unidentified holder: IDPath %v, want [\"\" kq2m7rta]", d.IDPath)
+		}
+		if d.Name == "Shell" && d.IDPath != nil {
+			t.Errorf("Shell IDPath = %v, want nil", d.IDPath)
 		}
 	}
 }
@@ -182,42 +225,6 @@ components:
 	}
 }
 
-func TestComponentFormerly(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "app.yaml"), `
-version: 1
-components:
-  - id: m5c9fw4j
-    name: Hero
-    selector: .hero
-    formerly: [p0z8ug3v, b2hdx7ke]
-  - id: q7rak3d9
-    name: SelfReference
-    selector: .self
-    formerly: [q7rak3d9]
-  - id: w8e2mz5t
-    name: Repeated
-    selector: .rep
-    formerly: [p0z8ug3v, p0z8ug3v]
-  - name: NoID
-    selector: .noid
-    formerly: [p0z8ug3v]
-`)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"component-formerly-invalid", "component-formerly-invalid", "component-formerly-invalid"}
-	if got := codes(sightmap.Validate(c)); !reflect.DeepEqual(got, want) {
-		t.Errorf("codes = %v, want %v", got, want)
-	}
-	for _, d := range c.GlobalComponents {
-		if d.Name == "Hero" && !reflect.DeepEqual(d.Formerly, []string{"p0z8ug3v", "b2hdx7ke"}) {
-			t.Errorf("Hero Formerly = %v", d.Formerly)
-		}
-	}
-}
-
 // Once a corpus declares any id, lint flags each declaration without one,
 // once, however many times a $ref places it. A corpus without ids is silent.
 func TestLintComponentIDMissing(t *testing.T) {
@@ -272,8 +279,7 @@ components:
 	}
 }
 
-// id and formerly are known component keys; a $ref entry still accepts no
-// other key.
+// id is a known component key; a $ref entry still accepts no other key.
 func TestComponentIDKnownFields(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "app.yaml"), `
@@ -286,7 +292,6 @@ components:
   - id: m5c9fw4j
     name: Hero
     selector: .hero
-    formerly: [p0z8ug3v]
     children:
       - $ref: ProductCard
         id: x1y2z3w4

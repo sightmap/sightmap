@@ -7,8 +7,7 @@ views:
       - id: checkout01
         name: LegacyCheckout
         selector: form.legacy
-      # A component can't replace itself.
+      # A different id is fine.
       - id: q7rak3d9
         name: PlaceOrder
         selector: button.place-order
-        formerly: [q7rak3d9]

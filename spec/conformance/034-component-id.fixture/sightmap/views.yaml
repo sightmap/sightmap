@@ -18,8 +18,6 @@ views:
         selector: .featured
         children:
           - $ref: ProductCard
-      # Hero replaced a removed Banner; formerly records the lineage.
       - id: m5c9fw4j
         name: Hero
         selector: .hero
-        formerly: [p0z8ug3v]

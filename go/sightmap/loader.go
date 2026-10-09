@@ -176,7 +176,6 @@ type rawField struct {
 
 type rawComponent struct {
 	ID          string         `yaml:"id"`
-	Formerly    []string       `yaml:"formerly"`
 	Name        string         `yaml:"name"`
 	Ref         string         `yaml:"$ref"`
 	Selector    rawSelector    `yaml:"selector"`
@@ -699,7 +698,7 @@ func definitionNameCollisions(globals, defs []rawComponent) []ValidationError {
 // letters, digits, '_' or '-', starting with a letter or digit.
 var componentIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{3,63}$`)
 
-// idIndex checks component ids and formerly lists across every file (SEP-0020).
+// idIndex checks component ids across every file (SEP-0020).
 // It walks declarations, before $ref expansion: expansion deep-copies a
 // definition at each reference site, so one declaration legitimately appears
 // many times in the flattened lists, and uniqueness is a property of
@@ -742,24 +741,6 @@ func (x *idIndex) check(rc rawComponent, file string) {
 		} else {
 			x.first[rc.ID] = idDecl{name: rc.Name, file: file}
 		}
-	}
-	if len(rc.Formerly) == 0 {
-		return
-	}
-	if rc.ID == "" {
-		bad("component-formerly-invalid", "formerly requires the component to declare its own id")
-	}
-	seen := map[string]bool{}
-	for _, f := range rc.Formerly {
-		switch {
-		case !componentIDPattern.MatchString(f):
-			bad("component-formerly-invalid", fmt.Sprintf("formerly entry %q is not a valid id", f))
-		case f == rc.ID:
-			bad("component-formerly-invalid", fmt.Sprintf("formerly lists the component's own id %q", f))
-		case seen[f]:
-			bad("component-formerly-invalid", fmt.Sprintf("formerly lists %q more than once", f))
-		}
-		seen[f] = true
 	}
 }
 
@@ -804,7 +785,7 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []ComponentDef {
 	var result []ComponentDef
 	for _, rc := range rcs {
-		result = append(result, flattenOne(rc, nil, ctx, nil, nil, nil, originDepth)...)
+		result = append(result, flattenOne(rc, nil, ctx, nil, nil, nil, nil, originDepth)...)
 	}
 	return result
 }
@@ -815,13 +796,14 @@ func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []Componen
 // selector. parentChain is the slice of ancestor component names (root-first)
 // carried through recursion and stored on each ComponentDef so the
 // extension can scope child selectors to their parent's DOM subtree.
-// parentIDs runs alongside parentChain with each ancestor's id ("" when it
-// declares none) and derives ComponentDef.IDPath.
+// parentKey is the parent placement's identity and scope the identity prefix
+// of the enclosing $ref expansion (nil outside any); together they derive
+// ComponentDef.IDPath.
 // refStack is the chain of $ref names currently being expanded; it guards
 // against circular references, which would otherwise recurse forever.
 // originDepth is the index in parentChain where the enclosing global instance
 // begins, or -1 outside any global; it derives ComponentDef.Origin.
-func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain, parentIDs []string, refStack []string, originDepth int) []ComponentDef {
+func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain, parentKey, scope []string, refStack []string, originDepth int) []ComponentDef {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
 	if rc.Ref != "" {
 		for _, prev := range refStack {
@@ -847,6 +829,9 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		refStack = append(refStack, rc.Ref)
 		rc = global
 		originDepth = len(parentChain)
+		// The expansion's placements are identified within the component that
+		// holds the $ref.
+		scope = parentKey
 	}
 
 	// A real (non-$ref) component that lacks a required field would otherwise be
@@ -892,7 +877,6 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 
 	result := []ComponentDef{{
 		ID:          rc.ID,
-		Formerly:    rc.Formerly,
 		Name:        rc.Name,
 		Selectors:   mySels,
 		Source:      rc.Source,
@@ -907,15 +891,15 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 	if originDepth >= 0 {
 		result[0].Origin = strings.Join(append(append([]string(nil), parentChain[originDepth:]...), rc.Name), "\x00")
 	}
-	childIDs := append(append([]string(nil), parentIDs...), rc.ID)
+	key := append(append([]string(nil), scope...), rc.ID)
 	if rc.ID != "" {
-		result[0].IDPath = childIDs
+		result[0].IDPath = key
 	}
 
 	// Recurse into children: extend the parent chain with this component's name.
 	childChain := append(append([]string(nil), parentChain...), rc.Name)
 	for _, child := range rc.Children {
-		result = append(result, flattenOne(child, mySels, ctx, childChain, childIDs, refStack, originDepth)...)
+		result = append(result, flattenOne(child, mySels, ctx, childChain, key, scope, refStack, originDepth)...)
 	}
 
 	return result

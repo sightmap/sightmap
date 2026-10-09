@@ -102,7 +102,6 @@ A named DOM subtree, identified by one or more CSS selectors.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
-| `formerly` | string[] | no | Ids of components this one replaces, for splits and merges. Requires `id`. See [Identity](#identity). |
 | `name` | string | yes | Replaces the generic a11y role in enriched snapshots. |
 | `selector` | string \| string[] | yes | CSS selector, or a list of alternatives. First match wins. |
 | `source` | string | no | Path to the source file. Rendered inline as `[src: …]` in enriched snapshots. |
@@ -740,28 +739,15 @@ An id is opaque. It is 4 to 64 letters, digits, `_` or `-`, starting with a lett
 
 **Unique among declarations.** No two component declarations in a sightmap, across all files, globals, definitions, views and nesting levels, may share an id. Uniqueness is a property of declarations: a definition referenced by `$ref` from several places is one declaration, so its id appears at each placement.
 
-**Placements.** A placement's identity is its **id path**: the id of each ancestor, root-first, followed by its own. The two placements of a definition referenced under `Results` and under `Recent` have the id paths `[results-id, card-id]` and `[recent-id, card-id]`. An id path is complete when every ancestor declares an id.
+**Placements.** A placement's identity is its **id path**: its own id, preceded, inside a `$ref` expansion, by the id path of the component that holds the `$ref`. Outside any expansion the id path is just the component's id, so moving a component, or renaming or reselecting an ancestor, never changes it. The two placements of a definition referenced under `Results` and under `Recent` have the id paths `[results-id, card-id]` and `[recent-id, card-id]`; moving `Results` keeps the first, and moving the `$ref` itself to another holder makes a new placement. An id path is complete when every component holding an enclosing `$ref` declares an id.
 
-**Stable across versions.** A tool that rewrites a sightmap (a formatter, an editor, an authoring agent) MUST preserve every id it doesn't deliberately remove, through renames, moves, selector changes and any other edit. An id MUST NOT be reused for a different component after its component is removed, and a tool that mints ids MUST NOT mint one that the sightmap already declares or lists in a `formerly`.
+**Stable across versions.** A tool that rewrites a sightmap (a formatter, an editor, an authoring agent) MUST preserve every id it doesn't deliberately remove, through renames, moves, selector changes and any other edit. An id MUST NOT be reused for a different component after its component is removed, and a tool that mints ids MUST NOT mint one that the sightmap already declares.
 
-**Splits and merges.** When one component becomes two, or two become one, the author states the lineage with `formerly`, because no tool can infer it:
+**Splits and merges.** When one component becomes two, one successor keeps the id and continues its identity; the other is a new component with a new id. When two become one, one id continues and the other is removed.
 
-```yaml
-# CardDetail (kq2m7rta) splits into CardSummary, which keeps the id, and CardEditor:
-- id: kq2m7rta
-  name: CardSummary
-  selector: '.card-summary'
-- id: v3n8pw2d
-  name: CardEditor
-  selector: '.card-editor'
-  formerly: [kq2m7rta]
-```
+**What an id is not.** `id` takes no part in route matching, in selector matching, in which component names an element, or in specificity. Two sightmaps that differ only in their ids match every page identically. A consumer that doesn't track identity across versions MUST accept and ignore `id`.
 
-`formerly` requires the component's own `id` and MUST NOT list it. It may list ids that are still declared, as a split does.
-
-**What an id is not.** `id` takes no part in route matching, in selector matching, in which component names an element, or in specificity. Two sightmaps that differ only in their ids match every page identically. A consumer that doesn't track identity across versions MUST accept and ignore `id` and `formerly`.
-
-**Conformance.** SDKs MUST emit `component-id-invalid` (error) for an id of the wrong shape, `component-id-duplicate` (error) when two declarations share an id, and `component-formerly-invalid` (error) for a `formerly` entry that is malformed, repeated, or the component's own id, or for `formerly` on a component without an id. When a sightmap declares any component id, SDKs SHOULD emit `component-id-missing` (warning) from lint for each declaration without one. See [SEP-0020](https://github.com/sightmap/sightmap/blob/main/spec/seps/0020-component-id.md).
+**Conformance.** SDKs MUST emit `component-id-invalid` (error) for an id of the wrong shape, and `component-id-duplicate` (error) when two declarations share an id. When a sightmap declares any component id, SDKs SHOULD emit `component-id-missing` (warning) from lint for each declaration without one. See [SEP-0020](https://github.com/sightmap/sightmap/blob/main/spec/seps/0020-component-id.md).
 
 ## Global vs view-scoped
 

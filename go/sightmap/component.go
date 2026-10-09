@@ -10,12 +10,11 @@ type ComponentDef struct {
 	// definition's ID, so one ID can appear at several placements; IDPath tells
 	// them apart.
 	ID string `json:"id,omitempty"`
-	// Formerly lists the IDs of components this one replaces, for splits and
-	// merges (SEP-0020).
-	Formerly []string `json:"formerly,omitempty"`
-	// IDPath is the ID of each ancestor, root-first, followed by ID: the identity
-	// of this placement. An ancestor without an ID contributes "". Nil when ID
-	// is "".
+	// IDPath is the identity of this placement: ID, preceded inside a $ref
+	// expansion by the IDPath of the component holding the $ref. It is just
+	// [ID] outside any expansion, so it doesn't change when a component moves.
+	// A holder without an ID contributes "", marking the path incomplete. Nil
+	// when ID is "".
 	IDPath    []string `json:"idPath,omitempty"`
 	Name      string   `json:"name"`
 	Selectors []string `json:"selectors"`

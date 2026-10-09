@@ -47,7 +47,7 @@ Explicit per entry type. Unknown keys preserved at the end in original order.
 |---|---|
 | Top-level | `version, environments, origins, memory, views, components, definitions, requests` |
 | View | `name, route, environments, origins, description, source, components, memory, requests` |
-| Component | `id, formerly, name, selector, description, source, children, memory` |
+| Component | `id, name, selector, description, source, children, memory` |
 | Request | `name, route, method, environments, origins, description, source, request, response, headers, memory` |
 | Environment | `name, platform, app_id, build_type, backend, origins` |
 

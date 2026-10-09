@@ -1,6 +1,6 @@
 ---
 sep: 0020
-title: Stable component identity with `id` and `formerly`
+title: Stable component identity with `id`
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-10-09
@@ -12,7 +12,7 @@ related-discussions: []
 
 ## Summary
 
-Add an optional `id` to components: an opaque string that is unique among the sightmap's component declarations and stays the same through renames, moves and selector changes. Add an optional `formerly` list so an author can record that a component replaces others, for splits and merges. Neither field takes part in matching. Together they let any tool tell, from two versions of a sightmap, exactly which component became which, and let two people or tools edit one sightmap concurrently without losing track of what they each changed.
+Add an optional `id` to components: an opaque string that is unique among the sightmap's component declarations and stays the same through renames, moves and selector changes. It takes no part in matching. It lets any tool tell, from two versions of a sightmap, exactly which component became which, and lets two people or tools edit one sightmap concurrently without losing track of what they each changed.
 
 ## Motivation
 
@@ -61,23 +61,10 @@ components:
         selector: '.card-detail'
 ```
 
-A split, recorded with `formerly`:
-
-```yaml
-# CardDetail (kq2m7rta) splits into CardSummary, which keeps the id, and CardEditor.
-- id: kq2m7rta
-  name: CardSummary
-  selector: '.card-summary'
-- id: v3n8pw2d
-  name: CardEditor
-  selector: '.card-editor'
-  formerly: [kq2m7rta]
-```
-
 **JSON Schema diff.**
 
 - `$defs.componentId`: add `{type: string, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{3,63}$"}`.
-- `$defs.component`: add `id: {$ref: componentId}` (optional); add `formerly: {type: array, minItems: 1, uniqueItems: true, items: {$ref: componentId}}` (optional); add `dependentRequired: {formerly: [id]}`.
+- `$defs.component`: add `id: {$ref: componentId}` (optional).
 - `$defs.componentRef`: unchanged. A `$ref` entry still accepts no other key, so it carries no `id`.
 
 ### Semantics
@@ -86,7 +73,7 @@ A split, recorded with `formerly`:
 
 **Unique among declarations.** No two component declarations may share an id, across all files, globals, definitions, view components and nesting levels. Uniqueness is a property of declarations, not of the expanded component tree: a definition referenced by `$ref` from several places is one declaration, so its id appears at each placement.
 
-**Placements have id paths.** A placement's identity is its id path: the id of each ancestor, root-first, followed by its own.
+**Placements have id paths.** A placement's identity is its id path: its own id, preceded, inside a `$ref` expansion, by the id path of the component that holds the `$ref`. Outside any expansion the id path is just the component's id, so a move, or a rename or selector change on an ancestor, never changes it. Only the reference sites a placement is reached through contribute to its id path.
 
 ```yaml
 definitions:
@@ -110,13 +97,13 @@ views:
           - $ref: ProductCard     # id path [f4j8nz1q, kq2m7rta]
 ```
 
-An id path is complete when every ancestor declares an id. A consumer that needs per-placement identity should treat an incomplete path as unidentified.
+Moving `Results` keeps the first placement's id path. Moving the `$ref` itself to another holder makes a different placement, with a new id path. An id path is complete when every component holding an enclosing `$ref` declares an id; a consumer that needs per-placement identity should treat an incomplete path as unidentified. Children of a placed definition extend the same prefix: `Title` inside the first `ProductCard` has the id path `[r2v8yd5e, <title-id>]`.
 
-**Stable across versions.** A tool that rewrites a sightmap, such as a formatter, an editor or an authoring agent, MUST preserve every id it doesn't deliberately remove, through renames, moves, selector changes and any other edit. An id MUST NOT be reused for a different component after its component is removed. A tool that mints ids MUST NOT mint one that the sightmap already declares or lists in any `formerly`.
+**Stable across versions.** A tool that rewrites a sightmap, such as a formatter, an editor or an authoring agent, MUST preserve every id it doesn't deliberately remove, through renames, moves, selector changes and any other edit. An id MUST NOT be reused for a different component after its component is removed. A tool that mints ids MUST NOT mint one that the sightmap already declares.
 
-**`formerly` states lineage that can't be inferred.** When one component becomes two, or two become one, the author lists the ids the component replaces. `formerly` requires the component's own `id` and MUST NOT list it. It may list ids still declared elsewhere, as in a split where one successor keeps the original id.
+**Splits and merges.** When one component becomes two, one successor keeps the id and continues its identity, and the other is a new component with a new id. When two become one, one id continues and the other is removed.
 
-**What an id is not.** `id` and `formerly` take no part in route matching, selector matching, which component names an element, or specificity. Two sightmaps that differ only in their ids match every page identically.
+**What an id is not.** `id` takes no part in route matching, selector matching, which component names an element, or specificity. Two sightmaps that differ only in their ids match every page identically.
 
 **Partial adoption.** A sightmap may give ids to some components and not others. Identity is tracked only for components that carry one, which is why lint flags the rest once any id appears.
 
@@ -126,7 +113,7 @@ With ids, comparing two versions of a sightmap is a total, deterministic functio
 
 1. Pair declarations by `id`.
 2. For each pair, compare `name`, parent id, and locator (the path of selectors from the root).
-3. An id only in the old version was removed; an id only in the new version was added; a new component's `formerly` names what it replaces.
+3. An id only in the old version was removed; an id only in the new version was added.
 
 | Change | Paired by id, the result is |
 |---|---|
@@ -135,7 +122,7 @@ With ids, comparing two versions of a sightmap is a total, deterministic functio
 | An ancestor's selector changes | Same ids, new locator for every component under that ancestor |
 | Move to a new parent | Same id, new parent id, new locator for it and its descendants |
 | Delete and re-add with a new id | One removal and one addition; a tool can flag the pair as a likely accidental re-creation when names or selectors match |
-| Split | The kept id continues; the new component's `formerly` names the original |
+| Split | The successor that keeps the id continues; the other successor is an addition |
 
 Only the endpoints matter: any number of edits between two versions, at any depth, reduce to the same result, and a sequence of versions can be compared pairwise to reconstruct a full history. What a consumer does with the result is outside this SEP.
 
@@ -157,14 +144,13 @@ Each is detected mechanically. Everything else, including renames, moves and sel
 
 A conforming SDK:
 
-- MUST accept `id` and `formerly` on components, and MUST accept and ignore them if it doesn't track identity.
+- MUST accept `id` on components, and MUST accept and ignore it if it doesn't track identity.
 - MUST emit `component-id-invalid` (error) for an id of the wrong shape.
 - MUST emit `component-id-duplicate` (error) when two component declarations share an id. A definition referenced from several places MUST NOT be reported as a duplicate.
-- MUST emit `component-formerly-invalid` (error) for a `formerly` entry that is malformed, repeated, or the component's own id, and for `formerly` on a component without an id.
 - SHOULD emit `component-id-missing` (warning) from lint for each component declaration without an id, when the sightmap declares any component id.
-- MUST NOT let `id` or `formerly` affect matching, naming or specificity.
+- MUST NOT let `id` affect matching, naming or specificity.
 
-A tool that rewrites sightmaps MUST preserve ids as described in [Semantics](#semantics). The canonical key order for a component puts `id` and `formerly` first.
+A tool that rewrites sightmaps MUST preserve ids as described in [Semantics](#semantics). The canonical key order for a component puts `id` first.
 
 ## Alternatives considered
 
@@ -186,14 +172,15 @@ A tool that rewrites sightmaps MUST preserve ids as described in [Semantics](#se
 
 ## Migration
 
-No existing sightmap changes meaning. `id` and `formerly` are optional, and a sightmap without them validates and matches exactly as before.
+No existing sightmap changes meaning. `id` is optional, and a sightmap without it validates and matches exactly as before.
 
-- SDKs that reject unknown keys need the schema update to accept the two fields.
-- The reference SDK loads both fields, exposes each component's id and id path, and implements the three validation errors and the lint warning.
+- SDKs that reject unknown keys need the schema update to accept the field.
+- The reference SDK loads it, exposes each component's id and id path, and implements the two validation errors and the lint warning.
 - Tooling that generates or rewrites sightmaps should start minting ids for new components and preserving existing ones. Adding ids to an existing sightmap is a one-time pass with no effect on matching.
 
 ## Open questions
 
+- **Lineage.** When a component splits, nothing records that the new successor came from the original. A field for that, such as `formerly: [ids]`, is additive and could follow in its own SEP if a consumer needs history to carry across a split; nothing in this SEP depends on it.
 - **Other entities.** Views, requests, messages and signals have the same rename problem. Should they get `id` in this SEP or a follow-up?
 - **Placement ids.** Id paths identify a definition's placements without new syntax. Should a `$ref` entry instead be allowed its own id, at the cost of relaxing "a reference carries no other key"?
 - **A diff command.** Should the reference CLI ship the derivation above as a `diff` command, and the id-keyed merge as a merge driver?
