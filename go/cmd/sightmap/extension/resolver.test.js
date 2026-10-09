@@ -306,6 +306,75 @@ describe("activeComponentSet", () => {
   });
 });
 
+// The cases below are Go's (sightmap/route_test.go): the overlay must pick the
+// view the CLI picks.
+describe("matchRoute", () => {
+  test.each([
+    // Trailing slashes on either side don't matter; the root is never empty.
+    ["/*/projects", "/acme/projects/", true],
+    ["/*/projects/", "/acme/projects", true],
+    ["/settings", "/settings/", true],
+    ["/", "/", true],
+    ["/", "", true],
+    // :param matches exactly one segment, like *.
+    ["/api/users/:id/orders", "/api/users/42/orders", true],
+    ["/api/users/:id/orders", "/api/users/42/orders/", true],
+    ["/api/users/:id", "/api/users/42/extra", false],
+    ["/ui/:org/settings/profile", "/ui/acme/settings/profile", true],
+    ["/users/*", "/users/42/edit", false],
+    ["/users/*", "/users/42", true],
+    // A whole ** segment matches zero or more segments, segment-bounded.
+    ["/admin/**", "/admin", true],
+    ["/admin/**", "/admin/users/42/edit", true],
+    ["/admin/**", "/adminx", false],
+    ["/a/**/b", "/a/b", true],
+    ["/a/**/b", "/a/x/y/b", true],
+    ["/a/**/b", "/a/b/c", false],
+    ["/**/foo", "/x/y/foo", true],
+    ["/**", "/", true],
+    // A * run inside a segment stays within it.
+    ["/messages**", "/messages-archive", true],
+    ["/messages**", "/messages/compose", false],
+    // Regex metacharacters in a literal segment are literal.
+    ["/a.b", "/axb", false],
+  ])("matchRoute(%j, %j) = %j", (pattern, path, want) => {
+    expect(matchRoute(pattern, path)).toBe(want);
+  });
+});
+
+describe("viewForPath", () => {
+  // Generic routes first, so a first-match implementation picks wrong.
+  const views = [
+    { name: "Generic", route: "/users/*" },
+    { name: "Specific", route: "/users/me" },
+    { name: "Param", route: "/users/:id/edit" },
+    { name: "Tree", route: "/admin/**" },
+    { name: "Root", route: "/" },
+    { name: "WildOrg", route: "/ui/*/settings" },
+    { name: "ParamOrg", route: "/ui/:org/settings" },
+  ];
+  test.each([
+    ["/users/me", "Specific"],
+    ["/users/42", "Generic"],
+    ["/users/42/edit", "Param"],
+    ["/admin/foo/bar", "Tree"],
+    ["/", "Root"],
+    ["/users/me/", "Specific"],
+    ["/ui/acme/settings", "ParamOrg"], // :param outranks *
+    ["/nope/nowhere", null],
+  ])("viewForPath(%j) = %j", (path, want) => {
+    expect(viewForPath(views, path)?.name ?? null).toBe(want);
+  });
+
+  test("ties go to the first declared view", () => {
+    const tied = [
+      { name: "First", route: "/x/:a" },
+      { name: "Second", route: "/x/:b" },
+    ];
+    expect(viewForPath(tied, "/x/1").name).toBe("First");
+  });
+});
+
 describe("resolveElement", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -489,6 +558,56 @@ describe("extractProperties owner scoping", () => {
       "Card",
     );
     expect(result).toEqual({});
+  });
+
+  test("a PATH segment resolves among descendants, not only children", () => {
+    // A card's name sits two levels down (Card > Body > Wrap > Title); SEP-0010
+    // resolves each segment within the previous segment's matched subtree, as
+    // the CLI does, so `Title.name` reads it.
+    document.body.innerHTML =
+      '<a class="card"><div class="body"><div class="wrap"><p class="title">Unnamed · sZnSLn</p></div></div></a>';
+    const components = [
+      { name: "Card", parentChain: [], selector: ".card" },
+      { name: "Body", parentChain: ["Card"], selector: ".body" },
+      { name: "Wrap", parentChain: ["Card", "Body"], selector: ".wrap" },
+      {
+        name: "Title",
+        parentChain: ["Card", "Body", "Wrap"],
+        selector: ".title",
+        properties: [{ name: "name", extract: "text" }],
+      },
+    ];
+    const result = extractProperties(
+      document.querySelector(".card"),
+      [{ name: "name", extract: "Title.name" }],
+      components,
+      "Card",
+    );
+    expect(result).toEqual({ name: "Unnamed · sZnSLn" });
+  });
+
+  test("a direct child shadows a deeper namesake", () => {
+    document.body.innerHTML =
+      '<div class="card"><span class="label">Direct</span><div class="body"><span class="deep">Deep</span></div></div>';
+    const components = [
+      { name: "Card", parentChain: [], selector: ".card" },
+      { name: "Body", parentChain: ["Card"], selector: ".body" },
+      { name: "Label", parentChain: ["Card", "Body"], selector: ".deep" },
+      { name: "Label", parentChain: ["Card"], selector: ".label" },
+    ];
+    const result = extractProperties(
+      document.querySelector(".card"),
+      [{ name: "label", extract: "Label.text" }],
+      components,
+      "Card",
+    );
+    expect(result).toEqual({});
+    const withProp = components.map((c) =>
+      c.name === "Label" ? { ...c, properties: [{ name: "text", extract: "text" }] } : c,
+    );
+    expect(
+      extractProperties(document.querySelector(".card"), [{ name: "label", extract: "Label.text" }], withProp, "Card"),
+    ).toEqual({ label: "Direct" });
   });
 });
 
