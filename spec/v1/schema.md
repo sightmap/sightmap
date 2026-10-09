@@ -93,6 +93,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Replaces the generic a11y role in enriched snapshots. |
 | `selector` | string \| string[] | yes | CSS selector, or a list of alternatives. First match wins. |
 | `source` | string | no | Path to the source file. Rendered inline as `[src: …]` in enriched snapshots. |
@@ -117,7 +118,7 @@ A reference is expanded inline (deep copy) to the named component's full definit
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `$ref` | string | yes | Name of a component defined at file root (`components:` or `definitions:`). The entry MUST contain no other keys. |
+| `$ref` | string | yes | Name of a component defined at file root (`components:` or `definitions:`). The entry MUST contain no other keys, so it carries no `id`: every placement takes the definition's (see [Identity](#identity)). |
 
 **Lookup scope.** Only components defined at the **root** of some file's `components:` or `definitions:` array are addressable. Globals and definitions share one namespace; on a clash the global wins (SDKs SHOULD emit `definition-shadowed-by-global`). Components nested under `children:`, or defined inside a view's `components:`, are not in the registry. First-seen wins on duplicate names (sorted by source-file path); SDKs SHOULD emit a `merge-collision-component` warning.
 
@@ -711,6 +712,34 @@ views:
 Use a definition when one structure recurs under several parents or views but its selector is only unambiguous in context (a bare `img`, `button`, or `h3` inside a card). As a global, such a selector would claim every matching element on every page.
 
 **Conformance.** SDKs MUST include `definitions:` in the `$ref` registry, MUST NOT match a definition except through a `$ref` expansion, MUST resolve a name defined both as a global and as a definition to the global, and SHOULD emit `merge-collision-definition` (warning) for a definition name declared more than once (first by source-file path wins). See [SEP-0019](../seps/0019-component-definitions.md).
+
+## Identity
+
+A component may declare an `id`: its identity across versions of the sightmap. A component's `name` is for people and can change; its selector is how it's found and changes with the markup; its `id` names the component itself and doesn't change.
+
+```yaml
+- id: kq2m7rta
+  name: CardDetail            # rename freely: the id stays
+  selector: '.card-detail'    # change with the markup: the id stays
+  children:
+    - id: c4mxq2nb
+      name: CardNumber
+      selector: 'input[name="cc"]'
+```
+
+An id is opaque. It is 4 to 64 letters, digits, `_` or `-`, starting with a letter or digit, and carries no meaning of its own. Tools that generate ids SHOULD use at least 8 random characters from an alphabet of 32 or more symbols, so ids minted independently, such as on two branches, don't collide.
+
+**Unique among declarations.** No two component declarations in a sightmap, across all files, globals, definitions, views and nesting levels, may share an id. Uniqueness is a property of declarations: a definition referenced by `$ref` from several places is one declaration, so its id appears at each placement.
+
+**Placements.** A placement's identity is its **id path**: its own id, preceded, inside a `$ref` expansion, by the id path of the component that holds the `$ref`. Outside any expansion the id path is just the component's id, so moving a component, or renaming or reselecting an ancestor, never changes it. The two placements of a definition referenced under `Results` and under `Recent` have the id paths `[results-id, card-id]` and `[recent-id, card-id]`; moving `Results` keeps the first, and moving the `$ref` itself to another holder makes a new placement. An id path is complete when every component holding an enclosing `$ref` declares an id.
+
+**Stable across versions.** A tool that rewrites a sightmap (a formatter, an editor, an authoring agent) MUST preserve every id it doesn't deliberately remove, through renames, moves, selector changes and any other edit. An id MUST NOT be reused for a different component after its component is removed, and a tool that mints ids MUST NOT mint one that the sightmap already declares.
+
+**Splits and merges.** When one component becomes two, one successor keeps the id and continues its identity; the other is a new component with a new id. When two become one, one id continues and the other is removed.
+
+**What an id is not.** `id` takes no part in route matching, in selector matching, in which component names an element, or in specificity. Two sightmaps that differ only in their ids match every page identically. A consumer that doesn't track identity across versions MUST accept and ignore `id`.
+
+**Conformance.** SDKs MUST emit `component-id-invalid` (error) for an id of the wrong shape or one that isn't a YAML string (such as an unquoted number or a null), and `component-id-duplicate` (error) when two declarations share an id. When a sightmap declares any component id, SDKs SHOULD emit `component-id-missing` (warning) from lint for each declaration without one. See [SEP-0020](../seps/0020-component-id.md).
 
 ## Global vs view-scoped
 

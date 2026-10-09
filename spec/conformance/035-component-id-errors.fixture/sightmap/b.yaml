@@ -1,0 +1,13 @@
+version: 1
+views:
+  - name: Checkout
+    route: /checkout
+    components:
+      # Already declared by CheckoutForm in a.yaml.
+      - id: checkout01
+        name: LegacyCheckout
+        selector: form.legacy
+      # A different id is fine.
+      - id: q7rak3d9
+        name: PlaceOrder
+        selector: button.place-order

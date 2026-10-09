@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -174,6 +175,7 @@ type rawField struct {
 }
 
 type rawComponent struct {
+	ID          string         `yaml:"id"`
 	Name        string         `yaml:"name"`
 	Ref         string         `yaml:"$ref"`
 	Selector    rawSelector    `yaml:"selector"`
@@ -249,6 +251,7 @@ func loadDir(path string) (*Corpus, error) {
 	var viewFiles []viewFileWithPath
 	var fieldDiags []ValidationError
 	envReg := newEnvironmentRegistry()
+	ids := newIDIndex()
 
 	for _, p := range yamlPaths {
 		data, err := os.ReadFile(p)
@@ -266,6 +269,7 @@ func loadDir(path string) (*Corpus, error) {
 		}
 		memory = append(memory, rf.Memory...)
 		envReg.add(rf, filepath.Base(p))
+		ids.addFile(rf, filepath.Base(p))
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
 		}
@@ -316,6 +320,7 @@ func loadDir(path string) (*Corpus, error) {
 	// otherwise look like a collision.
 	ctx.diagnostics = append(ctx.diagnostics, globalNameCollisions(globalRaws)...)
 	ctx.diagnostics = append(ctx.diagnostics, definitionNameCollisions(globalRaws, definitionRaws)...)
+	ctx.diagnostics = append(ctx.diagnostics, ids.diags...)
 
 	// Flatten global components (hierarchy → compound descendant selectors).
 	globalComps := flattenAll(globalRaws, ctx, 0)
@@ -689,6 +694,56 @@ func definitionNameCollisions(globals, defs []rawComponent) []ValidationError {
 	return out
 }
 
+// componentIDPattern is the shape of a component id (SEP-0020): 4 to 64
+// letters, digits, '_' or '-', starting with a letter or digit.
+var componentIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{3,63}$`)
+
+// idIndex checks component ids across every file (SEP-0020).
+// It walks declarations, before $ref expansion: expansion deep-copies a
+// definition at each reference site, so one declaration legitimately appears
+// many times in the flattened lists, and uniqueness is a property of
+// declarations.
+type idIndex struct {
+	first map[string]idDecl // id → the first declaration carrying it
+	diags []ValidationError
+}
+
+type idDecl struct{ name, file string }
+
+func newIDIndex() *idIndex { return &idIndex{first: map[string]idDecl{}} }
+
+func (x *idIndex) addFile(rf rawFile, file string) {
+	x.addAll(rf.Components, file)
+	x.addAll(rf.Definitions, file)
+	for _, v := range rf.Views {
+		x.addAll(v.Components, file)
+	}
+}
+
+func (x *idIndex) addAll(rcs []rawComponent, file string) {
+	for _, rc := range rcs {
+		if rc.Ref == "" {
+			x.check(rc, file)
+		}
+		x.addAll(rc.Children, file)
+	}
+}
+
+func (x *idIndex) check(rc rawComponent, file string) {
+	bad := func(code, msg string) {
+		x.diags = append(x.diags, ValidationError{File: file, Component: rc.Name, Code: code, Severity: SeverityError, Message: msg})
+	}
+	if rc.ID != "" {
+		if prev, dup := x.first[rc.ID]; dup {
+			bad("component-id-duplicate", fmt.Sprintf("id %q is already declared by %q in %s; an id names exactly one component declaration", rc.ID, prev.name, prev.file))
+		} else if !componentIDPattern.MatchString(rc.ID) {
+			bad("component-id-invalid", fmt.Sprintf("id %q must be 4 to 64 letters, digits, '_' or '-', starting with a letter or digit", rc.ID))
+		} else {
+			x.first[rc.ID] = idDecl{name: rc.Name, file: file}
+		}
+	}
+}
+
 // flattenCtx carries the shared state for a flattening pass: the $ref registry
 // and any structural diagnostics discovered along the way (currently circular
 // $ref chains, which are expanded away and so invisible downstream).
@@ -730,7 +785,7 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []ComponentDef {
 	var result []ComponentDef
 	for _, rc := range rcs {
-		result = append(result, flattenOne(rc, nil, ctx, nil, nil, originDepth)...)
+		result = append(result, flattenOne(rc, nil, ctx, nil, nil, nil, nil, originDepth)...)
 	}
 	return result
 }
@@ -741,11 +796,14 @@ func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []Componen
 // selector. parentChain is the slice of ancestor component names (root-first)
 // carried through recursion and stored on each ComponentDef so the
 // extension can scope child selectors to their parent's DOM subtree.
+// parentKey is the parent placement's identity and scope the identity prefix
+// of the enclosing $ref expansion (nil outside any); together they derive
+// ComponentDef.IDPath.
 // refStack is the chain of $ref names currently being expanded; it guards
 // against circular references, which would otherwise recurse forever.
 // originDepth is the index in parentChain where the enclosing global instance
 // begins, or -1 outside any global; it derives ComponentDef.Origin.
-func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string, originDepth int) []ComponentDef {
+func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain, parentKey, scope []string, refStack []string, originDepth int) []ComponentDef {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
 	if rc.Ref != "" {
 		for _, prev := range refStack {
@@ -771,6 +829,9 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 		refStack = append(refStack, rc.Ref)
 		rc = global
 		originDepth = len(parentChain)
+		// The expansion's placements are identified within the component that
+		// holds the $ref.
+		scope = parentKey
 	}
 
 	// A real (non-$ref) component that lacks a required field would otherwise be
@@ -815,6 +876,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 	}
 
 	result := []ComponentDef{{
+		ID:          rc.ID,
 		Name:        rc.Name,
 		Selectors:   mySels,
 		Source:      rc.Source,
@@ -829,11 +891,15 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 	if originDepth >= 0 {
 		result[0].Origin = strings.Join(append(append([]string(nil), parentChain[originDepth:]...), rc.Name), "\x00")
 	}
+	key := append(append([]string(nil), scope...), rc.ID)
+	if rc.ID != "" {
+		result[0].IDPath = key
+	}
 
 	// Recurse into children: extend the parent chain with this component's name.
 	childChain := append(append([]string(nil), parentChain...), rc.Name)
 	for _, child := range rc.Children {
-		result = append(result, flattenOne(child, mySels, ctx, childChain, refStack, originDepth)...)
+		result = append(result, flattenOne(child, mySels, ctx, childChain, key, scope, refStack, originDepth)...)
 	}
 
 	return result
