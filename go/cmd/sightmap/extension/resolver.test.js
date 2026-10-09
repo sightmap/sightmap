@@ -559,6 +559,56 @@ describe("extractProperties owner scoping", () => {
     );
     expect(result).toEqual({});
   });
+
+  test("a PATH segment resolves among descendants, not only children", () => {
+    // A card's name sits two levels down (Card > Body > Wrap > Title); SEP-0010
+    // resolves each segment within the previous segment's matched subtree, as
+    // the CLI does, so `Title.name` reads it.
+    document.body.innerHTML =
+      '<a class="card"><div class="body"><div class="wrap"><p class="title">Unnamed · sZnSLn</p></div></div></a>';
+    const components = [
+      { name: "Card", parentChain: [], selector: ".card" },
+      { name: "Body", parentChain: ["Card"], selector: ".body" },
+      { name: "Wrap", parentChain: ["Card", "Body"], selector: ".wrap" },
+      {
+        name: "Title",
+        parentChain: ["Card", "Body", "Wrap"],
+        selector: ".title",
+        properties: [{ name: "name", extract: "text" }],
+      },
+    ];
+    const result = extractProperties(
+      document.querySelector(".card"),
+      [{ name: "name", extract: "Title.name" }],
+      components,
+      "Card",
+    );
+    expect(result).toEqual({ name: "Unnamed · sZnSLn" });
+  });
+
+  test("a direct child shadows a deeper namesake", () => {
+    document.body.innerHTML =
+      '<div class="card"><span class="label">Direct</span><div class="body"><span class="deep">Deep</span></div></div>';
+    const components = [
+      { name: "Card", parentChain: [], selector: ".card" },
+      { name: "Body", parentChain: ["Card"], selector: ".body" },
+      { name: "Label", parentChain: ["Card", "Body"], selector: ".deep" },
+      { name: "Label", parentChain: ["Card"], selector: ".label" },
+    ];
+    const result = extractProperties(
+      document.querySelector(".card"),
+      [{ name: "label", extract: "Label.text" }],
+      components,
+      "Card",
+    );
+    expect(result).toEqual({});
+    const withProp = components.map((c) =>
+      c.name === "Label" ? { ...c, properties: [{ name: "text", extract: "text" }] } : c,
+    );
+    expect(
+      extractProperties(document.querySelector(".card"), [{ name: "label", extract: "Label.text" }], withProp, "Card"),
+    ).toEqual({ label: "Direct" });
+  });
 });
 
 describe("content.js mirrors resolver.js", () => {

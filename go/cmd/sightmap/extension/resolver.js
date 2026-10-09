@@ -177,13 +177,28 @@ export function viewForPath(views, pathname) {
   return best;
 }
 
-/** The component named `name` whose parent is `ownerAddress`, or null. */
-function childNamed(components, ownerAddress, name) {
-  return (
-    components.find(
-      (c) => parentAddress(c) === ownerAddress && c.name === name,
-    ) ?? null
-  );
+/**
+ * The declared component named `name` beneath `ownerAddress`, at any depth:
+ * a path segment resolves within the previous segment's matched subtree
+ * (SEP-0010), not only among its direct children. Shallower wins, so a direct
+ * child still shadows a deeper namesake; among equals, declaration order.
+ */
+function descendantNamed(components, ownerAddress, name) {
+  const prefix = ownerAddress + ADDRESS_SEP;
+  let best = null;
+  let bestDepth = Infinity;
+  for (const c of components) {
+    if (c.name !== name) continue;
+    const parent = parentAddress(c);
+    const beneath = ownerAddress === "" || parent === ownerAddress || parent.startsWith(prefix);
+    if (!beneath) continue;
+    const depth = (c.parentChain ?? []).length;
+    if (depth < bestDepth) {
+      best = c;
+      bestDepth = depth;
+    }
+  }
+  return best;
 }
 
 // ── Property extraction ───────────────────────────────────────────────────────
@@ -220,7 +235,7 @@ function resolvePathAll(el, path, components, ownerAddress, firstOnly = false) {
     const multi = !firstOnly && raw.endsWith("[]");
     const seg = multi ? raw.slice(0, -2) : raw;
     if (!seg) return [];
-    def = childNamed(components, addr, seg);
+    def = descendantNamed(components, addr, seg);
     if (!def || !def.selector) return [];
     const next = [];
     for (const c of cur) {
