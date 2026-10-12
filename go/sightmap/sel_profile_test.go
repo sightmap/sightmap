@@ -28,8 +28,8 @@ func TestParseProfileSelector_Classification(t *testing.T) {
 		{`[data-x='a']`, ""},
 		{`[data-x=""]`, ""},
 		{`[a~=w][a|=en][a^=p][a$=s][a*=m]`, ""},
+		{`[id^=card-]`, ""},
 		{`[class*="Card"][class*="link"]`, ""},
-		{`[class]`, ""},
 		{`[class~=x]`, ""},
 		{`input:not([type=hidden])`, ""},
 		{`input:not([type=hidden]):not(.public)`, ""},
@@ -39,8 +39,6 @@ func TestParseProfileSelector_Classification(t *testing.T) {
 		{`.a > .b`, ""},
 		{`.a>.b`, ""},
 		{`.a  >  .b   .c`, ""},
-		{`.a > * > input`, ""},
-		{`*`, ""},
 		{`.a\:b`, ""},
 		{`.café`, ""},
 		{`  .padded  `, ""},
@@ -83,6 +81,10 @@ func TestParseProfileSelector_Classification(t *testing.T) {
 		{`[a*=""]`, notProfile},
 		{`[a~=""]`, notProfile},
 		{`[a~="p q"]`, notProfile},
+		{`*`, notProfile},
+		{`.a > * > input`, notProfile},
+		{`[class]`, notProfile},
+		{`[id]`, notProfile},
 		{`[class=x]`, notProfile},
 		{`[class^=x]`, notProfile},
 		{`[x=1]`, notProfile},
@@ -121,11 +123,11 @@ func TestParseProfileSelector_Classification(t *testing.T) {
 }
 
 func TestParseProfileSelector_Compounds(t *testing.T) {
-	ps, err := sightmap.ParseProfileSelector(`form.checkout > * input[type=password]:not([data-x])`, sightmap.ProfileCaptureBaseline)
+	ps, err := sightmap.ParseProfileSelector(`form.checkout > fieldset input[type=password]:not([data-x])`, sightmap.ProfileCaptureBaseline)
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantText := []string{`form.checkout`, `*`, `input[type=password]:not([data-x])`}
+	wantText := []string{`form.checkout`, `fieldset`, `input[type=password]:not([data-x])`}
 	wantComb := []string{"", ">", " "}
 	if len(ps.Compounds) != len(wantText) {
 		t.Fatalf("got %d compounds, want %d", len(ps.Compounds), len(wantText))
@@ -142,8 +144,6 @@ func TestParseProfileSelector_Compounds(t *testing.T) {
 
 func TestParseProfileSelector_SubjectConstraint(t *testing.T) {
 	for sel, want := range map[string]sightmap.Constraint{
-		`*`:                sightmap.ConstraintNone,
-		`.a *`:             sightmap.ConstraintNone,
 		`:not(.x)`:         sightmap.ConstraintNone,
 		`.a > :not(.b)`:    sightmap.ConstraintNone,
 		`body`:             sightmap.ConstraintType,
@@ -173,7 +173,7 @@ func TestParseProfileSelector_UnknownProfile(t *testing.T) {
 // their combinators parses back to the same compounds.
 func FuzzParseProfileSelector(f *testing.F) {
 	for _, s := range []string{
-		`input`, `.a > .b .c`, `[data-x="a b"]`, `input:not([type=hidden])`, `.a > * > input`,
+		`input`, `.a > .b .c`, `[data-x="a b"]`, `input:not([type=hidden])`, `.a > .b > input`,
 		`section:has(input)`, `.a + .b`, `[a=b i]`, `:is(.a)`, `.café`, `.a\:b`, `#x`, `*`,
 	} {
 		f.Add(s)

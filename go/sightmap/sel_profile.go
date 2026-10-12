@@ -8,16 +8,17 @@ import (
 )
 
 // SelectorProfile names the selector features a corpus may use: ones every
-// engine in the profile's baseline implements identically (SEP-0018).
+// consumer the profile targets evaluates identically (SEP-0021).
 type SelectorProfile string
 
-// ProfileCaptureBaseline is the CSS3 subset common to the oldest engines a
-// capture consumer still has to support (Chrome 38, Firefox 29, Safari 9,
-// Edge 80) whose selectors depend only on an element and its ancestors.
+// ProfileCaptureBaseline is the CSS3 subset that the oldest engines a capture
+// consumer still has to support (Chrome 38, Firefox 29, Safari 9, Edge 80) and
+// matchers re-implemented outside a browser both evaluate identically. Every
+// selector in it depends only on an element and its ancestors.
 const ProfileCaptureBaseline SelectorProfile = "capture-baseline"
 
 // CodeSelectorNotInProfile marks a selector construct, or a form, that the
-// active profile does not include (SEP-0018). The message says why: an engine
+// active profile does not include (SEP-0021). The message says why: an engine
 // in the baseline lacks it, or it depends on more than the element and its
 // ancestors.
 const CodeSelectorNotInProfile = "selector-not-in-profile"
@@ -31,7 +32,7 @@ const (
 type Constraint int
 
 const (
-	// ConstraintNone: no type, id, class or attribute outside :not() (`*`, `:not(.x)`).
+	// ConstraintNone: no type, id, class or attribute outside :not() (`:not(.x)`).
 	ConstraintNone Constraint = iota
 	// ConstraintType: a type selector and nothing narrower (`body`, `div:not(.x)`).
 	ConstraintType
@@ -192,21 +193,13 @@ func (p *profileParser) unexpected() error {
 func (p *profileParser) compound() (ProfileCompound, error) {
 	start := p.i
 	var c ProfileCompound
-	if p.i < len(p.s) && p.s[p.i] == '*' {
-		p.i++
-		if !p.atCompoundEnd() {
-			return c, p.notInProfile(p.i, "'*' must be a whole compound; drop it")
-		}
-		c.Text = p.s[start:p.i]
-		return c, nil
-	}
 	sawSimple, sawType, sawID := false, false, false
 	for !p.atCompoundEnd() {
 		ch := p.s[p.i]
 		first := p.i == start
 		switch {
 		case ch == '*':
-			return c, p.notInProfile(p.i, "'*' must be a whole compound")
+			return c, p.notInProfile(p.i, "'*' is not in the profile; name the element, or join its neighbours with a descendant combinator")
 		case ch == '#':
 			if sawID {
 				return c, p.notInProfile(p.i, "a compound can have only one #id")
@@ -375,6 +368,9 @@ func (p *profileParser) attribute() (string, error) {
 		return "", p.notInProfile(open, "unclosed attribute selector")
 	}
 	if p.s[p.i] == ']' {
+		if name == "class" || name == "id" {
+			return "", p.notInProfile(open, "[%s] is not in the profile; test a value", name)
+		}
 		p.i++
 		return name, nil
 	}
@@ -423,7 +419,7 @@ func (p *profileParser) attribute() (string, error) {
 	case op == "~=" && strings.ContainsAny(value, " \t\n\r\f"):
 		return "", p.notInProfile(valStart, "a ~= value with whitespace never matches")
 	case name == "class" && op != "~=" && op != "*=":
-		return "", p.notInProfile(opStart, "on class only [class], ~= and *= are in the profile; use .class")
+		return "", p.notInProfile(opStart, "on class only ~= and *= are in the profile; use .class")
 	}
 	return name, nil
 }
