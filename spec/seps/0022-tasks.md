@@ -12,7 +12,7 @@ related-discussions: []
 
 ## Summary
 
-Add a top-level `tasks:` collection. A task names a workflow a user (or an agent) sets out to complete, as an ordered list of **steps**, plus the conditions that mean the attempt **failed** and the conditions that mean the user **abandoned** it. A consumer evaluating a session produces one record per attempt: succeeded, failed or abandoned, with the furthest step reached and the reasons for any failure. Every condition references a component, view, request, message or signal the corpus already declares, so a task adds no selector, route or body pattern of its own.
+Add a top-level `tasks:` collection. A task names a workflow a user (or an agent) sets out to complete, as an ordered list of **steps**, plus the conditions that mean the attempt **failed** and the conditions that mean the user **abandoned** it. A consumer evaluating a session produces one record per attempt: succeeded, failed or abandoned, with the furthest step reached and the reasons for any failure. Every condition references a component, view, request or message the corpus already declares, so a task adds no selector, route or body pattern of its own. A task is evaluated over the stream of records a capture layer already produces, and emits one attempt record per attempt; it asks nothing new of the page.
 
 ## Motivation
 
@@ -48,8 +48,11 @@ views:
 components:
   - name: OrderNumber
     selector: '.confirmation-order-id'
-  - name: EmptyCartMessage
-    selector: '.cart-empty'
+  - name: CartBody
+    selector: '.cart-view'
+    children:
+      - name: BrowseMenuButton      # rendered only when the cart is empty
+        selector: '.cart-view-browse'
 requests:
   - name: AddToCart
     route: /api/cart
@@ -71,7 +74,7 @@ tasks:
     failed:
       - { name: order-error, ref: PlaceOrder, filter: { status: ["422", "500"] } }
     abandoned:
-      - { name: emptied-cart, ref: EmptyCartMessage }
+      - { name: emptied-cart, ref: CartBody.BrowseMenuButton }
 ```
 
 **Task**
@@ -90,22 +93,31 @@ tasks:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `ref` | string | yes | Name of a component, view, request, message or signal. See [Resolving `ref`](#resolving-ref). |
+| `ref` | string | yes | Name of a component, view, request or message. A nested component is written as a dotted path. See [Resolving `ref`](#resolving-ref). |
 | `on` | string | no | The event on the referenced entity. Valid values and the default depend on its kind. See [Events](#events). |
 | `filter` | map | no | Constraints on the values the event carries. See [Filters](#filters). |
 | `name` | string | no | The label this condition is reported under. Defaults to `ref`. Unique within the task. |
 
 ### Events
 
-Each entity kind has a fixed set of events. `on` omitted means the kind's default.
+Each entity kind has a fixed set of events. `on` omitted means the kind's default. Each core event corresponds to a record a capture layer already produces, so a consumer can evaluate a task without capturing anything new.
 
-| Kind | Events | Default |
+| Kind | Event | Fires on | Default |
+|---|---|---|---|
+| Component | `visible` | a visibility record for the component (an element entered the viewport) | yes |
+| Component | `interacted` | an interaction record (click, change, submit) whose target is the component or inside it | |
+| View | `entered` | a navigation record whose resolved view is this view, when the previous one was not | yes |
+| View | `left` | a navigation record leaving this view | |
+| Request | `responded` | a network record for this request with a non-zero status | yes |
+| Request | `errored` | a network record for this request that ended without a response (status `0`: network failure, abort, transport timeout) | |
+| Message | `logged` | a console or exception record this message names | yes |
+
+Two further component events are **optional**. Neither is reported by a capture layer that records only interactions and first visibility, and a consumer MAY reject a task that uses one.
+
+| Kind | Event | Fires on |
 |---|---|---|
-| Component | `visible`: an element became visible to the user. `interacted`: the user clicked, typed into, changed or submitted the element or something inside it. `changed`: a visible element's declared properties took a new set of values, including the first set when it became visible. `removed`: an element left the page. | `visible` |
-| View | `entered`: the view's route became active. `left`: it stopped being active. | `entered` |
-| Request | `responded`: a matching response arrived. `errored`: the request ended without a response (network failure, abort, transport timeout). | `responded` |
-| Message | `logged`: a matching console record or exception was observed. | `logged` |
-| Signal | `holds`: the signal's predicate became true. | `holds` |
+| Component | `changed` | a visible element's declared properties took a new set of values after it became visible |
+| Component | `removed` | an element left the page |
 
 A component referenced with `visible` or `removed` is treated as watched, exactly as if it declared [`watch: true`](0015-component-watch.md), including the rule that a consumer's interactivity heuristic must not suppress it. A task that waits for a confirmation must not be defeated by a capture layer that ignores confirmations because nobody clicks them.
 
@@ -113,13 +125,17 @@ A component referenced with `visible` or `removed` is treated as watched, exactl
 
 A `filter` is a map of property name to a string (equality) or a non-empty list of strings (membership). Keys are ANDed. Values are compared as strings. This is the `filter:` shape [SEP-0007](0007-signals.md) proposes for signals, defined here so tasks do not depend on that draft. If SEP-0007 lands, the two are the same construct.
 
-A filter key names a property declared on the referenced entity: a component's [properties](../v1/schema.md#component-properties) as extracted at the moment of the event, a request's [properties](../v1/schema.md#request-properties), or a message's [properties](../v1/schema.md#message-properties). A request may also be filtered on its reserved identity names `status`, `method` and `duration`, with no declaration; `status` compares as its decimal string (`"402"`). A view or signal carries no values, so a condition on one takes no `filter`.
+A filter key names a property declared on the referenced entity: a component's [properties](../v1/schema.md#component-properties) as extracted at the moment of the event, a request's [properties](../v1/schema.md#request-properties), or a message's [properties](../v1/schema.md#message-properties). A request may also be filtered on its reserved identity names `status`, `method` and `duration`, with no declaration; `status` compares as its decimal string (`"402"`). A view carries no values, so a condition on one takes no `filter`.
 
 A key that does not resolve never matches: an omitted property, a pattern that did not match, a body the capture did not record, or a value withheld by [privacy](../v1/schema.md#privacy). A filter that reads withheld content therefore never fires. For a component property, the existing `extract-privacy-withheld` warning already flags it.
 
+Component property values are the ones extracted when the record was produced: at the interaction for `interacted`, at the moment it became visible for `visible`. Under the core events a component filter therefore sees each element's values once per interaction or appearance, not every later re-render; watching values change is what the optional `changed` event is for.
+
 ### Resolving `ref`
 
-A `ref` names a view, a request, a message, a signal, or a component declared at file root (`components:`) or at the top level of a view. A component name declared in several of those places refers to all of them. Components nested under `children:` are not addressable, the same restriction signals have today (see [Open questions](#open-questions)). A name that matches more than one kind is ambiguous and rejected.
+A `ref` names a view, a request, a message, or a component. A component is written as its name, or as a dotted path of component names for one nested under `children:` (`CartBody.BrowseMenuButton`). A component reference matches a record whose component chain, root to leaf, ends with that path, so a bare name matches the component wherever it appears and a path pins it to one placement. A name declared in several places refers to all of them. A name that matches more than one kind is ambiguous and rejected.
+
+A request reference matches network records the request definition names, wherever they occur; a network record's view is the view active when the response arrived, so a task should not combine a request condition with an assumption about which view it fires in.
 
 Task names are a separate namespace. A task may share a name with an entity, and a `ref` never resolves to a task.
 
@@ -156,6 +172,17 @@ A user who hits a declared failure and then leaves was failed by the product, so
 
 **The actor is not part of the task.** A person, an embedded assistant, an external browser agent and a test harness driving a preview build all produce attempts against the same declaration. A consumer that knows the actor can cut outcomes by it.
 
+### Emission
+
+A task does not change what a page captures (beyond watching the components it references with `visible` or `removed`). Its output is the **attempt record**, produced by evaluating the task over a session's records in order:
+
+- **Where.** Evaluation needs the whole session, including its end, so it runs wherever a session's records are assembled: a stream processor that closes a session after inactivity, an indexer, or a test harness that drives one session and reads the result. It is a pure function of the task and the records, so every consumer computes the same attempts from the same records.
+- **When.** An attempt is emitted when it closes. Attempts still open when the session ends close with `session-ended`, so a consumer emits them once it decides the session is over.
+- **Provenance.** Each attempt SHOULD reference the records that opened it, advanced it, recorded each failure and closed it, so a reader can go from an outcome to the moment it was decided.
+- **Re-evaluation.** Records name the components, views, requests and messages they matched, so a consumer that keeps them can re-evaluate an edited or new task over sessions already captured, as far as those sessions recorded the events the task references.
+
+An attempt record is not a signal. A signal is a boolean about one moment; an attempt spans a session, and its outcome is not known until it closes.
+
 ### Aggregation (informative)
 
 The spec defines attempts and their records. Aggregation belongs to the consumer, but the record is shaped so the common measures fall out directly:
@@ -177,6 +204,7 @@ A consumer that evaluates tasks MUST:
 - Apply `failed`, then `steps`, then `abandoned` to conditions firing at the same instant, treating a navigation's `left` and `entered` as simultaneous.
 - Evaluate filters as in [Filters](#filters), treating an unresolved key as not matching.
 - Treat a component referenced with `visible` or `removed` as watched.
+- Support every core event. A consumer that does not support an optional event MUST report a task using it as unsupported, never evaluate it as though the event never fired.
 - Report each closed attempt with the fields in [The record](#semantics), and never include filtered property values.
 
 A tool that does not evaluate sessions, such as an offline matcher or a documentation generator, MUST accept and validate `tasks:` and MAY otherwise ignore it.
@@ -186,10 +214,10 @@ Validation diagnostics (reference CLI):
 | Code | Severity | When |
 |---|---|---|
 | `task-name-duplicate` | error | Two tasks share a name. |
-| `task-ref-unresolved` | error | A `ref` names no addressable component, view, request, message or signal. |
+| `task-ref-unresolved` | error | A `ref` names no component, component path, view, request or message. |
 | `task-ref-ambiguous` | error | A `ref` names entities of more than one kind. |
 | `task-event-invalid` | error | `on` is not an event of the referenced kind. |
-| `task-filter-invalid` | error | A filter key is neither a declared property of the referenced entity nor a reserved request identity name, or a `filter` is set on a view or signal. |
+| `task-filter-invalid` | error | A filter key is neither a declared property of the referenced entity nor a reserved request identity name, or a `filter` is set on a view. |
 | `task-label-duplicate` | error | Two conditions in one task resolve to the same label (their `name`, or their `ref` when unnamed). |
 | `task-label-reserved` | error | A condition's label is `timeout` or `session-ended`. |
 | `task-no-failure` | warning | A task declares neither `failed` nor `within`, so it can never fail and its reliability is always 100%. |
@@ -200,7 +228,7 @@ Fixture `036-tasks` (reserved by this SEP) covers opening mid-workflow, skipped 
 
 - Root object: add `tasks: {type: array, items: {$ref: "#/$defs/task"}}` (optional). `fileRootFields` gains `"tasks"`, and the shallow-append merge list gains `tasks`.
 - `$defs.task` (new): `type: object`, `additionalProperties: false`, `required: [name, steps]`. Properties: `name` (string, minLength 1), `description` (string), `tags` (array of non-empty strings), `steps` (array of `$ref: "#/$defs/taskCondition"`, minItems 2), `failed` and `abandoned` (each an array of `$ref: "#/$defs/taskCondition"`, minItems 1), `within` (string, pattern `^[1-9][0-9]*(ms|s|m|h)$`).
-- `$defs.taskCondition` (new): `type: object`, `additionalProperties: false`, `required: [ref]`. Properties: `ref` (string, minLength 1), `on` (enum `visible`, `interacted`, `changed`, `removed`, `entered`, `left`, `responded`, `errored`, `logged`, `holds`), `filter` (object whose values are `oneOf: [{type: string}, {type: array, items: {type: string}, minItems: 1}]`), `name` (string, minLength 1). Whether `on` and `filter` suit the referenced kind is checked by validation, not the schema.
+- `$defs.taskCondition` (new): `type: object`, `additionalProperties: false`, `required: [ref]`. Properties: `ref` (string, minLength 1, pattern `^[^.]+(\.[^.]+)*$`), `on` (enum `visible`, `interacted`, `changed`, `removed`, `entered`, `left`, `responded`, `errored`, `logged`), `filter` (object whose values are `oneOf: [{type: string}, {type: array, items: {type: string}, minItems: 1}]`), `name` (string, minLength 1). Whether `on` and `filter` suit the referenced kind is checked by validation, not the schema.
 
 No existing `$defs` entry changes.
 
@@ -208,7 +236,7 @@ No existing `$defs` entry changes.
 
 Each example gives a corpus fragment, the sessions it is evaluated over, and what the task reports next to what a page-view funnel or server metrics report. Entities defined in one example are not repeated in the next.
 
-### 1. Ordering food: one task, seven sessions
+### 1. Ordering food, evaluated over captured sessions
 
 A food-ordering app: menu, item page, cart, checkout, confirmation. The `OrderFood` task from [Shape](#shape) runs over it, extended with the failures this app can actually produce:
 
@@ -231,29 +259,83 @@ tasks:
       - { name: order-error, ref: PlaceOrder, filter: { status: ["422", "500"] } }
       - { name: confirmation-lost, ref: LoadLatestOrder, filter: { status: ["404", "500"] } }
     abandoned:
-      - { name: emptied-cart, ref: EmptyCartMessage }
+      - { name: emptied-cart, ref: CartBody.BrowseMenuButton }
 ```
 
-Three facts about the app's code drive the interesting rows. The checkout page awaits the order request without catching its rejection, so a `402` or `500` leaves the Place order button doing nothing visible. The confirmation page loads the latest order and, if that request fails, redirects to the menu. The order endpoint clears the cart on success, so placing an order again from a stale checkout page returns `422 Cart is empty`.
+Three facts about the app's code drive the interesting sessions. The checkout page awaits the order request without catching its rejection, so a `402` or `500` leaves the Place order button doing nothing visible. The confirmation page loads the latest order and, if that request fails, redirects to the menu. The order endpoint clears the cart on success, so placing an order again from a stale checkout page returns `422 Cart is empty`.
+
+The sessions below were captured from the running app with a client-side capture layer and this corpus, and the records shown are the ones it emitted, abridged to those the task reads. `OrderNumber` and `BrowseMenuButton` are watched because the task references them with `visible`.
+
+**Session A: the order goes through.**
+
+```
+#11  network       POST /api/cart → 200  [AddToCart]                                step added (opens)
+#14  navigate      view Checkout                                                    step checkout
+#18  network       POST /api/orders → 200  [PlaceOrder order_status="confirmed"]    step placed
+#20  element-seen  [ConfirmationBody] > [OrderNumber]                             step confirmed
+→ succeeded, closed_by confirmed, failures []
+```
+
+**Session B: the card is declined three times, then the user empties the cart.**
+
+```
+#11  network       POST /api/cart → 200  [AddToCart]                                step added (opens)
+#14  navigate      view Checkout                                                    step checkout
+#16  click         [OrderSummary] > [SummaryCta "Place order"]
+#17  exception     "Uncaught (in promise) Error: POST /api/orders → 402"
+#18  error-click   from #16, #17
+#19  network       POST /api/orders → 402  [PlaceOrder decline_reason="Payment declined"]   failure declined
+#23  network       POST /api/orders → 402                                           failure declined
+#27  network       POST /api/orders → 402                                           failure declined
+#29  rage-click    from #16, #20, #24
+#32  network       DELETE /api/cart/:item → 200           
+#34  element-seen  [CartBody] > [BrowseMenuButton]                                 abandoned emptied-cart
+→ failed, closed_by emptied-cart, furthest checkout, failures [declined, declined, declined]
+```
+
+The user left by emptying the cart, but declared failures were already recorded, so the attempt is failed, not abandoned. The capture layer's own frustration records (`error-click`, `rage-click`) say something went wrong; the task says what, and that it ended the attempt.
+
+**Session C: two orders, no confirmation.**
+
+```
+#11  network       POST /api/cart → 200  [AddToCart]                                step added (opens)
+#18  network       POST /api/orders → 200  [PlaceOrder order_id="BC-FL82M2"]        step placed
+#19  network       GET /api/orders/latest → 500  [LoadLatestOrder]                  failure confirmation-lost
+#20  navigate      view Menu
+#29  network       POST /api/cart → 200  [AddToCart]                                (ignored: earlier than placed)
+#36  network       POST /api/orders → 200  [PlaceOrder order_id="BC-CMQ3JW"]        (ignored: already placed)
+#37  network       GET /api/orders/latest → 500  [LoadLatestOrder]                  failure confirmation-lost
+→ failed, closed_by session-ended, furthest placed, failures [confirmation-lost, confirmation-lost]
+```
+
+No exception, no frustration record, and two `200` order responses: a page-view funnel counts two conversions, because the confirmation route was entered twice. The task reports one failed attempt whose furthest step is `placed`, with `confirmation-lost` recorded twice, and its provenance links each failure to the `LoadLatestOrder` record behind it. The second `PlaceOrder` does not advance the attempt, since `placed` is already its furthest step; the record shows the cost through the repeated failure, and the two order ids sit in the session's records. The customer paid twice and was never told either order went through.
+
+**Session D: the user adds an item and goes back to the menu.**
+
+```
+#11  network       POST /api/cart → 200  [AddToCart]                                step added (opens)
+#14  navigate      view Menu
+→ abandoned, closed_by session-ended, furthest added, failures []
+```
+
+Across the four sessions:
 
 | Session | Page-view funnel (menu → confirmation) | `OrderFood` record |
 |---|---|---|
-| Adds an item, checks out, sees the order number | converted | **succeeded**, no failures |
-| Adds an item, leaves from the cart | dropped at cart | **abandoned**, `session-ended`, furthest `added` |
-| Adds an item, removes it, browses on | dropped at cart | **abandoned**, `emptied-cart`, furthest `added` |
-| Card declined; clicks Place order three times; leaves | dropped at checkout | **failed**, `session-ended`, failures `declined ×3`, furthest `checkout` |
-| Order endpoint returns `500`; leaves | dropped at checkout | **failed**, `session-ended`, failures `order-error`, furthest `checkout` |
-| Order placed; confirmation request fails; redirected to the menu; orders again, which confirms | **converted** | **succeeded**, failures `confirmation-lost` |
-| Orders successfully, presses Back to the emptied checkout, clicks Place order; leaves | converted (once) | first attempt **succeeded**; second **failed**, `session-ended`, failures `order-error`, entry `checkout` |
-| Returns with a saved cart straight to checkout; places the order | not counted: never saw the menu | **succeeded**, entry `checkout` |
+| A | converted | **succeeded** |
+| B | dropped at checkout | **failed**, `emptied-cart`, failures `declined ×3` |
+| C | converted twice | **failed**, `session-ended`, failures `confirmation-lost ×2` |
+| D | dropped at cart | **abandoned**, `session-ended`, furthest `added` |
 
-The funnel's two checkout drop-offs are one number; the task separates a payment problem from a server outage, and a user who left from a user who was stuck. The sixth session is the one that matters. The funnel counts a conversion because the confirmation route was entered. Server metrics show two `200` order responses. The task reports a success that cost a failure, labeled `confirmation-lost`: the first order went through, the app never said so, and this customer paid twice. Reliability excludes the attempt; completion includes it. The Back-button session is a defect the funnel cannot see at all, since that user already converted: a stale checkout page still offers Place order on an empty cart. The last session shows why attempts open on any step but the last: a funnel that requires its first step never sees returning customers.
+The funnel's B and D are both drop-offs, and its C is two successes. Reliability over these attempts is one clean success out of three that succeeded or failed; D does not count against the product.
 
 `declined` is listed because this app swallows the rejection, so the user sees nothing and cannot recover. Once the checkout page explains a decline and lets the user try another card, the author removes the condition, and a user who gets through with a second card counts as a clean success.
 
-One session is invisible to every column, task included: an item marked sold out renders its menu card disabled, and a click on a disabled control produces no event. That is correct here, since sold out is not a defect, but it bounds what any declaration can see.
+Two things the capture could not see bound what any declaration can see. An item marked sold out renders its menu card disabled, and a click on a disabled control produces no record. And in this app a click on a cart line's remove button produced no interaction record at all, though the request it triggered did; that is why the abandonment condition is the empty state becoming visible, not the click. Conditions are most robust when anchored on what the page shows or the server answers.
 
 ### 2. The canary that passed every health check
+
+This example uses the optional `changed` event, so it needs a capture layer that reports a component's properties when they change after it became visible.
 
 A release refactors the currency formatter. For annual plans in one locale, the per-seat price on the billing page renders as `NaN €`. The subscription endpoint computes prices server-side, so every request still returns `200`. Nothing throws.
 
@@ -460,7 +542,7 @@ An SDK in application code: `task.start("OrderFood")`, `task.fail("declined")`. 
 
 ### 7. Tasks as signals with a time window
 
-Extend signals with temporal composition (`A followed by B within 30s`) and express a task as signals. Ruled out: a signal is a boolean, and a task's result is a three-way outcome with an attempt lifecycle, a furthest step and a list of failures. Encoding that in signal composition would make every consumer rebuild attempts from booleans. Tasks reference signals instead, so a predicate declared once serves both.
+Extend signals with temporal composition (`A followed by B within 30s`) and express a task as signals. Ruled out: a signal is a boolean, and a task's result is a three-way outcome with an attempt lifecycle, a furthest step and a list of failures. Encoding that in signal composition would make every consumer rebuild attempts from booleans. Signals as conditions are left out of this SEP until signals are themselves emitted as records a task can read.
 
 ## Migration
 
@@ -480,7 +562,7 @@ Tooling:
 
 ## Open questions
 
-1. **Nested component refs.** Components under `children:` are not addressable, and many confirmations and error states are nested. A dotted path (`CartBody.EmptyState`) or the stable component `id` proposed in [SEP-0020](https://github.com/sightmap/sightmap/pull/509) would fix this for signals and tasks together.
+1. **Paths versus stable ids.** A dotted component path breaks when a component moves to a different parent. The stable component `id` proposed in [SEP-0020](https://github.com/sightmap/sightmap/pull/509) would give a reference that survives moves.
 2. **Alternatives and conjunctions within a step.** A step is one condition. Some workflows finish in either of two ways (a toast, or a redirect), and some succeed only when two things hold (a toast and a `200`). An `any:` or `all:` form can be added later without breaking the single-condition shape.
 3. **Step-scoped failures.** Failures apply anywhere in an attempt. A condition that only counts after a given step (an error banner on the payment form, but not on the address form) may need an `after:` field.
 4. **Undeclared failures.** A failure nobody declared reads as abandonment. A consumer could flag abandoned attempts that saw an uncaught exception, without the spec making every exception a failure.
