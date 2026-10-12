@@ -199,7 +199,7 @@ in the profile, including the HTML attributes whose values compare case-insensit
 (`input[type=password]` matches `type="PASSWORD"`, on HTML and SVG elements alike) and repeated
 attribute tests.
 
-**Existing corpora.** None of the 37 corpora in this repository gains a diagnostic. One real corpus
+**Existing corpora.** None of the 32 corpus directories in this repository, outside the conformance fixtures, gains a diagnostic. One real corpus
 tests one attribute twice (`[class*="..."][class*="..."]`) to target generated class names, which is
 why the profile keeps every test rather than rejecting the repeat.
 
