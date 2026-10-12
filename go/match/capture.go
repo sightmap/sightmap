@@ -44,21 +44,42 @@ func foldRank(parent, local int) int {
 	return parent
 }
 
+// PrivacyRule is a privacy rule a consumer supplies itself, such as a built-in
+// default or a rule configured outside the corpus.
+type PrivacyRule struct {
+	Selector string
+	// Privacy is "block" or "mask"; anything else unrecognized ranks as block.
+	// A consumer rule may only withhold, so "unmask" is ignored.
+	Privacy string
+}
+
+// Option configures a Matcher.
+type Option func(*Matcher)
+
+// WithPrivacyRules adds consumer privacy rules to every page's resolution.
+func WithPrivacyRules(rules ...PrivacyRule) Option {
+	return func(m *Matcher) { m.consumerRules = append(m.consumerRules, rules...) }
+}
+
 // captureSet is a page's compiled privacy and watch rules: one query per
-// selector of every component that declares privacy or watch.
+// selector of every component that declares privacy or watch, plus the
+// consumer's privacy rules.
 type captureSet struct {
 	queries []MatchQuery // each with privacyRank and/or watch set
 	index   *firstPartIndex
 	// floor is the rank every element resolves to at least: the strictest block
 	// or mask rule that could not be evaluated, which so covers the document.
 	floor int
+	// attrs are the attribute names the rules test, sorted.
+	attrs []string
 }
 
-// compileCapture compiles the privacy and watch rules of defs (SEP-0021). A rule outside the capture-baseline profile
+// compileCapture compiles the privacy and watch rules of defs and the
+// consumer's rules. A rule outside the capture-baseline profile (SEP-0021)
 // never matches loosely: a block or mask raises the floor, an unmask is
 // dropped, and a watch is not reported. A privacy rule whose subject matches
 // nearly every element is treated the same way.
-func compileCapture(defs []sightmap.ComponentDef) *captureSet {
+func compileCapture(defs []sightmap.ComponentDef, consumer []PrivacyRule) *captureSet {
 	cs := &captureSet{}
 	add := func(name, sel string, rank int, watch bool, def *sightmap.ComponentDef) {
 		parsed, err := sightmap.ParseSightmapSelector(sel)
@@ -80,6 +101,13 @@ func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 			Name: name, Parts: parsed.Parts, Combinators: parsed.Combinators, Def: def,
 			privacyRank: rank, watch: watch,
 		})
+		for _, c := range prof.Compounds {
+			for _, a := range c.Attrs {
+				if !slices.Contains(cs.attrs, a) {
+					cs.attrs = append(cs.attrs, a)
+				}
+			}
+		}
 	}
 	for i := range defs {
 		d := &defs[i]
@@ -94,7 +122,14 @@ func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 			add(d.Name, sel, rank, d.Watch, d)
 		}
 	}
+	for _, r := range consumer {
+		if r.Privacy == "unmask" {
+			continue
+		}
+		add("", r.Selector, rankOf(r.Privacy), false, nil)
+	}
 	cs.index = newFirstPartIndex(cs.queries)
+	slices.Sort(cs.attrs)
 	return cs
 }
 
@@ -192,4 +227,71 @@ func (m *Matcher) Privacy(root *sightmap.ComponentNode, pageURL string) map[*sig
 // covers nodes no component names.
 func (m *Matcher) Watched(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode][]string {
 	return m.entryFor(pageURL).capture.collect(root).watched
+}
+
+// PrivacyForChain resolves the effective privacy of each element on an
+// observed element's ancestor chain (root first, leaf last) for pageURL. Every
+// rule in the capture-baseline profile depends only on an element and its
+// ancestors, so this equals what Privacy gives the same elements in the full
+// tree. The result has one entry per chain element: "block",
+// "mask", "unmask" or "".
+func (m *Matcher) PrivacyForChain(chain []sightmap.Element, pageURL string) []string {
+	privacy, _ := m.chainCapture(chain, pageURL, false)
+	return privacy
+}
+
+// WatchedForChain returns, for each element on an ancestor chain, the names of
+// the watched components matching it, sorted; nil where none does.
+func (m *Matcher) WatchedForChain(chain []sightmap.Element, pageURL string) [][]string {
+	_, watched := m.chainCapture(chain, pageURL, true)
+	return watched
+}
+
+func (m *Matcher) chainCapture(chain []sightmap.Element, pageURL string, wantWatch bool) ([]string, [][]string) {
+	privacy := make([]string, len(chain))
+	var watched [][]string
+	if wantWatch {
+		watched = make([][]string, len(chain))
+	}
+	cs := m.entryFor(pageURL).capture
+	if len(chain) == 0 || (len(cs.queries) == 0 && cs.floor == rankNone) {
+		return privacy, watched
+	}
+	// One allocation each for the spine and its child links.
+	nodes := make([]sightmap.ComponentNode, len(chain))
+	links := make([]*sightmap.ComponentNode, len(chain))
+	for i := range chain {
+		nodes[i].Element = &chain[i]
+		links[i] = &nodes[i]
+		if i > 0 {
+			nodes[i-1].Children = links[i : i+1 : i+1]
+		}
+	}
+	local, parent := rankNone, rankNone
+	var names []string // watched components matching the current node
+	walkMatches(&nodes[0], cs.queries, cs.index,
+		func(_ *sightmap.ComponentNode, q *MatchQuery) {
+			local = max(local, q.privacyRank)
+			if wantWatch && q.watch && !slices.Contains(names, q.Name) {
+				names = append(names, q.Name)
+			}
+		},
+		func(_ *sightmap.ComponentNode, depth int) {
+			parent = max(foldRank(parent, local), cs.floor)
+			privacy[depth] = rankNames[parent]
+			if len(names) > 0 {
+				slices.Sort(names)
+				watched[depth] = names
+			}
+			local, names = rankNone, nil
+		})
+	return privacy, watched
+}
+
+// PrivacyAttributes returns the attribute names pageURL's privacy and watch
+// rules test, sorted. A consumer that records an element's ancestor chain for
+// PrivacyForChain or WatchedForChain must record at least these attributes,
+// plus each element's tag, id and classes.
+func (m *Matcher) PrivacyAttributes(pageURL string) []string {
+	return slices.Clone(m.entryFor(pageURL).capture.attrs)
 }

@@ -509,8 +509,9 @@ func oracle(root *sightmap.ComponentNode, defs []sightmap.ComponentDef) (map[*si
 }
 
 // TestCapture_EqualsOracle: across seeded pages and corpora with random privacy
-// and watch, Privacy and Watched equal the oracle on every node, and Match
-// reports the same on every node it names.
+// and watch, Privacy and Watched equal the oracle on every node, resolving from
+// each node's ancestor chain alone gives the same answer, and Match reports the
+// same on every node it names.
 func TestCapture_EqualsOracle(t *testing.T) {
 	seen := map[string]int{}
 	nodes, watchedNodes := 0, 0
@@ -521,10 +522,15 @@ func TestCapture_EqualsOracle(t *testing.T) {
 			m := match.NewMatcher(corpus)
 			privacy, watched := m.Privacy(root, ""), m.Watched(root, "")
 			wantP, wantW := oracle(root, corpus.GlobalComponents)
-			var walk func(n *sightmap.ComponentNode)
-			walk = func(n *sightmap.ComponentNode) {
+			var walk func(n *sightmap.ComponentNode, chain []sightmap.Element)
+			walk = func(n *sightmap.ComponentNode, chain []sightmap.Element) {
+				chain = append(slices.Clip(chain), *n.Element)
 				if privacy[n] != wantP[n] || !slices.Equal(watched[n], wantW[n]) {
 					t.Fatalf("seed %d exotic %v: privacy %q watched %v, oracle %q %v", seed, exotic, privacy[n], watched[n], wantP[n], wantW[n])
+				}
+				cp, cw := m.PrivacyForChain(chain, ""), m.WatchedForChain(chain, "")
+				if cp[len(cp)-1] != privacy[n] || !slices.Equal(cw[len(cw)-1], watched[n]) {
+					t.Fatalf("seed %d exotic %v: chain %q %v, tree %q %v", seed, exotic, cp[len(cp)-1], cw[len(cw)-1], privacy[n], watched[n])
 				}
 				seen[privacy[n]]++
 				nodes++
@@ -532,10 +538,10 @@ func TestCapture_EqualsOracle(t *testing.T) {
 					watchedNodes++
 				}
 				for _, c := range n.Children {
-					walk(c)
+					walk(c, chain)
 				}
 			}
-			walk(root)
+			walk(root, nil)
 			for node, cm := range m.Match(root, "") {
 				if cm.Privacy != privacy[node] || !slices.Equal(cm.Watched, watched[node]) {
 					t.Fatalf("seed %d exotic %v: Match %q %v, Privacy/Watched %q %v", seed, exotic, cm.Privacy, cm.Watched, privacy[node], watched[node])
