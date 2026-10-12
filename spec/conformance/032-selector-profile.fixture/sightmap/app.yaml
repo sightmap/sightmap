@@ -12,7 +12,7 @@ components:
     selector: ':is(.hint, .note)'
     privacy: unmask
   - name: Everything
-    selector: '.card *'
+    selector: '.card :not(.public)'
     privacy: mask
   - name: WatchedBanner
     selector: '.banner + .promo'
@@ -25,7 +25,7 @@ components:
   - name: Toolbar
     selector: 'header:has(nav)'
   - name: AnyRow
-    selector: '.table > *'
+    selector: '.table > :not(.header)'
   - name: SubmitButton
     selector: 'button[type="submit"]'
 

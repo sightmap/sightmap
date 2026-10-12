@@ -281,7 +281,7 @@ func validateComponent(comp ComponentDef, seen map[string]string) []ValidationEr
 		}
 	}
 
-	// SEP-0018: in the capture-baseline profile, and not universal.
+	// SEP-0021: in the capture-baseline profile, and not universal.
 	errs = append(errs, validateComponentSelectors(comp)...)
 
 	// duplicate-name+selector within scope: same name AND same selector set is
