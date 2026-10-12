@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Selector diagnostic codes (SEP-0018), beyond the profile parser's own.
+// Selector diagnostic codes (SEP-0021), beyond the profile parser's own.
 const (
 	// CodeSelectorUniversalSubject marks a selector whose subject compound has
 	// no type, id, class or attribute outside :not(), so it matches nearly
@@ -17,7 +17,7 @@ const (
 )
 
 // validateComponentSelectors checks each of a component's selectors, after
-// flattening, against SEP-0018: every selector must be in the capture-baseline
+// flattening, against SEP-0021: every selector must be in the capture-baseline
 // profile, and must not select nearly every element.
 // A component that declares privacy or watch is a capture directive, so its
 // findings are errors; on any other component they are warnings for the
