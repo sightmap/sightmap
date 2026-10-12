@@ -168,20 +168,30 @@ A user who hits a declared failure and then leaves was failed by the product, so
 
 **Only declared failures count.** A condition the author does not list does not fail the attempt. A declined card that the page explains, and that the user gets past with another card, is the product working; leaving it out of `failed` keeps it from counting against the product. The cost is the converse: a failure nobody declared reads as abandonment. Abandonment rate is worth watching for that reason.
 
-**The record.** For each closed attempt, a consumer reports at least: task `name`, `outcome`, `closed_by`, `entry_step`, `furthest_step`, `failures` (the labels in the order they fired, repeats kept), and the open and close times. The record never carries the property values a filter compared, so a task adds no path for extracted content to leave the capture layer.
+**The record.** For each closed attempt, a consumer emits a record (see [Emission](#emission)) carrying at least: task `name`, `outcome`, `closed_by`, `entry_step`, `furthest_step`, `failures` (the labels in the order they fired, repeats kept), and the open and close times. The record never carries the property values a filter compared, so a task adds no path for extracted content to leave the capture layer.
 
 **The actor is not part of the task.** A person, an embedded assistant, an external browser agent and a test harness driving a preview build all produce attempts against the same declaration. A consumer that knows the actor can cut outcomes by it.
 
 ### Emission
 
-A task does not change what a page captures (beyond watching the components it references with `visible` or `removed`). Its output is the **attempt record**, produced by evaluating the task over a session's records in order:
+A task does not change what a page captures (beyond watching the components it references with `visible` or `removed`). Its output is an **attempt record**, appended to the session's own record stream: the same stream of navigation, interaction, network and console records it was evaluated over. An attempt is a derived record, like a rage-click or error-click a capture layer derives from the clicks and exceptions behind it.
 
-- **Where.** Evaluation needs the whole session, including its end, so it runs wherever a session's records are assembled: a stream processor that closes a session after inactivity, an indexer, or a test harness that drives one session and reads the result. It is a pure function of the task and the records, so every consumer computes the same attempts from the same records.
-- **When.** An attempt is emitted when it closes. Attempts still open when the session ends close with `session-ended`, so a consumer emits them once it decides the session is over.
-- **Provenance.** Each attempt SHOULD reference the records that opened it, advanced it, recorded each failure and closed it, so a reader can go from an outcome to the moment it was decided.
-- **Re-evaluation.** Records name the components, views, requests and messages they matched, so a consumer that keeps them can re-evaluate an edited or new task over sessions already captured, as far as those sessions recorded the events the task references.
+```
+#37  network       GET /api/orders/latest → 500  [LoadLatestOrder]
+#38  navigate      view Menu
+#41  task-attempt  [OrderFood outcome="failed" closed_by="session-ended" entry_step="added"
+                    furthest_step="placed" failures="confirmation-lost,confirmation-lost"]
+                   from #11, #14, #18, #19, #37
+```
 
-An attempt record is not a signal. A signal is a boolean about one moment; an attempt spans a session, and its outcome is not known until it closes.
+- **Shape.** The record's kind is `task-attempt`. It names the task the way other records name the entity they matched, and carries the attempt's fields from [The record](#semantics) as that entity's values. It lists the records that opened it, advanced it, recorded each failure and closed it, in order, as the records it was derived from.
+- **Time.** The record is stamped with the time the attempt opened, as a derived record is stamped at its first member, and carries its close time.
+- **Where.** Evaluation needs the whole session, including its end, so the record is appended wherever a session's records are assembled across pages and tabs: a stream processor that closes a session after inactivity, an indexer, or a test harness that drives one session. A capture layer that numbers records per page cannot emit it, since an attempt routinely spans pages. Its references use the session-wide numbering of the assembled stream.
+- **When.** The record is appended when the attempt closes. Attempts still open when the session ends close with `session-ended`, and are appended once the consumer decides the session is over.
+- **Determinism.** Evaluation is a pure function of the task and the session's records, so every consumer appends the same attempts to the same stream.
+- **Re-evaluation.** Records name the components, views, requests and messages they matched, so a consumer that keeps them can evaluate an edited or new task over sessions already captured, as far as those sessions recorded the events the task references. Re-evaluation replaces the session's attempt records for that task; it never appends a second set.
+
+Attempt records are never inputs to a task. A condition's `ref` cannot name a task, so evaluating one task cannot depend on another's output, and attempts can be appended in any order.
 
 ### Aggregation (informative)
 
@@ -205,7 +215,8 @@ A consumer that evaluates tasks MUST:
 - Evaluate filters as in [Filters](#filters), treating an unresolved key as not matching.
 - Treat a component referenced with `visible` or `removed` as watched.
 - Support every core event. A consumer that does not support an optional event MUST report a task using it as unsupported, never evaluate it as though the event never fired.
-- Report each closed attempt with the fields in [The record](#semantics), and never include filtered property values.
+- Append each closed attempt to the session's record stream as a `task-attempt` record with the fields in [The record](#semantics) and references to the records it was derived from, and never include filtered property values.
+- Replace, never duplicate, a session's attempt records for a task when re-evaluating it.
 
 A tool that does not evaluate sessions, such as an offline matcher or a documentation generator, MUST accept and validate `tasks:` and MAY otherwise ignore it.
 
@@ -264,7 +275,7 @@ tasks:
 
 Three facts about the app's code drive the interesting sessions. The checkout page awaits the order request without catching its rejection, so a `402` or `500` leaves the Place order button doing nothing visible. The confirmation page loads the latest order and, if that request fails, redirects to the menu. The order endpoint clears the cart on success, so placing an order again from a stale checkout page returns `422 Cart is empty`.
 
-The sessions below were captured from the running app with a client-side capture layer and this corpus, and the records shown are the ones it emitted, abridged to those the task reads. `OrderNumber` and `BrowseMenuButton` are watched because the task references them with `visible`.
+The sessions below were captured from the running app with a client-side capture layer and this corpus, and the records shown are the ones it emitted, abridged to those the task reads. The last record in each is the attempt the task appended once the session's records were assembled. `OrderNumber` and `BrowseMenuButton` are watched because the task references them with `visible`.
 
 **Session A: the order goes through.**
 
@@ -273,7 +284,8 @@ The sessions below were captured from the running app with a client-side capture
 #14  navigate      view Checkout                                                    step checkout
 #18  network       POST /api/orders → 200  [PlaceOrder order_status="confirmed"]    step placed
 #20  element-seen  [ConfirmationBody] > [OrderNumber]                             step confirmed
-→ succeeded, closed_by confirmed, failures []
+#21  task-attempt  [OrderFood outcome="succeeded" closed_by="confirmed" entry_step="added" furthest_step="confirmed"]
+                   from #11, #14, #18, #20
 ```
 
 **Session B: the card is declined three times, then the user empties the cart.**
@@ -288,9 +300,11 @@ The sessions below were captured from the running app with a client-side capture
 #23  network       POST /api/orders → 402                                           failure declined
 #27  network       POST /api/orders → 402                                           failure declined
 #29  rage-click    from #16, #20, #24
-#32  network       DELETE /api/cart/:item → 200           
+#32  network       DELETE /api/cart/:item → 200
 #34  element-seen  [CartBody] > [BrowseMenuButton]                                 abandoned emptied-cart
-→ failed, closed_by emptied-cart, furthest checkout, failures [declined, declined, declined]
+#35  task-attempt  [OrderFood outcome="failed" closed_by="emptied-cart" entry_step="added" furthest_step="checkout"
+                    failures="declined,declined,declined"]
+                   from #11, #14, #19, #23, #27, #34
 ```
 
 The user left by emptying the cart, but declared failures were already recorded, so the attempt is failed, not abandoned. The capture layer's own frustration records (`error-click`, `rage-click`) say something went wrong; the task says what, and that it ended the attempt.
@@ -299,13 +313,17 @@ The user left by emptying the cart, but declared failures were already recorded,
 
 ```
 #11  network       POST /api/cart → 200  [AddToCart]                                step added (opens)
+#14  navigate      view Checkout                                                    step checkout
 #18  network       POST /api/orders → 200  [PlaceOrder order_id="BC-FL82M2"]        step placed
 #19  network       GET /api/orders/latest → 500  [LoadLatestOrder]                  failure confirmation-lost
 #20  navigate      view Menu
 #29  network       POST /api/cart → 200  [AddToCart]                                (ignored: earlier than placed)
 #36  network       POST /api/orders → 200  [PlaceOrder order_id="BC-CMQ3JW"]        (ignored: already placed)
 #37  network       GET /api/orders/latest → 500  [LoadLatestOrder]                  failure confirmation-lost
-→ failed, closed_by session-ended, furthest placed, failures [confirmation-lost, confirmation-lost]
+     (session ends)
+#41  task-attempt  [OrderFood outcome="failed" closed_by="session-ended" entry_step="added" furthest_step="placed"
+                    failures="confirmation-lost,confirmation-lost"]
+                   from #11, #14, #18, #19, #37
 ```
 
 No exception, no frustration record, and two `200` order responses: a page-view funnel counts two conversions, because the confirmation route was entered twice. The task reports one failed attempt whose furthest step is `placed`, with `confirmation-lost` recorded twice, and its provenance links each failure to the `LoadLatestOrder` record behind it. The second `PlaceOrder` does not advance the attempt, since `placed` is already its furthest step; the record shows the cost through the repeated failure, and the two order ids sit in the session's records. The customer paid twice and was never told either order went through.
@@ -315,7 +333,9 @@ No exception, no frustration record, and two `200` order responses: a page-view 
 ```
 #11  network       POST /api/cart → 200  [AddToCart]                                step added (opens)
 #14  navigate      view Menu
-→ abandoned, closed_by session-ended, furthest added, failures []
+     (session ends)
+#17  task-attempt  [OrderFood outcome="abandoned" closed_by="session-ended" entry_step="added" furthest_step="added"]
+                   from #11
 ```
 
 Across the four sessions:
