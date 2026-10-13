@@ -20,6 +20,7 @@ import (
 // sibling View / component definition types are regularized onto the same
 // convention separately.
 type RequestDef struct {
+	ID          string               `json:"id,omitempty"` // SEP-0020
 	Name        string               `json:"name"`
 	Route       string               `json:"route,omitempty"`  // glob pattern; express-style ":param" segments match one segment
 	Method      string               `json:"method,omitempty"` // optional HTTP method filter; "" matches any method
@@ -51,6 +52,7 @@ type RequestDef struct {
 // from static corpus definitions alone treats every property as
 // declared-but-unavailable rather than an error.
 type RequestPropertyDef struct {
+	ID      string  `json:"id,omitempty"` // SEP-0020
 	Name    string  `json:"name"`
 	Extract Extract `json:"extract"`
 }
@@ -74,6 +76,7 @@ type Payload struct {
 
 // Field is one expected field in a Payload. Type and Description are free-text.
 type Field struct {
+	ID          string `json:"id,omitempty"` // SEP-0020
 	Name        string `json:"name"`
 	Type        string `json:"type,omitempty"`
 	Description string `json:"description,omitempty"`

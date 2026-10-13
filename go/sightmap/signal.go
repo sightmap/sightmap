@@ -15,6 +15,7 @@ import "sort"
 // route match (active?), which is why the two evaluate identically to the
 // existing wait_for {query} / wait_for {route} forms.
 type SignalDef struct {
+	ID   string   `json:"id,omitempty"` // SEP-0020
 	Name string   `json:"name"`
 	Ref  string   `json:"ref"`
 	Tags []string `json:"tags,omitempty"`

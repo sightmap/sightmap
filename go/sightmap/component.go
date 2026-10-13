@@ -4,18 +4,14 @@ package sightmap
 // Hierarchical YAML selectors should be pre-flattened by the caller into
 // compound descendant selectors before compiling into match queries.
 type ComponentDef struct {
-	// ID is the component's identity across versions of the sightmap (SEP-0020):
-	// opaque, unique among component declarations, unchanged by a rename, move or
-	// edit. "" when the component declares none. A $ref placement carries its
-	// definition's ID, so one ID can appear at several placements; IDPath tells
-	// them apart.
+	// ID is the component declaration's identity across versions of the
+	// sightmap (SEP-0020). "" when it declares none. A $ref expansion copies its
+	// definition, so every placement of a definition carries the definition's ID;
+	// the id of the $ref entry itself is RefID.
 	ID string `json:"id,omitempty"`
-	// IDPath is the identity of this placement: ID, preceded inside a $ref
-	// expansion by the IDPath of the component holding the $ref. It is just
-	// [ID] outside any expansion, so it doesn't change when a component moves.
-	// A holder without an ID contributes "", marking the path incomplete. Nil
-	// when ID is "".
-	IDPath    []string `json:"idPath,omitempty"`
+	// RefID is the id of the $ref entry this component was expanded from, set
+	// on the root of an expansion only. "" otherwise.
+	RefID     string   `json:"refId,omitempty"`
 	Name      string   `json:"name"`
 	Selectors []string `json:"selectors"`
 	Source    string   `json:"source,omitempty"`
@@ -44,6 +40,7 @@ type ComponentDef struct {
 // ComponentPropertyDef describes a value extracted from a matched component,
 // resolved over the component tree (SEP-0010).
 type ComponentPropertyDef struct {
+	ID      string  `json:"id,omitempty"` // SEP-0020
 	Name    string  `json:"name"`
 	Extract Extract `json:"extract"` // SEP-0017; From is one of ComponentExtractSources
 }

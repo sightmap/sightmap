@@ -6,7 +6,8 @@
       "expected": {
         "ok": false,
         "diagnostics": [
-          { "code": "component-id-duplicate", "severity": "error" }
+          { "code": "id-duplicate", "severity": "error" },
+          { "code": "id-missing", "severity": "error" }
         ]
       }
     }

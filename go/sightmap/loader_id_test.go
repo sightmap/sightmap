@@ -19,356 +19,325 @@ func codes(errs []sightmap.ValidationError) []string {
 	return out
 }
 
-// SEP-0020: ids load onto every declaration, and IDPath tells a definition's
-// placements apart even though they share its id: inside a $ref expansion it
-// is prefixed by the component holding the $ref.
-func TestComponentIDsAndIDPaths(t *testing.T) {
+func loadYAML(t *testing.T, files map[string]string) *sightmap.Corpus {
+	t.Helper()
 	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "components.yaml"), `
-version: 1
-definitions:
-  - id: kq2m7rta
-    name: ProductCard
-    selector: '[data-component="ProductCard"]'
-    children:
-      - id: t9w4hx2c
-        name: Title
-        selector: h3
-`)
-	writeFile(t, filepath.Join(dir, "views.yaml"), `
-version: 1
-views:
-  - name: Search
-    route: /s/**
-    components:
-      - id: r2v8yd5e
-        name: Results
-        selector: ul.results
-        children:
-          - $ref: ProductCard
-      - id: f4j8nz1q
-        name: Recent
-        selector: ul.recent
-        children:
-          - $ref: ProductCard
-`)
+	for name, body := range files {
+		writeFile(t, filepath.Join(dir, name), body)
+	}
 	c, err := sightmap.Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return c
+}
+
+// SEP-0020: every named entity carries an id, and the loader exposes each one.
+func TestEntityIDsLoad(t *testing.T) {
+	c := loadYAML(t, map[string]string{"app.yaml": `
+version: 1
+environments:
+  - id: env4kq2m7r
+    name: prod
+    origins:
+      app: https://example.com
+definitions:
+  - id: def8kq2m7r
+    name: ProductCard
+    selector: .card
+    properties:
+      - id: prp2v8yd5e
+        name: price
+        extract: { from: dom.text }
+views:
+  - id: viw3n8kq2m
+    name: Search
+    route: /s
+    properties:
+      - id: prp7q4wz1d
+        name: query
+        extract: { from: url.query, path: q }
+    components:
+      - id: cmp6sjw3ra
+        name: Results
+        selector: ul.results
+        children:
+          - id: ref9tz2m4k
+            $ref: ProductCard
+    requests:
+      - id: req5c9fw4j
+        name: search
+        route: /api/search
+        response:
+          fields:
+            - id: fld1h7gq3n
+              name: total
+requests:
+  - id: req2b3n6pk
+    name: cart
+    route: /api/cart
+    properties:
+      - id: prp4x8mn2c
+        name: count
+        extract: { from: rsp.body, path: count }
+messages:
+  - id: msg8r2k5vt
+    name: Boom
+    level: exception
+    properties:
+      - id: prp6d1zq9h
+        name: fn
+        extract: { from: stack, path: top.function }
+signals:
+  - id: sig3w7jx4p
+    name: ResultsShown
+    ref: Results
+snapshots:
+  - id: snp5m2hb8c
+    name: base
+`})
 	if errs := sightmap.Validate(c); len(errs) != 0 {
 		t.Fatalf("unexpected diagnostics: %v", errs)
 	}
-	var paths [][]string
-	for _, d := range c.Views[0].Components {
-		if d.Name == "Title" {
-			if d.ID != "t9w4hx2c" {
-				t.Errorf("Title ID = %q, want t9w4hx2c", d.ID)
-			}
-			paths = append(paths, d.IDPath)
-		}
+	v := c.Views[0]
+	got := map[string]string{
+		"environment":  c.Environments[0].ID,
+		"definition":   c.Definitions[0].ID,
+		"def property": c.Definitions[0].Properties[0].ID,
+		"view":         v.ID,
+		"url property": v.Properties[0].ID,
+		"request":      v.Requests[0].ID,
+		"field":        v.Requests[0].Response.Fields[0].ID,
+		"global req":   c.Requests[0].ID,
+		"req property": c.Requests[0].Properties[0].ID,
+		"message":      c.Messages[0].ID,
+		"msg property": c.Messages[0].Properties[0].ID,
+		"signal":       c.Signals[0].ID,
 	}
-	want := [][]string{{"r2v8yd5e", "t9w4hx2c"}, {"f4j8nz1q", "t9w4hx2c"}}
-	if !reflect.DeepEqual(paths, want) {
-		t.Errorf("Title IDPaths = %v, want %v", paths, want)
+	want := map[string]string{
+		"environment":  "env4kq2m7r",
+		"definition":   "def8kq2m7r",
+		"def property": "prp2v8yd5e",
+		"view":         "viw3n8kq2m",
+		"url property": "prp7q4wz1d",
+		"request":      "req5c9fw4j",
+		"field":        "fld1h7gq3n",
+		"global req":   "req2b3n6pk",
+		"req property": "prp4x8mn2c",
+		"message":      "msg8r2k5vt",
+		"msg property": "prp6d1zq9h",
+		"signal":       "sig3w7jx4p",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ids = %v, want %v", got, want)
 	}
 }
 
-// Outside any $ref expansion IDPath is just the component's own id, so moving
-// a component (or renaming or reselecting an ancestor) doesn't change it. A
-// $ref held by a component without an id gives its expansion an incomplete
-// path, marked by "".
-func TestIDPathStableUnderMoves(t *testing.T) {
-	load := func(yaml string) *sightmap.Corpus {
-		dir := t.TempDir()
-		writeFile(t, filepath.Join(dir, "app.yaml"), yaml)
-		c, err := sightmap.Load(dir)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return c
-	}
-	pathOf := func(c *sightmap.Corpus, name string) []string {
-		for _, d := range c.GlobalComponents {
-			if d.Name == name {
-				return d.IDPath
-			}
-		}
-		t.Fatalf("no component %q", name)
-		return nil
-	}
-	before := load(`
-version: 1
-components:
-  - id: f3n8kq2m
-    name: CheckoutForm
-    selector: form.checkout
-    children:
-      - id: kq2m7rta
-        name: CardDetail
-        selector: .card-detail
-`)
-	after := load(`
-version: 1
-components:
-  - id: f3n8kq2m
-    name: CheckoutForm
-    selector: form.checkout
-  - id: p6sjw3ra
-    name: PaymentSheet
-    selector: '[role="dialog"]'
-    children:
-      - id: kq2m7rta
-        name: CardDetail
-        selector: .card-detail
-`)
-	if b, a := pathOf(before, "CardDetail"), pathOf(after, "CardDetail"); !reflect.DeepEqual(b, a) || !reflect.DeepEqual(a, []string{"kq2m7rta"}) {
-		t.Errorf("CardDetail IDPath before %v, after move %v; want [kq2m7rta] both", b, a)
-	}
-
-	unheld := load(`
+// A $ref entry has its own id. The root of each expansion carries the $ref
+// entry's id as RefID and the definition's id as ID, so two placements of one
+// definition are told apart by RefID.
+func TestRefIDOnExpansionRoot(t *testing.T) {
+	c := loadYAML(t, map[string]string{"app.yaml": `
 version: 1
 definitions:
-  - id: kq2m7rta
+  - id: def8kq2m7r
     name: ProductCard
     selector: .card
-components:
-  - name: Shell
-    selector: main
     children:
-      - $ref: ProductCard
-`)
-	for _, d := range unheld.GlobalComponents {
-		if d.Name == "ProductCard" && !reflect.DeepEqual(d.IDPath, []string{"", "kq2m7rta"}) {
-			t.Errorf("ProductCard under an unidentified holder: IDPath %v, want [\"\" kq2m7rta]", d.IDPath)
+      - id: cmpt9w4hx2
+        name: Title
+        selector: h3
+views:
+  - id: viw3n8kq2m
+    name: Search
+    route: /s/**
+    components:
+      - id: refr2v8yd5
+        $ref: ProductCard
+  - id: viw7f4j8nz
+    name: Home
+    route: /
+    components:
+      - id: refb3n6pk1
+        $ref: ProductCard
+`})
+	if errs := sightmap.Validate(c); len(errs) != 0 {
+		t.Fatalf("unexpected diagnostics: %v", errs)
+	}
+	type placement struct{ view, name, id, refID string }
+	var got []placement
+	for _, v := range c.Views {
+		for _, d := range v.Components {
+			got = append(got, placement{v.Name, d.Name, d.ID, d.RefID})
 		}
-		if d.Name == "Shell" && d.IDPath != nil {
-			t.Errorf("Shell IDPath = %v, want nil", d.IDPath)
-		}
+	}
+	want := []placement{
+		{"Search", "ProductCard", "def8kq2m7r", "refr2v8yd5"},
+		{"Search", "Title", "cmpt9w4hx2", ""},
+		{"Home", "ProductCard", "def8kq2m7r", "refb3n6pk1"},
+		{"Home", "Title", "cmpt9w4hx2", ""},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("placements = %v, want %v", got, want)
 	}
 }
 
-// Uniqueness is checked across declarations in every file. Referencing a
-// definition several times is not a duplicate.
-func TestComponentIDDuplicateAcrossFiles(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "a.yaml"), `
+// Uniqueness spans every entity kind and every file. Referencing a definition
+// several times is not a duplicate.
+func TestIDDuplicateAcrossKindsAndFiles(t *testing.T) {
+	c := loadYAML(t, map[string]string{
+		"a.yaml": `
 version: 1
 definitions:
-  - id: kq2m7rta
+  - id: def8kq2m7r
     name: ProductCard
     selector: .card
 components:
   - id: checkout01
     name: CheckoutForm
     selector: form.checkout
-`)
-	writeFile(t, filepath.Join(dir, "b.yaml"), `
+`,
+		"b.yaml": `
 version: 1
 views:
-  - name: Search
-    route: /s/**
+  - id: checkout01
+    name: Checkout
+    route: /checkout
     components:
-      - id: r2v8yd5e
+      - id: cmp6sjw3ra
         name: Results
         selector: ul.results
         children:
-          - $ref: ProductCard
-      - id: f4j8nz1q
+          - id: refr2v8yd5
+            $ref: ProductCard
+      - id: cmp4f8nz1q
         name: Recent
         selector: ul.recent
         children:
-          - $ref: ProductCard
-      - id: checkout01
-        name: LegacyCheckout
-        selector: form.legacy
-`)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+          - id: refb3n6pk1
+            $ref: ProductCard
+`,
+	})
 	errs := sightmap.Validate(c)
-	if got := codes(errs); !reflect.DeepEqual(got, []string{"component-id-duplicate"}) {
-		t.Fatalf("codes = %v, want [component-id-duplicate]", got)
+	if got := codes(errs); !reflect.DeepEqual(got, []string{"id-duplicate"}) {
+		t.Fatalf("codes = %v, want [id-duplicate]", got)
 	}
-	if e := errs[0]; e.File != "b.yaml" || e.Component != "LegacyCheckout" || !e.IsError() ||
-		!strings.Contains(e.Message, `"CheckoutForm" in a.yaml`) {
+	if e := errs[0]; e.File != "b.yaml" || e.Component != "Checkout" || !e.IsError() ||
+		!strings.Contains(e.Message, `component "CheckoutForm" in a.yaml`) {
 		t.Errorf("duplicate diagnostic = %+v", e)
 	}
 }
 
-func TestComponentIDInvalidShape(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "app.yaml"), `
+// An id must be a YAML string of the right shape: an unquoted number or a null
+// is invalid rather than silently coerced or dropped.
+func TestIDInvalid(t *testing.T) {
+	c := loadYAML(t, map[string]string{"app.yaml": `
 version: 1
 components:
-  - id: ab
+  - id: short1
     name: TooShort
     selector: .a
   - id: -leading-dash
     name: LeadingDash
     selector: .b
-  - id: has space
+  - id: has a space
     name: Space
     selector: .c
+  - id: 12345678
+    name: Number
+    selector: .n
+  - id: ~
+    name: Nothing
+    selector: .z
+  - id: '87654321'
+    name: Quoted
+    selector: .q
   - id: ok_ID-42
     name: Fine
     selector: .d
-`)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := []string{"component-id-invalid", "component-id-invalid", "component-id-invalid"}
+`})
+	want := []string{"id-invalid", "id-invalid", "id-invalid", "id-invalid", "id-invalid"}
 	if got := codes(sightmap.Validate(c)); !reflect.DeepEqual(got, want) {
 		t.Errorf("codes = %v, want %v", got, want)
 	}
 }
 
-// Once a corpus declares any id, lint flags each declaration without one,
-// once, however many times a $ref places it. A corpus without ids is silent.
-func TestLintComponentIDMissing(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "app.yaml"), `
+// Once a sightmap declares any id, every entity without one is an error. A
+// sightmap without ids validates as before.
+func TestIDMissingOnceAdopted(t *testing.T) {
+	c := loadYAML(t, map[string]string{
+		"a.yaml": `
 version: 1
 definitions:
-  - name: ProductCard
-    selector: '[data-component="ProductCard"]'
+  - id: def8kq2m7r
+    name: ProductCard
+    selector: .card
+`,
+		"b.yaml": `
+version: 1
 views:
   - name: Search
     route: /s/**
     components:
-      - id: r2v8yd5e
-        name: Results
-        selector: ul.results
-        children:
-          - $ref: ProductCard
-      - name: Filters
+      - $ref: ProductCard
+      - id: cmp6sjw3ra
+        name: Filters
         selector: .filters
-`)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+        properties:
+          - name: count
+            extract: { from: dom.text }
+`,
+	})
 	var missing []string
-	for _, w := range sightmap.Lint(c) {
-		if w.Rule == "component-id-missing" {
-			missing = append(missing, w.Component)
+	for _, e := range sightmap.Validate(c) {
+		if e.Code == "id-missing" {
+			if !e.IsError() {
+				t.Errorf("id-missing is not an error: %+v", e)
+			}
+			missing = append(missing, e.Component)
 		}
 	}
 	sort.Strings(missing)
-	if !reflect.DeepEqual(missing, []string{"Filters", "ProductCard"}) {
-		t.Errorf("component-id-missing on %v, want [Filters ProductCard]", missing)
+	if want := []string{"ProductCard", "Search", "count"}; !reflect.DeepEqual(missing, want) {
+		t.Errorf("id-missing on %v, want %v (the view, the $ref entry and the property)", missing, want)
 	}
 
-	plain := t.TempDir()
-	writeFile(t, filepath.Join(plain, "app.yaml"), `
+	plain := loadYAML(t, map[string]string{"app.yaml": `
 version: 1
 components:
   - name: SiteHeader
     selector: header
-`)
-	c2, err := sightmap.Load(plain)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, w := range sightmap.Lint(c2) {
-		if w.Rule == "component-id-missing" {
-			t.Errorf("unexpected %v in a corpus without ids", w)
-		}
+`})
+	if errs := sightmap.Validate(plain); len(errs) != 0 {
+		t.Errorf("unexpected diagnostics in a sightmap without ids: %v", errs)
 	}
 }
 
-// id is a known component key; a $ref entry still accepts no other key.
-func TestComponentIDKnownFields(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "app.yaml"), `
+// id is a known key on every entity, and the only key a $ref entry accepts
+// besides $ref.
+func TestIDKnownFields(t *testing.T) {
+	c := loadYAML(t, map[string]string{"app.yaml": `
 version: 1
 definitions:
-  - id: kq2m7rta
+  - id: def8kq2m7r
     name: ProductCard
     selector: .card
 components:
-  - id: m5c9fw4j
+  - id: cmp5c9fw4j
     name: Hero
     selector: .hero
     children:
-      - $ref: ProductCard
-        id: x1y2z3w4
-`)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+      - id: refx1y2z3w
+        $ref: ProductCard
+        name: Extra
+`})
 	var unknown []string
 	for _, e := range sightmap.Validate(c) {
-		if strings.Contains(e.Code, "unknown") {
+		if e.Code == "unknown-field" {
 			unknown = append(unknown, e.Message)
 		}
 	}
-	if len(unknown) != 1 || !strings.Contains(unknown[0], "id") {
-		t.Errorf("unknown-field findings = %v, want exactly the id on the $ref entry", unknown)
-	}
-}
-
-// A definition placed by $refs inside other globals is one declaration: an
-// id-less one is reported once, not once per expansion.
-func TestLintComponentIDMissingOncePerDeclaration(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "app.yaml"), `
-version: 1
-definitions:
-  - name: Logo
-    selector: .logo
-components:
-  - id: h7gq3n0p
-    name: Header
-    selector: header
-    children:
-      - $ref: Logo
-  - id: f9tz2m4k
-    name: Footer
-    selector: footer
-    children:
-      - $ref: Logo
-`)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var missing []string
-	for _, w := range sightmap.Lint(c) {
-		if w.Rule == "component-id-missing" {
-			missing = append(missing, w.Component+" "+w.Selector)
-		}
-	}
-	if !reflect.DeepEqual(missing, []string{"Logo .logo"}) {
-		t.Errorf("component-id-missing = %v, want only the Logo declaration", missing)
-	}
-}
-
-// An id must be a YAML string, as the schema requires: an unquoted number or
-// a null is invalid rather than silently coerced or dropped.
-func TestComponentIDMustBeString(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "app.yaml"), `
-version: 1
-components:
-  - id: 12345678
-    name: Number
-    selector: .n
-  - id: ~
-    name: Empty
-    selector: .z
-  - id: '87654321'
-    name: Quoted
-    selector: .q
-`)
-	c, err := sightmap.Load(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := codes(sightmap.Validate(c)); !reflect.DeepEqual(got, []string{"component-id-invalid", "component-id-invalid"}) {
-		t.Errorf("codes = %v, want two component-id-invalid (the number and the null)", got)
+	if len(unknown) != 1 || !strings.Contains(unknown[0], `"name"`) {
+		t.Errorf("unknown-field findings = %v, want exactly the name on the $ref entry", unknown)
 	}
 }

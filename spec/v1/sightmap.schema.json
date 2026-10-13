@@ -88,6 +88,7 @@
       "required": ["name"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": { "$ref": "#/$defs/definitionName" },
         "platform": {
           "type": "string",
@@ -144,6 +145,7 @@
       "required": ["name", "route"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string", "minLength": 1 },
         "route": {
           "type": "string",
@@ -210,12 +212,18 @@
         { "$ref": "#/$defs/componentRef" }
       ]
     },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{7,63}$",
+      "description": "Stable identity of an entity across versions of the sightmap: 8 to 64 letters, digits, '_' or '-', starting with a letter or digit. Opaque, unique among every entity in the sightmap, unchanged by a rename, move or edit, and never reused. See SEP-0020."
+    },
     "componentRef": {
       "type": "object",
       "description": "A reference to a component defined at file root in any sightmap file. Expanded inline before matching. See SEP-0002.",
       "required": ["$ref"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "$ref": {
           "type": "string",
           "minLength": 1,
@@ -223,20 +231,12 @@
         }
       }
     },
-    "componentId": {
-      "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{3,63}$",
-      "description": "A component id: 4 to 64 letters, digits, '_' or '-', starting with a letter or digit. See SEP-0020."
-    },
     "component": {
       "type": "object",
       "required": ["name", "selector"],
       "additionalProperties": false,
       "properties": {
-        "id": {
-          "$ref": "#/$defs/componentId",
-          "description": "Stable identity of this component across versions of the sightmap. Opaque, unique among every component declaration in the sightmap, unchanged by a rename, move or edit, and never reused. A $ref placement takes its definition's id. See SEP-0020."
-        },
+        "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string", "minLength": 1 },
         "selector": { "$ref": "#/$defs/selector" },
         "source": { "type": "string" },
@@ -279,6 +279,7 @@
       "required": ["name", "extract"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
@@ -403,6 +404,7 @@
       "required": ["name", "route"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string", "minLength": 1 },
         "route": {
           "type": "string",
@@ -450,6 +452,7 @@
       "required": ["name", "extract"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
@@ -527,6 +530,7 @@
         }
       ],
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
@@ -601,6 +605,7 @@
       "required": ["name"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": {
           "type": "string",
           "minLength": 1,
@@ -639,6 +644,7 @@
       "required": ["name", "ref"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": {
           "type": "string",
           "minLength": 1,
@@ -686,6 +692,7 @@
         }
       ],
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
@@ -748,6 +755,7 @@
       "required": ["name"],
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string", "minLength": 1 },
         "type": { "type": "string" },
         "description": { "type": "string" }
@@ -758,6 +766,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "id": { "$ref": "#/$defs/id" },
         "name": { "type": "string" },
         "notes": { "type": "string" },
         "url": { "type": "string" }

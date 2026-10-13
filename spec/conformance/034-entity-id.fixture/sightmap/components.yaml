@@ -1,0 +1,35 @@
+version: 1
+environments:
+  - id: envp4kq2m7
+    name: prod
+    origins:
+      app: https://shop.example.com
+
+components:
+  - id: cmph7gq3n0
+    name: SiteHeader
+    selector: header
+
+definitions:
+  # One declaration, so one id, however many places reference it.
+  - id: defkq2m7rt
+    name: ProductCard
+    selector: '[data-component="ProductCard"]'
+    properties:
+      - id: prpz8x2c4v
+        name: price
+        extract: { from: dom.text }
+    children:
+      - id: cmpt9w4hx2
+        name: Title
+        selector: h3
+
+messages:
+  - id: msgr2k5vt8
+    name: CheckoutCrash
+    level: exception
+
+signals:
+  - id: sigw7jx4p3
+    name: ResultsShown
+    ref: Results

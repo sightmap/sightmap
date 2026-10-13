@@ -1,0 +1,15 @@
+version: 1
+views:
+  # Already declared by CheckoutForm in a.yaml: ids are unique across every
+  # entity kind.
+  - id: checkout01
+    name: Checkout
+    route: /checkout
+    components:
+      # A different id is fine.
+      - id: q7rak3d9
+        name: PlaceOrder
+        selector: button.place-order
+      # No id, in a sightmap that declares ids.
+      - name: Total
+        selector: .total

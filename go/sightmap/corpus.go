@@ -82,6 +82,7 @@ func (a Access) IsOpen() bool {
 
 // ViewDef is a per-URL-pattern view definition from the sightmap corpus.
 type ViewDef struct {
+	ID         string         `json:"id,omitempty"` // SEP-0020
 	Name       string         `json:"name"`
 	Route      string         `json:"route,omitempty"`
 	Memory     []string       `json:"memory,omitempty"`
@@ -113,6 +114,7 @@ type ViewDef struct {
 // Extract.From is url.path (a segment bound by a :name in the view's route) or
 // url.query (a query-string parameter).
 type URLPropertyDef struct {
+	ID      string  `json:"id,omitempty"` // SEP-0020
 	Name    string  `json:"name"`
 	Extract Extract `json:"extract"`
 }
@@ -129,6 +131,7 @@ func (c *Corpus) ViewByName(name string) *ViewDef {
 
 // Snapshot represents a named snapshot of a view with optional reproduction notes.
 type Snapshot struct {
+	ID    string // Stable identity across versions (SEP-0020)
 	Name  string // Snapshot name (e.g., "base", "with-modal-open")
 	Notes string // Optional notes on how to reproduce this snapshot state
 	URL   string // Optional representative URL for this snapshot; falls back to the view's URL

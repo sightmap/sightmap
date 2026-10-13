@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -55,6 +54,7 @@ type rawFile struct {
 }
 
 type rawEnvironment struct {
+	ID        string            `yaml:"id"`
 	Name      string            `yaml:"name"`
 	Platform  string            `yaml:"platform"`
 	AppID     string            `yaml:"app_id"`
@@ -64,12 +64,14 @@ type rawEnvironment struct {
 }
 
 type rawSignal struct {
+	ID   string   `yaml:"id"`
 	Name string   `yaml:"name"`
 	Ref  string   `yaml:"ref"`
 	Tags []string `yaml:"tags"`
 }
 
 type rawMessage struct {
+	ID          string               `yaml:"id"`
 	Name        string               `yaml:"name"`
 	Level       string               `yaml:"level"`
 	Message     string               `yaml:"message"`
@@ -80,6 +82,7 @@ type rawMessage struct {
 }
 
 type rawMessageProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 	Source  string     `yaml:"source"`
@@ -88,12 +91,14 @@ type rawMessageProperty struct {
 }
 
 type rawSnapshot struct {
+	ID    string `yaml:"id"`
 	Name  string `yaml:"name"`
 	Notes string `yaml:"notes"`
 	URL   string `yaml:"url"`
 }
 
 type rawView struct {
+	ID          string           `yaml:"id"`
 	Name        string           `yaml:"name"`
 	Route       string           `yaml:"route"`
 	URL         string           `yaml:"url"`
@@ -118,11 +123,13 @@ type rawAccess struct {
 }
 
 type rawProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 }
 
 type rawRequest struct {
+	ID           string               `yaml:"id"`
 	Name         string               `yaml:"name"`
 	Route        string               `yaml:"route"`
 	Method       string               `yaml:"method"`
@@ -146,17 +153,19 @@ func toURLPropertyDefs(raws []rawURLProperty) []URLPropertyDef {
 	}
 	out := make([]URLPropertyDef, 0, len(raws))
 	for _, rp := range raws {
-		out = append(out, URLPropertyDef{Name: rp.Name, Extract: rp.Extract.url()})
+		out = append(out, URLPropertyDef{ID: rp.ID, Name: rp.Name, Extract: rp.Extract.url()})
 	}
 	return out
 }
 
 type rawURLProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 }
 
 type rawRequestProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 	Source  string     `yaml:"source"`
@@ -169,6 +178,7 @@ type rawPayload struct {
 }
 
 type rawField struct {
+	ID          string `yaml:"id"`
 	Name        string `yaml:"name"`
 	Type        string `yaml:"type"`
 	Description string `yaml:"description"`
@@ -269,7 +279,7 @@ func loadDir(path string) (*Corpus, error) {
 		}
 		memory = append(memory, rf.Memory...)
 		envReg.add(rf, filepath.Base(p))
-		ids.addFile(rf, filepath.Base(p))
+		ids.addFile(data, filepath.Base(p))
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
 		}
@@ -320,7 +330,7 @@ func loadDir(path string) (*Corpus, error) {
 	// otherwise look like a collision.
 	ctx.diagnostics = append(ctx.diagnostics, globalNameCollisions(globalRaws)...)
 	ctx.diagnostics = append(ctx.diagnostics, definitionNameCollisions(globalRaws, definitionRaws)...)
-	ctx.diagnostics = append(ctx.diagnostics, ids.diags...)
+	ctx.diagnostics = append(ctx.diagnostics, ids.diagnostics()...)
 
 	// Flatten global components (hierarchy → compound descendant selectors).
 	globalComps := flattenAll(globalRaws, ctx, 0)
@@ -346,6 +356,7 @@ func loadDir(path string) (*Corpus, error) {
 		var snapshots []Snapshot
 		for _, rs := range vf.Snapshots {
 			snapshots = append(snapshots, Snapshot{
+				ID:    rs.ID,
 				Name:  rs.Name,
 				Notes: rs.Notes,
 				URL:   rs.URL,
@@ -363,6 +374,7 @@ func loadDir(path string) (*Corpus, error) {
 				viewURL = vf.URL
 			}
 			views = append(views, ViewDef{
+				ID:         rv.ID,
 				Name:       rv.Name,
 				Route:      rv.Route,
 				Memory:     rv.Memory,
@@ -432,6 +444,7 @@ func (r *environmentRegistry) add(rf rawFile, file string) {
 			platform = PlatformWeb
 		}
 		r.envs = append(r.envs, EnvironmentDef{
+			ID:         re.ID,
 			Name:       re.Name,
 			Platform:   platform,
 			AppID:      re.AppID,
@@ -479,7 +492,7 @@ func rawPropsToMatch(rps []rawProperty) []ComponentPropertyDef {
 	}
 	ps := make([]ComponentPropertyDef, len(rps))
 	for i, rp := range rps {
-		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract.component()}
+		ps[i] = ComponentPropertyDef{ID: rp.ID, Name: rp.Name, Extract: rp.Extract.component()}
 	}
 	return ps
 }
@@ -511,6 +524,7 @@ func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
 			continue
 		}
 		out = append(out, RequestDef{
+			ID:           rr.ID,
 			Name:         rr.Name,
 			Route:        rr.Route,
 			Method:       rr.Method,
@@ -540,6 +554,7 @@ func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 	out := make([]RequestPropertyDef, 0, len(rps))
 	for _, rp := range rps {
 		out = append(out, RequestPropertyDef{
+			ID:      rp.ID,
 			Name:    rp.Name,
 			Extract: rp.Extract.sourced(rp.Source, rp.Field, rp.Pattern),
 		})
@@ -561,7 +576,7 @@ func toSignalDefs(rss []rawSignal) []SignalDef {
 	}
 	out := make([]SignalDef, 0, len(rss))
 	for _, rs := range rss {
-		out = append(out, SignalDef{Name: rs.Name, Ref: rs.Ref, Tags: rs.Tags})
+		out = append(out, SignalDef{ID: rs.ID, Name: rs.Name, Ref: rs.Ref, Tags: rs.Tags})
 	}
 	return out
 }
@@ -573,6 +588,7 @@ func toMessageDefs(rms []rawMessage) []MessageDef {
 	out := make([]MessageDef, 0, len(rms))
 	for _, rm := range rms {
 		md := MessageDef{
+			ID:          rm.ID,
 			Name:        rm.Name,
 			Level:       rm.Level,
 			Message:     rm.Message,
@@ -598,6 +614,7 @@ func toMessageProperties(rps []rawMessageProperty) []MessagePropertyDef {
 	out := make([]MessagePropertyDef, 0, len(rps))
 	for _, rp := range rps {
 		out = append(out, MessagePropertyDef{
+			ID:      rp.ID,
 			Name:    rp.Name,
 			Extract: rp.Extract.sourced(rp.Source, rp.Field, rp.Pattern),
 		})
@@ -612,7 +629,7 @@ func toPayload(rp *rawPayload) *Payload {
 	}
 	p := &Payload{}
 	for _, rf := range rp.Fields {
-		p.Fields = append(p.Fields, Field{Name: rf.Name, Type: rf.Type, Description: rf.Description})
+		p.Fields = append(p.Fields, Field{ID: rf.ID, Name: rf.Name, Type: rf.Type, Description: rf.Description})
 	}
 	return p
 }
@@ -694,56 +711,6 @@ func definitionNameCollisions(globals, defs []rawComponent) []ValidationError {
 	return out
 }
 
-// componentIDPattern is the shape of a component id (SEP-0020): 4 to 64
-// letters, digits, '_' or '-', starting with a letter or digit.
-var componentIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{3,63}$`)
-
-// idIndex checks component ids across every file (SEP-0020).
-// It walks declarations, before $ref expansion: expansion deep-copies a
-// definition at each reference site, so one declaration legitimately appears
-// many times in the flattened lists, and uniqueness is a property of
-// declarations.
-type idIndex struct {
-	first map[string]idDecl // id → the first declaration carrying it
-	diags []ValidationError
-}
-
-type idDecl struct{ name, file string }
-
-func newIDIndex() *idIndex { return &idIndex{first: map[string]idDecl{}} }
-
-func (x *idIndex) addFile(rf rawFile, file string) {
-	x.addAll(rf.Components, file)
-	x.addAll(rf.Definitions, file)
-	for _, v := range rf.Views {
-		x.addAll(v.Components, file)
-	}
-}
-
-func (x *idIndex) addAll(rcs []rawComponent, file string) {
-	for _, rc := range rcs {
-		if rc.Ref == "" {
-			x.check(rc, file)
-		}
-		x.addAll(rc.Children, file)
-	}
-}
-
-func (x *idIndex) check(rc rawComponent, file string) {
-	bad := func(code, msg string) {
-		x.diags = append(x.diags, ValidationError{File: file, Component: rc.Name, Code: code, Severity: SeverityError, Message: msg})
-	}
-	if rc.ID != "" {
-		if prev, dup := x.first[rc.ID]; dup {
-			bad("component-id-duplicate", fmt.Sprintf("id %q is already declared by %q in %s; an id names exactly one component declaration", rc.ID, prev.name, prev.file))
-		} else if !componentIDPattern.MatchString(rc.ID) {
-			bad("component-id-invalid", fmt.Sprintf("id %q must be 4 to 64 letters, digits, '_' or '-', starting with a letter or digit", rc.ID))
-		} else {
-			x.first[rc.ID] = idDecl{name: rc.Name, file: file}
-		}
-	}
-}
-
 // flattenCtx carries the shared state for a flattening pass: the $ref registry
 // and any structural diagnostics discovered along the way (currently circular
 // $ref chains, which are expanded away and so invisible downstream).
@@ -785,7 +752,7 @@ func (ctx *flattenCtx) recordCircular(chain []string) {
 func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []ComponentDef {
 	var result []ComponentDef
 	for _, rc := range rcs {
-		result = append(result, flattenOne(rc, nil, ctx, nil, nil, nil, nil, originDepth)...)
+		result = append(result, flattenOne(rc, nil, ctx, nil, nil, originDepth)...)
 	}
 	return result
 }
@@ -796,15 +763,13 @@ func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []Componen
 // selector. parentChain is the slice of ancestor component names (root-first)
 // carried through recursion and stored on each ComponentDef so the
 // extension can scope child selectors to their parent's DOM subtree.
-// parentKey is the parent placement's identity and scope the identity prefix
-// of the enclosing $ref expansion (nil outside any); together they derive
-// ComponentDef.IDPath.
 // refStack is the chain of $ref names currently being expanded; it guards
 // against circular references, which would otherwise recurse forever.
 // originDepth is the index in parentChain where the enclosing global instance
 // begins, or -1 outside any global; it derives ComponentDef.Origin.
-func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain, parentKey, scope []string, refStack []string, originDepth int) []ComponentDef {
+func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string, originDepth int) []ComponentDef {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
+	refID := ""
 	if rc.Ref != "" {
 		for _, prev := range refStack {
 			if prev == rc.Ref {
@@ -827,11 +792,9 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 			return nil
 		}
 		refStack = append(refStack, rc.Ref)
+		refID = rc.ID
 		rc = global
 		originDepth = len(parentChain)
-		// The expansion's placements are identified within the component that
-		// holds the $ref.
-		scope = parentKey
 	}
 
 	// A real (non-$ref) component that lacks a required field would otherwise be
@@ -877,6 +840,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 
 	result := []ComponentDef{{
 		ID:          rc.ID,
+		RefID:       refID,
 		Name:        rc.Name,
 		Selectors:   mySels,
 		Source:      rc.Source,
@@ -891,15 +855,11 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 	if originDepth >= 0 {
 		result[0].Origin = strings.Join(append(append([]string(nil), parentChain[originDepth:]...), rc.Name), "\x00")
 	}
-	key := append(append([]string(nil), scope...), rc.ID)
-	if rc.ID != "" {
-		result[0].IDPath = key
-	}
 
 	// Recurse into children: extend the parent chain with this component's name.
 	childChain := append(append([]string(nil), parentChain...), rc.Name)
 	for _, child := range rc.Children {
-		result = append(result, flattenOne(child, mySels, ctx, childChain, key, scope, refStack, originDepth)...)
+		result = append(result, flattenOne(child, mySels, ctx, childChain, refStack, originDepth)...)
 	}
 
 	return result
