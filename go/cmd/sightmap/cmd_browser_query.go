@@ -52,7 +52,22 @@ func resolveComponentQuery(ctx context.Context, conn *browser.CDPConn, sightmapD
 	if err != nil {
 		return nil, err
 	}
-	return compquery.Resolve(root, matches, props, q)
+	return resolveMatchedQuery(root, matches, props, q)
+}
+
+// queryRecoveryHint directs the calling agent to inspect evidence before editing
+// the corpus. Missing query results can reflect page state or predicates, not
+// selector drift; resolution must never guess a target or retry an action.
+const queryRecoveryHint = "Recovery: take a fresh sightmap snapshot in the same tab and corpus; check the URL/view, loading or hidden UI state, query properties and ancestor scope, and conflicts. If the intended element is present but unannotated, use sightmap explain and sel-probe to verify a selector repair (see sightmap-authoring)."
+
+// resolveMatchedQuery adds recovery guidance only for an empty candidate set.
+// Ambiguity and occurrence errors retain the query engine's diagnostics.
+func resolveMatchedQuery(root *sightmap.ComponentNode, matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch, props map[string]map[string]string, q *compquery.Query) (*sightmap.ComponentNode, error) {
+	node, err := compquery.Resolve(root, matches, props, q)
+	if err != nil && len(compquery.FindCandidates(root, matches, props, q)) == 0 {
+		return nil, fmt.Errorf("%w\n%s", err, queryRecoveryHint)
+	}
+	return node, err
 }
 
 // componentPresent reports whether queryStr matches at least one node on the
@@ -103,7 +118,7 @@ func extractMatchedComponents(ctx context.Context, conn *browser.CDPConn, sightm
 	matches := matcher.Match(root, pageURL)
 	if len(matches) == 0 {
 		return nil, nil, nil, fmt.Errorf(
-			"resolve query: no sightmap components matched the page (need a corpus in %s)", sightmapDir)
+			"resolve query: no sightmap components matched the page (check the corpus in %s)\n%s", sightmapDir, queryRecoveryHint)
 	}
 	return root, matches, queryPropertyValues(matches), nil
 }
