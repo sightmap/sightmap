@@ -1,7 +1,10 @@
 package sightmap_test
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,100 +16,23 @@ const notProfile = sightmap.CodeSelectorNotInProfile
 // TestParseProfileSelector_Classification maps each construct to the code the
 // capture-baseline profile gives it ("" = accepted).
 func TestParseProfileSelector_Classification(t *testing.T) {
-	cases := []struct {
-		sel, code string
-	}{
-		// Accepted.
-		{`input`, ""},
-		{`my-widget`, ""},
-		{`#card`, ""},
-		{`.card`, ""},
-		{`div.a.b#c`, ""},
-		{`[data-x]`, ""},
-		{`[data-x=a]`, ""},
-		{`[data-x="a b"]`, ""},
-		{`[data-x='a']`, ""},
-		{`[data-x=""]`, ""},
-		{`[a~=w][a|=en][a^=p][a$=s][a*=m]`, ""},
-		{`[id^=card-]`, ""},
-		{`[class*="Card"][class*="link"]`, ""},
-		{`[class~=x]`, ""},
-		{`input:not([type=hidden])`, ""},
-		{`input:not([type=hidden]):not(.public)`, ""},
-		{`li:not(#x)`, ""},
-		{`a:not(span)`, ""},
-		{`.a .b`, ""},
-		{`.a > .b`, ""},
-		{`.a>.b`, ""},
-		{`.a  >  .b   .c`, ""},
-		{`.a\:b`, ""},
-		{`.café`, ""},
-		{`  .padded  `, ""},
-		{`.-x`, ""},
-		{`.a .b .c .d .e .f .g .h`, ""}, // 8 compounds
-
-		// Depend on more than the element and its ancestors.
-		{`section:has(input)`, notProfile},
-		{`.a + .b`, notProfile},
-		{`.a ~ .b`, notProfile},
-		{`li:first-child`, notProfile},
-		{`li:nth-child(2)`, notProfile},
-		{`p:empty`, notProfile},
-		{`a:hover`, notProfile},
-		{`input:checked`, notProfile},
-		{`input:not(:checked)`, notProfile},
-		{`div:not(:has(.x))`, notProfile},
-
-		// Not supported by every baseline engine, or malformed.
-		{``, notProfile},
-		{`   `, notProfile},
-		{`:is(.a, .b)`, notProfile},
-		{`:where(.a)`, notProfile},
-		{`:root`, notProfile},
-		{`:not(.a, .b)`, notProfile},
-		{`:not(.a.b)`, notProfile},
-		{`:not(.a .b)`, notProfile},
-		{`:not(*)`, notProfile},
-		{`:not()`, notProfile},
-		{`:NOT(.a)`, notProfile},
-		{`p::before`, notProfile},
-		{`[a=b i]`, notProfile},
-		{`[a=b s]`, notProfile},
-		{`[ a=b]`, notProfile},
-		{`[a = b]`, notProfile},
-		{`[xlink|href]`, notProfile},
-		{`[A=b]`, notProfile},
-		{`DIV`, notProfile},
-		{`[a^=""]`, notProfile},
-		{`[a*=""]`, notProfile},
-		{`[a~=""]`, notProfile},
-		{`[a~="p q"]`, notProfile},
-		{`*`, notProfile},
-		{`.a > * > input`, notProfile},
-		{`[class]`, notProfile},
-		{`[id]`, notProfile},
-		{`[class=x]`, notProfile},
-		{`[class^=x]`, notProfile},
-		{`[x=1]`, notProfile},
-		{`.a, .b`, notProfile},
-		{`> .a`, notProfile},
-		{`.a >`, notProfile},
-		{`*.a`, notProfile},
-		{`.a*`, notProfile},
-		{`[x]div`, notProfile},
-		{`:not(.x)div`, notProfile},
-		{`#a#b`, notProfile},
-		{`.\31 0`, notProfile},
-		{`.a` + "\t" + `.b`, notProfile},
-		{`.a` + " " + `.b`, notProfile},
-		{`.--x`, notProfile},
-		{`.2col`, notProfile},
-		{`.a .b .c .d .e .f .g .h .i`, notProfile}, // 9 compounds
-		{strings.Repeat(".a", 520), notProfile},    // 1,040 bytes
+	raw, err := os.ReadFile(filepath.Join("..", "..", "spec", "conformance", "036-selector-classification.fixture", "cases.json"))
+	if err != nil {
+		t.Fatalf("read classification cases: %v", err)
+	}
+	var cases []struct {
+		Selector string `json:"selector"`
+		Code     string `json:"code"`
+	}
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatalf("parse classification cases: %v", err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("no classification cases")
 	}
 	for _, c := range cases {
-		t.Run(c.sel, func(t *testing.T) {
-			_, err := sightmap.ParseProfileSelector(c.sel, sightmap.ProfileCaptureBaseline)
+		t.Run(c.Selector, func(t *testing.T) {
+			_, err := sightmap.ParseProfileSelector(c.Selector, sightmap.ProfileCaptureBaseline)
 			got := ""
 			if err != nil {
 				var pe *sightmap.ProfileError
@@ -115,10 +41,58 @@ func TestParseProfileSelector_Classification(t *testing.T) {
 				}
 				got = pe.Code
 			}
-			if got != c.code {
-				t.Errorf("code = %q, want %q (err: %v)", got, c.code, err)
+			if got != c.Code {
+				t.Errorf("code = %q, want %q (err: %v)", got, c.Code, err)
 			}
 		})
+	}
+}
+
+func TestParseProfileSelector_DigitLeadingValue(t *testing.T) {
+	for _, c := range []struct {
+		sel  string
+		pos  int
+		want string
+	}{
+		{`[tabindex=0]`, 10, `[tabindex="0"]`},
+		{`div[data-index=12]`, 15, `[data-index="12"]`},
+		{`a:not([x=1])`, 9, `[x="1"]`},
+	} {
+		_, err := sightmap.ParseProfileSelector(c.sel, sightmap.ProfileCaptureBaseline)
+		var pe *sightmap.ProfileError
+		if !errors.As(err, &pe) {
+			t.Fatalf("%s: want *ProfileError, got %v", c.sel, err)
+		}
+		if pe.Code != notProfile || pe.Pos != c.pos {
+			t.Errorf("%s: code %q pos %d, want %q pos %d", c.sel, pe.Code, pe.Pos, notProfile, c.pos)
+		}
+		if !strings.Contains(pe.Msg, "quote it") || !strings.Contains(pe.Msg, c.want) {
+			t.Errorf("%s: message %q should advise quoting as %s", c.sel, pe.Msg, c.want)
+		}
+	}
+}
+
+func TestParseProfileSelector_SVGNames(t *testing.T) {
+	ps, err := sightmap.ParseProfileSelector(`svg linearGradient[gradientUnits=userSpaceOnUse]:not(feBlend)`, sightmap.ProfileCaptureBaseline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ps.Compounds) != 2 || ps.Compounds[0].Text != "svg" || ps.Compounds[0].Constraint != sightmap.ConstraintType {
+		t.Fatalf("compounds = %+v", ps.Compounds)
+	}
+	sub := ps.Subject()
+	if sub.Text != `linearGradient[gradientUnits=userSpaceOnUse]:not(feBlend)` || sub.Constraint != sightmap.ConstraintSpecific {
+		t.Errorf("subject = %+v", sub)
+	}
+	if len(sub.Attrs) != 1 || sub.Attrs[0] != "gradientUnits" {
+		t.Errorf("attrs = %v, want [gradientUnits]", sub.Attrs)
+	}
+	for sel, pos := range map[string]int{`myWidget`: 2, `a:not(myWidget)`: 8, `[dataFoo=x]`: 5, `div[ViewBox=x]`: 4, `ClipPath`: 0} {
+		_, err := sightmap.ParseProfileSelector(sel, sightmap.ProfileCaptureBaseline)
+		var pe *sightmap.ProfileError
+		if !errors.As(err, &pe) || pe.Pos != pos || !strings.Contains(pe.Msg, "lowercase") {
+			t.Errorf("%s: err = %v, want lowercase rejection at %d", sel, err, pos)
+		}
 	}
 }
 
@@ -175,6 +149,7 @@ func FuzzParseProfileSelector(f *testing.F) {
 	for _, s := range []string{
 		`input`, `.a > .b .c`, `[data-x="a b"]`, `input:not([type=hidden])`, `.a > .b > input`,
 		`section:has(input)`, `.a + .b`, `[a=b i]`, `:is(.a)`, `.café`, `.a\:b`, `#x`, `*`,
+		`clipPath`, `svg linearGradient[gradientUnits=x]`, `:not(feBlend)`, `[viewBox="0 0 1 1"]`, `[tabindex=0]`,
 	} {
 		f.Add(s)
 	}
