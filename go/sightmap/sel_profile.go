@@ -89,6 +89,111 @@ var beyondAncestorPseudos = map[string]bool{
 	"open": true, "closed": true, "playing": true, "paused": true,
 }
 
+// svgElementNames are the SVG element names the HTML parser adjusts to mixed
+// case. The profile writes names in lowercase except these exact spellings.
+var svgElementNames = map[string]bool{
+	"altGlyph":            true,
+	"altGlyphDef":         true,
+	"altGlyphItem":        true,
+	"animateColor":        true,
+	"animateMotion":       true,
+	"animateTransform":    true,
+	"clipPath":            true,
+	"feBlend":             true,
+	"feColorMatrix":       true,
+	"feComponentTransfer": true,
+	"feComposite":         true,
+	"feConvolveMatrix":    true,
+	"feDiffuseLighting":   true,
+	"feDisplacementMap":   true,
+	"feDistantLight":      true,
+	"feDropShadow":        true,
+	"feFlood":             true,
+	"feFuncA":             true,
+	"feFuncB":             true,
+	"feFuncG":             true,
+	"feFuncR":             true,
+	"feGaussianBlur":      true,
+	"feImage":             true,
+	"feMerge":             true,
+	"feMergeNode":         true,
+	"feMorphology":        true,
+	"feOffset":            true,
+	"fePointLight":        true,
+	"feSpecularLighting":  true,
+	"feSpotLight":         true,
+	"feTile":              true,
+	"feTurbulence":        true,
+	"foreignObject":       true,
+	"glyphRef":            true,
+	"linearGradient":      true,
+	"radialGradient":      true,
+	"textPath":            true,
+}
+
+// svgAttributeNames are the SVG attribute names the HTML parser adjusts to
+// mixed case; matched exactly, like svgElementNames.
+var svgAttributeNames = map[string]bool{
+	"attributeName":       true,
+	"attributeType":       true,
+	"baseFrequency":       true,
+	"baseProfile":         true,
+	"calcMode":            true,
+	"clipPathUnits":       true,
+	"diffuseConstant":     true,
+	"edgeMode":            true,
+	"filterUnits":         true,
+	"glyphRef":            true,
+	"gradientTransform":   true,
+	"gradientUnits":       true,
+	"kernelMatrix":        true,
+	"kernelUnitLength":    true,
+	"keyPoints":           true,
+	"keySplines":          true,
+	"keyTimes":            true,
+	"lengthAdjust":        true,
+	"limitingConeAngle":   true,
+	"markerHeight":        true,
+	"markerUnits":         true,
+	"markerWidth":         true,
+	"maskContentUnits":    true,
+	"maskUnits":           true,
+	"numOctaves":          true,
+	"pathLength":          true,
+	"patternContentUnits": true,
+	"patternTransform":    true,
+	"patternUnits":        true,
+	"pointsAtX":           true,
+	"pointsAtY":           true,
+	"pointsAtZ":           true,
+	"preserveAlpha":       true,
+	"preserveAspectRatio": true,
+	"primitiveUnits":      true,
+	"refX":                true,
+	"refY":                true,
+	"repeatCount":         true,
+	"repeatDur":           true,
+	"requiredExtensions":  true,
+	"requiredFeatures":    true,
+	"specularConstant":    true,
+	"specularExponent":    true,
+	"spreadMethod":        true,
+	"startOffset":         true,
+	"stdDeviation":        true,
+	"stitchTiles":         true,
+	"surfaceScale":        true,
+	"systemLanguage":      true,
+	"tableValues":         true,
+	"targetX":             true,
+	"targetY":             true,
+	"textLength":          true,
+	"viewBox":             true,
+	"viewTarget":          true,
+	"xChannelSelector":    true,
+	"yChannelSelector":    true,
+	"zoomAndPan":          true,
+}
+
 // ParseProfileSelector parses sel against profile, returning its compounds or
 // a *ProfileError naming the first construct outside the profile. Surrounding
 // spaces are ignored.
@@ -272,15 +377,23 @@ func isTypeStart(c byte) bool { return 'a' <= c && c <= 'z' }
 
 func (p *profileParser) typeName() error {
 	start := p.i
+	upper := -1
 	for p.i < len(p.s) {
 		c := p.s[p.i]
 		if 'A' <= c && c <= 'Z' {
-			return p.notInProfile(p.i, "type names are written in lowercase")
-		}
-		if !('a' <= c && c <= 'z' || '0' <= c && c <= '9' || c == '-') {
+			if upper < 0 {
+				upper = p.i
+			}
+		} else if !('a' <= c && c <= 'z' || '0' <= c && c <= '9' || c == '-') {
 			break
 		}
 		p.i++
+	}
+	if upper >= 0 {
+		if !svgElementNames[p.s[start:p.i]] {
+			return p.notInProfile(upper, "type names are written in lowercase")
+		}
+		return nil
 	}
 	if !isTypeStart(p.s[start]) {
 		return p.notInProfile(start, "a type name starts with a lowercase letter")
@@ -350,17 +463,22 @@ func (p *profileParser) attribute() (string, error) {
 	open := p.i
 	p.i++ // '['
 	nameStart := p.i
+	upper := -1
 	for p.i < len(p.s) {
 		c := p.s[p.i]
 		if 'A' <= c && c <= 'Z' {
-			return "", p.notInProfile(p.i, "attribute names are written in lowercase")
-		}
-		if !('a' <= c && c <= 'z' || '0' <= c && c <= '9' || c == '_' || c == '-') {
+			if upper < 0 {
+				upper = p.i
+			}
+		} else if !('a' <= c && c <= 'z' || '0' <= c && c <= '9' || c == '_' || c == '-') {
 			break
 		}
 		p.i++
 	}
 	name := p.s[nameStart:p.i]
+	if upper >= 0 && !svgAttributeNames[name] {
+		return "", p.notInProfile(upper, "attribute names are written in lowercase")
+	}
 	if name == "" || !('a' <= name[0] && name[0] <= 'z' || name[0] == '_') {
 		return "", p.attrUnexpected(nameStart)
 	}
@@ -398,6 +516,9 @@ func (p *profileParser) attribute() (string, error) {
 		}
 		value = v
 	} else {
+		if c := p.s[p.i]; '0' <= c && c <= '9' {
+			return "", p.notInProfile(p.i, "attribute value %q starts with a digit; quote it: [%s=%q]", p.valueToken(), name, p.valueToken())
+		}
 		if err := p.ident("attribute value"); err != nil {
 			return "", err
 		}
@@ -422,6 +543,15 @@ func (p *profileParser) attribute() (string, error) {
 		return "", p.notInProfile(opStart, "on class only ~= and *= are in the profile; use .class")
 	}
 	return name, nil
+}
+
+// valueToken returns the unquoted value starting at p.i, up to ']' or the end.
+func (p *profileParser) valueToken() string {
+	end := p.i
+	for end < len(p.s) && p.s[end] != ']' && p.s[end] != ' ' {
+		end++
+	}
+	return p.s[p.i:end]
 }
 
 func (p *profileParser) attrUnexpected(pos int) error {

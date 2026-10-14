@@ -1,0 +1,386 @@
+[
+  {
+    "selector": "input",
+    "code": ""
+  },
+  {
+    "selector": "my-widget",
+    "code": ""
+  },
+  {
+    "selector": "#card",
+    "code": ""
+  },
+  {
+    "selector": ".card",
+    "code": ""
+  },
+  {
+    "selector": "div.a.b#c",
+    "code": ""
+  },
+  {
+    "selector": "[data-x]",
+    "code": ""
+  },
+  {
+    "selector": "[data-x=a]",
+    "code": ""
+  },
+  {
+    "selector": "[data-x=\"a b\"]",
+    "code": ""
+  },
+  {
+    "selector": "[data-x='a']",
+    "code": ""
+  },
+  {
+    "selector": "[data-x=\"\"]",
+    "code": ""
+  },
+  {
+    "selector": "[a~=w][a|=en][a^=p][a$=s][a*=m]",
+    "code": ""
+  },
+  {
+    "selector": "[id^=card-]",
+    "code": ""
+  },
+  {
+    "selector": "[class*=\"Card\"][class*=\"link\"]",
+    "code": ""
+  },
+  {
+    "selector": "[class~=x]",
+    "code": ""
+  },
+  {
+    "selector": "input:not([type=hidden])",
+    "code": ""
+  },
+  {
+    "selector": "input:not([type=hidden]):not(.public)",
+    "code": ""
+  },
+  {
+    "selector": "li:not(#x)",
+    "code": ""
+  },
+  {
+    "selector": "a:not(span)",
+    "code": ""
+  },
+  {
+    "selector": ".a .b",
+    "code": ""
+  },
+  {
+    "selector": ".a > .b",
+    "code": ""
+  },
+  {
+    "selector": ".a>.b",
+    "code": ""
+  },
+  {
+    "selector": ".a  >  .b   .c",
+    "code": ""
+  },
+  {
+    "selector": ".a\\:b",
+    "code": ""
+  },
+  {
+    "selector": ".café",
+    "code": ""
+  },
+  {
+    "selector": "  .padded  ",
+    "code": ""
+  },
+  {
+    "selector": ".-x",
+    "code": ""
+  },
+  {
+    "selector": ".a .b .c .d .e .f .g .h",
+    "code": ""
+  },
+  {
+    "selector": "section:has(input)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a + .b",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a ~ .b",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "li:first-child",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "li:nth-child(2)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "p:empty",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "a:hover",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "input:checked",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "input:not(:checked)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "div:not(:has(.x))",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "   ",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":is(.a, .b)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":where(.a)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":root",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":not(.a, .b)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":not(.a.b)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":not(.a .b)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":not(*)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":not()",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":NOT(.a)",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "p::before",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[a=b i]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[a=b s]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[ a=b]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[a = b]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[xlink|href]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[A=b]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "DIV",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[a^=\"\"]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[a*=\"\"]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[a~=\"\"]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[a~=\"p q\"]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "*",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a > * > input",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[class]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[id]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[class=x]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[class^=x]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[x=1]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a, .b",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "> .a",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a >",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "*.a",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a*",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[x]div",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ":not(.x)div",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "#a#b",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".\\31 0",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a` + \"\\t\" + `.b",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a` + \" \" + `.b",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".--x",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".2col",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a .b .c .d .e .f .g .h .i",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": ".a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[tabindex=0]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[data-index=12]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[tabindex=\"0\"]",
+    "code": ""
+  },
+  {
+    "selector": "clipPath",
+    "code": ""
+  },
+  {
+    "selector": "svg linearGradient",
+    "code": ""
+  },
+  {
+    "selector": "[viewBox=\"0 0 1 1\"]",
+    "code": ""
+  },
+  {
+    "selector": "foreignObject > div.x",
+    "code": ""
+  },
+  {
+    "selector": "path:not([pathLength=\"1\"])",
+    "code": ""
+  },
+  {
+    "selector": ":not(clipPath)",
+    "code": ""
+  },
+  {
+    "selector": "clippath",
+    "code": ""
+  },
+  {
+    "selector": "ClipPath",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "myWidget",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[dataFoo=x]",
+    "code": "selector-not-in-profile"
+  },
+  {
+    "selector": "[ViewBox=x]",
+    "code": "selector-not-in-profile"
+  }
+]
