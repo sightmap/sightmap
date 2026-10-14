@@ -275,7 +275,7 @@ A conforming SDK:
   rule outside the profile.
 
 New conformance fixtures: `032-selector-profile` (validation and diagnostics) and
-`033-selector-classification` (parse-only cases, each a selector and its expected code, shared by
+`036-selector-classification` (parse-only cases, each a selector and its expected code, shared by
 every implementation of the parser).
 
 ## Evidence
