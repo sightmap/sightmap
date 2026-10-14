@@ -268,13 +268,18 @@ type queryIndex struct {
 	parts     []*sightmap.PartMatcher // part id -> its prepared matcher
 	byKey     [][]int                 // key -> queries whose first part has it, ascending
 	universal []int                   // queries whose first part has no key, ascending
+	// subjByKey and subjUniversal bucket the same queries on their subject,
+	// the last part, which the element under test must match itself. Chain
+	// resolution (PrivacyForChain) looks queries up here.
+	subjByKey     [][]int
+	subjUniversal []int
 	// walkers pools walk scratch sized to this index (see walkMatches).
 	walkers sync.Pool
 }
 
 func newQueryIndex(queries []MatchQuery) *queryIndex {
 	ix := &queryIndex{keys: newPartKeys(), partBase: make([]int32, len(queries))}
-	var first []int32
+	var first, subject []int32
 	for qi := range queries {
 		ix.partBase[qi] = int32(len(ix.partKey))
 		for _, p := range queries[qi].Parts {
@@ -286,11 +291,13 @@ func newQueryIndex(queries []MatchQuery) *queryIndex {
 			}
 			ix.parts = append(ix.parts, pm)
 		}
-		fk := int32(noKey)
-		if len(queries[qi].Parts) > 0 {
+		fk, sk := int32(noKey), int32(noKey)
+		if n := len(queries[qi].Parts); n > 0 {
 			fk = ix.partKey[ix.partBase[qi]]
+			sk = ix.partKey[ix.partBase[qi]+int32(n)-1]
 		}
 		first = append(first, fk)
+		subject = append(subject, sk)
 	}
 	ix.keys.finish()
 	ix.byKey = make([][]int, ix.keys.n)
@@ -304,7 +311,29 @@ func newQueryIndex(queries []MatchQuery) *queryIndex {
 			ix.byKey[k] = append(ix.byKey[k], qi)
 		}
 	}
+	ix.subjByKey = make([][]int, ix.keys.n)
+	for qi, k := range subject {
+		if len(queries[qi].Parts) == 0 {
+			continue
+		}
+		if k == noKey {
+			ix.subjUniversal = append(ix.subjUniversal, qi)
+		} else {
+			ix.subjByKey[k] = append(ix.subjByKey[k], qi)
+		}
+	}
 	return ix
+}
+
+// subjects appends to out, in ascending query order, every query whose subject
+// could match an element with keys nodeKeys.
+func (ix *queryIndex) subjects(nodeKeys []int32, out []int) []int {
+	out = append(out, ix.subjUniversal...)
+	for _, k := range nodeKeys {
+		out = append(out, ix.subjByKey[k]...)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
 }
 
 // fresh appends to out, in ascending query order, every query whose first
