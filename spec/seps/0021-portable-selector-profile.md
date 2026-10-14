@@ -4,7 +4,7 @@ title: A portable selector profile
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-10-06
-updated: 2026-10-12
+updated: 2026-10-14
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -87,33 +87,99 @@ A selector profile names the selector features a corpus may use. Every corpus us
 | Safari | 9 |
 | Edge | 80 |
 
-Grammar (whitespace is U+0020 only, outside quoted strings):
+Grammar, in ABNF. `SP` is U+0020, the only whitespace outside a quoted string.
 
+```abnf
+; A selector is one chain. No commas: alternatives are separate selectors.
+selector     = *SP compound *( combinator compound ) *SP
+combinator   = 1*SP / *SP ">" *SP
+compound     = type *simple / 1*simple
+simple       = id-sel / class-sel / attribute / negation
+type         = lcalpha *( lcalpha / DIGIT / "-" )
+id-sel       = "#" ident
+class-sel    = "." ident
+attribute    = "[" attr-name [ attr-op attr-value ] "]"
+attr-name    = ( lcalpha / "_" ) *( lcalpha / DIGIT / "_" / "-" )
+attr-op      = "=" / "~=" / "|=" / "^=" / "$=" / "*="
+attr-value   = ident / quoted
+negation     = ":not(" ( type / id-sel / class-sel / attribute ) ")"
+
+; Identifiers follow CSS, minus hex escapes.
+ident        = [ "-" ] ident-start *ident-char
+ident-start  = ALPHA / "_" / non-ascii / escape
+ident-char   = ident-start / DIGIT / "-"
+escape       = "\" printable-non-hex
+quoted       = DQUOTE *( qchar / escape ) DQUOTE
+             / SQUOTE *( qchar / escape ) SQUOTE
+lcalpha      = %x61-7A                ; a-z
+non-ascii    = %x80-10FFFF            ; excluding whitespace
+printable-non-hex = %x21-7E           ; except hex digits
+qchar        = %x20-7E / %x80-FF      ; except the delimiter and "\"
 ```
-selector    := compound ( combinator compound ){0,7}
-combinator  := " "+ | " "* ">" " "*
-compound    := type simple* | simple+
-type        := [a-z] [a-z0-9-]*
-simple      := "#" ident | "." ident | attribute | negation
-attribute   := "[" name ( op value )? "]"
-name        := [a-z_] [a-z0-9_-]*
-op          := "=" | "~=" | "|=" | "^=" | "$=" | "*="
-value       := ident | string
-negation    := ":not(" ( type | "#" ident | "." ident | attribute ) ")"
-```
 
-`ident` and `string` follow CSS, except that hex escapes are not allowed; a single escaped printable
-ASCII character (`\:`, `\.`, `\/`) is. In addition:
+A single escaped printable ASCII character (`\:`, `\.`, `\/`) is allowed. A component lists
+alternatives as separate selectors; the loader already splits a top-level comma into separate
+selectors. An attribute may be tested more than once; every test applies.
 
-- A selector is at most 8 compounds and 1,024 bytes, with no leading or trailing combinator and no
-  comma. A component lists alternatives as separate selectors; the loader already splits a top-level
-  comma into separate selectors.
-- A compound has at most one `#id`. An attribute may be tested more than once; every test applies.
-- A type selector comes first in its compound.
-- Only `=` may compare against an empty value, and a `~=` value contains no whitespace.
-- `class` and `id` are never tested for presence alone. On `class`, only `[class~=v]` and
-  `[class*=v]` are allowed; anything else is written with `.class`.
-- Type, attribute and pseudo-class names are written in lowercase.
+Eight constraints cannot be written in the grammar and apply during parsing:
+
+| | Constraint | Why |
+|---|---|---|
+| C1 | A compound has at most one `#id`. | `#a#b` can never match, and matchers commonly let the second id replace the first. |
+| C2 | A type selector comes first in its compound. | A type after another simple selector is ambiguous in some matchers. |
+| C3 | Type, attribute and pseudo-class names are lowercase, except the [SVG names](#svg-names) below. | HTML folds these names and XML does not; lowercase makes the two agree. |
+| C4 | `class` and `id` are never tested for presence alone. | Matchers that store class and id apart from other attributes never see them there, so `[class]` is silently false. |
+| C5 | On `class`, only `~=` and `*=` are allowed; anything else is written with `.class`. | Every other operator compares against the whole class attribute as one string, which rarely means what the author intended. |
+| C6 | Only `=` may compare against an empty value. | `[a^=""]` and its siblings can never match, so accepting them silently drops a rule. |
+| C7 | A `~=` value contains no whitespace. | `~=` matches one whitespace-delimited token, so such a value can never match. |
+| C8 | A selector is at most 8 compounds and 1,024 bytes. | Per-element cost grows with document depth, so an unbounded selector is an unbounded cost. |
+
+#### SVG names
+
+The HTML specification adjusts the case of some SVG element and attribute names. These are accepted
+with their canonical mixed-case spelling, and match exactly. The lists are closed; any other
+mixed-case name is rejected under C3.
+
+Elements: `altGlyph`, `altGlyphDef`, `altGlyphItem`, `animateColor`, `animateMotion`,
+`animateTransform`, `clipPath`, `feBlend`, `feColorMatrix`, `feComponentTransfer`, `feComposite`,
+`feConvolveMatrix`, `feDiffuseLighting`, `feDisplacementMap`, `feDistantLight`, `feDropShadow`,
+`feFlood`, `feFuncA`, `feFuncB`, `feFuncG`, `feFuncR`, `feGaussianBlur`, `feImage`, `feMerge`,
+`feMergeNode`, `feMorphology`, `feOffset`, `fePointLight`, `feSpecularLighting`, `feSpotLight`,
+`feTile`, `feTurbulence`, `foreignObject`, `glyphRef`, `linearGradient`, `radialGradient`,
+`textPath`.
+
+Attributes: `attributeName`, `attributeType`, `baseFrequency`, `baseProfile`, `calcMode`,
+`clipPathUnits`, `diffuseConstant`, `edgeMode`, `filterUnits`, `glyphRef`, `gradientTransform`,
+`gradientUnits`, `kernelMatrix`, `kernelUnitLength`, `keyPoints`, `keySplines`, `keyTimes`,
+`lengthAdjust`, `limitingConeAngle`, `markerHeight`, `markerUnits`, `markerWidth`,
+`maskContentUnits`, `maskUnits`, `numOctaves`, `pathLength`, `patternContentUnits`,
+`patternTransform`, `patternUnits`, `pointsAtX`, `pointsAtY`, `pointsAtZ`, `preserveAlpha`,
+`preserveAspectRatio`, `primitiveUnits`, `refX`, `refY`, `repeatCount`, `repeatDur`,
+`requiredExtensions`, `requiredFeatures`, `specularConstant`, `specularExponent`, `spreadMethod`,
+`startOffset`, `stdDeviation`, `stitchTiles`, `surfaceScale`, `systemLanguage`, `tableValues`,
+`targetX`, `targetY`, `textLength`, `viewBox`, `viewTarget`, `xChannelSelector`,
+`yChannelSelector`, `zoomAndPan`.
+
+Lowercasing exists so HTML and XML folding agree. A name whose only spelling is mixed case gives
+consumers nothing to disagree about.
+
+#### Matching
+
+For an HTML element, the values of these attributes compare ASCII case-insensitively: `accept`,
+`accept-charset`, `align`, `alink`, `axis`, `bgcolor`, `charset`, `checked`, `clear`, `codetype`,
+`color`, `compact`, `declare`, `defer`, `dir`, `direction`, `disabled`, `enctype`, `face`, `frame`,
+`hreflang`, `http-equiv`, `lang`, `language`, `link`, `media`, `method`, `multiple`, `nohref`,
+`noresize`, `noshade`, `nowrap`, `readonly`, `rel`, `rev`, `rules`, `scope`, `scrolling`,
+`selected`, `shape`, `target`, `text`, `type`, `valign`, `valuetype`, `vlink`. Every other
+attribute, and every attribute on a non-HTML (SVG or MathML) element, compares exactly. A matcher
+that compares everything exactly would otherwise mask `input[type=Password]` in one consumer and not
+in another.
+
+An unquoted attribute value is an `ident`, which cannot begin with a digit: `[tabindex=0]` is
+outside the profile, and `[tabindex="0"]` is inside it.
+
+Browsers in quirks mode match `#id` and `.class` case-insensitively, so a browser may match more
+than the profile defines. That only withholds more, and the grammar does not change.
 
 Outside the profile:
 
@@ -146,6 +212,28 @@ A privacy rule whose selector is outside the profile never matches loosely:
 A rule's *subject* is its last compound. A privacy rule whose subject has no `#id`, class or
 attribute outside `:not()` (`:not(.x)`, `.card > :not(.x)`) is resolved the same way: it applies to
 nearly every element, so an `unmask` would reopen the page and a `block` would close it.
+
+A keyed subject also makes rules indexable. When every subject carries an id, class, attribute or
+type, a consumer can bucket rules by subject key and test an element only against the rules whose
+key it carries. A universal subject is a candidate at every node and defeats that.
+
+### A conforming parser
+
+A parser for the profile has five properties:
+
+- **Total.** Every byte input, valid UTF-8 or not, returns a result or an error; none panics.
+- **Deterministic.** The same input gives the same output, including the error position.
+- **Subsumed.** Anything the profile accepts, the SDK's general selector parser accepts with the same
+  meaning. The profile is a strict subset, never a dialect.
+- **Round-tripping.** Rejoining the parsed compounds with their combinators reparses to the identical
+  compounds.
+- **First-failure positioned.** An error reports the byte offset of the first construct outside the
+  profile, scanning left to right.
+
+The error code (`selector-not-in-profile`) and the position are normative. The message wording is
+not. A message SHOULD name the in-profile alternative where one exists; in particular, a value that
+begins with a digit SHOULD be reported with advice to quote it, as in `[tabindex="0"]`, at the
+offset of the first digit.
 
 A watch rule outside the profile is not reported.
 
@@ -186,7 +274,9 @@ A conforming SDK:
   document when it is `block` or `mask`, and ignore it when it is `unmask`; and MUST NOT report a watch
   rule outside the profile.
 
-New conformance fixture: `032-selector-profile` (validation and diagnostics).
+New conformance fixtures: `032-selector-profile` (validation and diagnostics) and
+`033-selector-classification` (parse-only cases, each a selector and its expected code, shared by
+every implementation of the parser).
 
 ## Evidence
 
@@ -196,12 +286,23 @@ the profile).
 
 **Semantics checked against a browser.** Chrome agrees with the reference matcher on every construct
 in the profile, including the HTML attributes whose values compare case-insensitively
-(`input[type=password]` matches `type="PASSWORD"`, on HTML and SVG elements alike) and repeated
+(`input[type=password]` matches `type="PASSWORD"` on an HTML element) and repeated
 attribute tests.
 
 **Existing corpora.** None of the 32 corpus directories in this repository, outside the conformance fixtures, gains a diagnostic. One real corpus
 tests one attribute twice (`[class*="..."][class*="..."]`) to target generated class names, which is
 why the profile keeps every test rather than rejecting the repeat.
+
+**Measured cost.** A Go reference harness, run on a synthetic corpus of 719 rules (563 carrying
+privacy) with matchers verified to agree on every chain and node:
+
+| Operation | Result |
+|---|---|
+| Privacy resolution, subject-keyed index against evaluating every rule | 30-44x faster at the full corpus |
+| Watch resolution, same comparison | 3.9-9.5x faster; every matching watch rule reports, so there is no early exit |
+| Classifying an inserted subtree by inheriting the insertion point's resolved state | About 2 us per node, flat from 10 to 1,000 nodes |
+
+The inherit strategy is exact because every selector depends only on an element and its ancestors.
 
 Reproduce from `go/`:
 
@@ -232,13 +333,7 @@ go test ./sightmap/ -run '^$' -fuzz FuzzParseProfileSelector -fuzztime 60s
 
 ## Open questions
 
-1. **Quirks mode.** Browsers match `#id` and `.class` case-insensitively in quirks-mode documents, so
-   a browser can match more than the profile's definition. Acceptable as withholding more, or should
-   the profile ban mixed-case ids and classes?
-2. **The case-insensitive attribute list.** Browsers compare the values of a fixed list of HTML
-   attributes (`type`, `lang`, `rel` and others) case-insensitively. Matchers outside a browser may
-   compare them exactly. Should the profile reject a mixed-case value on those attributes, so both
-   agree?
+None.
 
 ## References
 
