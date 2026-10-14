@@ -92,3 +92,39 @@ func TestPrivacyForChain_AllocsBounded(t *testing.T) {
 	}
 	t.Logf("PrivacyForChain: %.0f allocs per call at depth 32, 100 rules", allocs)
 }
+
+// benchCaptureCorpus is benchPrivacyCorpus with every fourth definition also
+// watched, so a chain resolves privacy and watch from the same rules.
+func benchCaptureCorpus(seed uint64, rules int) *sightmap.Corpus {
+	c := benchPrivacyCorpus(seed, rules)
+	for i := range c.GlobalComponents {
+		c.GlobalComponents[i].Watch = i%4 == 0
+	}
+	return c
+}
+
+// BenchmarkChainCapture is the per-element cost of resolving privacy, and
+// separately watch, from one ancestor chain across chain depth and rule count.
+func BenchmarkChainCapture(b *testing.B) {
+	for _, kind := range []string{"privacy", "watched"} {
+		for _, depth := range []int{8, 32, 128} {
+			for _, rules := range []int{100, 1000} {
+				m := match.NewMatcher(benchCaptureCorpus(1, rules))
+				chain := benchPrivacyChain(1, depth)
+				m.PrivacyForChain(chain, "") // compile outside the timed loop
+				b.Run(fmt.Sprintf("%s/depth=%d/rules=%d", kind, depth, rules), func(b *testing.B) {
+					b.ReportAllocs()
+					if kind == "privacy" {
+						for range b.N {
+							m.PrivacyForChain(chain, "")
+						}
+						return
+					}
+					for range b.N {
+						m.WatchedForChain(chain, "")
+					}
+				})
+			}
+		}
+	}
+}

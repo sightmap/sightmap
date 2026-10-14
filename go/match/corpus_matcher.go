@@ -35,12 +35,12 @@ func NewMatcher(corpus *sightmap.Corpus, opts ...Option) *Matcher {
 type queryCacheEntry struct {
 	components []sightmap.ComponentDef
 	queries    []MatchQuery
-	index      *firstPartIndex
+	index      *partIndex
 	capture    *captureSet
 	// combined is queries followed by the capture rules, so Match resolves
 	// names, privacy and watch in one traversal.
 	combined      []MatchQuery
-	combinedIndex *firstPartIndex
+	combinedIndex *partIndex
 }
 
 // entryFor returns the cached (or freshly compiled) queries for pageURL.
