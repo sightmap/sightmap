@@ -45,7 +45,7 @@ func FindAllMatches(
 func findAllMatches(
 	root *sightmap.ComponentNode,
 	queries []MatchQuery,
-	index *firstPartIndex,
+	index *partIndex,
 	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 ) {
 	if root == nil || len(queries) == 0 {
@@ -61,7 +61,7 @@ func findAllMatches(
 func walkMatches(
 	root *sightmap.ComponentNode,
 	queries []MatchQuery,
-	index *firstPartIndex,
+	index *partIndex,
 	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 	onNode func(*sightmap.ComponentNode, int),
 ) {
@@ -87,7 +87,7 @@ type selectorState struct {
 // nfaWalker holds the state shared across one FindAllMatches traversal.
 type nfaWalker struct {
 	queries []MatchQuery
-	index   *firstPartIndex
+	index   *partIndex
 	onMatch func(*sightmap.ComponentNode, *MatchQuery)
 	onNode  func(*sightmap.ComponentNode, int)
 	// chain is the root-first path to the node being visited, pushed and popped
