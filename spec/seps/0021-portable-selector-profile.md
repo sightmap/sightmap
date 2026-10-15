@@ -25,7 +25,8 @@ This SEP defines the `capture-baseline` selector profile. Every selector in it d
 element and its ancestors, and names its target by an id, class, attribute or type, so a consumer
 can index rules by what they target and test a node against the few rules that could match it,
 whichever way it walks the page. Every corpus is validated against the profile. A privacy or watch
-rule outside it is an error, and resolves conservatively until fixed.
+rule outside it is an error. Until it is fixed, a privacy rule resolves conservatively and a watch
+rule never matches.
 
 ## Motivation
 
@@ -50,7 +51,7 @@ better:
   resolved state, and every one of those gives the same answer.
 - **Its target is named.** A selector whose last compound has no id, class, attribute or type
   (`*`, `:not(.x)`) is a candidate at every node, so a consumer cannot skip any rule for any node. A
-  selector that names an id, class or attribute can be filed under that key, and a node is tested
+  selector that names an id, class, attribute or type can be filed under that key, and a node is tested
   only against the rules filed under keys it carries.
 - **Its cost is bounded.** A selector of unbounded length multiplies the cost of every test.
 
@@ -92,7 +93,8 @@ A selector profile names the selector features a corpus may use. Every corpus us
 | Safari | 9 |
 | Edge | 80 |
 
-Grammar, in ABNF. `SP` is U+0020, the only whitespace outside a quoted string.
+Grammar, in ABNF. Values are Unicode code points. `SP` is U+0020, the only whitespace outside a
+quoted string.
 
 ```abnf
 ; A selector is one chain. No commas: alternatives are separate selectors.
@@ -100,11 +102,11 @@ selector     = *SP compound *( combinator compound ) *SP
 combinator   = 1*SP / *SP ">" *SP
 compound     = type *simple / 1*simple
 simple       = id-sel / class-sel / attribute / negation
-type         = lcalpha *( lcalpha / DIGIT / "-" )
+type         = ALPHA *( ALPHA / DIGIT / "-" )
 id-sel       = "#" ident
 class-sel    = "." ident
 attribute    = "[" attr-name [ attr-op attr-value ] "]"
-attr-name    = ( lcalpha / "_" ) *( lcalpha / DIGIT / "_" / "-" )
+attr-name    = ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" )
 attr-op      = "=" / "~=" / "|=" / "^=" / "$=" / "*="
 attr-value   = ident / quoted
 negation     = ":not(" ( type / id-sel / class-sel / attribute ) ")"
@@ -116,34 +118,34 @@ ident-char   = ident-start / DIGIT / "-"
 escape       = "\" printable-non-hex
 quoted       = DQUOTE *( qchar / escape ) DQUOTE
              / SQUOTE *( qchar / escape ) SQUOTE
-lcalpha      = %x61-7A                ; a-z
 non-ascii    = %x80-10FFFF            ; excluding whitespace
 printable-non-hex = %x21-7E           ; except hex digits
-qchar        = %x20-7E / %x80-FF      ; except the delimiter and "\"
+qchar        = %x20-7E / %x80-10FFFF  ; except the delimiter and "\"
 ```
 
-A single escaped printable ASCII character (`\:`, `\.`, `\/`) is allowed. A component lists
+A type selector, when present, comes first in its compound, as the `compound` rule requires; a
+type after another simple selector is ambiguous in some matchers. A single escaped printable ASCII
+character (`\:`, `\.`, `\/`) is allowed. A component lists
 alternatives as separate selectors; the loader already splits a top-level comma into separate
 selectors. An attribute may be tested more than once; every test applies.
 
-Eight constraints cannot be written in the grammar and apply during parsing:
+Seven constraints cannot be written in the grammar and apply during parsing:
 
 | | Constraint | Why |
 |---|---|---|
 | C1 | A compound has at most one `#id`. | `#a#b` can never match, and matchers commonly let the second id replace the first. |
-| C2 | A type selector comes first in its compound. | A type after another simple selector is ambiguous in some matchers. |
-| C3 | Type, attribute and pseudo-class names are lowercase, except the [SVG names](#svg-names) below. | HTML folds these names and XML does not; lowercase makes the two agree. |
-| C4 | `class` and `id` are never tested for presence alone. | Matchers that store class and id apart from other attributes never see them there, so `[class]` is silently false. |
-| C5 | On `class`, only `~=` and `*=` are allowed; anything else is written with `.class`. | Every other operator compares against the whole class attribute as one string, which rarely means what the author intended. |
-| C6 | Only `=` may compare against an empty value. | `[a^=""]` and its siblings can never match, so accepting them silently drops a rule. |
-| C7 | A `~=` value contains no whitespace. | `~=` matches one whitespace-delimited token, so such a value can never match. |
-| C8 | A selector is at most 8 compounds and 1,024 bytes. | Per-element cost grows with document depth, so an unbounded selector is an unbounded cost. |
+| C2 | Type, attribute and pseudo-class names are lowercase, except the [SVG names](#svg-names) below. The grammar admits either case so those names can be derived; this constraint narrows it. | HTML folds these names and XML does not; lowercase makes the two agree. |
+| C3 | `class` and `id` are never tested for presence alone. | Matchers that store class and id apart from other attributes never see them there, so `[class]` is silently false. |
+| C4 | On `class`, only `~=` and `*=` are allowed; anything else is written with `.class`. | Every other operator compares against the whole class attribute as one string, which rarely means what the author intended. |
+| C5 | Only `=` may compare against an empty value. | `[a^=""]` and its siblings can never match, so accepting them silently drops a rule. |
+| C6 | A `~=` value contains no whitespace. | `~=` matches one whitespace-delimited token, so such a value can never match. |
+| C7 | A selector is at most 8 compounds and 1,024 bytes. | Per-element cost grows with document depth, so an unbounded selector is an unbounded cost. |
 
 #### SVG names
 
 The HTML specification adjusts the case of some SVG element and attribute names. These are accepted
 with their canonical mixed-case spelling, and match exactly. The lists are closed; any other
-mixed-case name is rejected under C3.
+mixed-case name is rejected under C2.
 
 Elements: `altGlyph`, `altGlyphDef`, `altGlyphItem`, `animateColor`, `animateMotion`,
 `animateTransform`, `clipPath`, `feBlend`, `feColorMatrix`, `feComponentTransfer`, `feComposite`,
@@ -214,9 +216,15 @@ A privacy rule whose selector is outside the profile never matches loosely:
   be evaluated;
 - an `unmask` is ignored.
 
-A rule's *subject* is its last compound. A privacy rule whose subject has no `#id`, class or
-attribute outside `:not()` (`:not(.x)`, `.card > :not(.x)`) is resolved the same way: it applies to
-nearly every element, so an `unmask` would reopen the page and a `block` would close it.
+A watch rule whose selector is outside the profile never matches: a consumer emits no watch events
+for it.
+
+A rule's *subject* is its last compound. A subject is *universal* when it has no type, `#id`, class
+or attribute outside `:not()` (`:not(.x)`, `.card > :not(.x)`). A privacy rule with a universal
+subject is resolved like a rule outside the profile: it applies to nearly every element, so an
+`unmask` would reopen the page and a `block` would close it. A watch rule with a universal subject
+is evaluated as written, since reporting too much is noise rather than a leak; it is still a
+diagnostic, below.
 
 A keyed subject also makes rules indexable. When every subject carries an id, class, attribute or
 type, a consumer can bucket rules by subject key and test an element only against the rules whose
@@ -240,7 +248,6 @@ not. A message SHOULD name the in-profile alternative where one exists; in parti
 begins with a digit SHOULD be reported with advice to quote it, as in `[tabindex="0"]`, at the
 offset of the first digit.
 
-A watch rule outside the profile is not reported.
 
 ### Diagnostics
 
@@ -276,8 +283,8 @@ A conforming SDK:
 - MUST report a selector outside the profile, or a universal subject, with the severities in
   [Diagnostics](#diagnostics).
 - MUST resolve a privacy rule outside the profile, or with a universal subject, as covering the whole
-  document when it is `block` or `mask`, and ignore it when it is `unmask`; and MUST NOT report a watch
-  rule outside the profile.
+  document when it is `block` or `mask`, and ignore it when it is `unmask`.
+- MUST NOT emit watch events for a watch rule outside the profile.
 
 New conformance fixtures: `032-selector-profile` (validation and diagnostics) and
 `036-selector-classification` (parse-only cases, each a selector and its expected code, shared by
@@ -285,16 +292,21 @@ every implementation of the parser).
 
 ## Evidence
 
-The reference implementation: #495 (`ParseProfileSelector`, the profile grammar with coded
-rejections), #496 (validation, fixture `032-selector-profile`) and #502 (resolution of rules outside
-the profile).
+The reference implementation:
+[#495](https://github.com/sightmap/sightmap/pull/495) (`ParseProfileSelector`, the profile grammar
+with coded rejections), [#496](https://github.com/sightmap/sightmap/pull/496) (validation, fixture
+`032-selector-profile`), [#502](https://github.com/sightmap/sightmap/pull/502) (resolution of rules
+outside the profile) and [#512](https://github.com/sightmap/sightmap/pull/512) (chain resolution
+from a subject-keyed index).
 
 **Semantics checked against a browser.** Chrome agrees with the reference matcher on every construct
 in the profile, including the HTML attributes whose values compare case-insensitively
 (`input[type=password]` matches `type="PASSWORD"` on an HTML element) and repeated
 attribute tests.
 
-**Existing corpora.** None of the 32 corpus directories in this repository, outside the conformance fixtures, gains a diagnostic. One real corpus
+**Existing corpora.** None of the 37 `.sightmap` directories in this repository outside
+`spec/conformance` gains a profile diagnostic: the docs and web corpora, 14 example corpora under
+`web/src`, a web script fixture and 20 CLI test fixtures. One real corpus
 tests one attribute twice (`[class*="..."][class*="..."]`) to target generated class names, which is
 why the profile keeps every test rather than rejecting the repeat.
 
