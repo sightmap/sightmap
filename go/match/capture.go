@@ -49,10 +49,38 @@ func foldRank(parent, local int) int {
 type captureSet struct {
 	queries []MatchQuery // each with privacyRank and/or watch set
 	index   *firstPartIndex
+	// floor is the rank every element resolves to at least: the strictest block
+	// or mask rule that could not be evaluated, which so covers the document.
+	floor int
 }
 
+// compileCapture compiles the privacy and watch rules of defs (SEP-0021). A rule outside the capture-baseline profile
+// never matches loosely: a block or mask raises the floor, an unmask is
+// dropped, and a watch is not reported. A privacy rule whose subject matches
+// nearly every element is treated the same way.
 func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 	cs := &captureSet{}
+	add := func(name, sel string, rank int, watch bool, def *sightmap.ComponentDef) {
+		parsed, err := sightmap.ParseSightmapSelector(sel)
+		prof, perr := sightmap.ParseProfileSelector(sel, sightmap.ProfileCaptureBaseline)
+		valid := err == nil && perr == nil
+		if rank != rankNone && (!valid || prof.Subject().Constraint == sightmap.ConstraintNone) {
+			if rank != rankUnmask {
+				cs.floor = max(cs.floor, rank)
+			}
+			rank = rankNone
+		}
+		if !valid {
+			watch = false
+		}
+		if rank == rankNone && !watch {
+			return
+		}
+		cs.queries = append(cs.queries, MatchQuery{
+			Name: name, Parts: parsed.Parts, Combinators: parsed.Combinators, Def: def,
+			privacyRank: rank, watch: watch,
+		})
+	}
 	for i := range defs {
 		d := &defs[i]
 		if d.Privacy == "" && !d.Watch {
@@ -63,14 +91,7 @@ func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 			rank = rankOf(d.Privacy)
 		}
 		for _, sel := range d.Selectors {
-			ps, err := sightmap.ParseSightmapSelector(sel)
-			if err != nil {
-				continue // reported by validation
-			}
-			cs.queries = append(cs.queries, MatchQuery{
-				Name: d.Name, Parts: ps.Parts, Combinators: ps.Combinators, Def: d,
-				privacyRank: rank, watch: d.Watch,
-			})
+			add(d.Name, sel, rank, d.Watch, d)
 		}
 	}
 	cs.index = newFirstPartIndex(cs.queries)
@@ -143,7 +164,7 @@ func (c captured) sortWatched() {
 func (m *Matcher) Privacy(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode]string {
 	out := map[*sightmap.ComponentNode]string{}
 	cs := m.entryFor(pageURL).capture
-	if root == nil || len(cs.queries) == 0 {
+	if root == nil || (len(cs.queries) == 0 && cs.floor == rankNone) {
 		return out
 	}
 	local, eff := rankNone, []int(nil)
@@ -154,7 +175,7 @@ func (m *Matcher) Privacy(root *sightmap.ComponentNode, pageURL string) map[*sig
 			if depth > 0 {
 				parent = eff[depth-1]
 			}
-			e := foldRank(parent, local)
+			e := max(foldRank(parent, local), cs.floor)
 			eff = append(eff[:depth], e)
 			if e != rankNone {
 				out[n] = rankNames[e]
