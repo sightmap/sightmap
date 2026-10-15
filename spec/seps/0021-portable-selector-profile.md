@@ -12,47 +12,52 @@ related-discussions: []
 
 ## Summary
 
-A corpus may use any CSS selector, and sightmap's matcher evaluates them all. Consumers that apply a
-corpus's selectors on their own do not. A recording client uses the visitor's browser engine, which
-may be years old. A client that classifies an element once, when it is inserted, cannot follow a
-rule that depends on the element's siblings or descendants. A matcher re-implemented outside a
-browser supports a narrower grammar than CSS, and gets parts of it wrong.
+A corpus may use any CSS selector, and sightmap's matcher evaluates them all. Privacy and watch
+rules are applied by consumers that run on every page a visitor loads, and what a consumer pays is
+the number of nodes times the number of rules: it has to ask of each node it processes whether any
+rule applies. Broad selectors make that cost unavoidable, because nothing about a node or its
+ancestors says which rules could match it, so every rule is tried. Consumers also differ in what
+they can evaluate: a recording client uses the visitor's browser engine, which may be years old,
+and a matcher re-implemented outside a browser supports a narrower grammar than CSS and gets parts
+of it wrong.
 
-This SEP names the subset all of them evaluate identically, the `capture-baseline` selector profile.
-Every corpus is validated against it. A privacy or watch rule outside it is an error, and resolves
-conservatively until fixed.
+This SEP defines the `capture-baseline` selector profile. Every selector in it depends only on an
+element and its ancestors, and names its target by an id, class, attribute or type, so a consumer
+can index rules by what they target and test a node against the few rules that could match it,
+whichever way it walks the page. Every corpus is validated against the profile. A privacy or watch
+rule outside it is an error, and resolves conservatively until fixed.
 
 ## Motivation
 
 Privacy ([SEP-0009](0009-component-privacy.md)) and watch ([SEP-0015](0015-component-watch.md)) are
-only as good as the selectors behind them. A consumer that cannot evaluate a selector, or evaluates it
-differently, records what the corpus said to withhold, or misses what it said to watch. Three kinds of
-consumer diverge from sightmap's matcher.
+only as good as the selectors behind them, and they are applied on the hot path of every page. A
+consumer that cannot evaluate a selector, or evaluates it differently, records what the corpus said
+to withhold, or misses what it said to watch. A consumer that evaluates it too slowly slows the page
+it is recording. The goal is a grammar whose rules a consumer can match as cheaply as possible
+whatever strategy it uses, and that every consumer evaluates the same way.
+
+**Cost on every node.** A consumer that cannot tell which rules could match a node has to try all of
+them. The only shortcut a typical consumer has is to skip the descendants of a node it has already
+withheld, so the work for a document is its node count times the corpus's rule count, repeated for
+every node inserted afterwards. Three properties of a selector decide whether a consumer can do
+better:
+
+- **It reads only the element and its ancestors.** A rule that reads descendants or siblings
+  (`:has()`, `+`, `~`, `:nth-child()`) cannot be decided from a node and the path above it, so a
+  consumer cannot resolve a node as it meets it, and a node's answer can change when another node
+  elsewhere changes. An ancestor-only rule is decided by the path alone, so a consumer can resolve
+  each node on its own, a whole document in one pass, or a newly inserted subtree from its parent's
+  resolved state, and every one of those gives the same answer.
+- **Its target is named.** A selector whose last compound has no id, class, attribute or type
+  (`*`, `:not(.x)`) is a candidate at every node, so a consumer cannot skip any rule for any node. A
+  selector that names an id, class or attribute can be filed under that key, and a node is tested
+  only against the rules filed under keys it carries.
+- **Its cost is bounded.** A selector of unbounded length multiplies the cost of every test.
 
 **Old browser engines.** A recording client classifies elements with `Element.matches`. Its oldest
 supported engines lack `:is()`, `:where()` and `:not()` with a list or compound (2020 and later),
 `:has()` (2022 and later) and the attribute `i` flag (2016 and later). One of these on a privacy rule
 either throws, losing the rule, or forces the client to withhold everything.
-
-**Classification at insert time.** A recording client decides an element's privacy when the element is
-inserted, and re-checks it only when that element's own attributes change. A rule that reads anything
-other than the element and its ancestors goes stale:
-
-```html
-<section class="payment">
-  <p class="saved-card">Visa ending 4242</p>
-  <input name="cardnumber">   <!-- inserted after the section was classified -->
-</section>
-```
-
-```yaml
-- name: PaymentSection
-  selector: 'section:has(input[name="cardnumber"])'
-  privacy: block
-```
-
-The section was classified before the input existed, so its note was recorded. Sibling combinators
-and positional pseudo-classes (`:first-child`, `:nth-child()`) fail the same way.
 
 **Matchers outside a browser.** Consumers that apply selectors server-side, to captured pages or
 indexed elements, re-implement matching. These commonly support type, `#id`, `.class` and attribute
@@ -192,9 +197,9 @@ Outside the profile:
 | `*`, `[class]`, `[id]` | Commonly evaluated differently outside a browser; name the element, or join its neighbours with a descendant combinator |
 | Pseudo-elements, namespaces | Do not select elements, or not portably |
 
-Every selector in the profile depends only on an element and its ancestors, so a consumer that
-classifies an element once at insert time, or holds only the element's ancestor path, resolves it
-exactly.
+Every selector in the profile depends only on an element and its ancestors, so a consumer resolves
+it exactly whether it tests each node on its own, walks a whole document once, resolves an inserted
+subtree from its parent, or holds only an element's ancestor path.
 
 **Future profiles (to do).** A later SEP may define profiles that admit newer selectors, such as one
 for CSS Selectors Level 4. A corpus would opt in explicitly through the corpus-root key
@@ -302,7 +307,10 @@ privacy) with matchers verified to agree on every chain and node:
 | Watch resolution, same comparison | 3.9-9.5x faster; every matching watch rule reports, so there is no early exit |
 | Classifying an inserted subtree by inheriting the insertion point's resolved state | About 2 us per node, flat from 10 to 1,000 nodes |
 
-The inherit strategy is exact because every selector depends only on an element and its ancestors.
+The indexed result holds whichever way the document is walked: testing each node on its own,
+walking the document once, and inheriting from an insertion point all agree, and the index is what
+carries the gain. The inherit strategy is exact because every selector depends only on an element
+and its ancestors.
 
 Reproduce from `go/`:
 
