@@ -4,7 +4,7 @@ title: Stable entity identity with `id`
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-10-09
-updated: 2026-10-13
+updated: 2026-10-16
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -19,9 +19,9 @@ Add an `id` to every named entity in a sightmap: environments, views, components
 Nothing in a sightmap identifies an entity across versions:
 
 - **Names change and aren't unique.** Authors rename views, components and requests as a product's vocabulary evolves. A component name is also unique only within its parent, so `Title` can appear under several cards.
-- **Locators change.** A component's selector changes when its markup does, and because a child is searched inside its parent's match, its effective locator also changes whenever any ancestor's selector does. A view's route and a request's route and method change as URLs are redesigned.
+- **Locators change.** A component's selector changes when its markup does, and because a child is searched inside its parent's match, its effective locator also changes whenever any ancestor's selector does. A view's route and a request's route and method change as URLs are redesigned. An environment's origins change when a deploy target moves to a new host, and its name changes when a team relabels its targets.
 
-Anything that binds to an entity across versions breaks on these changes: data recorded against a component or request, rules configured per entity, saved queries, review notes, an agent's memory. A consumer that sees `CardDetail` in one version and `PaymentCard` in the next can't know they are the same component.
+Anything that binds to an entity across versions breaks on these changes: data recorded against a component or request, a history of what was deployed to an environment, rules configured per entity, saved queries, review notes, an agent's memory. A consumer that sees `CardDetail` in one version and `PaymentCard` in the next can't know they are the same component.
 
 Comparing two versions doesn't fix this, because two versions don't record intent:
 
@@ -112,6 +112,8 @@ Value objects (`extract`, `access`, `request`/`response` payloads), `memory` str
 - When two become one, one id continues and the other is removed.
 - When a copy is made, the original keeps the id and the copy gets a new one.
 
+**An environment's id names the deploy target.** Renaming an environment, or changing its origins, `app_id` or `build_type`, keeps the id: it is still the same target. An environment removed and declared again is the same target only if it keeps its id. A consumer that records anything per environment, such as which version of a sightmap was current there, SHOULD key it by id, so a rename doesn't split the record and a new id doesn't silently continue one.
+
 **What an id is not.** `id` takes no part in route matching, selector matching, which component names an element, specificity, or name resolution. `$ref`, `signals[].ref` and `environments:` lists still refer by name. Two sightmaps that differ only in their ids behave identically.
 
 ### Adoption
@@ -135,6 +137,8 @@ With ids, comparing two versions of a sightmap is a total, deterministic functio
 | An ancestor's selector changes | Same ids, new effective locator for every component under it |
 | Move to a new parent | Same id, new parent id |
 | A view's or request's route changes | Same id, new route |
+| An environment is renamed | Same id, new name |
+| An environment's origins change | Same id, new origins |
 | A `$ref` entry replaced by an inline copy | Same id, now a component |
 | Delete and re-add with a new id | One removal and one addition. A tool can flag the pair as a likely accidental re-creation when names or selectors match |
 
