@@ -54,6 +54,7 @@ type rawFile struct {
 }
 
 type rawEnvironment struct {
+	ID        string            `yaml:"id"`
 	Name      string            `yaml:"name"`
 	Platform  string            `yaml:"platform"`
 	AppID     string            `yaml:"app_id"`
@@ -63,12 +64,14 @@ type rawEnvironment struct {
 }
 
 type rawSignal struct {
+	ID   string   `yaml:"id"`
 	Name string   `yaml:"name"`
 	Ref  string   `yaml:"ref"`
 	Tags []string `yaml:"tags"`
 }
 
 type rawMessage struct {
+	ID          string               `yaml:"id"`
 	Name        string               `yaml:"name"`
 	Level       string               `yaml:"level"`
 	Message     string               `yaml:"message"`
@@ -79,6 +82,7 @@ type rawMessage struct {
 }
 
 type rawMessageProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 	Source  string     `yaml:"source"`
@@ -87,12 +91,14 @@ type rawMessageProperty struct {
 }
 
 type rawSnapshot struct {
+	ID    string `yaml:"id"`
 	Name  string `yaml:"name"`
 	Notes string `yaml:"notes"`
 	URL   string `yaml:"url"`
 }
 
 type rawView struct {
+	ID          string           `yaml:"id"`
 	Name        string           `yaml:"name"`
 	Route       string           `yaml:"route"`
 	URL         string           `yaml:"url"`
@@ -117,11 +123,13 @@ type rawAccess struct {
 }
 
 type rawProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 }
 
 type rawRequest struct {
+	ID           string               `yaml:"id"`
 	Name         string               `yaml:"name"`
 	Route        string               `yaml:"route"`
 	Method       string               `yaml:"method"`
@@ -145,17 +153,19 @@ func toURLPropertyDefs(raws []rawURLProperty) []URLPropertyDef {
 	}
 	out := make([]URLPropertyDef, 0, len(raws))
 	for _, rp := range raws {
-		out = append(out, URLPropertyDef{Name: rp.Name, Extract: rp.Extract.url()})
+		out = append(out, URLPropertyDef{ID: rp.ID, Name: rp.Name, Extract: rp.Extract.url()})
 	}
 	return out
 }
 
 type rawURLProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 }
 
 type rawRequestProperty struct {
+	ID      string     `yaml:"id"`
 	Name    string     `yaml:"name"`
 	Extract rawExtract `yaml:"extract"`
 	Source  string     `yaml:"source"`
@@ -168,12 +178,14 @@ type rawPayload struct {
 }
 
 type rawField struct {
+	ID          string `yaml:"id"`
 	Name        string `yaml:"name"`
 	Type        string `yaml:"type"`
 	Description string `yaml:"description"`
 }
 
 type rawComponent struct {
+	ID          string         `yaml:"id"`
 	Name        string         `yaml:"name"`
 	Ref         string         `yaml:"$ref"`
 	Selector    rawSelector    `yaml:"selector"`
@@ -249,6 +261,7 @@ func loadDir(path string) (*Corpus, error) {
 	var viewFiles []viewFileWithPath
 	var fieldDiags []ValidationError
 	envReg := newEnvironmentRegistry()
+	ids := newIDIndex()
 
 	for _, p := range yamlPaths {
 		data, err := os.ReadFile(p)
@@ -266,6 +279,7 @@ func loadDir(path string) (*Corpus, error) {
 		}
 		memory = append(memory, rf.Memory...)
 		envReg.add(rf, filepath.Base(p))
+		ids.addFile(data, filepath.Base(p))
 		if len(rf.Components) > 0 {
 			globalRaws = append(globalRaws, rf.Components...)
 		}
@@ -316,6 +330,7 @@ func loadDir(path string) (*Corpus, error) {
 	// otherwise look like a collision.
 	ctx.diagnostics = append(ctx.diagnostics, globalNameCollisions(globalRaws)...)
 	ctx.diagnostics = append(ctx.diagnostics, definitionNameCollisions(globalRaws, definitionRaws)...)
+	ctx.diagnostics = append(ctx.diagnostics, ids.diagnostics()...)
 
 	// Flatten global components (hierarchy → compound descendant selectors).
 	globalComps := flattenAll(globalRaws, ctx, 0)
@@ -341,6 +356,7 @@ func loadDir(path string) (*Corpus, error) {
 		var snapshots []Snapshot
 		for _, rs := range vf.Snapshots {
 			snapshots = append(snapshots, Snapshot{
+				ID:    rs.ID,
 				Name:  rs.Name,
 				Notes: rs.Notes,
 				URL:   rs.URL,
@@ -358,6 +374,7 @@ func loadDir(path string) (*Corpus, error) {
 				viewURL = vf.URL
 			}
 			views = append(views, ViewDef{
+				ID:         rv.ID,
 				Name:       rv.Name,
 				Route:      rv.Route,
 				Memory:     rv.Memory,
@@ -427,6 +444,7 @@ func (r *environmentRegistry) add(rf rawFile, file string) {
 			platform = PlatformWeb
 		}
 		r.envs = append(r.envs, EnvironmentDef{
+			ID:         re.ID,
 			Name:       re.Name,
 			Platform:   platform,
 			AppID:      re.AppID,
@@ -474,7 +492,7 @@ func rawPropsToMatch(rps []rawProperty) []ComponentPropertyDef {
 	}
 	ps := make([]ComponentPropertyDef, len(rps))
 	for i, rp := range rps {
-		ps[i] = ComponentPropertyDef{Name: rp.Name, Extract: rp.Extract.component()}
+		ps[i] = ComponentPropertyDef{ID: rp.ID, Name: rp.Name, Extract: rp.Extract.component()}
 	}
 	return ps
 }
@@ -506,6 +524,7 @@ func toRequestDefs(rrs []rawRequest, ctx *flattenCtx) []RequestDef {
 			continue
 		}
 		out = append(out, RequestDef{
+			ID:           rr.ID,
 			Name:         rr.Name,
 			Route:        rr.Route,
 			Method:       rr.Method,
@@ -535,6 +554,7 @@ func toRequestProperties(rps []rawRequestProperty) []RequestPropertyDef {
 	out := make([]RequestPropertyDef, 0, len(rps))
 	for _, rp := range rps {
 		out = append(out, RequestPropertyDef{
+			ID:      rp.ID,
 			Name:    rp.Name,
 			Extract: rp.Extract.sourced(rp.Source, rp.Field, rp.Pattern),
 		})
@@ -556,7 +576,7 @@ func toSignalDefs(rss []rawSignal) []SignalDef {
 	}
 	out := make([]SignalDef, 0, len(rss))
 	for _, rs := range rss {
-		out = append(out, SignalDef{Name: rs.Name, Ref: rs.Ref, Tags: rs.Tags})
+		out = append(out, SignalDef{ID: rs.ID, Name: rs.Name, Ref: rs.Ref, Tags: rs.Tags})
 	}
 	return out
 }
@@ -568,6 +588,7 @@ func toMessageDefs(rms []rawMessage) []MessageDef {
 	out := make([]MessageDef, 0, len(rms))
 	for _, rm := range rms {
 		md := MessageDef{
+			ID:          rm.ID,
 			Name:        rm.Name,
 			Level:       rm.Level,
 			Message:     rm.Message,
@@ -593,6 +614,7 @@ func toMessageProperties(rps []rawMessageProperty) []MessagePropertyDef {
 	out := make([]MessagePropertyDef, 0, len(rps))
 	for _, rp := range rps {
 		out = append(out, MessagePropertyDef{
+			ID:      rp.ID,
 			Name:    rp.Name,
 			Extract: rp.Extract.sourced(rp.Source, rp.Field, rp.Pattern),
 		})
@@ -607,7 +629,7 @@ func toPayload(rp *rawPayload) *Payload {
 	}
 	p := &Payload{}
 	for _, rf := range rp.Fields {
-		p.Fields = append(p.Fields, Field{Name: rf.Name, Type: rf.Type, Description: rf.Description})
+		p.Fields = append(p.Fields, Field{ID: rf.ID, Name: rf.Name, Type: rf.Type, Description: rf.Description})
 	}
 	return p
 }
@@ -747,6 +769,7 @@ func flattenAll(rcs []rawComponent, ctx *flattenCtx, originDepth int) []Componen
 // begins, or -1 outside any global; it derives ComponentDef.Origin.
 func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentChain []string, refStack []string, originDepth int) []ComponentDef {
 	// Expand $ref: replace the placeholder with a deep copy of the named global.
+	refID := ""
 	if rc.Ref != "" {
 		for _, prev := range refStack {
 			if prev == rc.Ref {
@@ -769,6 +792,7 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 			return nil
 		}
 		refStack = append(refStack, rc.Ref)
+		refID = rc.ID
 		rc = global
 		originDepth = len(parentChain)
 	}
@@ -815,6 +839,8 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 	}
 
 	result := []ComponentDef{{
+		ID:          rc.ID,
+		RefID:       refID,
 		Name:        rc.Name,
 		Selectors:   mySels,
 		Source:      rc.Source,

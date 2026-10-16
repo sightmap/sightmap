@@ -64,6 +64,10 @@ func TestSpecConformance_ComponentDefinitionFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-component-definitions.fixture")
 }
 
+func TestSpecConformance_EntityIDFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-entity-id*.fixture")
+}
+
 func runSpecValidateFixtures(t *testing.T, glob string) {
 	t.Helper()
 	const root = "../../spec/conformance"

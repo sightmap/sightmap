@@ -1,0 +1,5 @@
+version: 1
+components:
+  - id: checkout01
+    name: CheckoutForm
+    selector: form.checkout

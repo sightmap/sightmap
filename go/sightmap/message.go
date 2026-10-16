@@ -20,6 +20,7 @@ import (
 // view-scoped form, because a console record is not scoped to a page the way a
 // DOM element is.
 type MessageDef struct {
+	ID   string `json:"id,omitempty"` // SEP-0020
 	Name string `json:"name"`
 	// Level is compared case-insensitively for equality against the observed
 	// record's level. Match-any when empty.
@@ -60,6 +61,7 @@ type MessageDef struct {
 // attributes (function/file/line/column), e.g. "top.file" or "1.function";
 // Extract.Pattern optionally refines the resolved string.
 type MessagePropertyDef struct {
+	ID      string  `json:"id,omitempty"` // SEP-0020
 	Name    string  `json:"name"`
 	Extract Extract `json:"extract"`
 }
