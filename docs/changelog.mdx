@@ -8,6 +8,14 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.36.1" description="Released October 19, 2026" tags={["cli"]}>
+
+The overlay extension picks views the way the CLI does. Its route matcher treated `:param` segments as literal text, so a view routed `/ui/:org/settings` never activated and hover fell back to globals; it now ports the Go matcher (`:param`, in-segment `*`, `**` as zero or more segments, trailing-slash normalization). Only the most specific matching view is active, ties going to the first declared, instead of every matching view's components at once. The extension version is bumped so existing installs pick up this and the earlier resolver fixes. Component paths in extracts (`Title.name`) now resolve each segment among the previous segment's descendants, as SEP-0010 and the CLI do, not only its direct children; a direct child still shadows a deeper namesake.
+
+`validate` no longer reports "duplicate component name and selector" for one child name used under two different parents. Child names are scoped to their parent, but the check keyed on the bare name across a flattened scope, so two definitions (or two components in one view) that each contain, say, a `Label` matching the same selector were flagged. The check now keys on the component's address (parent chain plus name); a true duplicate under one parent is still an error.
+
+</Update>
+
 <Update label="sightmap 0.36.0" description="Released October 7, 2026" tags={["cli"]}>
 
 Full-page screenshots. `browser screenshot --full-page` captures the whole scrollable page rather than the viewport, and `capture --screenshot` saves a full-page PNG beside each capture as `<stamp>.snap.png` (removed by `capture prune` along with its capture), so a view set keeps a picture of every state it recorded.

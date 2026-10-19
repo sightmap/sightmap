@@ -1,5 +1,12 @@
 # @sightmap/sightmap
 
+## 0.36.1
+
+### Patch Changes
+
+- 43a63de: The overlay extension picks views the way the CLI does. Its route matcher treated `:param` segments as literal text, so a view routed `/ui/:org/settings` never activated and hover fell back to globals; it now ports the Go matcher (`:param`, in-segment `*`, `**` as zero or more segments, trailing-slash normalization). Only the most specific matching view is active, ties going to the first declared, instead of every matching view's components at once. The extension version is bumped so existing installs pick up this and the earlier resolver fixes. Component paths in extracts (`Title.name`) now resolve each segment among the previous segment's descendants, as SEP-0010 and the CLI do, not only its direct children; a direct child still shadows a deeper namesake.
+- 2fdcdd1: `validate` no longer reports "duplicate component name and selector" for one child name used under two different parents. Child names are scoped to their parent, but the check keyed on the bare name across a flattened scope, so two definitions (or two components in one view) that each contain, say, a `Label` matching the same selector were flagged. The check now keys on the component's address (parent chain plus name); a true duplicate under one parent is still an error.
+
 ## 0.36.0
 
 ### Minor Changes
