@@ -8,6 +8,12 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.37.0" description="Released October 20, 2026" tags={["cli"]}>
+
+Entity `id` (SEP-0020): every named entity (environments, views, components, `$ref` entries, properties, requests, payload fields, messages, signals and snapshots) accepts an opaque `id` that is unique across the sightmap and stays the same through renames, moves and edits. It doesn't affect matching. The loader exposes each entity's `ID`, and a `$ref` entry's id as `RefID` on the root of its expansion. `validate` reports `id-invalid`, `id-duplicate` (across every entity kind and file; a definition referenced from several places is not a duplicate) and, once a sightmap declares any id, `id-missing` for each entity without one.
+
+</Update>
+
 <Update label="sightmap 0.36.1" description="Released October 19, 2026" tags={["cli"]}>
 
 The overlay extension picks views the way the CLI does. Its route matcher treated `:param` segments as literal text, so a view routed `/ui/:org/settings` never activated and hover fell back to globals; it now ports the Go matcher (`:param`, in-segment `*`, `**` as zero or more segments, trailing-slash normalization). Only the most specific matching view is active, ties going to the first declared, instead of every matching view's components at once. The extension version is bumped so existing installs pick up this and the earlier resolver fixes. Component paths in extracts (`Title.name`) now resolve each segment among the previous segment's descendants, as SEP-0010 and the CLI do, not only its direct children; a direct child still shadows a deeper namesake.
