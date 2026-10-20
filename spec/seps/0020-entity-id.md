@@ -2,9 +2,9 @@
 sep: 0020
 title: Stable entity identity with `id`
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Accepted
 created: 2026-10-09
-updated: 2026-10-16
+updated: 2026-10-20
 spec-version-target: 1
 related-issues: []
 related-discussions: []
