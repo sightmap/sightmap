@@ -3,6 +3,7 @@ import Home from '@/pages/Home'
 import BlogIndex from '@/pages/BlogIndex'
 import BlogPost from '@/pages/BlogPost'
 import AtlasIndex from '@/pages/AtlasIndex'
+import AtlasCity from '@/pages/AtlasCity'
 import AtlasSlug from '@/pages/AtlasSlug'
 import Developers from '@/pages/Developers'
 import Building from '@/pages/Building'
@@ -23,6 +24,9 @@ export default function App() {
         {/* Every route here needs a matching entry in scripts/prerender.tsx —
             one declared only in this file ships as a client-only page. */}
         <Route path="/atlas" element={<AtlasIndex />} />
+        {/* Ahead of /atlas/:slug in the file for readers; react-router ranks
+            the literal segment above the dynamic one whatever the order. */}
+        <Route path="/atlas/city" element={<AtlasCity />} />
         {/* One route, two pages: AtlasSlug picks the WebMCP listing when the
             slug is in directoryListings and the community entry otherwise.
             Keep this on one literal line — check-route-coverage.ts reads the

@@ -85,6 +85,14 @@ describe('createListing', () => {
     expect(loaded.listings.map((l) => l.slug)).toEqual(['alpha-example-org'])
   })
 
+  it('gives a new listing a lot and records it in the YAML', async () => {
+    const report = fixture()
+    const result = await createListing({ dataDir, atlasDir: ATLAS, report, review: heuristicReview(report), today: '2026-09-10' })
+    const written = readListing(result.slug)
+    expect(Number.isInteger(written.lot)).toBe(true)
+    expect(written.lot).toBeGreaterThanOrEqual(0)
+  })
+
   it('avoids a slug the community atlas already holds', async () => {
     const report = fixture({ host: 'alpha.site', url: 'https://alpha.site/', finalUrl: 'https://alpha.site/' })
     const result = await createListing({ dataDir, atlasDir: ATLAS, report, review: heuristicReview(report), today: '2026-09-10' })
@@ -103,6 +111,8 @@ describe('createListing', () => {
       duration_ms: 4200,
       notes: 'Ran headless with no account.',
     }
+    // …and the building has an address the probe would not pick.
+    before.lot = 7
     fs.writeFileSync(path.join(dataDir, 'alpha-tools.yaml'), YAML.stringify(before))
 
     const report = fixture({ scannedAt: '2026-09-10T09:00:00.000Z' })
@@ -118,6 +128,7 @@ describe('createListing', () => {
     expect(after.labels).toEqual(['promising'])
     expect(after.collections).toEqual(['built-with-sightkick'])
     expect(after.journey.intent).toBe('Find the pricing page')
+    expect(after.lot).toBe(7)
     // …and the scan-derived ones move on.
     expect(after.updated).toBe('2026-09-10')
     expect(after.scan).toBe('scans/alpha-tools/2026-09-10.json')

@@ -55,6 +55,12 @@ export const NOT_FOUND_DESCRIPTION = "This page doesn't exist."
 export const DEVELOPERS_TITLE = `${SITE_NAME} developer resources`
 export const DEVELOPERS_DESCRIPTION =
   'OpenAPI, the Atlas HTTP API, documentation, CLI, and agent skills for the Sightmap spec.'
+// The city at /atlas/city: every admitted listing as a building on a lot it
+// keeps. Read by scripts/prerender.tsx and src/pages/AtlasCity.tsx, for the
+// same single-source reason ATLAS_DESCRIPTION is.
+export const ATLAS_CITY_TITLE = `The city — ${SITE_NAME} Atlas`
+export const ATLAS_CITY_DESCRIPTION =
+  'Every listed site as a building on a lot it keeps, derived from its scan: a city of the Sightmap Atlas directory, with filler on the lots no listing has taken yet.'
 // The immersive tour at /building: the app-as-a-building metaphor, rendered as
 // a scroll-driven 3D scene. Read by scripts/prerender.tsx, src/pages/Building.tsx,
 // and the sitemap / llms.txt / markdown-twin generators.
