@@ -100,7 +100,7 @@ Value objects (`extract`, `access`, `request`/`response` payloads), `memory` str
 
 **Unique across the sightmap.** No two entities may share an id, across all files and all entity kinds. A view and a component can't both be `checkout01`.
 
-**An id names the entity, not its kind of entry.** When an edit changes how an entity is written but not what it is, the id stays. A `$ref` entry replaced by an inline copy of its definition is the same placement and keeps the `$ref` entry's id. A component moved from a view to the file root is the same component and keeps its id.
+**An id names the entity, not its kind of entry.** When an edit changes how an entity is written but not what it is, the id stays. A `$ref` entry replaced by an inline copy of its definition is the same placement and keeps the `$ref` entry's id. The reverse holds too: when an inline component is extracted into a definition or root-level global, the `$ref` entry left in its place is the same placement and keeps the component's id, and the new definition or global is a new declaration with a new id. The component's children move into the new declaration and keep their ids. A component moved from a view to the file root is the same component and keeps its id.
 
 **`$ref` entries are entities.** A `$ref` entry's id names that placement of the definition. A definition's id names the declaration, so it is the same at every placement. Two placements of one definition are told apart by their `$ref` entries' ids. How a consumer combines the two ids for the components inside an expansion is outside this SEP.
 
@@ -140,6 +140,7 @@ With ids, comparing two versions of a sightmap is a total, deterministic functio
 | An environment is renamed | Same id, new name |
 | An environment's origins change | Same id, new origins |
 | A `$ref` entry replaced by an inline copy | Same id, now a component |
+| An inline component extracted into a definition | Same id, now a `$ref` entry; the definition is an addition |
 | Delete and re-add with a new id | One removal and one addition. A tool can flag the pair as a likely accidental re-creation when names or selectors match |
 
 Only the endpoints matter: any number of edits between two versions reduce to the same result, and a sequence of versions can be compared pairwise to reconstruct a history. What a consumer does with the result is outside this SEP.
