@@ -2,6 +2,7 @@
 // dependency on scripts/lib/atlas.ts (which reads the filesystem) so this can
 // be pulled into the bundle and can also run under scripts/prerender.tsx.
 import type { AtlasEntry } from '@/types/atlas'
+import type { DirectoryListing } from '@/types/directory'
 
 /**
  * The domain to show as the entry's identity. `domains` is the schema's answer
@@ -91,4 +92,37 @@ export function filterEntries(entries: AtlasEntry[], category: string, query: st
   return entries.filter(
     (e) => (!category || e.categories.includes(category)) && matchesQuery(e, query)
   )
+}
+
+/**
+ * The directory half of the gallery's search. Same contract as
+ * `matchesQuery` above — case-insensitive substring across the fields a
+ * visitor would plausibly type — but over a listing, whose identity is the
+ * host and whose interesting nouns are the tool names.
+ *
+ * Tool names are in the haystack because "checkout" or "search_flights" is
+ * exactly what someone hunting for an agent-callable site types, and it is the
+ * one thing a listing has that an atlas entry does not.
+ */
+export function matchesListingQuery(listing: DirectoryListing, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const haystack = [
+    listing.slug,
+    listing.name,
+    listing.host,
+    listing.description,
+    listing.category,
+    listing.type,
+    ...listing.labels,
+    ...listing.collections,
+    ...listing.tools.map((t) => t.name),
+  ]
+    .join(' ')
+    .toLowerCase()
+  return haystack.includes(q)
+}
+
+export function filterDirectory<T extends DirectoryListing>(listings: T[], category: string, query: string): T[] {
+  return listings.filter((l) => (!category || l.category === category) && matchesListingQuery(l, query))
 }
