@@ -142,7 +142,8 @@ func runBrowserStart(args []string) error {
 
 	// ── Start sightmap HTTP server in background ──────────────────────────────
 	siteName := filepath.Base(cwd())
-	srv, collectorPtr, err := startDevtoolsServer(*sightmapDir, siteName, resolvedServerPort)
+	srv, collectorPtr, err := startDevtoolsServer(*sightmapDir, siteName, resolvedServerPort,
+		fmt.Sprintf("127.0.0.1:%d", resolvedCDPPort))
 	if err != nil {
 		return fmt.Errorf("start: %w", err)
 	}
@@ -349,8 +350,9 @@ func runBrowserStart(args []string) error {
 // hot-reloaded from sightmapDir) and the devtools query surface (network/console).
 // It returns the running server plus the collector pointer the devtools handlers
 // read from — the caller Stores the live collector into it once the CDP session
-// is ready. Both the owned-launch and --attach paths share this.
-func startDevtoolsServer(sightmapDir, siteName string, serverPort int) (*http.Server, *atomic.Pointer[browser.Collector], error) {
+// is ready. Both the owned-launch and --attach paths share this. cdpAddr is the
+// session's Chrome, which /capture observes.
+func startDevtoolsServer(sightmapDir, siteName string, serverPort int, cdpAddr string) (*http.Server, *atomic.Pointer[browser.Collector], error) {
 	compiled, err := loadServedSightmap(sightmapDir, siteName)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "start: sightmap load warning: %v\n", err)
@@ -396,6 +398,7 @@ func startDevtoolsServer(sightmapDir, siteName string, serverPort int) (*http.Se
 	// ready; the handlers return 503 until then.
 	collectorPtr := &atomic.Pointer[browser.Collector]{}
 	registerDevtoolsHandlers(mux, collectorPtr, sightmapDir)
+	registerCaptureHandler(mux, sightmapDir, cdpAddr)
 
 	// Bind the sightmap server on the IPv4 loopback (not the ":port" wildcard) so
 	// it shares an address family with Chrome's CDP and with FindFreePort's probe.
@@ -654,7 +657,7 @@ func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlF
 	}
 
 	siteName := filepath.Base(cwd())
-	srv, collectorPtr, err := startDevtoolsServer(sightmapDir, siteName, resolvedServerPort)
+	srv, collectorPtr, err := startDevtoolsServer(sightmapDir, siteName, resolvedServerPort, cdpAddr)
 	if err != nil {
 		return fmt.Errorf("start --attach: %w", err)
 	}

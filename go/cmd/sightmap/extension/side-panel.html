@@ -70,6 +70,16 @@
                 color: #ffb74d;
                 border-color: #ffb74d;
             }
+            .icon-btn:disabled {
+                opacity: 0.5;
+                cursor: progress;
+            }
+            #btn-capture {
+                width: auto;
+                padding: 0 7px;
+                color: #9cdcfe;
+                border-color: #3c5a72;
+            }
 
             #toolbar-status {
                 display: flex;
@@ -266,6 +276,12 @@
             .ev-type.focus {
                 color: #ce93d8;
             }
+            .ev-type.capture {
+                color: #4caf50;
+            }
+            .ev-type.capture-failed {
+                color: #f44336;
+            }
 
             .comp-orphan {
                 color: #555;
@@ -277,6 +293,14 @@
         <div id="toolbar">
             <div id="toolbar-row1">
                 <span id="toolbar-title">⬡ Sightmap</span>
+
+                <button
+                    class="icon-btn"
+                    id="btn-capture"
+                    title="Capture this page into the inbox (Alt+Shift+C)"
+                >
+                    ◉ Capture
+                </button>
 
                 <button
                     class="icon-btn"

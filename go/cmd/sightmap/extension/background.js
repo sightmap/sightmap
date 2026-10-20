@@ -188,6 +188,46 @@ function getServer() {
   return _serverPromise;
 }
 
+// ── Capture into the inbox ────────────────────────────────────────────────────
+// The daemon serving the corpus also owns the browser session, so it does the
+// capturing: POST the active tab's URL to /capture and it observes that tab
+// over CDP and writes .sightmap/inbox/<stamp>.snap with a screenshot. The
+// outcome goes to every side panel, which logs it.
+
+let capturing = false;
+
+async function capturePage() {
+  if (capturing) return; // one at a time; the daemon serialises anyway
+  capturing = true;
+  let result;
+  try {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
+    if (!tab?.url) throw new Error("no active tab");
+    const srv = await getServer();
+    const resp = await fetch(`${srv}/capture`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: tab.url }),
+    });
+    if (!resp.ok) throw new Error((await resp.text()).trim() || resp.statusText);
+    result = { ok: true, ...(await resp.json()) };
+  } catch (err) {
+    result = { ok: false, error: err.message };
+  } finally {
+    capturing = false;
+  }
+  broadcastToSidePanel({ type: "capture-result", ...result });
+  setBadge(result.ok ? "◉" : "!", result.ok ? "#4CAF50" : "#F44336");
+  setTimeout(() => setBadge("✓", "#4CAF50"), 1500);
+}
+
+chrome.commands?.onCommand.addListener((command) => {
+  if (command === "capture-page") capturePage();
+});
+
 // ── Message handling ──────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -243,6 +283,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         path: msg.path,
         formatted: msg.formatted,
       });
+      return false;
+
+    case "capture-page":
+      capturePage();
       return false;
 
     case "query-overlay-visible":
