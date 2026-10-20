@@ -12,6 +12,7 @@ const (
 // web environment's origins through Backend. Environments are declarative
 // metadata: nothing in route matching reads them.
 type EnvironmentDef struct {
+	ID   string `json:"id,omitempty"` // SEP-0020
 	Name string `json:"name"`
 	// Platform is always set after loading: the loader supplies the schema's
 	// "web" default itself, since schema validators do not apply defaults.

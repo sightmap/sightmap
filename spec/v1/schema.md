@@ -58,6 +58,7 @@ A named screen in the app, identified by a URL route.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Shown in the snapshot header. Should be unique across the sightmap. |
 | `route` | string | yes | Glob pattern matched against the URL pathname. See [Route matching](#route-matching). |
 | `environments` | string[] | no | Names of the environments this view exists in. Absent or empty means every environment. See [Environments and origins](#environments-and-origins). |
@@ -93,6 +94,7 @@ A named DOM subtree, identified by one or more CSS selectors.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Replaces the generic a11y role in enriched snapshots. |
 | `selector` | string \| string[] | yes | CSS selector, or a list of alternatives. First match wins. |
 | `source` | string | no | Path to the source file. Rendered inline as `[src: …]` in enriched snapshots. |
@@ -117,7 +119,8 @@ A reference is expanded inline (deep copy) to the named component's full definit
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `$ref` | string | yes | Name of a component defined at file root (`components:` or `definitions:`). The entry MUST contain no other keys. |
+| `id` | string | no | Identity of this placement across versions of the sightmap. See [Identity](#identity). |
+| `$ref` | string | yes | Name of a component defined at file root (`components:` or `definitions:`). The entry MUST contain no other keys besides `id`. |
 
 **Lookup scope.** Only components defined at the **root** of some file's `components:` or `definitions:` array are addressable. Globals and definitions share one namespace; on a clash the global wins (SDKs SHOULD emit `definition-shadowed-by-global`). Components nested under `children:`, or defined inside a view's `components:`, are not in the registry. First-seen wins on duplicate names (sorted by source-file path); SDKs SHOULD emit a `merge-collision-component` warning.
 
@@ -140,6 +143,7 @@ A component may declare `properties: Property[]` — named values surfaced along
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Key used in the annotation (`name="value"`). Must match `^[a-z][a-z0-9_]*$`, and must be unique within a component. The name `value` is reserved: it may be declared to override the AX built-in, and SDKs MUST prefer a declared `value` over the AX tree's own value. |
 | `extract` | [Extract](#extract) | yes | How the value is read. A component reads one of the sources below. |
 
@@ -220,6 +224,7 @@ A named API endpoint.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Shown in network list and detail output. |
 | `route` | string | yes | Glob pattern. Express-style `:param` segments are normalized to `*`. See [Route matching](#route-matching). |
 | `method` | string | no | HTTP method filter (`GET`, `POST`, …). Match-any if omitted. |
@@ -268,6 +273,7 @@ A named API endpoint.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
 | `extract` | [Extract](#extract) | yes | How the value is read. A request reads one of the sources below. |
 
@@ -306,6 +312,7 @@ request:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | The field name. |
 | `type` | string | no | Free-text type label: `string`, `number`, `boolean`, `array`, `object`, or anything else an SDK author finds useful. |
 | `description` | string | no | Free-text description. |
@@ -333,6 +340,7 @@ messages:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Stable identifier, addressable by name by other tooling. |
 | `level` | string | no | Exact, case-insensitive match against the observed record's level. Match-any if omitted. |
 | `message` | string | no | [RE2](#regular-expressions) regex matched against the record's text. Match-any if omitted. |
@@ -365,6 +373,7 @@ messages:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. |
 | `extract` | [Extract](#extract) | yes | How the value is read. The only source is `stack`, the exception's call stack. |
 
@@ -411,6 +420,7 @@ signals:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Semantic identity of the signal — a named boolean predicate, addressable by other tooling. |
 | `ref` | string | yes | Name of an existing component or view this signal is about. Must resolve to exactly one. |
 | `tags` | string[] | no | Open-vocabulary classification labels carried onto the signal. |
@@ -492,6 +502,7 @@ requests:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Key a consumer refers to this value by. Must match `^[a-z][a-z0-9_]*$`. Must not equal a `:name` binding the entity still produces (see below). |
 | `extract` | [Extract](#extract) | yes | `from: url.path` with `path: <segment_name>` reads a `:name` bound by this entity's own route; `from: url.query` with `path: <key>` reads a query-string parameter. `path` is required; `pattern` refines the value; `join` is not valid. |
 
@@ -609,6 +620,7 @@ An environment answers "which deploy target"; an origin answers "which host". A 
 
 | Field | Type | Applies to | Required | Description |
 |---|---|---|---|---|
+| `id` | string | all | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | all | yes | Matches `^[a-z][a-z0-9_-]*$`. Unique among environments. |
 | `platform` | `web` \| `ios` \| `android` | all | no, default `web` | Which kind of deploy target this is. |
 | `origins` | map of name to [origin URL](#origin-urls) | all | web: yes; native: no | Each surface's URL in this environment. On a native environment it overrides the `backend`'s entry of the same name. |
@@ -711,6 +723,37 @@ views:
 Use a definition when one structure recurs under several parents or views but its selector is only unambiguous in context (a bare `img`, `button`, or `h3` inside a card). As a global, such a selector would claim every matching element on every page.
 
 **Conformance.** SDKs MUST include `definitions:` in the `$ref` registry, MUST NOT match a definition except through a `$ref` expansion, MUST resolve a name defined both as a global and as a definition to the global, and SHOULD emit `merge-collision-definition` (warning) for a definition name declared more than once (first by source-file path wins). See [SEP-0019](../seps/0019-component-definitions.md).
+
+## Identity
+
+Every named entity may declare an `id`: its identity across versions of the sightmap. The entities are environments, views, components (globals, definitions, view components and children), `$ref` entries, properties, requests, payload fields, messages, signals and snapshots. A `name` is for people and can change; a selector or route is how an entity is found and changes with the app; an `id` names the entity itself and doesn't change.
+
+```yaml
+views:
+  - id: v8kq2m7rta
+    name: Checkout                  # rename freely: the id stays
+    route: /checkout                # change with the URL: the id stays
+    components:
+      - id: c4mxq2nbw7
+        name: CardDetail
+        selector: '.card-detail'    # change with the markup: the id stays
+      - id: r3n8kq2mf5
+        $ref: OrderSummary          # this placement's id
+```
+
+An id is opaque. It is 8 to 64 letters, digits, `_` or `-`, starting with a letter or digit, and carries no meaning of its own. Tools that generate ids SHOULD generate them randomly, with at least 8 characters from an alphabet of 32 or more symbols, so ids minted independently, such as on two branches, don't collide.
+
+**Unique across the sightmap.** No two entities may share an id, across all files and all entity kinds.
+
+**All or nothing.** A sightmap without ids is valid. Once any entity declares an id, every entity MUST have one.
+
+**An id names the entity, not its kind of entry.** A `$ref` entry's id names that placement of the definition; the definition's own id names the declaration and is the same at every placement. When an edit changes how an entity is written but not what it is, such as replacing a `$ref` entry with an inline copy of its definition, the id stays.
+
+**Stable across versions.** A tool that rewrites a sightmap (a formatter, an editor, an authoring agent) MUST preserve every id it doesn't deliberately remove, through renames, moves, selector and route changes and any other edit. An id MUST NOT be reused for a different entity after its entity is removed, and a tool that mints ids MUST NOT mint one that the sightmap already declares. When an entity splits or is copied, one result keeps the id and the other gets a new one; when two merge, one id continues and the other is removed.
+
+**What an id is not.** `id` takes no part in route matching, selector matching, which component names an element, specificity, or name resolution: `$ref`, `signals[].ref` and `environments:` lists still refer by name. Two sightmaps that differ only in their ids behave identically.
+
+**Conformance.** SDKs MUST emit `id-invalid` (error) for an id of the wrong shape or one that isn't a YAML string (such as an unquoted number or a null), `id-duplicate` (error) when two entities share an id, and `id-missing` (error) for each entity without an id when any entity in the sightmap declares one. See [SEP-0020](../seps/0020-entity-id.md).
 
 ## Global vs view-scoped
 
@@ -869,7 +912,7 @@ See [SEP-0009](../seps/0009-component-privacy.md).
 Some fields are consumed by tooling built on Sightmap (the reference CLI's capture and probe workflows) but are **not part of this spec's matching or merge semantics**. They are permitted by the schema so corpora that use them validate, but conforming SDKs MAY ignore them:
 
 - **`access`** (on a view) — reachability of the view for a tool's reference account: `status` (`open` | `blocked` | `needs-data`) and an optional `reason`.
-- **`snapshots`** (file-level) — named page states to capture (`name`, `notes`, `url`), used to enumerate capture/probe targets.
+- **`snapshots`** (file-level) — named page states to capture (`id`, `name`, `notes`, `url`), used to enumerate capture/probe targets.
 
 These are reserved rather than standardized: their shape may change, and other tooling need not implement them. Do not rely on them for cross-SDK matching behavior.
 

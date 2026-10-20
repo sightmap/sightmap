@@ -41,15 +41,15 @@ The selector case is the load-bearing one: `[data-sightmap="LoginButton"]` canon
 
 ### Key ordering within entries
 
-Explicit per entry type. Unknown keys preserved at the end in original order.
+Explicit per entry type. Unknown keys preserved at the end in original order. `id` comes first in every entity, including those not listed here, and a `$ref` entry orders `id, $ref`.
 
 | Entry type | Canonical key order |
 |---|---|
 | Top-level | `version, environments, origins, memory, views, components, definitions, requests` |
-| View | `name, route, environments, origins, description, source, components, memory, requests` |
-| Component | `name, selector, description, source, children, memory` |
-| Request | `name, route, method, environments, origins, description, source, request, response, headers, memory` |
-| Environment | `name, platform, app_id, build_type, backend, origins` |
+| View | `id, name, route, environments, origins, description, source, components, memory, requests` |
+| Component | `id, name, selector, description, source, children, memory` |
+| Request | `id, name, route, method, environments, origins, description, source, request, response, headers, memory` |
+| Environment | `id, name, platform, app_id, build_type, backend, origins` |
 
 Keys within any origin map (the top-level `origins` and an environment's `origins`) are alphabetized.
 

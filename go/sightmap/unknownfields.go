@@ -23,24 +23,24 @@ import (
 
 var (
 	fileRootFields    = set("version", "environments", "origins", "url", "memory", "views", "components", "definitions", "requests", "messages", "signals", "snapshots")
-	viewFields        = set("name", "route", "environments", "origins", "url", "stability", "access", "description", "source", "memory", "tags", "properties", "components", "requests")
-	componentFields   = set("name", "selector", "source", "description", "stability", "memory", "tags", "watch", "privacy", "properties", "children")
-	refFields         = set("$ref")
-	requestFields     = set("name", "route", "method", "environments", "origins", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
+	viewFields        = set("id", "name", "route", "environments", "origins", "url", "stability", "access", "description", "source", "memory", "tags", "properties", "components", "requests")
+	componentFields   = set("id", "name", "selector", "source", "description", "stability", "memory", "tags", "watch", "privacy", "properties", "children")
+	refFields         = set("id", "$ref")
+	requestFields     = set("id", "name", "route", "method", "environments", "origins", "description", "source", "request", "response", "headers", "memory", "tags", "properties")
 	payloadFields     = set("fields")
-	fieldFields       = set("name", "type", "description")
-	propertyFields    = set("name", "extract")
-	urlPropertyFields = set("name", "extract")
+	fieldFields       = set("id", "name", "type", "description")
+	propertyFields    = set("id", "name", "extract")
+	urlPropertyFields = set("id", "name", "extract")
 
 	accessFields   = set("status", "reason")
-	snapshotFields = set("name", "notes", "url")
+	snapshotFields = set("id", "name", "notes", "url")
 
-	requestPropertyFields = set("name", "extract", "source", "field", "pattern")
-	messageFields         = set("name", "level", "message", "description", "source", "tags", "properties")
-	signalFields          = set("name", "ref", "tags")
-	messagePropertyFields = set("name", "extract", "source", "field", "pattern")
+	requestPropertyFields = set("id", "name", "extract", "source", "field", "pattern")
+	messageFields         = set("id", "name", "level", "message", "description", "source", "tags", "properties")
+	signalFields          = set("id", "name", "ref", "tags")
+	messagePropertyFields = set("id", "name", "extract", "source", "field", "pattern")
 	extractFields         = set("from", "path", "pattern", "join")
-	environmentFields     = set("name", "platform", "app_id", "build_type", "backend", "origins")
+	environmentFields     = set("id", "name", "platform", "app_id", "build_type", "backend", "origins")
 )
 
 func set(keys ...string) map[string]bool {

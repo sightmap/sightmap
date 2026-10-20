@@ -1,0 +1,35 @@
+version: 1
+views:
+  - id: viw3n8kq2m
+    name: Search
+    route: /s
+    properties:
+      - id: prp7q4wz1d
+        name: query
+        extract: { from: url.query, path: q }
+    components:
+      - id: cmpr2v8yd5
+        name: Results
+        selector: ul.results
+        children:
+          # Each $ref entry has its own id, which names this placement.
+          - id: refn6pk1s3
+            $ref: ProductCard
+    requests:
+      - id: req5c9fw4j
+        name: search
+        route: /api/search
+        response:
+          fields:
+            - id: fld1h7gq3x
+              name: total
+  - id: viw7f4j8nz
+    name: Home
+    route: /
+    components:
+      - id: refm5c9fw4
+        $ref: ProductCard
+
+snapshots:
+  - id: snp5m2hb8c
+    name: base
