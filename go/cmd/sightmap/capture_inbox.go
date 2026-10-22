@@ -19,7 +19,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sightmap/sightmap/go/browser"
@@ -124,10 +123,19 @@ func fromWebPage(r *http.Request) bool {
 	return o != "" && !strings.HasPrefix(o, "chrome-extension://")
 }
 
+// captureBudget bounds one /capture request: the wait for an earlier capture
+// to finish plus the capture itself. The overlay stops waiting after 25s
+// (Chrome ends a service worker whose fetch has waited 30s), so a capture
+// that runs past that is reported only in the daemon log.
+const captureBudget = 90 * time.Second
+
 // registerCaptureHandler wires POST /capture onto mux: capture the session tab
 // showing the requested URL into the inbox, and report where it went. Captures
 // are serialised, since two at once on one tab would interleave their CDP
-// traffic and could read a page between the other's screenshot and tree.
+// traffic and could read a page between the other's screenshot and tree; the
+// wait is bounded by the budget (and by the caller giving up), so a stuck
+// capture cannot queue the rest forever. Every failure is logged, since the
+// caller that asked is often gone by the time the answer is known.
 //
 // The endpoint changes state (it writes the corpus and drives the browser),
 // so unlike the read-only /sightmap endpoints it offers no CORS at all and
@@ -136,7 +144,7 @@ func fromWebPage(r *http.Request) bool {
 // page's POST is rejected by its Origin, and a form or text/plain POST that
 // would skip the preflight by its Content-Type.
 func registerCaptureHandler(mux *http.ServeMux, sightmapDir, cdpAddr string) {
-	var mu sync.Mutex
+	busy := make(chan struct{}, 1) // held by the capture in progress
 	mux.HandleFunc("/capture", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -155,19 +163,28 @@ func registerCaptureHandler(mux *http.ServeMux, sightmapDir, cdpAddr string) {
 			http.Error(w, `want {"url": "<the page's URL>"}`, http.StatusBadRequest)
 			return
 		}
-		mu.Lock()
-		defer mu.Unlock()
-		ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+		fail := func(status int, msg string) {
+			fmt.Fprintf(os.Stderr, "[capture] failed (%d) %s: %s\n", status, req.URL, msg)
+			http.Error(w, msg, status)
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), captureBudget)
 		defer cancel()
+		select {
+		case busy <- struct{}{}:
+			defer func() { <-busy }()
+		case <-ctx.Done():
+			fail(http.StatusServiceUnavailable, "another capture is still running: "+ctx.Err().Error())
+			return
+		}
 
 		tab, err := tabShowing(ctx, cdpAddr, req.URL)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusConflict)
+			fail(http.StatusConflict, err.Error())
 			return
 		}
 		conn, err := browser.ConnectTab(ctx, cdpAddr, tab)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("connect to tab %s: %v", tab, err), http.StatusBadGateway)
+			fail(http.StatusBadGateway, fmt.Sprintf("connect to tab %s: %v", tab, err))
 			return
 		}
 		defer conn.Close()
@@ -179,7 +196,7 @@ func registerCaptureHandler(mux *http.ServeMux, sightmapDir, cdpAddr string) {
 		path, res, err := inboxCapture(ctx, conn, sightmapDir, corpus,
 			observe.FormatOpts{Trace: cfg.Snapshot.Trace}, !cfg.Snapshot.IncludeHidden)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fail(http.StatusInternalServerError, err.Error())
 			return
 		}
 		fmt.Fprintf(os.Stderr, "[capture] %s  %s\n", path, res.URL)

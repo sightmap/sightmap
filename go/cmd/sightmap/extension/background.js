@@ -196,26 +196,39 @@ function getServer() {
 
 let capturing = false;
 
+// Chrome terminates an extension service worker whose fetch() has waited 30s
+// for a response (extension service worker lifecycle: "When a fetch()
+// response takes more than 30 seconds to arrive"). That would abort the
+// capture anyway, and take the pending capture-result with it, leaving the
+// panel waiting forever. Give up first, and say so.
+const CAPTURE_TIMEOUT_MS = 25_000;
+
 async function capturePage() {
   if (capturing) return; // one at a time; the daemon serialises anyway
   capturing = true;
   let result;
+  let srv = "the daemon";
   try {
     const [tab] = await chrome.tabs.query({
       active: true,
       lastFocusedWindow: true,
     });
     if (!tab?.url) throw new Error("no active tab");
-    const srv = await getServer();
+    srv = await getServer();
     const resp = await fetch(`${srv}/capture`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: tab.url }),
+      signal: AbortSignal.timeout(CAPTURE_TIMEOUT_MS),
     });
     if (!resp.ok) throw new Error((await resp.text()).trim() || resp.statusText);
     result = { ok: true, ...(await resp.json()) };
   } catch (err) {
-    result = { ok: false, error: err.message };
+    const error =
+      err.name === "TimeoutError"
+        ? `no answer from ${srv} in ${CAPTURE_TIMEOUT_MS / 1000}s; capturing this page took too long (see the daemon log)`
+        : err.message;
+    result = { ok: false, error };
   } finally {
     capturing = false;
   }

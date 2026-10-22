@@ -53,6 +53,13 @@ function connectToBackground() {
     port = null;
     setStatus(false, "reconnecting…");
     reconnectTimer = setTimeout(connectToBackground, 800);
+    // The background that was capturing is gone, and its result with it.
+    if (btnCapture.disabled) {
+      onCaptureResult({
+        ok: false,
+        error: "the extension restarted while capturing; check the inbox or try again",
+      });
+    }
   });
 }
 
@@ -232,13 +239,31 @@ btnClear.addEventListener("click", () => {
 
 // Capture: the background posts the active tab to the daemon's /capture, which
 // writes it to the corpus inbox. The result comes back as a capture-result
-// message, whether this button or the keyboard command started it.
+// message, whether this button or the keyboard command started it. The button
+// stays disabled until a result arrives, so every way a result can fail to
+// arrive must produce one here: the message not reaching the background, the
+// background going away, or nothing at all coming back (the background
+// itself gives up on the daemon after 25s; this is the backstop).
+const CAPTURE_RESULT_TIMEOUT_MS = 40_000;
+let captureTimer = null;
+
 btnCapture.addEventListener("click", () => {
   btnCapture.disabled = true;
-  chrome.runtime.sendMessage({ type: "capture-page" }).catch(() => {});
+  clearTimeout(captureTimer);
+  captureTimer = setTimeout(() => {
+    onCaptureResult({
+      ok: false,
+      error: `no result from the extension in ${CAPTURE_RESULT_TIMEOUT_MS / 1000}s`,
+    });
+  }, CAPTURE_RESULT_TIMEOUT_MS);
+  chrome.runtime
+    .sendMessage({ type: "capture-page" })
+    .catch((err) => onCaptureResult({ ok: false, error: err.message }));
 });
 
 function onCaptureResult(msg) {
+  clearTimeout(captureTimer);
+  captureTimer = null;
   btnCapture.disabled = false;
   while (log.children.length >= MAX_EVENTS) log.removeChild(log.lastChild);
   const card = document.createElement("div");
