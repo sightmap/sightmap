@@ -180,7 +180,7 @@ capture saved: .sightmap/inbox/20261020T122550Z.snap
   https://app.example.com/settings/accessibility
 ```
 
-The overlay extension writes to the same inbox. With a `browser start` session running, open the Sightmap side panel and click **Capture**, or press `Alt+Shift+C`. The session daemon captures the tab you are looking at, and the panel logs the stamp. The daemon serves this as `POST /capture` with a body of `{"url": "<the page's URL>"}`. It captures the one session tab showing that URL, and refuses when none or several do.
+The overlay extension writes to the same inbox. With a `browser start` session running, open the Sightmap side panel and click **Capture**, or press `Alt+Shift+C`. The session daemon captures the tab you are looking at, and the panel logs the stamp. The daemon serves this as `POST /capture` with a `Content-Type: application/json` body of `{"url": "<the page's URL>"}`. It captures the one session tab showing that URL, and refuses when none or several do. Only the extension and local tools may call it: a request carrying a web page's `Origin` is refused, since the endpoint drives the browser and writes the corpus.
 
 ---
 

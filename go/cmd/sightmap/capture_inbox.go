@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -114,21 +115,39 @@ type captureRequest struct {
 	URL string `json:"url"`
 }
 
+// fromWebPage reports whether r was sent by a web page rather than by the
+// overlay extension or a local tool. Browsers stamp every cross-origin POST
+// with the sender's Origin, so a page's request carries its http(s) origin,
+// the extension's carries chrome-extension://<id>, and a CLI's carries none.
+func fromWebPage(r *http.Request) bool {
+	o := r.Header.Get("Origin")
+	return o != "" && !strings.HasPrefix(o, "chrome-extension://")
+}
+
 // registerCaptureHandler wires POST /capture onto mux: capture the session tab
 // showing the requested URL into the inbox, and report where it went. Captures
 // are serialised, since two at once on one tab would interleave their CDP
 // traffic and could read a page between the other's screenshot and tree.
+//
+// The endpoint changes state (it writes the corpus and drives the browser),
+// so unlike the read-only /sightmap endpoints it offers no CORS at all and
+// refuses requests a web page could make: the overlay reaches it from its
+// service worker, whose localhost host permission exempts it from CORS. A
+// page's POST is rejected by its Origin, and a form or text/plain POST that
+// would skip the preflight by its Content-Type.
 func registerCaptureHandler(mux *http.ServeMux, sightmapDir, cdpAddr string) {
 	var mu sync.Mutex
 	mux.HandleFunc("/capture", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "POST")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-			return
-		}
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if fromWebPage(r) {
+			http.Error(w, "capture is for the overlay extension and local tools, not web pages", http.StatusForbidden)
+			return
+		}
+		if ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); ct != "application/json" {
+			http.Error(w, "want Content-Type: application/json", http.StatusUnsupportedMediaType)
 			return
 		}
 		var req captureRequest

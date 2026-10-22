@@ -158,29 +158,45 @@ func TestTabShowing(t *testing.T) {
 	}
 }
 
-// /capture accepts only a POST naming a URL, and answers CORS preflight so the
-// extension can call it.
+// /capture accepts only a JSON POST naming a URL, from the overlay extension
+// or a local tool: a web page's request (an http(s) Origin, or a body type
+// that skips the CORS preflight) is refused before anything is captured, and
+// no response invites cross-origin use.
 func TestCaptureHandlerRejectsBadRequests(t *testing.T) {
 	mux := http.NewServeMux()
 	registerCaptureHandler(mux, t.TempDir(), fakeTabs(t, "https://a.test/x"))
+	const json = "application/json"
 	for _, c := range []struct {
-		method, body string
-		want         int
+		method, origin, ctype, body string
+		want                        int
 	}{
-		{http.MethodOptions, "", http.StatusOK},
-		{http.MethodGet, "", http.StatusMethodNotAllowed},
-		{http.MethodPost, `{}`, http.StatusBadRequest},
-		{http.MethodPost, `not json`, http.StatusBadRequest},
-		{http.MethodPost, `{"url":"https://a.test/elsewhere"}`, http.StatusConflict},
+		{http.MethodOptions, "", "", "", http.StatusMethodNotAllowed},
+		{http.MethodGet, "", "", "", http.StatusMethodNotAllowed},
+		{http.MethodPost, "https://evil.test", json, `{"url":"https://a.test/x"}`, http.StatusForbidden},
+		{http.MethodPost, "null", json, `{"url":"https://a.test/x"}`, http.StatusForbidden},
+		{http.MethodPost, "", "text/plain", `{"url":"https://a.test/x"}`, http.StatusUnsupportedMediaType},
+		{http.MethodPost, "", "", `{"url":"https://a.test/x"}`, http.StatusUnsupportedMediaType},
+		{http.MethodPost, "", json, `{}`, http.StatusBadRequest},
+		{http.MethodPost, "", json, `not json`, http.StatusBadRequest},
+		// Past the checks (a CLI with no Origin, or the extension) the
+		// request reaches the tab lookup, which finds no such tab.
+		{http.MethodPost, "", "application/json; charset=utf-8", `{"url":"https://a.test/elsewhere"}`, http.StatusConflict},
+		{http.MethodPost, "chrome-extension://abcdefghijklmnop", json, `{"url":"https://a.test/elsewhere"}`, http.StatusConflict},
 	} {
 		req := httptest.NewRequest(c.method, "/capture", strings.NewReader(c.body))
+		if c.origin != "" {
+			req.Header.Set("Origin", c.origin)
+		}
+		if c.ctype != "" {
+			req.Header.Set("Content-Type", c.ctype)
+		}
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
 		if rec.Code != c.want {
-			t.Errorf("%s %s: status %d, want %d (%s)", c.method, c.body, rec.Code, c.want, strings.TrimSpace(rec.Body.String()))
+			t.Errorf("%s origin=%q type=%q %s: status %d, want %d (%s)", c.method, c.origin, c.ctype, c.body, rec.Code, c.want, strings.TrimSpace(rec.Body.String()))
 		}
-		if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
-			t.Errorf("%s %s: no CORS header", c.method, c.body)
+		if h := rec.Header().Get("Access-Control-Allow-Origin"); h != "" {
+			t.Errorf("%s origin=%q: Access-Control-Allow-Origin %q, want none", c.method, c.origin, h)
 		}
 	}
 }
