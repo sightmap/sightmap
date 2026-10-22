@@ -10,6 +10,13 @@ import (
 	"strings"
 )
 
+// InboxDir is the name of the directory under snapshots/ that holds captures
+// not yet sorted into a view (`capture --inbox`). It is not a view: ParsePath
+// rejects it, so no per-view tool (coverage, capture-novelty, capture-prune)
+// treats its captures as a set. The underscores keep it clear of view names
+// and sorted first.
+const InboxDir = "_inbox_"
+
 // TreePath returns the tree JSON path for a given snapshot path.
 // Example: ".sightmap/snapshots/app-home/base.snap" → ".sightmap/snapshots/app-home/base.snap.tree.json"
 func TreePath(snapPath string) string {
@@ -55,6 +62,9 @@ func ParsePath(path string) (view, stamp string, ok bool) {
 		return "", "", false
 	}
 	view = segs[0]
+	if view == InboxDir {
+		return "", "", false
+	}
 	if len(segs) >= 2 {
 		stamp = segs[len(segs)-1] // last segment; any middle "state" collapses away
 	}

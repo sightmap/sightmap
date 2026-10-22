@@ -5,7 +5,7 @@
 // presumes the views are already known. A tool that LEARNS the views from the
 // captures (surveyor infers routes from every captured URL) cannot ask for that
 // up front without circularity, so captures for it go to
-// .sightmap/inbox/<stamp>.snap instead: no view lookup, no novelty gate, always
+// .sightmap/snapshots/_inbox_/<stamp>.snap instead: no view lookup, no novelty gate, always
 // a screenshot. Sorting the inbox into views is the consumer's job.
 package main
 
@@ -28,7 +28,9 @@ import (
 )
 
 // inboxDir is the queue under a corpus dir.
-func inboxDir(sightmapDir string) string { return filepath.Join(sightmapDir, "inbox") }
+func inboxDir(sightmapDir string) string {
+	return filepath.Join(sightmapDir, "snapshots", viewset.InboxDir)
+}
 
 // reserveInboxPath claims a new capture's path in the inbox and returns it.
 // Stamps have one-second resolution, so a second capture in the same second

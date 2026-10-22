@@ -191,7 +191,7 @@ function getServer() {
 // ── Capture into the inbox ────────────────────────────────────────────────────
 // The daemon serving the corpus also owns the browser session, so it does the
 // capturing: POST the active tab's URL to /capture and it observes that tab
-// over CDP and writes .sightmap/inbox/<stamp>.snap with a screenshot. The
+// over CDP and writes .sightmap/snapshots/_inbox_/<stamp>.snap with a screenshot. The
 // outcome goes to every side panel, which logs it.
 
 let capturing = false;

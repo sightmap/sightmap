@@ -123,7 +123,7 @@ A view is a *set* of captures, not a single file — real pages are non-determin
 | `--addr` | `localhost:7892` | CDP address (host:port). |
 | `--all` | `false` | Capture every view URL declared in `views/*.yaml` (top-level `url:` plus `snapshots[].url`). |
 | `--force` | `false` | Write the capture even if it adds no new component or slot vs the view set (skip the novelty gate). |
-| `--inbox` | `false` | Write to the unsorted inbox (`.sightmap/inbox/{stamp}.snap`) with a screenshot, without matching a view or applying the novelty gate. Cannot be combined with `--all`. |
+| `--inbox` | `false` | Write to the unsorted inbox (`.sightmap/snapshots/_inbox_/{stamp}.snap`) with a screenshot, without matching a view or applying the novelty gate. Cannot be combined with `--all`. |
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
 | `--json` | `false` | Also write an annotated JSON sibling next to each capture. |
 | `--screenshot` | `false` | Also write a full-page PNG sibling (`{stamp}.snap.png`) of the page as captured. `capture prune` removes it with its capture. |

@@ -27,7 +27,7 @@ func TestReserveInboxPathNeverOverwrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := filepath.Join(dir, "inbox", "20261020T010203Z.snap"); first != want {
+	if want := filepath.Join(dir, "snapshots", "_inbox_", "20261020T010203Z.snap"); first != want {
 		t.Fatalf("first path %s, want %s", first, want)
 	}
 	if _, err := os.Stat(first); err != nil {
@@ -37,7 +37,7 @@ func TestReserveInboxPathNeverOverwrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := filepath.Join(dir, "inbox", "20261020T010203Z-2.snap"); second != want {
+	if want := filepath.Join(dir, "snapshots", "_inbox_", "20261020T010203Z-2.snap"); second != want {
 		t.Errorf("second path %s, want %s", second, want)
 	}
 }
@@ -127,7 +127,7 @@ func pageResult() *observe.Result {
 func TestWriteInboxCaptureTreeFailureIsWarning(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 10, 20, 1, 2, 3, 0, time.UTC)
-	snap := filepath.Join(dir, "inbox", "20261020T010203Z.snap")
+	snap := filepath.Join(dir, "snapshots", "_inbox_", "20261020T010203Z.snap")
 	// A directory where writeTreeJSON stages its file makes the tree write fail.
 	if err := os.MkdirAll(viewset.TreePath(snap)+".tmp", 0o755); err != nil {
 		t.Fatal(err)
@@ -156,7 +156,7 @@ func TestWriteInboxCaptureTreeFailureIsWarning(t *testing.T) {
 func TestWriteInboxCaptureSnapFailureLeavesNothing(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 10, 20, 1, 2, 3, 0, time.UTC)
-	snap := filepath.Join(dir, "inbox", "20261020T010203Z.snap")
+	snap := filepath.Join(dir, "snapshots", "_inbox_", "20261020T010203Z.snap")
 	if err := os.MkdirAll(snap+".tmp", 0o755); err != nil {
 		t.Fatal(err)
 	}

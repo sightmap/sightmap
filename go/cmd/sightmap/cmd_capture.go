@@ -40,7 +40,7 @@ func runCapture(args []string) error {
 	includeHiddenFlag := fs.Bool("include-hidden", false, "Include hidden/off-screen nodes in analysis")
 	jsonOutFlag := fs.Bool("json", false, "Also write an annotated JSON sibling next to each capture")
 	screenshotFlag := fs.Bool("screenshot", false, "Also write a full-page PNG sibling (<stamp>.snap.png) next to each capture")
-	inboxFlag := fs.Bool("inbox", false, "Write to the unsorted inbox (.sightmap/inbox/<stamp>.snap) with a screenshot, without matching a view or applying the novelty gate")
+	inboxFlag := fs.Bool("inbox", false, "Write to the unsorted inbox (.sightmap/snapshots/_inbox_/<stamp>.snap) with a screenshot, without matching a view or applying the novelty gate")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
