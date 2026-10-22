@@ -68,8 +68,10 @@ func TestFindConflicts_DistinctNodes(t *testing.T) {
 // A component name is unique only within its parent, so this is legal and — on a
 // real page — common. Deduplicating claims by name hid it completely: a production
 // sign-in corpus had five such nodes and reported none of them. The shape here is
-// exactly that one: the same component observed at two depths across different
-// states, whose shallower definition over-matches via the descendant combinator.
+// exactly that one: the same component observed under two ancestors across
+// different states, each definition reaching the other's node via the
+// descendant combinator. (Neither chain embeds in the other, so SEP-0023 does
+// not order them; a chain that extends the other's would resolve instead.)
 func TestFindConflicts_SameNameDistinctDefs(t *testing.T) {
 	root := node("root", "div", nil,
 		node("widget", "div", []string{"widget"},
@@ -80,7 +82,7 @@ func TestFindConflicts_SameNameDistinctDefs(t *testing.T) {
 	)
 	defs := []sightmap.ComponentDef{
 		{Name: "Recaptcha", Selectors: []string{".widget .recaptcha"}},
-		{Name: "Recaptcha", Selectors: []string{".widget .card .recaptcha"}},
+		{Name: "Recaptcha", Selectors: []string{".card .recaptcha"}},
 	}
 	conflicts := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Conflicts(root, "")
 	if len(conflicts) != 1 {

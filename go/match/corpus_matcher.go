@@ -36,6 +36,9 @@ type queryCacheEntry struct {
 	// names, privacy and watch in one traversal.
 	combined      []MatchQuery
 	combinedIndex *firstPartIndex
+	// narrow orders this entry's queries by selector specificity, so a node
+	// claimed by several definitions goes to the most specific (SEP-0023).
+	narrow specificity
 }
 
 // entryFor returns the cached (or freshly compiled) queries for pageURL.
@@ -80,7 +83,8 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 	// privacy folds down a depth-indexed stack (SEP-0009). A capture rule never
 	// names a node, whatever its order.
 	var (
-		named    *sightmap.ComponentMatch // the node's first naming match
+		claims   []*MatchQuery            // the node's naming matches, in match order
+		named    *sightmap.ComponentMatch // the node's name, resolved in onNode
 		local    int                      // strictest privacy declared on the node
 		watched  []string                 // watched components matching the node
 		watchDef []*sightmap.ComponentDef // their definitions, for identity dedup
@@ -98,32 +102,33 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 			}
 			return
 		}
-		if named != nil {
-			return // first-match-wins
-		}
-		named = &sightmap.ComponentMatch{Name: q.Name}
-		if q.Def != nil {
-			named.Memory = q.Def.Memory
-			named.Tags = q.Def.Tags
-			defByNode[node] = q.Def
-		}
-		result[node] = named
+		claims = append(claims, q)
 	}
-	onNode := func(_ *sightmap.ComponentNode, depth int) {
+	onNode := func(node *sightmap.ComponentNode, depth int) {
 		parent := rankNone
 		if depth > 0 {
 			parent = eff[depth-1]
 		}
 		e := foldRank(parent, local)
 		eff = append(eff[:depth], e)
-		if named != nil {
+		// The most specific claim names the node; among claims the selector text
+		// cannot order, the first in match order does, as before.
+		if claims = entry.narrow.mostSpecific(claims); len(claims) > 0 {
+			q := claims[0]
+			named = &sightmap.ComponentMatch{Name: q.Name}
+			if q.Def != nil {
+				named.Memory = q.Def.Memory
+				named.Tags = q.Def.Tags
+				defByNode[node] = q.Def
+			}
+			result[node] = named
 			named.Privacy = rankNames[e]
 			if len(watched) > 0 {
 				slices.Sort(watched)
 				named.Watched, named.Watch = watched, true
 			}
 		}
-		named, local, watched, watchDef = nil, rankNone, nil, nil
+		claims, named, local, watched, watchDef = claims[:0], nil, rankNone, nil, nil
 	}
 	walkMatches(root, entry.combined, entry.combinedIndex, onMatch, onNode)
 
@@ -150,9 +155,10 @@ func (m *Matcher) Components(pageURL string) []sightmap.ComponentDef {
 // Conflicts returns the nodes in root directly matched by more than one distinct
 // component DEFINITION for pageURL. One definition matching many nodes (e.g. a
 // list of cards) is normal and never reported; one node claimed by several
-// definitions is the ambiguity, since Match is first-match-wins and keeps only
-// the first. It reuses the same cached queries as Match, so it sees exactly the
-// same matches.
+// definitions is the ambiguity, since Match keeps only one. A claim that
+// another claim is strictly more specific than is not an ambiguity (SEP-0023):
+// the more specific definition names it, as Match resolves it. It reuses the same
+// cached queries as Match, so it sees exactly the same matches.
 //
 // Claims are deduplicated by DEFINITION, not by name. A component name is unique
 // only within its parent, so deduplicating by name silently discarded every
@@ -168,32 +174,34 @@ func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sigh
 		return nil
 	}
 
-	type claims struct {
-		defs  []*sightmap.ComponentDef
-		names []string
-	}
-	byNode := make(map[*sightmap.ComponentNode]*claims)
+	byNode := make(map[*sightmap.ComponentNode][]*MatchQuery)
 	var order []*sightmap.ComponentNode
 	findAllMatches(root, entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
-		c := byNode[node]
-		if c == nil {
-			c = &claims{}
-			byNode[node] = c
+		if _, ok := byNode[node]; !ok {
 			order = append(order, node)
 		}
-		for i, d := range c.defs {
-			if sameClaimant(d, q.Def, c.names[i], q.Name) {
-				return
-			}
-		}
-		c.defs = append(c.defs, q.Def)
-		c.names = append(c.names, q.Name)
+		byNode[node] = append(byNode[node], q)
 	})
 
 	var out []sightmap.Conflict
 	for _, node := range order {
-		if c := byNode[node]; len(c.defs) >= 2 {
-			out = append(out, sightmap.Conflict{Node: node, Names: c.names, Defs: c.defs})
+		var c sightmap.Conflict
+		for _, q := range entry.narrow.mostSpecific(byNode[node]) {
+			dup := false
+			for i, d := range c.Defs {
+				if sameClaimant(d, q.Def, c.Names[i], q.Name) {
+					dup = true
+					break
+				}
+			}
+			if !dup {
+				c.Defs = append(c.Defs, q.Def)
+				c.Names = append(c.Names, q.Name)
+			}
+		}
+		if len(c.Defs) >= 2 {
+			c.Node = node
+			out = append(out, c)
 		}
 	}
 	return out

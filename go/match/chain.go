@@ -41,9 +41,16 @@ type ChainMatch struct {
 // cannot be satisfied here — the same inherent limitation any ancestor-only
 // view carries.
 func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMatch {
+	out, _ := m.matchChain(chain, pageURL)
+	return out
+}
+
+// matchChain is MatchChain that also returns the query behind each match,
+// index-aligned, for callers that resolve among them.
+func (m *Matcher) matchChain(chain []sightmap.Element, pageURL string) ([]ChainMatch, []*MatchQuery) {
 	entry := m.entryFor(pageURL)
 	if len(chain) == 0 || len(entry.queries) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Build a single-branch spine (root -> leaf) of ComponentNodes so the shared
@@ -62,6 +69,7 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 	}
 
 	var out []ChainMatch
+	var qs []*MatchQuery
 	findAllMatches(nodes[0], entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		cm := ChainMatch{Depth: depthOf[node], Name: q.Name}
 		if q.Def != nil {
@@ -69,33 +77,53 @@ func (m *Matcher) MatchChain(chain []sightmap.Element, pageURL string) []ChainMa
 			cm.Memory = q.Def.Memory
 		}
 		out = append(out, cm)
+		qs = append(qs, q)
 	})
+	if len(out) == 0 {
+		return nil, nil
+	}
 	// FindAllMatches visits the linear spine depth-first, so out already runs
 	// root -> leaf; a defensive stable sort keeps the contract explicit without
 	// disturbing within-depth (definition) order.
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Depth < out[j].Depth })
-	return out
+	idx := make([]int, len(out))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(i, j int) bool { return out[idx[i]].Depth < out[idx[j]].Depth })
+	sorted, sortedQs := make([]ChainMatch, len(out)), make([]*MatchQuery, len(out))
+	for i, k := range idx {
+		sorted[i], sortedQs[i] = out[k], qs[k]
+	}
+	return sorted, sortedQs
 }
 
 // NamesForChain returns the component name(s) that identify the observed leaf
 // element, applying the spec's nearest-enclosing rule: the name resolved from
-// the deepest chain level that matched. It is almost always a single name;
-// more than one is returned only when several definitions match that same
-// deepest level (a genuine identity conflict the caller may want to see, rather
-// than a silently-picked winner). Names are deduplicated and returned in
+// the deepest chain level that matched. Among several definitions matching
+// that level, one strictly more specific than another sees it off (SEP-0023), so
+// the result is almost always a single name; more than one is returned only
+// when definitions the selector text cannot order match the same deepest
+// level (a genuine identity conflict the caller may want to see, rather than a
+// silently-picked winner). Names are deduplicated and returned in
 // component-definition order. Returns nil when nothing along the chain matched.
 func (m *Matcher) NamesForChain(chain []sightmap.Element, pageURL string) []string {
-	matches := m.MatchChain(chain, pageURL)
+	matches, qs := m.matchChain(chain, pageURL)
 	if len(matches) == 0 {
 		return nil
 	}
 	deepest := matches[len(matches)-1].Depth // sorted ascending by depth
+	var claims []*MatchQuery
+	for i, cm := range matches {
+		if cm.Depth == deepest {
+			claims = append(claims, qs[i])
+		}
+	}
 	var names []string
 	seen := make(map[string]bool)
-	for _, cm := range matches {
-		if cm.Depth == deepest && !seen[cm.Name] {
-			seen[cm.Name] = true
-			names = append(names, cm.Name)
+	for _, q := range m.entryFor(pageURL).narrow.mostSpecific(claims) {
+		if !seen[q.Name] {
+			seen[q.Name] = true
+			names = append(names, q.Name)
 		}
 	}
 	return names
