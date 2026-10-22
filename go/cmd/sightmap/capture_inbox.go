@@ -30,15 +30,27 @@ import (
 // inboxDir is the queue under a corpus dir.
 func inboxDir(sightmapDir string) string { return filepath.Join(sightmapDir, "inbox") }
 
-// inboxPath is a new capture's path in the inbox. Stamps have one-second
-// resolution, so a second capture in the same second takes a -2, -3, ...
-// suffix rather than overwriting the first.
-func inboxPath(sightmapDir string, t time.Time) string {
+// reserveInboxPath claims a new capture's path in the inbox and returns it.
+// Stamps have one-second resolution, so a second capture in the same second
+// takes a -2, -3, ... suffix rather than overwriting the first. The name is
+// claimed by creating it (empty) with O_EXCL: writers are separate processes
+// (the daemon, `capture --inbox`, parallel agents), so only the filesystem
+// can arbitrate between them. The caller then renames its content onto the
+// reserved name, or removes it on failure.
+func reserveInboxPath(sightmapDir string, t time.Time) (string, error) {
+	if err := os.MkdirAll(inboxDir(sightmapDir), 0o755); err != nil {
+		return "", fmt.Errorf("create inbox: %v", err)
+	}
 	base := filepath.Join(inboxDir(sightmapDir), viewset.Stamp(t))
 	p := base + ".snap"
 	for n := 2; ; n++ {
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			return p
+		f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if err == nil {
+			f.Close()
+			return p, nil
+		}
+		if !os.IsExist(err) {
+			return "", fmt.Errorf("reserve %s: %v", p, err)
 		}
 		p = fmt.Sprintf("%s-%d.snap", base, n)
 	}
@@ -57,7 +69,25 @@ func inboxCapture(ctx context.Context, conn *browser.CDPConn, sightmapDir string
 	if res.Root == nil {
 		return "", nil, fmt.Errorf("observe: the page has no content")
 	}
-	snapPath := inboxPath(sightmapDir, time.Now())
+	snapPath, err := writeInboxCapture(sightmapDir, time.Now(), res, opts)
+	if err != nil {
+		return "", nil, err
+	}
+	writeCaptureScreenshot(ctx, conn, snapPath)
+	return snapPath, res, nil
+}
+
+// writeInboxCapture persists an observed page to the inbox under a fresh stamp
+// for t, and returns the .snap path. The .snap is the capture; its .tree.json
+// sibling is a convenience, so losing it is a warning here as in writeCapture,
+// while a .snap that could not be written leaves nothing behind.
+func writeInboxCapture(sightmapDir string, t time.Time, res *observe.Result, opts observe.FormatOpts) (string, error) {
+	snapPath, err := reserveInboxPath(sightmapDir, t)
+	if err != nil {
+		return "", err
+	}
+	// writeOut stages at <snapPath>.tmp, which is ours alone now that the
+	// name is reserved, and renames onto the reservation.
 	if err := writeOut(snapPath, func(w io.Writer) error {
 		if res.View == nil {
 			// Without a matched view Format writes no url line (or none at
@@ -68,13 +98,13 @@ func inboxCapture(ctx context.Context, conn *browser.CDPConn, sightmapDir string
 		observe.Format(w, res, opts)
 		return nil
 	}); err != nil {
-		return "", nil, err
+		os.Remove(snapPath) // the empty reservation is not a capture
+		return "", err
 	}
 	if err := writeTreeJSON(res.Root, viewset.TreePath(snapPath)); err != nil {
-		return "", nil, fmt.Errorf("tree: %v", err)
+		fmt.Fprintf(os.Stderr, "capture: tree-out: %v\n", err)
 	}
-	writeCaptureScreenshot(ctx, conn, snapPath)
-	return snapPath, res, nil
+	return snapPath, nil
 }
 
 // captureRequest is the body of POST /capture. The overlay knows its tab's
