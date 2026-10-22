@@ -123,6 +123,7 @@ A view is a *set* of captures, not a single file — real pages are non-determin
 | `--addr` | `localhost:7892` | CDP address (host:port). |
 | `--all` | `false` | Capture every view URL declared in `views/*.yaml` (top-level `url:` plus `snapshots[].url`). |
 | `--force` | `false` | Write the capture even if it adds no new component or slot vs the view set (skip the novelty gate). |
+| `--inbox` | `false` | Write to the unsorted inbox (`.sightmap/snapshots/_inbox_/{stamp}.snap`) with a screenshot, without matching a view or applying the novelty gate. Cannot be combined with `--all`. |
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
 | `--json` | `false` | Also write an annotated JSON sibling next to each capture. |
 | `--screenshot` | `false` | Also write a full-page PNG sibling (`{stamp}.snap.png`) of the page as captured. `capture prune` removes it with its capture. |
@@ -165,6 +166,21 @@ pdp                   98 interactive · T1 74% · T2 26% · T3 0 ✓
 ```
 
 See [View sets](/cli/snapshots) for the full set model, the novelty gate, and the `capture-novelty` / `capture-prune` maintenance commands.
+
+#### The capture inbox
+
+`--inbox` keeps a page without deciding which view it belongs to. Use it when a tool learns the views from the captures themselves, so no route can be required up front. The capture goes to `.sightmap/inbox/{stamp}.snap` with its `.snap.tree.json` and a full-page `.snap.png`. Its header always records the page `url:`. No view is required and no gate applies; a corpus, when one loads, only annotates the capture. A second capture in the same second is written as `{stamp}-2.snap` rather than overwriting the first.
+
+```bash
+sightmap capture --inbox
+```
+
+```text
+capture saved: .sightmap/inbox/20261020T122550Z.snap
+  https://app.example.com/settings/accessibility
+```
+
+The overlay extension writes to the same inbox. With a `browser start` session running, open the Sightmap side panel and click **Capture**, or press `Alt+Shift+C`. The session daemon captures the tab you are looking at, and the panel logs the stamp. The daemon serves this as `POST /capture` with a `Content-Type: application/json` body of `{"url": "<the page's URL>"}`. It captures the one session tab showing that URL, and refuses when none or several do. Only the extension and local tools may call it: a request carrying a web page's `Origin` is refused, since the endpoint drives the browser and writes the corpus.
 
 ---
 
