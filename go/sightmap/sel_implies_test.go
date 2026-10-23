@@ -48,6 +48,15 @@ func TestMoreSpecific(t *testing.T) {
 		{`[a|="en"]`, `[a^="en"]`, true},
 		{`[a^="en"]`, `[a|="en"]`, false},
 		{`[a^="Foo"]`, `[a^="foo"]`, false}, // values compare exactly
+		{`[a="x"]`, `[a^=""]`, false},       // an empty-value test matches nothing
+		{`[a="x"]`, `[a$=""]`, false},
+		{`[a="x"]`, `[a*=""]`, false},
+		{`[a="x"]`, `[a]`, true},
+		{`[a~="x"]`, `[a~="x"]`, false}, // equivalent, not strictly narrower
+		{`[a|="en"]`, `[a|="en"]`, false},
+		{`[a="en"]`, `[a|="en"]`, true},
+		{`[a$="bc"]`, `[a*="b"]`, true},
+		{`[a~="b"]`, `[a*="b"]`, true},
 
 		// Chains.
 		{"[data-component=Card] button", "button", true},

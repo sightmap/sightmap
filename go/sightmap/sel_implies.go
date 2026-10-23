@@ -205,6 +205,13 @@ func impliesTest(s, t AttrTest) bool {
 	switch t.Op {
 	case "[]":
 		return true
+	case "^=", "$=", "*=":
+		// CSS matches nothing for an empty value here, so no test implies it.
+		if t.Value == "" {
+			return false
+		}
+	}
+	switch t.Op {
 	case "=":
 		return s.Op == "=" && s.Value == t.Value
 	case "^=":

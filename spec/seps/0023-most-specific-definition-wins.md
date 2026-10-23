@@ -72,7 +72,7 @@ Negations come second because they describe the other definitions an author had 
 2. Each further compound of B, moving toward the root, implies-aligns with some compound of A to the left of the previous alignment. Where the combinator before B's compound is a child combinator (`>`), the aligned compounds of A must be adjacent and joined by `>`; where it is a descendant combinator (whitespace), any compounds of A may lie between, as in CSS (`label span` is implied by `label > div span`).
 3. Compounds of A left over beyond B's first are ancestor constraints B does not have; they only narrow.
 
-Compound a implies compound b when b names a type and a names the same type (a compound with no type, or `*`, is implied only by one with no type), and every other simple selector of b is implied by some simple selector of a, where:
+Compound a implies compound b when b names no type (or `*`) or a names the same type, and every other simple selector of b is implied by some simple selector of a, where:
 
 - `#x` is read as `[id="x"]` and `.c` as `[class~="c"]`.
 - An attribute test on one name implies another on the same name by this table, comparing values exactly (a browser's case-insensitive attributes get no special treatment, which only ever withholds an implication):
@@ -96,12 +96,14 @@ Compound a implies compound b when b names a type and a names the same type (a c
 
 The comparison is between the selectors that matched. A definition with several alternatives is compared by the alternative that matched the element, and a child definition by its whole chain (parent selectors joined to its own), which is why a scoped child is more specific than a bare global, and a child more specific than its own parent's definition when that reaches the same element (`label span` and `label span span[data-testid="x"]`).
 
+View-scoped and global precedence is unchanged: a global whose name a view component shares is still replaced before matching. A global of another name remains a claimant, so it names an element that a less specific view component also reaches; between definitions the procedure cannot order, the view component still comes first.
+
 This changes what names an element, never what matches. Coverage, tags (a union across every matching definition) and privacy (nearest declaration wins, `block` absolute) see every match as before.
 
 ### Conformance
 
 - MUST name an element claimed by several definitions by the one that is strictly more specific than each of the others, when there is one, using exactly the procedure above.
-- MUST NOT assert an implication the procedure does not; two SDKs given the same corpus and tree MUST agree on which pairs are ordered.
+- MUST NOT assert an implication the procedure does not (`[n^=""]`, `[n$=""]` and `[n*=""]` match nothing, so nothing implies them); two SDKs given the same corpus and tree MUST agree on which pairs are ordered.
 - SHOULD surface an element whose remaining claimants number more than one.
 - MUST leave tag and privacy resolution unchanged.
 
