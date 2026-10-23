@@ -31,7 +31,9 @@ matching layer only.
 
 `expected-matches.json` maps component name to a sorted list of node IDs.
 A node ID that appears under more than one component name would be a test
-error (first-match-wins means each node maps to exactly one component).
+error (each node maps to exactly one component: the most specific definition
+claiming it, SEP-0023, or the first declared among definitions the selector
+text cannot order).
 
 ## Adding a fixture
 
