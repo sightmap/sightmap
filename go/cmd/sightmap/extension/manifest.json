@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sightmap Overlay",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "description": "Component path overlay and structured event log for sightmap-instrumented pages.",
 
   "permissions": ["storage", "activeTab", "tabs", "scripting", "devtools", "sidePanel"],
@@ -36,7 +36,10 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true
     }
   ],
 
