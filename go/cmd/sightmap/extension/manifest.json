@@ -1,10 +1,17 @@
 {
   "manifest_version": 3,
   "name": "Sightmap Overlay",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Component path overlay and structured event log for sightmap-instrumented pages.",
 
-  "permissions": ["storage", "activeTab", "scripting", "devtools", "sidePanel"],
+  "permissions": ["storage", "activeTab", "tabs", "scripting", "devtools", "sidePanel"],
+
+  "commands": {
+    "capture-page": {
+      "suggested_key": { "default": "Alt+Shift+C" },
+      "description": "Capture this page into the corpus inbox"
+    }
+  },
 
   "host_permissions": ["http://localhost:*/*"],
 

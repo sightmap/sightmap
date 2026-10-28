@@ -48,6 +48,11 @@ func TestParseSnapshotPath(t *testing.T) {
 			wantOk:    true,
 		},
 		{
+			name:   "inbox capture is not in a view",
+			path:   ".sightmap/snapshots/_inbox_/20260607T193000Z.snap",
+			wantOk: false,
+		},
+		{
 			name:      "view set tree json",
 			path:      ".sightmap/snapshots/checkout/20260607T193000Z.snap.tree.json",
 			wantView:  "checkout",

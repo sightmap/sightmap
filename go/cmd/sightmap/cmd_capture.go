@@ -9,6 +9,9 @@
 // capture of a view always writes, and --force bypasses the gate. Writing to an
 // arbitrary file is snapshot's job (`snapshot --out FILE`); capture only ever
 // targets the corpus set.
+//
+// --inbox writes to the unsorted capture inbox instead (capture_inbox.go): no
+// view is required, no gate applies, and a screenshot is always written.
 package main
 
 import (
@@ -37,8 +40,12 @@ func runCapture(args []string) error {
 	includeHiddenFlag := fs.Bool("include-hidden", false, "Include hidden/off-screen nodes in analysis")
 	jsonOutFlag := fs.Bool("json", false, "Also write an annotated JSON sibling next to each capture")
 	screenshotFlag := fs.Bool("screenshot", false, "Also write a full-page PNG sibling (<stamp>.snap.png) next to each capture")
+	inboxFlag := fs.Bool("inbox", false, "Write to the unsorted inbox (.sightmap/snapshots/_inbox_/<stamp>.snap) with a screenshot, without matching a view or applying the novelty gate")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *inboxFlag && *allFlag {
+		return fmt.Errorf("capture: --inbox and --all cannot be combined: --all captures each declared view's URL into its set")
 	}
 
 	// Apply .sightmap/config.yaml defaults for flags not explicitly set.
@@ -74,6 +81,23 @@ func runCapture(args []string) error {
 
 	if err := lf.navigate(ctx, conn, navOpts{idle: true}); err != nil {
 		return err
+	}
+
+	if *inboxFlag {
+		// A corpus only annotates an inbox capture; a missing or broken one
+		// never stops it, since sorting the inbox is how views get learned.
+		corpus, cErr := lf.loadCorpus()
+		if cErr != nil {
+			fmt.Fprintf(os.Stderr, "capture: corpus not applied: %v\n", cErr)
+			corpus = nil
+		}
+		path, res, err := inboxCapture(ctx, conn, *lf.sightmapDir, corpus,
+			observe.FormatOpts{Trace: *traceFlag, Selectors: *selectorsFlag}, visible)
+		if err != nil {
+			return fmt.Errorf("capture: %v", err)
+		}
+		fmt.Fprintf(os.Stderr, "capture saved: %s\n  %s\n", path, res.URL)
+		return nil
 	}
 
 	// ── Observe (require a matching view) ───────────────────────────────

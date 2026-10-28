@@ -12,6 +12,7 @@ const hoverTree = document.getElementById("hover-path-tree");
 const log = document.getElementById("log");
 const btnPause = document.getElementById("btn-pause");
 const btnClear = document.getElementById("btn-clear");
+const btnCapture = document.getElementById("btn-capture");
 
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -42,6 +43,9 @@ function connectToBackground() {
       case "sightmap-event":
         if (!paused) onEvent(msg.payload);
         break;
+      case "capture-result":
+        onCaptureResult(msg);
+        break;
     }
   });
 
@@ -49,6 +53,13 @@ function connectToBackground() {
     port = null;
     setStatus(false, "reconnecting…");
     reconnectTimer = setTimeout(connectToBackground, 800);
+    // The background that was capturing is gone, and its result with it.
+    if (btnCapture.disabled) {
+      onCaptureResult({
+        ok: false,
+        error: "the extension restarted while capturing; check the inbox or try again",
+      });
+    }
   });
 }
 
@@ -225,6 +236,58 @@ function onEvent(ev) {
 btnClear.addEventListener("click", () => {
   log.innerHTML = "";
 });
+
+// Capture: the background posts the active tab to the daemon's /capture, which
+// writes it to the corpus inbox. The result comes back as a capture-result
+// message, whether this button or the keyboard command started it. The button
+// stays disabled until a result arrives, so every way a result can fail to
+// arrive must produce one here: the message not reaching the background, the
+// background going away, or nothing at all coming back (the background
+// itself gives up on the daemon after 25s; this is the backstop).
+const CAPTURE_RESULT_TIMEOUT_MS = 40_000;
+let captureTimer = null;
+
+btnCapture.addEventListener("click", () => {
+  btnCapture.disabled = true;
+  clearTimeout(captureTimer);
+  captureTimer = setTimeout(() => {
+    onCaptureResult({
+      ok: false,
+      error: `no result from the extension in ${CAPTURE_RESULT_TIMEOUT_MS / 1000}s`,
+    });
+  }, CAPTURE_RESULT_TIMEOUT_MS);
+  chrome.runtime
+    .sendMessage({ type: "capture-page" })
+    .catch((err) => onCaptureResult({ ok: false, error: err.message }));
+});
+
+function onCaptureResult(msg) {
+  clearTimeout(captureTimer);
+  captureTimer = null;
+  btnCapture.disabled = false;
+  while (log.children.length >= MAX_EVENTS) log.removeChild(log.lastChild);
+  const card = document.createElement("div");
+  card.className = "ev";
+  const meta = document.createElement("div");
+  meta.className = "ev-meta";
+  const timeEl = document.createElement("span");
+  timeEl.className = "ev-time";
+  timeEl.textContent = new Date().toTimeString().slice(0, 8);
+  const dot = document.createElement("span");
+  dot.className = "ev-dot";
+  dot.textContent = " · ";
+  const typeEl = document.createElement("span");
+  typeEl.className = `ev-type ${msg.ok ? "capture" : "capture-failed"}`;
+  typeEl.textContent = msg.ok ? "capture" : "capture failed";
+  meta.append(timeEl, dot, typeEl);
+  card.appendChild(meta);
+  const body = document.createElement("div");
+  body.className = "comp-line";
+  body.textContent = msg.ok ? `${msg.stamp}  ${msg.url}` : msg.error;
+  body.title = msg.ok ? msg.path : msg.error;
+  card.appendChild(body);
+  log.insertBefore(card, log.firstChild);
+}
 
 btnPause.addEventListener("click", () => {
   paused = !paused;
