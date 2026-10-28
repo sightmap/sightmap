@@ -21,6 +21,13 @@ type ComponentRead struct {
 	// subtree: Target's selector alternatives relative to the declaring
 	// component, every definition between them included. Nil when Target is the
 	// declaring component.
+	//
+	// A multi-valued read collects every element Selectors match, exactly as
+	// the matcher does. A single-valued read takes the first in document order.
+	// That is the matcher's value whenever it resolves one; with more than one
+	// PATH step, the matcher takes the first match at each step, so when the
+	// first match of an earlier step contains none of the later step, the
+	// matcher omits the property while Selectors can still find a later match.
 	Selectors []string
 	// Source is the read performed at Target: a dom.* extract (From and Path,
 	// never Pattern or Join), or From: component.exists.
@@ -36,6 +43,8 @@ type ComponentRead struct {
 	// refined, empty ones are dropped, and the rest are joined with Join. Set
 	// exactly when Multi is.
 	Join string
+
+	plainSteps int // PATH steps without [], across chained reads
 }
 
 // maxComponentReadDepth bounds chained reads. The spec has references descend
@@ -56,12 +65,19 @@ const maxComponentReadDepth = 32
 // component-path-ambiguous. A component read whose target property is itself a
 // component read is followed to the leaf.
 //
+// A multi-valued read is resolvable only when every PATH step on the chain is
+// written Name[]. A plain step takes the first match within each branch the
+// steps before it produced, so `Row[].Item.text` reads one Item per Row, and
+// one list of selectors cannot express that per-branch first match.
+//
 // The returned error is a ValidationError: an invalid extract carries the code
 // Validate reports for it, and resolution failures carry
 // component-path-unresolved, component-path-ambiguous,
-// component-property-unresolved, component-read-cycle, or
-// component-read-unsupported (a chained read whose inner read is itself
-// joined, which no single read expresses).
+// component-property-unresolved, component-read-cycle,
+// component-read-owner-unknown, or component-read-unsupported. The last covers
+// a multi-valued read with a plain step (including a chained read beneath
+// it), a chained read of a property that is itself joined, and a corpus whose
+// nested selectors cannot be recovered (see ComponentDef.LocalSelectors).
 func (c *Corpus) ResolveComponentRead(owner ComponentDef, e Extract) (ComponentRead, error) {
 	scope := c.scopeOf(owner)
 	if scope == nil {
@@ -72,8 +88,16 @@ func (c *Corpus) ResolveComponentRead(owner ComponentDef, e Extract) (ComponentR
 	if err := resolveRead(scope, owner, e, &r, nil); err != nil {
 		return ComponentRead{}, err
 	}
+	if r.Multi && r.plainSteps > 0 {
+		return ComponentRead{}, readError(owner, "component-read-unsupported",
+			fmt.Sprintf("path %q mixes Name[] with plain steps (across chained reads), which take the first match per branch; write every step as Name[] or read a single value", e.Path))
+	}
 	if defAddress(r.Target) != defAddress(owner) {
-		r.Selectors = relativeSelectors(scope, owner, r.Target)
+		sels, err := relativeSelectors(scope, owner, r.Target)
+		if err != nil {
+			return ComponentRead{}, err
+		}
+		r.Selectors = sels
 	}
 	return r, nil
 }
@@ -89,7 +113,7 @@ func resolveRead(scope []ComponentDef, owner ComponentDef, e Extract, r *Compone
 	case FromComponent:
 		dot := strings.LastIndex(e.Path, ".")
 		path, prop := e.Path[:dot], e.Path[dot+1:]
-		target, multi, err := resolvePathDefs(scope, owner, path)
+		target, multi, err := resolvePathDefs(scope, owner, path, r)
 		if err != nil {
 			return err
 		}
@@ -104,9 +128,9 @@ func resolveRead(scope []ComponentDef, owner ComponentDef, e Extract, r *Compone
 				fmt.Sprintf("path %q: component %q declares no property %q", e.Path, target.Name, prop))
 		}
 		inner := target.Properties[i].Extract
-		if inner.Join != "" || (multi && inner.From == FromComponentExists) {
+		if inner.Join != "" {
 			return readError(owner, "component-read-unsupported",
-				fmt.Sprintf("path %q reads %s.%s, which cannot be collected by a multi-valued read", e.Path, target.Name, prop))
+				fmt.Sprintf("path %q reads %s.%s, which is itself joined", e.Path, target.Name, prop))
 		}
 		r.Target = target
 		if err := resolveRead(scope, target, inner, r, append(seen, key)); err != nil {
@@ -116,7 +140,7 @@ func resolveRead(scope []ComponentDef, owner ComponentDef, e Extract, r *Compone
 			r.Multi, r.Join = true, e.Join
 		}
 	case FromComponentExists:
-		target, _, err := resolvePathDefs(scope, owner, e.Path)
+		target, _, err := resolvePathDefs(scope, owner, e.Path, r)
 		if err != nil {
 			return err
 		}
@@ -132,8 +156,9 @@ func resolveRead(scope []ComponentDef, owner ComponentDef, e Extract, r *Compone
 }
 
 // resolvePathDefs resolves a component PATH beneath owner to the definition its
-// last segment names, and reports whether any segment was Name[].
-func resolvePathDefs(scope []ComponentDef, owner ComponentDef, path string) (ComponentDef, bool, error) {
+// last segment names, and reports whether any segment was Name[]. It counts
+// the plain segments into r.
+func resolvePathDefs(scope []ComponentDef, owner ComponentDef, path string, r *ComponentRead) (ComponentDef, bool, error) {
 	cur := owner
 	var multi bool
 	for _, seg := range ParseComponentPath(path) {
@@ -155,6 +180,9 @@ func resolvePathDefs(scope []ComponentDef, owner ComponentDef, path string) (Com
 		}
 		cur = found[0]
 		multi = multi || seg.Multi
+		if !seg.Multi {
+			r.plainSteps++
+		}
 	}
 	return cur, multi, nil
 }
@@ -163,45 +191,70 @@ func resolvePathDefs(scope []ComponentDef, owner ComponentDef, path string) (Com
 // ancestor owner: the cross product of the local selectors of every definition
 // from owner (exclusive) down to target (inclusive), joined by a descendant
 // combinator. That is target's flattened Selectors with owner's prefix removed.
-func relativeSelectors(scope []ComponentDef, owner, target ComponentDef) []string {
+func relativeSelectors(scope []ComponentDef, owner, target ComponentDef) ([]string, error) {
 	out := []string{""}
 	parent := owner
+	step := func(d ComponentDef) error {
+		local, ok := localSelectors(parent, d)
+		if !ok {
+			return readError(owner, "component-read-unsupported",
+				fmt.Sprintf("cannot recover %q's own selectors from its flattened ones; re-export the corpus with a current sightmap", d.Name))
+		}
+		out = crossSelectors(out, local)
+		parent = d
+		return nil
+	}
 	// target.ParentChain[:len(owner.ParentChain)+1] is owner's own address, so the
 	// definitions strictly between owner and target start one level deeper.
 	for depth := len(owner.ParentChain) + 2; depth <= len(target.ParentChain); depth++ {
 		chain := target.ParentChain[:depth]
-		var step ComponentDef
-		for _, d := range scope {
-			if slices.Equal(addressOf(d), chain) {
-				step = d
-				break
-			}
+		i := slices.IndexFunc(scope, func(d ComponentDef) bool { return slices.Equal(addressOf(d), chain) })
+		if i < 0 {
+			return nil, readError(owner, "component-path-unresolved",
+				fmt.Sprintf("no definition at %q between %q and %q", strings.Join(chain, "."), owner.Name, target.Name))
 		}
-		out = crossSelectors(out, localSelectors(parent, step))
-		parent = step
+		if err := step(scope[i]); err != nil {
+			return nil, err
+		}
 	}
-	return crossSelectors(out, localSelectors(parent, target))
+	if err := step(target); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // localSelectors returns d's own selector alternatives, as authored. The loader
-// records them; for a corpus built without them (an older exporter's wire) they
-// are recovered from d's flattened Selectors by removing parent's.
-func localSelectors(parent, d ComponentDef) []string {
+// records them. For a corpus built without them (an older exporter's wire) they
+// are recovered from the loader's flattening order: d's Selectors are every
+// parent alternative, in order, each followed by every local one, in order. The
+// recovery is checked against every flattened entry and reports false when it
+// does not hold, rather than guessing which parent alternative produced an
+// entry (one parent alternative can prefix another).
+func localSelectors(parent, d ComponentDef) ([]string, bool) {
 	if len(d.LocalSelectors) > 0 {
-		return d.LocalSelectors
+		return d.LocalSelectors, true
 	}
-	var out []string
-	for _, s := range d.Selectors {
-		for _, ps := range parent.Selectors {
-			if rel, ok := strings.CutPrefix(s, ps+" "); ok {
-				if !slices.Contains(out, rel) {
-					out = append(out, rel)
-				}
-				break
+	p := len(parent.Selectors)
+	if p == 0 || len(d.Selectors) == 0 || len(d.Selectors)%p != 0 {
+		return nil, false
+	}
+	n := len(d.Selectors) / p
+	local := make([]string, n)
+	for j := range n {
+		rel, ok := strings.CutPrefix(d.Selectors[j], parent.Selectors[0]+" ")
+		if !ok || rel == "" {
+			return nil, false
+		}
+		local[j] = rel
+	}
+	for i, ps := range parent.Selectors {
+		for j, ls := range local {
+			if d.Selectors[i*n+j] != ps+" "+ls {
+				return nil, false
 			}
 		}
 	}
-	return out
+	return local, true
 }
 
 // crossSelectors joins every outer alternative with every inner one by a

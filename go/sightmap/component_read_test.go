@@ -203,6 +203,79 @@ func TestResolveComponentRead_WithoutLocalSelectors(t *testing.T) {
 	}
 }
 
+// A multi-valued read with a plain step can't be expressed as one selector list:
+// the plain step takes the first match per branch. All-Name[] paths resolve.
+func TestResolveComponentRead_MixedMultiPath(t *testing.T) {
+	ex := func(from, path string) sightmap.Extract { return sightmap.Extract{From: from, Path: path} }
+	text := []sightmap.ComponentPropertyDef{{Name: "text", Extract: ex(sightmap.FromDOMText, "")}}
+	joined := func(path string) sightmap.Extract {
+		return sightmap.Extract{From: sightmap.FromComponent, Path: path, Join: "|"}
+	}
+	c := &sightmap.Corpus{GlobalComponents: []sightmap.ComponentDef{
+		{Name: "Card", Selectors: []string{".card"}, LocalSelectors: []string{".card"}, Properties: []sightmap.ComponentPropertyDef{
+			{Name: "row_first", Extract: joined("Row[].Item.text")},
+			{Name: "first_row", Extract: joined("Row.Item[].text")},
+			{Name: "chained", Extract: joined("Row[].first")},
+			{Name: "all", Extract: joined("Row[].Item[].text")},
+			{Name: "exists", Extract: joined("Row[].has_item")},
+		}},
+		{Name: "Row", Selectors: []string{".card .row"}, LocalSelectors: []string{".row"}, ParentChain: []string{"Card"}, Properties: []sightmap.ComponentPropertyDef{
+			{Name: "first", Extract: ex(sightmap.FromComponent, "Item.text")},
+			{Name: "has_item", Extract: ex(sightmap.FromComponentExists, "Item")},
+		}},
+		{Name: "Item", Selectors: []string{".card .row .item"}, LocalSelectors: []string{".item"}, ParentChain: []string{"Card", "Row"}, Properties: text},
+	}}
+	card := c.GlobalComponents[0]
+	for _, p := range []string{"row_first", "first_row", "chained", "exists"} {
+		_, err := c.ResolveComponentRead(card, propExtract(t, card, p))
+		var ve sightmap.ValidationError
+		if !errors.As(err, &ve) || ve.Code != "component-read-unsupported" {
+			t.Errorf("%s: got %v, want component-read-unsupported", p, err)
+		}
+	}
+	r, err := c.ResolveComponentRead(card, propExtract(t, card, "all"))
+	if err != nil {
+		t.Fatalf("all-Name[] path: %v", err)
+	}
+	if want := []string{".row .item"}; !r.Multi || !reflect.DeepEqual(r.Selectors, want) {
+		t.Errorf("all-Name[] path: multi=%v selectors=%q, want true %q", r.Multi, r.Selectors, want)
+	}
+}
+
+// The older-wire fallback recovers local selectors from the loader's
+// flattening order, so a parent alternative that prefixes another ("li" and
+// "li span.x") doesn't corrupt them; flattened selectors that don't follow
+// that order are reported rather than guessed at.
+func TestResolveComponentRead_FallbackPrefixAlternatives(t *testing.T) {
+	read := sightmap.Extract{From: sightmap.FromComponent, Path: "Item.text"}
+	build := func(itemSels []string) (*sightmap.Corpus, sightmap.ComponentDef) {
+		c := &sightmap.Corpus{GlobalComponents: []sightmap.ComponentDef{
+			{Name: "List", Selectors: []string{".list"}, Properties: []sightmap.ComponentPropertyDef{{Name: "first", Extract: read}}},
+			{Name: "Row", Selectors: []string{".list li", ".list li span.x"}, ParentChain: []string{"List"}},
+			{Name: "Item", Selectors: itemSels, ParentChain: []string{"List", "Row"},
+				Properties: []sightmap.ComponentPropertyDef{{Name: "text", Extract: sightmap.Extract{From: sightmap.FromDOMText}}}},
+		}}
+		c.GlobalComponents[0].Properties[0].Extract.Path = "Row.Item.text"
+		return c, c.GlobalComponents[0]
+	}
+
+	c, list := build([]string{".list li em", ".list li span.x em"})
+	r, err := c.ResolveComponentRead(list, list.Properties[0].Extract)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if want := []string{"li em", "li span.x em"}; !reflect.DeepEqual(r.Selectors, want) {
+		t.Errorf("selectors %q, want %q", r.Selectors, want)
+	}
+
+	c, list = build([]string{".list li em", ".list li strong"}) // not parent x local order
+	_, err = c.ResolveComponentRead(list, list.Properties[0].Extract)
+	var ve sightmap.ValidationError
+	if !errors.As(err, &ve) || ve.Code != "component-read-unsupported" {
+		t.Errorf("inconsistent flattening: got %v, want component-read-unsupported", err)
+	}
+}
+
 func TestLoader_LocalSelectors(t *testing.T) {
 	c, _ := loadReadCorpus(t)
 	for _, d := range c.GlobalComponents {

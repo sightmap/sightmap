@@ -135,7 +135,7 @@ for _, comp := range corpus.AllComponents() {
 }
 ```
 
-A `component` read is followed through chained reads to the definition the value comes from. `ComponentRead.Selectors` are that definition's selectors relative to the declaring component, built from each nested definition's `LocalSelectors` (its selectors as authored). Errors are `ValidationError` values. Besides the codes `Validate` reports for a malformed extract, `component-path-unresolved` and `component-path-ambiguous` mean a PATH segment names no descendant definition or several. `ValidateComponentExtract(extract)` checks one extract without a corpus.
+A `component` read is followed through chained reads to the definition the value comes from. `ComponentRead.Selectors` are that definition's selectors relative to the declaring component, built from each nested definition's `LocalSelectors` (its selectors as authored). Errors are `ValidationError` values. Besides the codes `Validate` reports for a malformed extract, `component-path-unresolved` and `component-path-ambiguous` mean a PATH segment names no descendant definition or several. `component-read-unsupported` means a multi-valued read has a plain step: `Row[].Item.text` reads the first Item in each Row, which one selector list cannot express, so write every step as `Name[]` or read a single value. `ValidateComponentExtract(extract)` checks one extract without a corpus.
 
 `Load(dir)` is shorthand for `DirLoader(dir).Load()`. For an existing in-memory corpus, `StaticLoader(c *Corpus) Loader` wraps it as a `Loader`; the `LoaderFunc` type, `func() (*Corpus, error)`, also implements `Loader`.
 
