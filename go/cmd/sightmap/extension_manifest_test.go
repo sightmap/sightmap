@@ -24,6 +24,43 @@ func TestExtensionManifestValid(t *testing.T) {
 	}
 }
 
+// TestContentScriptRunsInEveryFrame pins the overlay into iframes. Without
+// all_frames the content script runs only in the top frame, so components inside
+// any iframe (an MCP Apps view, an embedded widget, a payment form) never match.
+// Those views are typically about:blank or srcdoc frames written by their host
+// (match_about_blank), sometimes under an opaque sandboxed origin
+// (match_origin_as_fallback).
+func TestContentScriptRunsInEveryFrame(t *testing.T) {
+	data, err := extensionFS.ReadFile("extension/manifest.json")
+	if err != nil {
+		t.Fatalf("read embedded extension/manifest.json: %v", err)
+	}
+	var m struct {
+		ContentScripts []map[string]any `json:"content_scripts"`
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("parse manifest: %v", err)
+	}
+	if len(m.ContentScripts) == 0 {
+		t.Fatal("manifest declares no content_scripts")
+	}
+	for _, key := range []string{"all_frames", "match_about_blank", "match_origin_as_fallback"} {
+		if m.ContentScripts[0][key] != true {
+			t.Errorf("content_scripts[0].%s must be true, or the overlay misses components inside iframes", key)
+		}
+	}
+
+	src, err := extensionFS.ReadFile("extension/content.js")
+	if err != nil {
+		t.Fatalf("read embedded extension/content.js: %v", err)
+	}
+	// A host that fills the frame with document.open()/write() after injection
+	// erases the overlay nodes and listeners; content.js must re-arm.
+	if !strings.Contains(string(src), "function arm()") {
+		t.Error("extension/content.js: arm() is gone; a document.open()-written frame would lose the overlay")
+	}
+}
+
 // TestContentScriptDoesNotGateOnGlobals pins the fix for the "overlay renders
 // empty" bug: content.js used `state.globals.length` as its "corpus is loaded"
 // signal in the hover and poll paths.
