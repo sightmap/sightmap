@@ -63,6 +63,18 @@ func checkComponentProperties(c *Corpus) []ValidationError {
 	return errs
 }
 
+// ValidateComponentExtract reports whether e is a valid component property
+// directive (SEP-0017), as Validate checks every component property: nil when it
+// is, else a ValidationError carrying the same code and message Validate would
+// report. It checks the directive alone; ResolveComponentRead additionally
+// resolves a PATH against the corpus.
+func ValidateComponentExtract(e Extract) error {
+	if code, msg := checkComponentExtract(e); msg != "" {
+		return ValidationError{Code: code, Severity: SeverityError, Message: msg}
+	}
+	return nil
+}
+
 // checkComponentExtract returns a diagnostic code and message when e is not a
 // valid component directive, else ("", "").
 func checkComponentExtract(e Extract) (code, msg string) {
@@ -73,10 +85,13 @@ func checkComponentExtract(e Extract) (code, msg string) {
 		}
 		return invalid, "extract has no from"
 	}
-	if e.joinSet && e.From != FromComponent {
+	// joinSet records a join key the corpus wrote, even as ""; an Extract built in
+	// Go has no such record, so a non-empty Join counts as set.
+	joinSet := e.joinSet || e.Join != ""
+	if joinSet && e.From != FromComponent {
 		return "extract-join-invalid", fmt.Sprintf("join is only valid with from: %s", FromComponent)
 	}
-	if e.joinSet && e.Join == "" {
+	if joinSet && e.Join == "" {
 		return "extract-join-invalid", "join must be a non-empty string"
 	}
 	switch e.From {
@@ -104,10 +119,10 @@ func checkComponentExtract(e Extract) (code, msg string) {
 		if prop := e.Path[dot+1:]; !propertyNameRe.MatchString(prop) {
 			return invalid, fmt.Sprintf("invalid referenced property name %q in %q", prop, e.Path)
 		}
-		if multi && !e.joinSet {
+		if multi && !joinSet {
 			return invalid, fmt.Sprintf("path %q is multi-valued (Name[]), so it requires join; array-valued results are reserved", e.Path)
 		}
-		if !multi && e.joinSet {
+		if !multi && joinSet {
 			return "extract-join-invalid", fmt.Sprintf("join needs a multi-valued segment to collect, written Name[] (e.g. %s)", suggestMulti(e.Path))
 		}
 	case FromComponentExists:
