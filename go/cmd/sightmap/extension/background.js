@@ -302,6 +302,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       capturePage();
       return false;
 
+    case "toggle-overlay":
+      // Alt+S from one frame: apply it to every frame of that tab.
+      if (sender.tab?.id != null) {
+        chrome.tabs
+          .sendMessage(sender.tab.id, {
+            type: "overlay-visible",
+            value: msg.value,
+          })
+          .catch(() => {});
+      }
+      return false;
+
     case "query-overlay-visible":
       // Content script asking whether it should show the overlay on load
       sendResponse({ visible: sidePanelPorts.size > 0 });

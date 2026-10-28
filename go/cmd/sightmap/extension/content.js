@@ -1051,11 +1051,13 @@ function attachListeners(signal) {
     "keydown",
     (e) => {
       if (e.altKey && e.code === "KeyS") {
-        state.enabled = !state.enabled;
-        if (!state.enabled) clearOverlay();
-        console.log(
-          `[sightmap] overlay ${state.enabled ? "enabled" : "disabled"}`,
-        );
+        // Ask the background to apply it to every frame of this tab (this one
+        // included, via the overlay-visible handler), so the frames stay in sync.
+        const value = !state.enabled;
+        chrome.runtime
+          .sendMessage({ type: "toggle-overlay", value })
+          .catch(() => {});
+        console.log(`[sightmap] overlay ${value ? "enabled" : "disabled"}`);
       }
     },
     { signal },
