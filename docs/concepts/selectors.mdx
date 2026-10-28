@@ -55,6 +55,7 @@ Components, views, and requests resolve matches differently:
 | Definition | Rule | Result |
 |---|---|---|
 | Component `selector` array | First match wins | Sightmap uses the first selector that matches one or more elements. |
+| Several components on one element | Most specific wins | `span.label` names the element over `span`; `[data-id$="-total-price"]` over `[data-id$="-price"]`. Components the selector text cannot order are reported as a conflict. |
 | View `route` | Most specific match wins | Sightmap activates one view; declaration order breaks equal scores. |
 | Request `route` | All matches apply | Every matching route and optional method contributes request metadata and memory. |
 

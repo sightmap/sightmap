@@ -1,0 +1,100 @@
+{
+  "id": "root",
+  "role": "generic",
+  "name": "",
+  "value": "",
+  "isVisible": true,
+  "isInteractive": false,
+  "inViewport": true,
+  "isIgnored": false,
+  "nthChild": 1,
+  "element": {"tag": "div"},
+  "children": [
+    {
+      "id": "plain",
+      "role": "text",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 1,
+      "element": {"tag": "span"}
+    },
+    {
+      "id": "label",
+      "role": "text",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 2,
+      "element": {"tag": "span", "classes": ["label"]}
+    },
+    {
+      "id": "price",
+      "role": "text",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 3,
+      "element": {"tag": "span", "attrs": {"data-id": "row-1-price"}}
+    },
+    {
+      "id": "total",
+      "role": "text",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 4,
+      "element": {"tag": "span", "attrs": {"data-id": "row-1-total-price"}}
+    },
+    {
+      "id": "card",
+      "role": "generic",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": false,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 5,
+      "element": {"tag": "div", "attrs": {"data-component": "Card"}},
+      "children": [
+        {
+          "id": "cardbtn",
+          "role": "button",
+          "name": "",
+          "value": "",
+          "isVisible": true,
+          "isInteractive": true,
+          "inViewport": true,
+          "isIgnored": false,
+          "nthChild": 1,
+          "element": {"tag": "button"}
+        }
+      ]
+    },
+    {
+      "id": "both",
+      "role": "button",
+      "name": "",
+      "value": "",
+      "isVisible": true,
+      "isInteractive": true,
+      "inViewport": true,
+      "isIgnored": false,
+      "nthChild": 6,
+      "element": {"tag": "button", "classes": ["primary", "submit"]}
+    }
+  ]
+}

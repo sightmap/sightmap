@@ -68,8 +68,10 @@ func TestFindConflicts_DistinctNodes(t *testing.T) {
 // A component name is unique only within its parent, so this is legal and — on a
 // real page — common. Deduplicating claims by name hid it completely: a production
 // sign-in corpus had five such nodes and reported none of them. The shape here is
-// exactly that one: the same component observed at two depths across different
-// states, whose shallower definition over-matches via the descendant combinator.
+// exactly that one: the same component observed under two ancestors across
+// different states, each definition reaching the other's node via the
+// descendant combinator. (Neither chain embeds in the other, so SEP-0023 does
+// not order them; a chain that extends the other's would resolve instead.)
 func TestFindConflicts_SameNameDistinctDefs(t *testing.T) {
 	root := node("root", "div", nil,
 		node("widget", "div", []string{"widget"},
@@ -80,7 +82,7 @@ func TestFindConflicts_SameNameDistinctDefs(t *testing.T) {
 	)
 	defs := []sightmap.ComponentDef{
 		{Name: "Recaptcha", Selectors: []string{".widget .recaptcha"}},
-		{Name: "Recaptcha", Selectors: []string{".widget .card .recaptcha"}},
+		{Name: "Recaptcha", Selectors: []string{".card .recaptcha"}},
 	}
 	conflicts := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Conflicts(root, "")
 	if len(conflicts) != 1 {
@@ -99,6 +101,27 @@ func TestFindConflicts_SameNameDistinctDefs(t *testing.T) {
 	}
 	if c.Defs[0].Selectors[0] != ".widget .recaptcha" {
 		t.Errorf("Defs must be index-aligned with Names in first-seen order, got %q", c.Defs[0].Selectors[0])
+	}
+}
+
+// TestFindConflicts_SameNameNestedDefsResolve: the original shape of the
+// sign-in bug, where one definition's chain extends the other's, is not a
+// conflict under SEP-0023; the longer chain names the node.
+func TestFindConflicts_SameNameNestedDefsResolve(t *testing.T) {
+	root := node("root", "div", nil,
+		node("widget", "div", []string{"widget"},
+			node("card", "div", []string{"card"},
+				node("recaptcha", "div", []string{"recaptcha"}),
+			),
+		),
+	)
+	defs := []sightmap.ComponentDef{
+		{Name: "Recaptcha", Selectors: []string{".widget .recaptcha"}},
+		{Name: "Recaptcha", Selectors: []string{".widget .card .recaptcha"}},
+	}
+	m := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs})
+	if conflicts := m.Conflicts(root, ""); len(conflicts) != 0 {
+		t.Fatalf("expected no conflicts, got %+v", conflicts)
 	}
 }
 

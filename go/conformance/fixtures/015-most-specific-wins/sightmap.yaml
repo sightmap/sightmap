@@ -1,0 +1,26 @@
+# Broad definitions first, so first-match-wins alone would give them every node.
+- name: Text
+  selectors:
+    - "span"
+- name: Price
+  selectors:
+    - 'span[data-id^="row-"][data-id$="-price"]'
+- name: Button
+  selectors:
+    - "button"
+- name: Primary
+  selectors:
+    - "button.primary"
+# Narrower definitions after.
+- name: Label
+  selectors:
+    - "span.label"
+- name: TotalPrice
+  selectors:
+    - 'span[data-id^="row-"][data-id$="-total-price"]'
+- name: CardButton
+  selectors:
+    - '[data-component="Card"] > button'
+- name: Submit
+  selectors:
+    - "button.submit"
