@@ -1,5 +1,21 @@
 # @sightmap/sightmap
 
+## 0.37.0
+
+### Minor Changes
+
+- ce3dcde: Capture inbox: `sightmap capture --inbox` keeps a page in `.sightmap/snapshots/_inbox_/<stamp>.snap` (not a view: per-view tools skip it), with its tree and a full-page screenshot, without matching a view or applying the novelty gate. This lets a tool that learns views from captures queue them first and sort them later. The overlay side panel has a **Capture** button (and `Alt+Shift+C`) that writes the tab you are looking at to the same inbox, through a new `POST /capture` endpoint on the `browser start` daemon.
+- 282ec5a: Entity `id` (SEP-0020): every named entity (environments, views, components, `$ref` entries, properties, requests, payload fields, messages, signals and snapshots) accepts an opaque `id` that is unique across the sightmap and stays the same through renames, moves and edits. It doesn't affect matching. The loader exposes each entity's `ID`, and a `$ref` entry's id as `RefID` on the root of its expansion. `validate` reports `id-invalid`, `id-duplicate` (across every entity kind and file; a definition referenced from several places is not a duplicate) and, once a sightmap declares any id, `id-missing` for each entity without one.
+- 2e02c11: The most specific definition names an element (SEP-0023): when several component definitions match one element, the one whose selector is strictly more specific than each of the others names it, whatever the declaration order, so `span.label` beats `span`, `[data-id$="-total-price"]` beats `[data-id$="-price"]` and a child's chain beats its parent's, without a `:not()`. Selectors are ordered by what they require first and what they exclude second, decided from the selector text alone (`sightmap.ParsedSelector.MoreSpecific`), so every implementation orders the same pairs; definitions it cannot order keep the first-declared tie-break and are still reported as conflicts. `Match`, `Conflicts` and `NamesForChain` all apply the rule.
+- beff246: Resolve a component property against the corpus's definitions, for consumers that compile properties ahead of time instead of matching a component tree. `Corpus.ResolveComponentRead(owner, extract)` follows a `from: component` or `component.exists` PATH (and any chained reads) to the definition the value is read from. It returns that target, its selectors relative to the declaring component, the `dom.*` read to perform there, the patterns to apply innermost first, and whether the read is multi-valued and its `join`. A PATH segment that names no descendant, or several, is reported (`component-path-unresolved`, `component-path-ambiguous`), as is a missing property or a cycle. A multi-valued read must write every PATH step as `Name[]`: a plain step takes the first match per branch (`Row[].Item.text` reads one Item per Row), which one selector list cannot express, so such reads are reported as `component-read-unsupported`. `ValidateComponentExtract` checks a single component extract with the same codes `Validate` reports.
+
+  Component definitions now carry `LocalSelectors`, the component's own selector alternatives as authored before ancestors' are prefixed. The corpus wire includes them as `localSelectors` on nested components, and a reader handles a wire without them.
+
+### Patch Changes
+
+- bb747e4: Browser overlay: match components inside iframes. The extension's content script ran only in the top frame, so nothing inside an embedded view (an MCP Apps widget, a sandboxed `about:blank`/`srcdoc` frame) ever matched. It now runs in every frame, including `about:blank` and opaque-origin sandboxed frames, and re-arms its overlay when a host fills a frame with `document.open()`/`write()` after load.
+  Alt+S now toggles the overlay in every frame of the tab, not just the focused one.
+
 ## 0.36.1
 
 ### Patch Changes
