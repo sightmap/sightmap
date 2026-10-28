@@ -11,12 +11,20 @@ type ComponentDef struct {
 	ID string `json:"id,omitempty"`
 	// RefID is the id of the $ref entry this component was expanded from, set
 	// on the root of an expansion only. "" otherwise.
-	RefID     string   `json:"refId,omitempty"`
-	Name      string   `json:"name"`
+	RefID string `json:"refId,omitempty"`
+	Name  string `json:"name"`
+	// Selectors are the flattened selectors that match this component anywhere in
+	// the document: each ancestor's selector alternatives prefixed onto the
+	// component's own, joined by a descendant combinator.
 	Selectors []string `json:"selectors"`
-	Source    string   `json:"source,omitempty"`
-	Memory    []string `json:"memory,omitempty"`
-	Tags      []string `json:"tags,omitempty"`
+	// LocalSelectors are the component's own selector alternatives as authored,
+	// before any ancestor's are prefixed: the part that selects it within its
+	// parent's subtree. Set by the loader; empty in a corpus built another way, in
+	// which case ResolveComponentRead derives it from the parent's Selectors.
+	LocalSelectors []string `json:"localSelectors,omitempty"`
+	Source         string   `json:"source,omitempty"`
+	Memory         []string `json:"memory,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
 	// Watch asks a capture consumer to report this component's visibility lifecycle even
 	// when it is never interacted with. Applies to this component only, never its
 	// children. See SEP-0015.

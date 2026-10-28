@@ -289,7 +289,7 @@ curl -s localhost:7891/sightmap
 
 ### `sightmap export`
 
-Loads a `.sightmap/` corpus with the Go loader and prints the canonical corpus wire: `json.Marshal` of the library's `sightmap.Corpus`, the same shape a Go consumer reads. Top-level keys are `memory`, `globals`, `views`, `requests`, `messages`, `signals`, `environments`, and `origins`, each omitted when empty. Components carry `name`, a `selectors` array, `parentChain` for nested components, and `source`, `memory`, `tags`, `privacy`, `watch`, `properties`, and `stability` when set.
+Loads a `.sightmap/` corpus with the Go loader and prints the canonical corpus wire: `json.Marshal` of the library's `sightmap.Corpus`, the same shape a Go consumer reads. Top-level keys are `memory`, `globals`, `views`, `requests`, `messages`, `signals`, `environments`, and `origins`, each omitted when empty. Components carry `name`, a `selectors` array (flattened: each ancestor's selector prefixed onto the component's own), `parentChain` and `localSelectors` (the component's own selectors as authored) for nested components, and `source`, `memory`, `tags`, `privacy`, `watch`, `properties`, and `stability` when set.
 
 ```bash
 sightmap export                       # stdout

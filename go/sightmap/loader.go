@@ -839,18 +839,19 @@ func flattenOne(rc rawComponent, parentSels []string, ctx *flattenCtx, parentCha
 	}
 
 	result := []ComponentDef{{
-		ID:          rc.ID,
-		RefID:       refID,
-		Name:        rc.Name,
-		Selectors:   mySels,
-		Source:      rc.Source,
-		Memory:      rc.Memory,
-		Tags:        rc.Tags,
-		Watch:       rc.Watch,
-		Privacy:     rc.Privacy,
-		Properties:  rawPropsToMatch(rc.Properties),
-		ParentChain: parentChain, // nil for top-level; omitted from JSON
-		Stability:   rc.Stability,
+		ID:             rc.ID,
+		RefID:          refID,
+		Name:           rc.Name,
+		Selectors:      mySels,
+		LocalSelectors: rawSels,
+		Source:         rc.Source,
+		Memory:         rc.Memory,
+		Tags:           rc.Tags,
+		Watch:          rc.Watch,
+		Privacy:        rc.Privacy,
+		Properties:     rawPropsToMatch(rc.Properties),
+		ParentChain:    parentChain, // nil for top-level; omitted from JSON
+		Stability:      rc.Stability,
 	}}
 	if originDepth >= 0 {
 		result[0].Origin = strings.Join(append(append([]string(nil), parentChain[originDepth:]...), rc.Name), "\x00")

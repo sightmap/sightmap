@@ -110,9 +110,32 @@ func main() {
 | `SignalByName`, `ResolveSignal`, `ResolveSignalRef`, `TagsForSignal` | Look up a signal and the component or view its `ref` names |
 | `EnvironmentByName(name) *EnvironmentDef` | An environment from the project-wide registry |
 | `ResolveOrigin(environment, origin) (string, bool)` | An origin's URL in an environment: its own map, then its backend's, then the shared map |
+| `ResolveComponentRead(owner, extract) (ComponentRead, error)` | Resolve a component property against the definitions, without a tree (see below) |
 | `Stats() Stats` | The counts `sightmap stats` prints |
 
 Package-level helpers include `RequestEnvironments(view, request)`, which intersects a view-scoped request's environments with its view's, and `SplitFieldPath`, which splits a body `path` with `\.` and `\\` escapes. Every property definition (`ComponentPropertyDef`, `RequestPropertyDef`, `MessagePropertyDef`, `URLPropertyDef`) carries one `Extract` value.
+
+## Compile component properties ahead of time
+
+`Matcher.Match` resolves component properties over a matched tree. A consumer that extracts values some other way, such as a rule engine that reads a DOM by selector, can resolve each property against the definitions instead and compile it into its own rules:
+
+```go
+for _, comp := range corpus.AllComponents() {
+	for _, p := range comp.Properties {
+		r, err := corpus.ResolveComponentRead(comp, p.Extract)
+		if err != nil {
+			log.Printf("skip %s.%s: %v", comp.Name, p.Name, err)
+			continue
+		}
+		// Read r.Source at the element r.Selectors selects within comp (comp itself when
+		// r.Selectors is nil): every such element when r.Multi, else the first. Refine
+		// each value with r.Patterns in order, as Extract.Refine does, then join
+		// multi-valued results with r.Join.
+	}
+}
+```
+
+A `component` read is followed through chained reads to the definition the value comes from. `ComponentRead.Selectors` are that definition's selectors relative to the declaring component, built from each nested definition's `LocalSelectors` (its selectors as authored). Errors are `ValidationError` values. Besides the codes `Validate` reports for a malformed extract, `component-path-unresolved` and `component-path-ambiguous` mean a PATH segment names no descendant definition or several. `ValidateComponentExtract(extract)` checks one extract without a corpus.
 
 `Load(dir)` is shorthand for `DirLoader(dir).Load()`. For an existing in-memory corpus, `StaticLoader(c *Corpus) Loader` wraps it as a `Loader`; the `LoaderFunc` type, `func() (*Corpus, error)`, also implements `Loader`.
 
