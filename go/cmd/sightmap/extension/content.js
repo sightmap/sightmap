@@ -1016,9 +1016,10 @@ function emitEvent(eventType, target) {
 
 // ── Event listeners ───────────────────────────────────────────────────────────
 
-function attachListeners() {
-  document.addEventListener("mousemove", onMouseMove, { passive: true });
-  document.addEventListener("mouseleave", onMouseLeave, { passive: true });
+/** Binds the document listeners; aborting `signal` removes them all. */
+function attachListeners(signal) {
+  document.addEventListener("mousemove", onMouseMove, { passive: true, signal });
+  document.addEventListener("mouseleave", onMouseLeave, { passive: true, signal });
 
   // Click capture (useCapture=true to see all clicks before stopPropagation)
   document.addEventListener(
@@ -1030,7 +1031,7 @@ function attachListeners() {
       if (!state.enabled) return;
       emitEvent("click", e.target);
     },
-    true,
+    { capture: true, signal },
   );
 
   // Input capture
@@ -1040,21 +1041,25 @@ function attachListeners() {
       if (!state.enabled) return;
       emitEvent("input", e.target);
     },
-    true,
+    { capture: true, signal },
   );
 
   // Alt+S — toggle overlay.
   // Use e.code (physical key): on macOS, holding Option rewrites e.key to a
   // composed glyph (Option+S → "ß"), so e.key checks never fire.
-  document.addEventListener("keydown", (e) => {
-    if (e.altKey && e.code === "KeyS") {
-      state.enabled = !state.enabled;
-      if (!state.enabled) clearOverlay();
-      console.log(
-        `[sightmap] overlay ${state.enabled ? "enabled" : "disabled"}`,
-      );
-    }
-  });
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.altKey && e.code === "KeyS") {
+        state.enabled = !state.enabled;
+        if (!state.enabled) clearOverlay();
+        console.log(
+          `[sightmap] overlay ${state.enabled ? "enabled" : "disabled"}`,
+        );
+      }
+    },
+    { signal },
+  );
 }
 
 // ── Overlay visibility (controlled by side panel open/close) ─────────────────
@@ -1077,6 +1082,12 @@ chrome.runtime.onMessage.addListener((msg) => {
   // Guard: only run once per page
   if (window.__sightmapOverlayLoaded) return;
   window.__sightmapOverlayLoaded = true;
+
+  // Torn down by the next arm(), so re-arming never stacks listeners: after a
+  // document.open() the old ones are already gone and this is a no-op, but a
+  // page that swaps documentElement without it leaves them live.
+  let armed = null;
+  let armedObserver = null;
 
   arm();
   // A frame the page fills with document.open()/write() after we injected (an
@@ -1106,25 +1117,33 @@ chrome.runtime.onMessage.addListener((msg) => {
 
   /** Overlay nodes and every listener, for this document (again after a document.open). */
   function arm() {
+    armed?.abort();
+    armedObserver?.disconnect();
+    armed = new AbortController();
+    const { signal } = armed;
     state.overlayEl = null;
     state.tooltipEl = null;
     state.hoverTarget = null;
     ensureOverlay();
-    attachListeners();
+    attachListeners(signal);
 
     // DOM mutations — handles removal, new nodes shifting element positions,
     // and conditional re-renders (SPA navigation, Preact reconciliation).
     // Debounced so rapid batched mutations don't cause continuous re-resolution.
     // Observes the root, not body: a document being written has no body yet.
     let mutationRaf = null;
-    new MutationObserver(() => {
+    armedObserver = new MutationObserver(() => {
       if (!state.hoverTarget) return;
       if (mutationRaf) return;
       mutationRaf = requestAnimationFrame(() => {
         mutationRaf = null;
         refreshOverlay();
       });
-    }).observe(document.documentElement, { childList: true, subtree: true });
+    });
+    armedObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
 
     // Scroll — element positions change relative to the fixed overlay boxes.
     // Use capture so we catch scrolls on any scrollable container, not just window.
@@ -1134,7 +1153,7 @@ chrome.runtime.onMessage.addListener((msg) => {
         if (!state.hoverTarget) return;
         requestAnimationFrame(refreshOverlay);
       },
-      { passive: true, capture: true },
+      { passive: true, capture: true, signal },
     );
   }
 
