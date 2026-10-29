@@ -1,0 +1,7 @@
+version: 1
+components:
+  - name: TabBarItem
+    selector: 'tab'
+    properties:
+      - name: title
+        extract: { from: dom.text }
