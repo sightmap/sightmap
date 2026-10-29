@@ -81,8 +81,9 @@ lists them: add a predicate or append `#N`.
 
 **Off-screen and covered elements.** `click` refuses a target whose center is
 off the screen, under the tab bar, toolbar, navigation bar or keyboard, under a
-React Native LogBox toast, or within 24 pt of a floating dev-menu button, and
-says what to do. Long SwiftUI/UIKit lists expose only the rows near the screen,
+React Native LogBox toast, under any control drawn over it (e.g. a custom tab
+bar of plain buttons floating over a list), or within 24 pt of a floating
+dev-menu button, and says what to do. Long SwiftUI/UIKit lists expose only the rows near the screen,
 so a row further down is "not found" until you scroll:
 `scroll down --until TARGET` scrolls slowly enough not to fling past it, stops
 once the target is tappable, and refreshes the snapshot ids.
@@ -91,8 +92,9 @@ once the target is tappable, and refreshes the snapshot ids.
 animating for a moment. If a snapshot still shows the old screen, snapshot
 again. `click` and `fill` wait out short animations themselves: while the target
 is missing, or the screen moves between two reads ~150 ms apart (a sheet
-closing, a back navigation), they re-read for up to ~1.5 s. `--json` reports how
-many re-reads it took as `retries`.
+closing, a back navigation), they re-read for up to 3 s (`--settle 5s` to
+wait longer, e.g. for a Debug React Native build redrawing after a back
+navigation). `--json` reports how many re-reads it took as `retries`.
 
 ## Commands
 
@@ -103,8 +105,8 @@ many re-reads it took as `retries`.
 | `status` / `stop [--shutdown]` | Session health / stop the daemon and the app (`--shutdown`: the simulator too). |
 | `launch` / `relaunch` | Foreground the app / restart it (re-enables accessibility first). |
 | `snapshot [--view V] [--include-offscreen] [--out F] [--tree-out F]` | Annotated tree. `--out F` writes the text plus `F.tree.json`, which `sightmap explain --snap` and `sightmap coverage` read. |
-| `click TARGET` | Re-resolves, checks it's on screen, uncovered and enabled, taps its center. |
-| `fill TARGET TEXT [--clear]` | Taps, types (appends unless `--clear`), errors if the field doesn't show the text. `fill TARGET "" --clear` empties it; a field then showing only its placeholder reports value `""`. |
+| `click TARGET [--settle DUR]` | Re-resolves, checks it's on screen, uncovered and enabled, taps its center. |
+| `fill TARGET TEXT [--clear] [--settle DUR]` | Taps, types (appends unless `--clear`), errors if the field doesn't show the text. `fill TARGET "" --clear` empties it; a field then showing only its placeholder reports value `""`. |
 | `scroll up\|down\|left\|right [--in TARGET] [--until TARGET] [--max N]` | One page, or until a target is tappable (default `--max 20`). `--in` scrolls inside that element. |
 | `swipe X1 Y1 X2 Y2 [--duration S]`, `tap-xy X Y`, `type TEXT`, `key NAME`, `button NAME`, `openurl URL` | Raw input in screen points. Keys: `return delete tab escape space` and arrows. Buttons: `home lock siri side apple_pay volume_up volume_down`. |
 | `screenshot --out F.png` | PNG of the screen. |
@@ -227,7 +229,7 @@ views:
 without it the app shows a red "No script URL provided" box. If edits don't
 show, restart Metro with `--clear`. In a git worktree nested inside another
 checkout, Watchman watches the parent: stop Metro, `watchman watch-del-all`, add
-an empty `.watchmanconfig` at the worktree root, and restart Metro there. If
+a `.watchmanconfig` containing `{}` at the worktree root (Watchman rejects an empty file), and restart Metro there. If
 port 8081 is taken, run Metro with `--port N` and point the app at it:
 `xcrun simctl spawn <udid> defaults write <bundle-id> RCT_jsLocation localhost:N`,
 then `relaunch`. A Release build drops `console.log` below error unless the app

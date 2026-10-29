@@ -41,7 +41,7 @@ type Timing struct {
 	FillReadback  time.Duration // how long fill waits for the typed text to show
 	ReadyTimeout  time.Duration // how long start waits for a readable tree
 	RetryInterval time.Duration // between re-reads while the screen moves
-	RetryTimeout  time.Duration // how long click/fill wait for a moving screen
+	RetryTimeout  time.Duration // how long click/fill wait for a missing target or a moving screen
 }
 
 func (t Timing) withDefaults() Timing {
@@ -56,7 +56,9 @@ func (t Timing) withDefaults() Timing {
 	def(&t.FillReadback, 2*time.Second)
 	def(&t.ReadyTimeout, 20*time.Second)
 	def(&t.RetryInterval, 150*time.Millisecond)
-	def(&t.RetryTimeout, 1500*time.Millisecond)
+	// A Debug React Native build can take a few seconds to draw a screen
+	// after a navigation.
+	def(&t.RetryTimeout, 3*time.Second)
 	return t
 }
 
@@ -403,6 +405,20 @@ type TargetArgs struct {
 	Target string `json:"target"`
 	Text   string `json:"text,omitempty"`
 	Clear  bool   `json:"clear,omitempty"`
+	// Settle overrides how long to wait for a missing target or a moving
+	// screen (Timing.RetryTimeout), as a Go duration such as "5s".
+	Settle string `json:"settle,omitempty"`
+}
+
+func (a TargetArgs) settle(def time.Duration) (time.Duration, error) {
+	if a.Settle == "" {
+		return def, nil
+	}
+	d, err := time.ParseDuration(a.Settle)
+	if err != nil || d < 0 {
+		return 0, errorf("usage", "--settle takes a duration such as 3s or 500ms, not %q", a.Settle)
+	}
+	return d, nil
 }
 
 // ScrollArgs are the scroll command's arguments.
@@ -457,7 +473,11 @@ func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (
 		if err != nil {
 			return nil, err
 		}
-		r, err := s.tap(ctx, a.Target)
+		settle, err := a.settle(s.Timing.RetryTimeout)
+		if err != nil {
+			return nil, err
+		}
+		r, err := s.tap(ctx, a.Target, settle)
 		if err != nil {
 			return nil, err
 		}
@@ -699,8 +719,8 @@ func (t tapped) result() map[string]any {
 // tap re-reads the screen, re-resolves target, checks it is tappable and taps
 // its center. Right after a sheet closes or a navigation pops, the target can
 // be missing or still moving, so it re-reads until two reads agree and the
-// target is there, for up to Timing.RetryTimeout.
-func (s *Session) tap(ctx context.Context, target string) (tapped, error) {
+// target is there, for up to settle.
+func (s *Session) tap(ctx context.Context, target string, settle time.Duration) (tapped, error) {
 	numeric := IsSnapshotID(target)
 	base := s.last
 	if numeric && base == nil {
@@ -724,7 +744,7 @@ func (s *Session) tap(ctx context.Context, target string) (tapped, error) {
 		}
 		return Resolve(snap, target)
 	}
-	deadline := time.Now().Add(s.Timing.RetryTimeout)
+	deadline := time.Now().Add(settle)
 	retries, stable := 0, false
 	snap, err := s.fresh(ctx, view)
 	if err != nil {
@@ -803,7 +823,11 @@ func (s *Session) notFound(ctx context.Context, snap *Snapshot, target string, e
 }
 
 func (s *Session) fill(ctx context.Context, a TargetArgs) (map[string]any, error) {
-	t, err := s.tap(ctx, a.Target)
+	settle, err := a.settle(s.Timing.RetryTimeout)
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.tap(ctx, a.Target, settle)
 	if err != nil {
 		return nil, err
 	}

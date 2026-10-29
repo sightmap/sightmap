@@ -2,6 +2,7 @@ package sightmap
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 )
 
@@ -197,6 +198,9 @@ type ComponentNode struct {
 // This allows minimal JSON fixtures to omit common default values while maintaining
 // backward compatibility with fully-populated snapshot files.
 func (n *ComponentNode) UnmarshalJSON(data []byte) error {
+	if n == nil {
+		return errors.New("sightmap: UnmarshalJSON into a nil *ComponentNode")
+	}
 	// Define an alias type to avoid recursion when calling json.Unmarshal
 	type Alias ComponentNode
 

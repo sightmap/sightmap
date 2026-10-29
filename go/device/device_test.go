@@ -2,6 +2,7 @@ package device
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -358,5 +359,83 @@ func TestSparseNote(t *testing.T) {
 	}
 	if !strings.Contains(s.Render(RenderOpts{UDID: "UDID"}), "[Mostly empty]") {
 		t.Error("render lacks [Mostly empty]")
+	}
+}
+
+// A snapshot result decodes back into its tree (the CLI and library callers
+// read `snapshot --json`); this must hold under encoding/json/v2 too
+// (GOEXPERIMENT=jsonv2 before Go 1.27, the default after).
+func TestSnapshotResultJSONRoundTrip(t *testing.T) {
+	s := snapshot(t, "describe-heavy", "corpus", "")
+	data, err := json.Marshal(SnapshotResult{Text: "x", Tree: s.AnnotatedTree()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var r SnapshotResult
+	if err := json.Unmarshal(data, &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.Tree == nil || r.Tree.ComponentNode == nil || r.Tree.Id != "1" || len(r.Tree.Children) != len(s.Root.Children) {
+		t.Fatalf("tree did not round-trip: %+v", r.Tree)
+	}
+	var rows int
+	var walk func(n *AnnotatedNode)
+	walk = func(n *AnnotatedNode) {
+		if n.Component == "ProductRow" && n.Props["title"] != "" {
+			rows++
+		}
+		for _, c := range n.Children {
+			walk(c)
+		}
+	}
+	walk(r.Tree)
+	if rows == 0 {
+		t.Error("no ProductRow with props survived the round trip")
+	}
+}
+
+// A custom tab bar of plain buttons (no tab role, no tab bar container) drawn
+// over a list covers the rows under it.
+func TestCustomBarDrawnOverAListCoversRows(t *testing.T) {
+	row := func(i int, y float64) *RawElement {
+		return &RawElement{Type: "Button", Identifier: fmt.Sprintf("participant-row-%d", i), Label: fmt.Sprintf("Row %d", i), Frame: Frame{X: 0, Y: y, W: 400, H: 60}}
+	}
+	d := &Describe{Screen: Size{W: 400, H: 800}, Root: &RawElement{Type: "Application", Frame: Frame{W: 400, H: 800}, Children: []*RawElement{
+		row(1, 100), row(25, 720),
+		{Type: "Button", Identifier: "leaderboard-tab", Label: "Leaderboard", Frame: Frame{X: 20, Y: 710, W: 170, H: 70}},
+		{Type: "Button", Identifier: "stats-tab", Label: "Stats", Frame: Frame{X: 190, Y: 710, W: 190, H: 70}},
+	}}}
+	s, _ := Annotate(Normalize(d), nil, nil, "")
+	err := s.AssertActionable(byIdentifier(t, s.Tree, "participant-row-25"), "participant-row-25")
+	if err == nil || Code(err) != "covered" || !strings.Contains(err.Error(), "stats-tab") || !strings.Contains(AsError(err).Hint, "scroll down") {
+		t.Fatalf("row under the bar: %v", err)
+	}
+	for _, id := range []string{"participant-row-1", "stats-tab"} {
+		if err := s.AssertActionable(byIdentifier(t, s.Tree, id), id); err != nil {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+}
+
+// The Expo dev client's floating gear reports its SF Symbol name as its
+// identifier.
+func TestFloatingExpoGear(t *testing.T) {
+	d := &Describe{Screen: Size{W: 400, H: 800}, Root: &RawElement{Type: "Application", Frame: Frame{W: 400, H: 800}, Children: []*RawElement{
+		{Type: "Button", Identifier: "topbar-avatar-button", Label: "Profile", Frame: Frame{X: 330, Y: 60, W: 50, H: 40}},
+		{Type: "Button", Identifier: "settings-button", Frame: Frame{X: 10, Y: 60, W: 44, H: 44}, Children: []*RawElement{
+			{Type: "Image", Identifier: "gearshape", Frame: Frame{X: 16, Y: 66, W: 32, H: 32}},
+		}},
+		{Type: "Image", Identifier: "gearshape.fill", Frame: Frame{X: 340, Y: 100, W: 44, H: 44}},
+	}}}
+	s, _ := Annotate(Normalize(d), nil, nil, "")
+	floating := s.floatingControls()
+	if len(floating) != 1 || Identifier(floating[0]) != "gearshape.fill" {
+		t.Fatalf("floating = %v", floating)
+	}
+	if err := s.AssertActionable(byIdentifier(t, s.Tree, "topbar-avatar-button"), "topbar-avatar-button"); err == nil || !strings.Contains(err.Error(), "dev-menu") {
+		t.Errorf("avatar next to the gear: %v", err)
+	}
+	if err := s.AssertActionable(byIdentifier(t, s.Tree, "settings-button"), "settings-button"); err != nil {
+		t.Errorf("the app's own gear button: %v", err)
 	}
 }

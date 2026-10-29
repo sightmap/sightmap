@@ -3,6 +3,7 @@ package device
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -128,8 +129,37 @@ func (s *Snapshot) AssertActionable(n *sightmap.ComponentNode, target string) er
 		}
 		return withHint("covered", hint, "%s is covered by the %s (%s)", desc, barName(o), what)
 	}
+	if o := s.drawnOver(n, cx, cy); o != nil {
+		dir := "up"
+		if float64(cy) > s.Screen.H/2 {
+			dir = "down"
+		}
+		return withHint("covered", fmt.Sprintf("scroll it clear (`sightmap device scroll %s --until %s`), then retry", dir, quote(target)),
+			"%s is covered by %s, which is drawn over it; a tap at (%d, %d) would land there", desc, s.Describe(o), cx, cy)
+	}
 	if !Enabled(n) {
 		return errorf("disabled", "%s is disabled", desc)
+	}
+	return nil
+}
+
+// drawnOver returns an interactive element drawn over n's center, or nil. The
+// accessibility tree is in drawing order, so an element later in it whose
+// frame holds the point is in front, e.g. a custom tab bar of plain buttons
+// floating over a list. Elements as large as half the screen are left out:
+// they are containers, not something in the way.
+func (s *Snapshot) drawnOver(n *sightmap.ComponentNode, cx, cy int) *sightmap.ComponentNode {
+	start := slices.Index(s.Nodes, n)
+	if start < 0 {
+		return nil
+	}
+	for _, o := range s.Nodes[start+1:] {
+		b := o.Bounds
+		if !o.IsInteractive || !o.IsVisible || s.IsAncestor(n, o) || !rectOf(o).contains(cx, cy) ||
+			float64(b.Width*b.Height) >= s.Screen.W*s.Screen.H/2 {
+			continue
+		}
+		return o
 	}
 	return nil
 }

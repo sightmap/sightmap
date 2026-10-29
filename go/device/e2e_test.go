@@ -88,6 +88,7 @@ func TestE2E(t *testing.T) {
 
 	snap := snapshotUntil("[View: Login]")
 	expect(snap, `[SignInButton "Sign In"]`, "[EmailField]")
+	expect(must("snapshot", "--json"), `"ok":true`, `"component":"SignInButton"`)
 
 	must("click", "SignInButton")
 	snapshotUntil("[LoginError")

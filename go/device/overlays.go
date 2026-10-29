@@ -65,16 +65,29 @@ var devMenuLabel = regexp.MustCompile(`(?i)\b(dev(eloper)?[\s-]?menu|dev[\s-]?to
 // taps, in points.
 const floatingMargin = 24
 
+// devMenuSymbol matches the SF Symbol names dev-menu buttons draw, which the
+// accessibility tree reports as their identifier (the Expo dev client's gear
+// is `image[identifier="gearshape.fill"]`).
+var devMenuSymbol = regexp.MustCompile(`^(gearshape(\.2)?|gear|ellipsis\.circle|wrench(\.and\.screwdriver)?|hammer)(\.(fill|circle))*$`)
+
+func small(n *sightmap.ComponentNode) bool {
+	return n.Bounds.Width <= 96 && n.Bounds.Height <= 96
+}
+
+// fabShaped: a small, roughly square leaf whose identifier, if any, is a
+// dev-menu symbol rather than one the app gave it.
 func fabShaped(n *sightmap.ComponentNode) bool {
 	w, h := float64(n.Bounds.Width), float64(n.Bounds.Height)
-	return len(n.Children) == 0 && Identifier(n) == "" && w >= 32 && h >= 32 && w <= 96 && h <= 96 && w/h >= 0.6 && w/h <= 1.67
+	id := Identifier(n)
+	return len(n.Children) == 0 && (id == "" || devMenuSymbol.MatchString(id)) && w >= 32 && h >= 32 && small(n) && w/h >= 0.6 && w/h <= 1.67
 }
 
 // floatingControls returns controls that most likely float in a separate small
 // window above the app, like the React Native / Expo dev-menu button. describe
-// reports no windows, so this is a heuristic: a dev-menu label or identifier,
-// or a small square element without an identifier drawn last at the root, as a
-// window above the app's own would be.
+// reports no windows, so this is a heuristic: a dev-menu label or identifier; a
+// small element named after a dev-menu symbol (a gear) outside any control of
+// the app's; or a small square leaf drawn last at the root, as a window above
+// the app's own would be.
 func (t *Tree) floatingControls() []*sightmap.ComponentNode {
 	var top []*sightmap.ComponentNode
 	for _, c := range t.Root.Children {
@@ -91,7 +104,8 @@ func (t *Tree) floatingControls() []*sightmap.ComponentNode {
 		if n == t.Root || !n.IsVisible {
 			continue
 		}
-		if devMenuLabel.MatchString(n.Name) || devMenuLabel.MatchString(Identifier(n)) || (n == last && fabShaped(n)) {
+		symbol := devMenuSymbol.MatchString(Identifier(n)) && small(n) && !t.hasAncestor(n, func(a *sightmap.ComponentNode) bool { return a.IsInteractive })
+		if devMenuLabel.MatchString(n.Name) || devMenuLabel.MatchString(Identifier(n)) || symbol || (n == last && fabShaped(n)) {
 			out = append(out, n)
 		}
 	}

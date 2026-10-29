@@ -185,7 +185,11 @@ The corpus reloads whenever a YAML file under `--sightmap-dir` changes, so the n
 
 ### `device click`
 
-Resolves the target in a fresh read of the screen, checks that its center is on screen, not under a tab bar, toolbar, navigation bar, keyboard, LogBox toast, or floating dev-menu button, and that it is enabled, then taps its center. While the target is missing or the screen is still moving, it re-reads for up to about 1.5 s first.
+Resolves the target in a fresh read of the screen, checks that its center is on screen, not under a tab bar, toolbar, navigation bar, keyboard, LogBox toast, any control drawn over it (such as a custom tab bar of plain buttons over a list), or a floating dev-menu button, and that it is enabled, then taps its center. While the target is missing or the screen is still moving, it re-reads for up to 3 s first.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--settle` | `3s` | How long to wait for a missing target or a moving screen, e.g. `5s` for a Debug React Native build that redraws slowly after a navigation |
 
 ```bash
 sightmap device click SignInButton
@@ -211,6 +215,7 @@ Taps the target, types the text, and errors if the field does not show it. Text 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--clear` | off | Empty the field first |
+| `--settle` | `3s` | As for `click` |
 
 ```bash
 sightmap device fill login-email "a@example.com" --clear

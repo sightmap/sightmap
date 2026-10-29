@@ -1,6 +1,7 @@
 package device
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -219,4 +220,28 @@ type AnnotatedNode struct {
 	Component string            `json:"component,omitempty"`
 	Props     map[string]string `json:"props,omitempty"`
 	Children  []*AnnotatedNode  `json:"children,omitempty"`
+}
+
+// UnmarshalJSON decodes the node's own ComponentNode fields and its identity.
+// It allocates the embedded node itself: a decoder that calls the embedded
+// pointer's UnmarshalJSON (encoding/json/v2 does) would otherwise call it on nil.
+func (a *AnnotatedNode) UnmarshalJSON(data []byte) error {
+	node := &sightmap.ComponentNode{}
+	if err := json.Unmarshal(data, node); err != nil {
+		return err
+	}
+	var identity struct {
+		Component string            `json:"component"`
+		Props     map[string]string `json:"props"`
+		Children  []*AnnotatedNode  `json:"children"`
+	}
+	if err := json.Unmarshal(data, &identity); err != nil {
+		return err
+	}
+	node.Children = node.Children[:0]
+	for _, c := range identity.Children {
+		node.Children = append(node.Children, c.ComponentNode)
+	}
+	*a = AnnotatedNode{ComponentNode: node, Component: identity.Component, Props: identity.Props, Children: identity.Children}
+	return nil
 }

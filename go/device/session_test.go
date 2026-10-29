@@ -286,3 +286,18 @@ func TestRunLogNotesAndRelaunch(t *testing.T) {
 		t.Errorf("relaunch logged as %q", entries[1].Action)
 	}
 }
+
+func TestClickSettleWaitsForAMissingTarget(t *testing.T) {
+	s, _ := newTestSession(t, "describe-simple")
+	s.Timing.RetryTimeout = time.Hour
+	started := time.Now()
+	if _, err := handle(t, s, "click", TargetArgs{Target: "not-on-screen", Settle: "200ms"}); Code(err) != "not_found" {
+		t.Fatalf("err = %v", err)
+	}
+	if took := time.Since(started); took < 200*time.Millisecond || took > 5*time.Second {
+		t.Errorf("--settle 200ms waited %s", took)
+	}
+	if _, err := handle(t, s, "click", TargetArgs{Target: "simple.primary", Settle: "soon"}); Code(err) != "usage" {
+		t.Errorf("bad --settle: %v", err)
+	}
+}

@@ -43,8 +43,8 @@ Observe:
   console get INDEX
 
 Act (TARGET: snapshot id, accessibility identifier, component query, or a selector):
-  click TARGET
-  fill TARGET TEXT [--clear]
+  click TARGET [--settle DUR]                       DUR: how long to wait for the target (default 3s)
+  fill TARGET TEXT [--clear] [--settle DUR]
   scroll up|down|left|right [--in TARGET] [--until TARGET] [--max N]
   swipe X1 Y1 X2 Y2 [--duration S]                  screen points (not pixels), origin top-left
   tap-xy X Y                                        screen points; off-screen points are refused
@@ -164,7 +164,7 @@ func deviceCommand(cmd string, args []string, f *deviceFlags) error {
 	// likely still loading, and a script must not take it for a real screen.
 	var empty *device.Error
 	if req.cmd == "snapshot" {
-		var r device.SnapshotResult
+		var r struct{ Coverage device.CoverageCounts }
 		json.Unmarshal(result, &r)
 		if r.Coverage.Interactive == 0 {
 			empty = &device.Error{Code: "empty", Message: "0 interactive elements; the app may still be loading", Hint: "wait a moment and snapshot again"}
@@ -216,10 +216,10 @@ func absPath(p string) string {
 func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error) {
 	fs := f.fs
 	var (
-		view, out, treeOut, in, until, grep, level *string
-		offscreen, clear, all, ignoreCase, follow  *bool
-		maxScrolls, limit, since                   *int
-		duration                                   *float64
+		view, out, treeOut, in, until, grep, level, settle *string
+		offscreen, clear, all, ignoreCase, follow          *bool
+		maxScrolls, limit, since                           *int
+		duration                                           *float64
 	)
 	switch cmd {
 	case "snapshot":
@@ -227,8 +227,11 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 		offscreen = fs.Bool("include-offscreen", false, "list off-screen elements too")
 		out = fs.String("out", "", "also write the snapshot here, with a .tree.json companion for the offline tools")
 		treeOut = fs.String("tree-out", "", "write the ComponentNode tree JSON here")
+	case "click":
+		settle = fs.String("settle", "", "how long to wait for a missing target or a moving screen (default 3s)")
 	case "fill":
 		clear = fs.Bool("clear", false, "empty the field first")
+		settle = fs.String("settle", "", "how long to wait for a missing target or a moving screen (default 3s)")
 	case "scroll":
 		in = fs.String("in", "", "scroll inside this element")
 		until = fs.String("until", "", "scroll until this target is tappable")
@@ -264,12 +267,12 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 		if err := need(1, "click TARGET"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{cmd: "click", args: device.TargetArgs{Target: p[0]}}, nil
+		return &deviceReq{cmd: "click", args: device.TargetArgs{Target: p[0], Settle: *settle}}, nil
 	case "fill":
 		if err := need(2, "fill TARGET TEXT [--clear]"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{cmd: "fill", args: device.TargetArgs{Target: p[0], Text: p[1], Clear: *clear}}, nil
+		return &deviceReq{cmd: "fill", args: device.TargetArgs{Target: p[0], Text: p[1], Clear: *clear, Settle: *settle}}, nil
 	case "scroll":
 		if err := need(1, "scroll up|down|left|right [--in TARGET] [--until TARGET] [--max N]"); err != nil {
 			return nil, err
