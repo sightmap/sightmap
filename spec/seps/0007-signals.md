@@ -4,7 +4,7 @@ title: Signals — composing a named, tagged classification from existing entiti
 author: Clint Ayres (@jurassix)
 status: Draft
 created: 2026-07-31
-updated: 2026-09-29
+updated: 2026-10-29
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -166,6 +166,25 @@ Omitting `filter:` means the rule fires on every match of `ref`. This is deliber
 
 If more than one `signals:` rule references the same entity and both match the same live instance, both fire — nothing is deduped or merged into a single result. Each rule is evaluated independently; a consumer sees one classification per firing rule, not one classification with multiple names.
 
+#### What a signal emits
+
+Evaluated over a session, a signal produces **signal events**, points in time, one per occurrence. Counting is the number of events, and a session *has* a signal when it has at least one. This is what lets a signal replace a metric: instead of a consumer deciding which metrics apply to a session, each signal is already an event on every session it occurs in.
+
+What counts as one occurrence depends on the kind `ref` names:
+
+| `ref` kind | One event per | Holds (current state) |
+|---|---|---|
+| Request | completed request record that matches the request entry (all matches apply) with the filter holding | n/a |
+| Message | console or exception record that matches the message entry with the filter holding | n/a |
+| View | transition into the state where this view is the page's view (most specific wins) with the filter holding | while that state lasts |
+| Component | transition of one element into the state where this component names it ([SEP-0023](0023-most-specific-definition-wins.md)) with the filter holding | while any element is in that state |
+
+Requests and messages are records; views and components are state. Without the distinction, a component signal has no answer to "how many": every DOM mutation, re-render, or observer callback would be a candidate occurrence. Edge-triggering on the state starting to hold gives one event per appearance, per arrival, and per change of a filtered property into a matching value, the same collapse [SEP-0015](0015-component-watch.md) asks of visibility reports. The current-state boolean stays available for completion and availability predicates, which is what the shipped Component/View subset defined.
+
+A component ref follows naming rather than raw selector matches. A ref to a general `Button` does not also count the `DangerButton` a more specific definition names, so the two never double-count one element. `watch` deliberately does not depend on naming, because it generates its own records; a signal reads properties, and properties resolve against the component that names the element.
+
+Each event carries `signal` (the name), `id` (when declared), resolved `tags`, `ref` and `kind`, `ts`, the page's `view` at `ts`, and `properties`: the referenced instance's resolved property values, including route bindings and a request's `status`/`method`/`duration`, minus anything unresolved or withheld by privacy ([SEP-0009](0009-component-privacy.md)). The properties are what make an event countable along dimensions the filter did not fix; `checkout.payment.declined` filters `outcome: declined` and still carries `decline_code`. A stored series SHOULD key on `id` when present, so renaming a signal does not split its history ([SEP-0020](0020-entity-id.md)).
+
 #### Derivation is explicit
 
 A classification produced by a `signals:` match carries the referenced entity's `name` as its link back to what produced it (`CheckoutPayment`, not merely "a network request") — the reference itself, required by this SEP's Shape, is what makes this link structural rather than something a consumer has to reconstruct.
@@ -181,6 +200,8 @@ A classification produced by a `signals:` match carries the referenced entity's 
 - MUST evaluate each `signals:` rule independently — a live instance matched by more than one rule produces one classification per matching rule.
 - MUST NOT require a numeric-comparison filter operator (`>=`, ranges) in v1 — see [Open questions](#open-questions).
 - SHOULD surface the referenced entity's `name` as part of the classification's own identity, per [Derivation is explicit](#derivation-is-explicit).
+- MUST emit one event per matching record for a `Request` or `Message` ref, and one per transition into the holding state for a `View` or `Component` ref, per [What a signal emits](#what-a-signal-emits). A `Component` ref counts only elements the component names.
+- MUST carry `signal`, `tags`, `ref`, `kind` and `ts` on each event; SHOULD carry `id`, `view` and the referenced instance's resolved `properties`.
 
 ### JSON Schema diff
 
@@ -265,7 +286,8 @@ Existing SDKs that encounter a `signals:` key MUST treat it as an unknown top-le
 1. **Reference key naming.** `ref:` is used throughout this proposal; `signal:` and `from:` were both considered and read worse for a rule referencing a `Component` or `Message` specifically (`signal: PaymentBanner` reads oddly when nothing about `PaymentBanner` is itself a signal). Open to reviewer pushback on the final name.
 2. **Should `views:` be referenceable at all in v1?** Included in this proposal (see the `CheckoutView` example) since it costs little and is a natural instance of "no filter = unconditional," but it's the least load-bearing of the four entity kinds — worth confirming reviewers see real demand for it versus deferring.
 3. **Comparison-operator filters.** `filter:` supports only equality/membership in v1. A numeric range or comparison operator (`filter: {duration: ">=1000"}`) was considered and deferred — an intrinsic, non-`signals:` mechanism already handles the one case that came up (HTTP status-code ranges) — but a future SEP could add operator support if a real case needs it that intrinsic handling doesn't cover.
-4. **Fan-out policy revisit.** This SEP requires independent firing for multiple matching rules ([Conformance](#conformance)) as the simplest, least-surprising default. A future SEP could introduce a dedup/union mode if real corpora show independent firing producing noise.
+4. **Falling edges.** Events mark a view or component state starting to hold. Whether a consumer should also emit the end (so a signal can carry a duration, such as how long an error banner stayed up) is left open; nothing in v1 needs it.
+5. **Fan-out policy revisit.** This SEP requires independent firing for multiple matching rules ([Conformance](#conformance)) as the simplest, least-surprising default. A future SEP could introduce a dedup/union mode if real corpora show independent firing producing noise.
 
 ## References
 

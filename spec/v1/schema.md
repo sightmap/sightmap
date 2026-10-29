@@ -496,6 +496,35 @@ A key resolving to none of the above is an error (`signal-filter-unknown`). This
 
 Each rule is evaluated independently. When more than one references the same entity and both match the same live instance, both fire — nothing is deduped or merged. A consumer sees one classification per firing rule, not one classification with several names. See [SEP-0007](../seps/0007-signals.md).
 
+### Signal events
+
+Evaluated over a session, a signal produces **signal events**: points in time, one per occurrence. A count is the number of events, and a session *has* a signal when it has at least one. What counts as one occurrence depends on what `ref` names:
+
+| `ref` kind | One event per | Holds (current state) |
+|---|---|---|
+| Request | completed request record that matches the request entry ([all matches apply](#request-matching-all-matches-apply)) with the filter holding | n/a |
+| Message | console or exception record that matches the message entry with the filter holding | n/a |
+| View | transition into the state where this view is the page's view ([most specific wins](#view-matching-most-specific-wins)) with the filter holding | while that state lasts |
+| Component | transition of one element into the state where this component names it (the most specific definition, per [SEP-0023](../seps/0023-most-specific-definition-wins.md)) with the filter holding | while any element is in that state |
+
+Requests and messages are records, so each matching record is an event. Views and components are state, so an event is the moment the state starts to hold: arriving on the view, an element appearing, or an existing element's filtered property changing to a matching value. Re-rendering an element that already holds is not a new event; leaving and re-entering is. The current-state boolean is what a completion or availability predicate reads ("done once `checkout.reached` holds").
+
+A component ref follows naming, unlike [`watch`](#watch): an element counts toward the component that names it, so a ref to a general component does not also count the special cases a more specific definition names.
+
+Each event carries:
+
+| Field | Description |
+|---|---|
+| `signal` | The signal's `name`. |
+| `id` | The signal's `id`, when declared. Stored series SHOULD be keyed on it, so renaming a signal does not split its history. |
+| `tags` | The signal's resolved tags (see [Tags](#tags)). |
+| `ref`, `kind` | The referenced entity's name and kind (`request`, `message`, `view`, `component`). |
+| `ts` | When the record completed or the state started to hold. |
+| `view` | The page's view at `ts`, when one matches. |
+| `properties` | The referenced instance's resolved property values at `ts`: declared properties, route bindings, and for a request its `status`/`method`/`duration`. A value the instance does not resolve, or that [privacy](#privacy) withholds, is omitted. |
+
+`properties` is what makes an event countable along dimensions the filter did not fix: `checkout.payment.declined` filters `outcome: declined` and still carries `decline_code`.
+
 ## Extract
 
 Every property that extracts a value (component, request, message) declares how with one object. See [SEP-0017](../seps/0017-extract-object.md).
@@ -1020,7 +1049,8 @@ An SDK that also **evaluates live activity** (observed network requests, console
 - MUST resolve a `MessageProperty` only from a live record's stack, omitting the value silently when the record has no stack or the addressed frame/attribute doesn't resolve
 - MUST assign a session to an environment as specified in [Session membership](#session-membership): a web session to the web environment with the most specific matching origin (and to none when the most specific matches span several), comparing host and port only; a native session by `platform` and `app_id`, matching `build_type` verbatim and treating an environment with no `build_type` as covering every variant
 - MUST evaluate each `signals:` rule independently: a live instance matched by several rules produces one classification per matching rule
-- SHOULD carry the referenced entity's name on the generated classification, so its derivation stays explicit
+- MUST emit signal events as specified in [Signal events](#signal-events): one per matching record for a request or message ref, one per transition into the holding state for a view or component ref, with a component counting only the elements it names
+- MUST carry `signal`, `tags`, `ref`, `kind` and `ts` on each event, and SHOULD carry `id`, `view` and the referenced instance's resolved `properties`
 
 **Not yet implemented in the reference SDK.** The Go SDK under `go/` parses and validates every field above, and resolves request and message properties and `messages:` matches against a record handed to it, but evaluates no `signals:` rule, observes no live traffic itself and assigns no session to an environment. The evaluation requirements in this section are normative for consumers that do evaluate, and are not yet exercised by the reference implementation or by the conformance fixtures.
 
