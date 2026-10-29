@@ -23,6 +23,7 @@ const SessionFile = ".device-session"
 type SessionInfo struct {
 	Socket     string `json:"socket"`
 	PID        int    `json:"pid"`
+	Platform   string `json:"platform,omitempty"`
 	UDID       string `json:"udid"`
 	DeviceName string `json:"deviceName,omitempty"`
 	BundleID   string `json:"bundleId"`
@@ -151,6 +152,9 @@ func Serve(s *Session, launch bool, logFile string) (_ *Daemon, err error) {
 	if err := os.MkdirAll(s.SightmapDir, 0o755); err != nil {
 		return nil, err
 	}
+	if s.Platform == PlatformAndroid {
+		s.Timing = s.Timing.or(androidTiming)
+	}
 	s.Timing = s.Timing.withDefaults()
 	if s.RunDir != "" {
 		if err := os.MkdirAll(s.RunDir, 0o755); err != nil {
@@ -168,12 +172,17 @@ func Serve(s *Session, launch bool, logFile string) (_ *Daemon, err error) {
 		}
 	}()
 	if s.Process != "" && s.Logs == nil {
-		s.Logs = &LogCollector{UDID: s.UDID, Process: s.Process, Stdout: s.stdoutPath(), Stderr: s.stderrPath(), Console: s.Console, Log: s.Log}
+		s.Logs = &LogCollector{UDID: s.UDID, Process: s.Process, Stdout: s.stdoutPath(), Stderr: s.stderrPath(), Console: s.Console, Log: s.Log, Platform: s.Platform}
+		if sim, ok := s.Sim.(AndroidSim); ok {
+			s.Logs.ADB = sim.ADB
+		}
 		s.Logs.Start()
 		// log stream misses what happens before it attaches.
 		time.Sleep(500 * time.Millisecond)
 	}
-	if s.Process != "" && s.Net == nil {
+	// The network sources (CFNetwork HAR, its log summary, Metro CDP found
+	// through the simulator) are iOS-only so far.
+	if s.Process != "" && s.Net == nil && s.Platform != PlatformAndroid {
 		s.Net = s.newNetCollector(ctx)
 	}
 	var hello map[string]any
@@ -200,7 +209,7 @@ func Serve(s *Session, launch bool, logFile string) (_ *Daemon, err error) {
 	}
 	d := &Daemon{Session: s, listener: ln, stopped: make(chan struct{})}
 	d.Info = SessionInfo{
-		Socket: socket, PID: os.Getpid(), UDID: s.UDID, DeviceName: s.DeviceName, BundleID: s.BundleID, AppPath: s.AppPath,
+		Socket: socket, PID: os.Getpid(), Platform: s.Platform, UDID: s.UDID, DeviceName: s.DeviceName, BundleID: s.BundleID, AppPath: s.AppPath,
 		StartedAt: s.StartedAt.UTC().Format(time.RFC3339), Run: s.RunLog.Current().Run, LogFile: logFile,
 	}
 	go d.accept()

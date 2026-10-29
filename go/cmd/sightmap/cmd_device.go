@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,23 +26,27 @@ import (
 
 func deviceUsage() {
 	fmt.Fprint(os.Stderr, `sightmap device — drive an app in the local iOS Simulator (macOS, Apple Silicon, Xcode 26+)
+or on an Android emulator or device (adb)
 
 Session:
-  doctor [--fix]                                    check prerequisites; builds the simulator helper on first use
+  doctor [--fix] [--platform ios|android]           check prerequisites; builds the simulator helper on first use
   start [--device NAME|UDID] [--app PATH | --bundle-id ID] [--label L] [--console-limit N] [--detach]
         [--network auto|har|rn-cdp|summary|off] [--network-limit N] [--metro-port N]
                                                     boot, enable accessibility, install, launch, run the daemon
                                                     (blocks the shell; --detach backgrounds it). On a running
                                                     session: reinstall (--app) and relaunch the same app
+  start --platform android [--device SERIAL|AVD] [--app APP.apk | --package ID] [...]
+                                                    the same on Android; --device names a connected device or an
+                                                    AVD to boot. An .apk or --package implies --platform android
   status                                            session health
-  stop [--shutdown]                                 stop the daemon and the app (--shutdown: the simulator too)
+  stop [--shutdown]                                 stop the daemon and the app (--shutdown: the simulator or emulator too)
   launch | relaunch                                 foreground the app | restart it (re-enables accessibility)
 
 Observe:
   snapshot [--view V] [--include-offscreen] [--out F] [--tree-out F]
   screenshot --out F.png
   console list [--limit N] [--grep S] [--level L[,L]] [--all] [--since INDEX] [--follow]
-                                                    levels: debug info default error fault stdout stderr;
+                                                    levels: debug info default warning error fault stdout stderr;
                                                     --grep is case-insensitive; --all adds Apple frameworks;
                                                     --since pages forward from an index; --follow streams
   console get INDEX
@@ -59,6 +65,7 @@ Act (TARGET: snapshot id, accessibility identifier, component query, or a select
   type TEXT
   key NAME                                          return delete tab escape space up down left right …
   button NAME                                       home lock siri side apple_pay volume_up volume_down
+                                                    (Android: home back menu app_switch lock volume_up volume_down)
   openurl URL
 
 Run log (.sightmap/.device-runs/<run>.jsonl: one line per action):
@@ -704,14 +711,24 @@ func asFloat(v any) float64 {
 
 func deviceDoctor(args []string, f *deviceFlags) error {
 	fix := f.fs.Bool("fix", false, "run the unprivileged fixes, then check again")
+	platformFlag := f.fs.String("platform", "", "ios or android (default: ios on macOS, else android)")
 	if _, err := parseFlagsAroundArgs(f.fs, args); err != nil {
 		return usageErr("%v", err)
+	}
+	platform, err := devicePlatform(*platformFlag, "", "")
+	if err != nil {
+		return err
 	}
 	var progress io.Writer = os.Stderr
 	if *f.json {
 		progress = io.Discard
 	}
-	checks := device.Doctor(context.Background(), *fix, progress)
+	var checks []device.Check
+	if platform == device.PlatformAndroid {
+		checks = device.DoctorAndroid(context.Background())
+	} else {
+		checks = device.Doctor(context.Background(), *fix, progress)
+	}
 	if session := device.LiveSession(*f.sightmapDir); session != nil {
 		var s device.Status
 		if err := device.Call(session.Socket, "status", nil, &s, 10*time.Second); err == nil && s.Network != nil {
@@ -757,14 +774,36 @@ func deviceDoctor(args []string, f *deviceFlags) error {
 type daemonConfig struct {
 	device.Config
 	Helper  string `json:"helper"`
+	ADB     string `json:"adb,omitempty"`
 	LogFile string `json:"logFile"`
+}
+
+// devicePlatform resolves --platform: explicit, else implied by an .apk or
+// --package, else iOS on a Mac and Android elsewhere.
+func devicePlatform(flag, appPath, pkg string) (string, error) {
+	switch strings.ToLower(flag) {
+	case device.PlatformIOS, device.PlatformAndroid:
+		if strings.ToLower(flag) == device.PlatformIOS && (pkg != "" || strings.HasSuffix(strings.ToLower(appPath), ".apk")) {
+			return "", usageErr("--platform ios takes an .app and --bundle-id, not an .apk or --package")
+		}
+		return strings.ToLower(flag), nil
+	case "":
+	default:
+		return "", usageErr("--platform must be ios or android, not %q", flag)
+	}
+	if pkg != "" || strings.HasSuffix(strings.ToLower(appPath), ".apk") || runtime.GOOS != "darwin" {
+		return device.PlatformAndroid, nil
+	}
+	return device.PlatformIOS, nil
 }
 
 func deviceStart(args []string, f *deviceFlags) error {
 	fs := f.fs
-	deviceName := fs.String("device", "", "simulator name or UDID (default: a booted one, else the newest iPhone)")
-	appFlag := fs.String("app", "", "the .app bundle built for the simulator, to install")
+	deviceName := fs.String("device", "", "simulator name or UDID (default: a booted one, else the newest iPhone); on Android a serial, model or AVD name")
+	appFlag := fs.String("app", "", "the .app bundle built for the simulator, or an .apk, to install")
 	bundleID := fs.String("bundle-id", "", "an installed app's bundle id")
+	packageFlag := fs.String("package", "", "an Android app's package name (implies --platform android)")
+	platformFlag := fs.String("platform", "", "ios or android (default: android for an .apk or --package, else ios on macOS)")
 	label := fs.String("label", "", "a label for the run log")
 	detach := fs.Bool("detach", false, "run the daemon in the background and return once it is ready")
 	consoleLimit := fs.Int("console-limit", 5000, "how many console entries the session keeps")
@@ -783,9 +822,16 @@ func deviceStart(args []string, f *deviceFlags) error {
 	ctx := context.Background()
 	sightmapDir := absPath(*f.sightmapDir)
 	appPath := absPath(*appFlag)
+	platform, err := devicePlatform(*platformFlag, appPath, *packageFlag)
+	if err != nil {
+		return err
+	}
+	if platform == device.PlatformAndroid && *packageFlag != "" {
+		*bundleID = *packageFlag
+	}
 	if appPath != "" {
 		if _, err := os.Stat(appPath); err != nil {
-			return &device.Error{Code: "bad_app", Message: appPath + " does not exist", Hint: "build the app for the simulator and pass the .app path"}
+			return &device.Error{Code: "bad_app", Message: appPath + " does not exist", Hint: "build the app (for the simulator on iOS) and pass the .app or .apk path"}
 		}
 	}
 	progress := func(s string) {
@@ -798,15 +844,26 @@ func deviceStart(args []string, f *deviceFlags) error {
 		if *deviceName != "" && *deviceName != existing.UDID && !strings.HasPrefix(existing.DeviceName, *deviceName+",") {
 			return &device.Error{Code: "session_running", Message: fmt.Sprintf("a session is already running on %s (%s)", existing.DeviceName, existing.UDID), Hint: "run `sightmap device stop` first"}
 		}
+		if cmpOr(existing.Platform, device.PlatformIOS) != platform && (*platformFlag != "" || appPath != "" || *bundleID != "") {
+			return &device.Error{Code: "session_running", Message: fmt.Sprintf("a %s session is already running on %s", cmpOr(existing.Platform, device.PlatformIOS), existing.DeviceName), Hint: "run `sightmap device stop` first"}
+		}
 		wanted := *bundleID
 		if wanted == "" && appPath != "" {
 			var err error
-			if wanted, err = device.PlistValue(appPath, "CFBundleIdentifier"); err != nil {
+			if platform == device.PlatformAndroid {
+				wanted, err = device.APKPackage(ctx, appPath)
+			} else {
+				wanted, err = device.PlistValue(appPath, "CFBundleIdentifier")
+			}
+			if err != nil {
 				return err
 			}
 		}
 		if wanted != "" && wanted != existing.BundleID {
 			again := "--bundle-id " + wanted
+			if platform == device.PlatformAndroid {
+				again = "--package " + wanted
+			}
 			if appPath != "" {
 				again = "--app " + strconv.Quote(appPath)
 			}
@@ -827,51 +884,20 @@ func deviceStart(args []string, f *deviceFlags) error {
 	}
 
 	started := time.Now()
-	helper, err := device.BuildHelper(ctx, writerFunc(progress))
-	if err != nil {
-		return err
-	}
-	devices, err := device.ListDevices(ctx)
-	if err != nil {
-		return err
-	}
-	d, err := device.PickDevice(devices, *deviceName)
-	if err != nil {
-		return err
-	}
-	if err := device.PrepareDevice(ctx, d, progress); err != nil {
-		return err
-	}
-	if *bundleID == "" && appPath == "" {
-		return usageErr("start needs --app PATH or --bundle-id ID")
-	}
-	cfg := device.Config{UDID: d.UDID, DeviceName: d.Label(), BundleID: *bundleID, AppPath: appPath, SightmapDir: sightmapDir, RunLabel: *label, ConsoleLimit: *consoleLimit,
-		Network: *network, NetworkLimit: *networkLimit, MetroPort: *metroPort,
-		RunDir: filepath.Join(device.CacheDir(), "sessions", d.UDID)}
-	if appPath != "" {
-		if cfg.BundleID == "" {
-			if cfg.BundleID, err = device.PlistValue(appPath, "CFBundleIdentifier"); err != nil {
-				return err
-			}
-		}
-		progress("installing " + appPath + "…")
-		if err := (device.Simctl{}).Install(ctx, d.UDID, appPath); err != nil {
+	var dc daemonConfig
+	if platform == device.PlatformAndroid {
+		if dc, err = prepareAndroid(ctx, *deviceName, appPath, *bundleID, progress); err != nil {
 			return err
 		}
-	}
-	installed := appPath
-	if installed == "" {
-		if installed, err = device.AppContainer(ctx, d.UDID, cfg.BundleID); err != nil {
-			return err
-		}
-	}
-	if cfg.Process, err = device.PlistValue(installed, "CFBundleExecutable"); err != nil {
+	} else if dc, err = prepareIOS(ctx, *deviceName, appPath, *bundleID, progress); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(cfg.RunDir, 0o755); err != nil {
+	dc.SightmapDir, dc.RunLabel, dc.ConsoleLimit = sightmapDir, *label, *consoleLimit
+	dc.Network, dc.NetworkLimit, dc.MetroPort = *network, *networkLimit, *metroPort
+	if err := os.MkdirAll(dc.RunDir, 0o755); err != nil {
 		return err
 	}
-	dc := daemonConfig{Config: cfg, Helper: helper, LogFile: filepath.Join(cfg.RunDir, "daemon.log")}
+	dc.LogFile = filepath.Join(dc.RunDir, "daemon.log")
 
 	var info *device.SessionInfo
 	var foreground *device.Daemon
@@ -904,6 +930,109 @@ func deviceStart(args []string, f *deviceFlags) error {
 	return nil
 }
 
+func cmpOr(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
+}
+
+// prepareAndroid picks (or boots) the device, installs the APK, and returns
+// the daemon's configuration.
+func prepareAndroid(ctx context.Context, deviceName, apk, pkg string, progress func(string)) (daemonConfig, error) {
+	path, err := device.FindADB()
+	if err != nil {
+		return daemonConfig{}, err
+	}
+	adb := device.ADB{Path: path}
+	devices, err := adb.ListAndroidDevices(ctx)
+	if err != nil {
+		return daemonConfig{}, err
+	}
+	d, err := device.PickAndroidDevice(devices, deviceName)
+	if err != nil && device.Code(err) == "no_device" {
+		avds := device.ListAVDs(ctx)
+		avd := ""
+		switch {
+		case deviceName != "" && slices.Contains(avds, deviceName):
+			avd = deviceName
+		case deviceName == "" && len(avds) == 1:
+			avd = avds[0]
+		}
+		if avd == "" {
+			return daemonConfig{}, err
+		}
+		if d, err = adb.BootAVD(ctx, avd, progress); err != nil {
+			return daemonConfig{}, err
+		}
+	} else if err != nil {
+		return daemonConfig{}, err
+	}
+	if pkg == "" && apk == "" {
+		return daemonConfig{}, usageErr("start --platform android needs --app APP.apk or --package ID")
+	}
+	if pkg == "" {
+		if pkg, err = device.APKPackage(ctx, apk); err != nil {
+			return daemonConfig{}, err
+		}
+	}
+	if apk != "" {
+		progress("installing " + apk + "…")
+		if err := (device.AndroidSim{ADB: adb}).Install(ctx, d.Serial, apk); err != nil {
+			return daemonConfig{}, err
+		}
+	}
+	cfg := device.Config{Platform: device.PlatformAndroid, UDID: d.Serial, DeviceName: d.Label(), BundleID: pkg, AppPath: apk, Process: pkg,
+		RunDir: filepath.Join(device.CacheDir(), "sessions", d.Serial)}
+	return daemonConfig{Config: cfg, ADB: path}, nil
+}
+
+// prepareIOS builds the helper, picks and prepares the simulator, installs the
+// app, and returns the daemon's configuration.
+func prepareIOS(ctx context.Context, deviceName, appPath, bundleID string, progress func(string)) (daemonConfig, error) {
+	helper, err := device.BuildHelper(ctx, writerFunc(progress))
+	if err != nil {
+		return daemonConfig{}, err
+	}
+	devices, err := device.ListDevices(ctx)
+	if err != nil {
+		return daemonConfig{}, err
+	}
+	d, err := device.PickDevice(devices, deviceName)
+	if err != nil {
+		return daemonConfig{}, err
+	}
+	if err := device.PrepareDevice(ctx, d, progress); err != nil {
+		return daemonConfig{}, err
+	}
+	if bundleID == "" && appPath == "" {
+		return daemonConfig{}, usageErr("start needs --app PATH or --bundle-id ID")
+	}
+	cfg := device.Config{Platform: device.PlatformIOS, UDID: d.UDID, DeviceName: d.Label(), BundleID: bundleID, AppPath: appPath,
+		RunDir: filepath.Join(device.CacheDir(), "sessions", d.UDID)}
+	if appPath != "" {
+		if cfg.BundleID == "" {
+			if cfg.BundleID, err = device.PlistValue(appPath, "CFBundleIdentifier"); err != nil {
+				return daemonConfig{}, err
+			}
+		}
+		progress("installing " + appPath + "…")
+		if err := (device.Simctl{}).Install(ctx, d.UDID, appPath); err != nil {
+			return daemonConfig{}, err
+		}
+	}
+	installed := appPath
+	if installed == "" {
+		if installed, err = device.AppContainer(ctx, d.UDID, cfg.BundleID); err != nil {
+			return daemonConfig{}, err
+		}
+	}
+	if cfg.Process, err = device.PlistValue(installed, "CFBundleExecutable"); err != nil {
+		return daemonConfig{}, err
+	}
+	return daemonConfig{Config: cfg, Helper: helper}, nil
+}
+
 type writerFunc func(string)
 
 func (w writerFunc) Write(p []byte) (int, error) {
@@ -922,8 +1051,12 @@ func formatDeviceStart(info *device.SessionInfo, ready map[string]any, took time
 	if rel, err := filepath.Rel(cwd(), file); err == nil && !strings.HasPrefix(rel, "..") {
 		file = rel
 	}
+	what := "simulator"
+	if info.Platform == device.PlatformAndroid {
+		what = "android"
+	}
 	lines := []string{
-		fmt.Sprintf("✓ simulator session started in %.1f s", took.Seconds()),
+		fmt.Sprintf("✓ %s session started in %.1f s", what, took.Seconds()),
 		fmt.Sprintf("  device:  %s (%s)", info.DeviceName, info.UDID),
 		"  app:     " + app,
 		fmt.Sprintf("  daemon:  pid %d; session file %s; log %s", info.PID, file, info.LogFile),
@@ -978,7 +1111,13 @@ func spawnDeviceDaemon(dc daemonConfig, sightmapDir string) (*device.SessionInfo
 // serveDevice runs the daemon in this process, logging to log.
 func serveDevice(dc daemonConfig, log io.Writer) (*device.Daemon, error) {
 	logf := func(s string) { fmt.Fprintf(log, "[%s] %s\n", time.Now().UTC().Format(time.RFC3339), s) }
-	s := device.NewSession(dc.Config, device.NewHelperClient(dc.Helper, logf), device.Simctl{})
+	var s *device.Session
+	if dc.Platform == device.PlatformAndroid {
+		adb := device.ADB{Path: dc.ADB}
+		s = device.NewSession(dc.Config, device.NewADBHelper(adb, dc.UDID, dc.BundleID, logf), device.AndroidSim{ADB: adb})
+	} else {
+		s = device.NewSession(dc.Config, device.NewHelperClient(dc.Helper, logf), device.Simctl{})
+	}
 	s.Log = logf
 	d, err := device.Serve(s, true, dc.LogFile)
 	if err != nil {
@@ -1123,7 +1262,7 @@ func deviceStop(args []string, f *deviceFlags) error {
 	if *f.json {
 		printJSON(map[string]any{"ok": true, "result": map[string]bool{"stopped": true, "shutdown": *shutdown}})
 	} else if *shutdown {
-		fmt.Println("✓ stopped; simulator shut down")
+		fmt.Println("✓ stopped; simulator or emulator shut down")
 	} else {
 		fmt.Println("✓ stopped")
 	}

@@ -1,13 +1,13 @@
 ---
-title: "Sightmap Device Commands: Driving iOS Apps in the Simulator"
+title: "Sightmap Device Commands: Driving iOS and Android Apps"
 sidebarTitle: "Device Sessions"
-description: "Snapshot a native iOS app's accessibility tree against your corpus and tap, type, and scroll by identifier or component query in the local iOS Simulator."
+description: "Snapshot a native iOS or Android app's accessibility tree against your corpus and tap, type, and scroll by identifier or component query in the iOS Simulator or on an Android emulator or device."
 ---
 
-`sightmap device` drives a native iOS app in the local iOS Simulator the way [`sightmap browser`](/cli/browser) drives Chrome. It reads the app's accessibility tree, applies your `.sightmap/` corpus with the same matcher as `sightmap snapshot`, and acts on elements by accessibility identifier or [component query](/cli/interaction#component-queries). Nothing leaves the Mac except the app's own traffic.
+`sightmap device` drives a native iOS app in the local iOS Simulator, or an Android app on an emulator or device ([Android](#android)), the way [`sightmap browser`](/cli/browser) drives Chrome. It reads the app's accessibility tree, applies your `.sightmap/` corpus with the same matcher as `sightmap snapshot`, and acts on elements by accessibility identifier or [component query](/cli/interaction#component-queries). Nothing leaves the machine except the app's own traffic.
 
 <Note>
-`sightmap device` needs an Apple Silicon Mac, macOS 15 or later, and Xcode 26 or later selected with `xcode-select` (the Command Line Tools alone are not enough). Run [`device doctor`](#device-doctor) first.
+On iOS, `sightmap device` needs an Apple Silicon Mac, macOS 15 or later, and Xcode 26 or later selected with `xcode-select` (the Command Line Tools alone are not enough). On Android it needs `adb` from the Android SDK platform-tools. Run [`device doctor`](#device-doctor) first.
 </Note>
 
 ## Conventions
@@ -377,9 +377,34 @@ Sightmap builds the helper locally instead of shipping a prebuilt, signed binary
 
 A new Xcode release can still need a sightmap update; `device doctor` says so when the helper fails to build.
 
+## Android
+
+`sightmap device` also drives an Android emulator or a connected device through `adb`, with the same commands, targets, run log, and corpus matching. It works on macOS, Linux, and Windows and needs only the Android SDK platform-tools: nothing is installed on the device besides your app.
+
+```bash
+sightmap device doctor --platform android
+sightmap device start --app app/build/outputs/apk/debug/app-debug.apk --detach   # an .apk implies --platform android
+sightmap device start --package com.example.app --device Pixel_8_API_35 --detach  # installed app; boots the AVD if it isn't running
+```
+
+- **Platform.** `--platform android` is implied by an `.apk` or `--package`, and is the default off macOS.
+- **Device.** `--device` takes a serial from `adb devices`, a model, or an AVD name. An AVD that is not running is booted (one AVD and no device connected boots it without `--device`). `stop --shutdown` shuts down an emulator.
+- **Tree.** Each snapshot is a `uiautomator dump` of the active window, which takes a second or more, so actions wait longer than on iOS. The app needs no instrumentation and no setting turned on.
+- **Points are dp.** Frames, `tap-xy`, and `swipe` use density-independent pixels: divide screenshot pixels by dpi/160 (2.625 on a 420 dpi device).
+- **Identifiers.** `identifier` (and `testid`) is the view's resource-id without its package (`com.example:id/login_submit` becomes `login_submit`). Jetpack Compose `Modifier.testTag` values appear only when the app sets `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor.
+- **Roles.** Widget classes map to the iOS roles: `Button` and `ImageButton` to `button`, `TextView` to `text`, `EditText` to `textfield` (`securetextfield` for passwords), `CheckBox`, `Switch`, `RadioButton`, `ImageView` to `image`, `RecyclerView`/`ListView` to `collection`, `ScrollView` or any scrollable view to `scrollview`, TabLayout tabs to `tab`, everything else to `other`. A clickable `other` without text (a list row, a Compose `Modifier.clickable` row) is named by its children's text. `checked`, `selected`, and `disabled` go into the state.
+- **Fields.** A field's label is its hint or content description and its value is its text.
+- **Overlays.** A window from another package (a runtime permission dialog, an autofill prompt) appears as `[Overlay]`, named by its package.
+- **Keyboard.** The input method window is read from `dumpsys window` and covers what is under it, as on iOS. `device button back` hides it.
+- **Input.** `type` and `fill` go through `adb shell input text`, which types ASCII only. `key` takes the same names as on iOS; `button` takes `home`, `back`, `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
+- **Network.** `network list` / `get` and `--network` are iOS-only for now; on Android they fail with `unsupported`.
+- **Console.** `console` reads logcat lines from the app's process: the tag is the subsystem, levels are `debug`, `info`, `warning`, `error`, `fault`, and `System.out` / `System.err` read as `stdout` / `stderr`.
+
+If a snapshot fails with "could not get idle state", the screen never stopped animating; turn off animations with `adb shell settings put global animator_duration_scale 0` (and `transition_animation_scale`, `window_animation_scale`). uiautomator can't run alongside another UI automation client such as an Appium UiAutomator2 server.
+
 ## Limits
 
-- Simulator only, on Apple Silicon. Physical devices are not supported.
+- On iOS, simulator only, on Apple Silicon. Physical iOS devices are not supported.
 - No hover or file upload. For another screen size, start on a different `--device`.
 - Network capture covers `URLSession`/CFNetwork traffic (and, for React Native Debug builds, JS traffic through Metro); full detail needs the `get-task-allow` entitlement.
 - On iOS 26, a SwiftUI tab bar can appear as one `other "Tab Bar"` element without its tabs; switch tabs with `tap-xy` from a screenshot.
