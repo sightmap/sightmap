@@ -87,8 +87,9 @@ type Network struct {
 	next    int
 }
 
-// NewNetwork returns a Network holding the most recent capacity entries.
-func NewNetwork(capacity int) *Network { return &Network{Capacity: capacity} }
+// NewNetwork returns a Network holding the most recent capacity entries (at
+// least one).
+func NewNetwork(capacity int) *Network { return &Network{Capacity: max(capacity, 1)} }
 
 // Push appends e, assigning its index (and time, when it has none).
 func (n *Network) Push(e NetworkEntry) NetworkEntry {
