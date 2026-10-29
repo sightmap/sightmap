@@ -4,6 +4,7 @@
 //
 //	sightmap atlas <subcommand>     find and install corpora from the community atlas
 //	sightmap browser <subcommand>   manage the Chrome session
+//	sightmap device <subcommand>    drive an app in the local iOS Simulator
 //	sightmap snapshot [flags]       observe: annotated component tree + coverage
 //	sightmap capture [flags]        persist a capture into the matched view's set
 //	sightmap sel-probe [flags] SEL  validate a CSS selector against the live page
@@ -42,6 +43,8 @@ func main() {
 		err = runInit(args)
 	case "browser":
 		err = runBrowser(args)
+	case "device":
+		err = runDevice(args)
 	case "inspect":
 		err = runInspect(args)
 	case "explain":
@@ -120,6 +123,9 @@ Commands:
   browser click / fill / hover / keypress / scroll     interact with page elements
   browser drag / wait-for / dialog                     more interactions
   browser tabs list/new/close/resize                   tab management
+
+  device start [--app PATH] [--device NAME] [--detach] start an iOS Simulator session (macOS)
+  device snapshot / click / fill / scroll / console    drive and observe it ('sightmap device help')
 
   report        [--sightmap-dir DIR]                              per-view coverage health table + T2 quality
   stats          [--sightmap-dir DIR] [--json]                    corpus totals + per-view component/request counts

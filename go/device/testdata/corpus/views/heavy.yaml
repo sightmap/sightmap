@@ -1,0 +1,33 @@
+version: 1
+views:
+  - name: Heavy
+    route: /heavy
+    memory:
+      - Rows lazy-load; scroll to reach rows past the first screen.
+    components:
+      - name: ScreenTitle
+        selector: 'heading'
+      - name: ProductRow
+        selector: 'button:has(> button[identifier$=".buy"])'
+        properties:
+          - name: title
+            extract: { from: component, path: Title.text }
+          - name: price
+            extract: { from: component, path: Price.text }
+          - name: favoritable
+            extract: { from: component.exists, path: FavoriteButton }
+        children:
+          - name: Title
+            selector: 'text[text^="Row"]'
+            properties:
+              - name: text
+                extract: { from: dom.text }
+          - name: Price
+            selector: 'text[text^="$"]'
+            properties:
+              - name: text
+                extract: { from: dom.text }
+          - name: BuyButton
+            selector: 'button[identifier$=".buy"]'
+          - name: FavoriteButton
+            selector: 'button[identifier$=".fav"]'
