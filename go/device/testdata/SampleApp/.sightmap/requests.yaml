@@ -1,0 +1,12 @@
+version: 1
+requests:
+  # The Network tab's Send Request button. The route ignores the host, so it
+  # matches httpbin.org and the local server the end-to-end test points it at.
+  - name: CreateOrder
+    route: /anything/sightmap/*
+    method: POST
+    properties:
+      - name: order
+        extract: { from: req.body, path: order }
+      - name: echoed
+        extract: { from: rsp.body, path: json.order }
