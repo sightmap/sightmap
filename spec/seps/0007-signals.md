@@ -156,7 +156,7 @@ A classification produced by a `signals:` match carries the referenced entity's 
 - MUST evaluate every declared `filter:` key with AND semantics; MUST support both scalar (equality) and array (membership) values per key.
 - MUST reject a `filter:` key that does not resolve on the referenced entity, i.e. is neither one of its declared `properties:` nor a reserved name available for its kind (`status`/`method`/`duration` on a `Request`, `value` on a `Component`). Diagnostic code: `signal-filter-unknown`. Without this check the structural link this SEP is built on is unenforced: a filter naming a renamed or never-existent property passes silently and the rule simply never fires.
 - MUST reject any `filter:` key on a `Message` or `View` ref. A message's own `level`/`message` already identify it fully and a view has no extractable property, so a filter there is authoring confusion rather than a constraint.
-- MUST compare `filter:` values as canonical text, normalizing an integer before comparison so `0200` and `200` agree with an SDK that reads the same corpus as JSON.
+- MUST compare `filter:` values as canonical text, rendering an integer as its decimal value so `0x1F` and `31` agree. MUST reject an unquoted integer that YAML 1.1 and 1.2 parsers read differently (a leading-zero octal like `0200`, or underscores like `1_000`), since two SDKs would otherwise compare different values for one corpus.
 - MUST fire a rule with no `filter:` on every match of its `ref:`.
 - MUST evaluate each `signals:` rule independently — a live instance matched by more than one rule produces one classification per matching rule.
 - MUST NOT require a numeric-comparison filter operator (`>=`, ranges) in v1 — see [Open questions](#open-questions).

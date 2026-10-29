@@ -374,6 +374,8 @@ func TestFieldTypeInvalid_SignalFilterValues(t *testing.T) {
 		"float":           "duration: 1.5",
 		"empty list":      "code: []",
 		"float in list":   "code: [200, 1.5]",
+		"leading zero":    "code: 0200",
+		"underscored":     "code: [1_000]",
 	}
 	for name, body := range bad {
 		t.Run(name, func(t *testing.T) {
@@ -390,6 +392,9 @@ func TestFieldTypeInvalid_SignalFilterValues(t *testing.T) {
 		"boolean": "flag: true",
 		"string":  `status: "200"`,
 		"list":    "code: [200, 404]",
+		"quoted":  `code: "0200"`,
+		"zero":    "code: 0",
+		"octal":   "code: 0o200",
 	}
 	for name, body := range good {
 		t.Run(name, func(t *testing.T) {

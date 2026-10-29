@@ -245,9 +245,8 @@ signals:
 	}
 }
 
-// An integer is re-emitted from its parsed numeric value, not its lexeme. YAML
-// accepts octal, hex, and underscore-separated integers, so comparing raw
-// lexemes would make `0x1F` and `31` different values for the same number.
+// An integer is re-emitted from its parsed numeric value, not its lexeme, so
+// `0x1F` and `31` are one value rather than two strings.
 func TestLoadDir_SignalFilterIntegerCanonicalization(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir+"/app.yaml", `
@@ -260,7 +259,7 @@ requests:
         extract: {from: rsp.body, path: a}
       - name: hex
         extract: {from: rsp.body, path: b}
-      - name: underscored
+      - name: signed
         extract: {from: rsp.body, path: c}
       - name: flag
         extract: {from: rsp.body, path: d}
@@ -268,18 +267,16 @@ signals:
   - name: s
     ref: R
     filter:
-      octal: 0200
+      octal: 0o200
       hex: 0x1F
-      underscored: 1_000
+      signed: +42
       flag: true
 `)
 	c, err := sightmap.DirLoader(dir).Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	// 0200 is octal in YAML, so it is 128 — canonicalizing is what makes that
-	// unambiguous instead of comparing the string "0200".
-	want := map[string]string{"octal": "128", "hex": "31", "underscored": "1000", "flag": "true"}
+	want := map[string]string{"octal": "128", "hex": "31", "signed": "42", "flag": "true"}
 	for key, exp := range want {
 		got := c.Signals[0].Filter[key]
 		if len(got) != 1 || got[0] != exp {

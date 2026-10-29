@@ -447,7 +447,9 @@ filter:
   rate_limit_remaining: "0"      # quoted, compares as "0"
 ```
 
-An integer compares as its **numeric value in decimal**, not as the characters you typed. YAML accepts octal, hexadecimal, and underscore-separated integers, so `0200` is 128, `0x1F` is 31, and `1_000` is 1000. Comparing lexemes instead would make `0x1F` and `31` two different values for one number.
+An integer compares as its **numeric value in decimal**, not as the characters you typed, so `0x1F` and `0o37` both compare as `31`. Comparing lexemes instead would make `0x1F` and `31` two different values for one number.
+
+An unquoted integer that YAML 1.1 and 1.2 parsers read differently is rejected as `field-type-invalid`: a leading-zero octal (`0200` is 128 to a YAML 1.1 parser and 200 to a 1.2 one) and underscore separators (`1_000` is 1000 to one and a string to the other). Write it in plain decimal, with an explicit `0o`/`0x` prefix, or quoted.
 
 A `null` (a bare `key:`), a float, and an empty list are all invalid: the first has nothing to compare, a float has no single canonical text (`1.50` versus `1.5`), and an empty list can never match.
 

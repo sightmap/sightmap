@@ -4,7 +4,7 @@
 
 Add a top-level `signals:` entity ([SEP-0007](https://github.com/sightmap/sightmap/blob/main/spec/seps/0007-signals.md)): a rule that references an existing component, request, message, or view by name and optionally filters on its declared properties, minting a named, tagged classification. A signal never redeclares a selector, route, or body pattern, so a classification cannot drift away from the thing it is about.
 
-**Filter values accept an unquoted integer or boolean.** The previous draft's schema allowed only strings, which made SEP-0007's own headline example invalid: `status: 200` is an unquoted YAML integer, and the reserved `status` identity genuinely is one. Values compare as canonical text, and an integer compares as its numeric value in decimal, so `0x1F` and `31` are the same value rather than two different strings. `null`, floats, and empty lists stay invalid.
+**Filter values accept an unquoted integer or boolean.** The previous draft's schema allowed only strings, which made SEP-0007's own headline example invalid: `status: 200` is an unquoted YAML integer, and the reserved `status` identity genuinely is one. Values compare as canonical text, and an integer compares as its numeric value in decimal, so `0x1F` and `31` are the same value rather than two different strings. `null`, floats, empty lists, and integers that YAML 1.1 and 1.2 parsers read differently (`0200`, `1_000`) are invalid.
 
 New validation:
 

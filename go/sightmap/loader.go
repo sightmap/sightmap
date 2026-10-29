@@ -75,10 +75,11 @@ type rawSignal struct {
 // unquoted integer or boolean to its canonical text.
 //
 // The normalization matters for cross-SDK agreement. yaml.v3 hands back the raw
-// lexeme, so `code: 0200` would compare as "0200" here while a JSON-based SDK
-// parsing the same corpus sees 200. Re-emitting from the parsed value makes both
-// agree. Tags outside string/int/bool are left verbatim for the walker to report
-// rather than failing the whole file to load.
+// lexeme, so `code: 0x1F` would compare as "0x1F" here while an SDK that parses
+// the integer sees 31. Re-emitting from the parsed value makes both agree.
+// Spellings YAML 1.1 and 1.2 parsers read differently (0200, 1_000) are rejected
+// by the walker. Tags outside string/int/bool are left verbatim for the walker
+// to report rather than failing the whole file to load.
 type rawFilterValue []string
 
 func (r *rawFilterValue) UnmarshalYAML(value *yaml.Node) error {

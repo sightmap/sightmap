@@ -2,6 +2,7 @@ package sightmap
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -346,7 +347,22 @@ func checkFilterValues(filter *yaml.Node, file string, out *[]ValidationError) {
 	}
 }
 
+// yaml11Int matches integer spellings that YAML 1.1 and 1.2 parsers read
+// differently: a leading-zero octal (yaml.v3 reads 0200 as 128, js-yaml as 200)
+// and underscore separators (yaml.v3 reads 1_000 as 1000, js-yaml as a string).
+var yaml11Int = regexp.MustCompile(`^[-+]?(0[0-9_]+|[0-9]*_[0-9_]*)$`)
+
 func checkFilterScalar(key string, n *yaml.Node, file string, out *[]ValidationError) {
+	if n.Tag == "!!int" && n.Style == 0 && yaml11Int.MatchString(n.Value) {
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "field-type-invalid",
+			Severity: SeverityError,
+			Message: fmt.Sprintf("filter %q has an ambiguous integer %s on line %d: YAML parsers disagree on its value; write it in plain decimal, as 0o/0x, or quote it",
+				key, n.Value, n.Line),
+		})
+		return
+	}
 	if filterValueTags[n.Tag] {
 		return
 	}
