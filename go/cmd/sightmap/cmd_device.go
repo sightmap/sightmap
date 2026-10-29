@@ -155,20 +155,29 @@ func deviceCommand(cmd string, args []string, f *deviceFlags) error {
 	if err := device.Call(session.Socket, req.cmd, req.args, &result, 2*time.Minute); err != nil {
 		return err
 	}
-	if *f.json {
-		printJSON(map[string]any{"ok": true, "result": result})
-	} else {
-		fmt.Println(formatDeviceResult(req.cmd, result))
-	}
+	// A snapshot with nothing to act on is printed, but fails: the app is most
+	// likely still loading, and a script must not take it for a real screen.
+	var empty *device.Error
 	if req.cmd == "snapshot" {
 		var r device.SnapshotResult
 		json.Unmarshal(result, &r)
 		if r.Coverage.Interactive == 0 {
-			if !*f.json {
-				fmt.Fprintln(os.Stderr, "error: 0 interactive elements; the app may still be loading. Next: wait a moment and snapshot again")
-			}
-			return deviceExit{1}
+			empty = &device.Error{Code: "empty", Message: "0 interactive elements; the app may still be loading", Hint: "wait a moment and snapshot again"}
 		}
+	}
+	switch {
+	case *f.json && empty != nil:
+		printJSON(map[string]any{"ok": false, "error": empty, "result": result})
+	case *f.json:
+		printJSON(map[string]any{"ok": true, "result": result})
+	default:
+		fmt.Println(formatDeviceResult(req.cmd, result))
+		if empty != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\nNext: %s\n", empty.Message, empty.Hint)
+		}
+	}
+	if empty != nil {
+		return deviceExit{1}
 	}
 	return nil
 }

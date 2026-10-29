@@ -194,3 +194,30 @@ func TestPickDevice(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestRunLogRedactsSecrets(t *testing.T) {
+	s, _ := newTestSession(t, "describe-simple")
+	s.Helper.(*fakeHelper).describe = &Describe{Screen: Size{W: 400, H: 800}, Root: &RawElement{Type: "Application", Frame: Frame{W: 400, H: 800}, Children: []*RawElement{
+		{Type: "SecureTextField", Identifier: "password", Frame: Frame{X: 10, Y: 100, W: 300, H: 40}},
+		{Type: "TextField", Identifier: "email", Frame: Frame{X: 10, Y: 200, W: 300, H: 40}},
+	}}}
+	handle(t, s, "click", TargetArgs{Target: "password"})
+	handle(t, s, "type", ValueArgs{Text: "typed-secret"})
+	handle(t, s, "fill", TargetArgs{Target: "missing-field", Text: "unresolved-secret"})
+	handle(t, s, "click", TargetArgs{Target: "email"})
+	handle(t, s, "type", ValueArgs{Text: "a@example.com"})
+
+	data, err := os.ReadFile(s.RunLog.Current().Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := string(data)
+	for _, secret := range []string{"typed-secret", "unresolved-secret"} {
+		if strings.Contains(log, secret) {
+			t.Errorf("%s reached the run log:\n%s", secret, log)
+		}
+	}
+	if !strings.Contains(log, "a@example.com") {
+		t.Errorf("text typed into a plain field should be logged:\n%s", log)
+	}
+}

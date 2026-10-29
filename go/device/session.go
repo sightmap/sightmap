@@ -80,8 +80,11 @@ type Session struct {
 	lastTarget *sightmap.ComponentNode
 	lastSnap   *Snapshot
 	lastView   string
-	axOn       *bool
-	readable   bool
+	// secureFocus is true while the last element tapped is a secure text
+	// field, so text typed into it stays out of the run log.
+	secureFocus bool
+	axOn        *bool
+	readable    bool
 }
 
 // NewSession returns a Session for cfg using helper and sim.
@@ -252,7 +255,7 @@ func (s *Session) LaunchApp(ctx context.Context, terminate bool) (map[string]any
 	if err != nil {
 		return nil, err
 	}
-	s.AppPID, s.axOn, s.readable, s.last = pid, nil, false, nil
+	s.AppPID, s.axOn, s.readable, s.last, s.secureFocus = pid, nil, false, nil, false
 	return map[string]any{"bundleId": s.BundleID, "pid": pid}, nil
 }
 
@@ -309,7 +312,7 @@ func (s *Session) Handle(ctx context.Context, cmd string, raw json.RawMessage) (
 			delete(args, k)
 		}
 	}
-	if cmd == "fill" && s.lastTarget != nil && s.lastTarget.Role == "securetextfield" {
+	if _, ok := args["text"]; ok && s.redactText(cmd) {
 		args["text"] = "<redacted>"
 	}
 	entry := RunEntry{Action: action, Args: args, View: s.lastView, OK: err == nil, Target: s.runTarget()}
@@ -321,6 +324,19 @@ func (s *Session) Handle(ctx context.Context, cmd string, raw json.RawMessage) (
 		s.Log("run log write failed: " + werr.Error())
 	}
 	return result, err
+}
+
+// redactText reports whether cmd's text could be a secret: a fill into a
+// secure field, or one whose field never resolved (it might have been one); or
+// a type while a secure field has focus.
+func (s *Session) redactText(cmd string) bool {
+	switch cmd {
+	case "fill":
+		return s.lastTarget == nil || s.lastTarget.Role == "securetextfield"
+	case "type":
+		return s.secureFocus
+	}
+	return false
 }
 
 func (s *Session) runTarget() *RunTarget {
@@ -698,14 +714,14 @@ func (s *Session) tap(ctx context.Context, target string) (tapped, error) {
 	}
 	for {
 		node, failure := locate(snap)
+		if node != nil {
+			s.lastTarget = node
+		}
 		if failure == nil {
 			failure = snap.AssertActionable(node, target)
 		}
 		if failure != nil && !retryable[Code(failure)] {
 			return tapped{}, failure
-		}
-		if node != nil {
-			s.lastTarget = node
 		}
 		outOfTime := time.Now().After(deadline)
 		if failure == nil && (stable || outOfTime) {
@@ -713,6 +729,7 @@ func (s *Session) tap(ctx context.Context, target string) (tapped, error) {
 			if err := s.input(ctx, "tap", map[string]any{"x": x, "y": y}); err != nil {
 				return tapped{}, err
 			}
+			s.secureFocus = node.Role == "securetextfield"
 			return tapped{snap: snap, node: node, x: x, y: y, retries: retries}, nil
 		}
 		waitable := failure != nil && (Code(failure) == "not_found" || Code(failure) == "stale_target" || !stable)

@@ -2,6 +2,7 @@ package match
 
 import (
 	"slices"
+	"strconv"
 	"sync"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -48,11 +49,22 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 
 // entryForView returns the cached (or freshly compiled) queries for a view
 // chosen without a URL. Its cache key cannot collide with a URL's, which never
-// starts with a NUL byte.
+// starts with a NUL byte. View names need not be unique, so a view of this
+// corpus is keyed by its position; any other view is not cached.
 func (m *Matcher) entryForView(view *sightmap.ViewDef) *queryCacheEntry {
 	key := "\x00"
 	if view != nil {
-		key += view.Name
+		i := -1
+		for j := range m.corpus.Views {
+			if &m.corpus.Views[j] == view {
+				i = j
+				break
+			}
+		}
+		if i < 0 {
+			return m.compile(view)
+		}
+		key += strconv.Itoa(i)
 	}
 	return m.cached(key, func() *sightmap.ViewDef { return view })
 }
@@ -68,7 +80,13 @@ func (m *Matcher) cached(key string, resolve func() *sightmap.ViewDef) *queryCac
 	if e, ok := m.cache[key]; ok {
 		return e
 	}
-	view := resolve()
+	e := m.compile(resolve())
+	m.cache[key] = e
+	return e
+}
+
+// compile builds the queries for view's components (plus globals).
+func (m *Matcher) compile(view *sightmap.ViewDef) *queryCacheEntry {
 	compList := m.corpus.ComponentsForView(view)
 	queries, _ := ParseQueries(compList)
 	e := &queryCacheEntry{
@@ -79,7 +97,6 @@ func (m *Matcher) cached(key string, resolve func() *sightmap.ViewDef) *queryCac
 	}
 	e.combined = append(append([]MatchQuery(nil), queries...), e.capture.queries...)
 	e.combinedIndex = newFirstPartIndex(e.combined)
-	m.cache[key] = e
 	return e
 }
 
