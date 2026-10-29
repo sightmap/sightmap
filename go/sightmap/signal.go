@@ -34,24 +34,29 @@ type SignalDef struct {
 type SignalRefKind int
 
 const (
-	// SignalRefUnresolved means the ref matched no component or view, or matched
-	// both (ambiguous). Validate reports these as signal-ref-unresolved /
-	// signal-ref-ambiguous; a consumer should treat an unresolved target as
-	// "do not evaluate".
+	// SignalRefUnresolved means the ref matched no entity, or matched entities of
+	// more than one kind (ambiguous). Validate reports these as
+	// signal-ref-unresolved / signal-ref-ambiguous; a consumer should treat an
+	// unresolved target as "do not evaluate".
 	SignalRefUnresolved SignalRefKind = iota
 	// SignalRefComponent means the ref names a component (present? predicate).
 	SignalRefComponent
 	// SignalRefView means the ref names a view (route-active? predicate).
 	SignalRefView
+	// SignalRefRequest means the ref names a request, global or view-scoped.
+	SignalRefRequest
+	// SignalRefMessage means the ref names a message.
+	SignalRefMessage
 )
 
-// SignalTarget is the resolved subject of a signal. For SignalRefComponent,
-// Component is set; for SignalRefView, View is set; for SignalRefUnresolved, both
-// are nil.
+// SignalTarget is the resolved subject of a signal. Exactly the field matching
+// Kind is set; for SignalRefUnresolved, all are nil.
 type SignalTarget struct {
 	Kind      SignalRefKind
 	Component *ComponentDef
 	View      *ViewDef
+	Request   *RequestDef
+	Message   *MessageDef
 }
 
 // SignalByName returns a pointer to the first signal with the given name, or nil.
@@ -82,23 +87,55 @@ func (c *Corpus) componentByName(name string) *ComponentDef {
 	return nil
 }
 
+// requestByName finds a request by name across the global list and every
+// view's requests (first-seen wins), or nil.
+func (c *Corpus) requestByName(name string) *RequestDef {
+	for i := range c.Requests {
+		if c.Requests[i].Name == name {
+			return &c.Requests[i]
+		}
+	}
+	for vi := range c.Views {
+		for ri := range c.Views[vi].Requests {
+			if c.Views[vi].Requests[ri].Name == name {
+				return &c.Views[vi].Requests[ri]
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Corpus) messageByName(name string) *MessageDef {
+	for i := range c.Messages {
+		if c.Messages[i].Name == name {
+			return &c.Messages[i]
+		}
+	}
+	return nil
+}
+
 // ResolveSignalRef resolves a signal's `ref` name to its corpus subject. A ref
-// that matches both a component and a view is ambiguous and reported here as
+// that matches entities of more than one kind is ambiguous and reported here as
 // Unresolved (Validate flags it as a hard error); post-validation a consumer can
 // trust any non-Unresolved result.
 func (c *Corpus) ResolveSignalRef(ref string) SignalTarget {
-	comp := c.componentByName(ref)
-	view := c.ViewByName(ref)
-	switch {
-	case comp != nil && view != nil:
-		return SignalTarget{Kind: SignalRefUnresolved}
-	case comp != nil:
-		return SignalTarget{Kind: SignalRefComponent, Component: comp}
-	case view != nil:
-		return SignalTarget{Kind: SignalRefView, View: view}
-	default:
+	var found []SignalTarget
+	if comp := c.componentByName(ref); comp != nil {
+		found = append(found, SignalTarget{Kind: SignalRefComponent, Component: comp})
+	}
+	if view := c.ViewByName(ref); view != nil {
+		found = append(found, SignalTarget{Kind: SignalRefView, View: view})
+	}
+	if req := c.requestByName(ref); req != nil {
+		found = append(found, SignalTarget{Kind: SignalRefRequest, Request: req})
+	}
+	if msg := c.messageByName(ref); msg != nil {
+		found = append(found, SignalTarget{Kind: SignalRefMessage, Message: msg})
+	}
+	if len(found) != 1 {
 		return SignalTarget{Kind: SignalRefUnresolved}
 	}
+	return found[0]
 }
 
 // ResolveSignal looks up a signal by name and resolves its ref (SignalByName +
@@ -143,6 +180,10 @@ func (c *Corpus) TagsForSignal(name string) []string {
 		add(target.Component.Tags)
 	case SignalRefView:
 		add(target.View.Tags)
+	case SignalRefRequest:
+		add(target.Request.Tags)
+	case SignalRefMessage:
+		add(target.Message.Tags)
 	}
 	sort.Strings(out)
 	return out

@@ -103,7 +103,7 @@ signals:
     tags: [defect]
     ref: PaymentBanner
     filter:
-      text: "*declined*"
+      text: Payment declined         # equality on the extracted text, not a glob
 ```
 
 For a `Message` ref ([SEP-0006](0006-message-entity.md)), `filter:` is typically omitted — a message entity's own `level`/`message` usually already fully identifies the case:
