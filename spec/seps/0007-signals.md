@@ -2,26 +2,24 @@
 sep: 0007
 title: Signals — composing a named, tagged classification from existing entities
 author: Clint Ayres (@jurassix)
-status: Draft
+status: Review
 created: 2026-07-31
-updated: 2026-09-29
+updated: 2026-10-29
 spec-version-target: 1
 related-issues: []
 related-discussions: []
 ---
 
-> **Partially shipped as a subset.** PR #445 landed the Component/View
-> state-predicate slice of this proposal: a `signals:` entry carries `name`,
-> `ref` and `tags`, and denotes the boolean of the referenced entity's current
-> state. The `filter:` mechanism, `Request` and `Message` refs, and evaluation
-> are all still unimplemented, and have no conformance fixture. The declaration
-> and validation layer for the full proposal is open as PR #114, which predates
-> the subset and needs rebasing onto it; its fixture also claims number 020,
-> which `020-message-properties` now holds.
+> **Implementation status.** PR #445 shipped the Component/View subset
+> (`name`, `ref`, `tags`, read as a current-state boolean). PR #114 adds the
+> rest of the declaration and validation layer: `filter:`, `Request` and
+> `Message` refs, filter-key resolution on all four kinds, and conformance
+> fixture `037-signals`. Evaluation (producing signal events from live
+> activity) is specified here but not implemented in the reference SDK.
 
 ## Summary
 
-Add a new top-level `signals` concept: a rule that references an existing entity by name (a `Component`, `Request`, or `Message` — see [SEP-0005](0005-request-properties.md), [SEP-0006](0006-message-entity.md)) and, optionally, filters on that entity's own declared properties, minting a named, tagged classification when it matches. A `signals:` rule never redeclares a selector, route, or body pattern of its own — it only composes what the corpus already defines.
+Add a new top-level `signals` concept: a rule that references an existing entity by name (a `Component`, `Request`, `Message`, or `View`; see [SEP-0005](0005-request-properties.md), [SEP-0006](0006-message-entity.md)) and, optionally, filters on that entity's own declared properties, minting a named, tagged classification when it matches. Each match is an event on the session, so a signal can be counted like a metric. A `signals:` rule never redeclares a selector, route, or body pattern of its own — it only composes what the corpus already defines.
 
 ## Motivation
 
@@ -35,8 +33,9 @@ This SEP proposes the fix directly: a `signals:` rule must reference an entity (
 
 ```yaml
 signals:
-  - name: <string>              # required, semantic identity of the generated classification
-    ref: <entity name>          # required, name of a components:/requests:/messages: entry
+  - id: <string>                # optional, stable identity (SEP-0020)
+    name: <string>              # required, semantic identity of the generated classification
+    ref: <entity name>          # required, name of a components:/requests:/messages:/views: entry
     tags: [<string>, ...]       # optional
     filter:                     # optional; omitted = fires on every match of ref
       <property>: <value>       # equality
@@ -51,22 +50,25 @@ requests:
     route: "/api/checkout/pay"
     method: POST
     properties:
-      - name: status
-        field: "rsp.body.status"
+      - name: outcome
+        extract: { from: rsp.body, path: status }
+      - name: decline_code
+        extract: { from: rsp.body, path: error.code }
 
 signals:
   - name: checkout.payment.declined
     tags: [defect]
     ref: CheckoutPayment
     filter:
-      status: declined
+      status: 200          # the HTTP status, a reserved identity
+      outcome: declined    # a declared property
 ```
 
 ### Semantics
 
 #### `filter:` evaluates against the referenced entity's properties, plus its already-structured identity
 
-For a `Request` ref, `filter:` may name any of its declared `properties:` (SEP-0005), or one of the reserved already-structured identity names (`status`, `method`, `duration`) without any `properties:` declaration at all — a real asymmetry worth stating plainly: a request's *identity* is free to filter on, its *extracted content* is not. The following example needs both, ANDed:
+For a `Request` ref, `filter:` may name any of its declared `properties:` (SEP-0005), or one of the reserved already-structured identity names (`status`, `method`, `duration`) without any `properties:` declaration. A request's identity is free to filter on; anything read from its body or headers has to be declared as a property first. The following example needs both, ANDed:
 
 ```yaml
 requests:
@@ -75,9 +77,9 @@ requests:
     method: POST
     properties:
       - name: rate_limit_remaining
-        field: "rsp.headers.X-RateLimit-Remaining"
+        extract: { from: rsp.headers, path: X-RateLimit-Remaining }
       - name: outcome
-        field: "rsp.body.status"
+        extract: { from: rsp.body, path: status }
 
 signals:
   - name: checkout.payment.throttled_silently
@@ -97,17 +99,17 @@ components:
     selector: ".payment-status-banner"
     properties:
       - name: text
-        extract: text
+        extract: { from: dom.text }
 
 signals:
   - name: checkout.payment.declined.banner
     tags: [defect]
     ref: PaymentBanner
     filter:
-      text: "*declined*"
+      text: Payment declined         # equality on the extracted text, not a glob
 ```
 
-For a `Message` ref ([SEP-0006](0006-message-entity.md)), `filter:` is typically omitted — a message entity's own `level`/`message` usually already fully identifies the case:
+For a `Message` ref ([SEP-0006](0006-message-entity.md)), `filter:` is often omitted, since a message entity's own `level`/`message` usually identifies the case. When it declares stack `properties:`, a filter may name them:
 
 ```yaml
 messages:
@@ -115,28 +117,49 @@ messages:
     level: ERROR
     message: cart version mismatch
 
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        extract: { from: stack, path: top.file, pattern: '([^/]+)$' }
+
 signals:
   - name: cart.abandoned
     tags: [defect]
     ref: CartVersionMismatch
+  - name: chunk.vendor.failed
+    tags: [defect]
+    ref: ChunkLoadFailed
+    filter:
+      origin_file: vendor.js
 ```
 
-A `View` ref has no extractable property at all, so a view-referencing signal always omits `filter:` — it scopes a classification to "any activity observed while this view is active," a different kind of statement than a content match:
+A `View` ref with no `filter:` fires on every entry to the view. With [SEP-0008](0008-url-properties.md) URL properties, a filter may name the view's declared properties or a `:name` its route binds; a `Request` ref may name its route's bindings the same way:
 
 ```yaml
 views:
   - name: CheckoutView
     route: "/checkout"
+  - name: OrderDetail
+    route: "/orders/:order_id"
+    properties:
+      - name: tab
+        extract: { from: url.query, path: tab }
 
 signals:
   - name: checkout.view.active
     tags: [checkout]
     ref: CheckoutView
+  - name: orders.returns_tab.viewed
+    tags: [returns]
+    ref: OrderDetail
+    filter:
+      tab: returns
 ```
 
 #### No `filter:` means unconditional
 
-Omitting `filter:` means the rule fires on every match of `ref`. This is deliberately the same case a `Component`'s or `Request`'s static `tags:` field already covers ([SEP-0004](0004-component-tags.md)) — referencing an entity with no `filter:` is equivalent to a static tag on it. `signals:` is a strict superset of that mechanism, not a parallel one; an author reaches for `filter:` only when the entity's mere presence isn't itself the classification.
+Omitting `filter:` means the rule fires on every match of `ref`. It classifies the same occurrences a static `tags:` field on the entity would ([SEP-0004](0004-component-tags.md)), and additionally names them as events that can be counted. An author reaches for `filter:` only when the entity's mere presence isn't itself the classification.
 
 #### Multiple `filter:` keys are ANDed
 
@@ -145,6 +168,25 @@ Omitting `filter:` means the rule fires on every match of `ref`. This is deliber
 #### Multiple matching rules fire independently
 
 If more than one `signals:` rule references the same entity and both match the same live instance, both fire — nothing is deduped or merged into a single result. Each rule is evaluated independently; a consumer sees one classification per firing rule, not one classification with multiple names.
+
+#### What a signal emits
+
+Evaluated over a session, a signal produces **signal events**, points in time, one per occurrence. Counting is the number of events, and a session *has* a signal when it has at least one. This is what lets a signal replace a metric: instead of a consumer deciding which metrics apply to a session, each signal is already an event on every session it occurs in.
+
+What counts as one occurrence depends on the kind `ref` names:
+
+| `ref` kind | One event per | Holds (current state) |
+|---|---|---|
+| Request | completed request record that matches the request entry (all matches apply) with the filter holding | n/a |
+| Message | console or exception record that matches the message entry with the filter holding | n/a |
+| View | transition into the state where this view is the page's view (most specific wins) with the filter holding | while that state lasts |
+| Component | transition of one element into the state where this component names it ([SEP-0023](0023-most-specific-definition-wins.md)) with the filter holding | while any element is in that state |
+
+Requests and messages are records; views and components are state. Without the distinction, a component signal has no answer to "how many": every DOM mutation, re-render, or observer callback would be a candidate occurrence. Edge-triggering on the state starting to hold gives one event per appearance, per arrival, and per change of a filtered property into a matching value, the same collapse [SEP-0015](0015-component-watch.md) asks of visibility reports. The current-state boolean stays available for completion and availability predicates, which is what the shipped Component/View subset defined.
+
+A component ref follows naming rather than raw selector matches. A ref to a general `Button` does not also count the `DangerButton` a more specific definition names, so the two never double-count one element. `watch` deliberately does not depend on naming, because it generates its own records; a signal reads properties, and properties resolve against the component that names the element.
+
+Each event carries `signal` (the name), `id` (when declared), resolved `tags`, `ref` and `kind`, `ts`, the page's `view` at `ts`, and `properties`: the referenced instance's resolved property values, including route bindings and a request's `status`/`method`/`duration`, minus anything unresolved or withheld by privacy ([SEP-0009](0009-component-privacy.md)). The properties are what make an event countable along dimensions the filter did not fix; `checkout.payment.declined` filters `outcome: declined` and still carries `decline_code`. A stored series SHOULD key on `id` when present, so renaming a signal does not split its history ([SEP-0020](0020-entity-id.md)).
 
 #### Derivation is explicit
 
@@ -155,10 +197,16 @@ A classification produced by a `signals:` match carries the referenced entity's 
 - MUST reject a `signals:` entry whose `ref:` does not resolve to a known `Component`/`Request`/`Message`/`View` name. Diagnostic code: `signal-ref-unresolved` (mirrors the existing `ref-unresolved` code for `$ref`).
 - MUST reject (not silently resolve) a `ref:` name that collides across entity kinds (e.g. a `Component` and a `Request` sharing a name) — unlike DOM tree matching, there is no adjacency/tree-position reason to prefer one over the other. Diagnostic code: `signal-ref-ambiguous`.
 - MUST evaluate every declared `filter:` key with AND semantics; MUST support both scalar (equality) and array (membership) values per key.
+- MUST reject a `filter:` key that does not resolve on the referenced entity, i.e. is not one of its declared `properties:`, not a `:name` its route still binds (`View`, `Request`; SEP-0008), and not a reserved name available for its kind (`status`/`method`/`duration` on a `Request`, `value` on a `Component`). A name declared by several entities of one kind resolves a key any of them declares. Diagnostic code: `signal-filter-unknown`. Without this check the structural link this SEP is built on is unenforced: a filter naming a renamed or never-existent property passes silently and the rule simply never fires.
+- MUST reject a `filter:` value that is not a string, integer, or boolean, or a non-empty list of them: a `null`, a float, a mapping, or an empty list. Diagnostic code: `field-type-invalid`.
+- MUST reject a `signals:` entry with no `name` or no `ref` (`missing-name`, `missing-ref`), and two entries sharing a `name` (`merge-collision-signal`).
+- MUST compare `filter:` values as canonical text, rendering an integer as its decimal value so `0x1F` and `31` agree. MUST reject an unquoted integer that YAML 1.1 and 1.2 parsers read differently (a leading-zero octal like `0200`, or underscores like `1_000`), since two SDKs would otherwise compare different values for one corpus.
 - MUST fire a rule with no `filter:` on every match of its `ref:`.
 - MUST evaluate each `signals:` rule independently — a live instance matched by more than one rule produces one classification per matching rule.
 - MUST NOT require a numeric-comparison filter operator (`>=`, ranges) in v1 — see [Open questions](#open-questions).
 - SHOULD surface the referenced entity's `name` as part of the classification's own identity, per [Derivation is explicit](#derivation-is-explicit).
+- MUST emit one event per matching record for a `Request` or `Message` ref, and one per transition into the holding state for a `View` or `Component` ref, per [What a signal emits](#what-a-signal-emits). A `Component` ref counts only elements the component names.
+- MUST carry `signal`, `tags`, `ref`, `kind` and `ts` on each event; SHOULD carry `id`, `view` and the referenced instance's resolved `properties`.
 
 ### JSON Schema diff
 
@@ -179,6 +227,7 @@ $defs.signal:
   required: [name, ref]
   additionalProperties: false
   properties:
+    id: { $ref: "#/$defs/id" }    # SEP-0020
     name:
       type: string
       minLength: 1
@@ -190,17 +239,19 @@ $defs.signal:
     tags:
       type: array
       items: { type: string, minLength: 1 }
-      description: "Open-vocabulary classification labels carried onto the generated classification. See SEP-0004."
+      description: "Open-vocabulary classification labels carried onto the signal, unioned with the resolved tags of the entity named by ref. See SEP-0016."
     filter:
       type: object
-      description: "Property-name → value (equality) or value-list (membership) constraints, ANDed across keys, evaluated against the referenced entity's declared properties and already-structured identity fields. Omitted = unconditional."
+      description: "Property-name → value (equality) or value-list (membership) constraints, ANDed across keys, evaluated against the referenced entity's declared properties, its route's :name bindings, and its already-structured identity fields. Omitted = unconditional."
       additionalProperties:
         oneOf:
-          - { type: string }
-          - { type: array, items: { type: string }, minItems: 1 }
+          - { type: [string, integer, boolean] }
+          - { type: array, items: { type: [string, integer, boolean] }, minItems: 1 }
 ```
 
-`fileRootFields` gains `"signals"`.
+Note the value types. An earlier draft of this diff allowed only `string`, which made this proposal's own multi-key example above invalid: `status: 200` is an unquoted YAML integer, and the reserved `status` identity genuinely *is* an integer. Integers and booleans are accepted and compared as canonical text, so the natural spelling works. `integer` rather than `number` is deliberate: a float has no single canonical text (`1.50` versus `1.5`), which would become a cross-SDK divergence. `null` and an empty list stay invalid, the first having nothing to compare and the second never matching.
+
+`fileRootFields` gains `"signals"` (already shipped with the subset).
 
 ## Alternatives considered
 
@@ -228,19 +279,19 @@ Ruled out: a classification frequently needs to survive independently of how its
 
 ## Migration
 
-`signals:` is a new top-level key — purely additive, no existing sightmap corpus references it today. No migration is required for existing sightmaps.
+Purely additive. Every corpus valid under the shipped Component/View subset stays valid with the same meaning: a `signals:` entry with no `filter:` on a component or view resolves exactly as before. No migration is required.
 
-Existing SDKs that encounter a `signals:` key MUST treat it as an unknown top-level field; under `additionalProperties: false` at the root, existing SDKs reject sightmaps that use it until they implement this SEP. Release playbook, matching SEP-0001/SEP-0003's pattern:
+An SDK that implements only the subset rejects the new shapes: a `filter:` key fails `additionalProperties: false` on `$defs.signal` in the JSON Schema (the Go loader warns `unknown-field`), and a `Request` or `Message` ref is `signal-ref-unresolved`. Release playbook:
 
-1. This SEP merges (status: Accepted) — depends on [SEP-0005](0005-request-properties.md) and [SEP-0006](0006-message-entity.md) also being accepted, since this proposal's `Request`/`Message` examples assume both exist.
-2. `sightmap/sightmap` implements `signals:` parsing and `ref:`/`filter:` resolution. Bumped to a minor release.
-3. Consumers pin `github.com/sightmap/sightmap/go >= <new version>` before authoring `signals:`.
+1. This SEP merges as Accepted. Its dependencies, [SEP-0005](0005-request-properties.md), [SEP-0006](0006-message-entity.md) and [SEP-0008](0008-url-properties.md), are already Accepted.
+2. `sightmap/sightmap` ships `filter:` parsing, `Request`/`Message` refs and filter-key validation in a minor release.
+3. Consumers pin `github.com/sightmap/sightmap/go >= <that version>` before authoring `filter:` or request/message refs.
 
 ## Open questions
 
-1. **Reference key naming.** `ref:` is used throughout this proposal; `signal:` and `from:` were both considered and read worse for a rule referencing a `Component` or `Message` specifically (`signal: PaymentBanner` reads oddly when nothing about `PaymentBanner` is itself a signal). Open to reviewer pushback on the final name.
-2. **Should `views:` be referenceable at all in v1?** Included in this proposal (see the `CheckoutView` example) since it costs little and is a natural instance of "no filter = unconditional," but it's the least load-bearing of the four entity kinds — worth confirming reviewers see real demand for it versus deferring.
-3. **Comparison-operator filters.** `filter:` supports only equality/membership in v1. A numeric range or comparison operator (`filter: {duration: ">=1000"}`) was considered and deferred — an intrinsic, non-`signals:` mechanism already handles the one case that came up (HTTP status-code ranges) — but a future SEP could add operator support if a real case needs it that intrinsic handling doesn't cover.
+1. **Comparison-operator filters.** `filter:` supports only equality and membership in v1, so "any 5xx" and "slower than 3s" can't be written. A numeric range or comparison operator (`filter: {duration: ">=1000"}`), negation, and pattern matching were considered and deferred to a future SEP, to keep v1's comparison rule (canonical text equality) the same in every SDK.
+2. **Composition.** A signal cannot reference another signal, and there is no sequence, absence, or time-window form ("declined, then no retry within 30s"). That is a different kind of rule, evaluated over a sequence of events rather than one instance, and belongs in its own SEP.
+3. **Falling edges.** Events mark a view or component state starting to hold. Whether a consumer should also emit the end (so a signal can carry a duration, such as how long an error banner stayed up) is left open; nothing in v1 needs it.
 4. **Fan-out policy revisit.** This SEP requires independent firing for multiple matching rules ([Conformance](#conformance)) as the simplest, least-surprising default. A future SEP could introduce a dedup/union mode if real corpora show independent firing producing noise.
 
 ## References
@@ -249,3 +300,9 @@ Existing SDKs that encounter a `signals:` key MUST treat it as an unknown top-le
 - [SEP-0004](0004-component-tags.md) — the static-tag mechanism `signals:` with no `filter:` is a strict superset of.
 - [SEP-0005](0005-request-properties.md) — the request-property mechanism a `Request`-referencing `signals:` rule filters against; a direct dependency of this proposal.
 - [SEP-0006](0006-message-entity.md) — the console/exception entity a `Message`-referencing `signals:` rule composes; a direct dependency of this proposal.
+- [SEP-0008](0008-url-properties.md) — URL properties and route bindings on views and requests, which a filter may name.
+- [SEP-0009](0009-component-privacy.md) — privacy, which withholds properties from a signal event.
+- [SEP-0015](0015-component-watch.md) — visibility reporting, whose collapse rule component signal events follow.
+- [SEP-0016](0016-message-and-signal-tags.md) — how a signal's tags resolve.
+- [SEP-0020](0020-entity-id.md) — the stable `id` a stored signal series keys on.
+- [SEP-0023](0023-most-specific-definition-wins.md) — which component names an element, and so which a component signal counts.

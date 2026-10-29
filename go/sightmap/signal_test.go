@@ -20,7 +20,7 @@ views:
     route: /booking/checkout
     components:
       - name: UpsellModal
-        selector: .jtpsdk-popup-modal
+        selector: .upsell-modal
 signals:
   - name: checkout.reached
     ref: Checkout
@@ -91,5 +91,96 @@ func TestCheckSignalsErrors(t *testing.T) {
 		if codes[code] == 0 {
 			t.Errorf("expected a %q error; got codes %v", code, codes)
 		}
+	}
+}
+
+// Validation accepts request and message refs, so the resolver consumers call
+// must resolve them too, and their tags must reach the signal (SEP-0016).
+func TestSignalsResolveRequestAndMessageRefs(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `version: 1
+views:
+  - name: Checkout
+    route: /checkout
+    requests:
+      - name: ApplyCoupon
+        route: /api/coupon
+        tags: [promo]
+requests:
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    tags: [payments]
+messages:
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    tags: [deploy]
+signals:
+  - name: payment.seen
+    ref: CheckoutPayment
+    tags: [defect]
+  - name: coupon.seen
+    ref: ApplyCoupon
+  - name: chunk.failed
+    ref: ChunkLoadFailed
+`
+	if err := os.WriteFile(filepath.Join(dir, "app.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := DirLoader(dir).Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if tgt := c.ResolveSignal("payment.seen"); tgt.Kind != SignalRefRequest || tgt.Request == nil || tgt.Request.Name != "CheckoutPayment" {
+		t.Errorf("payment.seen: want request CheckoutPayment, got %+v", tgt)
+	}
+	if tgt := c.ResolveSignal("coupon.seen"); tgt.Kind != SignalRefRequest || tgt.Request == nil || tgt.Request.Name != "ApplyCoupon" {
+		t.Errorf("coupon.seen: want view-scoped request ApplyCoupon, got %+v", tgt)
+	}
+	if tgt := c.ResolveSignal("chunk.failed"); tgt.Kind != SignalRefMessage || tgt.Message == nil || tgt.Message.Name != "ChunkLoadFailed" {
+		t.Errorf("chunk.failed: want message ChunkLoadFailed, got %+v", tgt)
+	}
+
+	for name, want := range map[string]string{
+		"payment.seen": "defect,payments",
+		"coupon.seen":  "promo",
+		"chunk.failed": "deploy",
+	} {
+		if got := strings.Join(c.TagsForSignal(name), ","); got != want {
+			t.Errorf("TagsForSignal(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+// A name shared by a request and a message resolves to nothing, as validation
+// reports it ambiguous.
+func TestSignalsResolveAmbiguousAcrossRequestAndMessage(t *testing.T) {
+	c := &Corpus{
+		Requests: []RequestDef{{Name: "Dup", Route: "/api/x"}},
+		Messages: []MessageDef{{Name: "Dup", Level: "error"}},
+		Signals:  []SignalDef{{Name: "s", Ref: "Dup"}},
+	}
+	if tgt := c.ResolveSignal("s"); tgt.Kind != SignalRefUnresolved {
+		t.Fatalf("want unresolved for a ref shared by a request and a message, got %+v", tgt)
+	}
+}
+
+// A component declared in two views is one entity to a ref, so the signal
+// carries the tags of both declarations.
+func TestTagsForSignal_SameNameUnion(t *testing.T) {
+	c := &Corpus{
+		Views: []ViewDef{
+			{Name: "A", Route: "/a", Components: []ComponentDef{{Name: "Banner", Selectors: []string{".a"}, Tags: []string{"orders"}}}},
+			{Name: "B", Route: "/b", Components: []ComponentDef{{Name: "Banner", Selectors: []string{".b"}, Tags: []string{"cart"}}}},
+		},
+		Requests: []RequestDef{{Name: "R", Route: "/api/r", Tags: []string{"global"}}},
+		Signals:  []SignalDef{{Name: "s", Ref: "Banner"}, {Name: "r", Ref: "R"}},
+	}
+	c.Views[1].Requests = []RequestDef{{Name: "R", Route: "/api/r", Tags: []string{"scoped"}}}
+	if got := strings.Join(c.TagsForSignal("s"), ","); got != "cart,orders" {
+		t.Errorf("component tags = %q, want cart,orders", got)
+	}
+	if got := strings.Join(c.TagsForSignal("r"), ","); got != "global,scoped" {
+		t.Errorf("request tags = %q, want global,scoped", got)
 	}
 }

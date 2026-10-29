@@ -646,6 +646,40 @@ messages:
         extract: { from: stack, path: top.function }   # <frame>.<attr>; frame = top|<index>, attr = function|file|line|column
 ```
 
+### `signals:` — name a finding so it can be counted
+
+A signal classifies something the corpus already names. It points at a
+component, request, message, or view with `ref` and optionally narrows it with
+`filter`; it never has its own selector, route, or regex. Each occurrence
+becomes an event on the session, so "how many sessions saw a declined payment"
+is a count, not a search.
+
+```yaml
+signals:
+  - name: checkout.payment.declined    # dotted, area.thing.outcome
+    ref: CheckoutPayment               # the request above
+    tags: [defect]
+    filter:
+      status: 200                      # reserved request identity, no declaration needed
+      outcome: declined                # a declared property
+  - name: checkout.banner.error
+    ref: PaymentBanner
+    filter: { severity: error }        # equality; a list means any of
+```
+
+- Declare the property first, then filter on it. A filter key the entity doesn't
+  have is `signal-filter-unknown`. Keys: declared properties (any kind), a route's
+  `:name` bindings (views and requests), `status`/`method`/`duration` on a
+  request, `value` on a component.
+- Filters are equality only. A glob like `"*declined*"` never matches; extract a
+  narrower value with `pattern` instead.
+- Keys are ANDed. For OR, write two signals.
+- A request or message signal counts each matching record; a view or component
+  signal counts each time it starts to hold (arrival, appearance, or a filtered
+  property changing to a matching value), not every re-render.
+- No `filter` means every occurrence. If that is the whole classification, a
+  `tags:` on the entity may be enough.
+
 ---
 
 ## Environments and origins
@@ -909,6 +943,9 @@ sightmap console list               # name recurring console/exception patterns
   auth call, a data fetch). Add request `properties:` where a value inside the
   body/headers is the real signal — the "200 OK but the body says failed" case.
 - Add a `messages:` entry for recurring console/exception patterns worth naming.
+- When a request, message, or component state is a finding worth counting
+  across sessions (a silent failure, a blocked action), add a `signals:` entry
+  for it.
 - Requests/messages are often global; promote cross-page ones like components
   (Phase 2). Skip it only when the page makes no meaningful traffic.
 
