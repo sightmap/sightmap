@@ -108,8 +108,8 @@ many re-reads it took as `retries`.
 | `scroll up\|down\|left\|right [--in TARGET] [--until TARGET] [--max N]` | One page, or until a target is tappable (default `--max 20`). `--in` scrolls inside that element. |
 | `swipe X1 Y1 X2 Y2 [--duration S]`, `tap-xy X Y`, `type TEXT`, `key NAME`, `button NAME`, `openurl URL` | Raw input in screen points. Keys: `return delete tab escape space` and arrows. Buttons: `home lock siri side apple_pay volume_up volume_down`. |
 | `screenshot --out F.png` | PNG of the screen. |
-| `console list [--limit N] [--grep S] [--level L[,L]] [--all]` / `console get N` | The app's os_log/Logger output and its stdout/stderr. Levels: `debug info default error fault stdout stderr`. `--grep` is case-insensitive; `--all` adds Apple framework errors, hidden by default as noise. |
-| `run new [--label L]` / `run current` / `run tail [--follow] [--since SEQ] [--run ID]` | The run log (below). |
+| `console list [--limit N] [--grep S] [--level L[,L]] [--all] [--since INDEX] [--follow]` / `console get N` | The app's os_log/Logger output and its stdout/stderr. Levels: `debug info default error fault stdout stderr`. `--grep` is case-insensitive and covers every source; `--all` adds Apple framework errors, hidden by default as noise. `--since` pages forward (pass back `last`); `--follow` streams. The session keeps the latest 5,000 entries (`start --console-limit N`); a list says when earlier ones were dropped. |
+| `run new [--label L]` / `run current` / `run note TEXT [--kind K]` / `run tail [--follow] [--since SEQ] [--run ID]` | The run log (below). |
 
 ## Reading a snapshot
 
@@ -265,7 +265,9 @@ say the app exposes nothing, the causes in order are:
 Every action appends one JSON line to `.sightmap/.device-runs/<run>.jsonl`:
 `ts`, `run`, `seq`, `action`, `args`, the `target` (snapshot id, component,
 identifier, text, role), the `view`, `ok`, and any `error`. `start` begins a
-run; `run new --label L` starts another. Another agent or tool can follow a
+run; `run new --label L` starts another. `launch` and `relaunch` are logged as
+such. `run note TEXT --kind K` records an annotation of your own (e.g. when a
+recording you started begins or ends) among the steps. Another agent or tool can follow a
 driving agent with `run tail --follow` (or poll with `--since SEQ`) and line up
 its own data (network captures, analytics, logs) with the steps by timestamp.
 `console list --grep` covers the app's own logs.

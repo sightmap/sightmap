@@ -25,7 +25,7 @@ func deviceUsage() {
 
 Session:
   doctor [--fix]                                    check prerequisites; builds the simulator helper on first use
-  start [--device NAME|UDID] [--app PATH | --bundle-id ID] [--label L] [--detach]
+  start [--device NAME|UDID] [--app PATH | --bundle-id ID] [--label L] [--console-limit N] [--detach]
                                                     boot, enable accessibility, install, launch, run the daemon
                                                     (blocks the shell; --detach backgrounds it). On a running
                                                     session: reinstall (--app) and relaunch the same app
@@ -36,9 +36,10 @@ Session:
 Observe:
   snapshot [--view V] [--include-offscreen] [--out F] [--tree-out F]
   screenshot --out F.png
-  console list [--limit N] [--grep S] [--level L[,L]] [--all]
+  console list [--limit N] [--grep S] [--level L[,L]] [--all] [--since INDEX] [--follow]
                                                     levels: debug info default error fault stdout stderr;
-                                                    --grep is case-insensitive; --all adds Apple frameworks
+                                                    --grep is case-insensitive; --all adds Apple frameworks;
+                                                    --since pages forward from an index; --follow streams
   console get INDEX
 
 Act (TARGET: snapshot id, accessibility identifier, component query, or a selector):
@@ -54,6 +55,7 @@ Act (TARGET: snapshot id, accessibility identifier, component query, or a select
 
 Run log (.sightmap/.device-runs/<run>.jsonl: one line per action):
   run new [--label L] | run current
+  run note TEXT [--kind K]                          record an annotation, e.g. --kind session-start
   run tail [--follow] [--since SEQ] [--run ID]
 
 Every command takes --json and --sightmap-dir DIR (default .sightmap).
@@ -151,6 +153,9 @@ func deviceCommand(cmd string, args []string, f *deviceFlags) error {
 	if err != nil {
 		return err
 	}
+	if req.follow {
+		return followConsole(session, req.args.(device.ConsoleFilter), *f.json)
+	}
 	var result json.RawMessage
 	if err := device.Call(session.Socket, req.cmd, req.args, &result, 2*time.Minute); err != nil {
 		return err
@@ -183,8 +188,9 @@ func deviceCommand(cmd string, args []string, f *deviceFlags) error {
 }
 
 type deviceReq struct {
-	cmd  string
-	args any
+	cmd    string
+	args   any
+	follow bool
 }
 
 func parseNum(s, name string) (float64, error) {
@@ -211,8 +217,8 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 	fs := f.fs
 	var (
 		view, out, treeOut, in, until, grep, level *string
-		offscreen, clear, all, ignoreCase          *bool
-		maxScrolls, limit                          *int
+		offscreen, clear, all, ignoreCase, follow  *bool
+		maxScrolls, limit, since                   *int
 		duration                                   *float64
 	)
 	switch cmd {
@@ -237,6 +243,8 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 		ignoreCase = fs.Bool("i", false, "accepted for familiarity; --grep is always case-insensitive")
 		level = fs.String("level", "", "comma-separated levels")
 		all = fs.Bool("all", false, "include Apple framework entries")
+		since = fs.Int("since", -1, "only entries after this index, oldest first; --limit then takes the first N")
+		follow = fs.Bool("follow", false, "keep printing new entries until interrupted")
 	}
 	p, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
@@ -251,17 +259,17 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 	}
 	switch cmd {
 	case "snapshot":
-		return &deviceReq{"snapshot", device.SnapshotArgs{View: *view, IncludeOffscreen: *offscreen, Out: absPath(*out), TreeOut: absPath(*treeOut), JSON: *f.json}}, nil
+		return &deviceReq{cmd: "snapshot", args: device.SnapshotArgs{View: *view, IncludeOffscreen: *offscreen, Out: absPath(*out), TreeOut: absPath(*treeOut), JSON: *f.json}}, nil
 	case "click":
 		if err := need(1, "click TARGET"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{"click", device.TargetArgs{Target: p[0]}}, nil
+		return &deviceReq{cmd: "click", args: device.TargetArgs{Target: p[0]}}, nil
 	case "fill":
 		if err := need(2, "fill TARGET TEXT [--clear]"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{"fill", device.TargetArgs{Target: p[0], Text: p[1], Clear: *clear}}, nil
+		return &deviceReq{cmd: "fill", args: device.TargetArgs{Target: p[0], Text: p[1], Clear: *clear}}, nil
 	case "scroll":
 		if err := need(1, "scroll up|down|left|right [--in TARGET] [--until TARGET] [--max N]"); err != nil {
 			return nil, err
@@ -271,7 +279,7 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 		default:
 			return nil, usageErr("scroll direction must be up, down, left or right, not %q", p[0])
 		}
-		return &deviceReq{"scroll", device.ScrollArgs{Direction: p[0], In: *in, Until: *until, Max: *maxScrolls}}, nil
+		return &deviceReq{cmd: "scroll", args: device.ScrollArgs{Direction: p[0], In: *in, Until: *until, Max: *maxScrolls}}, nil
 	case "swipe":
 		if err := need(4, "swipe X1 Y1 X2 Y2 [--duration S]"); err != nil {
 			return nil, err
@@ -282,7 +290,7 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 				return nil, err
 			}
 		}
-		return &deviceReq{"swipe", device.PointArgs{X1: v[0], Y1: v[1], X2: v[2], Y2: v[3], Duration: *duration}}, nil
+		return &deviceReq{cmd: "swipe", args: device.PointArgs{X1: v[0], Y1: v[1], X2: v[2], Y2: v[3], Duration: *duration}}, nil
 	case "tap-xy":
 		if err := need(2, "tap-xy X Y  (screen points, not pixels)"); err != nil {
 			return nil, err
@@ -295,44 +303,48 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 		if err != nil {
 			return nil, err
 		}
-		return &deviceReq{"tapXY", device.PointArgs{X: x, Y: y}}, nil
+		return &deviceReq{cmd: "tapXY", args: device.PointArgs{X: x, Y: y}}, nil
 	case "type":
 		if err := need(1, "type TEXT"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{"type", device.ValueArgs{Text: p[0]}}, nil
+		return &deviceReq{cmd: "type", args: device.ValueArgs{Text: p[0]}}, nil
 	case "key":
 		if err := need(1, "key NAME"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{"key", device.ValueArgs{Key: p[0]}}, nil
+		return &deviceReq{cmd: "key", args: device.ValueArgs{Key: p[0]}}, nil
 	case "button":
 		if err := need(1, "button NAME"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{"button", device.ValueArgs{Name: p[0]}}, nil
+		return &deviceReq{cmd: "button", args: device.ValueArgs{Name: p[0]}}, nil
 	case "openurl":
 		if err := need(1, "openurl URL"); err != nil {
 			return nil, err
 		}
-		return &deviceReq{"openurl", device.ValueArgs{URL: p[0]}}, nil
+		return &deviceReq{cmd: "openurl", args: device.ValueArgs{URL: p[0]}}, nil
 	case "screenshot":
 		if *out == "" {
 			return nil, usageErr("usage: sightmap device screenshot --out F.png")
 		}
-		return &deviceReq{"screenshot", device.ValueArgs{Out: absPath(*out)}}, nil
+		return &deviceReq{cmd: "screenshot", args: device.ValueArgs{Out: absPath(*out)}}, nil
 	case "launch", "relaunch":
-		return &deviceReq{cmd, struct{}{}}, nil
+		return &deviceReq{cmd: cmd, args: struct{}{}}, nil
 	case "console":
 		if len(p) > 0 && p[0] == "list" {
-			return &deviceReq{"consoleList", device.ConsoleFilter{Limit: *limit, Grep: *grep, Level: *level, All: *all}}, nil
+			filter := device.ConsoleFilter{Limit: *limit, Grep: *grep, Level: *level, All: *all}
+			if *since >= 0 {
+				filter.Since = since
+			}
+			return &deviceReq{cmd: "consoleList", args: filter, follow: *follow}, nil
 		}
 		if len(p) > 1 && p[0] == "get" {
 			i, err := strconv.Atoi(p[1])
 			if err != nil {
 				return nil, usageErr("console get takes an index, got %q", p[1])
 			}
-			return &deviceReq{"consoleGet", device.ValueArgs{Index: i}}, nil
+			return &deviceReq{cmd: "consoleGet", args: device.ValueArgs{Index: i}}, nil
 		}
 		return nil, usageErr("usage: sightmap device console list [--limit N] [--grep S] [--level L] | console get INDEX")
 	}
@@ -349,6 +361,57 @@ func consoleLine(e device.ConsoleEntry) string {
 	}
 	msg, _, _ := strings.Cut(e.Message, "\n")
 	return fmt.Sprintf("#%d %-7s%s  %s", e.Index, e.Level, where, msg)
+}
+
+// consoleLines renders a console list; following, it leaves out the notes
+// about an empty or truncated list.
+func consoleLines(l device.ConsoleList, following bool) []string {
+	var lines []string
+	if l.Dropped > 0 {
+		lines = append(lines, fmt.Sprintf("(%d earlier entries dropped; the console keeps the latest %d)", l.Dropped, l.Capacity))
+	}
+	for _, e := range l.Entries {
+		lines = append(lines, consoleLine(e))
+	}
+	if following {
+		return lines
+	}
+	if len(l.Entries) == 0 {
+		lines = append(lines, "(no console entries match)")
+	} else if more := l.Total - len(l.Entries); more > 0 {
+		lines = append(lines, fmt.Sprintf("(%d more match; raise --limit, or page on with --since %d)", more, l.Last))
+	}
+	return lines
+}
+
+// followConsole prints the entries filter selects, then new ones as they
+// arrive, until interrupted; with --json, one entry per line.
+func followConsole(session *device.SessionInfo, filter device.ConsoleFilter, asJSON bool) error {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	for first := true; ; first = false {
+		var l device.ConsoleList
+		if err := device.Call(session.Socket, "consoleList", filter, &l, 30*time.Second); err != nil {
+			return err
+		}
+		if asJSON {
+			for _, e := range l.Entries {
+				printJSON(e)
+			}
+		} else if lines := consoleLines(l, true); len(lines) > 0 {
+			fmt.Println(strings.Join(lines, "\n"))
+		}
+		last := l.Last
+		filter.Since, filter.Limit = &last, 0
+		if first && !asJSON {
+			fmt.Fprintln(os.Stderr, "(following; Ctrl-C to stop)")
+		}
+		select {
+		case <-sig:
+			return nil
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
 }
 
 func waited(r map[string]any) string {
@@ -418,17 +481,7 @@ func formatDeviceResult(cmd string, raw json.RawMessage) string {
 	case "consoleList":
 		var l device.ConsoleList
 		json.Unmarshal(raw, &l)
-		if len(l.Entries) == 0 {
-			return "(no console entries match)"
-		}
-		lines := make([]string, 0, len(l.Entries)+1)
-		for _, e := range l.Entries {
-			lines = append(lines, consoleLine(e))
-		}
-		if l.Total > len(l.Entries) {
-			lines = append(lines, fmt.Sprintf("(%d earlier; raise --limit)", l.Total-len(l.Entries)))
-		}
-		return strings.Join(lines, "\n")
+		return strings.Join(consoleLines(l, false), "\n")
 	case "consoleGet":
 		var e device.ConsoleEntry
 		json.Unmarshal(raw, &e)
@@ -510,6 +563,7 @@ func deviceStart(args []string, f *deviceFlags) error {
 	bundleID := fs.String("bundle-id", "", "an installed app's bundle id")
 	label := fs.String("label", "", "a label for the run log")
 	detach := fs.Bool("detach", false, "run the daemon in the background and return once it is ready")
+	consoleLimit := fs.Int("console-limit", 5000, "how many console entries the session keeps")
 	if _, err := parseFlagsAroundArgs(fs, args); err != nil {
 		return usageErr("%v", err)
 	}
@@ -578,7 +632,7 @@ func deviceStart(args []string, f *deviceFlags) error {
 	if *bundleID == "" && appPath == "" {
 		return usageErr("start needs --app PATH or --bundle-id ID")
 	}
-	cfg := device.Config{UDID: d.UDID, DeviceName: d.Label(), BundleID: *bundleID, AppPath: appPath, SightmapDir: sightmapDir, RunLabel: *label,
+	cfg := device.Config{UDID: d.UDID, DeviceName: d.Label(), BundleID: *bundleID, AppPath: appPath, SightmapDir: sightmapDir, RunLabel: *label, ConsoleLimit: *consoleLimit,
 		RunDir: filepath.Join(device.CacheDir(), "sessions", d.UDID)}
 	if appPath != "" {
 		if cfg.BundleID == "" {
@@ -821,6 +875,13 @@ func deviceStop(args []string, f *deviceFlags) error {
 }
 
 func formatRunEntry(e device.RunEntry) string {
+	if e.Action == "note" {
+		kind := ""
+		if e.Kind != "" {
+			kind = " [" + e.Kind + "]"
+		}
+		return fmt.Sprintf("%d %s note%s %s", e.Seq, e.TS, kind, e.Text)
+	}
 	mark := "✓"
 	if !e.OK {
 		mark = "✗"
@@ -864,6 +925,7 @@ func formatRunEntry(e device.RunEntry) string {
 func deviceRun(args []string, f *deviceFlags) error {
 	fs := f.fs
 	label := fs.String("label", "", "a label for the new run")
+	kind := fs.String("kind", "", "what a note is, e.g. session-start")
 	follow := fs.Bool("follow", false, "keep printing new entries")
 	since := fs.Int("since", 0, "only entries after this sequence number")
 	runID := fs.String("run", "", "a run id (default: the session's current run, else the newest)")
@@ -876,6 +938,23 @@ func deviceRun(args []string, f *deviceFlags) error {
 		sub = p[0]
 	}
 	switch sub {
+	case "note":
+		if len(p) < 2 {
+			return usageErr("usage: sightmap device run note TEXT [--kind K]")
+		}
+		session, err := device.RequireSession(*f.sightmapDir)
+		if err != nil {
+			return err
+		}
+		if err := device.Call(session.Socket, "runNote", device.ValueArgs{Text: p[1], Kind: *kind}, nil, 10*time.Second); err != nil {
+			return err
+		}
+		if *f.json {
+			printJSON(map[string]any{"ok": true})
+		} else {
+			fmt.Println("✓ noted")
+		}
+		return nil
 	case "new", "current":
 		session, err := device.RequireSession(*f.sightmapDir)
 		if err != nil {
@@ -894,7 +973,7 @@ func deviceRun(args []string, f *deviceFlags) error {
 		return nil
 	case "tail":
 	default:
-		return usageErr("usage: sightmap device run new [--label L] | run current | run tail [--follow] [--since SEQ] [--run ID]")
+		return usageErr("usage: sightmap device run new [--label L] | run current | run note TEXT [--kind K] | run tail [--follow] [--since SEQ] [--run ID]")
 	}
 	path := ""
 	switch {

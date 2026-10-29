@@ -3,6 +3,7 @@ package device
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,10 @@ func (f *fakeHelper) Close()        {}
 type fakeSim struct{ Simctl }
 
 func (fakeSim) AccessibilityEnabled(context.Context, string) bool { return true }
+func (fakeSim) EnableAccessibility(context.Context, string) error { return nil }
+func (fakeSim) Launch(context.Context, string, string, LaunchOptions) (int, error) {
+	return 42, nil
+}
 
 func newTestSession(t *testing.T, describe string) (*Session, *fakeHelper) {
 	t.Helper()
@@ -219,5 +224,65 @@ func TestRunLogRedactsSecrets(t *testing.T) {
 	}
 	if !strings.Contains(log, "a@example.com") {
 		t.Errorf("text typed into a plain field should be logged:\n%s", log)
+	}
+}
+
+func TestConsolePagesForwardAndReportsDropped(t *testing.T) {
+	c := NewConsole(5)
+	for i := range 8 {
+		c.Push(ConsoleEntry{Level: "stdout", Source: "stdout", Message: fmt.Sprintf("line %d", i)})
+	}
+	all := c.List(ConsoleFilter{})
+	if all.Dropped != 3 || all.Last != 7 || all.Capacity != 5 || len(all.Entries) != 5 {
+		t.Fatalf("list = %+v", all)
+	}
+	since := 1
+	page := c.List(ConsoleFilter{Since: &since, Limit: 2})
+	if page.Dropped != 1 || len(page.Entries) != 2 || page.Entries[0].Index != 3 || page.Last != 4 {
+		t.Fatalf("page = %+v", page)
+	}
+	next := page.Last
+	rest := c.List(ConsoleFilter{Since: &next})
+	if rest.Dropped != 0 || len(rest.Entries) != 3 || rest.Last != 7 {
+		t.Fatalf("rest = %+v", rest)
+	}
+	none := 7
+	if empty := c.List(ConsoleFilter{Since: &none}); len(empty.Entries) != 0 || empty.Last != 7 {
+		t.Fatalf("caught up = %+v", empty)
+	}
+}
+
+func TestConsoleGrepCoversEverySource(t *testing.T) {
+	c := NewConsole(10)
+	c.Push(ConsoleEntry{Level: "info", Source: "os_log", Subsystem: "dev.example", Message: "Session started"})
+	c.Push(ConsoleEntry{Level: "stdout", Source: "stdout", Message: "SESSION from print"})
+	c.Push(ConsoleEntry{Level: "stderr", Source: "stderr", Message: "a session warning"})
+	if got := c.List(ConsoleFilter{Grep: "session"}); got.Total != 3 {
+		t.Errorf("grep matched %d of 3 sources: %+v", got.Total, got)
+	}
+}
+
+func TestRunLogNotesAndRelaunch(t *testing.T) {
+	s, _ := newTestSession(t, "describe-simple")
+	s.Timing.ReadyTimeout = time.Millisecond
+	if _, err := handle(t, s, "runNote", ValueArgs{Text: "recording started", Kind: "session-start"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handle(t, s, "relaunch", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handle(t, s, "runNote", ValueArgs{}); Code(err) != "usage" {
+		t.Errorf("an empty note: %v", err)
+	}
+	entries, _ := ReadRun(s.RunLog.Current().Path, 0)
+	if len(entries) < 2 {
+		t.Fatalf("entries = %+v", entries)
+	}
+	note := entries[0]
+	if note.Action != "note" || note.Kind != "session-start" || note.Text != "recording started" || note.Args != nil {
+		t.Errorf("note = %+v", note)
+	}
+	if entries[1].Action != "relaunch" {
+		t.Errorf("relaunch logged as %q", entries[1].Action)
 	}
 }

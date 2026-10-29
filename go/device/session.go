@@ -1,6 +1,7 @@
 package device
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,6 +28,8 @@ type Config struct {
 	// RunDir holds the app's redirected stdout/stderr and the daemon log.
 	RunDir   string `json:"runDir,omitempty"`
 	RunLabel string `json:"runLabel,omitempty"`
+	// ConsoleLimit is how many console entries the session keeps; 0 means 5000.
+	ConsoleLimit int `json:"consoleLimit,omitempty"`
 }
 
 // Timing tunes how long a Session waits for the screen; zero fields take the
@@ -93,7 +96,7 @@ func NewSession(cfg Config, helper Helper, sim Sim) *Session {
 		Config:    cfg,
 		Helper:    helper,
 		Sim:       sim,
-		Console:   NewConsole(5000),
+		Console:   NewConsole(cmp.Or(cfg.ConsoleLimit, 5000)),
 		RunLog:    NewRunLog(cfg.SightmapDir),
 		Log:       func(string) {},
 		StartedAt: time.Now(),
@@ -288,7 +291,7 @@ func (s *Session) WaitReady(ctx context.Context) map[string]any {
 // loggedActions are the commands recorded in the run log, by run-log name.
 var loggedActions = map[string]string{
 	"snapshot": "snapshot", "click": "click", "fill": "fill", "scroll": "scroll", "swipe": "swipe", "tapXY": "tap-xy",
-	"button": "button", "key": "key", "type": "type", "openurl": "openurl", "launch": "launch", "relaunch": "launch", "restart": "launch",
+	"button": "button", "key": "key", "type": "type", "openurl": "openurl", "launch": "launch", "relaunch": "relaunch", "restart": "relaunch", "runNote": "note",
 }
 
 // Handle runs one command with JSON args and returns its result. Commands run
@@ -316,6 +319,11 @@ func (s *Session) Handle(ctx context.Context, cmd string, raw json.RawMessage) (
 		args["text"] = "<redacted>"
 	}
 	entry := RunEntry{Action: action, Args: args, View: s.lastView, OK: err == nil, Target: s.runTarget()}
+	if cmd == "runNote" {
+		kind, _ := args["kind"].(string)
+		text, _ := args["text"].(string)
+		entry = RunEntry{Action: action, Kind: kind, Text: text, OK: err == nil}
+	}
 	if err != nil {
 		e := AsError(err)
 		entry.Error = &Error{Code: e.Code, Message: e.Message}
@@ -426,6 +434,7 @@ type ValueArgs struct {
 	Out   string `json:"out,omitempty"`
 	Index int    `json:"index,omitempty"`
 	Label string `json:"label,omitempty"`
+	Kind  string `json:"kind,omitempty"`
 	App   string `json:"appPath,omitempty"`
 }
 
@@ -550,6 +559,15 @@ func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (
 			return nil, err
 		}
 		return s.RunLog.Begin(a.Label)
+	case "runNote":
+		a, err := decode[ValueArgs](raw)
+		if err != nil {
+			return nil, err
+		}
+		if a.Text == "" {
+			return nil, errorf("usage", "run note needs the text to record")
+		}
+		return map[string]string{"kind": a.Kind, "text": a.Text}, nil
 	case "runCurrent":
 		return s.RunLog.Current(), nil
 	}

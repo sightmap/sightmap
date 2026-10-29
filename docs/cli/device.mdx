@@ -93,6 +93,7 @@ On a running session, `start` reinstalls (with `--app`) and relaunches the same 
 | `--bundle-id` | none | An installed app's bundle id (instead of `--app`) |
 | `--device` | a booted simulator, else the newest iPhone | Simulator name or UDID |
 | `--label` | none | Label for the run log |
+| `--console-limit` | `5000` | How many console entries the session keeps |
 | `--detach` | off | Run the daemon in the background and return once it is ready |
 
 ```bash
@@ -265,14 +266,18 @@ sightmap device scroll down --until 'ProductRow[title="Product 40"]'
 | `--grep` | none | Case-insensitive substring of the message or subsystem |
 | `--level` | all | Comma-separated levels: `debug`, `info`, `default`, `error`, `fault`, `stdout`, `stderr` |
 | `--all` | off | Include Apple framework entries, hidden by default as noise |
+| `--since` | none | Only entries after this index, oldest first; `--limit` then takes the first N, and the result's `last` is the index to page on from |
+| `--follow` | off | Keep printing new entries until interrupted (with `--json`, one entry per line) |
+
+The session keeps the latest 5,000 entries (`start --console-limit` changes that). When a list would have reached further back, it says so: `(N earlier entries dropped; …)`, or `dropped` in `--json`.
 
 ```bash
-sightmap device console list --grep login
+sightmap device console list --grep "signed in"
 ```
 
 ```text
-#41 info    org.sightmap.SimSample:auth  login submitted for a@example.com
-#44 info    org.sightmap.SimSample:auth  login succeeded
+#12 info    dev.sightmap.SimSample:app  signed in as agent@example.com
+#13 stdout   signed in as agent@example.com
 ```
 
 React Native `console.log` output arrives as `info` entries from the `com.facebook.react.log` subsystem.
@@ -281,12 +286,13 @@ React Native `console.log` output arrives as `info` entries from the `com.facebo
 
 ### `device run`
 
-Every action appends one JSON line to `.sightmap/.device-runs/<run>.jsonl` with its timestamp, sequence number, arguments, target element, view, and outcome. Another agent or tool can follow a session with `run tail --follow`, or poll with `--since`, and line up its own data with the steps by timestamp.
+Every action appends one JSON line to `.sightmap/.device-runs/<run>.jsonl` with its timestamp, sequence number, arguments, target element, view, and outcome. Another agent or tool can follow a session with `run tail --follow`, or poll with `--since`, and line up its own data with the steps by timestamp. `launch` and `relaunch` are logged as such, so a restart is told apart from a first launch.
 
 | Command | Description |
 |---------|-------------|
 | `device run new [--label L]` | Start a new run |
 | `device run current` | Print the current run's id and path |
+| `device run note TEXT [--kind K]` | Record an annotation in the run, e.g. `--kind session-start`, so a tool layered on top can mark its own events among the steps |
 | `device run tail [--follow] [--since SEQ] [--run ID]` | Print run entries; `--follow` keeps printing new ones |
 
 ---

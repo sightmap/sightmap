@@ -94,12 +94,24 @@ type ConsoleFilter struct {
 	// All includes Apple frameworks' entries (subsystem com.apple.*), which are
 	// hidden by default as noise.
 	All bool `json:"all"`
+	// Since, when set, selects entries after that index, oldest first, and
+	// Limit then takes the first N of them, so a caller can page forward by
+	// passing back the result's Last.
+	Since *int `json:"since,omitempty"`
 }
 
 // ConsoleList is List's result.
 type ConsoleList struct {
 	Total   int            `json:"total"`
 	Entries []ConsoleEntry `json:"entries"`
+	// Last is the index to pass as Since to read on from here: the last entry
+	// returned when Limit cut the list short, else the newest entry (-1 when
+	// there is none).
+	Last int `json:"last"`
+	// Dropped counts the entries the query would have covered that the buffer
+	// no longer holds: it keeps only the most recent Capacity.
+	Dropped  int `json:"dropped,omitempty"`
+	Capacity int `json:"capacity"`
 }
 
 // List returns the entries f selects, oldest first.
@@ -113,8 +125,16 @@ func (c *Console) List(f ConsoleFilter) ConsoleList {
 		}
 	}
 	needle := strings.ToLower(f.Grep)
+	first := c.next - len(c.entries)
+	out := ConsoleList{Last: c.next - 1, Capacity: c.Capacity, Dropped: first}
+	if f.Since != nil {
+		out.Dropped = max(0, first-(*f.Since+1))
+	}
 	var hits []ConsoleEntry
 	for _, e := range c.entries {
+		if f.Since != nil && e.Index <= *f.Since {
+			continue
+		}
 		if !f.All && strings.HasPrefix(e.Subsystem, "com.apple.") {
 			continue
 		}
@@ -126,8 +146,13 @@ func (c *Console) List(f ConsoleFilter) ConsoleList {
 		}
 		hits = append(hits, e)
 	}
-	out := ConsoleList{Total: len(hits), Entries: hits}
-	if f.Limit > 0 && len(hits) > f.Limit {
+	out.Total, out.Entries = len(hits), hits
+	switch {
+	case f.Limit <= 0 || len(hits) <= f.Limit:
+	case f.Since != nil:
+		out.Entries = hits[:f.Limit]
+		out.Last = out.Entries[f.Limit-1].Index
+	default:
 		out.Entries = hits[len(hits)-f.Limit:]
 	}
 	if out.Entries == nil {

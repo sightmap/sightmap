@@ -27,10 +27,14 @@ type RunEntry struct {
 	Seq    int            `json:"seq"`
 	Action string         `json:"action"`
 	Args   map[string]any `json:"args,omitempty"`
-	Target *RunTarget     `json:"target,omitempty"`
-	View   string         `json:"view,omitempty"`
-	OK     bool           `json:"ok"`
-	Error  *Error         `json:"error,omitempty"`
+	// Kind and Text are a note's: an annotation another tool records in the
+	// run with `run note`, e.g. kind "session-start".
+	Kind   string     `json:"kind,omitempty"`
+	Text   string     `json:"text,omitempty"`
+	Target *RunTarget `json:"target,omitempty"`
+	View   string     `json:"view,omitempty"`
+	OK     bool       `json:"ok"`
+	Error  *Error     `json:"error,omitempty"`
 }
 
 // RunTarget is the element an action acted on.
