@@ -1,0 +1,39 @@
+version: 1
+views:
+  # Placeholder route: sightmap requires one, and a native screen has no URL.
+  - name: Login
+    route: /login
+    components:
+      - name: EmailField
+        selector: 'textfield[identifier="login_email"]'
+        properties:
+          - name: value
+            extract: { from: dom.attr, path: value }
+      - name: PasswordField
+        selector: 'securetextfield[identifier="login_password"]'
+      - name: RememberMe
+        selector: 'checkbox[identifier="remember"]'
+        properties:
+          - name: on
+            extract: { from: dom.state, path: checked }
+      - name: SignInButton
+        selector: 'button[identifier="login_submit"]'
+      - name: RecentRow
+        selector: '[identifier="recent_row"]'
+        properties:
+          - name: title
+            extract: { from: dom.text }
+  - name: Products
+    route: /products
+    components:
+      - name: SearchField
+        selector: 'textfield[identifier="search"]'
+      - name: ProductRow
+        selector: '[testid^="product_row_"]'
+        properties:
+          - name: title
+            extract: { from: dom.text }
+      - name: AddToCart
+        selector: 'button[identifier="add_to_cart"]'
+      - name: NotificationsToggle
+        selector: 'switch[identifier="notifications"]'
