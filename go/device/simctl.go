@@ -31,8 +31,9 @@ type Sim interface {
 
 // LaunchOptions controls Simctl.Launch.
 type LaunchOptions struct {
-	Stdout, Stderr string // files the app's stdout/stderr are redirected to
-	Terminate      bool   // terminate a running instance first
+	Stdout, Stderr string   // files the app's stdout/stderr are redirected to
+	Terminate      bool     // terminate a running instance first
+	Env            []string // NAME=VALUE pairs for the app's environment
 }
 
 // Simctl implements Sim with xcrun simctl.
@@ -217,7 +218,11 @@ func (Simctl) Launch(ctx context.Context, udid, bundleID string, opts LaunchOpti
 	if opts.Stderr != "" {
 		args = append(args, "--stderr="+opts.Stderr)
 	}
-	out, err := xcrun(ctx, 2*time.Minute, []string{"SIMCTL_CHILD_NSUnbufferedIO=YES"}, append(args, udid, bundleID)...)
+	env := []string{"SIMCTL_CHILD_NSUnbufferedIO=YES"}
+	for _, kv := range opts.Env {
+		env = append(env, "SIMCTL_CHILD_"+kv)
+	}
+	out, err := xcrun(ctx, 2*time.Minute, env, append(args, udid, bundleID)...)
 	if err != nil {
 		return 0, err
 	}

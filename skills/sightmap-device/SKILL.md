@@ -1,6 +1,6 @@
 ---
 name: sightmap-device
-description: Use when driving a native iOS app in the local iOS Simulator with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console. Activate when the user wants to run, try, test, or reproduce a flow in an iOS app on the Simulator, inspect an iOS screen, or author `.sightmap/` definitions for an iOS or React Native app.
+description: Use when driving a native iOS app in the local iOS Simulator with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console and network requests. Activate when the user wants to run, try, test, or reproduce a flow in an iOS app on the Simulator, inspect an iOS screen, or author `.sightmap/` definitions for an iOS or React Native app.
 activation:
   - .sightmap/ directory exists in an iOS or React Native project
   - driving an app in the iOS Simulator against a sightmap corpus
@@ -42,6 +42,7 @@ sightmap device click login-submit                 # identifier, snapshot id, co
 sightmap device fill login-email "a@example.com"
 sightmap device snapshot                           # re-snapshot after every action that changes the screen
 sightmap device console list --grep error          # the app's logs (print / os_log), live
+sightmap device network list                       # the app's requests, matched against requests:
 sightmap device stop                               # --shutdown also shuts the simulator down
 ```
 
@@ -58,7 +59,8 @@ sightmap device stop                               # --shutdown also shuts the s
    and `swipe` take screen **points**, not pixels (a 390×844 pt screen is
    1170×2532 px in a screenshot); points off the screen are refused.
 4. **Check** with `snapshot` (state), `console list` / `console get N` (logs),
-   `screenshot --out shot.png` (visual evidence).
+   `network list` / `network get N` (requests), `screenshot --out shot.png`
+   (visual evidence).
 
 Every command takes `--json`. Errors are one line plus a `Next:` step. A flag
 value that starts with `-` goes after `=`: `--grep=-foo`.
@@ -106,7 +108,7 @@ reports how many re-reads it took as `retries`.
 | Command | What it does |
 |---|---|
 | `doctor [--fix]` | Checks macOS, Apple Silicon, Xcode, simulator runtimes and devices, Swift; builds the helper. |
-| `start [--device NAME\|UDID] [--app PATH \| --bundle-id ID] [--label L] [--detach]` | Boots, enables app accessibility, installs, launches, runs the daemon and begins a run log. |
+| `start [--device NAME\|UDID] [--app PATH \| --bundle-id ID] [--label L] [--network auto\|har\|rn-cdp\|summary\|off] [--detach]` | Boots, enables app accessibility, installs, launches, runs the daemon and begins a run log. |
 | `status` / `stop [--shutdown]` | Session health / stop the daemon and the app (`--shutdown`: the simulator too). |
 | `launch` / `relaunch` | Foreground the app / restart it (re-enables accessibility first). |
 | `snapshot [--view V] [--include-offscreen] [--out F] [--tree-out F]` | Annotated tree. `--out F` writes the text plus `F.tree.json`, which `sightmap explain --snap` and `sightmap coverage` read. |
@@ -116,6 +118,7 @@ reports how many re-reads it took as `retries`.
 | `swipe X1 Y1 X2 Y2 [--duration S]`, `tap-xy X Y`, `type TEXT`, `key NAME`, `button NAME`, `openurl URL` | Raw input in screen points. Keys: `return delete tab escape space` and arrows. Buttons: `home lock siri side apple_pay volume_up volume_down`. |
 | `screenshot --out F.png` | PNG of the screen. |
 | `console list [--limit N] [--grep S] [--level L[,L]] [--all] [--since INDEX] [--follow]` / `console get N` | The app's os_log/Logger output and its stdout/stderr. Levels: `debug info default error fault stdout stderr`. `--grep` is case-insensitive and covers every source; `--all` adds Apple framework errors, hidden by default as noise. `--since` pages forward (pass back `last`); `--follow` streams. The session keeps the latest 5,000 entries (`start --console-limit N`); a list says when earlier ones were dropped. |
+| `network list [--limit N] [--grep S] [--source har\|rn-cdp\|summary] [--since INDEX] [--follow] [--unredacted]` / `network get N [--unredacted] [--request-file F] [--response-file F]` | The app's requests (below). |
 | `run new [--label L]` / `run current` / `run note TEXT [--kind K]` / `run tail [--follow] [--since SEQ] [--run ID]` | The run log (below). |
 
 ## Reading a snapshot
@@ -267,6 +270,48 @@ say the app exposes nothing, the causes in order are:
    it's already on).
 3. A system sheet is animating in: snapshot again in a moment.
 
+## Network
+
+`network list` shows the app's requests, oldest first, each led by the
+`requests:` definitions that match it and trailed by the properties they
+extract, like `sightmap browser network list`:
+
+```
+#0 [CreateOrder]          POST http://127.0.0.1:18765/anything/sightmap/order-1 → 201 (56 ms, har) {order=1, echoed=1}
+```
+
+`network get N` adds headers and bodies; `--grep`, `--source`, `--since`
+and `--follow` work as in `console list`. Each entry's `source` is where it
+came from. `start --network auto` (default) picks, in order:
+
+| Source | Gives | Needs |
+|---|---|---|
+| `har` | Full URL with query, method, status, timing, all headers, bodies ≤ 1 MiB; all `URLSession` traffic, React Native `fetch` included | The app signed with the **`get-task-allow`** entitlement |
+| `rn-cdp` | JS `fetch`/XHR of a React Native Debug build via Metro: URL, method, JS-set headers, bodies | Metro running (`--metro-port N`, else the app's `RCT_jsLocation`, else 8081) |
+| `summary` | Status, timing, bytes; method and host (no path) when HAR is off. Never matches a route | Nothing |
+
+- **`get-task-allow`**: CFNetwork logs HAR only for a process with it. A
+  Debug build Xcode signs for development has it; an ad hoc simulator build
+  (`CODE_SIGN_IDENTITY = "-"`) needs `CODE_SIGN_ENTITLEMENTS` pointing at a
+  plist with `<key>get-task-allow</key><true/>`. Without it, `status` says
+  `har unavailable: … lacks the get-task-allow entitlement` and the session
+  falls back. Release builds never have it.
+- `status` (and `doctor`, while a session runs) shows each source's state
+  and why the others are not used. HAR misses requests already under way
+  when capture began; `summary` lists those, host-free.
+- HAR capture uses private CFNetwork switches inside the simulator; `stop`
+  turns them off (a dead session's capture lapses within 10 minutes).
+- **Redaction**: `Authorization`, `Cookie`, `Set-Cookie`,
+  `Proxy-Authorization`, and any header, query parameter, form field or JSON
+  key containing `token`, `password`, `secret` or `key` show as `<redacted>`,
+  in properties too. `--unredacted` shows them; ask before using it.
+  Entries stay in the daemon's memory (latest 1,000, bodies capped at
+  256 KiB) and never reach the run log.
+- To author a `requests:` entry, copy the path from `network list`, write a
+  `route` glob (`/api/orders/*`) and `method`, add `properties:` with
+  `extract: { from: req.body|rsp.body|req.headers|rsp.headers, path: … }`,
+  and check the match on the next `network list` (the corpus reloads).
+
 ## The run log
 
 Every action appends one JSON line to `.sightmap/.device-runs/<run>.jsonl`:
@@ -301,5 +346,8 @@ signing in, iOS may show a "Save Password?" sheet: it appears as `[Overlay]`.
 - On iOS 26 a SwiftUI tab bar can show up as one `other "Tab Bar"` element
   without its tabs; switch tabs with `tap-xy` from a screenshot.
 - The corpus is always the session's `--sightmap-dir`.
+- Network capture sees `URLSession`/CFNetwork traffic (plus, via Metro, a
+  React Native Debug build's JS traffic); raw sockets and custom stacks are
+  invisible.
 - Scrolling to a far row takes about 3 s per screenful (more for a React Native
   `FlatList`, whose tree is larger).

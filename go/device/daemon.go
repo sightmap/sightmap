@@ -166,6 +166,9 @@ func Serve(s *Session, launch bool, logFile string) (*Daemon, error) {
 		// log stream misses what happens before it attaches.
 		time.Sleep(500 * time.Millisecond)
 	}
+	if s.Process != "" && s.Net == nil {
+		s.Net = s.newNetCollector(ctx)
+	}
 	var hello map[string]any
 	if err := s.Helper.Request(ctx, "hello", nil, &hello); err != nil {
 		return nil, err
