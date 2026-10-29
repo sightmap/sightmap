@@ -70,7 +70,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 033 | `component-definitions` | File-root `definitions:` are `$ref` targets that are never matched on their own; a view gets one only where it references it, scoped by the reference ([SEP-0019](../seps/0019-component-definitions.md)) |
 | 034 | `entity-id` | `id:` validates on every entity kind (environments, views, components at every depth, definitions, `$ref` entries, properties, requests, payload fields, messages, signals, snapshots); a definition referenced from two places is one declaration, not a duplicate ([SEP-0020](../seps/0020-entity-id.md)) |
 | 035 | `entity-id-errors` | A view and a component sharing an id across files → `id-duplicate`; an entity without an id in a sightmap that declares ids → `id-missing` ([SEP-0020](../seps/0020-entity-id.md)) |
-| 037 | `signals` | `signals:` resolves refs to a request, component, message, and view; filter keys resolve against declared properties, reserved request identities, and the built-in `value`; an unquoted integer filter value is accepted ([SEP-0007](../seps/0007-signals.md)) |
+| 037 | `signals` | `signals:` resolves refs to a request, component, message, and view; filter keys resolve against declared properties on all four kinds, view and request route bindings, reserved request identities, and the built-in `value`; an unquoted integer filter value is accepted ([SEP-0007](../seps/0007-signals.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 
