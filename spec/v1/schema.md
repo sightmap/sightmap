@@ -909,7 +909,7 @@ resolution is instead a **union across every applicable definition**:
 | View | Most-specific-route wins (see [View matching](#view-matching-most-specific-wins)). | Union across every view whose route matches the URL, not just the most-specific one. |
 | Request | Not applicable — [all matching requests already apply](#request-matching-all-matches-apply); there is no single winner to begin with. | Union across every matching request — the existing "all matches apply" rule already gives this for free. |
 | Message | Ambiguous matches are **refused**: a consumer MUST surface an ambiguity rather than pick a winner. | Union across every matching entry. The classification therefore survives an ambiguity the identity does not: a consumer that cannot say *which* message a record is can still say it is tagged `defect`. |
-| Signal | Single, named classification; `ref` resolves to exactly one entity. | Union of the signal's own `tags` with the resolved tags of the entity named by `ref`. |
+| Signal | Single, named classification; `ref` resolves to exactly one entity kind. | Union of the signal's own `tags` with the resolved tags of the entity named by `ref`, across every declaration of that name (a component in two views, a request both global and view-scoped). |
 
 A component example: a `CheckoutForm` tagged `defect` with an untagged `SubmitButton` child
 — a click on the button resolves `name: SubmitButton` (nearest-enclosing, unchanged) and

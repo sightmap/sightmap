@@ -623,7 +623,7 @@
         },
         "filter": {
           "type": "object",
-          "description": "Property name → an accepted value (equality) or list of them (membership), ANDed across keys, evaluated against the referenced entity's declared properties and already-structured identity fields. Omitted means unconditional. A key must resolve on the referenced entity; a message or view ref accepts no keys.",
+          "description": "Property name → an accepted value (equality) or list of them (membership), ANDed across keys, evaluated against the referenced entity's declared properties, its route's :name bindings, and its already-structured identity fields. Omitted means unconditional. A key must resolve on the referenced entity (signal-filter-unknown).",
           "additionalProperties": {
             "oneOf": [
               {
