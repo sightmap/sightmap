@@ -1,0 +1,313 @@
+---
+title: "Sightmap Device Commands: Driving iOS Apps in the Simulator"
+sidebarTitle: "Device Sessions"
+description: "Snapshot a native iOS app's accessibility tree against your corpus and tap, type, and scroll by identifier or component query in the local iOS Simulator."
+---
+
+`sightmap device` drives a native iOS app in the local iOS Simulator the way [`sightmap browser`](/cli/browser) drives Chrome. It reads the app's accessibility tree, applies your `.sightmap/` corpus with the same matcher as `sightmap snapshot`, and acts on elements by accessibility identifier or [component query](/cli/interaction#component-queries). Nothing leaves the Mac except the app's own traffic.
+
+<Note>
+`sightmap device` needs an Apple Silicon Mac, macOS 15 or later, and Xcode 26 or later selected with `xcode-select` (the Command Line Tools alone are not enough). Run [`device doctor`](#device-doctor) first.
+</Note>
+
+## Conventions
+
+- Every command takes `--json` (machine-readable output) and `--sightmap-dir` (default `.sightmap`). There is no upward search for the corpus, so run commands from the project root.
+- `device start` records the session in `.sightmap/.device-session` and writes one run log per run to `.sightmap/.device-runs/<run>.jsonl`. Add both to `.sightmap/.gitignore`.
+- Errors print one line, then a `Next:` line with the step to take.
+- Coordinates are screen **points**, not pixels: a 390×844 pt screen is 1170×2532 px in a screenshot.
+
+### Targets
+
+`click`, `fill`, `scroll --in`, and `scroll --until` take one target:
+
+| Target | Example | Resolves to |
+|--------|---------|-------------|
+| Snapshot id | `12` | Element 12 of the latest snapshot |
+| Identifier | `login-submit` | The one element whose accessibility identifier is exactly this |
+| Component query | `ProductRow[title^="Product 15"]` | A component filtered on extracted properties; `LoginForm SignInButton` and `ProductRow#2` work as in the browser |
+| Selector | `button[identifier="login-submit"]`, `[text="Not Now"]#0` | A CSS selector over the normalized tree, for elements no component names |
+
+A target that matches several elements is an error that lists the candidates; add a predicate or append `#N`.
+
+### Views without routes
+
+The spec requires a `route` on every view, and native screens have no URL, so native corpora use short placeholder routes such as `/login`. `sightmap device` ignores routes: a snapshot uses the view whose own components match the most elements, marked `(inferred)`, unless you pass `--view`. SEP-0024 proposes a route-less `screen:` selector for this case; it is not part of the spec yet.
+
+### Selectors on iOS
+
+Each element exposes a role from its accessibility type (`button`, `text`, `textfield`, `securetextfield`, `switch`, `tab`, `cell`, `image`, `other`, and so on) and the attributes `identifier` (the `accessibilityIdentifier`, with `testid` as an alias), `text` (the label), and `value`.
+
+Only accessible elements reach the iOS tree. An identifier on a plain wrapper view (a React Native `testID` on a non-accessible `View`, for example) never appears there, so `[testid="login-form"] [testid="login-submit"]` matches nothing. Write leaf selectors such as `[identifier="login-submit"]`.
+
+```yaml .sightmap/views/login.yaml
+version: 1
+views:
+  - name: Login
+    route: /login            # placeholder; sightmap device ignores it
+    components:
+      - name: EmailField
+        selector: '[identifier="login-email"]'
+      - name: SignInButton
+        selector: 'button[identifier="login-submit"]'
+```
+
+---
+
+### `device doctor`
+
+Checks macOS, Apple Silicon, `xcode-select`, the Xcode version, iOS Simulator runtimes and devices, and Swift, then builds the simulator helper if it is not built yet. Exits `1` if any check fails.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--fix` | off | Run the unprivileged fixes (download an iOS runtime, create a simulator), then check again |
+
+```bash
+sightmap device doctor
+```
+
+```text
+[ok  ] macos          macOS 26.0
+[ok  ] apple-silicon  arm64
+[ok  ] xcode-select   /Applications/Xcode.app/Contents/Developer
+[ok  ] xcode-version  Xcode 26.0
+[ok  ] ios-runtime    iOS 26.0
+[ok  ] ios-device     8 iOS simulators; booted: iPhone 17 Pro
+[ok  ] swift          Apple Swift version 6.2 (swiftlang-6.2.0.19.9 clang-1700.3.19.1)
+[ok  ] helper         /Users/you/Library/Caches/sightmap/device/helper/3f9c1a7d2b4e6f80/sightmap-device-helper
+
+All checks passed.
+```
+
+---
+
+### `device start`
+
+Boots the simulator, enables app accessibility, installs and launches the app, starts the session daemon, and begins a run log. The first time a simulator gets app accessibility, `start` reboots it once. Without `--detach`, `start` holds the shell as a foreground daemon; agents and scripts should pass `--detach`.
+
+On a running session, `start` reinstalls (with `--app`) and relaunches the same app. It refuses a different app or device; run `device stop` first.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--app` | none | The `.app` bundle built for the simulator, to install |
+| `--bundle-id` | none | An installed app's bundle id (instead of `--app`) |
+| `--device` | a booted simulator, else the newest iPhone | Simulator name or UDID |
+| `--label` | none | Label for the run log |
+| `--detach` | off | Run the daemon in the background and return once it is ready |
+
+```bash
+sightmap device start --app build/SimSample.app --device "iPhone 17 Pro" --detach
+```
+
+```text
+✓ simulator session started in 9.4 s
+  device:  iPhone 17 Pro, iOS 26.0 (5D3E1A2B-7C8F-4E9A-B0C1-D2E3F4A5B6C7)
+  app:     installed /Users/you/app/build/SimSample.app and launched org.sightmap.SimSample
+  daemon:  pid 48213; session file .sightmap/.device-session; log /Users/you/Library/Caches/sightmap/device/sessions/5D3E1A2B-7C8F-4E9A-B0C1-D2E3F4A5B6C7/daemon.log
+  run:     20261029T171502Z-3fa1 (`sightmap device run tail --follow` to follow)
+  next:    sightmap device snapshot
+```
+
+Apps must be built by Xcode (`xcodebuild` or the Xcode app) so they carry the simulated entitlements a simulator app needs.
+
+---
+
+### `device status`, `device stop`, `device launch`, `device relaunch`
+
+`status` reports the session's device, app, helper, console buffer, and current run; it exits `1` when no session is running. `stop` stops the daemon and the app; `--shutdown` also shuts the simulator down. `launch` brings the app to the foreground; `relaunch` restarts it and re-enables accessibility first.
+
+```bash
+sightmap device status
+```
+
+```text
+✓ session running (daemon pid 48213, since 2026-10-29T17:15:02Z)
+  device:  iPhone 17 Pro, iOS 26.0 (5D3E1A2B-7C8F-4E9A-B0C1-D2E3F4A5B6C7)
+  app:     org.sightmap.SimSample (pid 48290)  /Users/you/app/build/SimSample.app
+  helper:  running
+  console: 112 entries
+  session: /Users/you/app/.sightmap/.device-session
+  run:     20261029T171502Z-3fa1 (6 entries)
+```
+
+---
+
+### `device snapshot`
+
+Prints the annotated accessibility tree in the shape of [`sightmap snapshot`](/cli/capture): the view, a guide of matched components, the tree with per-snapshot ids, conflicts, and visible-only coverage. Matched elements show `[Component prop="value"]`; unmatched ones show `role[identifier="…"] "label"`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--view` | inferred | Apply this view's components instead of inferring the view |
+| `--include-offscreen` | off | List off-screen elements too |
+| `--out` | none | Also write the snapshot to this file, plus a `.tree.json` companion that `sightmap explain --snap` and `sightmap coverage` read |
+| `--tree-out` | none | Write the tree JSON here |
+
+```bash
+sightmap device snapshot
+```
+
+```text
+[View: Login] (inferred)
+
+[Guide]
+EmailField     1
+PasswordField  1
+SignInButton   1
+
+--- component tree ---
+
+1 application "Sightmap Sim Sample"
+  2 text[identifier="login-title"] "Sightmap Sim Sample"
+  3 [EmailField]
+  4 [PasswordField]
+  5 [SignInButton "Sign In"]
+
+[Coverage] (visible only)
+3 interactive · 3 direct T1 (100%) · 0 scoped T2 (0%) · 0 orphaned T3 ✓
+```
+
+Extra sections appear when they apply:
+
+| Section | Meaning |
+|---------|---------|
+| `[Overlay]` | A system sheet from another process, such as iOS's "Save Password?", is in front of the app, and the tree is that sheet. Dismiss it with one of its buttons: `click '[text="Not Now"]'`. |
+| `[Mostly empty]` | The app exposes no interactive elements, or only a small floating element, with the likely causes in order. |
+| `[LogBox]` | A React Native LogBox toast covers the bottom of the screen; the section gives the `tap-xy` that hits its ✕. |
+| `[Memory]` | `memory:` entries for the view and its matched components. |
+| `[Conflicts]` | Elements matched by more than one component. |
+| `[Off-screen]` | How many off-screen nodes were left out. Targets still resolve them. |
+
+The corpus reloads whenever a YAML file under `--sightmap-dir` changes, so the next snapshot reflects your edits.
+
+---
+
+### `device click`
+
+Resolves the target in a fresh read of the screen, checks that its center is on screen, not under a tab bar, toolbar, navigation bar, keyboard, LogBox toast, or floating dev-menu button, and that it is enabled, then taps its center. While the target is missing or the screen is still moving, it re-reads for up to about 1.5 s first.
+
+```bash
+sightmap device click SignInButton
+```
+
+```text
+✓ clicked 6 [SignInButton "Sign In"] at (196, 412)
+```
+
+A refused click names the reason and the fix:
+
+```text
+error: 42 [ProductRow title="Product 40"] is off-screen (center 196,1210 on a 402x874 screen); refusing to tap
+Next: run `sightmap device scroll down --until "ProductRow[title=\"Product 40\"]"`, then retry
+```
+
+---
+
+### `device fill`
+
+Taps the target, types the text, and errors if the field does not show it. Text is appended unless you pass `--clear`. `fill TARGET "" --clear` empties a field; a field that then shows only its placeholder reports an empty value.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--clear` | off | Empty the field first |
+
+```bash
+sightmap device fill login-email "a@example.com" --clear
+```
+
+```text
+✓ filled 4 [EmailField "Email"] → value "a@example.com"
+```
+
+---
+
+### `device scroll`
+
+Scrolls one page in a direction (`up`, `down`, `left`, `right`), or until a target is tappable. Long SwiftUI and UIKit lists only expose rows near the screen, so a row further down is not found until you scroll to it. `--until` scrolls slowly enough not to fling past the target and refreshes the snapshot ids when it stops.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--in` | the screen | Scroll inside this element |
+| `--until` | none | Scroll until this target is tappable |
+| `--max` | `20` | Give up after this many swipes |
+
+```bash
+sightmap device scroll down --until 'ProductRow[title="Product 40"]'
+```
+
+```text
+✓ 42 [ProductRow title="Product 40"] is on screen after 5 scroll(s) down; snapshot ids refreshed, act on it by id 42 or by the same target
+```
+
+---
+
+### Raw input
+
+| Command | Description |
+|---------|-------------|
+| `device tap-xy X Y` | Tap a screen point; points off the screen are refused |
+| `device swipe X1 Y1 X2 Y2 [--duration S]` | Swipe between two screen points |
+| `device type TEXT` | Type into the focused field |
+| `device key NAME` | Press `return`, `delete`, `tab`, `escape`, `space`, or an arrow key |
+| `device button NAME` | Press `home`, `lock`, `siri`, `side`, `apple_pay`, `volume_up`, or `volume_down` |
+| `device openurl URL` | Open a URL or deep link |
+| `device screenshot --out F.png` | Write a PNG of the screen |
+
+---
+
+### `device console`
+
+`console list` reads the app's own `os_log`/`Logger` output and its stdout and stderr, captured by the session daemon. `console get N` prints one entry in full.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--limit` | `50` | The most recent N entries (`0`: all) |
+| `--grep` | none | Case-insensitive substring of the message or subsystem |
+| `--level` | all | Comma-separated levels: `debug`, `info`, `default`, `error`, `fault`, `stdout`, `stderr` |
+| `--all` | off | Include Apple framework entries, hidden by default as noise |
+
+```bash
+sightmap device console list --grep login
+```
+
+```text
+#41 info    org.sightmap.SimSample:auth  login submitted for a@example.com
+#44 info    org.sightmap.SimSample:auth  login succeeded
+```
+
+React Native `console.log` output arrives as `info` entries from the `com.facebook.react.log` subsystem.
+
+---
+
+### `device run`
+
+Every action appends one JSON line to `.sightmap/.device-runs/<run>.jsonl` with its timestamp, sequence number, arguments, target element, view, and outcome. Another agent or tool can follow a session with `run tail --follow`, or poll with `--since`, and line up its own data with the steps by timestamp.
+
+| Command | Description |
+|---------|-------------|
+| `device run new [--label L]` | Start a new run |
+| `device run current` | Print the current run's id and path |
+| `device run tail [--follow] [--since SEQ] [--run ID]` | Print run entries; `--follow` keeps printing new ones |
+
+---
+
+## How the simulator helper is distributed
+
+The simulator is driven by a small Swift helper built on Meta's FBSimulatorControl, using the prebuilt xcframeworks from the idb v1.7.7 release (arm64 only). It reads the accessibility tree and sends touch, key, and button input.
+
+The helper's sources are embedded in the `sightmap` binary. On first use (`device doctor` or `device start`), `sightmap` builds them with your local Xcode toolchain; Swift Package Manager downloads idb's frameworks (about 10 MB) during that build. Nothing else needs installing: no Homebrew, no `idb` or `idb_companion`. The build takes a minute or two and is cached under `~/Library/Caches/sightmap/device` (set `SIGHTMAP_DEVICE_CACHE` to move it). It rebuilds only when the embedded sources change. To use a helper you built yourself, set `SIGHTMAP_DEVICE_HELPER` to its path.
+
+Sightmap builds the helper locally instead of shipping a prebuilt, signed binary for two reasons:
+
+- The helper links Apple's private CoreSimulator and accessibility frameworks through FBSimulatorControl. Those frameworks track the installed Xcode, so a helper built against your Xcode matches it, while a prebuilt binary could break on the next Xcode release.
+- `go install`, the npm package, and the release binaries stay identical, with no per-platform codesigning or notarization pipeline for a separate helper.
+
+A new Xcode release can still need a sightmap update; `device doctor` says so when the helper fails to build.
+
+## Limits
+
+- Simulator only, on Apple Silicon. Physical devices are not supported.
+- No hover or file upload. For another screen size, start on a different `--device`.
+- On iOS 26, a SwiftUI tab bar can appear as one `other "Tab Bar"` element without its tabs; switch tabs with `tap-xy` from a screenshot.
+
+The `sightmap-device` agent skill covers the full agent workflow, including React Native specifics. Install it with [`sightmap skills install`](/cli/integrate#sightmap-skills-install).
