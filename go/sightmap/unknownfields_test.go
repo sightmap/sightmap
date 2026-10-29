@@ -375,6 +375,9 @@ func TestFieldTypeInvalid_SignalFilterValues(t *testing.T) {
 		"empty list":      "code: []",
 		"float in list":   "code: [200, 1.5]",
 		"leading zero":    "code: 0200",
+		"mapping":         "code: {a: 1}",
+		"nested list":     "code: [[200]]",
+		"mapping in list": "code: [200, {a: 1}]",
 		"underscored":     "code: [1_000]",
 	}
 	for name, body := range bad {

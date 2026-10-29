@@ -82,29 +82,38 @@ type rawSignal struct {
 // to report rather than failing the whole file to load.
 type rawFilterValue []string
 
+// A mapping, or a list holding anything but scalars, loads as no values rather
+// than failing the file: the walker reports it as field-type-invalid, so the
+// author sees it beside every other problem instead of a bare parse error.
 func (r *rawFilterValue) UnmarshalYAML(value *yaml.Node) error {
+	value = derefAlias(value)
 	switch value.Kind {
 	case yaml.ScalarNode:
 		*r = []string{canonicalFilterScalar(value)}
-		return nil
 	case yaml.SequenceNode:
 		parts := make([]string, 0, len(value.Content))
 		for _, item := range value.Content {
-			if item.Kind != yaml.ScalarNode {
-				return fmt.Errorf("filter list values must be scalars, got node kind %v", item.Kind)
+			if item = derefAlias(item); item.Kind == yaml.ScalarNode {
+				parts = append(parts, canonicalFilterScalar(item))
 			}
-			parts = append(parts, canonicalFilterScalar(item))
 		}
 		*r = parts
-		return nil
 	default:
-		return fmt.Errorf("unexpected YAML node kind %v for filter value", value.Kind)
+		*r = nil
 	}
+	return nil
+}
+
+func derefAlias(n *yaml.Node) *yaml.Node {
+	for n != nil && n.Kind == yaml.AliasNode && n.Alias != nil {
+		n = n.Alias
+	}
+	return n
 }
 
 // canonicalFilterScalar renders a scalar filter value as the text it compares
-// as. An int round-trips through strconv so leading zeros and underscores
-// normalize; a bool becomes "true"/"false"; anything else keeps its lexeme.
+// as. An int round-trips through strconv so 0x1F and 0o37 become 31; a bool
+// becomes "true"/"false"; anything else keeps its lexeme.
 func canonicalFilterScalar(n *yaml.Node) string {
 	switch n.Tag {
 	case "!!int":

@@ -320,8 +320,17 @@ func checkFilterValues(filter *yaml.Node, file string, out *[]ValidationError) {
 	if filter == nil || filter.Kind != yaml.MappingNode {
 		return
 	}
+	notScalar := func(key string, n *yaml.Node) {
+		*out = append(*out, ValidationError{
+			File:     file,
+			Code:     "field-type-invalid",
+			Severity: SeverityError,
+			Message: fmt.Sprintf("filter %q on line %d must be a string, integer, or boolean, or a list of them",
+				key, n.Line),
+		})
+	}
 	for i := 0; i+1 < len(filter.Content); i += 2 {
-		key, val := filter.Content[i], filter.Content[i+1]
+		key, val := filter.Content[i], derefAlias(filter.Content[i+1])
 		switch val.Kind {
 		case yaml.ScalarNode:
 			checkFilterScalar(key.Value, val, file, out)
@@ -339,10 +348,14 @@ func checkFilterValues(filter *yaml.Node, file string, out *[]ValidationError) {
 				continue
 			}
 			for _, item := range val.Content {
-				if item.Kind == yaml.ScalarNode {
+				if item = derefAlias(item); item.Kind == yaml.ScalarNode {
 					checkFilterScalar(key.Value, item, file, out)
+				} else {
+					notScalar(key.Value, item)
 				}
 			}
+		default:
+			notScalar(key.Value, val)
 		}
 	}
 }

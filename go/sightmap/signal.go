@@ -87,6 +87,16 @@ func (c *Corpus) componentByName(name string) *ComponentDef {
 	return nil
 }
 
+// componentLists returns every list a component can be declared in: globals,
+// definitions, and each view's components.
+func (c *Corpus) componentLists() [][]ComponentDef {
+	lists := [][]ComponentDef{c.GlobalComponents, c.Definitions}
+	for _, v := range c.Views {
+		lists = append(lists, v.Components)
+	}
+	return lists
+}
+
 // requestByName finds a request by name across the global list and every
 // view's requests (first-seen wins), or nil.
 func (c *Corpus) requestByName(name string) *RequestDef {
@@ -175,13 +185,32 @@ func (c *Corpus) TagsForSignal(name string) []string {
 		}
 	}
 	add(s.Tags)
+	// A name declared by several entities of one kind (a component in two
+	// views, a request both globally and under a view) is one entity to a ref,
+	// so its tags are the union across every declaration, as its filter keys are.
 	switch target := c.ResolveSignalRef(s.Ref); target.Kind {
 	case SignalRefComponent:
-		add(target.Component.Tags)
+		for _, comps := range c.componentLists() {
+			for _, comp := range comps {
+				if comp.Name == s.Ref {
+					add(comp.Tags)
+				}
+			}
+		}
 	case SignalRefView:
 		add(target.View.Tags)
 	case SignalRefRequest:
-		add(target.Request.Tags)
+		lists := [][]RequestDef{c.Requests}
+		for _, v := range c.Views {
+			lists = append(lists, v.Requests)
+		}
+		for _, reqs := range lists {
+			for _, req := range reqs {
+				if req.Name == s.Ref {
+					add(req.Tags)
+				}
+			}
+		}
 	case SignalRefMessage:
 		add(target.Message.Tags)
 	}

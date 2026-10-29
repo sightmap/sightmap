@@ -20,7 +20,7 @@ views:
     route: /booking/checkout
     components:
       - name: UpsellModal
-        selector: .jtpsdk-popup-modal
+        selector: .upsell-modal
 signals:
   - name: checkout.reached
     ref: Checkout
@@ -162,5 +162,25 @@ func TestSignalsResolveAmbiguousAcrossRequestAndMessage(t *testing.T) {
 	}
 	if tgt := c.ResolveSignal("s"); tgt.Kind != SignalRefUnresolved {
 		t.Fatalf("want unresolved for a ref shared by a request and a message, got %+v", tgt)
+	}
+}
+
+// A component declared in two views is one entity to a ref, so the signal
+// carries the tags of both declarations.
+func TestTagsForSignal_SameNameUnion(t *testing.T) {
+	c := &Corpus{
+		Views: []ViewDef{
+			{Name: "A", Route: "/a", Components: []ComponentDef{{Name: "Banner", Selectors: []string{".a"}, Tags: []string{"orders"}}}},
+			{Name: "B", Route: "/b", Components: []ComponentDef{{Name: "Banner", Selectors: []string{".b"}, Tags: []string{"cart"}}}},
+		},
+		Requests: []RequestDef{{Name: "R", Route: "/api/r", Tags: []string{"global"}}},
+		Signals:  []SignalDef{{Name: "s", Ref: "Banner"}, {Name: "r", Ref: "R"}},
+	}
+	c.Views[1].Requests = []RequestDef{{Name: "R", Route: "/api/r", Tags: []string{"scoped"}}}
+	if got := strings.Join(c.TagsForSignal("s"), ","); got != "cart,orders" {
+		t.Errorf("component tags = %q, want cart,orders", got)
+	}
+	if got := strings.Join(c.TagsForSignal("r"), ","); got != "global,scoped" {
+		t.Errorf("request tags = %q, want global,scoped", got)
 	}
 }
