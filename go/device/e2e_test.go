@@ -2,9 +2,15 @@ package device_test
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,14 +83,24 @@ func TestE2E(t *testing.T) {
 		return out
 	}
 
+	var udid string
 	t.Cleanup(func() {
-		if os.Getenv("SIGHTMAP_DEVICE_E2E_KEEP_BOOTED") != "" {
-			run("stop")
-		} else {
-			run("stop", "--shutdown")
+		run("stop")
+		if os.Getenv("SIGHTMAP_DEVICE_E2E_KEEP_BOOTED") == "" && udid != "" {
+			exec.Command("xcrun", "simctl", "shutdown", udid).Run()
 		}
 	})
 	must("start", "--device", sim, "--app", app, "--detach", "--label", "e2e")
+	var session struct{ UDID string }
+	data, _ := os.ReadFile(filepath.Join(work, ".sightmap", ".device-session"))
+	if json.Unmarshal(data, &session); session.UDID == "" {
+		t.Fatalf("no udid in the session file:\n%s", data)
+	}
+	udid = session.UDID
+	simctl := func(args ...string) (string, error) {
+		out, err := exec.Command("xcrun", append([]string{"simctl", "spawn", udid}, args...)...).CombinedOutput()
+		return string(out), err
+	}
 
 	snap := snapshotUntil("[View: Login]")
 	expect(snap, `[SignInButton "Sign In"]`, "[EmailField]")
@@ -131,6 +147,56 @@ func TestE2E(t *testing.T) {
 	expect(must("console", "list", "--grep", "Product 150"), "added Product 150 to cart")
 	expect(must("console", "list", "--grep", "signed in"), "signed in as agent@example.com")
 
+	// The Network tab's Send Request posts to this server instead of httpbin.org.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		http.SetCookie(w, &http.Cookie{Name: "session", Value: "sample-cookie"})
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{"json": json.RawMessage(body), "url": r.URL.Path})
+	}))
+	defer server.Close()
+	if out, err := simctl("defaults", "write", "dev.sightmap.SimSample", "networkBaseURL", server.URL+"/anything"); err != nil {
+		t.Fatalf("defaults write: %v\n%s", err, out)
+	}
+	expect(must("status"), "har      active")
+	// iOS 26 can expose the SwiftUI tab bar as one element without its tabs;
+	// Network is the middle of three.
+	if _, err := run("click", "tab-network"); err != nil {
+		var snap struct {
+			Result struct{ Tree map[string]any }
+		}
+		json.Unmarshal([]byte(must("snapshot", "--json")), &snap)
+		bar := findNamed(snap.Result.Tree, "Tab Bar")
+		if bar == nil {
+			t.Fatal("no tab bar to switch to the Network tab")
+		}
+		b := bar["bounds"].(map[string]any)
+		x, y := b["x"].(float64)+b["width"].(float64)/2, b["y"].(float64)+b["height"].(float64)/2
+		must("tap-xy", strconv.FormatFloat(x, 'f', 0, 64), strconv.FormatFloat(y, 'f', 0, 64))
+	}
+	must("click", "network-send")
+	snapshotUntil(`"HTTP 201"`)
+	var list string
+	for range 10 {
+		if list = must("network", "list"); strings.Contains(list, "[CreateOrder]") {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	expect(list, "[CreateOrder]", "POST "+server.URL+"/anything/sightmap/order-1 → 201", "har)", "{order=1, echoed=1}")
+	m := regexp.MustCompile(`#(\d+) \[CreateOrder\]`).FindStringSubmatch(list)
+	if m == nil {
+		t.Fatalf("no CreateOrder entry:\n%s", list)
+	}
+	redacted := must("network", "get", m[1])
+	expect(redacted, "Authorization: <redacted>", "Set-Cookie: <redacted>", `"sessionToken":"<redacted>"`, "order = 1")
+	if strings.Contains(redacted, "sample-not-a-secret") || strings.Contains(redacted, "sample-cookie") {
+		t.Fatalf("network get leaks a credential:\n%s", redacted)
+	}
+	expect(must("network", "get", m[1], "--unredacted"), "Authorization: Bearer sample-not-a-secret")
+	expect(must("network", "list", "--json", "--grep", "createorder"), `"matches":["CreateOrder"]`, `"source":"har"`)
+
 	shot := filepath.Join(work, "shot.png")
 	must("screenshot", "--out", shot)
 	if data, err := os.ReadFile(shot); err != nil || !bytes.HasPrefix(data, []byte("\x89PNG")) {
@@ -143,9 +209,12 @@ func TestE2E(t *testing.T) {
 	if len(logs) != 1 {
 		t.Fatalf("want one run log, got %v", logs)
 	}
-	data, _ := os.ReadFile(logs[0])
+	data, _ = os.ReadFile(logs[0])
 	if !strings.Contains(string(data), `"text":"\u003credacted\u003e"`) || strings.Contains(string(data), "hunter2") {
 		t.Fatalf("the password was not redacted in the run log:\n%s", data)
+	}
+	if strings.Contains(string(data), "sample-not-a-secret") || strings.Contains(string(data), "sessionToken") {
+		t.Fatalf("a network body reached the run log:\n%s", data)
 	}
 
 	expect(must("status"), "session running", "dev.sightmap.SimSample")
@@ -157,4 +226,28 @@ func TestE2E(t *testing.T) {
 	expect(switched, "sightmap device stop")
 	offscreen, _ := run("tap-xy", "230", "5000")
 	expect(offscreen, "not pixels")
+
+	must("stop")
+	if out, err := simctl("defaults", "read", "com.apple.CFNetwork", "har-capture-global"); err == nil {
+		t.Errorf("stop left HAR capture on: %s", out)
+	}
+	if out, _ := simctl("log", "config", "--status", "--subsystem", "com.apple.CFNetwork", "--category", "HAR"); !strings.Contains(out, "OFF") {
+		t.Errorf("stop left the HAR log category on: %s", out)
+	}
+	simctl("defaults", "delete", "dev.sightmap.SimSample", "networkBaseURL")
+}
+
+func findNamed(n map[string]any, name string) map[string]any {
+	if n["name"] == name {
+		return n
+	}
+	children, _ := n["children"].([]any)
+	for _, c := range children {
+		if child, ok := c.(map[string]any); ok {
+			if found := findNamed(child, name); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
 }

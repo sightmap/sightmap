@@ -30,6 +30,13 @@ type Config struct {
 	RunLabel string `json:"runLabel,omitempty"`
 	// ConsoleLimit is how many console entries the session keeps; 0 means 5000.
 	ConsoleLimit int `json:"consoleLimit,omitempty"`
+	// Network is the network source mode (NetworkModes); "" means auto.
+	Network string `json:"network,omitempty"`
+	// NetworkLimit is how many network entries the session keeps; 0 means 1000.
+	NetworkLimit int `json:"networkLimit,omitempty"`
+	// MetroPort is where the rn-cdp source looks for Metro; 0 means the app's
+	// RCT_jsLocation default, else 8081.
+	MetroPort int `json:"metroPort,omitempty"`
 }
 
 // Timing tunes how long a Session waits for the screen; zero fields take the
@@ -71,6 +78,8 @@ type Session struct {
 	Sim     Sim
 	Console *Console
 	Logs    *LogCollector
+	Network *Network
+	Net     *NetCollector
 	RunLog  *RunLog
 	Timing  Timing
 	Log     func(string)
@@ -99,6 +108,7 @@ func NewSession(cfg Config, helper Helper, sim Sim) *Session {
 		Helper:    helper,
 		Sim:       sim,
 		Console:   NewConsole(cmp.Or(cfg.ConsoleLimit, 5000)),
+		Network:   NewNetwork(cmp.Or(cfg.NetworkLimit, 1000)),
 		RunLog:    NewRunLog(cfg.SightmapDir),
 		Log:       func(string) {},
 		StartedAt: time.Now(),
@@ -256,7 +266,7 @@ func (s *Session) LaunchApp(ctx context.Context, terminate bool) (map[string]any
 			return nil, err
 		}
 	}
-	pid, err := s.Sim.Launch(ctx, s.UDID, s.BundleID, LaunchOptions{Stdout: s.stdoutPath(), Stderr: s.stderrPath(), Terminate: terminate})
+	pid, err := s.Sim.Launch(ctx, s.UDID, s.BundleID, LaunchOptions{Stdout: s.stdoutPath(), Stderr: s.stderrPath(), Terminate: terminate, Env: s.Net.LaunchEnv()})
 	if err != nil {
 		return nil, err
 	}
@@ -452,6 +462,8 @@ type ValueArgs struct {
 	Label string `json:"label,omitempty"`
 	Kind  string `json:"kind,omitempty"`
 	App   string `json:"appPath,omitempty"`
+	// Unredacted shows a network entry's credentials (network get).
+	Unredacted bool `json:"unredacted,omitempty"`
 }
 
 func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (any, error) {
@@ -573,6 +585,33 @@ func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (
 			return nil, withHint("not_found", "run `sightmap device console list` for current indexes", "no console entry #%d (the buffer holds the most recent %d)", a.Index, s.Console.Capacity)
 		}
 		return e, nil
+	case "networkList":
+		f, err := decode[NetworkFilter](raw)
+		if err != nil {
+			return nil, err
+		}
+		if f.Source != "" && f.Source != SourceHAR && f.Source != SourceRNCDP && f.Source != SourceSummary {
+			return nil, errorf("usage", "--source takes har, rn-cdp or summary, not %q", f.Source)
+		}
+		view, err := s.networkView(f.Unredacted)
+		if err != nil {
+			return nil, err
+		}
+		return s.Network.List(f, view), nil
+	case "networkGet":
+		a, err := decode[ValueArgs](raw)
+		if err != nil {
+			return nil, err
+		}
+		e, ok := s.Network.Get(a.Index)
+		if !ok {
+			return nil, withHint("not_found", "run `sightmap device network list` for current indexes", "no network entry #%d (the buffer holds the most recent %d)", a.Index, s.Network.Capacity)
+		}
+		view, err := s.networkView(a.Unredacted)
+		if err != nil {
+			return nil, err
+		}
+		return view(e), nil
 	case "runNew":
 		a, err := decode[ValueArgs](raw)
 		if err != nil {
@@ -592,6 +631,21 @@ func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (
 		return s.RunLog.Current(), nil
 	}
 	return nil, errorf("unknown_cmd", "unknown device command %q", cmd)
+}
+
+// networkView redacts an entry (unless unredacted) and then matches it
+// against the corpus, so a property extracted from a credential stays hidden.
+func (s *Session) networkView(unredacted bool) (func(NetworkEntry) NetworkEntry, error) {
+	corpus, _, err := s.corpus.get()
+	if err != nil {
+		return nil, err
+	}
+	return func(e NetworkEntry) NetworkEntry {
+		if !unredacted {
+			e = e.Redact()
+		}
+		return e.Annotate(corpus)
+	}, nil
 }
 
 func (s *Session) relaunch(ctx context.Context) (map[string]any, error) {
@@ -619,7 +673,8 @@ type Status struct {
 		Streaming bool `json:"streaming"`
 		Entries   int  `json:"entries"`
 	} `json:"console"`
-	Run RunInfo `json:"run"`
+	Network *NetStatus `json:"network,omitempty"`
+	Run     RunInfo    `json:"run"`
 }
 
 func (s *Session) status() Status {
@@ -628,6 +683,10 @@ func (s *Session) status() Status {
 	st.Console.Entries = s.Console.Len()
 	if s.Logs != nil {
 		st.Console.Streaming = s.Logs.Streaming()
+	}
+	if s.Net != nil {
+		net := s.Net.Status()
+		st.Network = &net
 	}
 	return st
 }
@@ -1090,10 +1149,13 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 	return nil, withHint("not_found", "raise --max, or check the target with `sightmap device snapshot`", "%s after %d scroll(s) %s", notFound, a.Max, a.Direction)
 }
 
-// Close stops the helper and the log collector.
+// Close stops the helper and the log and network collectors.
 func (s *Session) Close() {
 	s.Helper.Close()
 	if s.Logs != nil {
 		s.Logs.Close()
+	}
+	if s.Net != nil {
+		s.Net.Close()
 	}
 }
