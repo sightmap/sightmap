@@ -457,13 +457,38 @@ A `null` (a bare `key:`), a float, and an empty list are all invalid: the first 
 
 A filter key must resolve on the referenced entity. In order:
 
-1. A property the entity declares — `properties:` on a [Request](#request-properties) or a [Component](#component-properties).
-2. For a `Request` ref, a reserved identity name: `status`, `method`, `duration`.
-3. For a `Component` ref, the built-in `value`.
+1. A property the entity declares: `properties:` on a [Component](#component-properties), [Request](#request-properties), [Message](#message-properties), or [View](#url-properties).
+2. For a `View` or `Request` ref, a `:name` binding its route still produces (see [URL properties](#url-properties)).
+3. For a `Request` ref, a reserved identity name: `status`, `method`, `duration`.
+4. For a `Component` ref, the built-in `value`.
 
 A declared property shadows a reserved name of the same name; see [Request properties](#request-properties).
 
-A `Message` or `View` ref accepts **no** filter keys. A message's own `level`/`message` already identify it fully, and a view has no extractable property, so reference either without a filter.
+A name declared by several entities of one kind (a component in two views) is one entity to a `ref`, so a key resolves when any of them declares it. The filter then only holds where the property exists.
+
+```yaml
+views:
+  - name: OrderDetail
+    route: /orders/:order_id
+    properties:
+      - name: tab
+        extract: { from: url.query, path: tab }
+
+messages:
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        extract: { from: stack, path: top.file, pattern: '([^/]+)$' }
+
+signals:
+  - name: orders.returns_tab.viewed
+    ref: OrderDetail
+    filter: { tab: returns }          # declared URL property
+  - name: chunk.vendor.failed
+    ref: ChunkLoadFailed
+    filter: { origin_file: vendor.js }
+```
 
 A key resolving to none of the above is an error (`signal-filter-unknown`). This is what keeps a signal tied to its entity: without it, a filter naming a property that was renamed or never existed would pass silently and the rule would simply never fire.
 

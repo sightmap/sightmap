@@ -8,7 +8,7 @@ Add a top-level `signals:` entity ([SEP-0007](https://github.com/sightmap/sightm
 
 New validation:
 
-- `signal-filter-unknown` (error) rejects a filter key that does not resolve on the referenced entity. Resolution order is a declared property, then a reserved request identity (`status`/`method`/`duration`), then a component's built-in `value`. A message or view ref accepts no filter keys, since a message's own `level`/`message` already identify it and a view has no extractable property.
+- `signal-filter-unknown` (error) rejects a filter key that does not resolve on the referenced entity. A key resolves when it is a declared property on any of the four kinds (component, request, message, view), a `:name` binding a view or request route still produces (SEP-0008), a reserved request identity (`status`/`method`/`duration`), or a component's built-in `value`. A component name declared in several views resolves a key any of them declares.
 
   This is what makes SEP-0007's central claim hold. The proposal rests on a signal composing what the corpus already defines so the two cannot drift; without checking the keys, a filter naming a renamed or never-existent property passed silently and the rule simply never fired. The previous conformance fixture did exactly that, filtering on a property it declared nowhere while asserting zero diagnostics.
 

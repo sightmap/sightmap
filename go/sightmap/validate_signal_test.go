@@ -110,27 +110,83 @@ func TestValidate_SignalFilterComponentValueIsBuiltIn(t *testing.T) {
 	}
 }
 
-// A message and a view have nothing to filter on, so a filter there is an error
-// rather than a constraint that quietly never applies.
-func TestValidate_SignalFilterOnMessageOrViewIsRejected(t *testing.T) {
-	msg := &sightmap.Corpus{
-		Messages: []sightmap.MessageDef{{Name: "M", Level: "ERROR", Message: "x"}},
-		Signals: []sightmap.SignalDef{{
-			Name: "s", Ref: "M", Filter: map[string][]string{"level": {"ERROR"}},
+// Messages (SEP-0006 stack properties) and views (SEP-0008 URL properties) can
+// both declare properties, so a filter resolves against them like any other
+// kind, and an undeclared key is still rejected.
+func TestValidate_SignalFilterMessageAndViewProperties(t *testing.T) {
+	c := &sightmap.Corpus{
+		Messages: []sightmap.MessageDef{{
+			Name: "M", Level: "EXCEPTION",
+			Properties: []sightmap.MessagePropertyDef{{Name: "origin_file", Extract: sightmap.Extract{From: "stack", Path: "top.file"}}},
 		}},
+		Views: []sightmap.ViewDef{{
+			Name: "V", Route: "/orders/:order_id",
+			Properties: []sightmap.URLPropertyDef{{Name: "tab", Extract: sightmap.Extract{From: "url.query", Path: "tab"}}},
+		}},
+		Signals: []sightmap.SignalDef{
+			{Name: "s1", Ref: "M", Filter: map[string][]string{"origin_file": {"vendor.js"}}},
+			{Name: "s2", Ref: "V", Filter: map[string][]string{"tab": {"returns"}, "order_id": {"123"}}},
+		},
 	}
-	if !hasCode(sightmap.Validate(msg), "signal-filter-unknown") {
-		t.Errorf("a filter on a message ref should be rejected, got %v", findingCodes(sightmap.Validate(msg)))
+	if errs := sightmap.Validate(c); len(errs) != 0 {
+		t.Fatalf("declared message/view properties and a route binding should resolve, got %v", findingCodes(errs))
 	}
 
-	view := &sightmap.Corpus{
-		Views: []sightmap.ViewDef{{Name: "V", Route: "/v"}},
-		Signals: []sightmap.SignalDef{{
-			Name: "s", Ref: "V", Filter: map[string][]string{"anything": {"x"}},
-		}},
+	c.Signals = []sightmap.SignalDef{
+		{Name: "s1", Ref: "M", Filter: map[string][]string{"level": {"ERROR"}}},
+		{Name: "s2", Ref: "V", Filter: map[string][]string{"anything": {"x"}}},
 	}
-	if !hasCode(sightmap.Validate(view), "signal-filter-unknown") {
-		t.Errorf("a filter on a view ref should be rejected, got %v", findingCodes(sightmap.Validate(view)))
+	if got := countCode(sightmap.Validate(c), "signal-filter-unknown"); got != 2 {
+		t.Fatalf("want 2 signal-filter-unknown for undeclared keys, got %v", findingCodes(sightmap.Validate(c)))
+	}
+}
+
+// A request route's :name binds with no declaration. Renaming the segment with
+// a url.path entry frees the old name, so only the new one resolves.
+func TestValidate_SignalFilterRouteBindings(t *testing.T) {
+	c := &sightmap.Corpus{
+		Requests: []sightmap.RequestDef{
+			{Name: "GetOrder", Route: "/api/orders/:order_id"},
+			{
+				Name: "GetItem", Route: "/api/items/:item_id",
+				Properties: []sightmap.RequestPropertyDef{{Name: "item", Extract: sightmap.Extract{From: "url.path", Path: "item_id"}}},
+			},
+		},
+		Signals: []sightmap.SignalDef{
+			{Name: "s1", Ref: "GetOrder", Filter: map[string][]string{"order_id": {"1"}}},
+			{Name: "s2", Ref: "GetItem", Filter: map[string][]string{"item": {"1"}}},
+		},
+	}
+	if errs := sightmap.Validate(c); len(errs) != 0 {
+		t.Fatalf("route bindings should resolve, got %v", findingCodes(errs))
+	}
+	c.Signals = []sightmap.SignalDef{{Name: "s", Ref: "GetItem", Filter: map[string][]string{"item_id": {"1"}}}}
+	if !hasCode(sightmap.Validate(c), "signal-filter-unknown") {
+		t.Fatalf("a renamed binding's old name should not resolve, got %v", findingCodes(sightmap.Validate(c)))
+	}
+}
+
+// A component name declared in two views is one entity to a ref, so a key
+// either declaration carries resolves.
+func TestValidate_SignalFilterSameNameComponentsUnion(t *testing.T) {
+	c := &sightmap.Corpus{
+		Views: []sightmap.ViewDef{
+			{Name: "A", Route: "/a", Components: []sightmap.ComponentDef{{
+				Name: "Banner", Selectors: []string{".a"},
+				Properties: []sightmap.ComponentPropertyDef{{Name: "severity", Extract: sightmap.Extract{From: "dom.attr", Path: "data-severity"}}},
+			}}},
+			{Name: "B", Route: "/b", Components: []sightmap.ComponentDef{{
+				Name: "Banner", Selectors: []string{".b"},
+				Properties: []sightmap.ComponentPropertyDef{{Name: "promo_code", Extract: sightmap.Extract{From: "dom.attr", Path: "data-promo"}}},
+			}}},
+		},
+		Signals: []sightmap.SignalDef{
+			{Name: "s1", Ref: "Banner", Filter: map[string][]string{"severity": {"error"}}},
+			{Name: "s2", Ref: "Banner", Filter: map[string][]string{"promo_code": {"SAVE10"}}},
+		},
+	}
+	if errs := sightmap.Validate(c); hasCode(errs, "signal-filter-unknown") {
+		t.Fatalf("a key declared on either Banner should resolve, got %v", findingCodes(errs))
 	}
 }
 
@@ -286,4 +342,14 @@ signals:
 	if errs := sightmap.Validate(c); len(errs) != 0 {
 		t.Errorf("want no findings, got %v", findingCodes(errs))
 	}
+}
+
+func countCode(errs []sightmap.ValidationError, code string) int {
+	n := 0
+	for _, e := range errs {
+		if e.Code == code {
+			n++
+		}
+	}
+	return n
 }

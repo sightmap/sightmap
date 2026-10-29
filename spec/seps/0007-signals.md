@@ -106,7 +106,7 @@ signals:
       text: Payment declined         # equality on the extracted text, not a glob
 ```
 
-For a `Message` ref ([SEP-0006](0006-message-entity.md)), `filter:` is typically omitted — a message entity's own `level`/`message` usually already fully identifies the case:
+For a `Message` ref ([SEP-0006](0006-message-entity.md)), `filter:` is often omitted, since a message entity's own `level`/`message` usually identifies the case. When it declares stack `properties:`, a filter may name them:
 
 ```yaml
 messages:
@@ -114,23 +114,44 @@ messages:
     level: ERROR
     message: cart version mismatch
 
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        extract: { from: stack, path: top.file, pattern: '([^/]+)$' }
+
 signals:
   - name: cart.abandoned
     tags: [defect]
     ref: CartVersionMismatch
+  - name: chunk.vendor.failed
+    tags: [defect]
+    ref: ChunkLoadFailed
+    filter:
+      origin_file: vendor.js
 ```
 
-A `View` ref has no extractable property at all, so a view-referencing signal always omits `filter:` — it scopes a classification to "any activity observed while this view is active," a different kind of statement than a content match:
+A `View` ref with no `filter:` fires on every entry to the view. With [SEP-0008](0008-url-properties.md) URL properties, a filter may name the view's declared properties or a `:name` its route binds; a `Request` ref may name its route's bindings the same way:
 
 ```yaml
 views:
   - name: CheckoutView
     route: "/checkout"
+  - name: OrderDetail
+    route: "/orders/:order_id"
+    properties:
+      - name: tab
+        extract: { from: url.query, path: tab }
 
 signals:
   - name: checkout.view.active
     tags: [checkout]
     ref: CheckoutView
+  - name: orders.returns_tab.viewed
+    tags: [returns]
+    ref: OrderDetail
+    filter:
+      tab: returns
 ```
 
 #### No `filter:` means unconditional
@@ -154,8 +175,7 @@ A classification produced by a `signals:` match carries the referenced entity's 
 - MUST reject a `signals:` entry whose `ref:` does not resolve to a known `Component`/`Request`/`Message`/`View` name. Diagnostic code: `signal-ref-unresolved` (mirrors the existing `ref-unresolved` code for `$ref`).
 - MUST reject (not silently resolve) a `ref:` name that collides across entity kinds (e.g. a `Component` and a `Request` sharing a name) — unlike DOM tree matching, there is no adjacency/tree-position reason to prefer one over the other. Diagnostic code: `signal-ref-ambiguous`.
 - MUST evaluate every declared `filter:` key with AND semantics; MUST support both scalar (equality) and array (membership) values per key.
-- MUST reject a `filter:` key that does not resolve on the referenced entity, i.e. is neither one of its declared `properties:` nor a reserved name available for its kind (`status`/`method`/`duration` on a `Request`, `value` on a `Component`). Diagnostic code: `signal-filter-unknown`. Without this check the structural link this SEP is built on is unenforced: a filter naming a renamed or never-existent property passes silently and the rule simply never fires.
-- MUST reject any `filter:` key on a `Message` or `View` ref. A message's own `level`/`message` already identify it fully and a view has no extractable property, so a filter there is authoring confusion rather than a constraint.
+- MUST reject a `filter:` key that does not resolve on the referenced entity, i.e. is not one of its declared `properties:`, not a `:name` its route still binds (`View`, `Request`; SEP-0008), and not a reserved name available for its kind (`status`/`method`/`duration` on a `Request`, `value` on a `Component`). A name declared by several entities of one kind resolves a key any of them declares. Diagnostic code: `signal-filter-unknown`. Without this check the structural link this SEP is built on is unenforced: a filter naming a renamed or never-existent property passes silently and the rule simply never fires.
 - MUST compare `filter:` values as canonical text, rendering an integer as its decimal value so `0x1F` and `31` agree. MUST reject an unquoted integer that YAML 1.1 and 1.2 parsers read differently (a leading-zero octal like `0200`, or underscores like `1_000`), since two SDKs would otherwise compare different values for one corpus.
 - MUST fire a rule with no `filter:` on every match of its `ref:`.
 - MUST evaluate each `signals:` rule independently — a live instance matched by more than one rule produces one classification per matching rule.

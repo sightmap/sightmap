@@ -15,13 +15,11 @@ type entityIndex map[string]*entityEntry
 type entityEntry struct {
 	kinds map[string]bool
 	// props holds every filter key that resolves for this entity: the
-	// properties it declares plus the reserved names available for its kind.
+	// properties it declares, the :name bindings its route still produces, and
+	// the reserved names available for its kind. A name reused by several
+	// entities of one kind (a component declared in two views) is one entity
+	// for a ref, so its props are the union across them.
 	props map[string]bool
-	// acceptsFilter is false for kinds with nothing to filter on. A message's
-	// own level/message already identify it fully, and a view has no extractable
-	// property at all, so a filter on either is authoring confusion worth
-	// reporting rather than a constraint that quietly never applies.
-	acceptsFilter bool
 }
 
 func (e *entityEntry) kindList() []string {
@@ -33,11 +31,29 @@ func (e *entityEntry) kindList() []string {
 	return out
 }
 
+// producedBindings returns the :name bindings a route still produces after any
+// `from: url.path` entry renames its segment (SEP-0008).
+func producedBindings(route string, props []namedExtract) []string {
+	renamed := map[string]bool{}
+	for _, p := range props {
+		if p.extract.From == FromURLPath {
+			renamed[p.extract.Path] = true
+		}
+	}
+	var out []string
+	for _, name := range routeParams(route) {
+		if !renamed[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 func buildEntityIndex(c *Corpus) entityIndex {
 	idx := entityIndex{}
-	entry := func(name, kind string, acceptsFilter bool) *entityEntry {
+	entry := func(name, kind string, props ...string) {
 		if name == "" {
-			return nil
+			return
 		}
 		e := idx[name]
 		if e == nil {
@@ -45,42 +61,41 @@ func buildEntityIndex(c *Corpus) entityIndex {
 			idx[name] = e
 		}
 		e.kinds[kind] = true
-		if acceptsFilter {
-			e.acceptsFilter = true
+		for _, p := range props {
+			e.props[p] = true
 		}
-		return e
 	}
 
-	for _, comp := range c.AllComponents() {
-		e := entry(comp.Name, "component", true)
-		if e == nil {
-			continue
+	// Every declaration rather than AllComponents, which keeps only the first
+	// of each name and would hide a property declared on a later one.
+	addComponents := func(comps []ComponentDef) {
+		for _, comp := range comps {
+			names := slices.Clone(ReservedComponentPropertyNames)
+			for _, p := range comp.Properties {
+				names = append(names, p.Name)
+			}
+			entry(comp.Name, "component", names...)
 		}
-		for _, p := range comp.Properties {
-			e.props[p.Name] = true
-		}
-		// `value` resolves from the accessibility tree with no declaration.
-		for _, r := range ReservedComponentPropertyNames {
-			e.props[r] = true
-		}
+	}
+	addComponents(c.GlobalComponents)
+	addComponents(c.Definitions)
+	for i := range c.Views {
+		addComponents(c.Views[i].Components)
 	}
 
 	addRequests := func(reqs []RequestDef) {
 		for _, req := range reqs {
-			e := entry(req.Name, "request", true)
-			if e == nil {
-				continue
-			}
-			for _, p := range req.Properties {
-				e.props[p.Name] = true
-			}
 			// status/method/duration resolve from the request's own HTTP
 			// identity with no declaration. A declared property of the same
-			// name shadows the identity; either way the key resolves, so this
-			// check does not care which won.
-			for _, r := range ReservedRequestPropertyNames {
-				e.props[r] = true
+			// name shadows the identity; either way the key resolves.
+			names := slices.Clone(ReservedRequestPropertyNames)
+			urlProps := make([]namedExtract, len(req.Properties))
+			for i, p := range req.Properties {
+				names = append(names, p.Name)
+				urlProps[i] = namedExtract{p.Name, p.Extract}
 			}
+			names = append(names, producedBindings(req.Route, urlProps)...)
+			entry(req.Name, "request", names...)
 		}
 	}
 	addRequests(c.Requests)
@@ -89,10 +104,22 @@ func buildEntityIndex(c *Corpus) entityIndex {
 	}
 
 	for _, msg := range c.Messages {
-		entry(msg.Name, "message", false)
+		var names []string
+		for _, p := range msg.Properties {
+			names = append(names, p.Name)
+		}
+		entry(msg.Name, "message", names...)
 	}
+
 	for _, v := range c.Views {
-		entry(v.Name, "view", false)
+		var names []string
+		urlProps := make([]namedExtract, len(v.Properties))
+		for i, p := range v.Properties {
+			names = append(names, p.Name)
+			urlProps[i] = namedExtract{p.Name, p.Extract}
+		}
+		names = append(names, producedBindings(v.Route, urlProps)...)
+		entry(v.Name, "view", names...)
 	}
 	return idx
 }
@@ -172,17 +199,6 @@ func checkSignalFilter(sig SignalDef, e *entityEntry) []ValidationError {
 		return nil
 	}
 	kind := e.kindList()[0]
-
-	if !e.acceptsFilter {
-		keys := sortedKeys(sig.Filter)
-		return []ValidationError{{
-			Component: sig.Name,
-			Code:      "signal-filter-unknown",
-			Severity:  SeverityError,
-			Message: fmt.Sprintf("signal %q: ref %q is a %s, which has no filterable properties, but filter declares %s; reference it without a filter to fire on every match",
-				sig.Name, sig.Ref, kind, strings.Join(quoteAll(keys), ", ")),
-		}}
-	}
 
 	available := sortedKeys(e.props)
 	var out []ValidationError

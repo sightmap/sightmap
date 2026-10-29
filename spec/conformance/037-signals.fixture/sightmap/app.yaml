@@ -22,6 +22,15 @@ views:
   - name: CheckoutView
     route: /checkout
 
+  - name: OrderDetail
+    route: /orders/:order_id
+    properties:
+      - name: tab
+        extract: { from: url.query, path: tab }
+    requests:
+      - name: GetOrder
+        route: /api/orders/:order_id
+
 components:
   - name: PaymentBanner
     selector: .payment-status-banner
@@ -33,6 +42,12 @@ messages:
   - name: CartVersionMismatch
     level: ERROR
     message: cart version mismatch
+
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        extract: { from: stack, path: top.file, pattern: '([^/]+)$' }
 
 signals:
   # Filters a declared property that shadows a reserved name.
@@ -59,13 +74,32 @@ signals:
     filter:
       text: declined
 
-  # A message ref takes no filter: its own level/message already identify it.
+  # A message ref with no filter fires on every matching record.
   - name: cart.abandoned
     tags: [defect]
     ref: CartVersionMismatch
 
-  # A view ref scopes a classification to "observed while this view is active".
-  # It has no extractable property, so it takes no filter either.
+  # A view ref with no filter fires on every entry to the view.
   - name: checkout.view.active
     tags: [checkout]
     ref: CheckoutView
+
+  # A message's declared stack property.
+  - name: chunk.vendor.failed
+    tags: [defect]
+    ref: ChunkLoadFailed
+    filter:
+      origin_file: vendor.js
+
+  # A view's declared URL property and its route binding.
+  - name: orders.returns_tab.viewed
+    ref: OrderDetail
+    filter:
+      tab: returns
+      order_id: "123"
+
+  # A request's route binding needs no declaration.
+  - name: orders.fetched.one
+    ref: GetOrder
+    filter:
+      order_id: "123"
