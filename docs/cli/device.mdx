@@ -185,7 +185,7 @@ The corpus reloads whenever a YAML file under `--sightmap-dir` changes, so the n
 
 ### `device click`
 
-Resolves the target in a fresh read of the screen, checks that its center is on screen, not under a tab bar, toolbar, navigation bar, keyboard, LogBox toast, any control drawn over it (such as a custom tab bar of plain buttons over a list), or a floating dev-menu button, and that it is enabled, then taps its center. While the target is missing or the screen is still moving, it re-reads for up to 3 s first. It taps only once two reads in a row agree on where the target and the screen are; a screen still moving when the wait runs out is refused with an `unstable` error instead of being tapped mid-transition.
+Resolves the target in a fresh read of the screen, checks that its center is on screen, not under the status bar or a navigation bar or outside the visible part of its list, not under a tab bar, toolbar, navigation bar, keyboard, LogBox toast, any control drawn over it (such as a custom tab bar of plain buttons over a list), or a floating dev-menu button, and that it is enabled, then taps its center. While the target is missing or the screen is still moving, it re-reads for up to 3 s first. It taps only once two reads in a row agree on where the target and the screen are; a screen still moving when the wait runs out is refused with an `unstable` error instead of being tapped mid-transition.
 
 | Flag | Default | Description |
 |------|---------|-------------|

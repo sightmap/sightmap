@@ -957,6 +957,30 @@ func scrollVector(direction string, r rect) (map[string]any, error) {
 	return map[string]any{"x1": x1, "y1": y1, "x2": x2, "y2": y2, "duration": duration}, nil
 }
 
+// inMiddleBand reports whether n's center is in the middle 60% of the screen
+// along the scroll axis, clear of the bars at either edge.
+func (t *Tree) inMiddleBand(n *sightmap.ComponentNode, direction string) bool {
+	cx, cy := Center(n)
+	if direction == "left" || direction == "right" {
+		return float64(cx) >= 0.2*t.Screen.W && float64(cx) <= 0.8*t.Screen.W
+	}
+	return float64(cy) >= max(0.2*t.Screen.H, float64(t.topBar(n))) && float64(cy) <= 0.8*t.Screen.H
+}
+
+// nudge is a slow swipe, centered on the screen's middle, that moves n's
+// center to the middle along the scroll axis.
+func (t *Tree) nudge(n *sightmap.ComponentNode, direction string) map[string]any {
+	cx, cy := Center(n)
+	mx, my := t.Screen.W/2, t.Screen.H/2
+	dx, dy := 0.0, my-float64(cy)
+	if direction == "left" || direction == "right" {
+		dx, dy = mx-float64(cx), 0
+	}
+	x1, y1 := mx-dx/2, my-dy/2
+	return map[string]any{"x1": x1, "y1": y1, "x2": x1 + dx, "y2": y1 + dy,
+		"duration": math.Max(0.3, math.Round(math.Hypot(dx, dy)/scrollSpeed*100)/100)}
+}
+
 var opposite = map[string]string{"down": "up", "up": "down", "left": "right", "right": "left"}
 
 func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, error) {
@@ -997,7 +1021,7 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		return map[string]any{"direction": a.Direction, "scrolls": 1}, err
 	}
 	notFound := fmt.Sprintf("%s not found", quote(a.Until))
-	previous, stalls := "", 0
+	previous, stalls, nudges := "", 0, 0
 	for i := 0; i <= a.Max; i++ {
 		if i > 0 {
 			if snap, err = s.settled(ctx, 4*time.Second); err != nil {
@@ -1007,6 +1031,17 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		found, ferr := Resolve(snap, a.Until)
 		if ferr == nil {
 			ferr = snap.AssertActionable(found, a.Until)
+		}
+		// A target that is on screen but near an edge is under a bar (or will
+		// be once the list settles); a short swipe brings it to the middle,
+		// where a full page could carry it off the screen again.
+		if found != nil && (ferr == nil || Code(ferr) == "covered") && snap.OnScreen(found) && !snap.inMiddleBand(found, a.Direction) && nudges < 3 && i < a.Max {
+			nudges++
+			if err := s.input(ctx, "swipe", snap.nudge(found, a.Direction)); err != nil {
+				return nil, err
+			}
+			time.Sleep(s.Timing.ScrollSettle)
+			continue
 		}
 		if ferr == nil {
 			s.lastTarget, s.last = found, snap

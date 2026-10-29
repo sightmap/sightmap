@@ -80,13 +80,15 @@ a selector. A target matching several elements errors and
 lists them: add a predicate or append `#N`.
 
 **Off-screen and covered elements.** `click` refuses a target whose center is
-off the screen, under the tab bar, toolbar, navigation bar or keyboard, under a
+off the screen, under the status bar (where a tap scrolls the list to the top)
+or a navigation bar, outside the visible part of its list, under the tab bar, toolbar, navigation bar or keyboard, under a
 React Native LogBox toast, under any control drawn over it (e.g. a custom tab
 bar of plain buttons floating over a list), or within 24 pt of a floating
 dev-menu button, and says what to do. Long SwiftUI/UIKit lists expose only the rows near the screen,
 so a row further down is "not found" until you scroll:
-`scroll down --until TARGET` scrolls slowly enough not to fling past it, stops
-once the target is tappable, and refreshes the snapshot ids.
+`scroll down --until TARGET` scrolls slowly enough not to fling past it, nudges
+the target into the middle of the screen, stops once it is tappable there, and
+refreshes the snapshot ids.
 
 **Waiting.** Actions return as soon as the tap lands; navigation keeps
 animating for a moment. If a snapshot still shows the old screen, snapshot

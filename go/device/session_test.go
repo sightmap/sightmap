@@ -16,6 +16,10 @@ type fakeHelper struct {
 	describe *Describe
 	// frames, when set, replaces describe: one tree per read, the last repeating.
 	frames []*Describe
+	// scenes, when set, replaces describe: one tree per swipe so far, the last
+	// repeating.
+	scenes []*Describe
+	swipes int
 	inputs []string
 }
 
@@ -23,6 +27,9 @@ func (f *fakeHelper) Request(_ context.Context, cmd string, args map[string]any,
 	switch cmd {
 	case "describe":
 		d := f.describe
+		if len(f.scenes) > 0 {
+			d = f.scenes[min(f.swipes, len(f.scenes)-1)]
+		}
 		if len(f.frames) > 0 {
 			d = f.frames[0]
 			if len(f.frames) > 1 {
@@ -36,6 +43,9 @@ func (f *fakeHelper) Request(_ context.Context, cmd string, args map[string]any,
 	}
 	data, _ := json.Marshal(args)
 	f.inputs = append(f.inputs, cmd+" "+string(data))
+	if cmd == "swipe" {
+		f.swipes++
+	}
 	return nil
 }
 func (f *fakeHelper) Alive() bool   { return true }
@@ -397,5 +407,91 @@ func TestScrollUpSwipesInsideTheListAndHintsTheRightWay(t *testing.T) {
 	_, err = handle(t, s, "scroll", ScrollArgs{Direction: "down", Until: "masters-row"})
 	if Code(err) != "offscreen" || !strings.Contains(AsError(err).Hint, "scroll up --until") || len(h.inputs) != 0 {
 		t.Errorf("scroll down toward a row above: %v (%s), inputs %v", err, AsError(err).Hint, h.inputs)
+	}
+}
+
+// Scrolling up can leave a row with its center under the status bar, where a
+// tap scrolls the list to the top instead: not tappable, so scroll on.
+func TestScrollUpUntilClearsTheStatusBar(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	h.scenes = []*Describe{scheduleScreen(-1110), scheduleScreen(-10), scheduleScreen(560)}
+
+	snap, err := Annotate(Normalize(scheduleScreen(-10)), nil, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := byIdentifier(t, snap.Tree, "masters-row")
+	if err := snap.AssertActionable(row, "masters-row"); Code(err) != "covered" || !strings.Contains(err.Error(), "status bar") || !strings.Contains(AsError(err).Hint, "scroll up --until") {
+		t.Fatalf("a row centered at y=20: %v", err)
+	}
+	inList, _ := Annotate(Normalize(scheduleScreen(160)), nil, nil, "")
+	if err := inList.AssertActionable(byIdentifier(t, inList.Tree, "masters-row"), "masters-row"); Code(err) != "covered" || !strings.Contains(err.Error(), "outside the visible part of its list") {
+		t.Errorf("a row centered above its list's top edge: %v", err)
+	}
+
+	r, err := handle(t, s, "scroll", ScrollArgs{Direction: "up", Until: "masters-row"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r["scrolls"].(float64) != 2 {
+		t.Errorf("scroll up --until stopped after %v scroll(s), want 2: once past the status bar", r["scrolls"])
+	}
+}
+
+// productList is SwiftUI's Products screen scrolled down: the collapsed
+// navigation bar shows only as its title, outside the list of rows.
+func productList(rowY float64) *Describe {
+	rows := []*RawElement{{Type: "Button", Identifier: "product-row-30", Label: "Product 30", Frame: Frame{X: 16, Y: rowY, W: 358, H: 52}}}
+	for i, y := range []float64{500, 552, 604} {
+		rows = append(rows, &RawElement{Type: "Button", Identifier: fmt.Sprintf("product-row-%d", 40+i), Label: "Other", Frame: Frame{X: 16, Y: y, W: 358, H: 52}})
+	}
+	return &Describe{Screen: Size{W: 390, H: 844}, Root: &RawElement{Type: "Application", Frame: Frame{W: 390, H: 844}, Children: []*RawElement{
+		{Type: "Heading", Label: "Products", Frame: Frame{X: 159, Y: 59, W: 72, H: 21}},
+		{Type: "Group", Frame: Frame{W: 390, H: 844}, Children: rows},
+	}}}
+}
+
+func TestRowsUnderACollapsedNavigationBarAreCovered(t *testing.T) {
+	under, _ := Annotate(Normalize(productList(45)), nil, nil, "")
+	if err := under.AssertActionable(byIdentifier(t, under.Tree, "product-row-30"), "product-row-30"); Code(err) != "covered" || !strings.Contains(err.Error(), "navigation bar") {
+		t.Fatalf("a row centered at y=71 under the bar: %v", err)
+	}
+	clear, _ := Annotate(Normalize(productList(97)), nil, nil, "")
+	if err := clear.AssertActionable(byIdentifier(t, clear.Tree, "product-row-30"), "product-row-30"); err != nil {
+		t.Errorf("a row just below the bar: %v", err)
+	}
+}
+
+// scroll --until finishes with the target in the middle of the screen: one on
+// screen but under the navigation bar is nudged down rather than paged past.
+func TestScrollUntilNudgesTheTargetToTheMiddle(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	h.scenes = []*Describe{productList(45), productList(396)}
+	r, err := handle(t, s, "scroll", ScrollArgs{Direction: "up", Until: "product-row-30"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.inputs) != 1 {
+		t.Fatalf("swipes %v, want one nudge", h.inputs)
+	}
+	var nudge struct{ Y1, Y2 float64 }
+	json.Unmarshal([]byte(strings.TrimPrefix(h.inputs[0], "swipe ")), &nudge)
+	if moved := nudge.Y2 - nudge.Y1; moved < 340 || moved > 360 {
+		t.Errorf("nudge moved %g pt, want the row's center (71) to the middle (422)", moved)
+	}
+	if !strings.Contains(r["found"].(string), "product-row-30") && !strings.Contains(r["found"].(string), "Product 30") {
+		t.Errorf("found %v", r["found"])
+	}
+}
+
+func TestNavigationBarItemsAreNotCoveredByTheirOwnBar(t *testing.T) {
+	d := &Describe{Screen: Size{W: 390, H: 844}, Root: &RawElement{Type: "Application", Frame: Frame{W: 390, H: 844}, Children: []*RawElement{
+		{Type: "Button", Identifier: "BackButton", Label: "Products", Frame: Frame{X: 8, Y: 52, W: 100, H: 34}},
+		{Type: "Heading", Label: "Product 30", Frame: Frame{X: 150, Y: 59, W: 90, H: 21}},
+		{Type: "Button", Identifier: "product-detail-add", Label: "Add to Cart", Frame: Frame{X: 120, Y: 460, W: 150, H: 34}},
+	}}}
+	s, _ := Annotate(Normalize(d), nil, nil, "")
+	if err := s.AssertActionable(byIdentifier(t, s.Tree, "BackButton"), "BackButton"); err != nil {
+		t.Errorf("back button: %v", err)
 	}
 }

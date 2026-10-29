@@ -83,6 +83,24 @@ func (s *Snapshot) AssertActionable(n *sightmap.ComponentNode, target string) er
 		return withHint("offscreen", fmt.Sprintf("run `sightmap device scroll %s --until %s`, then retry", dir, quote(target)),
 			"%s is off-screen (center %d,%d on a %gx%g screen); refusing to tap", desc, cx, cy, s.Screen.W, s.Screen.H)
 	}
+	if top := s.systemTop(); cy < top {
+		return withHint("covered", fmt.Sprintf("run `sightmap device scroll up --until %s`, then retry", quote(target)),
+			"%s has its center at y=%d, under the status bar (the top %d pt); a tap there scrolls the list to the top instead", desc, cy, top)
+	}
+	if bar := s.topBar(n); cy < bar {
+		return withHint("covered", fmt.Sprintf("run `sightmap device scroll up --until %s`, then retry", quote(target)),
+			"%s has its center at y=%d, under the navigation bar (down to y=%d); a tap there would not reach it", desc, cy, bar)
+	}
+	if c := s.scrollContainer(n); c != nil {
+		if inner := rectOf(c).grow(-containerInset); !inner.contains(cx, cy) {
+			dir := "down"
+			if cy < inner.y || cx < inner.x {
+				dir = "up"
+			}
+			return withHint("covered", fmt.Sprintf("run `sightmap device scroll %s --until %s`, then retry", dir, quote(target)),
+				"%s has its center (%d, %d) outside the visible part of its list (%s), where something else is drawn", desc, cx, cy, s.Describe(c))
+		}
+	}
 	if lb := s.logBoxToast(); lb != nil && lb.Node != n && rectOf(lb.Node).contains(cx, cy) {
 		return withHint("covered", fmt.Sprintf("dismiss it with `sightmap device tap-xy %d %d` (its ✕), then retry", lb.DismissX, lb.DismissY),
 			"%s is covered by a React Native LogBox toast (%s)", desc, s.Describe(lb.Node))
@@ -219,3 +237,69 @@ func clipRect(r, to rect) rect {
 	x1, y1 := min(r.x+r.w, to.x+to.w), min(r.y+r.h, to.y+to.h)
 	return rect{x0, y0, max(0, x1-x0), max(0, y1-y0)}
 }
+
+// containerInset keeps a tap off the very edge of a scroll container, where a
+// row is clipped or a bar is drawn over it.
+const containerInset = 8
+
+// systemTop is the height of the status bar area, where a tap scrolls the
+// list to the top rather than reaching what is drawn there: generous on a
+// notched or Dynamic Island iPhone, small on an iPad or a home-button iPhone.
+// It stays below the center of a navigation bar item on every device.
+func (t *Tree) systemTop() int {
+	switch {
+	case t.Screen.W >= 600:
+		return 24
+	case t.Screen.H >= 812:
+		return 60
+	}
+	return 20
+}
+
+// scrollContainer returns n's nearest scroll view, table or collection, or nil.
+func (t *Tree) scrollContainer(n *sightmap.ComponentNode) *sightmap.ComponentNode {
+	for p := t.parent[n]; p != nil; p = t.parent[p] {
+		switch p.Role {
+		case "scrollview", "table", "collection":
+			return p
+		}
+	}
+	return nil
+}
+
+// topBar returns the bottom edge of a navigation bar drawn over n's list, or
+// 0. A collapsed navigation bar covers the rows scrolled under it but shows in
+// the tree only as its title (and its buttons): a heading or navbar element,
+// or a control, in the top 15% of the screen and outside n's list. The bar
+// reaches a little below its title.
+func (t *Tree) topBar(n *sightmap.ComponentNode) int {
+	list := t.scrollContainer(n)
+	if list == nil {
+		list = t.parent[n]
+	}
+	// In a flat tree (React Native's, often) the list is the root, so only a
+	// title says where a bar is; any control could be another row.
+	flat := list == t.Root
+	if flat {
+		list = nil
+	}
+	bottom := 0
+	for _, o := range t.Nodes {
+		b := o.Bounds
+		if !o.IsVisible || o == n || b.Y+b.Height > int(0.15*t.Screen.H) || b.Height <= 0 {
+			continue
+		}
+		// The bar's own items (a back button) sit beside its title; only what
+		// lies under the bar, in another layer, is covered by it.
+		if list != nil && (o == list || t.IsAncestor(list, o)) || t.IsAncestor(o, n) || t.parent[o] == t.parent[n] {
+			continue
+		}
+		if o.Role == "heading" || o.Role == "navbar" || (o.IsInteractive && !flat) {
+			bottom = max(bottom, b.Y+b.Height+navBarMargin)
+		}
+	}
+	return bottom
+}
+
+// navBarMargin is how far a navigation bar reaches below its title.
+const navBarMargin = 16
