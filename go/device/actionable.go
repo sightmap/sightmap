@@ -79,15 +79,7 @@ func (s *Snapshot) AssertActionable(n *sightmap.ComponentNode, target string) er
 	desc := s.Describe(n)
 	cx, cy := Center(n)
 	if !n.IsVisible || !s.OnScreen(n) {
-		dir := "left"
-		switch {
-		case float64(cy) > s.Screen.H:
-			dir = "down"
-		case cy < 0:
-			dir = "up"
-		case float64(cx) > s.Screen.W:
-			dir = "right"
-		}
+		dir := s.towards(n)
 		return withHint("offscreen", fmt.Sprintf("run `sightmap device scroll %s --until %s`, then retry", dir, quote(target)),
 			"%s is off-screen (center %d,%d on a %gx%g screen); refusing to tap", desc, cx, cy, s.Screen.W, s.Screen.H)
 	}
@@ -187,4 +179,43 @@ func Relocate(fresh *Snapshot, node *sightmap.ComponentNode, target string) (*si
 	}
 	sort.SliceStable(same, func(i, j int) bool { return dist(same[i]) < dist(same[j]) })
 	return same[0], nil
+}
+
+// towards returns the scroll direction that brings n's center onto the screen.
+func (t *Tree) towards(n *sightmap.ComponentNode) string {
+	cx, cy := Center(n)
+	switch {
+	case float64(cy) > t.Screen.H:
+		return "down"
+	case cy < 0:
+		return "up"
+	case float64(cx) > t.Screen.W:
+		return "right"
+	}
+	return "left"
+}
+
+// scrollRegion is where a scroll swipes when no container is named: the
+// largest visible scroll view, table or collection covering at least a quarter
+// of the screen, else the whole screen.
+func (t *Tree) scrollRegion() rect {
+	screen := rect{0, 0, int(t.Screen.W), int(t.Screen.H)}
+	best, bestArea := screen, int(t.Screen.W*t.Screen.H)/4
+	for _, n := range t.Nodes {
+		switch n.Role {
+		case "scrollview", "table", "collection":
+		default:
+			continue
+		}
+		if r := clipRect(rectOf(n), screen); n.IsVisible && r.w*r.h >= bestArea {
+			best, bestArea = r, r.w*r.h
+		}
+	}
+	return best
+}
+
+func clipRect(r, to rect) rect {
+	x0, y0 := max(r.x, to.x), max(r.y, to.y)
+	x1, y1 := min(r.x+r.w, to.x+to.w), min(r.y+r.h, to.y+to.h)
+	return rect{x0, y0, max(0, x1-x0), max(0, y1-y0)}
 }

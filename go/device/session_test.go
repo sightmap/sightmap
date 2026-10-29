@@ -14,13 +14,22 @@ import (
 // fakeHelper answers describe with a recorded tree and records input.
 type fakeHelper struct {
 	describe *Describe
-	inputs   []string
+	// frames, when set, replaces describe: one tree per read, the last repeating.
+	frames []*Describe
+	inputs []string
 }
 
 func (f *fakeHelper) Request(_ context.Context, cmd string, args map[string]any, out any) error {
 	switch cmd {
 	case "describe":
-		data, _ := json.Marshal(f.describe)
+		d := f.describe
+		if len(f.frames) > 0 {
+			d = f.frames[0]
+			if len(f.frames) > 1 {
+				f.frames = f.frames[1:]
+			}
+		}
+		data, _ := json.Marshal(d)
 		return json.Unmarshal(data, out)
 	case "hello":
 		return nil
@@ -299,5 +308,94 @@ func TestClickSettleWaitsForAMissingTarget(t *testing.T) {
 	}
 	if _, err := handle(t, s, "click", TargetArgs{Target: "simple.primary", Settle: "soon"}); Code(err) != "usage" {
 		t.Errorf("bad --settle: %v", err)
+	}
+}
+
+// sliding is a screen sliding in from the right, with its row at x.
+func sliding(x float64) *Describe {
+	return &Describe{Screen: Size{W: 400, H: 800}, Root: &RawElement{Type: "Application", Frame: Frame{W: 400, H: 800}, Children: []*RawElement{
+		{Type: "Other", Label: "List", Frame: Frame{X: x, Y: 0, W: 400, H: 800}, Children: []*RawElement{
+			{Type: "Button", Identifier: "participant-row-1", Label: "Robert", Frame: Frame{X: x, Y: 100, W: 400, H: 60}},
+		}},
+	}}}
+}
+
+func TestClickWaitsForTheScreenToStopMoving(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	s.Timing.RetryTimeout = time.Minute
+	h.frames = []*Describe{sliding(300), sliding(200), sliding(100), sliding(0)}
+	r, err := handle(t, s, "click", TargetArgs{Target: "participant-row-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(h.inputs) != 1 || !strings.Contains(h.inputs[0], `"x":200`) || r["retries"].(float64) < 3 {
+		t.Fatalf("tapped %v (result %v), want one tap at the row's resting center x=200", h.inputs, r)
+	}
+}
+
+func TestClickRefusesAScreenThatKeepsMoving(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	s.Timing.RetryTimeout = 300 * time.Millisecond
+	for i := range 5000 {
+		h.frames = append(h.frames, sliding(float64(100+i%2)))
+	}
+	_, err := handle(t, s, "click", TargetArgs{Target: "participant-row-1"})
+	if Code(err) != "unstable" || len(h.inputs) != 0 {
+		t.Fatalf("err = %v, inputs %v", err, h.inputs)
+	}
+}
+
+func TestScrollVectorsStayInTheMiddleBand(t *testing.T) {
+	screen := rect{0, 0, 390, 844}
+	for _, dir := range []string{"up", "down"} {
+		v, err := scrollVector(dir, screen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		y1, y2 := v["y1"].(float64), v["y2"].(float64)
+		for _, y := range []float64{y1, y2} {
+			if y < 0.25*844 || y > 0.85*844 {
+				t.Errorf("%s swipes through y=%g, outside the middle band", dir, y)
+			}
+		}
+		if (dir == "up") != (y2 > y1) {
+			t.Errorf("%s swipes from %g to %g", dir, y1, y2)
+		}
+		if y1 < 0.3*844 && dir == "up" {
+			t.Errorf("scroll up starts at y=%g, near the top where headers and system gestures are", y1)
+		}
+	}
+}
+
+func scheduleScreen(rowY float64) *Describe {
+	return &Describe{Screen: Size{W: 390, H: 844}, Root: &RawElement{Type: "Application", Frame: Frame{W: 390, H: 844}, Children: []*RawElement{
+		{Type: "Other", Label: "Header", Frame: Frame{X: 0, Y: 0, W: 390, H: 200}},
+		{Type: "Table", Frame: Frame{X: 0, Y: 200, W: 390, H: 600}, Children: []*RawElement{
+			{Type: "Button", Identifier: "masters-row", Label: "Masters Tournament", Frame: Frame{X: 0, Y: rowY, W: 390, H: 60}},
+			{Type: "Button", Identifier: "other-row", Label: "Other", Frame: Frame{X: 0, Y: 400, W: 390, H: 60}},
+		}},
+	}}}
+}
+
+func TestScrollUpSwipesInsideTheListAndHintsTheRightWay(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	h.describe = scheduleScreen(-1110)
+	if _, err := handle(t, s, "scroll", ScrollArgs{Direction: "up"}); err != nil {
+		t.Fatal(err)
+	}
+	var swipe struct{ Y1, Y2 float64 }
+	json.Unmarshal([]byte(strings.TrimPrefix(h.inputs[0], "swipe ")), &swipe)
+	if swipe.Y1 < 200 || swipe.Y2 > 800 || swipe.Y2 <= swipe.Y1 {
+		t.Errorf("scroll up swiped %v, want upward within the table (y 200–800)", swipe)
+	}
+
+	_, err := handle(t, s, "click", TargetArgs{Target: "masters-row"})
+	if Code(err) != "offscreen" || !strings.Contains(AsError(err).Hint, "scroll up --until") {
+		t.Errorf("a row above the screen: %v (%s)", err, AsError(err).Hint)
+	}
+	h.inputs = nil
+	_, err = handle(t, s, "scroll", ScrollArgs{Direction: "down", Until: "masters-row"})
+	if Code(err) != "offscreen" || !strings.Contains(AsError(err).Hint, "scroll up --until") || len(h.inputs) != 0 {
+		t.Errorf("scroll down toward a row above: %v (%s), inputs %v", err, AsError(err).Hint, h.inputs)
 	}
 }

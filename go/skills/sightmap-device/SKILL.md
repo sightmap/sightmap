@@ -94,7 +94,10 @@ again. `click` and `fill` wait out short animations themselves: while the target
 is missing, or the screen moves between two reads ~150 ms apart (a sheet
 closing, a back navigation), they re-read for up to 3 s (`--settle 5s` to
 wait longer, e.g. for a Debug React Native build redrawing after a back
-navigation). `--json` reports how many re-reads it took as `retries`.
+navigation). They tap only once two reads in a row agree on where the target
+and the screen are, so a tap never lands mid-transition; a screen that keeps
+moving for the whole wait is refused as `unstable` rather than tapped. `--json`
+reports how many re-reads it took as `retries`.
 
 ## Commands
 

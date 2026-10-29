@@ -745,7 +745,9 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		return Resolve(snap, target)
 	}
 	deadline := time.Now().Add(settle)
-	retries, stable := 0, false
+	retries := 0
+	var prev *Snapshot
+	var prevNode *sightmap.ComponentNode
 	snap, err := s.fresh(ctx, view)
 	if err != nil {
 		return tapped{}, err
@@ -761,14 +763,23 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		if failure != nil && !retryable[Code(failure)] {
 			return tapped{}, failure
 		}
+		// A screen mid-transition can already show the target; a tap then
+		// lands on whatever is passing under that point. Tap only once two
+		// reads in a row agree on where the target and the screen are.
+		stable := prev != nil && node != nil && prevNode != nil && sameElement(prevNode, node) &&
+			*prevNode.Bounds == *node.Bounds && topLayout(prev) == topLayout(snap)
 		outOfTime := time.Now().After(deadline)
-		if failure == nil && (stable || outOfTime) {
+		if failure == nil && stable {
 			x, y := Center(node)
 			if err := s.input(ctx, "tap", map[string]any{"x": x, "y": y}); err != nil {
 				return tapped{}, err
 			}
 			s.secureFocus = node.Role == "securetextfield"
 			return tapped{snap: snap, node: node, x: x, y: y, retries: retries}, nil
+		}
+		if outOfTime && failure == nil && prev != nil {
+			return tapped{}, withHint("unstable", "retry, or wait longer with `--settle 6s`; `sightmap device snapshot` shows where the screen is",
+				"%s was found, but the screen kept moving for %s, so it was not tapped", snap.Describe(node), settle)
 		}
 		waitable := failure != nil && (Code(failure) == "not_found" || Code(failure) == "stale_target" || !stable)
 		if failure != nil && (outOfTime || !waitable) {
@@ -779,12 +790,24 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		if err != nil {
 			return tapped{}, err
 		}
-		stable = layout(next, false) == layout(snap, false)
-		if failure != nil || !stable {
-			retries++
-		}
-		snap = next
+		retries++
+		prev, prevNode, snap = snap, node, next
 	}
+}
+
+// sameElement reports whether a and b, from two reads, are the same element.
+func sameElement(a, b *sightmap.ComponentNode) bool {
+	return a.Role == b.Role && Identifier(a) == Identifier(b) && a.Name == b.Name
+}
+
+// topLayout fingerprints the frames of the root's children: what moves when a
+// screen slides in or a sheet animates, and not text such as a clock.
+func topLayout(s *Snapshot) string {
+	var b strings.Builder
+	for _, n := range s.Root.Children {
+		fmt.Fprintf(&b, "%s|%s|%d,%d,%d,%d\n", n.Role, Identifier(n), n.Bounds.X, n.Bounds.Y, n.Bounds.Width, n.Bounds.Height)
+	}
+	return b.String()
 }
 
 // sparseError is the not-found error for a tree that exposes next to nothing,
@@ -915,11 +938,14 @@ func scrollVector(direction string, r rect) (map[string]any, error) {
 	x, y, w, h := float64(r.x), float64(r.y), float64(r.w), float64(r.h)
 	cx, cy := x+w/2, y+h/2
 	var x1, y1, x2, y2 float64
+	// A swipe that starts near the top lands on a header or navigation bar, or
+	// reads as a system gesture, and moves nothing; both directions keep their
+	// start and end in the region's middle band.
 	switch direction {
 	case "down":
-		x1, y1, x2, y2 = cx, y+h*0.8, cx, y+h*0.2
+		x1, y1, x2, y2 = cx, y+h*0.75, cx, y+h*0.25
 	case "up":
-		x1, y1, x2, y2 = cx, y+h*0.2, cx, y+h*0.8
+		x1, y1, x2, y2 = cx, y+h*0.35, cx, y+h*0.85
 	case "right":
 		x1, y1, x2, y2 = x+w*0.8, cy, x+w*0.2, cy
 	case "left":
@@ -941,16 +967,14 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 	if err != nil {
 		return nil, err
 	}
-	region := rect{0, 0, int(snap.Screen.W), int(snap.Screen.H)}
+	region := snap.scrollRegion()
 	if a.In != "" {
 		container, err := Resolve(snap, a.In)
 		if err != nil {
 			return nil, err
 		}
 		s.lastTarget = container
-		b := container.Bounds
-		x0, y0 := max(0, b.X), max(0, b.Y)
-		region = rect{x0, y0, min(int(snap.Screen.W), b.X+b.Width) - x0, min(int(snap.Screen.H), b.Y+b.Height) - y0}
+		region = clipRect(rectOf(container), rect{0, 0, int(snap.Screen.W), int(snap.Screen.H)})
 	}
 	vector, err := scrollVector(a.Direction, region)
 	if err != nil {
@@ -990,6 +1014,12 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		}
 		if c := Code(ferr); c != "not_found" && c != "offscreen" && c != "covered" {
 			return nil, ferr
+		}
+		if Code(ferr) == "offscreen" {
+			if want := snap.towards(found); want != a.Direction {
+				return nil, withHint("offscreen", fmt.Sprintf("run `sightmap device scroll %s --until %s`", want, quote(a.Until)),
+					"%s is %s the screen; scrolling %s moves away from it", snap.Describe(found), map[string]string{"up": "above", "down": "below", "left": "left of", "right": "right of"}[want], a.Direction)
+			}
 		}
 		if snap.Overlay {
 			return nil, overlayError(snap, notFound)
