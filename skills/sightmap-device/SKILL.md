@@ -304,7 +304,8 @@ came from. `start --network auto` (default) picks, in order:
 - **Redaction**: `Authorization`, `Cookie`, `Set-Cookie`,
   `Proxy-Authorization`, and any header, query parameter, form field or JSON
   key containing `token`, `password`, `secret` or `key` show as `<redacted>`,
-  in properties too. `--unredacted` shows them; ask before using it.
+  in properties and in `--request-file` / `--response-file` too.
+  `--unredacted` shows them; ask before using it.
   Entries stay in the daemon's memory (latest 1,000, bodies capped at
   256 KiB) and never reach the run log.
 - To author a `requests:` entry, copy the path from `network list`, write a

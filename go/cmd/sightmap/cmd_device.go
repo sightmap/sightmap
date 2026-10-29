@@ -48,6 +48,7 @@ Observe:
                                                     the app's requests, matched against the corpus's requests:;
                                                     credentials are redacted unless --unredacted
   network get INDEX [--unredacted] [--request-file F] [--response-file F]
+                                                    body files are redacted too unless --unredacted
 
 Act (TARGET: snapshot id, accessibility identifier, component query, or a selector):
   click TARGET [--settle DUR]                       DUR: how long to wait for the target (default 3s)
@@ -274,8 +275,8 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 		since = fs.Int("since", -1, "only entries after this index, oldest first; --limit then takes the first N")
 		follow = fs.Bool("follow", false, "keep printing new entries until interrupted")
 		unredacted = fs.Bool("unredacted", false, "show credentials (Authorization, cookies, token/password/secret/key fields)")
-		reqFile = fs.String("request-file", "", "network get: write the request body here")
-		rspFile = fs.String("response-file", "", "network get: write the response body here")
+		reqFile = fs.String("request-file", "", "network get: write the request body here (redacted unless --unredacted)")
+		rspFile = fs.String("response-file", "", "network get: write the response body here (redacted unless --unredacted)")
 	}
 	p, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
@@ -772,6 +773,9 @@ func deviceStart(args []string, f *deviceFlags) error {
 	metroPort := fs.Int("metro-port", 0, "where rn-cdp looks for Metro (default: the app's RCT_jsLocation, else 8081)")
 	if _, err := parseFlagsAroundArgs(fs, args); err != nil {
 		return usageErr("%v", err)
+	}
+	if *networkLimit < 1 {
+		return usageErr("--network-limit must be at least 1, not %d", *networkLimit)
 	}
 	if !device.ValidNetworkMode(*network) {
 		return usageErr("--network takes %s, not %q", strings.Join(device.NetworkModes, ", "), *network)

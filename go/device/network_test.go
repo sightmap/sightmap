@@ -478,3 +478,12 @@ func fmtSscan(serverURL string, port *int) (int, error) {
 	_, p, _ := strings.Cut(strings.TrimPrefix(serverURL, "http://"), ":")
 	return fmt.Sscan(p, port)
 }
+
+func TestNetworkCapacityIsAtLeastOne(t *testing.T) {
+	n := NewNetwork(-1)
+	n.Push(NetworkEntry{Source: SourceHAR})
+	n.Push(NetworkEntry{Source: SourceHAR})
+	if n.Capacity != 1 || n.CountSource(SourceHAR) != 1 {
+		t.Errorf("capacity %d, holding %d", n.Capacity, n.CountSource(SourceHAR))
+	}
+}
