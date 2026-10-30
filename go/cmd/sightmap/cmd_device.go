@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/sightmap/sightmap/go/device"
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func deviceUsage() {
@@ -26,6 +28,7 @@ func deviceUsage() {
 Session:
   doctor [--fix]                                    check prerequisites; builds the simulator helper on first use
   start [--device NAME|UDID] [--app PATH | --bundle-id ID] [--label L] [--console-limit N] [--detach]
+        [--network auto|har|rn-cdp|summary|off] [--network-limit N] [--metro-port N]
                                                     boot, enable accessibility, install, launch, run the daemon
                                                     (blocks the shell; --detach backgrounds it). On a running
                                                     session: reinstall (--app) and relaunch the same app
@@ -41,6 +44,11 @@ Observe:
                                                     --grep is case-insensitive; --all adds Apple frameworks;
                                                     --since pages forward from an index; --follow streams
   console get INDEX
+  network list [--limit N] [--grep S] [--source har|rn-cdp|summary] [--since INDEX] [--follow] [--unredacted]
+                                                    the app's requests, matched against the corpus's requests:;
+                                                    credentials are redacted unless --unredacted
+  network get INDEX [--unredacted] [--request-file F] [--response-file F]
+                                                    body files are redacted too unless --unredacted
 
 Act (TARGET: snapshot id, accessibility identifier, component query, or a selector):
   click TARGET [--settle DUR]                       DUR: how long to wait for the target (default 3s)
@@ -154,11 +162,19 @@ func deviceCommand(cmd string, args []string, f *deviceFlags) error {
 		return err
 	}
 	if req.follow {
+		if filter, ok := req.args.(device.NetworkFilter); ok {
+			return followNetwork(session, filter, *f.json)
+		}
 		return followConsole(session, req.args.(device.ConsoleFilter), *f.json)
 	}
 	var result json.RawMessage
 	if err := device.Call(session.Socket, req.cmd, req.args, &result, 2*time.Minute); err != nil {
 		return err
+	}
+	if req.cmd == "networkGet" {
+		if err := saveNetworkBodies(result, req.reqFile, req.rspFile); err != nil {
+			return err
+		}
 	}
 	// A snapshot with nothing to act on is printed, but fails: the app is most
 	// likely still loading, and a script must not take it for a real screen.
@@ -191,6 +207,8 @@ type deviceReq struct {
 	cmd    string
 	args   any
 	follow bool
+	// reqFile and rspFile receive a network entry's bodies (network get).
+	reqFile, rspFile string
 }
 
 func parseNum(s, name string) (float64, error) {
@@ -217,7 +235,9 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 	fs := f.fs
 	var (
 		view, out, treeOut, in, until, grep, level, settle *string
+		source, reqFile, rspFile                           *string
 		offscreen, clear, all, ignoreCase, follow          *bool
+		unredacted                                         *bool
 		maxScrolls, limit, since                           *int
 		duration                                           *float64
 	)
@@ -248,6 +268,15 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 		all = fs.Bool("all", false, "include Apple framework entries")
 		since = fs.Int("since", -1, "only entries after this index, oldest first; --limit then takes the first N")
 		follow = fs.Bool("follow", false, "keep printing new entries until interrupted")
+	case "network":
+		limit = fs.Int("limit", 50, "the most recent N entries (0: all)")
+		grep = fs.String("grep", "", "case-insensitive substring of the method, URL, status, source or matched request name")
+		source = fs.String("source", "", "only entries from this source: har, rn-cdp or summary")
+		since = fs.Int("since", -1, "only entries after this index, oldest first; --limit then takes the first N")
+		follow = fs.Bool("follow", false, "keep printing new entries until interrupted")
+		unredacted = fs.Bool("unredacted", false, "show credentials (Authorization, cookies, token/password/secret/key fields)")
+		reqFile = fs.String("request-file", "", "network get: write the request body here (redacted unless --unredacted)")
+		rspFile = fs.String("response-file", "", "network get: write the response body here (redacted unless --unredacted)")
 	}
 	p, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
@@ -350,6 +379,22 @@ func deviceRequest(cmd string, args []string, f *deviceFlags) (*deviceReq, error
 			return &deviceReq{cmd: "consoleGet", args: device.ValueArgs{Index: i}}, nil
 		}
 		return nil, usageErr("usage: sightmap device console list [--limit N] [--grep S] [--level L] | console get INDEX")
+	case "network":
+		if len(p) > 0 && p[0] == "list" {
+			filter := device.NetworkFilter{Limit: *limit, Grep: *grep, Source: *source, Unredacted: *unredacted}
+			if *since >= 0 {
+				filter.Since = since
+			}
+			return &deviceReq{cmd: "networkList", args: filter, follow: *follow}, nil
+		}
+		if len(p) > 1 && p[0] == "get" {
+			i, err := strconv.Atoi(p[1])
+			if err != nil {
+				return nil, usageErr("network get takes an index, got %q", p[1])
+			}
+			return &deviceReq{cmd: "networkGet", args: device.ValueArgs{Index: i, Unredacted: *unredacted}, reqFile: absPath(*reqFile), rspFile: absPath(*rspFile)}, nil
+		}
+		return nil, usageErr("usage: sightmap device network list [--limit N] [--grep S] [--source S] [--since INDEX] [--follow] | network get INDEX")
 	}
 	return nil, usageErr("unknown device command %q", cmd)
 }
@@ -402,6 +447,148 @@ func followConsole(session *device.SessionInfo, filter device.ConsoleFilter, asJ
 				printJSON(e)
 			}
 		} else if lines := consoleLines(l, true); len(lines) > 0 {
+			fmt.Println(strings.Join(lines, "\n"))
+		}
+		last := l.Last
+		filter.Since, filter.Limit = &last, 0
+		if first && !asJSON {
+			fmt.Fprintln(os.Stderr, "(following; Ctrl-C to stop)")
+		}
+		select {
+		case <-sig:
+			return nil
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+func networkLine(e device.NetworkEntry) string {
+	what := strings.TrimSpace(e.Method + " " + e.URL)
+	if what == "" {
+		what = "(host not logged)"
+	}
+	status := "→ " + strconv.Itoa(e.Status)
+	if e.Status == 0 {
+		status = "→ no response"
+	}
+	if e.Error != "" {
+		status += " " + e.Error
+	}
+	detail := []string{e.Source}
+	if e.DurationMs > 0 {
+		detail = append([]string{fmt.Sprintf("%d ms", e.DurationMs)}, detail...)
+	}
+	return fmt.Sprintf("#%d %s %s %s (%s)%s", e.Index, matchSlot(e.Matches), what, status, strings.Join(detail, ", "), propsSlot(e.Props))
+}
+
+// networkLines renders a network list; following, it leaves out the notes
+// about an empty or truncated list.
+func networkLines(l device.NetworkList, following bool) []string {
+	var lines []string
+	if l.Dropped > 0 {
+		lines = append(lines, fmt.Sprintf("(%d earlier entries dropped; the session keeps the latest %d)", l.Dropped, l.Capacity))
+	}
+	for _, e := range l.Entries {
+		lines = append(lines, networkLine(e))
+	}
+	if following {
+		return lines
+	}
+	if len(l.Entries) == 0 {
+		lines = append(lines, "(no network entries match; `sightmap device status` shows which sources are capturing)")
+	} else if more := l.Total - len(l.Entries); more > 0 {
+		lines = append(lines, fmt.Sprintf("(%d more match; raise --limit, or page on with --since %d)", more, l.Last))
+	}
+	return lines
+}
+
+func formatNetworkEntry(e device.NetworkEntry) string {
+	lines := []string{networkLine(e), "time:     " + e.Time, "source:   " + e.Source}
+	if e.Protocol != "" {
+		lines = append(lines, "protocol: "+e.Protocol)
+	}
+	if e.Source == device.SourceSummary {
+		lines = append(lines, "(the summary source has status, timing and host only: CFNetwork redacts the path, headers and bodies)")
+	}
+	if len(e.Props) > 0 {
+		lines = append(lines, "", "Properties:")
+		for _, p := range e.Props {
+			lines = append(lines, fmt.Sprintf("  %s = %s", p.Name, p.Value))
+		}
+	}
+	for _, block := range []struct {
+		label string
+		hs    []sightmap.Header
+	}{{"Request headers", e.ReqHeaders}, {"Response headers", e.RspHeaders}} {
+		if len(block.hs) == 0 {
+			continue
+		}
+		lines = append(lines, "", block.label+":")
+		for _, h := range block.hs {
+			lines = append(lines, fmt.Sprintf("  %s: %s", h.Name, h.Value))
+		}
+	}
+	for _, block := range []struct {
+		label string
+		b     *sightmap.Body
+	}{{"Request body", e.ReqBody}, {"Response body", e.RspBody}} {
+		if block.b == nil {
+			continue
+		}
+		header := fmt.Sprintf("%s (%s, %d bytes", block.label, cmp.Or(block.b.ContentType, "unknown type"), block.b.Size)
+		if block.b.Truncated {
+			header += fmt.Sprintf("; stored the first %d", len(block.b.Content))
+		}
+		content := block.b.Content
+		if len(content) > 4096 {
+			header += "; showing the first 4096, --request-file / --response-file for all"
+			content = content[:4096]
+		}
+		lines = append(lines, "", header+"):")
+		if content == "" {
+			content = "(not captured)"
+		}
+		lines = append(lines, content)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// saveNetworkBodies writes a network get result's bodies to the files asked for.
+func saveNetworkBodies(raw json.RawMessage, reqFile, rspFile string) error {
+	var e device.NetworkEntry
+	json.Unmarshal(raw, &e)
+	for _, w := range []struct {
+		path string
+		b    *sightmap.Body
+		what string
+	}{{reqFile, e.ReqBody, "request"}, {rspFile, e.RspBody, "response"}} {
+		if w.path == "" {
+			continue
+		}
+		if w.b == nil {
+			return &device.Error{Code: "no_body", Message: fmt.Sprintf("entry #%d has no %s body captured", e.Index, w.what)}
+		}
+		if err := os.WriteFile(w.path, []byte(w.b.Content), 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// followNetwork is followConsole for network entries.
+func followNetwork(session *device.SessionInfo, filter device.NetworkFilter, asJSON bool) error {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	for first := true; ; first = false {
+		var l device.NetworkList
+		if err := device.Call(session.Socket, "networkList", filter, &l, 30*time.Second); err != nil {
+			return err
+		}
+		if asJSON {
+			for _, e := range l.Entries {
+				printJSON(e)
+			}
+		} else if lines := networkLines(l, true); len(lines) > 0 {
 			fmt.Println(strings.Join(lines, "\n"))
 		}
 		last := l.Last
@@ -497,6 +684,14 @@ func formatDeviceResult(cmd string, raw json.RawMessage) string {
 			lines = append(lines, sub)
 		}
 		return strings.Join(append(lines, "", e.Message), "\n")
+	case "networkList":
+		var l device.NetworkList
+		json.Unmarshal(raw, &l)
+		return strings.Join(networkLines(l, false), "\n")
+	case "networkGet":
+		var e device.NetworkEntry
+		json.Unmarshal(raw, &e)
+		return formatNetworkEntry(e)
 	}
 	out, _ := json.MarshalIndent(r, "", "  ")
 	return string(out)
@@ -517,6 +712,12 @@ func deviceDoctor(args []string, f *deviceFlags) error {
 		progress = io.Discard
 	}
 	checks := device.Doctor(context.Background(), *fix, progress)
+	if session := device.LiveSession(*f.sightmapDir); session != nil {
+		var s device.Status
+		if err := device.Call(session.Socket, "status", nil, &s, 10*time.Second); err == nil && s.Network != nil {
+			checks = append(checks, networkCheck(*s.Network))
+		}
+	}
 	failed := 0
 	for _, c := range checks {
 		if !c.OK {
@@ -567,8 +768,17 @@ func deviceStart(args []string, f *deviceFlags) error {
 	label := fs.String("label", "", "a label for the run log")
 	detach := fs.Bool("detach", false, "run the daemon in the background and return once it is ready")
 	consoleLimit := fs.Int("console-limit", 5000, "how many console entries the session keeps")
+	network := fs.String("network", device.NetworkAuto, "network source: auto, har, rn-cdp, summary or off")
+	networkLimit := fs.Int("network-limit", 1000, "how many network entries the session keeps")
+	metroPort := fs.Int("metro-port", 0, "where rn-cdp looks for Metro (default: the app's RCT_jsLocation, else 8081)")
 	if _, err := parseFlagsAroundArgs(fs, args); err != nil {
 		return usageErr("%v", err)
+	}
+	if *networkLimit < 1 {
+		return usageErr("--network-limit must be at least 1, not %d", *networkLimit)
+	}
+	if !device.ValidNetworkMode(*network) {
+		return usageErr("--network takes %s, not %q", strings.Join(device.NetworkModes, ", "), *network)
 	}
 	ctx := context.Background()
 	sightmapDir := absPath(*f.sightmapDir)
@@ -636,6 +846,7 @@ func deviceStart(args []string, f *deviceFlags) error {
 		return usageErr("start needs --app PATH or --bundle-id ID")
 	}
 	cfg := device.Config{UDID: d.UDID, DeviceName: d.Label(), BundleID: *bundleID, AppPath: appPath, SightmapDir: sightmapDir, RunLabel: *label, ConsoleLimit: *consoleLimit,
+		Network: *network, NetworkLimit: *networkLimit, MetroPort: *metroPort,
 		RunDir: filepath.Join(device.CacheDir(), "sessions", d.UDID)}
 	if appPath != "" {
 		if cfg.BundleID == "" {
@@ -842,9 +1053,51 @@ func deviceStatus(args []string, f *deviceFlags) error {
 	if s.AppPath != "" {
 		app += "  " + s.AppPath
 	}
-	fmt.Printf("✓ session running (daemon pid %d, since %s)\n  device:  %s (%s)\n  app:     %s\n  helper:  %s\n  console: %d entries%s\n  session: %s\n  run:     %s (%d entries)\n",
-		s.PID, s.StartedAt, s.DeviceName, s.UDID, app, helper, s.Console.Entries, logs, session.File, s.Run.Run, s.Run.Seq)
+	fmt.Printf("✓ session running (daemon pid %d, since %s)\n  device:  %s (%s)\n  app:     %s\n  helper:  %s\n  console: %d entries%s\n",
+		s.PID, s.StartedAt, s.DeviceName, s.UDID, app, helper, s.Console.Entries, logs)
+	if s.Network != nil {
+		fmt.Println(strings.Join(networkStatusLines(*s.Network), "\n"))
+	}
+	fmt.Printf("  session: %s\n  run:     %s (%d entries)\n", session.File, s.Run.Run, s.Run.Seq)
 	return nil
+}
+
+func networkStatusLines(n device.NetStatus) []string {
+	lines := []string{fmt.Sprintf("  network: %d entries (--network %s)", n.Entries, n.Mode)}
+	for _, src := range n.Sources {
+		line := fmt.Sprintf("    %-8s %-11s %s", src.Name, src.State, src.Detail)
+		if src.Entries > 0 {
+			line += fmt.Sprintf(" [%d entries]", src.Entries)
+		}
+		lines = append(lines, line)
+	}
+	return lines
+}
+
+// networkCheck is doctor's report on a running session's network sources.
+func networkCheck(n device.NetStatus) device.Check {
+	var active, other []string
+	for _, src := range n.Sources {
+		if src.State == "active" {
+			active = append(active, src.Name+" ("+src.Detail+")")
+		} else {
+			other = append(other, src.Name+" "+src.State+": "+src.Detail)
+		}
+	}
+	c := device.Check{Name: "network", OK: len(active) > 0 || n.Mode == device.NetworkOff}
+	switch {
+	case n.Mode == device.NetworkOff:
+		c.Detail = "off (--network off)"
+	case len(active) == 0:
+		c.Detail = "no source is capturing; " + strings.Join(other, "; ")
+		c.Fix = "see `sightmap device status`; for full detail, build the app with the get-task-allow entitlement (a Debug build) and restart the session"
+	default:
+		c.Detail = "active: " + strings.Join(active, "; ")
+		if len(other) > 0 {
+			c.Detail += ". Not used: " + strings.Join(other, "; ")
+		}
+	}
+	return c
 }
 
 func deviceStop(args []string, f *deviceFlags) error {
