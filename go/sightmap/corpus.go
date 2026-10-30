@@ -163,7 +163,14 @@ func (v *ViewDef) SnapBasename() string {
 // view components first, then global components that don't collide on name.
 // Returns GlobalComponents only if no view matches.
 func (c *Corpus) ComponentsForURL(pageURL string) []ComponentDef {
-	v := c.ViewForURL(pageURL)
+	return c.ComponentsForView(c.ViewForURL(pageURL))
+}
+
+// ComponentsForView returns the merged flat component list for view v, chosen
+// some way other than by URL (a native screen has none): v's components first,
+// then global components that don't collide on name. A nil v yields
+// GlobalComponents.
+func (c *Corpus) ComponentsForView(v *ViewDef) []ComponentDef {
 	if v == nil {
 		return c.GlobalComponents
 	}

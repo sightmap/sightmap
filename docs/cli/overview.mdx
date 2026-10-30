@@ -6,7 +6,7 @@ description: "Learn the flag placement, session flags, visibility defaults, and 
 
 The `sightmap` CLI drives Chrome for Testing over the Chrome DevTools Protocol (CDP). Its commands apply `.sightmap/` to the live page, capture annotated snapshots, measure coverage, validate selectors, and interact with page elements. This page covers conventions shared across command groups.
 
-In the standard authoring workflow, the `sightmap-authoring` and `sightmap-browser` skills run these commands for the agent; this reference documents the surface they drive. You can also run any command directly.
+In the standard authoring workflow, the `sightmap-authoring`, `sightmap-browser`, and `sightmap-device` skills run these commands for the agent; this reference documents the surface they drive. You can also run any command directly.
 
 <Note>
 See [Install the Sightmap CLI](/start/install) for all install options. To install directly, run `npm install -g @sightmap/sightmap` or `go install github.com/sightmap/sightmap/go/cmd/sightmap@latest`.
@@ -70,6 +70,9 @@ A page with no interactive nodes renders the `∅` mark (rather than `✓`/`✗`
   </Card>
   <Card title="Page interaction" icon="bolt" href="/cli/interaction">
     Click, fill, scroll, and screenshot the live page by component identity.
+  </Card>
+  <Card title="iOS Simulator" icon="mobile" href="/cli/device">
+    Drive a native iOS app in the Simulator: snapshot its accessibility tree and act by identifier or component query.
   </Card>
   <Card title="Snapshot & capture" icon="map" href="/cli/capture">
     Use `snapshot` to observe component trees, `capture` to persist them, and `inspect` for the raw DOM.

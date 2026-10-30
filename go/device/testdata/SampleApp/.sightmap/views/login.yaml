@@ -1,0 +1,16 @@
+version: 1
+views:
+  # sightmap requires a route on every view. Native screens have no URL, so this
+  # is a placeholder until SEP-0024 (route-less views) lands: `sightmap device`
+  # ignores routes and infers the view from its components.
+  - name: Login
+    route: /login
+    components:
+      - name: EmailField
+        selector: '[identifier="login-email"]'
+      - name: PasswordField
+        selector: '[identifier="login-password"]'
+      - name: SignInButton
+        selector: 'button[identifier="login-submit"]'
+      - name: LoginError
+        selector: '[identifier="login-error"]'
