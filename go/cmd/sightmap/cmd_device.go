@@ -755,13 +755,28 @@ func spawnDeviceDaemon(dc daemonConfig, sightmapDir string) (*device.SessionInfo
 		case err := <-done:
 			return nil, &device.Error{Code: "daemon_failed", Message: fmt.Sprintf("the daemon exited during startup (%v):\n%s", err, tailFile(dc.LogFile, 2000)), Hint: "see " + dc.LogFile}
 		case <-deadline:
-			return nil, &device.Error{Code: "daemon_timeout", Message: "the daemon did not start within 90 s", Hint: "see " + dc.LogFile}
+			stopUnstartedDaemon(cmd.Process, done)
+			return nil, &device.Error{Code: "daemon_timeout", Message: "the daemon did not start within 90 s, so it was stopped", Hint: "see " + dc.LogFile}
 		case <-time.After(150 * time.Millisecond):
 		}
 		if info := device.ReadSession(sightmapDir); info != nil && info.PID == cmd.Process.Pid {
 			return info, nil
 		}
 	}
+}
+
+// stopUnstartedDaemon ends a daemon that missed the start deadline. Left
+// running, it would hold the simulator although start reported a failure, and
+// a retried start would spawn a second daemon for the same simulator.
+func stopUnstartedDaemon(p *os.Process, done <-chan error) {
+	if p.Signal(syscall.SIGTERM) == nil {
+		select {
+		case <-done:
+			return
+		case <-time.After(10 * time.Second):
+		}
+	}
+	p.Kill()
 }
 
 // serveDevice runs the daemon in this process, logging to log.

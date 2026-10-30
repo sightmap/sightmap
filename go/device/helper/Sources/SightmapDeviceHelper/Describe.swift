@@ -48,9 +48,10 @@ enum Describe {
     return nil
   }
 
-  // Out of process, iOS 26 reports some bars (the floating tab bar) as one
-  // childless element, yet their items answer a hit test. Probe a line of
-  // points along each such bar and adopt the distinct elements hit inside it.
+  // Out of process, iOS 26 reports some bars (the floating tab bar, a
+  // navigation bar with a back button) as one childless element, yet their
+  // items answer a hit test. Probe a line of points along each such bar and
+  // adopt the distinct elements hit inside it.
   private static func expandOpaqueBars(_ connection: SimulatorConnection, _ element: [String: Any]) async -> [String: Any] {
     var element = element
     if let children = element["children"] as? [[String: Any]], !children.isEmpty {
@@ -85,7 +86,10 @@ enum Describe {
   private static func isOpaqueBar(_ element: [String: Any]) -> Bool {
     guard let frame = rect(element["frame"]), frame.width >= 88, (44...120).contains(frame.height) else { return false }
     let traits = element["traits"] as? [String] ?? []
-    return element["identifier"] is NSNull && element["value"] is NSNull && leafTraits.isDisjoint(with: traits)
+    // UIKit names a navigation bar's group after its title, so an identifier
+    // rules a leaf out only when it is not a group.
+    let group = element["type"] as? String == "Group"
+    return (group || element["identifier"] is NSNull) && element["value"] is NSNull && leafTraits.isDisjoint(with: traits)
   }
 
   private static func rect(_ frame: Any?) -> CGRect? {
