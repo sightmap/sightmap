@@ -65,6 +65,9 @@ func (s *Snapshot) line(n *sightmap.ComponentNode) string {
 	if !Enabled(n) {
 		l += " (disabled)"
 	}
+	if n.State["selected"] == "true" {
+		l += " (selected)"
+	}
 	if !n.IsVisible {
 		l += " (off-screen)"
 	} else if !s.OnScreen(n) {

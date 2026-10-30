@@ -114,6 +114,7 @@ func TestE2E(t *testing.T) {
 	}
 	expect(snap, "[View: Products]")
 	expect(snap, "[ProductRow")
+	expect(snap, `[TabBarItem title="Products"] (selected)`, `[TabBarItem title="Account"]`)
 
 	refused, err := run("click", "product-row-150")
 	if err == nil {

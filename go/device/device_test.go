@@ -210,6 +210,23 @@ func TestAnnotateReactNativeTestidAlias(t *testing.T) {
 	}
 }
 
+func TestRenderMarksTheSelectedElement(t *testing.T) {
+	s := snapshot(t, "describe-rn", "", "")
+	if l := s.line(byIdentifier(t, s.Tree, "tab-products")); !strings.HasSuffix(l, " (selected)") {
+		t.Errorf("selected tab line = %q", l)
+	}
+	if l := s.line(byIdentifier(t, s.Tree, "tab-network")); strings.Contains(l, "(selected)") {
+		t.Errorf("unselected tab line = %q", l)
+	}
+}
+
+func TestSocketPathFitsWhenTheTempDirIsLong(t *testing.T) {
+	t.Setenv("TMPDIR", "/private/tmp/"+strings.Repeat("sandbox/", 12))
+	if p := SocketPath(".sightmap", "A2E36025-0000-0000-0000-000000000000"); len(p) > maxSocketPath || !strings.HasPrefix(p, "/tmp/") {
+		t.Errorf("socket path = %q (%d bytes)", p, len(p))
+	}
+}
+
 // The snapshot is matched by sightmap's own matcher, so a tree written with
 // --tree-out and matched offline names every node the same way.
 func TestTreeJSONRoundTripMatchesTheSame(t *testing.T) {

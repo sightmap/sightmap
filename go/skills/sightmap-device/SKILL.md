@@ -145,7 +145,7 @@ SignInButton   1
 
 Matched elements show `[Component prop="value"]`; unmatched ones show
 `role[identifier="…"] "label" value="…"`. Markers: `(disabled)`,
-`(partly off-screen)`, and with `--include-offscreen`, `(off-screen)`. Extra
+`(selected)`, `(partly off-screen)`, and with `--include-offscreen`, `(off-screen)`. Extra
 sections appear when they apply:
 
 | Section | Meaning |
@@ -298,8 +298,6 @@ signing in, iOS may show a "Save Password?" sheet: it appears as `[Overlay]`.
 - The helper uses Apple private frameworks (via FBSimulatorControl); a new
   Xcode release may need a sightmap update. `doctor` says so when the helper
   fails to build.
-- On iOS 26 a SwiftUI tab bar can show up as one `other "Tab Bar"` element
-  without its tabs; switch tabs with `tap-xy` from a screenshot.
 - The corpus is always the session's `--sightmap-dir`.
 - Scrolling to a far row takes about 3 s per screenful (more for a React Native
   `FlatList`, whose tree is larger).

@@ -13,7 +13,7 @@ enum Describe {
   static func run(_ connection: SimulatorConnection, udid: String) async throws -> [String: Any] {
     let options = AccessibilityRequestOptions(format: .nested, keys: keys)
     let response = try await connection.automation.describe(.frontmost, options: options)
-    let root = tree(response.elements.elements)
+    let root = await expandOpaqueBars(connection, tree(response.elements.elements))
     if hasChildren(root) {
       return ["screen": screen(connection.simulator, root: root), "root": root]
     }
@@ -46,6 +46,53 @@ enum Describe {
       }
     }
     return nil
+  }
+
+  // Out of process, iOS 26 reports some bars (the floating tab bar) as one
+  // childless element, yet their items answer a hit test. Probe a line of
+  // points along each such bar and adopt the distinct elements hit inside it.
+  private static func expandOpaqueBars(_ connection: SimulatorConnection, _ element: [String: Any]) async -> [String: Any] {
+    var element = element
+    if let children = element["children"] as? [[String: Any]], !children.isEmpty {
+      var expanded: [[String: Any]] = []
+      for child in children {
+        expanded.append(await expandOpaqueBars(connection, child))
+      }
+      element["children"] = expanded
+      return element
+    }
+    guard isOpaqueBar(element), let bar = rect(element["frame"]) else { return element }
+    let options = AccessibilityRequestOptions(format: .nested, keys: keys)
+    var items: [[String: Any]] = []
+    var seen = Set<String>()
+    for x in stride(from: bar.minX + barProbeStep / 2, to: bar.maxX, by: barProbeStep) {
+      guard let hit = try? await connection.automation.describe(.point(CGPoint(x: x, y: bar.midY)), options: options).elements.elements.first
+      else { continue }
+      let item = node(hit)
+      if let frame = rect(item["frame"]), frame != bar, bar.contains(CGPoint(x: frame.midX, y: frame.midY)), seen.insert("\(frame)").inserted {
+        items.append(item)
+      }
+    }
+    if !items.isEmpty {
+      element["children"] = items
+    }
+    return element
+  }
+
+  private static let barProbeStep = 20.0
+  private static let leafTraits: Set<String> = ["Button", "Link", "Adjustable", "StaticText", "Image", "SearchField", "KeyboardKey"]
+
+  private static func isOpaqueBar(_ element: [String: Any]) -> Bool {
+    guard let frame = rect(element["frame"]), frame.width >= 88, (44...120).contains(frame.height) else { return false }
+    let traits = element["traits"] as? [String] ?? []
+    return element["identifier"] is NSNull && element["value"] is NSNull && leafTraits.isDisjoint(with: traits)
+  }
+
+  private static func rect(_ frame: Any?) -> CGRect? {
+    guard let f = frame as? [String: Any], let x = f["x"] as? CGFloat, let y = f["y"] as? CGFloat,
+      let w = f["w"] as? CGFloat, let h = f["h"] as? CGFloat
+    else { return nil }
+    return CGRect(x: x, y: y, width: w, height: h)
   }
 
   private static func tree(_ elements: [AccessibilityDocumentElement]) -> [String: Any] {

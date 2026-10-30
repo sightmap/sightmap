@@ -75,12 +75,21 @@ func RequireSession(sightmapDir string) (*SessionInfo, error) {
 	return nil, errorf("no_session", "no running device session (no live %s)", SessionPath(sightmapDir))
 }
 
+// maxSocketPath is the longest Unix socket path macOS accepts: sun_path holds
+// 104 bytes including the terminating NUL.
+const maxSocketPath = 103
+
 // SocketPath returns the daemon socket for sightmapDir and udid. It lives in
-// the temp dir because a Unix socket path is limited to ~100 bytes.
+// the temp dir because a Unix socket path is limited in length, and in /tmp
+// when the temp dir is itself too long (as in some agent sandboxes).
 func SocketPath(sightmapDir, udid string) string {
 	abs, _ := filepath.Abs(sightmapDir)
 	sum := sha256.Sum256([]byte(abs + "\x00" + udid))
-	return filepath.Join(os.TempDir(), "sightmap-device-"+hex.EncodeToString(sum[:])[:12]+".sock")
+	name := "sightmap-device-" + hex.EncodeToString(sum[:])[:12] + ".sock"
+	if p := filepath.Join(os.TempDir(), name); len(p) <= maxSocketPath {
+		return p
+	}
+	return filepath.Join("/tmp", name)
 }
 
 type request struct {
