@@ -638,6 +638,9 @@ func formatDeviceResult(cmd string, raw json.RawMessage) string {
 		return line + waited(r)
 	case "scroll":
 		if found := str("found"); found != "" {
+			if n := asFloat(r["matches"]); n > 1 {
+				return fmt.Sprintf("✓ %s is on screen after %s scroll(s) %s (first of %s matches); snapshot ids refreshed, act on it by id %s", found, num("scrolls"), str("direction"), num("matches"), str("id"))
+			}
 			return fmt.Sprintf("✓ %s is on screen after %s scroll(s) %s; snapshot ids refreshed, act on it by id %s or by the same target", found, num("scrolls"), str("direction"), str("id"))
 		}
 		return fmt.Sprintf("✓ scrolled %s; take a new snapshot", str("direction"))

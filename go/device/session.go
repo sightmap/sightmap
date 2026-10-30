@@ -4,11 +4,13 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -263,6 +265,11 @@ func (s *Session) fresh(ctx context.Context, view string) (*Snapshot, error) {
 // where it is drawn now, so a screen presented a moment ago reads the same on
 // every read until it is done; only the time since it changed tells.
 func (s *Session) quietLeft() time.Duration {
+	// A settled read was taken only after the screen went idle, so it has
+	// already held still.
+	if s.lastSnap != nil && s.lastSnap.Settled {
+		return 0
+	}
 	return s.Timing.Quiet - s.readAt.Sub(s.layoutSince)
 }
 
@@ -282,8 +289,8 @@ func (s *Session) still(ctx context.Context) (*Snapshot, error) {
 // list's momentum has stopped.
 func (s *Session) settled(ctx context.Context, timeout time.Duration) (*Snapshot, error) {
 	snap, err := s.fresh(ctx, "")
-	if err != nil {
-		return nil, err
+	if err != nil || snap.Settled {
+		return snap, err
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -903,13 +910,14 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		// A screen mid-transition can already show the target; a tap then
 		// lands on whatever is passing under that point, or is dropped. Tap
 		// only once two reads in a row agree on where the target and the
-		// screen are, and neither has moved for Timing.Quiet.
+		// screen are, and neither has moved for Timing.Quiet. A settled read
+		// stands for two that agree.
 		same := node != nil && prevNode != nil && sameElement(prevNode, node)
 		if same && *prevNode.Bounds != *node.Bounds {
 			// A list still coasting takes a tap as a stop, not a tap.
 			s.layoutSince = s.readAt
 		}
-		stable := prev != nil && same && *prevNode.Bounds == *node.Bounds && topLayout(prev) == topLayout(snap)
+		stable := node != nil && snap.Settled || prev != nil && same && *prevNode.Bounds == *node.Bounds && topLayout(prev) == topLayout(snap)
 		quiet := s.quietLeft() <= 0
 		outOfTime := time.Now().After(deadline)
 		if failure == nil && stable && quiet {
@@ -958,6 +966,18 @@ func (s *Session) tapAt(ctx context.Context, node *sightmap.ComponentNode, x, y 
 	return s.input(ctx, "tap", map[string]any{"x": x, "y": y})
 }
 
+var exactText = regexp.MustCompile(`\[text="([^"]*)"\]`)
+
+// exactTextHint reminds that [text="…"] matches a whole label, for a target
+// that found nothing.
+func exactTextHint(target string) string {
+	m := exactText.FindStringSubmatch(target)
+	if m == nil {
+		return ""
+	}
+	return fmt.Sprintf("; [text=%q] matches the whole label, so use [text*=%q] for part of one", m[1], m[1])
+}
+
 // sameElement reports whether a and b, from two reads, are the same element.
 func sameElement(a, b *sightmap.ComponentNode) bool {
 	return a.Role == b.Role && Identifier(a) == Identifier(b) && a.Name == b.Name
@@ -1004,7 +1024,7 @@ func (s *Session) notFound(ctx context.Context, snap *Snapshot, target string, e
 	if numeric {
 		return err
 	}
-	return withHint("not_found", fmt.Sprintf("if it is further down a list, run `sightmap device scroll down --until %s`; otherwise `sightmap device snapshot`", quote(target)),
+	return withHint("not_found", fmt.Sprintf("if it is further down a list, run `sightmap device scroll down --until %s`; otherwise `sightmap device snapshot`%s", quote(target), exactTextHint(target)),
 		"%s; long lists expose only the rows near the screen", err.Error())
 }
 
@@ -1193,6 +1213,19 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 			}
 		}
 		found, ferr := Resolve(snap, a.Until)
+		matches := 1
+		// --until asks for the target on screen; when it matches several
+		// elements, the first one that can be acted on ends the scroll.
+		var amb *ambiguousError
+		if errors.As(ferr, &amb) {
+			matches, found, ferr = len(amb.nodes), amb.nodes[0], nil
+			for _, n := range amb.nodes {
+				if snap.AssertActionable(n, a.Until) == nil {
+					found = n
+					break
+				}
+			}
+		}
 		if ferr == nil {
 			ferr = snap.AssertActionable(found, a.Until)
 		}
@@ -1209,7 +1242,11 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		}
 		if ferr == nil {
 			s.lastTarget, s.last = found, snap
-			return map[string]any{"direction": a.Direction, "scrolls": i, "found": snap.Describe(found), "id": found.Id}, nil
+			r := map[string]any{"direction": a.Direction, "scrolls": i, "found": snap.Describe(found), "id": found.Id}
+			if matches > 1 {
+				r["matches"] = matches
+			}
+			return r, nil
 		}
 		if c := Code(ferr); c != "not_found" && c != "offscreen" && c != "covered" {
 			return nil, ferr
@@ -1238,7 +1275,7 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		}
 		if stalls >= 2 {
 			s.last = snap
-			return nil, withHint("not_found", fmt.Sprintf("try `sightmap device scroll %s --until %s`", opposite[a.Direction], quote(a.Until)),
+			return nil, withHint("not_found", fmt.Sprintf("try `sightmap device scroll %s --until %s`%s", opposite[a.Direction], quote(a.Until), exactTextHint(a.Until)),
 				"%s; reached the end after scrolling %s %d time(s)", notFound, a.Direction, i)
 		}
 		previous = text
@@ -1251,7 +1288,7 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		time.Sleep(s.Timing.ScrollSettle)
 	}
 	s.last = snap
-	return nil, withHint("not_found", "raise --max, or check the target with `sightmap device snapshot`", "%s after %d scroll(s) %s", notFound, a.Max, a.Direction)
+	return nil, withHint("not_found", "raise --max, or check the target with `sightmap device snapshot`"+exactTextHint(a.Until), "%s after %d scroll(s) %s", notFound, a.Max, a.Direction)
 }
 
 // Close stops the helper and the log and network collectors.

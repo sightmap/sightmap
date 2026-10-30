@@ -253,7 +253,8 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 	}
 	size := Size{W: math.Round(float64(w)/c.scale*100) / 100, H: math.Round(float64(hgt)/c.scale*100) / 100}
 	root := &RawElement{Role: "AXApplication", Type: "Application", Label: appPackage, Frame: Frame{W: size.W, H: size.H}}
-	d := &Describe{Screen: size, Root: root}
+	// uiautomator dumps only after a second without accessibility events.
+	d := &Describe{Screen: size, Root: root, Settled: true}
 	foreign := ""
 	for _, n := range h.Nodes {
 		if appPackage != "" && n.Package != "" && n.Package != appPackage {
