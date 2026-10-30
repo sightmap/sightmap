@@ -109,9 +109,10 @@ func androidIdentifier(id string) string {
 type AndroidScreen struct {
 	WidthPx, HeightPx int // in the natural (portrait) orientation, as `wm size` reports
 	Density           int // dpi, as `wm density` reports; 160 is 1 px per dp
-	// Keyboard is the input method window's frame in pixels while it is
-	// shown, else nil.
-	Keyboard *[4]int
+	// Keyboard holds the parts of the input method window that are drawn and
+	// take touches, in pixels, while it is shown: usually one rectangle, more
+	// for a floating toolbar. Empty when no keyboard is shown.
+	Keyboard [][4]int
 	// StatusBarPx is the status bar's height in pixels, or 0 when unknown.
 	StatusBarPx int
 }
@@ -280,7 +281,10 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 	for _, n := range h.Nodes {
 		root.Children = append(root.Children, c.element(n))
 	}
-	if k := screen.Keyboard; k != nil && len(root.Children) > 0 {
+	for _, k := range screen.Keyboard {
+		if len(root.Children) == 0 {
+			break
+		}
 		f := c.frame("[" + strconv.Itoa(k[0]) + "," + strconv.Itoa(k[1]) + "][" + strconv.Itoa(k[2]) + "," + strconv.Itoa(k[3]) + "]")
 		if f.W > 0 && f.H > 0 {
 			root.Children = append(root.Children, &RawElement{Role: "AXKeyboard", Type: "Keyboard", Label: "keyboard", Frame: f})
@@ -309,6 +313,11 @@ var (
 	wmSizePattern    = regexp.MustCompile(`(Physical|Override) size: (\d+)x(\d+)`)
 	wmDensityPattern = regexp.MustCompile(`(Physical|Override) density: (\d+)`)
 	imeFramePattern  = regexp.MustCompile(`\b(?:mFrame|frame)=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]`)
+	// touchable region=SkRegion((21,963,169,1523)(0,2337,1080,2400))
+	imeTouchablePattern = regexp.MustCompile(`touchable region=SkRegion\(((?:\(-?\d+,-?\d+,-?\d+,-?\d+\))*)\)`)
+	imeRectPattern      = regexp.MustCompile(`\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\)`)
+	// mGivenContentInsets=[0,1385][0,0]: left,top then right,bottom
+	imeInsetsPattern = regexp.MustCompile(`mGivenContentInsets=\[-?\d+,(-?\d+)\]`)
 )
 
 // parseWM reads `wm size` and `wm density` output; an override wins over the
@@ -344,25 +353,55 @@ func parseStatusBar(out string) int {
 	return 0
 }
 
-// parseIMEWindow reads `dumpsys window InputMethod` and returns the keyboard's
-// frame in pixels when it is on screen. The format varies across Android
-// versions; anything unrecognized reads as no keyboard.
-func parseIMEWindow(out string) *[4]int {
+// parseIMEWindow reads `dumpsys window InputMethod` and returns the parts of
+// the keyboard that are on screen, in pixels. Since Android 11 the input
+// method window usually spans the whole display and is transparent above the
+// keys, so its frame says little: the touchable region (or, failing that, the
+// content insets) is where the keyboard is actually drawn. A floating toolbar,
+// as Gboard shows when a hardware keyboard is attached, is a small rectangle of
+// its own. The format varies across Android versions; anything unrecognized
+// reads as no keyboard.
+func parseIMEWindow(out string) [][4]int {
 	visible := strings.Contains(out, "isVisible=true") ||
 		(strings.Contains(out, "mHasSurface=true") && strings.Contains(out, "mViewVisibility=0x0"))
 	if !visible {
 		return nil
 	}
+	var frame [4]int
 	m := imeFramePattern.FindStringSubmatch(out)
 	if m == nil {
 		return nil
 	}
-	var f [4]int
-	for i := range f {
-		f[i], _ = strconv.Atoi(m[i+1])
+	for i := range frame {
+		frame[i], _ = strconv.Atoi(m[i+1])
 	}
-	if f[2] <= f[0] || f[3] <= f[1] || f[1] <= 0 {
+	if frame[2] <= frame[0] || frame[3] <= frame[1] || frame[1] < 0 {
 		return nil
 	}
-	return &f
+	if region := imeTouchablePattern.FindStringSubmatch(out); region != nil {
+		var rects [][4]int
+		for _, r := range imeRectPattern.FindAllStringSubmatch(region[1], -1) {
+			var f [4]int
+			for i := range f {
+				f[i], _ = strconv.Atoi(r[i+1])
+			}
+			if f[2] > f[0] && f[3] > f[1] {
+				rects = append(rects, f)
+			}
+		}
+		if len(rects) > 0 {
+			return rects
+		}
+	}
+	if c := imeInsetsPattern.FindStringSubmatch(out); c != nil {
+		if top, _ := strconv.Atoi(c[1]); top > 0 && frame[1]+top < frame[3] {
+			return [][4]int{{frame[0], frame[1] + top, frame[2], frame[3]}}
+		}
+	}
+	if frame[1] == 0 {
+		// A full-display frame with no region or insets to narrow it down
+		// can't be told apart from a keyboard that isn't drawn.
+		return nil
+	}
+	return [][4]int{frame}
 }

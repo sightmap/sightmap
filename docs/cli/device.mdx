@@ -388,7 +388,7 @@ sightmap device start --package com.example.app --device Pixel_8_API_35 --detach
 ```
 
 - **Platform.** `--platform android` is implied by an `.apk` or `--package`, and is the default off macOS.
-- **Device.** `--device` takes a serial from `adb devices`, a model, or an AVD name. An AVD that is not running is booted (one AVD and no device connected boots it without `--device`). `stop --shutdown` shuts down an emulator.
+- **Device.** `--device` takes a serial from `adb devices`, a model, or an AVD name. An AVD that is not running is booted (one AVD and no device connected boots it without `--device`); if the emulator exits during boot, the error quotes its log, written to `$TMPDIR/sightmap-emulator-<AVD>.log`. On macOS a `QT_QPA_PLATFORM` other than `cocoa` is dropped from the emulator's environment, since it makes the emulator exit. `stop --shutdown` shuts down an emulator.
 - **Tree.** Each snapshot is a `uiautomator dump` of the active window. uiautomator waits for a second without accessibility events before it dumps, so a read takes a second or more but is already settled: `click` taps after one read instead of the two that must agree on iOS. The app needs no instrumentation and no setting turned on.
 - **Points are dp.** Frames, `tap-xy`, and `swipe` use density-independent pixels: divide screenshot pixels by dpi/160 (2.625 on a 420 dpi device).
 - **Identifiers.** `identifier` (and `testid`) is the view's resource-id without its package (`com.example:id/login_submit` becomes `login_submit`). Jetpack Compose `Modifier.testTag` values appear only when the app sets `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor.
@@ -396,10 +396,29 @@ sightmap device start --package com.example.app --device Pixel_8_API_35 --detach
 - **Fields.** A field's label is its hint or content description and its value is its text.
 - **Overlays.** A window from another package (a runtime permission dialog, an autofill prompt) appears as `[Overlay]`, named by its package.
 - **Status bar.** Taps are kept off the status bar as on iOS, using its height from `dumpsys window StatusBar` (24 dp if that can't be read), so a toolbar button just below it stays tappable.
-- **Keyboard.** The input method window is read from `dumpsys window` and covers what is under it, as on iOS. `device button back` hides it.
+- **Keyboard.** The keyboard is read from `dumpsys window InputMethod` and covers what is under it, as on iOS. On recent Android the input method window spans the whole screen and is transparent above the keys, so the keyboard is taken from its touchable region (or its content insets), not its frame. Gboard on an emulator with a hardware keyboard shows a small floating toolbar instead of a keyboard; it appears as its own `keyboard` node. `device button back` hides it.
 - **Input.** `type` and `fill` go through `adb shell input text`, which types ASCII only. `key` takes the same names as on iOS; `button` takes `home`, `back`, `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
 - **Network.** `network list` / `get` and `--network` are iOS-only for now; on Android they fail with `unsupported`.
 - **Console.** `console` reads logcat lines from the app's process: the tag is the subsystem, levels are `debug`, `info`, `warning`, `error`, `fault`, and `System.out` / `System.err` read as `stdout` / `stderr`.
+
+### Setting up from nothing
+
+On a Mac with nothing installed, this sets up an emulator without Android Studio:
+
+```bash
+brew install openjdk@17 && brew install --cask android-commandlinetools
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export ANDROID_HOME=$HOME/Library/Android/sdk
+SDKM=/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager
+yes | $SDKM --sdk_root=$ANDROID_HOME --licenses
+$SDKM --sdk_root=$ANDROID_HOME --install "cmdline-tools;latest" platform-tools emulator \
+  "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;google_apis;arm64-v8a"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/35.0.0:$PATH"
+avdmanager create avd -n Pixel_8_API_35 -k "system-images;android-35;google_apis;arm64-v8a" -d pixel_8
+sightmap device doctor --platform android
+```
+
+`build-tools` on `PATH` provides `aapt2`, which `start --app` uses to read an APK's package name. A cold boot of the AVD takes about 80 s; later boots from its snapshot take under 20 s. If an app never reaches its first screen, `adb logcat -d -b crash` has the reason.
 
 If a snapshot fails with "could not get idle state", the screen never stopped animating; turn off animations with `adb shell settings put global animator_duration_scale 0` (and `transition_animation_scale`, `window_animation_scale`). uiautomator can't run alongside another UI automation client such as an Appium UiAutomator2 server.
 

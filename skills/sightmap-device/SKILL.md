@@ -373,12 +373,51 @@ What differs from iOS:
   without text, such as a list row, is named by its children's text.
 - A field's label is its hint; its value is its text.
 - Permission dialogs and other apps' windows appear as `[Overlay]`.
+- The keyboard is the part of the input method window that is drawn and takes
+  touches, not its frame (which spans the screen on recent Android). Gboard on
+  an emulator with a hardware keyboard shows only a small floating toolbar;
+  it reads as its own `keyboard` node and covers only what's under it.
 - `button back` goes back or hides the keyboard; `button` also takes `home`,
   `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
 - `type` / `fill` are ASCII only (`adb shell input text`).
 - `network` is iOS-only for now; on Android it fails with `unsupported`.
 - `console` is the app's logcat (tag as subsystem; `System.out` reads as
   `stdout`).
+- If the app never reaches its first screen (the snapshot shows the launcher),
+  it crashed: read `adb logcat -d -b crash`. A release build missing env that
+  its JS bundle reads at build time crashes like this.
+
+### Setting up Android from nothing (macOS)
+
+When `doctor --platform android` finds no adb or no AVD and nothing is
+installed, this is the shortest working setup (no Android Studio):
+
+```bash
+brew install openjdk@17 && brew install --cask android-commandlinetools
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export ANDROID_HOME=$HOME/Library/Android/sdk
+SDKM=/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager
+yes | $SDKM --sdk_root=$ANDROID_HOME --licenses
+$SDKM --sdk_root=$ANDROID_HOME --install "cmdline-tools;latest" platform-tools emulator \
+  "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;google_apis;arm64-v8a"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/35.0.0:$PATH"
+avdmanager create avd -n Pixel_8_API_35 -k "system-images;android-35;google_apis;arm64-v8a" -d pixel_8
+```
+
+Put the exports in the user's shell profile. `build-tools` on PATH gives
+`aapt2`, which `start --app` uses to read the package name. Then
+`sightmap device start --app X.apk --device Pixel_8_API_35 --detach` boots the
+AVD (about 80 s cold, under 20 s from its snapshot later). Building the app
+itself needs whatever its Gradle build needs (usually JDK 17 and an SDK
+platform it downloads on first build).
+
+- If the emulator exits during boot, the error quotes its log
+  (`$TMPDIR/sightmap-emulator-<AVD>.log`).
+- `QT_QPA_PLATFORM` set to anything but `cocoa` makes the macOS emulator exit;
+  `start` drops it when it boots an AVD, but an emulator you launch yourself
+  needs it unset.
+- Don't change the AVD's `hw.keyboard`: with it off, the person watching can't
+  type into the emulator from their own keyboard, and `fill` doesn't need it.
 
 ## Known limits
 

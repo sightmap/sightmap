@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -170,7 +171,7 @@ func TestParseWMAndIME(t *testing.T) {
     isOnScreen=true isVisible=true
 `
 	k := parseIMEWindow(ime)
-	if k == nil || *k != [4]int{0, 1527, 1080, 2400} {
+	if len(k) != 1 || k[0] != [4]int{0, 1527, 1080, 2400} {
 		t.Fatalf("ime frame = %v", k)
 	}
 	if parseIMEWindow(strings.ReplaceAll(ime, "isVisible=true", "isVisible=false")) != nil {
@@ -189,6 +190,47 @@ func TestParseWMAndIME(t *testing.T) {
 	}
 	if err := snap.AssertActionable(add, "add_to_cart"); Code(err) != "covered" {
 		t.Errorf("a button under the keyboard is covered, got %v", err)
+	}
+}
+
+// The input method window on Android 15 spans the display and is transparent
+// above the keys; the dumps come from Gboard on an API 35 emulator.
+func TestParseIMEWindowFullDisplayFrame(t *testing.T) {
+	read := func(name string) string {
+		data, err := os.ReadFile(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	if k := parseIMEWindow(read("ime-gboard-api35.txt")); len(k) != 1 || k[0] != [4]int{0, 1517, 1080, 2400} {
+		t.Errorf("full keyboard = %v, want the keys only, not the window frame", k)
+	}
+	floating := parseIMEWindow(read("ime-gboard-floating-api35.txt"))
+	if len(floating) != 2 || floating[0] != [4]int{21, 963, 169, 1523} || floating[1] != [4]int{0, 2337, 1080, 2400} {
+		t.Errorf("floating toolbar = %v", floating)
+	}
+	if k := parseIMEWindow(read("ime-hidden-api35.txt")); k != nil {
+		t.Errorf("hidden keyboard = %v", k)
+	}
+	insetsOnly := regexp.MustCompile(`touchable region=.*\n`).ReplaceAllString(read("ime-gboard-api35.txt"), "")
+	if k := parseIMEWindow(insetsOnly); len(k) != 1 || k[0] != [4]int{0, 132 + 1385, 1080, 2400} {
+		t.Errorf("keyboard from content insets = %v", k)
+	}
+
+	screen := AndroidScreen{WidthPx: 1080, HeightPx: 2400, Density: 420, Keyboard: floating}
+	d := loadUIAutomator(t, "uiautomator-pixel9a", "", screen)
+	snap, err := Annotate(Normalize(d), nil, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// NONE spans the toolbar's rows but its center is clear of it.
+	none, err := Resolve(snap, `[text="NONE"]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := snap.AssertActionable(none, "NONE"); err != nil {
+		t.Errorf("a button beside a floating keyboard toolbar is actionable, got %v", err)
 	}
 }
 
@@ -469,5 +511,27 @@ func TestAndroidStatusBarComesFromTheDevice(t *testing.T) {
 	nav, _ := Resolve(snap, "nav")
 	if err := snap.AssertActionable(nav, "nav"); Code(err) != "covered" {
 		t.Errorf("a button under a 152 px status bar is covered, got %v", err)
+	}
+}
+
+func TestEmulatorEnv(t *testing.T) {
+	env := []string{"HOME=/Users/x", "QT_QPA_PLATFORM=wayland", "PATH=/bin"}
+	if got := emulatorEnv(env, "darwin"); strings.Join(got, " ") != "HOME=/Users/x PATH=/bin" {
+		t.Errorf("darwin env = %v", got)
+	}
+	if got := emulatorEnv([]string{"QT_QPA_PLATFORM=cocoa"}, "darwin"); len(got) != 1 {
+		t.Errorf("cocoa is kept, got %v", got)
+	}
+	if got := emulatorEnv(env, "linux"); len(got) != 3 {
+		t.Errorf("linux env is untouched, got %v", got)
+	}
+}
+
+func TestEmulatorExitedQuotesTheFatalLine(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "emu.log")
+	os.WriteFile(log, []byte("INFO | Checking system compatibility\nINFO | Fatal: This application failed to start because no Qt platform plugin could be initialized.\nINFO | done\n"), 0o644)
+	err := emulatorExited("pixel", log, nil)
+	if Code(err) != "emulator_failed" || !strings.Contains(err.Error(), "no Qt platform plugin") {
+		t.Errorf("err = %v", err)
 	}
 }

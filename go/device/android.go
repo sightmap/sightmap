@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -286,16 +287,29 @@ func (a ADB) BootAVD(ctx context.Context, avd string, progress func(string)) (An
 	}
 	progress(fmt.Sprintf("booting the %s emulator…", avd))
 	cmd := exec.Command(emulator, "-avd", avd, "-no-snapshot-save", "-no-boot-anim")
+	cmd.Env = emulatorEnv(os.Environ(), runtime.GOOS)
+	logPath := filepath.Join(os.TempDir(), "sightmap-emulator-"+avd+".log")
+	if f, err := os.Create(logPath); err == nil {
+		cmd.Stdout, cmd.Stderr = f, f
+		defer f.Close()
+	} else {
+		logPath = ""
+	}
 	detachProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return AndroidDevice{}, errorf("emulator_failed", "cannot start the emulator: %v", err)
 	}
-	cmd.Process.Release()
+	// The emulator outlives this process; waiting only notices it dying
+	// during boot, which otherwise looks like a slow boot for 5 minutes.
+	exited := make(chan error, 1)
+	go func() { exited <- cmd.Wait() }()
 	deadline := time.Now().Add(5 * time.Minute)
 	for time.Now().Before(deadline) {
 		select {
 		case <-ctx.Done():
 			return AndroidDevice{}, ctx.Err()
+		case err := <-exited:
+			return AndroidDevice{}, emulatorExited(avd, logPath, err)
 		case <-time.After(2 * time.Second):
 		}
 		devices, err := a.ListAndroidDevices(ctx)
@@ -312,6 +326,56 @@ func (a ADB) BootAVD(ctx context.Context, avd string, progress func(string)) (An
 		}
 	}
 	return AndroidDevice{}, withHint("emulator_failed", "start it yourself with `emulator -avd "+avd+"` and check its output", "the %s emulator did not finish booting within 5 minutes", avd)
+}
+
+// emulatorEnv is env for launching the emulator. On macOS the emulator's Qt
+// only has the cocoa platform plugin, and a QT_QPA_PLATFORM set for some
+// other platform (agent harnesses that mimic a Linux desktop set wayland)
+// makes it exit at once.
+func emulatorEnv(env []string, goos string) []string {
+	if goos != "darwin" {
+		return env
+	}
+	out := env[:0:0]
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "QT_QPA_PLATFORM="); ok && v != "cocoa" {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
+}
+
+// emulatorExited explains an emulator that quit before it finished booting,
+// quoting the end of its output.
+func emulatorExited(avd, logPath string, waitErr error) error {
+	detail := ""
+	if logPath != "" {
+		if data, err := os.ReadFile(logPath); err == nil {
+			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+			var keep []string
+			for _, l := range lines {
+				if strings.Contains(l, "FATAL") || strings.Contains(l, "Fatal") || strings.Contains(l, "ERROR") {
+					keep = append(keep, strings.TrimSpace(l))
+				}
+			}
+			if len(keep) == 0 && len(lines) > 0 {
+				keep = lines[max(0, len(lines)-3):]
+			}
+			if len(keep) > 5 {
+				keep = keep[len(keep)-5:]
+			}
+			detail = strings.Join(keep, "; ")
+		}
+	}
+	hint := "run `emulator -avd " + avd + "` yourself to see why"
+	if logPath != "" {
+		hint = "see " + logPath + ", or run `emulator -avd " + avd + "` yourself"
+	}
+	if detail == "" {
+		return withHint("emulator_failed", hint, "the %s emulator exited before it finished booting (%v)", avd, waitErr)
+	}
+	return withHint("emulator_failed", hint, "the %s emulator exited before it finished booting: %s", avd, detail)
 }
 
 // apkPackage reads an APK's package name with the SDK's aapt2 or aapt.
