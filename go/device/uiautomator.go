@@ -429,7 +429,7 @@ func dropText(el *RawElement, label string) bool {
 
 // withoutIconGlyphs drops Unicode private-use characters, which icon fonts
 // (react-native-vector-icons, Material Symbols) draw as glyphs and which
-// uiautomator reports as text, so "\U000f0538, Rank" names a tab "Rank".
+// uiautomator reports as text, so "\U000f0538, Home" names a tab "Home".
 func withoutIconGlyphs(s string) string {
 	if !strings.ContainsFunc(s, isPrivateUse) {
 		return s

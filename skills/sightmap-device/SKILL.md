@@ -432,8 +432,8 @@ What differs from iOS:
   is its text. A Material `TextInputLayout` field that is empty reports its
   hint as its text, so it reads as `value="Search products"`.
 - Icon-font glyphs (private-use characters from react-native-vector-icons or
-  Material Symbols) are dropped from names: a tab is `Rank`, not
-  `\U000f0538, Rank`.
+  Material Symbols) are dropped from names: a tab is `Home`, not
+  `\U000f0538, Home`.
 - Permission dialogs and other apps' windows appear as `[Overlay]`.
 - What is in front follows elevation and `zIndex` (uiautomator's
   `drawing-order`), not tree order: a row under a header that floats over the
