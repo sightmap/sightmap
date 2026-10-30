@@ -85,7 +85,7 @@ All checks passed.
 
 Boots the simulator, enables app accessibility, installs and launches the app, starts the session daemon, and begins a run log. The first time a simulator gets app accessibility, `start` reboots it once. Without `--detach`, `start` holds the shell as a foreground daemon; agents and scripts should pass `--detach`.
 
-On a running session, `start` reinstalls (with `--app`) and relaunches the same app. It refuses a different app or device; run `device stop` first.
+On a running session, `start` reinstalls (with `--app`) and relaunches the same app; after a reinstall the network sources are chosen again for the new build. It refuses a different app or device; run `device stop` first.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -118,7 +118,7 @@ Apps must be built by Xcode (`xcodebuild` or the Xcode app) so they carry the si
 
 ### `device status`, `device stop`, `device launch`, `device relaunch`
 
-`status` reports the session's device, app, helper, console buffer, network sources, and current run; it exits `1` when no session is running. `stop` stops the daemon and the app; `--shutdown` also shuts the simulator down. `launch` brings the app to the foreground; `relaunch` restarts it and re-enables accessibility first.
+`status` reports the session's device, app, helper, console buffer, network sources, and current run; it exits `1` when no session is running. `stop` stops the daemon and the app and switches HAR capture back off; `--shutdown` also shuts the simulator down. `launch` brings the app to the foreground; `relaunch` restarts it and re-enables accessibility first.
 
 ```bash
 sightmap device status

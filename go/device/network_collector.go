@@ -76,6 +76,7 @@ type NetCollector struct {
 
 	mu          sync.Mutex
 	cancel      context.CancelFunc
+	streams     sync.WaitGroup
 	states      map[string]*NetSourceStatus
 	harArmed    bool
 	diagnostics bool
@@ -156,7 +157,11 @@ func (c *NetCollector) Start(ctx context.Context) {
 		c.setState(SourceSummary, stateActive, c.summaryDetail)
 	}
 	if wantHAR || wantSummary {
-		go c.stream(ctx, wantHAR, wantSummary)
+		c.streams.Add(1)
+		go func() {
+			defer c.streams.Done()
+			c.stream(ctx, wantHAR, wantSummary)
+		}()
 	}
 	switch {
 	case wantCDP:
@@ -189,15 +194,20 @@ func (c *NetCollector) entitled(ctx context.Context) (bool, string) {
 	if c.AppPath == "" || c.Process == "" {
 		return false, "the app's bundle was not found to check for the get-task-allow entitlement"
 	}
-	exe := filepath.Join(c.AppPath, c.Process)
-	if getTaskAllow.Match(simulatedEntitlements(exe)) {
-		return true, ""
-	}
-	out, _ := exec.CommandContext(ctx, "codesign", "-d", "--entitlements", "-", "--xml", exe).Output()
-	if getTaskAllow.Match(out) {
+	if getTaskAllow.Match(entitlementsOf(ctx, filepath.Join(c.AppPath, c.Process))) {
 		return true, ""
 	}
 	return false, c.Process + " lacks the get-task-allow entitlement"
+}
+
+// entitlementsOf returns exe's entitlements: the simulated ones Xcode embeds
+// for a simulator build, else those in its code signature.
+var entitlementsOf = func(ctx context.Context, exe string) []byte {
+	if data := simulatedEntitlements(exe); data != nil {
+		return data
+	}
+	out, _ := exec.CommandContext(ctx, "codesign", "-d", "--entitlements", "-", "--xml", exe).Output()
+	return out
 }
 
 func simulatedEntitlements(exe string) []byte {
@@ -239,8 +249,18 @@ func (c *NetCollector) metroPort(ctx context.Context) int {
 }
 
 func (c *NetCollector) spawn(ctx context.Context, args ...string) error {
-	_, err := xcrun(ctx, 30*time.Second, nil, append([]string{"simctl", "spawn", c.UDID}, args...)...)
+	return simSpawn(ctx, c.UDID, args...)
+}
+
+// simSpawn runs a command in the simulator and waits for it.
+var simSpawn = func(ctx context.Context, udid string, args ...string) error {
+	_, err := xcrun(ctx, 30*time.Second, nil, append([]string{"simctl", "spawn", udid}, args...)...)
 	return err
+}
+
+// logStream is `log stream` in the simulator, in ndjson, for predicate.
+var logStream = func(ctx context.Context, udid, predicate string) *exec.Cmd {
+	return exec.CommandContext(ctx, "xcrun", "simctl", "spawn", udid, "log", "stream", "--style", "ndjson", "--level", "info", "--predicate", predicate)
 }
 
 func (c *NetCollector) armHAR(ctx context.Context) error {
@@ -301,7 +321,7 @@ func (c *NetCollector) stream(ctx context.Context, har, summary bool) {
 	}
 	predicate := fmt.Sprintf(`subsystem == "com.apple.CFNetwork" AND process == %q AND (%s)`, c.Process, strings.Join(categories, " OR "))
 	for ctx.Err() == nil {
-		cmd := exec.CommandContext(ctx, "xcrun", "simctl", "spawn", c.UDID, "log", "stream", "--style", "ndjson", "--level", "info", "--predicate", predicate)
+		cmd := logStream(ctx, c.UDID, predicate)
 		out, err := cmd.StdoutPipe()
 		if err == nil {
 			err = cmd.Start()
@@ -401,11 +421,15 @@ func (c *NetCollector) Status() NetStatus {
 	return st
 }
 
-// Close stops the sources and switches HAR capture off.
+// Close stops the sources, waits for `log stream` to exit, and switches HAR
+// capture off. It must run while the simulator is still booted.
 func (c *NetCollector) Close() {
 	if c.cancel != nil {
 		c.cancel()
 	}
+	// The daemon exits right after Close; a log stream not yet reaped would
+	// outlive it.
+	c.streams.Wait()
 	if c.harArmed {
 		c.disarmHAR()
 		c.harArmed = false

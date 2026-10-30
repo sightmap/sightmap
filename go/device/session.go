@@ -563,6 +563,13 @@ func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (
 				return nil, err
 			}
 			s.AppPath = a.App
+			// The new build may differ in what the network sources depend on,
+			// such as the get-task-allow entitlement; they are armed again
+			// before it launches.
+			if s.Net != nil {
+				s.Net.Close()
+				s.Net = s.newNetCollector(context.WithoutCancel(ctx))
+			}
 		}
 		r, err := s.relaunch(ctx)
 		if r != nil {
@@ -1152,6 +1159,10 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 // Close stops the helper and the log and network collectors.
 func (s *Session) Close() {
 	s.Helper.Close()
+	s.closeCollectors()
+}
+
+func (s *Session) closeCollectors() {
 	if s.Logs != nil {
 		s.Logs.Close()
 	}
