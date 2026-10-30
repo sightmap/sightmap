@@ -540,6 +540,11 @@ func (h *ADBHelper) display(ctx context.Context) (AndroidScreen, error) {
 	if s.WidthPx == 0 || s.Density == 0 {
 		return AndroidScreen{}, errorf("adb_failed", "cannot read the display size and density (wm size: %q, wm density: %q)", strings.TrimSpace(size), strings.TrimSpace(density))
 	}
+	// A tap in the status bar goes to the system, not the app. Its height
+	// varies with the display cutout; an unreadable frame falls back to 24 dp.
+	if bar, err := h.ADB.shell(ctx, h.Serial, 15*time.Second, "dumpsys window StatusBar"); err == nil {
+		s.StatusBarPx = parseStatusBar(bar)
+	}
 	h.screen = &s
 	return s, nil
 }

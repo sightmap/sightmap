@@ -433,3 +433,41 @@ func TestScrollUntilStopsOnTheFirstOfSeveralMatches(t *testing.T) {
 		t.Errorf("an exact [text=] miss hints at text*=: %+v", AsError(err))
 	}
 }
+
+func TestAndroidStatusBarComesFromTheDevice(t *testing.T) {
+	bar := `  Window #12 Window{9e1c0d u0 StatusBar}:
+    mDisplayId=0 rootTaskId=1 mSession=Session{4b2 1890:u0a10204} mClient=android.os.BinderProxy@2
+    mOwnerUid=10204 showForAllUsers=true package=com.android.systemui appop=NONE
+    Frames: parent=[0,0][1080,152] display=[0,0][1080,2424] frame=[0,0][1080,152] last=[0,0][1080,152] insetsChanged=false
+`
+	if px := parseStatusBar(bar); px != 152 {
+		t.Fatalf("status bar = %d px, want 152", px)
+	}
+	if parseStatusBar("Window #1 Window{1 u0 NavigationBar0}:\n    frame=[0,2361][1080,2424]") != 0 {
+		t.Error("a bar along the bottom is not the status bar")
+	}
+	// A toolbar button just below a 24 dp status bar: iOS's 60 pt guess for a
+	// tall screen would refuse it.
+	dump := []byte(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" package="x" bounds="[0,0][1080,2400]"><node class="android.widget.ImageButton" package="x" resource-id="x:id/nav" clickable="true" enabled="true" bounds="[0,63][147,210]"/></node></hierarchy>`)
+	for _, px := range []int{0, 63} {
+		screen := pixel
+		screen.StatusBarPx = px
+		d, err := ParseUIAutomator(dump, "x", screen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snap, _ := Annotate(Normalize(d), nil, nil, "")
+		nav, _ := Resolve(snap, "nav")
+		if err := snap.AssertActionable(nav, "nav"); err != nil {
+			t.Errorf("status bar %d px: the toolbar button is refused: %v", px, err)
+		}
+	}
+	screen := pixel
+	screen.StatusBarPx = 152
+	d, _ := ParseUIAutomator(dump, "x", screen)
+	snap, _ := Annotate(Normalize(d), nil, nil, "")
+	nav, _ := Resolve(snap, "nav")
+	if err := snap.AssertActionable(nav, "nav"); Code(err) != "covered" {
+		t.Errorf("a button under a 152 px status bar is covered, got %v", err)
+	}
+}
