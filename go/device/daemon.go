@@ -155,7 +155,7 @@ type Daemon struct {
 // Serve launches the session's app (when launch is set), starts the console
 // collector, begins a run, listens, and writes the session file. It returns
 // once the daemon is serving; Wait blocks until it stops.
-func Serve(s *Session, launch bool, logFile string) (*Daemon, error) {
+func Serve(s *Session, launch bool, logFile string) (_ *Daemon, err error) {
 	ctx := context.Background()
 	if err := os.MkdirAll(s.SightmapDir, 0o755); err != nil {
 		return nil, err
@@ -169,6 +169,13 @@ func Serve(s *Session, launch bool, logFile string) (*Daemon, error) {
 			os.WriteFile(p, nil, 0o644)
 		}
 	}
+	// A daemon that fails to start exits; its log streams and HAR capture must
+	// not outlive it.
+	defer func() {
+		if err != nil {
+			s.closeCollectors()
+		}
+	}()
 	if s.Process != "" && s.Logs == nil {
 		s.Logs = &LogCollector{UDID: s.UDID, Process: s.Process, Stdout: s.stdoutPath(), Stderr: s.stderrPath(), Console: s.Console, Log: s.Log}
 		s.Logs.Start()
@@ -283,10 +290,12 @@ func (d *Daemon) stop(shutdown bool) {
 	ctx := context.Background()
 	s.Log("stopping")
 	s.Sim.Terminate(ctx, s.UDID, s.BundleID)
+	// Closing switches HAR capture off inside the simulator, so it must come
+	// before a shutdown.
+	s.Close()
 	if shutdown {
 		s.Sim.Shutdown(ctx, s.UDID)
 	}
-	s.Close()
 	d.listener.Close()
 	os.Remove(d.Info.Socket)
 	if cur := ReadSession(s.SightmapDir); cur != nil && cur.PID == d.Info.PID {
