@@ -29,6 +29,8 @@ type Describe struct {
 	// Untagged is true when the screen shows Jetpack Compose content with no
 	// identifiers, because the app doesn't publish its testTags (Android).
 	Untagged bool `json:"untagged,omitempty"`
+	// Platform is PlatformAndroid for a uiautomator dump; empty is iOS.
+	Platform string `json:"platform,omitempty"`
 }
 
 // Size is a screen size in points.
@@ -58,8 +60,12 @@ type RawElement struct {
 	Traits     []string `json:"traits"`
 	// Checked is the state of a checkable element that reports no value for
 	// it, such as a segment of an Android toggle group; nil when not checkable.
-	Checked  *bool         `json:"checked,omitempty"`
-	Children []*RawElement `json:"children"`
+	Checked *bool `json:"checked,omitempty"`
+	// DrawingOrder ranks the element among its siblings by when it is drawn
+	// (uiautomator's drawing-order, which follows elevation and zIndex rather
+	// than child order); 0 is unknown, and then the tree order stands for it.
+	DrawingOrder int           `json:"drawingOrder,omitempty"`
+	Children     []*RawElement `json:"children"`
 }
 
 // Value is an element's accessibility value. The helper sends a string or null;
@@ -100,9 +106,11 @@ type Tree struct {
 	Settled   bool    // see Describe.Settled
 	StatusBar float64 // see Describe.StatusBar
 	Untagged  bool    // see Describe.Untagged
+	Platform  string  // see Describe.Platform
 
 	parent map[*sightmap.ComponentNode]*sightmap.ComponentNode
 	traits map[*sightmap.ComponentNode][]string
+	order  map[*sightmap.ComponentNode]int
 }
 
 var tagByType = map[string]string{
@@ -216,7 +224,16 @@ func isKeyboard(raw *RawElement, tag string) bool {
 // tappable. React Native's accessible Views (role-less Pressables included) are
 // GenericElements, so one with a testID counts; so does a labelled or
 // identified `other` whose traits say it can be tapped.
+//
+// A disabled control still counts when it has a label or identifier: a
+// disabled "Forgot Password?" button is a control the corpus names. A disabled
+// `other`, or a disabled control with nothing to call it by, does not: React
+// Native reports a Pressable with no onPress (a table cell, a decorative icon
+// button) as disabled, and nothing happens when it is tapped.
 func isInteractive(raw *RawElement, tag string) bool {
+	if raw.Enabled != nil && !*raw.Enabled && (tag == "other" || raw.Label == "" && raw.Identifier == "") {
+		return false
+	}
 	if interactiveTags[tag] {
 		return true
 	}
@@ -240,6 +257,7 @@ func cmpOr(a, b string) string {
 type collapsed struct {
 	raw      *RawElement
 	tag      string
+	order    int // the drawing order of the element it stands in for
 	children []collapsed
 }
 
@@ -254,16 +272,19 @@ func collapse(raw *RawElement, isRoot bool) []collapsed {
 		if tag != "keyboard" {
 			return nil
 		}
-		return []collapsed{{raw: raw, tag: tag}}
+		return []collapsed{{raw: raw, tag: tag, order: raw.DrawingOrder}}
 	}
 	var children []collapsed
 	for _, c := range raw.Children {
 		children = append(children, collapse(c, false)...)
 	}
 	if !isRoot && isWrapper(raw, tag) && len(children) <= 1 {
+		if len(children) == 1 {
+			children[0].order = raw.DrawingOrder
+		}
 		return children
 	}
-	return []collapsed{{raw: raw, tag: tag, children: children}}
+	return []collapsed{{raw: raw, tag: tag, order: raw.DrawingOrder, children: children}}
 }
 
 func intersects(f Frame, s Size) bool {
@@ -278,8 +299,10 @@ func Normalize(d *Describe) *Tree {
 		Settled:   d.Settled,
 		StatusBar: d.StatusBar,
 		Untagged:  d.Untagged,
+		Platform:  d.Platform,
 		parent:    map[*sightmap.ComponentNode]*sightmap.ComponentNode{},
 		traits:    map[*sightmap.ComponentNode][]string{},
+		order:     map[*sightmap.ComponentNode]int{},
 	}
 	if d.Root == nil {
 		d.Root = &RawElement{}
@@ -336,6 +359,7 @@ func (t *Tree) build(c collapsed, parent *sightmap.ComponentNode, nth int) *sigh
 		t.parent[n] = parent
 	}
 	t.traits[n] = raw.Traits
+	t.order[n] = c.order
 	for i, ch := range c.children {
 		n.Children = append(n.Children, t.build(ch, n, i+1))
 	}
