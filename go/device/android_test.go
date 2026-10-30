@@ -566,20 +566,20 @@ func TestHomeScreenIsNotASheet(t *testing.T) {
 
 func TestIconGlyphsLeaveNames(t *testing.T) {
 	xml := `<?xml version="1.0" encoding="UTF-8"?><hierarchy rotation="0">
-<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="club.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
-<node index="0" text="" resource-id="rank-tab" class="android.view.ViewGroup" package="club.example" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,2200][216,2400]">
-<node index="0" text="&#xf0538;" resource-id="" class="android.widget.TextView" package="club.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[80,2220][136,2276]" />
-<node index="1" text="Rank" resource-id="" class="android.widget.TextView" package="club.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[60,2290][156,2340]" />
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+<node index="0" text="" resource-id="home-tab" class="android.view.ViewGroup" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,2200][216,2400]">
+<node index="0" text="&#xf0538;" resource-id="" class="android.widget.TextView" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[80,2220][136,2276]" />
+<node index="1" text="Home" resource-id="" class="android.widget.TextView" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[60,2290][156,2340]" />
 </node></node></hierarchy>`
-	d, err := ParseUIAutomator([]byte(xml), "club.example", pixel)
+	d, err := ParseUIAutomator([]byte(xml), "com.example.app", pixel)
 	if err != nil {
 		t.Fatal(err)
 	}
 	tab := d.Root.Children[0].Children[0]
-	if tab.Label != "Rank" {
+	if tab.Label != "Home" {
 		t.Errorf("tab label = %q, want the icon glyph dropped", tab.Label)
 	}
-	if got := withoutIconGlyphs("\U000f0538, Rank"); got != "Rank" {
+	if got := withoutIconGlyphs("\U000f0538, Home"); got != "Home" {
 		t.Errorf("React Native label = %q", got)
 	}
 	if got := withoutIconGlyphs("CV, My Account, \U000f0142"); got != "CV, My Account" {
@@ -604,7 +604,7 @@ func TestDisabledElementsInCoverage(t *testing.T) {
 			interactive = append(interactive, n.Role+" "+cmpOr(Identifier(n), n.Name))
 		}
 	}
-	want := []string{"button sheet-close", "textfield player-stats-search", "other player-stats-row-1", "other player-stats-row-2", "button forgot-password"}
+	want := []string{"button sheet-close", "textfield list-search", "other list-row-1", "other list-row-2", "button forgot-password"}
 	if !slices.Equal(interactive, want) {
 		t.Errorf("interactive = %q, want %q", interactive, want)
 	}
@@ -620,15 +620,15 @@ func TestDisabledElementsInCoverage(t *testing.T) {
 func TestHeaderDrawnOverListByDrawingOrder(t *testing.T) {
 	d := loadUIAutomator(t, "uiautomator-rn-header", "dev.sightmap.rn", pixel)
 	snap, _ := Annotate(Normalize(d), nil, nil, "")
-	row := byIdentifier(t, snap.Tree, "player-stats-row-1")
-	err := snap.AssertActionable(row, "player-stats-row-1")
-	if Code(err) != "covered" || !strings.Contains(err.Error(), "player-stats-search") || !strings.Contains(AsError(err).Hint, "scroll up") {
+	row := byIdentifier(t, snap.Tree, "list-row-1")
+	err := snap.AssertActionable(row, "list-row-1")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "list-search") || !strings.Contains(AsError(err).Hint, "scroll up") {
 		t.Errorf("a row under the header's search field: %v (%s)", err, AsError(err).Hint)
 	}
-	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "player-stats-row-2"), "player-stats-row-2"); err != nil {
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "list-row-2"), "list-row-2"); err != nil {
 		t.Errorf("a row below the header: %v", err)
 	}
-	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "player-stats-search"), "player-stats-search"); err != nil {
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "list-search"), "list-search"); err != nil {
 		t.Errorf("the search field itself: %v", err)
 	}
 
@@ -639,7 +639,7 @@ func TestHeaderDrawnOverListByDrawingOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	snap, _ = Annotate(Normalize(d), nil, nil, "")
-	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "player-stats-row-1"), "player-stats-row-1"); err != nil {
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "list-row-1"), "list-row-1"); err != nil {
 		t.Errorf("tree order: %v", err)
 	}
 }
@@ -657,9 +657,9 @@ func TestAndroidStatusBarRefusal(t *testing.T) {
 // above it.
 func TestBackdropUnderSheet(t *testing.T) {
 	snap, _ := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-sheet", "dev.sightmap.rn", pixel)), nil, nil, "")
-	backdrop := byIdentifier(t, snap.Tree, "chat-media-picker-backdrop")
-	err := snap.AssertActionable(backdrop, "chat-media-picker-backdrop")
-	if Code(err) != "covered" || !strings.Contains(err.Error(), "media-picker-library") {
+	backdrop := byIdentifier(t, snap.Tree, "sheet-backdrop")
+	err := snap.AssertActionable(backdrop, "sheet-backdrop")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "sheet-option-1") {
 		t.Fatalf("backdrop: %v", err)
 	}
 	var x, y int
@@ -669,7 +669,7 @@ func TestBackdropUnderSheet(t *testing.T) {
 	if sheetTop := 1100 / 2.625; float64(y) >= sheetTop || float64(y) < snap.StatusBar {
 		t.Errorf("tap-xy %d %d is not between the status bar and the sheet (y=%.0f)", x, y, sheetTop)
 	}
-	for _, id := range []string{"media-picker-library", "media-picker-camera"} {
+	for _, id := range []string{"sheet-option-1", "sheet-option-2"} {
 		if err := snap.AssertActionable(byIdentifier(t, snap.Tree, id), id); err != nil {
 			t.Errorf("%s: %v", id, err)
 		}
