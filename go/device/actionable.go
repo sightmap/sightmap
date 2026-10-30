@@ -190,15 +190,38 @@ func (s *Snapshot) drawnOver(n *sightmap.ComponentNode, cx, cy int) *sightmap.Co
 }
 
 // uncoveredSpot returns a point of n, outside zone, below the status bar and
-// with nothing drawn over it, nearest n's center.
+// any navigation bar, clear of bars, the keyboard, a LogBox toast and floating
+// buttons, and with nothing drawn over it, nearest n's center.
 func (s *Snapshot) uncoveredSpot(n *sightmap.ComponentNode, zone rect) (x, y int, ok bool) {
 	cx, cy := Center(n)
 	b := n.Bounds
+	top := max(s.systemTop(), s.topBar(n))
+	blocked := []rect{zone}
+	unrelated := func(o *sightmap.ComponentNode) bool { return o != n && !s.IsAncestor(o, n) && !s.IsAncestor(n, o) }
+	for _, o := range s.Nodes {
+		if obstructs(o) && o.IsVisible && unrelated(o) {
+			blocked = append(blocked, rectOf(o))
+		}
+	}
+	if n.Role != "tab" && !s.hasAncestor(n, func(a *sightmap.ComponentNode) bool { return a.Role == "tab" }) {
+		if band := s.tabBand(); band != nil {
+			blocked = append(blocked, rectOf(band))
+		}
+	}
+	if lb := s.logBoxToast(); lb != nil && lb.Node != n {
+		blocked = append(blocked, rectOf(lb.Node))
+	}
+	for _, f := range s.floatingControls() {
+		if unrelated(f) {
+			blocked = append(blocked, rectOf(f).grow(floatingMargin))
+		}
+	}
 	best := math.Inf(1)
 	for _, fx := range []float64{0.15, 0.3, 0.5, 0.7, 0.85} {
 		for _, fy := range []float64{0.15, 0.25, 0.5, 0.75} {
 			px, py := b.X+round(float64(b.Width)*fx), b.Y+round(float64(b.Height)*fy)
-			if px < 0 || py < s.systemTop() || float64(px) > s.Screen.W || float64(py) > s.Screen.H || zone.contains(px, py) || s.drawnOver(n, px, py) != nil {
+			if px < 0 || py < top || float64(px) > s.Screen.W || float64(py) > s.Screen.H ||
+				slices.ContainsFunc(blocked, func(r rect) bool { return r.contains(px, py) }) || s.drawnOver(n, px, py) != nil {
 				continue
 			}
 			if d := math.Hypot(float64(px-cx), float64(py-cy)); d < best {
