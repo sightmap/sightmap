@@ -83,11 +83,12 @@ a selector. A target matching several elements errors and
 lists them: add a predicate or append `#N`.
 
 **Off-screen and covered elements.** `click` refuses a target whose center is
-off the screen, under the status bar (where a tap scrolls the list to the top)
-or a navigation bar, outside the visible part of its list, under the tab bar, toolbar, navigation bar or keyboard, under a
+off the screen, under the status bar (where a tap scrolls the list to the top
+on iOS, and goes to the status bar on Android) or a navigation bar, outside the visible part of its list, under the tab bar, toolbar, navigation bar or keyboard, under a
 React Native LogBox toast, under any control drawn over it (e.g. a custom tab
 bar of plain buttons floating over a list), or within 24 pt of a floating
-dev-menu button, and says what to do. Long SwiftUI/UIKit lists expose only the rows near the screen,
+dev-menu button, and says what to do. When the center is covered but part of
+the target shows (a sheet's dimmed backdrop), it gives a `tap-xy` point there. Long SwiftUI/UIKit lists expose only the rows near the screen,
 so a row further down is "not found" until you scroll:
 `scroll down --until TARGET` scrolls slowly enough not to fling past it, nudges
 the target into the middle of the screen, stops once it is tappable there, and
@@ -228,7 +229,10 @@ views:
 - **Role-less `Pressable`s are `other`**, not `button`; only
   `accessibilityRole="button"` makes a `button`. Write role-free selectors
   (`[identifier^="product-row-"]`). Coverage counts an `other` as interactive
-  when it has a `testID`, or a label or `testID` plus a tappable trait.
+  when it has a `testID`, or a label or `testID` plus a tappable trait, and it
+  is enabled. A Pressable without `onPress` (a DataTable cell, a decorative
+  IconButton) reads as disabled and is left out; a disabled control with a
+  label or `testID` still counts.
 - **React Navigation tabs** become `tab "Products"` (the "tab, 1 of 3" suffix is
   stripped). Rows behind its JS tab bar are refused as covered, like a native one.
 - **Labels join child texts with ", "**: a row reads `"Product 1, $6.37"`.
@@ -363,6 +367,10 @@ What differs from iOS:
   transition and window scales). It can't run beside an Appium UiAutomator2
   server.
 - Points are dp: divide screenshot pixels by dpi/160.
+- A sleeping display reads as no window at all. `start`, `relaunch` and a read
+  that finds no window wake it (an emulator is also set to stay on); if a
+  snapshot says the display "was asleep", unlock the device by hand (a PIN or
+  pattern lock can't be dismissed over adb).
 - `identifier` / `testid` is the resource-id without its package
   (`login_submit`, not `com.example:id/login_submit`). Compose `testTag`s show up
   only with `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor;
@@ -372,13 +380,62 @@ What differs from iOS:
   `RecyclerView` → `collection`, the rest → `other`). A clickable `other`
   without text, such as a list row, is named by its children's text.
 - A field's label is its hint; its value is its text.
+- Icon-font glyphs (private-use characters from react-native-vector-icons or
+  Material Symbols) are dropped from names: a tab is `Home`, not
+  `\U000f0538, Home`.
 - Permission dialogs and other apps' windows appear as `[Overlay]`.
+- What is in front follows elevation and `zIndex` (uiautomator's
+  `drawing-order`), not tree order: a row under a header that floats over the
+  list is refused as covered. A button the app draws under the status bar,
+  outside a list, can't be scrolled clear; use `button back`.
+- When the home screen is in front, the snapshot says `[Not in front]` and
+  actions fail with `not_in_front`: run `launch`. `button back` on the app's
+  first screen closes the app, an easy way to lose it mid-exploration.
+- The keyboard is the part of the input method window that is drawn and takes
+  touches, not its frame (which spans the screen on recent Android). Gboard on
+  an emulator with a hardware keyboard shows only a small floating toolbar;
+  it reads as its own `keyboard` node and covers only what's under it.
 - `button back` goes back or hides the keyboard; `button` also takes `home`,
   `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
 - `type` / `fill` are ASCII only (`adb shell input text`).
 - `network` is iOS-only for now; on Android it fails with `unsupported`.
 - `console` is the app's logcat (tag as subsystem; `System.out` reads as
   `stdout`).
+- If the app never reaches its first screen (the snapshot says `[Not in front]`),
+  it crashed: read `adb logcat -d -b crash`. A release build missing env that
+  its JS bundle reads at build time crashes like this.
+
+### Setting up Android from nothing (macOS)
+
+When `doctor --platform android` finds no adb or no AVD and nothing is
+installed, this is the shortest working setup (no Android Studio):
+
+```bash
+brew install openjdk@17 && brew install --cask android-commandlinetools
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+export ANDROID_HOME=$HOME/Library/Android/sdk
+SDKM=/opt/homebrew/share/android-commandlinetools/cmdline-tools/latest/bin/sdkmanager
+yes | $SDKM --sdk_root=$ANDROID_HOME --licenses
+$SDKM --sdk_root=$ANDROID_HOME --install "cmdline-tools;latest" platform-tools emulator \
+  "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;google_apis;arm64-v8a"
+export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/35.0.0:$PATH"
+avdmanager create avd -n Pixel_8_API_35 -k "system-images;android-35;google_apis;arm64-v8a" -d pixel_8
+```
+
+Put the exports in the user's shell profile. `build-tools` on PATH gives
+`aapt2`, which `start --app` uses to read the package name. Then
+`sightmap device start --app X.apk --device Pixel_8_API_35 --detach` boots the
+AVD (about 80 s cold, under 20 s from its snapshot later). Building the app
+itself needs whatever its Gradle build needs (usually JDK 17 and an SDK
+platform it downloads on first build).
+
+- If the emulator exits during boot, the error quotes its log
+  (`$TMPDIR/sightmap-emulator-<AVD>.log`).
+- `QT_QPA_PLATFORM` set to anything but `cocoa` makes the macOS emulator exit;
+  `start` drops it when it boots an AVD, but an emulator you launch yourself
+  needs it unset.
+- Don't change the AVD's `hw.keyboard`: with it off, the person watching can't
+  type into the emulator from their own keyboard, and `fill` doesn't need it.
 
 ## Known limits
 

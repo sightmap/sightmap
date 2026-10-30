@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -286,16 +287,29 @@ func (a ADB) BootAVD(ctx context.Context, avd string, progress func(string)) (An
 	}
 	progress(fmt.Sprintf("booting the %s emulator…", avd))
 	cmd := exec.Command(emulator, "-avd", avd, "-no-snapshot-save", "-no-boot-anim")
+	cmd.Env = emulatorEnv(os.Environ(), runtime.GOOS)
+	logPath := filepath.Join(os.TempDir(), "sightmap-emulator-"+avd+".log")
+	if f, err := os.Create(logPath); err == nil {
+		cmd.Stdout, cmd.Stderr = f, f
+		defer f.Close()
+	} else {
+		logPath = ""
+	}
 	detachProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return AndroidDevice{}, errorf("emulator_failed", "cannot start the emulator: %v", err)
 	}
-	cmd.Process.Release()
+	// The emulator outlives this process; waiting only notices it dying
+	// during boot, which otherwise looks like a slow boot for 5 minutes.
+	exited := make(chan error, 1)
+	go func() { exited <- cmd.Wait() }()
 	deadline := time.Now().Add(5 * time.Minute)
 	for time.Now().Before(deadline) {
 		select {
 		case <-ctx.Done():
 			return AndroidDevice{}, ctx.Err()
+		case err := <-exited:
+			return AndroidDevice{}, emulatorExited(avd, logPath, err)
 		case <-time.After(2 * time.Second):
 		}
 		devices, err := a.ListAndroidDevices(ctx)
@@ -312,6 +326,56 @@ func (a ADB) BootAVD(ctx context.Context, avd string, progress func(string)) (An
 		}
 	}
 	return AndroidDevice{}, withHint("emulator_failed", "start it yourself with `emulator -avd "+avd+"` and check its output", "the %s emulator did not finish booting within 5 minutes", avd)
+}
+
+// emulatorEnv is env for launching the emulator. On macOS the emulator's Qt
+// only has the cocoa platform plugin, and a QT_QPA_PLATFORM set for some
+// other platform (agent harnesses that mimic a Linux desktop set wayland)
+// makes it exit at once.
+func emulatorEnv(env []string, goos string) []string {
+	if goos != "darwin" {
+		return env
+	}
+	out := env[:0:0]
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "QT_QPA_PLATFORM="); ok && v != "cocoa" {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
+}
+
+// emulatorExited explains an emulator that quit before it finished booting,
+// quoting the end of its output.
+func emulatorExited(avd, logPath string, waitErr error) error {
+	detail := ""
+	if logPath != "" {
+		if data, err := os.ReadFile(logPath); err == nil {
+			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+			var keep []string
+			for _, l := range lines {
+				if strings.Contains(l, "FATAL") || strings.Contains(l, "Fatal") || strings.Contains(l, "ERROR") {
+					keep = append(keep, strings.TrimSpace(l))
+				}
+			}
+			if len(keep) == 0 && len(lines) > 0 {
+				keep = lines[max(0, len(lines)-3):]
+			}
+			if len(keep) > 5 {
+				keep = keep[len(keep)-5:]
+			}
+			detail = strings.Join(keep, "; ")
+		}
+	}
+	hint := "run `emulator -avd " + avd + "` yourself to see why"
+	if logPath != "" {
+		hint = "see " + logPath + ", or run `emulator -avd " + avd + "` yourself"
+	}
+	if detail == "" {
+		return withHint("emulator_failed", hint, "the %s emulator exited before it finished booting (%v)", avd, waitErr)
+	}
+	return withHint("emulator_failed", hint, "the %s emulator exited before it finished booting: %s", avd, detail)
 }
 
 // apkPackage reads an APK's package name with the SDK's aapt2 or aapt.
@@ -365,8 +429,50 @@ type AndroidSim struct{ ADB ADB }
 // no setting to turn on.
 func (AndroidSim) AccessibilityEnabled(context.Context, string) bool { return true }
 
-// EnableAccessibility implements Sim.
-func (AndroidSim) EnableAccessibility(context.Context, string) error { return nil }
+// EnableAccessibility implements Sim. Nothing needs turning on, but
+// uiautomator reads nothing while the display sleeps, so it wakes the display,
+// and keeps an emulator's display on from then on.
+func (s AndroidSim) EnableAccessibility(ctx context.Context, serial string) error {
+	if strings.HasPrefix(serial, "emulator-") {
+		s.ADB.shell(ctx, serial, 15*time.Second, "svc power stayon true")
+	}
+	s.ADB.wakeIfAsleep(ctx, serial)
+	return nil
+}
+
+var wakefulnessPattern = regexp.MustCompile(`mWakefulness=(\w+)`)
+
+// wakefulness is the display's power state from `dumpsys power`: Awake,
+// Asleep, Dozing or Dreaming, or "" when it can't be read.
+func (a ADB) wakefulness(ctx context.Context, serial string) string {
+	out, err := a.shell(ctx, serial, 15*time.Second, "dumpsys power")
+	if err != nil {
+		return ""
+	}
+	if m := wakefulnessPattern.FindStringSubmatch(out); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+func sleeping(wakefulness string) bool {
+	return wakefulness == "Asleep" || wakefulness == "Dozing" || wakefulness == "Dreaming"
+}
+
+// wakeIfAsleep wakes a display that is asleep, dozing or showing a
+// screensaver, and dismisses a keyguard that has no PIN, pattern or
+// password. It returns the state it found.
+func (a ADB) wakeIfAsleep(ctx context.Context, serial string) (string, error) {
+	state := a.wakefulness(ctx, serial)
+	if !sleeping(state) {
+		return state, nil
+	}
+	if _, err := a.shell(ctx, serial, 15*time.Second, "input keyevent KEYCODE_WAKEUP"); err != nil {
+		return state, err
+	}
+	_, err := a.shell(ctx, serial, 15*time.Second, "wm dismiss-keyguard")
+	return state, err
+}
 
 // Install implements Sim. -r replaces an installed copy, -t allows test-only
 // (debug) APKs.
@@ -558,8 +664,10 @@ func (h *ADBHelper) describe(ctx context.Context) (*Describe, error) {
 	// current screen.
 	command := "rm -f " + dumpPath + "; uiautomator dump " + dumpPath + " 2>&1; cat " + dumpPath + " 2>/dev/null; echo; echo " + imeMarker + "; dumpsys window InputMethod"
 	var lastErr error
+	asleep, checked := "", false
 	// uiautomator gives up while the screen animates, and finds no window for a
-	// moment during a transition; both pass.
+	// moment during a transition; both pass. It also finds no window while the
+	// display sleeps, which is woken once.
 	for attempt := range 4 {
 		if attempt > 0 {
 			time.Sleep(time.Duration(attempt) * 300 * time.Millisecond)
@@ -578,6 +686,22 @@ func (h *ADBHelper) describe(ctx context.Context) (*Describe, error) {
 		if Code(err) != "ax_unavailable" {
 			break
 		}
+		if isNullRoot(err) && !checked {
+			checked = true
+			if state, werr := h.ADB.wakeIfAsleep(ctx, h.Serial); sleeping(state) {
+				asleep = state
+				if werr != nil {
+					h.Log(fmt.Sprintf("the display was %s; waking it failed: %v", strings.ToLower(state), werr))
+				} else {
+					h.Log(fmt.Sprintf("the display was %s; woke it", strings.ToLower(state)))
+				}
+			}
+		}
+	}
+	if asleep != "" && isNullRoot(lastErr) {
+		return nil, withHint("ax_unavailable",
+			fmt.Sprintf("wake and unlock the device: `adb -s %s shell input keyevent KEYCODE_WAKEUP`, then `adb -s %s shell wm dismiss-keyguard` (a PIN, pattern or password lock must be unlocked on the device), then retry", h.Serial, h.Serial),
+			"the device's display was %s and uiautomator still finds no window after waking it", strings.ToLower(asleep))
 	}
 	return nil, lastErr
 }

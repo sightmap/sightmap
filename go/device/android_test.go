@@ -2,8 +2,11 @@ package device
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -170,7 +173,7 @@ func TestParseWMAndIME(t *testing.T) {
     isOnScreen=true isVisible=true
 `
 	k := parseIMEWindow(ime)
-	if k == nil || *k != [4]int{0, 1527, 1080, 2400} {
+	if len(k) != 1 || k[0] != [4]int{0, 1527, 1080, 2400} {
 		t.Fatalf("ime frame = %v", k)
 	}
 	if parseIMEWindow(strings.ReplaceAll(ime, "isVisible=true", "isVisible=false")) != nil {
@@ -192,16 +195,76 @@ func TestParseWMAndIME(t *testing.T) {
 	}
 }
 
+// The input method window on Android 15 spans the display and is transparent
+// above the keys; the dumps come from Gboard on an API 35 emulator.
+func TestParseIMEWindowFullDisplayFrame(t *testing.T) {
+	read := func(name string) string {
+		data, err := os.ReadFile(filepath.Join("testdata", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	if k := parseIMEWindow(read("ime-gboard-api35.txt")); len(k) != 1 || k[0] != [4]int{0, 1517, 1080, 2400} {
+		t.Errorf("full keyboard = %v, want the keys only, not the window frame", k)
+	}
+	floating := parseIMEWindow(read("ime-gboard-floating-api35.txt"))
+	if len(floating) != 2 || floating[0] != [4]int{21, 963, 169, 1523} || floating[1] != [4]int{0, 2337, 1080, 2400} {
+		t.Errorf("floating toolbar = %v", floating)
+	}
+	if k := parseIMEWindow(read("ime-hidden-api35.txt")); k != nil {
+		t.Errorf("hidden keyboard = %v", k)
+	}
+	insetsOnly := regexp.MustCompile(`touchable region=.*\n`).ReplaceAllString(read("ime-gboard-api35.txt"), "")
+	if k := parseIMEWindow(insetsOnly); len(k) != 1 || k[0] != [4]int{0, 132 + 1385, 1080, 2400} {
+		t.Errorf("keyboard from content insets = %v", k)
+	}
+	frameOnly := regexp.MustCompile(`(touchable region|mGivenContentInsets)=.*\n`).ReplaceAllString(read("ime-gboard-api35.txt"), "")
+	if k := parseIMEWindow(frameOnly); k != nil {
+		t.Errorf("a full-display frame with neither region nor insets = %v, want no keyboard", k)
+	}
+	emptyRegion := strings.NewReplacer("SkRegion((0,1517,1080,2400))", "SkRegion()", "mGivenContentInsets=[0,1385]", "mGivenContentInsets=[0,0]").Replace(read("ime-gboard-api35.txt"))
+	if k := parseIMEWindow(emptyRegion); k != nil {
+		t.Errorf("a full-display frame with an empty region and no insets = %v, want no keyboard", k)
+	}
+	fullscreen := strings.Replace(frameOnly, "mTouchableInsets=3", "mTouchableInsets=0", 1)
+	if k := parseIMEWindow(fullscreen); len(k) != 1 || k[0] != [4]int{0, 132, 1080, 2400} {
+		t.Errorf("an input method touchable over its whole frame = %v, want the frame", k)
+	}
+
+	screen := AndroidScreen{WidthPx: 1080, HeightPx: 2400, Density: 420, Keyboard: floating}
+	d := loadUIAutomator(t, "uiautomator-pixel9a", "", screen)
+	snap, err := Annotate(Normalize(d), nil, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// NONE spans the toolbar's rows but its center is clear of it.
+	none, err := Resolve(snap, `[text="NONE"]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := snap.AssertActionable(none, "NONE"); err != nil {
+		t.Errorf("a button beside a floating keyboard toolbar is actionable, got %v", err)
+	}
+}
+
 // fakeADB answers adb commands from a table of command prefixes and records
 // every command.
 type fakeADB struct {
 	answers map[string]string
 	calls   []string
+	// respond, when set, answers a command before answers does.
+	respond func(cmd string) (string, bool)
 }
 
 func (f *fakeADB) run(_ context.Context, args ...string) (string, error) {
 	cmd := strings.Join(args, " ")
 	f.calls = append(f.calls, cmd)
+	if f.respond != nil {
+		if out, ok := f.respond(cmd); ok {
+			return out, nil
+		}
+	}
 	best := ""
 	for prefix := range f.answers {
 		if strings.Contains(cmd, prefix) && len(prefix) > len(best) {
@@ -469,5 +532,258 @@ func TestAndroidStatusBarComesFromTheDevice(t *testing.T) {
 	nav, _ := Resolve(snap, "nav")
 	if err := snap.AssertActionable(nav, "nav"); Code(err) != "covered" {
 		t.Errorf("a button under a 152 px status bar is covered, got %v", err)
+	}
+}
+
+func TestEmulatorEnv(t *testing.T) {
+	env := []string{"HOME=/Users/x", "QT_QPA_PLATFORM=wayland", "PATH=/bin"}
+	if got := emulatorEnv(env, "darwin"); strings.Join(got, " ") != "HOME=/Users/x PATH=/bin" {
+		t.Errorf("darwin env = %v", got)
+	}
+	if got := emulatorEnv([]string{"QT_QPA_PLATFORM=cocoa"}, "darwin"); len(got) != 1 {
+		t.Errorf("cocoa is kept, got %v", got)
+	}
+	if got := emulatorEnv(env, "linux"); len(got) != 3 {
+		t.Errorf("linux env is untouched, got %v", got)
+	}
+}
+
+func TestEmulatorExitedQuotesTheFatalLine(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "emu.log")
+	os.WriteFile(log, []byte("INFO | Checking system compatibility\nINFO | Fatal: This application failed to start because no Qt platform plugin could be initialized.\nINFO | done\n"), 0o644)
+	err := emulatorExited("pixel", log, nil)
+	if Code(err) != "emulator_failed" || !strings.Contains(err.Error(), "no Qt platform plugin") {
+		t.Errorf("err = %v", err)
+	}
+}
+
+func TestHomeScreenIsNotASheet(t *testing.T) {
+	for owner, want := range map[string]bool{
+		"com.google.android.apps.nexuslauncher":   true,
+		"com.android.launcher3":                   true,
+		"com.miui.home":                           true,
+		"com.google.android.permissioncontroller": false,
+		"com.android.systemui":                    false,
+	} {
+		if isHomeScreen(owner) != want {
+			t.Errorf("isHomeScreen(%q) = %v", owner, !want)
+		}
+	}
+}
+
+func TestIconGlyphsLeaveNames(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><hierarchy rotation="0">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+<node index="0" text="" resource-id="home-tab" class="android.view.ViewGroup" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,2200][216,2400]">
+<node index="0" text="&#xf0538;" resource-id="" class="android.widget.TextView" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[80,2220][136,2276]" />
+<node index="1" text="Home" resource-id="" class="android.widget.TextView" package="com.example.app" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[60,2290][156,2340]" />
+</node></node></hierarchy>`
+	d, err := ParseUIAutomator([]byte(xml), "com.example.app", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tab := d.Root.Children[0].Children[0]
+	if tab.Label != "Home" {
+		t.Errorf("tab label = %q, want the icon glyph dropped", tab.Label)
+	}
+	if got := withoutIconGlyphs("\U000f0538, Home"); got != "Home" {
+		t.Errorf("React Native label = %q", got)
+	}
+	if got := withoutIconGlyphs("CV, My Account, \U000f0142"); got != "CV, My Account" {
+		t.Errorf("trailing chevron = %q", got)
+	}
+	if withoutIconGlyphs("\uE000 Save") != "Save" || withoutIconGlyphs("🐥") != "🐥" {
+		t.Error("only private-use characters are dropped")
+	}
+}
+
+// React Native reports a Pressable with no onPress (a DataTable cell, a
+// decorative IconButton) as disabled; it is not something to tap or to name.
+// A disabled button with a label still is.
+func TestDisabledElementsInCoverage(t *testing.T) {
+	snap, err := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-header", "dev.sightmap.rn", pixel)), nil, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var interactive []string
+	for _, n := range snap.Nodes {
+		if n.IsInteractive {
+			interactive = append(interactive, n.Role+" "+cmpOr(Identifier(n), n.Name))
+		}
+	}
+	want := []string{"button sheet-close", "textfield list-search", "other list-row-1", "other list-row-2", "button forgot-password"}
+	if !slices.Equal(interactive, want) {
+		t.Errorf("interactive = %q, want %q", interactive, want)
+	}
+	forgot := byIdentifier(t, snap.Tree, "forgot-password")
+	if err := snap.AssertActionable(forgot, "forgot-password"); Code(err) != "disabled" {
+		t.Errorf("a disabled button: %v", err)
+	}
+}
+
+// A header drawn over the list it scrolls under comes first in the tree, but
+// its zIndex or elevation puts it in front, which uiautomator's drawing-order
+// says.
+func TestHeaderDrawnOverListByDrawingOrder(t *testing.T) {
+	d := loadUIAutomator(t, "uiautomator-rn-header", "dev.sightmap.rn", pixel)
+	snap, _ := Annotate(Normalize(d), nil, nil, "")
+	row := byIdentifier(t, snap.Tree, "list-row-1")
+	err := snap.AssertActionable(row, "list-row-1")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "list-search") || !strings.Contains(AsError(err).Hint, "scroll up") {
+		t.Errorf("a row under the header's search field: %v (%s)", err, AsError(err).Hint)
+	}
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "list-row-2"), "list-row-2"); err != nil {
+		t.Errorf("a row below the header: %v", err)
+	}
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "list-search"), "list-search"); err != nil {
+		t.Errorf("the search field itself: %v", err)
+	}
+
+	// Without a drawing order, the tree order decides: the list, later, is in front.
+	stripped := regexp.MustCompile(` drawing-order="\d+"`).ReplaceAll(mustRead(t, "uiautomator-rn-header.xml"), nil)
+	d, err = ParseUIAutomator(stripped, "dev.sightmap.rn", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, _ = Annotate(Normalize(d), nil, nil, "")
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "list-row-1"), "list-row-1"); err != nil {
+		t.Errorf("tree order: %v", err)
+	}
+}
+
+func TestAndroidStatusBarRefusal(t *testing.T) {
+	snap, _ := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-header", "dev.sightmap.rn", pixel)), nil, nil, "")
+	err := snap.AssertActionable(byIdentifier(t, snap.Tree, "sheet-close"), "sheet-close")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "goes to the status bar") || strings.Contains(err.Error(), "scrolls the list") ||
+		!strings.Contains(AsError(err).Hint, "button back") {
+		t.Errorf("a fixed button under the status bar: %v (%s)", err, AsError(err).Hint)
+	}
+}
+
+// A sheet's dimmed backdrop is covered in the middle by the sheet, but shows
+// above it.
+func TestBackdropUnderSheet(t *testing.T) {
+	snap, _ := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-sheet", "dev.sightmap.rn", pixel)), nil, nil, "")
+	backdrop := byIdentifier(t, snap.Tree, "sheet-backdrop")
+	err := snap.AssertActionable(backdrop, "sheet-backdrop")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "sheet-option-1") {
+		t.Fatalf("backdrop: %v", err)
+	}
+	var x, y int
+	if _, scanErr := fmt.Sscanf(AsError(err).Hint, "tap a part of it that shows with `sightmap device tap-xy %d %d`", &x, &y); scanErr != nil {
+		t.Fatalf("hint = %q", AsError(err).Hint)
+	}
+	if sheetTop := 1100 / 2.625; float64(y) >= sheetTop || float64(y) < snap.StatusBar {
+		t.Errorf("tap-xy %d %d is not between the status bar and the sheet (y=%.0f)", x, y, sheetTop)
+	}
+	for _, id := range []string{"sheet-option-1", "sheet-option-2"} {
+		if err := snap.AssertActionable(byIdentifier(t, snap.Tree, id), id); err != nil {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+}
+
+// The tap-xy point offered for a partly covered target stays off the keyboard.
+func TestBackdropSpotAvoidsKeyboard(t *testing.T) {
+	screen := pixel
+	screen.Keyboard = [][4]int{{0, 400, 1080, 1100}}
+	snap, _ := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-sheet", "dev.sightmap.rn", screen)), nil, nil, "")
+	err := snap.AssertActionable(byIdentifier(t, snap.Tree, "sheet-backdrop"), "sheet-backdrop")
+	var x, y int
+	if _, scanErr := fmt.Sscanf(AsError(err).Hint, "tap a part of it that shows with `sightmap device tap-xy %d %d`", &x, &y); scanErr != nil {
+		t.Fatalf("hint = %q", AsError(err).Hint)
+	}
+	if top, bottom := 400/2.625, 1100/2.625; float64(y) >= top && float64(y) <= bottom {
+		t.Errorf("tap-xy %d %d is under the keyboard (y %.0f-%.0f)", x, y, top, bottom)
+	}
+}
+
+func mustRead(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// sleepyDevice is a fake device whose display sleeps until it gets
+// KEYCODE_WAKEUP (or never wakes, with stubborn); uiautomator finds no window
+// while it sleeps.
+func sleepyDevice(t *testing.T, stubborn bool) *fakeADB {
+	f := newFakeADB(t, "uiautomator-compose")
+	awake := false
+	f.respond = func(cmd string) (string, bool) {
+		switch {
+		case strings.Contains(cmd, "KEYCODE_WAKEUP"):
+			awake = !stubborn
+			return "", true
+		case strings.Contains(cmd, "dumpsys power"):
+			if awake {
+				return "  mWakefulness=Awake\n", true
+			}
+			return "  mWakefulness=Asleep\n  mWakefulnessChanging=false\n", true
+		case strings.Contains(cmd, "uiautomator dump") && !awake:
+			return "ERROR: null root node returned by UiTestAutomationBridge.\n\n" + imeMarker + "\n", true
+		}
+		return "", false
+	}
+	return f
+}
+
+func TestDescribeWakesASleepingDisplay(t *testing.T) {
+	f := sleepyDevice(t, false)
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	var d Describe
+	if err := h.Request(context.Background(), "describe", nil, &d); err != nil || d.Root == nil || len(d.Root.Children) == 0 {
+		t.Fatalf("describe = %v, %+v", err, d.Root)
+	}
+	if f.called("input keyevent KEYCODE_WAKEUP") == "" || f.called("wm dismiss-keyguard") == "" {
+		t.Errorf("did not wake the display: %q", f.calls)
+	}
+}
+
+func TestDescribeSaysTheDisplayWontWake(t *testing.T) {
+	f := sleepyDevice(t, true)
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	err := h.Request(context.Background(), "describe", nil, &Describe{})
+	if Code(err) != "ax_unavailable" || !strings.Contains(err.Error(), "display was asleep") || !strings.Contains(AsError(err).Hint, "KEYCODE_WAKEUP") ||
+		strings.Contains(AsError(err).Hint, "relaunch") {
+		t.Errorf("describe = %v (%s)", err, AsError(err).Hint)
+	}
+}
+
+// With the display awake, a missing window is a transition, and nothing is woken.
+func TestDescribeNullRootWhileAwake(t *testing.T) {
+	f := newFakeADB(t, "uiautomator-compose")
+	f.answers["uiautomator"] = "ERROR: null root node returned by UiTestAutomationBridge.\n\n" + imeMarker + "\n"
+	f.answers["dumpsys power"] = "  mWakefulness=Awake\n"
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	err := h.Request(context.Background(), "describe", nil, &Describe{})
+	if Code(err) != "ax_unavailable" || !strings.Contains(err.Error(), "found no window") {
+		t.Errorf("describe = %v", err)
+	}
+	if f.called("KEYCODE_WAKEUP") != "" {
+		t.Errorf("woke an awake display: %q", f.calls)
+	}
+	if n := strings.Count(strings.Join(f.calls, "\n"), "dumpsys power"); n != 1 {
+		t.Errorf("read the power state %d times, want once", n)
+	}
+}
+
+func TestEnableAccessibilityKeepsAnEmulatorAwake(t *testing.T) {
+	f := sleepyDevice(t, false)
+	sim := AndroidSim{ADB: ADB{Run: f.run}}
+	if err := sim.EnableAccessibility(context.Background(), "emulator-5554"); err != nil {
+		t.Fatal(err)
+	}
+	if f.called("svc power stayon true") == "" || f.called("KEYCODE_WAKEUP") == "" {
+		t.Errorf("emulator: %q", f.calls)
+	}
+	f = sleepyDevice(t, false)
+	sim = AndroidSim{ADB: ADB{Run: f.run}}
+	sim.EnableAccessibility(context.Background(), "R5CT1234ABC")
+	if f.called("svc power stayon") != "" || f.called("KEYCODE_WAKEUP") == "" {
+		t.Errorf("a device's settings are left alone, but its display is woken: %q", f.calls)
 	}
 }

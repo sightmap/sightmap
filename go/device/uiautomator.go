@@ -36,6 +36,7 @@ type uiNode struct {
 	Password      string   `xml:"password,attr"`
 	Selected      string   `xml:"selected,attr"`
 	Bounds        string   `xml:"bounds,attr"`
+	DrawingOrder  string   `xml:"drawing-order,attr"`
 	Children      []uiNode `xml:"node"`
 }
 
@@ -109,9 +110,10 @@ func androidIdentifier(id string) string {
 type AndroidScreen struct {
 	WidthPx, HeightPx int // in the natural (portrait) orientation, as `wm size` reports
 	Density           int // dpi, as `wm density` reports; 160 is 1 px per dp
-	// Keyboard is the input method window's frame in pixels while it is
-	// shown, else nil.
-	Keyboard *[4]int
+	// Keyboard holds the parts of the input method window that are drawn and
+	// take touches, in pixels, while it is shown: usually one rectangle, more
+	// for a floating toolbar. Empty when no keyboard is shown.
+	Keyboard [][4]int
 	// StatusBarPx is the status bar's height in pixels, or 0 when unknown.
 	StatusBarPx int
 }
@@ -169,29 +171,31 @@ func (c uiConverter) element(n uiNode) *RawElement {
 		Frame:      c.frame(n.Bounds),
 		Enabled:    &enabled,
 	}
+	el.DrawingOrder, _ = strconv.Atoi(n.DrawingOrder)
 	// An empty field reports its hint as its text; recent dumps carry the hint
 	// separately too. The hint is the field's label, and the text its value.
 	hint := n.Hint
 	if hint == "true" || hint == "false" {
 		hint = ""
 	}
+	desc, text := withoutIconGlyphs(n.ContentDesc), withoutIconGlyphs(n.Text)
 	switch {
 	case typ == "TextField" || typ == "SearchField":
-		el.Label = cmpOr(n.ContentDesc, hint)
+		el.Label = cmpOr(desc, hint)
 		el.Value = Value(n.Text)
 	case checkedTypes[typ] && n.Checkable == "true":
-		el.Label = cmpOr(n.ContentDesc, n.Text)
+		el.Label = cmpOr(desc, text)
 		el.Value = "0"
 		if n.Checked == "true" {
 			el.Value = "1"
 		}
 	case typ == "Slider" || typ == "ProgressIndicator":
-		el.Label = n.ContentDesc
+		el.Label = desc
 		el.Value = Value(n.Text)
 	default:
-		el.Label = cmpOr(n.ContentDesc, n.Text)
-		if n.ContentDesc != "" && n.Text != "" && n.Text != n.ContentDesc {
-			el.Value = Value(n.Text)
+		el.Label = cmpOr(desc, text)
+		if desc != "" && text != "" && text != desc {
+			el.Value = Value(text)
 		}
 	}
 	clickable := n.Clickable == "true" || n.LongClickable == "true"
@@ -212,6 +216,34 @@ func (c uiConverter) element(n uiNode) *RawElement {
 		el.Label = truncateRunes(strings.Join(descendantText(el), ", "), maxText)
 	}
 	return el
+}
+
+// withoutIconGlyphs drops Unicode private-use characters, which icon fonts
+// (react-native-vector-icons, Material Symbols) draw as glyphs and which
+// uiautomator reports as text, so "\U000f0538, Home" names a tab "Home".
+func withoutIconGlyphs(s string) string {
+	if !strings.ContainsFunc(s, isPrivateUse) {
+		return s
+	}
+	s = strings.Map(func(r rune) rune {
+		if isPrivateUse(r) {
+			return -1
+		}
+		return r
+	}, s)
+	// React Native joins a pressable's children into its label with ", ",
+	// so a dropped glyph leaves an empty part behind.
+	var parts []string
+	for _, part := range strings.Split(s, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+func isPrivateUse(r rune) bool {
+	return (r >= 0xE000 && r <= 0xF8FF) || (r >= 0xF0000 && r <= 0xFFFFD) || (r >= 0x100000 && r <= 0x10FFFD)
 }
 
 func descendantText(el *RawElement) []string {
@@ -260,7 +292,7 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 	size := Size{W: math.Round(float64(w)/c.scale*100) / 100, H: math.Round(float64(hgt)/c.scale*100) / 100}
 	root := &RawElement{Role: "AXApplication", Type: "Application", Label: appPackage, Frame: Frame{W: size.W, H: size.H}}
 	// uiautomator dumps only after a second without accessibility events.
-	d := &Describe{Screen: size, Root: root, Settled: true, StatusBar: defaultStatusBar}
+	d := &Describe{Screen: size, Root: root, Settled: true, StatusBar: defaultStatusBar, Platform: PlatformAndroid}
 	if screen.StatusBarPx > 0 {
 		d.StatusBar = math.Round(float64(screen.StatusBarPx)/c.scale*100) / 100
 	}
@@ -280,7 +312,10 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 	for _, n := range h.Nodes {
 		root.Children = append(root.Children, c.element(n))
 	}
-	if k := screen.Keyboard; k != nil && len(root.Children) > 0 {
+	for _, k := range screen.Keyboard {
+		if len(root.Children) == 0 {
+			break
+		}
 		f := c.frame("[" + strconv.Itoa(k[0]) + "," + strconv.Itoa(k[1]) + "][" + strconv.Itoa(k[2]) + "," + strconv.Itoa(k[3]) + "]")
 		if f.W > 0 && f.H > 0 {
 			root.Children = append(root.Children, &RawElement{Role: "AXKeyboard", Type: "Keyboard", Label: "keyboard", Frame: f})
@@ -305,10 +340,23 @@ func uiautomatorFailure(message string) *Error {
 	return errorf("ax_error", "uiautomator dump failed: %s", message)
 }
 
+// isNullRoot reports whether err is uiautomator finding no window at all, as
+// during a transition or while the display sleeps.
+func isNullRoot(err error) bool {
+	return err != nil && Code(err) == "ax_unavailable" && strings.Contains(AsError(err).Message, "found no window")
+}
+
 var (
 	wmSizePattern    = regexp.MustCompile(`(Physical|Override) size: (\d+)x(\d+)`)
 	wmDensityPattern = regexp.MustCompile(`(Physical|Override) density: (\d+)`)
 	imeFramePattern  = regexp.MustCompile(`\b(?:mFrame|frame)=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]`)
+	// touchable region=SkRegion((21,963,169,1523)(0,2337,1080,2400))
+	imeTouchablePattern = regexp.MustCompile(`touchable region=SkRegion\(((?:\(-?\d+,-?\d+,-?\d+,-?\d+\))*)\)`)
+	imeRectPattern      = regexp.MustCompile(`\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\)`)
+	// mGivenContentInsets=[0,1385][0,0]: left,top then right,bottom
+	imeInsetsPattern = regexp.MustCompile(`mGivenContentInsets=\[-?\d+,(-?\d+)\]`)
+	// mTouchableInsets=3: 0 frame, 1 content, 2 visible, 3 region
+	imeTouchableInsetsPattern = regexp.MustCompile(`mTouchableInsets=(\d+)`)
 )
 
 // parseWM reads `wm size` and `wm density` output; an override wins over the
@@ -344,25 +392,61 @@ func parseStatusBar(out string) int {
 	return 0
 }
 
-// parseIMEWindow reads `dumpsys window InputMethod` and returns the keyboard's
-// frame in pixels when it is on screen. The format varies across Android
-// versions; anything unrecognized reads as no keyboard.
-func parseIMEWindow(out string) *[4]int {
+// parseIMEWindow reads `dumpsys window InputMethod` and returns the parts of
+// the keyboard that are on screen, in pixels. Since Android 11 the input
+// method window usually spans the whole display and is transparent above the
+// keys, so its frame says little: the touchable region (or, failing that, the
+// content insets) is where the keyboard is actually drawn. A floating toolbar,
+// as Gboard shows when a hardware keyboard is attached, is a small rectangle of
+// its own. The format varies across Android versions; anything unrecognized
+// reads as no keyboard.
+func parseIMEWindow(out string) [][4]int {
 	visible := strings.Contains(out, "isVisible=true") ||
 		(strings.Contains(out, "mHasSurface=true") && strings.Contains(out, "mViewVisibility=0x0"))
 	if !visible {
 		return nil
 	}
+	var frame [4]int
 	m := imeFramePattern.FindStringSubmatch(out)
 	if m == nil {
 		return nil
 	}
-	var f [4]int
-	for i := range f {
-		f[i], _ = strconv.Atoi(m[i+1])
+	for i := range frame {
+		frame[i], _ = strconv.Atoi(m[i+1])
 	}
-	if f[2] <= f[0] || f[3] <= f[1] || f[1] <= 0 {
+	if frame[2] <= frame[0] || frame[3] <= frame[1] || frame[1] < 0 {
 		return nil
 	}
-	return &f
+	if t := imeTouchableInsetsPattern.FindStringSubmatch(out); t != nil && t[1] == "0" {
+		// The input method takes touches over its whole frame, as in
+		// fullscreen extract mode, so the frame is what it covers.
+		return [][4]int{frame}
+	}
+	if region := imeTouchablePattern.FindStringSubmatch(out); region != nil {
+		var rects [][4]int
+		for _, r := range imeRectPattern.FindAllStringSubmatch(region[1], -1) {
+			var f [4]int
+			for i := range f {
+				f[i], _ = strconv.Atoi(r[i+1])
+			}
+			if f[2] > f[0] && f[3] > f[1] {
+				rects = append(rects, f)
+			}
+		}
+		if len(rects) > 0 {
+			return rects
+		}
+	}
+	if c := imeInsetsPattern.FindStringSubmatch(out); c != nil {
+		if top, _ := strconv.Atoi(c[1]); top > 0 && frame[1]+top < frame[3] {
+			return [][4]int{{frame[0], frame[1] + top, frame[2], frame[3]}}
+		}
+	}
+	if frame[1] <= frame[3]/3 {
+		// A frame from the top of the display (or just under the status
+		// bar) with no region or insets to narrow it down can't be told
+		// apart from a keyboard that isn't drawn.
+		return nil
+	}
+	return [][4]int{frame}
 }
