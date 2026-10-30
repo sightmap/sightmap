@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -259,8 +260,13 @@ var simSpawn = func(ctx context.Context, udid string, args ...string) error {
 }
 
 // logStream is `log stream` in the simulator, in ndjson, for predicate.
+// Cancelling sends SIGTERM, which `simctl spawn` forwards to `log`; the default
+// SIGKILL would orphan `log`, which keeps the stdout pipe open, so the reader
+// never sees EOF.
 var logStream = func(ctx context.Context, udid, predicate string) *exec.Cmd {
-	return exec.CommandContext(ctx, "xcrun", "simctl", "spawn", udid, "log", "stream", "--style", "ndjson", "--level", "info", "--predicate", predicate)
+	cmd := exec.CommandContext(ctx, "xcrun", "simctl", "spawn", udid, "log", "stream", "--style", "ndjson", "--level", "info", "--predicate", predicate)
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	return cmd
 }
 
 func (c *NetCollector) armHAR(ctx context.Context) error {
