@@ -131,7 +131,7 @@ func (s *Snapshot) AssertActionable(n *sightmap.ComponentNode, target string) er
 		}
 		hint := fmt.Sprintf("scroll it clear of the %s (`sightmap device scroll down` or `up`), then retry", barName(o))
 		if o.Role == "keyboard" {
-			hint = "dismiss the keyboard (`sightmap device key return`) or scroll, then retry"
+			hint = "dismiss the keyboard (`sightmap device key return` on iOS, `sightmap device button back` on Android) or scroll, then retry"
 		}
 		what := s.Describe(o)
 		if o.Id == "-" {
