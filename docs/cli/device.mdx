@@ -85,7 +85,7 @@ All checks passed.
 
 Boots the simulator, enables app accessibility, installs and launches the app, starts the session daemon, and begins a run log. The first time a simulator gets app accessibility, `start` reboots it once. Without `--detach`, `start` holds the shell as a foreground daemon; agents and scripts should pass `--detach`.
 
-On a running session, `start` reinstalls (with `--app`) and relaunches the same app. It refuses a different app or device; run `device stop` first.
+On a running session, `start` reinstalls (with `--app`) and relaunches the same app; after a reinstall the network sources are chosen again for the new build. It refuses a different app or device; run `device stop` first.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -94,6 +94,9 @@ On a running session, `start` reinstalls (with `--app`) and relaunches the same 
 | `--device` | a booted simulator, else the newest iPhone | Simulator name or UDID |
 | `--label` | none | Label for the run log |
 | `--console-limit` | `5000` | How many console entries the session keeps |
+| `--network` | `auto` | Network source: `auto`, `har`, `rn-cdp`, `summary` or `off` (see [`device network`](#device-network)) |
+| `--network-limit` | `1000` | How many network entries the session keeps |
+| `--metro-port` | the app's `RCT_jsLocation`, else `8081` | Where the `rn-cdp` source looks for Metro |
 | `--detach` | off | Run the daemon in the background and return once it is ready |
 
 ```bash
@@ -115,7 +118,7 @@ Apps must be built by Xcode (`xcodebuild` or the Xcode app) so they carry the si
 
 ### `device status`, `device stop`, `device launch`, `device relaunch`
 
-`status` reports the session's device, app, helper, console buffer, and current run; it exits `1` when no session is running. `stop` stops the daemon and the app; `--shutdown` also shuts the simulator down. `launch` brings the app to the foreground; `relaunch` restarts it and re-enables accessibility first.
+`status` reports the session's device, app, helper, console buffer, network sources, and current run; it exits `1` when no session is running. `stop` stops the daemon and the app and switches HAR capture back off; `--shutdown` also shuts the simulator down. `launch` brings the app to the foreground; `relaunch` restarts it and re-enables accessibility first.
 
 ```bash
 sightmap device status
@@ -127,6 +130,10 @@ sightmap device status
   app:     org.sightmap.SimSample (pid 48290)  /Users/you/app/build/SimSample.app
   helper:  running
   console: 112 entries
+  network: 3 entries (--network auto)
+    har      active      capturing [3 entries]
+    rn-cdp   off         not needed: HAR logs a React Native app's JS fetch/XHR traffic too
+    summary  active      backstop: lists requests HAR did not log (such as ones made before capture began), with method, host, status and timing
   session: /Users/you/app/.sightmap/.device-session
   run:     20261029T171502Z-3fa1 (6 entries)
 ```
@@ -289,6 +296,61 @@ React Native `console.log` output arrives as `info` entries from the `com.facebo
 
 ---
 
+### `device network`
+
+`network list` lists the requests the app made, oldest first, each led by the [`requests:`](/spec/requests) definitions in your corpus that match it, as [`browser network list`](/cli/devtools) does, and trailed by the properties those definitions extract. `network get N` prints one entry with its headers and bodies.
+
+```bash
+sightmap device network list
+```
+
+```text
+#0 [CreateOrder]          POST http://127.0.0.1:18765/anything/sightmap/order-1 → 201 (56 ms, har) {order=1, echoed=1}
+#1 [--]                   GET https://api.example.com/v1/me → 200 (88 ms, har)
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--limit` | `50` | The most recent N entries (`0`: all) |
+| `--grep` | none | Case-insensitive substring of the method, URL, status, source or matched request name |
+| `--source` | all | Only entries from `har`, `rn-cdp` or `summary` |
+| `--since` | none | Only entries after this index, oldest first, as in `console list` |
+| `--follow` | off | Keep printing new entries until interrupted (with `--json`, one entry per line) |
+| `--unredacted` | off | Show credentials (see *Redaction*) |
+| `--request-file`, `--response-file` | none | `network get`: write the stored request or response body to a file, redacted unless `--unredacted` |
+
+#### Sources
+
+The session reads the app's traffic from the first of these sources that works; each entry's `source` says which one recorded it.
+
+| Source | What it gives | Needs |
+|---|---|---|
+| `har` | Method, full URL with query, status, timing, request and response headers, and bodies up to 1 MiB, for everything that goes through `URLSession`/CFNetwork (including a React Native app's `fetch`) | The app's executable signed with the `get-task-allow` entitlement |
+| `rn-cdp` | Method, full URL, the headers JavaScript set, request and response bodies, for a React Native Debug build's JS `fetch`/XHR only | Metro running, and a Debug build that reports to it |
+| `summary` | Status, timing, byte counts and protocol, plus the method and host (`http://host`, no path). It never matches a `requests:` route | Nothing |
+
+`--network auto` (the default) arms `har` before the app launches when the app has `get-task-allow`, and keeps `summary` as a backstop for requests HAR did not log. Without the entitlement it uses `summary` and looks for Metro every 2 s; once it attaches to the app's Metro page, `rn-cdp` replaces `summary` (which would list the same JS requests with less detail) until the connection drops, and it reattaches after a relaunch. `--network har`, `rn-cdp` or `summary` uses that source alone; `off` captures nothing. `device status` and `device doctor` report which source is active and why the others are not.
+
+**`get-task-allow`.** CFNetwork logs HAR entries only for a process with this entitlement. A Debug build that Xcode signs for development carries it. A simulator build signed ad hoc (`CODE_SIGN_IDENTITY = "-"`) does not unless you add it: point `CODE_SIGN_ENTITLEMENTS` at a file containing
+
+```xml
+<key>get-task-allow</key><true/>
+```
+
+Release and App Store builds never have it, so they fall back to `summary`. `start` reads the entitlement from the executable and, when it is missing, `status` says so and why.
+
+**How HAR capture works.** `har` switches on CFNetwork's own HAR logging inside the simulator, the mechanism Instruments' HTTP Traffic instrument uses, with private, undocumented CFNetwork preferences (`har-capture-global`, `har-body-size-limit`) and the `com.apple.CFNetwork` `HAR` log category; then it reads the simulator's unified log. Requests already under way when capture starts are missed. `stop` deletes the preferences and resets the log category. The capture is leased for 10 minutes at a time and renewed while the session runs, so a session that dies leaves it on for at most 10 minutes. A future iOS release may change these switches.
+
+Only `URLSession`/CFNetwork traffic is visible to `har` and `summary`; raw sockets, SwiftNIO and other custom stacks are not. `rn-cdp` misses image loads and native modules' requests, and requests made before it attached.
+
+#### Redaction
+
+Output hides credentials by default: the values of the `Authorization`, `Cookie`, `Set-Cookie` and `Proxy-Authorization` headers, and of any header, query parameter, form field or JSON key whose name contains `token`, `password`, `secret` or `key` (case-insensitive) become `<redacted>`. Properties are extracted from the redacted entry, so a property that reads a credential shows `<redacted>` too. `--unredacted` shows everything.
+
+The session keeps the latest 1,000 entries (`start --network-limit`) in memory, with each body capped at 256 KiB, and never writes them to disk: network entries and bodies stay out of the run log.
+
+---
+
 ### `device run`
 
 Every action appends one JSON line to `.sightmap/.device-runs/<run>.jsonl` with its timestamp, sequence number, arguments, target element, view, and outcome. Another agent or tool can follow a session with `run tail --follow`, or poll with `--since`, and line up its own data with the steps by timestamp. `launch` and `relaunch` are logged as such, so a restart is told apart from a first launch.
@@ -319,5 +381,6 @@ A new Xcode release can still need a sightmap update; `device doctor` says so wh
 
 - Simulator only, on Apple Silicon. Physical devices are not supported.
 - No hover or file upload. For another screen size, start on a different `--device`.
+- Network capture covers `URLSession`/CFNetwork traffic (and, for React Native Debug builds, JS traffic through Metro); full detail needs the `get-task-allow` entitlement.
 
 The `sightmap-device` agent skill covers the full agent workflow, including React Native specifics. Install it with [`sightmap skills install`](/cli/integrate#sightmap-skills-install).

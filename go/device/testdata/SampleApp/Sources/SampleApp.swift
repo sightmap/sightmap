@@ -171,10 +171,15 @@ struct NetworkView: View {
     private func send() {
         requestCount += 1
         let path = "sightmap/order-\(requestCount)"
-        var request = URLRequest(url: URL(string: "https://httpbin.org/anything/\(path)")!)
+        // The networkBaseURL default points the request at a local server.
+        let base = UserDefaults.standard.string(forKey: "networkBaseURL") ?? "https://httpbin.org/anything"
+        var request = URLRequest(url: URL(string: "\(base)/\(path)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["order": requestCount, "items": ["Product 1", "Product 2"]])
+        request.setValue("Bearer sample-not-a-secret", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "order": requestCount, "items": ["Product 1", "Product 2"], "sessionToken": "sample-not-a-secret",
+        ])
         status = "Sending…"
         appLog.info("POST \(path, privacy: .public)")
         print("POST /anything/\(path)")
