@@ -372,7 +372,13 @@ What differs from iOS:
   `RecyclerView` → `collection`, the rest → `other`). A clickable `other`
   without text, such as a list row, is named by its children's text.
 - A field's label is its hint; its value is its text.
+- Icon-font glyphs (private-use characters from react-native-vector-icons or
+  Material Symbols) are dropped from names: a tab is `Rank`, not
+  `\U000f0538, Rank`.
 - Permission dialogs and other apps' windows appear as `[Overlay]`.
+- When the home screen is in front, the snapshot says `[Not in front]` and
+  actions fail with `not_in_front`: run `launch`. `button back` on the app's
+  first screen closes the app, an easy way to lose it mid-exploration.
 - The keyboard is the part of the input method window that is drawn and takes
   touches, not its frame (which spans the screen on recent Android). Gboard on
   an emulator with a hardware keyboard shows only a small floating toolbar;
@@ -383,7 +389,7 @@ What differs from iOS:
 - `network` is iOS-only for now; on Android it fails with `unsupported`.
 - `console` is the app's logcat (tag as subsystem; `System.out` reads as
   `stdout`).
-- If the app never reaches its first screen (the snapshot shows the launcher),
+- If the app never reaches its first screen (the snapshot says `[Not in front]`),
   it crashed: read `adb logcat -d -b crash`. A release build missing env that
   its JS bundle reads at build time crashes like this.
 
