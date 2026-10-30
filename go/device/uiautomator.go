@@ -340,6 +340,12 @@ func uiautomatorFailure(message string) *Error {
 	return errorf("ax_error", "uiautomator dump failed: %s", message)
 }
 
+// isNullRoot reports whether err is uiautomator finding no window at all, as
+// during a transition or while the display sleeps.
+func isNullRoot(err error) bool {
+	return err != nil && Code(err) == "ax_unavailable" && strings.Contains(AsError(err).Message, "found no window")
+}
+
 var (
 	wmSizePattern    = regexp.MustCompile(`(Physical|Override) size: (\d+)x(\d+)`)
 	wmDensityPattern = regexp.MustCompile(`(Physical|Override) density: (\d+)`)

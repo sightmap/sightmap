@@ -367,6 +367,10 @@ What differs from iOS:
   transition and window scales). It can't run beside an Appium UiAutomator2
   server.
 - Points are dp: divide screenshot pixels by dpi/160.
+- A sleeping display reads as no window at all. `start`, `relaunch` and a read
+  that finds no window wake it (an emulator is also set to stay on); if a
+  snapshot says the display "was asleep", unlock the device by hand (a PIN or
+  pattern lock can't be dismissed over adb).
 - `identifier` / `testid` is the resource-id without its package
   (`login_submit`, not `com.example:id/login_submit`). Compose `testTag`s show up
   only with `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor;

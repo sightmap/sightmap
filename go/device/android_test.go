@@ -253,11 +253,18 @@ func TestParseIMEWindowFullDisplayFrame(t *testing.T) {
 type fakeADB struct {
 	answers map[string]string
 	calls   []string
+	// respond, when set, answers a command before answers does.
+	respond func(cmd string) (string, bool)
 }
 
 func (f *fakeADB) run(_ context.Context, args ...string) (string, error) {
 	cmd := strings.Join(args, " ")
 	f.calls = append(f.calls, cmd)
+	if f.respond != nil {
+		if out, ok := f.respond(cmd); ok {
+			return out, nil
+		}
+	}
 	best := ""
 	for prefix := range f.answers {
 		if strings.Contains(cmd, prefix) && len(prefix) > len(best) {
@@ -698,4 +705,85 @@ func mustRead(t *testing.T, name string) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+// sleepyDevice is a fake device whose display sleeps until it gets
+// KEYCODE_WAKEUP (or never wakes, with stubborn); uiautomator finds no window
+// while it sleeps.
+func sleepyDevice(t *testing.T, stubborn bool) *fakeADB {
+	f := newFakeADB(t, "uiautomator-compose")
+	awake := false
+	f.respond = func(cmd string) (string, bool) {
+		switch {
+		case strings.Contains(cmd, "KEYCODE_WAKEUP"):
+			awake = !stubborn
+			return "", true
+		case strings.Contains(cmd, "dumpsys power"):
+			if awake {
+				return "  mWakefulness=Awake\n", true
+			}
+			return "  mWakefulness=Asleep\n  mWakefulnessChanging=false\n", true
+		case strings.Contains(cmd, "uiautomator dump") && !awake:
+			return "ERROR: null root node returned by UiTestAutomationBridge.\n\n" + imeMarker + "\n", true
+		}
+		return "", false
+	}
+	return f
+}
+
+func TestDescribeWakesASleepingDisplay(t *testing.T) {
+	f := sleepyDevice(t, false)
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	var d Describe
+	if err := h.Request(context.Background(), "describe", nil, &d); err != nil || d.Root == nil || len(d.Root.Children) == 0 {
+		t.Fatalf("describe = %v, %+v", err, d.Root)
+	}
+	if f.called("input keyevent KEYCODE_WAKEUP") == "" || f.called("wm dismiss-keyguard") == "" {
+		t.Errorf("did not wake the display: %q", f.calls)
+	}
+}
+
+func TestDescribeSaysTheDisplayWontWake(t *testing.T) {
+	f := sleepyDevice(t, true)
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	err := h.Request(context.Background(), "describe", nil, &Describe{})
+	if Code(err) != "ax_unavailable" || !strings.Contains(err.Error(), "display was asleep") || !strings.Contains(AsError(err).Hint, "KEYCODE_WAKEUP") ||
+		strings.Contains(AsError(err).Hint, "relaunch") {
+		t.Errorf("describe = %v (%s)", err, AsError(err).Hint)
+	}
+}
+
+// With the display awake, a missing window is a transition, and nothing is woken.
+func TestDescribeNullRootWhileAwake(t *testing.T) {
+	f := newFakeADB(t, "uiautomator-compose")
+	f.answers["uiautomator"] = "ERROR: null root node returned by UiTestAutomationBridge.\n\n" + imeMarker + "\n"
+	f.answers["dumpsys power"] = "  mWakefulness=Awake\n"
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	err := h.Request(context.Background(), "describe", nil, &Describe{})
+	if Code(err) != "ax_unavailable" || !strings.Contains(err.Error(), "found no window") {
+		t.Errorf("describe = %v", err)
+	}
+	if f.called("KEYCODE_WAKEUP") != "" {
+		t.Errorf("woke an awake display: %q", f.calls)
+	}
+	if n := strings.Count(strings.Join(f.calls, "\n"), "dumpsys power"); n != 1 {
+		t.Errorf("read the power state %d times, want once", n)
+	}
+}
+
+func TestEnableAccessibilityKeepsAnEmulatorAwake(t *testing.T) {
+	f := sleepyDevice(t, false)
+	sim := AndroidSim{ADB: ADB{Run: f.run}}
+	if err := sim.EnableAccessibility(context.Background(), "emulator-5554"); err != nil {
+		t.Fatal(err)
+	}
+	if f.called("svc power stayon true") == "" || f.called("KEYCODE_WAKEUP") == "" {
+		t.Errorf("emulator: %q", f.calls)
+	}
+	f = sleepyDevice(t, false)
+	sim = AndroidSim{ADB: ADB{Run: f.run}}
+	sim.EnableAccessibility(context.Background(), "R5CT1234ABC")
+	if f.called("svc power stayon") != "" || f.called("KEYCODE_WAKEUP") == "" {
+		t.Errorf("a device's settings are left alone, but its display is woken: %q", f.calls)
+	}
 }
