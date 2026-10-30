@@ -676,6 +676,21 @@ func TestBackdropUnderSheet(t *testing.T) {
 	}
 }
 
+// The tap-xy point offered for a partly covered target stays off the keyboard.
+func TestBackdropSpotAvoidsKeyboard(t *testing.T) {
+	screen := pixel
+	screen.Keyboard = [][4]int{{0, 400, 1080, 1100}}
+	snap, _ := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-sheet", "dev.sightmap.rn", screen)), nil, nil, "")
+	err := snap.AssertActionable(byIdentifier(t, snap.Tree, "sheet-backdrop"), "sheet-backdrop")
+	var x, y int
+	if _, scanErr := fmt.Sscanf(AsError(err).Hint, "tap a part of it that shows with `sightmap device tap-xy %d %d`", &x, &y); scanErr != nil {
+		t.Fatalf("hint = %q", AsError(err).Hint)
+	}
+	if top, bottom := 400/2.625, 1100/2.625; float64(y) >= top && float64(y) <= bottom {
+		t.Errorf("tap-xy %d %d is under the keyboard (y %.0f-%.0f)", x, y, top, bottom)
+	}
+}
+
 func mustRead(t *testing.T, name string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", name))
