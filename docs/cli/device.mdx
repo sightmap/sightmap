@@ -395,6 +395,7 @@ sightmap device start --package com.example.app --device Pixel_8_API_35 --detach
 - **Roles.** Widget classes map to the iOS roles: `Button` and `ImageButton` to `button`, `TextView` to `text`, `EditText` to `textfield` (`securetextfield` for passwords), `CheckBox`, `Switch`, `RadioButton`, `ImageView` to `image`, `RecyclerView`/`ListView` to `collection`, `ScrollView` or any scrollable view to `scrollview`, TabLayout tabs to `tab`, everything else to `other`. A clickable `other` without text (a list row, a Compose `Modifier.clickable` row) is named by its children's text. `checked`, `selected`, and `disabled` go into the state.
 - **Fields.** A field's label is its hint or content description and its value is its text.
 - **Overlays.** A window from another package (a runtime permission dialog, an autofill prompt) appears as `[Overlay]`, named by its package.
+- **Status bar.** Taps are kept off the status bar as on iOS, using its height from `dumpsys window StatusBar` (24 dp if that can't be read), so a toolbar button just below it stays tappable.
 - **Keyboard.** The input method window is read from `dumpsys window` and covers what is under it, as on iOS. `device button back` hides it.
 - **Input.** `type` and `fill` go through `adb shell input text`, which types ASCII only. `key` takes the same names as on iOS; `button` takes `home`, `back`, `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
 - **Network.** `network list` / `get` and `--network` are iOS-only for now; on Android they fail with `unsupported`.

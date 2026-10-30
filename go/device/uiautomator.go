@@ -112,7 +112,13 @@ type AndroidScreen struct {
 	// Keyboard is the input method window's frame in pixels while it is
 	// shown, else nil.
 	Keyboard *[4]int
+	// StatusBarPx is the status bar's height in pixels, or 0 when unknown.
+	StatusBarPx int
 }
+
+// defaultStatusBar is the status bar height in dp assumed when `dumpsys
+// window` doesn't say: the platform's standard bar, without a display cutout.
+const defaultStatusBar = 24
 
 func (s AndroidScreen) scale() float64 {
 	if s.Density <= 0 {
@@ -254,7 +260,10 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 	size := Size{W: math.Round(float64(w)/c.scale*100) / 100, H: math.Round(float64(hgt)/c.scale*100) / 100}
 	root := &RawElement{Role: "AXApplication", Type: "Application", Label: appPackage, Frame: Frame{W: size.W, H: size.H}}
 	// uiautomator dumps only after a second without accessibility events.
-	d := &Describe{Screen: size, Root: root, Settled: true}
+	d := &Describe{Screen: size, Root: root, Settled: true, StatusBar: defaultStatusBar}
+	if screen.StatusBarPx > 0 {
+		d.StatusBar = math.Round(float64(screen.StatusBarPx)/c.scale*100) / 100
+	}
 	foreign := ""
 	for _, n := range h.Nodes {
 		if appPackage != "" && n.Package != "" && n.Package != appPackage {
@@ -318,6 +327,21 @@ func parseWM(size, density string) AndroidScreen {
 		}
 	}
 	return s
+}
+
+// parseStatusBar reads `dumpsys window StatusBar` and returns the bar's height
+// in pixels, or 0 when the output has no frame along the top of the screen.
+func parseStatusBar(out string) int {
+	for _, m := range imeFramePattern.FindAllStringSubmatch(out, -1) {
+		var f [4]int
+		for i := range f {
+			f[i], _ = strconv.Atoi(m[i+1])
+		}
+		if f[1] == 0 && f[3] > 0 && f[2] > f[0] && f[3] < f[2] {
+			return f[3]
+		}
+	}
+	return 0
 }
 
 // parseIMEWindow reads `dumpsys window InputMethod` and returns the keyboard's
