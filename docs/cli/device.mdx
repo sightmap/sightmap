@@ -175,6 +175,8 @@ SignInButton   1
 3 interactive · 3 direct T1 (100%) · 0 scoped T2 (0%) · 0 orphaned T3 ✓
 ```
 
+Coverage counts controls (buttons, fields, cells, tabs, …) and `other` elements that look tappable. A disabled element counts only when it is a control with a label or identifier, such as a disabled "Sign In" button: React Native reports a Pressable without an `onPress` (a table cell, a decorative icon button) as disabled, and those are left out.
+
 Extra sections appear when they apply:
 
 | Section | Meaning |
@@ -192,7 +194,7 @@ The corpus reloads whenever a YAML file under `--sightmap-dir` changes, so the n
 
 ### `device click`
 
-Resolves the target in a fresh read of the screen, checks that its center is on screen, not under the status bar or a navigation bar or outside the visible part of its list, not under a tab bar, toolbar, navigation bar, keyboard, LogBox toast, any control drawn over it (such as a custom tab bar of plain buttons over a list), or a floating dev-menu button, and that it is enabled, then taps its center. While the target is missing or the screen is still moving, it re-reads for up to 3 s first. It taps only once two reads in a row agree on where the target and the screen are; a screen still moving when the wait runs out is refused with an `unstable` error instead of being tapped mid-transition.
+Resolves the target in a fresh read of the screen, checks that its center is on screen, not under the status bar or a navigation bar or outside the visible part of its list, not under a tab bar, toolbar, navigation bar, keyboard, LogBox toast, any control drawn over it (such as a custom tab bar of plain buttons over a list, or a search field in a header the list scrolls under), or a floating dev-menu button, and that it is enabled, then taps its center. When the center is covered but part of the target shows, as with a sheet's dimmed backdrop, the error gives a `tap-xy` point in that part. While the target is missing or the screen is still moving, it re-reads for up to 3 s first. It taps only once two reads in a row agree on where the target and the screen are; a screen still moving when the wait runs out is refused with an `unstable` error instead of being tapped mid-transition.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -397,7 +399,8 @@ sightmap device start --package com.example.app --device Pixel_8_API_35 --detach
 - **Icon glyphs.** Icon-font characters (Unicode private use, as drawn by react-native-vector-icons or Material Symbols) are dropped from names, so a tab that reads `\U000f0538, Rank` in uiautomator is named `Rank`.
 - **Overlays.** A window from another package (a runtime permission dialog, an autofill prompt) appears as `[Overlay]`, named by its package.
 - **Home screen.** When the launcher is in front instead of the app (it crashed, was sent to the background, or `button back` on its first screen closed it), the snapshot shows `[Not in front]` and actions fail with `not_in_front`. Bring the app back with `launch`.
-- **Status bar.** Taps are kept off the status bar as on iOS, using its height from `dumpsys window StatusBar` (24 dp if that can't be read), so a toolbar button just below it stays tappable.
+- **Status bar.** Taps are kept off the status bar as on iOS, using its height from `dumpsys window StatusBar` (24 dp if that can't be read), so a toolbar button just below it stays tappable. A tap there goes to the status bar, not the app; an element the app draws under it outside a list can't be scrolled clear, so the error suggests `button back`.
+- **Drawing order.** What is in front comes from uiautomator's `drawing-order`, which follows elevation and `zIndex`, not from the order of the tree. A header that comes first in the tree but is drawn over the list it scrolls under covers the rows beneath it.
 - **Keyboard.** The keyboard is read from `dumpsys window InputMethod` and covers what is under it, as on iOS. On recent Android the input method window spans the whole screen and is transparent above the keys, so the keyboard is taken from its touchable region (or its content insets), not its frame. Gboard on an emulator with a hardware keyboard shows a small floating toolbar instead of a keyboard; it appears as its own `keyboard` node. `device button back` hides it.
 - **Input.** `type` and `fill` go through `adb shell input text`, which types ASCII only. `key` takes the same names as on iOS; `button` takes `home`, `back`, `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
 - **Network.** `network list` / `get` and `--network` are iOS-only for now; on Android they fail with `unsupported`.

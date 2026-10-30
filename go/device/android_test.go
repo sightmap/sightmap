@@ -2,9 +2,11 @@ package device
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -586,4 +588,99 @@ func TestIconGlyphsLeaveNames(t *testing.T) {
 	if withoutIconGlyphs("\uE000 Save") != "Save" || withoutIconGlyphs("🐥") != "🐥" {
 		t.Error("only private-use characters are dropped")
 	}
+}
+
+// React Native reports a Pressable with no onPress (a DataTable cell, a
+// decorative IconButton) as disabled; it is not something to tap or to name.
+// A disabled button with a label still is.
+func TestDisabledElementsInCoverage(t *testing.T) {
+	snap, err := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-header", "dev.sightmap.rn", pixel)), nil, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var interactive []string
+	for _, n := range snap.Nodes {
+		if n.IsInteractive {
+			interactive = append(interactive, n.Role+" "+cmpOr(Identifier(n), n.Name))
+		}
+	}
+	want := []string{"button sheet-close", "textfield player-stats-search", "other player-stats-row-1", "other player-stats-row-2", "button forgot-password"}
+	if !slices.Equal(interactive, want) {
+		t.Errorf("interactive = %q, want %q", interactive, want)
+	}
+	forgot := byIdentifier(t, snap.Tree, "forgot-password")
+	if err := snap.AssertActionable(forgot, "forgot-password"); Code(err) != "disabled" {
+		t.Errorf("a disabled button: %v", err)
+	}
+}
+
+// A header drawn over the list it scrolls under comes first in the tree, but
+// its zIndex or elevation puts it in front, which uiautomator's drawing-order
+// says.
+func TestHeaderDrawnOverListByDrawingOrder(t *testing.T) {
+	d := loadUIAutomator(t, "uiautomator-rn-header", "dev.sightmap.rn", pixel)
+	snap, _ := Annotate(Normalize(d), nil, nil, "")
+	row := byIdentifier(t, snap.Tree, "player-stats-row-1")
+	err := snap.AssertActionable(row, "player-stats-row-1")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "player-stats-search") || !strings.Contains(AsError(err).Hint, "scroll up") {
+		t.Errorf("a row under the header's search field: %v (%s)", err, AsError(err).Hint)
+	}
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "player-stats-row-2"), "player-stats-row-2"); err != nil {
+		t.Errorf("a row below the header: %v", err)
+	}
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "player-stats-search"), "player-stats-search"); err != nil {
+		t.Errorf("the search field itself: %v", err)
+	}
+
+	// Without a drawing order, the tree order decides: the list, later, is in front.
+	stripped := regexp.MustCompile(` drawing-order="\d+"`).ReplaceAll(mustRead(t, "uiautomator-rn-header.xml"), nil)
+	d, err = ParseUIAutomator(stripped, "dev.sightmap.rn", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, _ = Annotate(Normalize(d), nil, nil, "")
+	if err := snap.AssertActionable(byIdentifier(t, snap.Tree, "player-stats-row-1"), "player-stats-row-1"); err != nil {
+		t.Errorf("tree order: %v", err)
+	}
+}
+
+func TestAndroidStatusBarRefusal(t *testing.T) {
+	snap, _ := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-header", "dev.sightmap.rn", pixel)), nil, nil, "")
+	err := snap.AssertActionable(byIdentifier(t, snap.Tree, "sheet-close"), "sheet-close")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "goes to the status bar") || strings.Contains(err.Error(), "scrolls the list") ||
+		!strings.Contains(AsError(err).Hint, "button back") {
+		t.Errorf("a fixed button under the status bar: %v (%s)", err, AsError(err).Hint)
+	}
+}
+
+// A sheet's dimmed backdrop is covered in the middle by the sheet, but shows
+// above it.
+func TestBackdropUnderSheet(t *testing.T) {
+	snap, _ := Annotate(Normalize(loadUIAutomator(t, "uiautomator-rn-sheet", "dev.sightmap.rn", pixel)), nil, nil, "")
+	backdrop := byIdentifier(t, snap.Tree, "chat-media-picker-backdrop")
+	err := snap.AssertActionable(backdrop, "chat-media-picker-backdrop")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "media-picker-library") {
+		t.Fatalf("backdrop: %v", err)
+	}
+	var x, y int
+	if _, scanErr := fmt.Sscanf(AsError(err).Hint, "tap a part of it that shows with `sightmap device tap-xy %d %d`", &x, &y); scanErr != nil {
+		t.Fatalf("hint = %q", AsError(err).Hint)
+	}
+	if sheetTop := 1100 / 2.625; float64(y) >= sheetTop || float64(y) < snap.StatusBar {
+		t.Errorf("tap-xy %d %d is not between the status bar and the sheet (y=%.0f)", x, y, sheetTop)
+	}
+	for _, id := range []string{"media-picker-library", "media-picker-camera"} {
+		if err := snap.AssertActionable(byIdentifier(t, snap.Tree, id), id); err != nil {
+			t.Errorf("%s: %v", id, err)
+		}
+	}
+}
+
+func mustRead(t *testing.T, name string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }

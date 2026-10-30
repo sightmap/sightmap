@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -84,7 +85,15 @@ func (s *Snapshot) AssertActionable(n *sightmap.ComponentNode, target string) er
 			"%s is off-screen (center %d,%d on a %gx%g screen); refusing to tap", desc, cx, cy, s.Screen.W, s.Screen.H)
 	}
 	if top := s.systemTop(); cy < top {
-		return withHint("covered", fmt.Sprintf("run `sightmap device scroll up --until %s`, then retry", quote(target)),
+		hint := fmt.Sprintf("run `sightmap device scroll up --until %s`, then retry", quote(target))
+		if s.Platform == PlatformAndroid {
+			if s.scrollContainer(n) == nil {
+				hint = "it is not in a scrolling list, so scrolling won't move it: the app draws it under the status bar. Leave the screen with `sightmap device button back`, or tap a part of it that is below the bar with `sightmap device tap-xy`"
+			}
+			return withHint("covered", hint,
+				"%s has its center at y=%d, under the status bar (the top %d dp); a tap there goes to the status bar, not the app", desc, cy, top)
+		}
+		return withHint("covered", hint,
 			"%s has its center at y=%d, under the status bar (the top %d pt); a tap there scrolls the list to the top instead", desc, cy, top)
 	}
 	if bar := s.topBar(n); cy < bar {
@@ -144,7 +153,15 @@ func (s *Snapshot) AssertActionable(n *sightmap.ComponentNode, target string) er
 		if float64(cy) > s.Screen.H/2 {
 			dir = "down"
 		}
-		return withHint("covered", fmt.Sprintf("scroll it clear (`sightmap device scroll %s --until %s`), then retry", dir, quote(target)),
+		hint := fmt.Sprintf("scroll it clear (`sightmap device scroll %s --until %s`), then retry", dir, quote(target))
+		// A large target, such as a sheet's dimmed backdrop, is covered in the
+		// middle but shows around what is drawn over it.
+		if x, y, ok := s.uncoveredSpot(n, rectOf(s.branchOf(o, n))); ok {
+			hint = fmt.Sprintf("tap a part of it that shows with `sightmap device tap-xy %d %d`", x, y)
+		} else if 2*float64(n.Bounds.Width*n.Bounds.Height) >= s.Screen.W*s.Screen.H {
+			hint = "tap a part of it that shows with `sightmap device tap-xy` (see `sightmap device screenshot`), or close what is drawn over it"
+		}
+		return withHint("covered", hint,
 			"%s is covered by %s, which is drawn over it; a tap at (%d, %d) would land there", desc, s.Describe(o), cx, cy)
 	}
 	if !Enabled(n) {
@@ -153,25 +170,78 @@ func (s *Snapshot) AssertActionable(n *sightmap.ComponentNode, target string) er
 	return nil
 }
 
-// drawnOver returns an interactive element drawn over n's center, or nil. The
-// accessibility tree is in drawing order, so an element later in it whose
-// frame holds the point is in front, e.g. a custom tab bar of plain buttons
-// floating over a list. Elements as large as half the screen are left out:
-// they are containers, not something in the way.
+// drawnOver returns an element that takes taps drawn over the point (cx, cy)
+// of n, or nil: e.g. a custom tab bar of plain buttons floating over a list, or
+// a search field in a header the list scrolls under. Elements as large as half
+// the screen are left out: they are containers, not something in the way.
 func (s *Snapshot) drawnOver(n *sightmap.ComponentNode, cx, cy int) *sightmap.ComponentNode {
-	start := slices.Index(s.Nodes, n)
-	if start < 0 {
+	if !slices.Contains(s.Nodes, n) {
 		return nil
 	}
-	for _, o := range s.Nodes[start+1:] {
+	for _, o := range s.Nodes {
 		b := o.Bounds
-		if !o.IsInteractive || !o.IsVisible || s.IsAncestor(n, o) || !rectOf(o).contains(cx, cy) ||
-			float64(b.Width*b.Height) >= s.Screen.W*s.Screen.H/2 {
+		if o == n || !s.takesTaps(o) || !o.IsVisible || s.IsAncestor(n, o) || s.IsAncestor(o, n) || !rectOf(o).contains(cx, cy) ||
+			float64(b.Width*b.Height) >= s.Screen.W*s.Screen.H/2 || !s.drawnAbove(o, n) {
 			continue
 		}
 		return o
 	}
 	return nil
+}
+
+// uncoveredSpot returns a point of n, outside zone, below the status bar and
+// with nothing drawn over it, nearest n's center.
+func (s *Snapshot) uncoveredSpot(n *sightmap.ComponentNode, zone rect) (x, y int, ok bool) {
+	cx, cy := Center(n)
+	b := n.Bounds
+	best := math.Inf(1)
+	for _, fx := range []float64{0.15, 0.3, 0.5, 0.7, 0.85} {
+		for _, fy := range []float64{0.15, 0.25, 0.5, 0.75} {
+			px, py := b.X+round(float64(b.Width)*fx), b.Y+round(float64(b.Height)*fy)
+			if px < 0 || py < s.systemTop() || float64(px) > s.Screen.W || float64(py) > s.Screen.H || zone.contains(px, py) || s.drawnOver(n, px, py) != nil {
+				continue
+			}
+			if d := math.Hypot(float64(px-cx), float64(py-cy)); d < best {
+				best, x, y, ok = d, px, py, true
+			}
+		}
+	}
+	return x, y, ok
+}
+
+// takesTaps reports whether a tap on o reaches o: an interactive element, or a
+// disabled one that would be, which still swallows the tap on Android.
+func (t *Tree) takesTaps(o *sightmap.ComponentNode) bool {
+	return o.IsInteractive || !Enabled(o) && slices.Contains(t.traits[o], "Button")
+}
+
+// drawnAbove reports whether o, which is neither n's ancestor nor its
+// descendant, is drawn over n. Where they branch apart, the branch with the
+// higher drawing order is in front (Android reports it, following elevation
+// and zIndex); without one, the accessibility tree is in drawing order, so the
+// later element is.
+func (t *Tree) drawnAbove(o, n *sightmap.ComponentNode) bool {
+	a, b := t.branchOf(o, n), t.branchOf(n, o)
+	if oa, ob := t.order[a], t.order[b]; oa > 0 && ob > 0 && oa != ob {
+		return oa > ob
+	}
+	return t.index(o) > t.index(n)
+}
+
+// branchOf returns o's ancestor (or o itself) whose parent is also n's
+// ancestor: the subtree o is drawn in, apart from n's.
+func (t *Tree) branchOf(o, n *sightmap.ComponentNode) *sightmap.ComponentNode {
+	for b := o; b != nil; b = t.parent[b] {
+		if p := t.parent[b]; p == nil || t.IsAncestor(p, n) {
+			return b
+		}
+	}
+	return o
+}
+
+func (t *Tree) index(n *sightmap.ComponentNode) int {
+	i, _ := strconv.Atoi(n.Id)
+	return i
 }
 
 // Relocate finds, in a fresh snapshot, the element that node (from an earlier

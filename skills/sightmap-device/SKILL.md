@@ -83,11 +83,12 @@ a selector. A target matching several elements errors and
 lists them: add a predicate or append `#N`.
 
 **Off-screen and covered elements.** `click` refuses a target whose center is
-off the screen, under the status bar (where a tap scrolls the list to the top)
-or a navigation bar, outside the visible part of its list, under the tab bar, toolbar, navigation bar or keyboard, under a
+off the screen, under the status bar (where a tap scrolls the list to the top
+on iOS, and goes to the status bar on Android) or a navigation bar, outside the visible part of its list, under the tab bar, toolbar, navigation bar or keyboard, under a
 React Native LogBox toast, under any control drawn over it (e.g. a custom tab
 bar of plain buttons floating over a list), or within 24 pt of a floating
-dev-menu button, and says what to do. Long SwiftUI/UIKit lists expose only the rows near the screen,
+dev-menu button, and says what to do. When the center is covered but part of
+the target shows (a sheet's dimmed backdrop), it gives a `tap-xy` point there. Long SwiftUI/UIKit lists expose only the rows near the screen,
 so a row further down is "not found" until you scroll:
 `scroll down --until TARGET` scrolls slowly enough not to fling past it, nudges
 the target into the middle of the screen, stops once it is tappable there, and
@@ -228,7 +229,10 @@ views:
 - **Role-less `Pressable`s are `other`**, not `button`; only
   `accessibilityRole="button"` makes a `button`. Write role-free selectors
   (`[identifier^="product-row-"]`). Coverage counts an `other` as interactive
-  when it has a `testID`, or a label or `testID` plus a tappable trait.
+  when it has a `testID`, or a label or `testID` plus a tappable trait, and it
+  is enabled. A Pressable without `onPress` (a DataTable cell, a decorative
+  IconButton) reads as disabled and is left out; a disabled control with a
+  label or `testID` still counts.
 - **React Navigation tabs** become `tab "Products"` (the "tab, 1 of 3" suffix is
   stripped). Rows behind its JS tab bar are refused as covered, like a native one.
 - **Labels join child texts with ", "**: a row reads `"Product 1, $6.37"`.
@@ -376,6 +380,10 @@ What differs from iOS:
   Material Symbols) are dropped from names: a tab is `Rank`, not
   `\U000f0538, Rank`.
 - Permission dialogs and other apps' windows appear as `[Overlay]`.
+- What is in front follows elevation and `zIndex` (uiautomator's
+  `drawing-order`), not tree order: a row under a header that floats over the
+  list is refused as covered. A button the app draws under the status bar,
+  outside a list, can't be scrolled clear; use `button back`.
 - When the home screen is in front, the snapshot says `[Not in front]` and
   actions fail with `not_in_front`: run `launch`. `button back` on the app's
   first screen closes the app, an easy way to lose it mid-exploration.

@@ -36,6 +36,7 @@ type uiNode struct {
 	Password      string   `xml:"password,attr"`
 	Selected      string   `xml:"selected,attr"`
 	Bounds        string   `xml:"bounds,attr"`
+	DrawingOrder  string   `xml:"drawing-order,attr"`
 	Children      []uiNode `xml:"node"`
 }
 
@@ -170,6 +171,7 @@ func (c uiConverter) element(n uiNode) *RawElement {
 		Frame:      c.frame(n.Bounds),
 		Enabled:    &enabled,
 	}
+	el.DrawingOrder, _ = strconv.Atoi(n.DrawingOrder)
 	// An empty field reports its hint as its text; recent dumps carry the hint
 	// separately too. The hint is the field's label, and the text its value.
 	hint := n.Hint
@@ -290,7 +292,7 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 	size := Size{W: math.Round(float64(w)/c.scale*100) / 100, H: math.Round(float64(hgt)/c.scale*100) / 100}
 	root := &RawElement{Role: "AXApplication", Type: "Application", Label: appPackage, Frame: Frame{W: size.W, H: size.H}}
 	// uiautomator dumps only after a second without accessibility events.
-	d := &Describe{Screen: size, Root: root, Settled: true, StatusBar: defaultStatusBar}
+	d := &Describe{Screen: size, Root: root, Settled: true, StatusBar: defaultStatusBar, Platform: PlatformAndroid}
 	if screen.StatusBarPx > 0 {
 		d.StatusBar = math.Round(float64(screen.StatusBarPx)/c.scale*100) / 100
 	}
