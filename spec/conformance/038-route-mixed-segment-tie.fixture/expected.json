@@ -1,0 +1,14 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/KeanuShop.ProductViewController" },
+      "expected": { "result": { "view": { "name": "Product" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/KeanuShop.CartViewController" },
+      "expected": { "result": { "view": { "name": "AnyScreen" } } }
+    }
+  ]
+}
