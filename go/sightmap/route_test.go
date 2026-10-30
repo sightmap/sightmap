@@ -133,3 +133,31 @@ func TestViewForURLTieBreakDeclarationOrder(t *testing.T) {
 		t.Errorf("ViewForURL(/a/b) = %q, want First (declaration-order tiebreak)", got)
 	}
 }
+
+// TestViewForURLMixedWildcardSegmentScoresAsLiteral pins the spec rule that a
+// segment mixing literal text with a wildcard scores 3, so a suffix catch-all
+// ties an exact route and declaration order decides.
+func TestViewForURLMixedWildcardSegmentScoresAsLiteral(t *testing.T) {
+	const url = "/account-settings"
+	exact := sightmap.ViewDef{Name: "AccountSettings", Route: url}
+	catchAll := sightmap.ViewDef{Name: "AnySettings", Route: "/*-settings"}
+
+	cases := []struct {
+		name  string
+		views []sightmap.ViewDef
+		want  string
+	}{
+		{"exact declared first", []sightmap.ViewDef{exact, catchAll}, "AccountSettings"},
+		{"catch-all declared first", []sightmap.ViewDef{catchAll, exact}, "AnySettings"},
+	}
+	for _, tc := range cases {
+		c := &sightmap.Corpus{Views: tc.views}
+		got := ""
+		if v := c.ViewForURL(url); v != nil {
+			got = v.Name
+		}
+		if got != tc.want {
+			t.Errorf("%s: ViewForURL(%q) = %q, want %q", tc.name, url, got, tc.want)
+		}
+	}
+}
