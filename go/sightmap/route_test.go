@@ -39,6 +39,62 @@ func TestMatchRouteTrailingSlash(t *testing.T) {
 	}
 }
 
+// ---- Route matching: slashless mobile page URLs -----------------------------
+
+// Fullstory mobile pages carry a bare view-controller name as their URL, with
+// no scheme and no leading slash.
+func TestMatchRouteSlashlessPath(t *testing.T) {
+	const vc = "KeanuShop.ProductViewController"
+	cases := []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"/KeanuShop.ProductViewController", vc, true},
+		{"KeanuShop.ProductViewController", vc, true},
+		{"/*ProductViewController", vc, true},
+		{"*ProductViewController", vc, true},
+		{"/*", vc, true},
+		{"/**", vc, true},
+		{"/**/KeanuShop.ProductViewController", vc, true},
+		{"/KeanuShop.CartViewController", vc, false},
+		{"/KeanuShop", vc, false},
+		{"/", vc, false},
+	}
+	for _, tc := range cases {
+		if got := sightmap.MatchRoute(tc.pattern, tc.path); got != tc.want {
+			t.Errorf("MatchRoute(%q, %q) = %v, want %v", tc.pattern, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestViewForURLSlashlessMobilePage(t *testing.T) {
+	c := &sightmap.Corpus{
+		Views: []sightmap.ViewDef{
+			{Name: "Product", Route: "/KeanuShop.ProductViewController"},
+			{Name: "Cart", Route: "/KeanuShop.CartViewController"},
+			{Name: "Any", Route: "/*ViewController"},
+		},
+	}
+	cases := []struct {
+		url, want string
+	}{
+		{"KeanuShop.ProductViewController", "Product"},
+		{"KeanuShop.CartViewController", "Cart"},
+		{"KeanuShop.HomeViewController", "Any"},
+		{"KeanuShop.Unrelated", ""},
+	}
+	for _, tc := range cases {
+		v := c.ViewForURL(tc.url)
+		got := ""
+		if v != nil {
+			got = v.Name
+		}
+		if got != tc.want {
+			t.Errorf("ViewForURL(%q) = %q, want %q", tc.url, got, tc.want)
+		}
+	}
+}
+
 // ---- Route matching: ** globstar semantics ----------------------------------
 
 func TestMatchRouteGlobstar(t *testing.T) {

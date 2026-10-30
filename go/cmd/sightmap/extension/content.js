@@ -137,10 +137,11 @@ function activeComponentSet(globals, viewLists) {
 // view the CLI does. A hand-rolled matcher that only knew `*` and `**` treated
 // `:param` as literal text, so a view routed `/ui/:org/settings` never matched.
 
-/** Drop trailing slashes; the root stays "/" (Go normalizeRoutePath). */
+/** Drop trailing slashes and root a slashless path; the root stays "/" (Go normalizeRoutePath). */
 function normalizeRoutePath(p) {
   const trimmed = (p ?? "").replace(/\/+$/, "");
-  return trimmed === "" ? "/" : trimmed;
+  if (trimmed === "") return "/";
+  return trimmed.startsWith("/") ? trimmed : "/" + trimmed;
 }
 
 /**

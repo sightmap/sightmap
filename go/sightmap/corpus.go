@@ -291,12 +291,19 @@ func MatchRoute(pattern, path string) bool {
 }
 
 // normalizeRoutePath strips a trailing slash from a URL path or route pattern so
-// that matching is insensitive to it. The root "/" (or an all-slash/empty path)
-// normalizes to "/".
+// that matching is insensitive to it, and roots a path that lacks a leading
+// slash. Fullstory mobile pages carry a bare view-controller name as their URL
+// (e.g. "KeanuShop.ProductViewController"), which url.Parse yields as a
+// slashless relative path; rooting it lets a view routed
+// "/KeanuShop.ProductViewController" match. The root "/" (or an all-slash/empty
+// path) normalizes to "/".
 func normalizeRoutePath(p string) string {
 	trimmed := strings.TrimRight(p, "/")
 	if trimmed == "" {
 		return "/"
+	}
+	if !strings.HasPrefix(trimmed, "/") {
+		return "/" + trimmed
 	}
 	return trimmed
 }
