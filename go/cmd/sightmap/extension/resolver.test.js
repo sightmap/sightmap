@@ -337,6 +337,9 @@ describe("matchRoute", () => {
     ["/messages**", "/messages/compose", false],
     // Regex metacharacters in a literal segment are literal.
     ["/a.b", "/axb", false],
+    // A slashless path (a mobile view-controller name) is rooted before matching.
+    ["/KeanuShop.ProductViewController", "KeanuShop.ProductViewController", true],
+    ["/*ProductViewController", "KeanuShop.ProductViewController", true],
   ])("matchRoute(%j, %j) = %j", (pattern, path, want) => {
     expect(matchRoute(pattern, path)).toBe(want);
   });
