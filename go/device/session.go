@@ -937,6 +937,10 @@ func (s *Session) sparseError(ctx context.Context, snap *Snapshot, message strin
 // overlayError explains that a system sheet from another process is in front
 // of the app, so nothing of the app's can be found or scrolled.
 func overlayError(snap *Snapshot, message string) error {
+	if isHomeScreen(snap.Root.Name) {
+		return withHint("not_in_front", "bring the app back with `sightmap device launch`, then retry",
+			"%s: the home screen (%s) is showing, not the app", message, quote(snap.Root.Name))
+	}
 	return withHint("covered", "dismiss it with one of its buttons, e.g. `sightmap device click 'button[text=\"Not Now\"]'`, then retry",
 		"%s: a system sheet from another process (%s) is in front of the app", message, quote(snap.Root.Name))
 }

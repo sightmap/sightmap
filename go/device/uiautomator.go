@@ -176,23 +176,24 @@ func (c uiConverter) element(n uiNode) *RawElement {
 	if hint == "true" || hint == "false" {
 		hint = ""
 	}
+	desc, text := withoutIconGlyphs(n.ContentDesc), withoutIconGlyphs(n.Text)
 	switch {
 	case typ == "TextField" || typ == "SearchField":
-		el.Label = cmpOr(n.ContentDesc, hint)
+		el.Label = cmpOr(desc, hint)
 		el.Value = Value(n.Text)
 	case checkedTypes[typ] && n.Checkable == "true":
-		el.Label = cmpOr(n.ContentDesc, n.Text)
+		el.Label = cmpOr(desc, text)
 		el.Value = "0"
 		if n.Checked == "true" {
 			el.Value = "1"
 		}
 	case typ == "Slider" || typ == "ProgressIndicator":
-		el.Label = n.ContentDesc
+		el.Label = desc
 		el.Value = Value(n.Text)
 	default:
-		el.Label = cmpOr(n.ContentDesc, n.Text)
-		if n.ContentDesc != "" && n.Text != "" && n.Text != n.ContentDesc {
-			el.Value = Value(n.Text)
+		el.Label = cmpOr(desc, text)
+		if desc != "" && text != "" && text != desc {
+			el.Value = Value(text)
 		}
 	}
 	clickable := n.Clickable == "true" || n.LongClickable == "true"
@@ -213,6 +214,34 @@ func (c uiConverter) element(n uiNode) *RawElement {
 		el.Label = truncateRunes(strings.Join(descendantText(el), ", "), maxText)
 	}
 	return el
+}
+
+// withoutIconGlyphs drops Unicode private-use characters, which icon fonts
+// (react-native-vector-icons, Material Symbols) draw as glyphs and which
+// uiautomator reports as text, so "\U000f0538, Rank" names a tab "Rank".
+func withoutIconGlyphs(s string) string {
+	if !strings.ContainsFunc(s, isPrivateUse) {
+		return s
+	}
+	s = strings.Map(func(r rune) rune {
+		if isPrivateUse(r) {
+			return -1
+		}
+		return r
+	}, s)
+	// React Native joins a pressable's children into its label with ", ",
+	// so a dropped glyph leaves an empty part behind.
+	var parts []string
+	for _, part := range strings.Split(s, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+func isPrivateUse(r rune) bool {
+	return (r >= 0xE000 && r <= 0xF8FF) || (r >= 0xF0000 && r <= 0xFFFFD) || (r >= 0x100000 && r <= 0x10FFFD)
 }
 
 func descendantText(el *RawElement) []string {

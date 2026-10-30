@@ -34,6 +34,7 @@ var hints = map[string]string{
 	"bad_query":          "targets look like `SignInButton`, `ProductRow[title^=\"Product 1\"]`, or a selector such as `button[identifier=\"login-submit\"]`",
 	"unknown_view":       "check the view names under .sightmap/",
 	"usage":              "run `sightmap device help`",
+	"not_in_front":       "bring the app back with `sightmap device launch`, then retry",
 }
 
 // errorf returns an Error with code's default hint.

@@ -535,3 +535,43 @@ func TestEmulatorExitedQuotesTheFatalLine(t *testing.T) {
 		t.Errorf("err = %v", err)
 	}
 }
+
+func TestHomeScreenIsNotASheet(t *testing.T) {
+	for owner, want := range map[string]bool{
+		"com.google.android.apps.nexuslauncher":   true,
+		"com.android.launcher3":                   true,
+		"com.miui.home":                           true,
+		"com.google.android.permissioncontroller": false,
+		"com.android.systemui":                    false,
+	} {
+		if isHomeScreen(owner) != want {
+			t.Errorf("isHomeScreen(%q) = %v", owner, !want)
+		}
+	}
+}
+
+func TestIconGlyphsLeaveNames(t *testing.T) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><hierarchy rotation="0">
+<node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="club.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][1080,2400]">
+<node index="0" text="" resource-id="rank-tab" class="android.view.ViewGroup" package="club.example" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,2200][216,2400]">
+<node index="0" text="&#xf0538;" resource-id="" class="android.widget.TextView" package="club.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[80,2220][136,2276]" />
+<node index="1" text="Rank" resource-id="" class="android.widget.TextView" package="club.example" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[60,2290][156,2340]" />
+</node></node></hierarchy>`
+	d, err := ParseUIAutomator([]byte(xml), "club.example", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tab := d.Root.Children[0].Children[0]
+	if tab.Label != "Rank" {
+		t.Errorf("tab label = %q, want the icon glyph dropped", tab.Label)
+	}
+	if got := withoutIconGlyphs("\U000f0538, Rank"); got != "Rank" {
+		t.Errorf("React Native label = %q", got)
+	}
+	if got := withoutIconGlyphs("CV, My Account, \U000f0142"); got != "CV, My Account" {
+		t.Errorf("trailing chevron = %q", got)
+	}
+	if withoutIconGlyphs("\uE000 Save") != "Save" || withoutIconGlyphs("🐥") != "🐥" {
+		t.Error("only private-use characters are dropped")
+	}
+}

@@ -88,7 +88,10 @@ func (s *Snapshot) Render(opts RenderOpts) string {
 	}
 	b.WriteString("\n")
 
-	if s.Overlay {
+	if s.Overlay && isHomeScreen(s.Root.Name) {
+		fmt.Fprintf(&b, "[Not in front]\nThe home screen (%s) is showing, not the app: it was closed or sent to the background (`button back` on its first screen closes it).\n", quote(s.Root.Name))
+		b.WriteString("Bring it back with `launch`, then snapshot again.\n\n")
+	} else if s.Overlay {
 		owner := ""
 		if s.Root.Name != "" {
 			owner = " (" + quote(s.Root.Name) + ")"
@@ -244,4 +247,12 @@ func (a *AnnotatedNode) UnmarshalJSON(data []byte) error {
 	}
 	*a = AnnotatedNode{ComponentNode: node, Component: identity.Component, Props: identity.Props, Children: identity.Children}
 	return nil
+}
+
+// isHomeScreen reports whether an overlay's owner is an Android launcher: the
+// app isn't covered by a sheet but gone from the screen, and no button in the
+// "overlay" brings it back.
+func isHomeScreen(owner string) bool {
+	o := strings.ToLower(owner)
+	return strings.Contains(o, "launcher") || strings.HasSuffix(o, ".home")
 }
