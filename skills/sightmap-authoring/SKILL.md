@@ -784,9 +784,8 @@ catch-all. Matching every page is the problem, not the goal — don't keep an
 over-general route just because it "matches."
 
 **Declare partial-wildcard catch-alls last.** A segment that mixes a wildcard
-with literal text (`*ViewController`, `messages**`) scores as a literal, so
-`/*ViewController` *ties* `/KeanuShop.ProductViewController` and whichever is
-declared first wins. Put such a fallback after every exact view it backs up.
+with literal text (`*-settings`, `messages**`) scores as a literal, so
+`/*-settings` *ties* `/account-settings` and whichever is declared first wins. Put such a fallback after every exact view it backs up.
 
 ### Step 1b — Snap and read coverage
 

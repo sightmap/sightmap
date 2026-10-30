@@ -2,13 +2,13 @@
   "cases": [
     {
       "command": "match",
-      "args": { "url": "/KeanuShop.ProductViewController" },
-      "expected": { "result": { "view": { "name": "Product" } } }
+      "args": { "url": "/account-settings" },
+      "expected": { "result": { "view": { "name": "AccountSettings" } } }
     },
     {
       "command": "match",
-      "args": { "url": "/KeanuShop.CartViewController" },
-      "expected": { "result": { "view": { "name": "AnyScreen" } } }
+      "args": { "url": "/billing-settings" },
+      "expected": { "result": { "view": { "name": "AnySettings" } } }
     }
   ]
 }

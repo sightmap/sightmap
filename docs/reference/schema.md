@@ -567,7 +567,7 @@ When multiple views could match a URL, the most specific wins. Specificity is th
 | Segment | Score |
 |---|---|
 | Literal (e.g. `users`) | 3 |
-| Mixed literal and wildcard (e.g. `*ViewController`, `messages**`) | 3 |
+| Mixed literal and wildcard (e.g. `*-settings`, `messages**`) | 3 |
 | `:param` (e.g. `:id`) | 2 |
 | `*` (single-segment wildcard) | 1 |
 | `**` or empty | 0 |
@@ -578,7 +578,7 @@ The root route `/` scores `1` — more specific than any wildcard-only pattern. 
 
 For example, given `/users/*` (score 4) and `/users/admin` (score 6), the URL `/users/admin` matches the literal — `/users/*` only wins for paths like `/users/42`.
 
-A suffix or prefix catch-all therefore **ties** with an exact route: `/*ViewController` and `/KeanuShop.ProductViewController` both score 3, so whichever is declared first wins `/KeanuShop.ProductViewController`. Declare such catch-alls after the exact views they back up.
+A suffix or prefix catch-all therefore **ties** with an exact route: `/*-settings` and `/account-settings` both score 3, so whichever is declared first wins `/account-settings`. Declare such catch-alls after the exact views they back up.
 
 ### Request matching: all matches apply
 

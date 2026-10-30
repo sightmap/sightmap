@@ -1,8 +1,8 @@
 version: 1
 views:
-  - name: Product
-    route: /KeanuShop.ProductViewController
+  - name: AccountSettings
+    route: /account-settings
   # A wildcard glued to literal text scores as a literal, so this catch-all
   # ties the exact route above; declared after it, it only wins the rest.
-  - name: AnyScreen
-    route: /*ViewController
+  - name: AnySettings
+    route: /*-settings
