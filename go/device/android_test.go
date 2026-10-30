@@ -367,3 +367,69 @@ func TestNetworkIsRefusedOnAndroid(t *testing.T) {
 		t.Errorf("iOS err = %v", err)
 	}
 }
+
+// uiautomator-pixel9a.xml is a real dump of a sample app's
+// click screen, taken on a Pixel 9a (Android 17).
+func TestParseUIAutomatorRealDump(t *testing.T) {
+	d := loadUIAutomator(t, "uiautomator-pixel9a", "com.example.sampleapp", AndroidScreen{WidthPx: 1080, HeightPx: 2424, Density: 420})
+	snap, err := Annotate(Normalize(d), nil, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Overlay || !snap.Settled || snap.Coverage.Total != 16 {
+		t.Errorf("overlay %v settled %v interactive %d; want the app's tree, settled, 16 interactive", d.Overlay, snap.Settled, snap.Coverage.Total)
+	}
+	for target, want := range map[string]string{
+		"buttonClick":                   "JUST CLICK",
+		"buttonClickAndLong4":           "CLICK AND LONG CLICK 4",
+		`[text="NOTHING"]`:              "NOTHING",
+		`[identifier="toolbar"] button`: "",
+	} {
+		n, err := Resolve(snap, target)
+		if err != nil || n.Role != "button" || n.Name != want {
+			t.Errorf("%s = %+v, %v; want button %q", target, n, err, want)
+		}
+	}
+}
+
+func TestAndroidClickReadsTheScreenOnce(t *testing.T) {
+	dir := t.TempDir()
+	f := newFakeADB(t, "uiautomator-compose")
+	adb := ADB{Run: f.run}
+	s := NewSession(Config{Platform: PlatformAndroid, UDID: "emulator-5554", BundleID: "dev.sightmap.compose", SightmapDir: dir},
+		NewADBHelper(adb, "emulator-5554", "dev.sightmap.compose", nil), AndroidSim{ADB: adb})
+	s.Timing = Timing{RetryTimeout: time.Millisecond, RetryInterval: time.Millisecond, Settle: time.Millisecond}.withDefaults()
+	if _, err := handle(t, s, "click", TargetArgs{Target: "add_to_cart"}); err != nil {
+		t.Fatal(err)
+	}
+	dumps := 0
+	for _, c := range f.calls {
+		if strings.Contains(c, "uiautomator dump") {
+			dumps++
+		}
+	}
+	if dumps != 1 {
+		t.Errorf("click took %d dumps; uiautomator waits for an idle screen, so one is enough", dumps)
+	}
+}
+
+func TestScrollUntilStopsOnTheFirstOfSeveralMatches(t *testing.T) {
+	dir := t.TempDir()
+	f := newFakeADB(t, "uiautomator-compose")
+	adb := ADB{Run: f.run}
+	s := NewSession(Config{Platform: PlatformAndroid, UDID: "emulator-5554", BundleID: "dev.sightmap.compose", SightmapDir: dir},
+		NewADBHelper(adb, "emulator-5554", "dev.sightmap.compose", nil), AndroidSim{ADB: adb})
+	s.Timing = Timing{RetryTimeout: time.Millisecond, RetryInterval: time.Millisecond, Settle: time.Millisecond, ScrollSettle: time.Millisecond}.withDefaults()
+	r, err := handle(t, s, "scroll", ScrollArgs{Direction: "down", Until: `[text*="Product 2"]`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r["matches"] != 2.0 || r["scrolls"] != 0.0 || f.called("input swipe") != "" {
+		t.Errorf("result %v, swipe %q; want the first of 2 matches without scrolling", r, f.called("input swipe"))
+	}
+
+	_, err = handle(t, s, "scroll", ScrollArgs{Direction: "down", Until: `[text="Product"]`, Max: 3})
+	if Code(err) != "not_found" || !strings.Contains(AsError(err).Hint, `[text*="Product"]`) {
+		t.Errorf("an exact [text=] miss hints at text*=: %+v", AsError(err))
+	}
+}

@@ -19,6 +19,10 @@ type Describe struct {
 	// Overlay is true when the tree belongs to a system sheet from another
 	// process (e.g. "Save Password?") rather than to the app.
 	Overlay bool `json:"overlay,omitempty"`
+	// Settled is true when the reader waited for the screen to go idle before
+	// reading it, as `uiautomator dump` does, so one read stands for two that
+	// agree.
+	Settled bool `json:"settled,omitempty"`
 }
 
 // Size is a screen size in points.
@@ -84,6 +88,7 @@ type Tree struct {
 	Root    *sightmap.ComponentNode
 	Nodes   []*sightmap.ComponentNode
 	Overlay bool
+	Settled bool // see Describe.Settled
 
 	parent map[*sightmap.ComponentNode]*sightmap.ComponentNode
 	traits map[*sightmap.ComponentNode][]string
@@ -261,6 +266,7 @@ func Normalize(d *Describe) *Tree {
 	t := &Tree{
 		Screen:  d.Screen,
 		Overlay: d.Overlay,
+		Settled: d.Settled,
 		parent:  map[*sightmap.ComponentNode]*sightmap.ComponentNode{},
 		traits:  map[*sightmap.ComponentNode][]string{},
 	}

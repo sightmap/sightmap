@@ -91,7 +91,9 @@ dev-menu button, and says what to do. Long SwiftUI/UIKit lists expose only the r
 so a row further down is "not found" until you scroll:
 `scroll down --until TARGET` scrolls slowly enough not to fling past it, nudges
 the target into the middle of the screen, stops once it is tappable there, and
-refreshes the snapshot ids.
+refreshes the snapshot ids. A target matching several elements stops at the
+first tappable one. `[text="…"]` is the whole label; use `[text*="…"]` for part
+of it.
 
 **Waiting.** Actions return as soon as the tap lands; navigation keeps
 animating for a moment. If a snapshot still shows the old screen, snapshot
@@ -354,7 +356,8 @@ What differs from iOS:
 
 - `--device` is an `adb devices` serial, a model, or an AVD name (a stopped AVD
   is booted).
-- Each read is a `uiautomator dump`, a second or more, so waits are longer. If
+- Each read is a `uiautomator dump`, a second or more, but it waits for an idle
+  screen, so `click` taps after one read instead of waiting for two to agree. If
   it fails with "could not get idle state", turn off animations
   (`adb shell settings put global animator_duration_scale 0`, and the
   transition and window scales). It can't run beside an Appium UiAutomator2

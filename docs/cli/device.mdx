@@ -236,7 +236,7 @@ sightmap device fill login-email "a@example.com" --clear
 
 ### `device scroll`
 
-Scrolls one page in a direction (`up`, `down`, `left`, `right`), or until a target is tappable. Long SwiftUI and UIKit lists only expose rows near the screen, so a row further down is not found until you scroll to it. `--until` scrolls slowly enough not to fling past the target and refreshes the snapshot ids when it stops.
+Scrolls one page in a direction (`up`, `down`, `left`, `right`), or until a target is tappable. Long SwiftUI and UIKit lists only expose rows near the screen, so a row further down is not found until you scroll to it. `--until` scrolls slowly enough not to fling past the target and refreshes the snapshot ids when it stops. A target that matches several elements stops the scroll at the first one that can be tapped, and the result says how many matched. `[text="…"]` matches a whole label; use `[text*="…"]` for part of one.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -389,7 +389,7 @@ sightmap device start --package com.example.app --device Pixel_8_API_35 --detach
 
 - **Platform.** `--platform android` is implied by an `.apk` or `--package`, and is the default off macOS.
 - **Device.** `--device` takes a serial from `adb devices`, a model, or an AVD name. An AVD that is not running is booted (one AVD and no device connected boots it without `--device`). `stop --shutdown` shuts down an emulator.
-- **Tree.** Each snapshot is a `uiautomator dump` of the active window, which takes a second or more, so actions wait longer than on iOS. The app needs no instrumentation and no setting turned on.
+- **Tree.** Each snapshot is a `uiautomator dump` of the active window. uiautomator waits for a second without accessibility events before it dumps, so a read takes a second or more but is already settled: `click` taps after one read instead of the two that must agree on iOS. The app needs no instrumentation and no setting turned on.
 - **Points are dp.** Frames, `tap-xy`, and `swipe` use density-independent pixels: divide screenshot pixels by dpi/160 (2.625 on a 420 dpi device).
 - **Identifiers.** `identifier` (and `testid`) is the view's resource-id without its package (`com.example:id/login_submit` becomes `login_submit`). Jetpack Compose `Modifier.testTag` values appear only when the app sets `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor.
 - **Roles.** Widget classes map to the iOS roles: `Button` and `ImageButton` to `button`, `TextView` to `text`, `EditText` to `textfield` (`securetextfield` for passwords), `CheckBox`, `Switch`, `RadioButton`, `ImageView` to `image`, `RecyclerView`/`ListView` to `collection`, `ScrollView` or any scrollable view to `scrollview`, TabLayout tabs to `tab`, everything else to `other`. A clickable `other` without text (a list row, a Compose `Modifier.clickable` row) is named by its children's text. `checked`, `selected`, and `disabled` go into the state.
