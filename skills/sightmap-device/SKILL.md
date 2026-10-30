@@ -288,7 +288,7 @@ came from. `start --network auto` (default) picks, in order:
 |---|---|---|
 | `har` | Full URL with query, method, status, timing, all headers, bodies ≤ 1 MiB; all `URLSession` traffic, React Native `fetch` included | The app signed with the **`get-task-allow`** entitlement |
 | `rn-cdp` | JS `fetch`/XHR of a React Native Debug build via Metro: URL, method, JS-set headers, bodies | Metro running (`--metro-port N`, else the app's `RCT_jsLocation`, else 8081) |
-| `summary` | Status, timing, bytes; method and host (no path) when HAR is off. Never matches a route | Nothing |
+| `summary` | Status, timing, bytes, method and host (no path). Never matches a route | Nothing |
 
 - **`get-task-allow`**: CFNetwork logs HAR only for a process with it. A
   Debug build Xcode signs for development has it; an ad hoc simulator build
@@ -298,7 +298,7 @@ came from. `start --network auto` (default) picks, in order:
   falls back. Release builds never have it.
 - `status` (and `doctor`, while a session runs) shows each source's state
   and why the others are not used. HAR misses requests already under way
-  when capture began; `summary` lists those, host-free.
+  when capture began; `summary` lists those by method and host only.
 - HAR capture uses private CFNetwork switches inside the simulator; `stop`
   turns them off (a dead session's capture lapses within 10 minutes).
 - **Redaction**: `Authorization`, `Cookie`, `Set-Cookie`,

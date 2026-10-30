@@ -130,7 +130,7 @@ func (c *NetCollector) Start(ctx context.Context) {
 	wantHAR := c.Mode == SourceHAR || auto && entitled
 	wantCDP := c.Mode == SourceRNCDP || auto && !entitled
 	wantSummary := c.Mode == SourceSummary || auto
-	c.diagnostics = c.Mode == SourceSummary || auto && !entitled
+	c.diagnostics = c.Mode == SourceSummary || auto
 
 	switch {
 	case wantHAR:
@@ -152,7 +152,7 @@ func (c *NetCollector) Start(ctx context.Context) {
 	if wantSummary {
 		c.summaryDetail = "status, timing and host only: CFNetwork redacts paths, headers and bodies in this log"
 		if c.harArmed {
-			c.summaryDetail = "backstop: lists requests HAR did not log (such as ones made before capture began), with status and timing only"
+			c.summaryDetail = "backstop: lists requests HAR did not log (such as ones made before capture began), with method, host, status and timing"
 		}
 		c.setState(SourceSummary, stateActive, c.summaryDetail)
 	}

@@ -133,7 +133,7 @@ sightmap device status
   network: 3 entries (--network auto)
     har      active      capturing [3 entries]
     rn-cdp   off         not needed: HAR logs a React Native app's JS fetch/XHR traffic too
-    summary  active      backstop: lists requests HAR did not log (such as ones made before capture began), with status and timing only
+    summary  active      backstop: lists requests HAR did not log (such as ones made before capture began), with method, host, status and timing
   session: /Users/you/app/.sightmap/.device-session
   run:     20261029T171502Z-3fa1 (6 entries)
 ```
@@ -327,7 +327,7 @@ The session reads the app's traffic from the first of these sources that works; 
 |---|---|---|
 | `har` | Method, full URL with query, status, timing, request and response headers, and bodies up to 1 MiB, for everything that goes through `URLSession`/CFNetwork (including a React Native app's `fetch`) | The app's executable signed with the `get-task-allow` entitlement |
 | `rn-cdp` | Method, full URL, the headers JavaScript set, request and response bodies, for a React Native Debug build's JS `fetch`/XHR only | Metro running, and a Debug build that reports to it |
-| `summary` | Status, timing, byte counts and protocol; with no HAR, also the method and host (`http://host`, no path). It never matches a `requests:` route | Nothing |
+| `summary` | Status, timing, byte counts and protocol, plus the method and host (`http://host`, no path). It never matches a `requests:` route | Nothing |
 
 `--network auto` (the default) arms `har` before the app launches when the app has `get-task-allow`, and keeps `summary` as a backstop for requests HAR did not log. Without the entitlement it uses `summary` and looks for Metro every 2 s; once it attaches to the app's Metro page, `rn-cdp` replaces `summary` (which would list the same JS requests with less detail) until the connection drops, and it reattaches after a relaunch. `--network har`, `rn-cdp` or `summary` uses that source alone; `off` captures nothing. `device status` and `device doctor` report which source is active and why the others are not.
 

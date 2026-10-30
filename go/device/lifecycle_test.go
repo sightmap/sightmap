@@ -123,7 +123,7 @@ func TestStopShutdownSwitchesHAROffFirst(t *testing.T) {
 	}
 	// The console's and the network's.
 	pids := r.streamPIDs(t, 2)
-	ln, err := net.Listen("unix", filepath.Join(r.dir, "s.sock"))
+	ln, err := net.Listen("unix", SocketPath(r.dir, "lifecycle"))
 	if err != nil {
 		t.Fatal(err)
 	}
