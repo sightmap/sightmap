@@ -217,6 +217,18 @@ func TestParseIMEWindowFullDisplayFrame(t *testing.T) {
 	if k := parseIMEWindow(insetsOnly); len(k) != 1 || k[0] != [4]int{0, 132 + 1385, 1080, 2400} {
 		t.Errorf("keyboard from content insets = %v", k)
 	}
+	frameOnly := regexp.MustCompile(`(touchable region|mGivenContentInsets)=.*\n`).ReplaceAllString(read("ime-gboard-api35.txt"), "")
+	if k := parseIMEWindow(frameOnly); k != nil {
+		t.Errorf("a full-display frame with neither region nor insets = %v, want no keyboard", k)
+	}
+	emptyRegion := strings.NewReplacer("SkRegion((0,1517,1080,2400))", "SkRegion()", "mGivenContentInsets=[0,1385]", "mGivenContentInsets=[0,0]").Replace(read("ime-gboard-api35.txt"))
+	if k := parseIMEWindow(emptyRegion); k != nil {
+		t.Errorf("a full-display frame with an empty region and no insets = %v, want no keyboard", k)
+	}
+	fullscreen := strings.Replace(frameOnly, "mTouchableInsets=3", "mTouchableInsets=0", 1)
+	if k := parseIMEWindow(fullscreen); len(k) != 1 || k[0] != [4]int{0, 132, 1080, 2400} {
+		t.Errorf("an input method touchable over its whole frame = %v, want the frame", k)
+	}
 
 	screen := AndroidScreen{WidthPx: 1080, HeightPx: 2400, Density: 420, Keyboard: floating}
 	d := loadUIAutomator(t, "uiautomator-pixel9a", "", screen)

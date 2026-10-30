@@ -347,6 +347,8 @@ var (
 	imeRectPattern      = regexp.MustCompile(`\((-?\d+),(-?\d+),(-?\d+),(-?\d+)\)`)
 	// mGivenContentInsets=[0,1385][0,0]: left,top then right,bottom
 	imeInsetsPattern = regexp.MustCompile(`mGivenContentInsets=\[-?\d+,(-?\d+)\]`)
+	// mTouchableInsets=3: 0 frame, 1 content, 2 visible, 3 region
+	imeTouchableInsetsPattern = regexp.MustCompile(`mTouchableInsets=(\d+)`)
 )
 
 // parseWM reads `wm size` and `wm density` output; an override wins over the
@@ -407,6 +409,11 @@ func parseIMEWindow(out string) [][4]int {
 	if frame[2] <= frame[0] || frame[3] <= frame[1] || frame[1] < 0 {
 		return nil
 	}
+	if t := imeTouchableInsetsPattern.FindStringSubmatch(out); t != nil && t[1] == "0" {
+		// The input method takes touches over its whole frame, as in
+		// fullscreen extract mode, so the frame is what it covers.
+		return [][4]int{frame}
+	}
 	if region := imeTouchablePattern.FindStringSubmatch(out); region != nil {
 		var rects [][4]int
 		for _, r := range imeRectPattern.FindAllStringSubmatch(region[1], -1) {
@@ -427,9 +434,10 @@ func parseIMEWindow(out string) [][4]int {
 			return [][4]int{{frame[0], frame[1] + top, frame[2], frame[3]}}
 		}
 	}
-	if frame[1] == 0 {
-		// A full-display frame with no region or insets to narrow it down
-		// can't be told apart from a keyboard that isn't drawn.
+	if frame[1] <= frame[3]/3 {
+		// A frame from the top of the display (or just under the status
+		// bar) with no region or insets to narrow it down can't be told
+		// apart from a keyboard that isn't drawn.
 		return nil
 	}
 	return [][4]int{frame}
