@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -172,19 +173,24 @@ func (c *Console) Get(i int) (ConsoleEntry, bool) {
 	return ConsoleEntry{}, false
 }
 
-// LogCollector fills a Console from the app's process: `log stream` for its
-// os_log / Logger output (minus Apple frameworks' info and default chatter) and
-// the files its stdout and stderr are redirected to.
+// LogCollector fills a Console from the app's process. On iOS that is `log
+// stream` for its os_log / Logger output (minus Apple frameworks' info and
+// default chatter) and the files its stdout and stderr are redirected to; on
+// Android, logcat lines from the app's pid (see SetPID).
 type LogCollector struct {
 	UDID, Process  string
 	Stdout, Stderr string
 	Console        *Console
 	Log            func(string)
+	// Platform is PlatformAndroid for logcat; anything else is iOS.
+	Platform string
+	ADB      ADB
 
 	mu        sync.Mutex
 	cancel    context.CancelFunc
 	streams   sync.WaitGroup
 	streaming bool
+	pid       atomic.Int64
 }
 
 // Start begins collecting until Close.
@@ -192,6 +198,13 @@ func (l *LogCollector) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	l.cancel = cancel
 	l.streams.Add(1)
+	if l.Platform == PlatformAndroid {
+		go func() {
+			defer l.streams.Done()
+			l.logcat(ctx)
+		}()
+		return
+	}
 	go func() {
 		defer l.streams.Done()
 		l.stream(ctx)
@@ -200,7 +213,7 @@ func (l *LogCollector) Start() {
 	go l.tail(ctx, l.Stderr, "stderr")
 }
 
-// Streaming reports whether `log stream` is running.
+// Streaming reports whether `log stream` (or logcat) is running.
 func (l *LogCollector) Streaming() bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()

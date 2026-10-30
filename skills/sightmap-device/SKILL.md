@@ -1,9 +1,10 @@
 ---
 name: sightmap-device
-description: Use when driving a native iOS app in the local iOS Simulator with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console and network requests. Activate when the user wants to run, try, test, or reproduce a flow in an iOS app on the Simulator, inspect an iOS screen, or author `.sightmap/` definitions for an iOS or React Native app.
+description: Use when driving a native iOS app in the local iOS Simulator, or an Android app on an emulator or device, with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console and network requests. Activate when the user wants to run, try, test, or reproduce a flow in an iOS app on the Simulator, inspect an iOS screen, or author `.sightmap/` definitions for an iOS or React Native app.
 activation:
   - .sightmap/ directory exists in an iOS or React Native project
   - driving an app in the iOS Simulator against a sightmap corpus
+  - driving an Android app on an emulator or device against a sightmap corpus
 ---
 
 # Sightmap device: drive an iOS app in the Simulator
@@ -90,7 +91,9 @@ dev-menu button, and says what to do. Long SwiftUI/UIKit lists expose only the r
 so a row further down is "not found" until you scroll:
 `scroll down --until TARGET` scrolls slowly enough not to fling past it, nudges
 the target into the middle of the screen, stops once it is tappable there, and
-refreshes the snapshot ids.
+refreshes the snapshot ids. A target matching several elements stops at the
+first tappable one. `[text="…"]` is the whole label; use `[text*="…"]` for part
+of it.
 
 **Waiting.** Actions return as soon as the tap lands; navigation keeps
 animating for a moment. If a snapshot still shows the old screen, snapshot
@@ -337,9 +340,49 @@ Apps you build yourself must be built by Xcode (`xcodebuild` or the Xcode
 app), not assembled by hand, so they carry the simulated entitlements. After
 signing in, iOS may show a "Save Password?" sheet: it appears as `[Overlay]`.
 
+## Android
+
+The same commands drive an Android emulator or device through `adb` (any OS,
+only the SDK platform-tools needed). `sightmap device doctor --platform android`
+checks for adb and a device or AVD. Start with an `.apk` or `--package`, which
+imply `--platform android`:
+
+```bash
+sightmap device start --app app/build/outputs/apk/debug/app-debug.apk --detach
+sightmap device start --package com.example.app --device Pixel_8_API_35 --detach
+```
+
+What differs from iOS:
+
+- `--device` is an `adb devices` serial, a model, or an AVD name (a stopped AVD
+  is booted).
+- Each read is a `uiautomator dump`, a second or more, but it waits for an idle
+  screen, so `click` taps after one read instead of waiting for two to agree. If
+  it fails with "could not get idle state", turn off animations
+  (`adb shell settings put global animator_duration_scale 0`, and the
+  transition and window scales). It can't run beside an Appium UiAutomator2
+  server.
+- Points are dp: divide screenshot pixels by dpi/160.
+- `identifier` / `testid` is the resource-id without its package
+  (`login_submit`, not `com.example:id/login_submit`). Compose `testTag`s show up
+  only with `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor;
+  without it, select Compose elements by role and `text`.
+- Roles come from widget classes (`Button` → `button`, `TextView` → `text`,
+  `EditText` → `textfield`/`securetextfield`, scrollable views → `scrollview`,
+  `RecyclerView` → `collection`, the rest → `other`). A clickable `other`
+  without text, such as a list row, is named by its children's text.
+- A field's label is its hint; its value is its text.
+- Permission dialogs and other apps' windows appear as `[Overlay]`.
+- `button back` goes back or hides the keyboard; `button` also takes `home`,
+  `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
+- `type` / `fill` are ASCII only (`adb shell input text`).
+- `network` is iOS-only for now; on Android it fails with `unsupported`.
+- `console` is the app's logcat (tag as subsystem; `System.out` reads as
+  `stdout`).
+
 ## Known limits
 
-- Simulator only, Apple Silicon only. No physical devices.
+- iOS: Simulator only, Apple Silicon only. No physical iOS devices.
 - No hover or file upload; for another screen size, pick a different `--device`.
 - The helper uses Apple private frameworks (via FBSimulatorControl); a new
   Xcode release may need a sightmap update. `doctor` says so when the helper

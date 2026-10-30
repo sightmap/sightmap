@@ -116,10 +116,19 @@ func (s *Snapshot) pick(text string, found []*sightmap.ComponentNode, nth int, w
 	return nil, s.ambiguous(fmt.Sprintf("%s matches %d elements; add a predicate or append #N", quote(text), len(found)), found)
 }
 
+// ambiguousError is an "ambiguous" Error that keeps the elements matched.
+type ambiguousError struct {
+	err   *Error
+	nodes []*sightmap.ComponentNode
+}
+
+func (e *ambiguousError) Error() string { return e.err.Error() }
+func (e *ambiguousError) Unwrap() error { return e.err }
+
 func (s *Snapshot) ambiguous(msg string, nodes []*sightmap.ComponentNode) error {
 	lines := make([]string, len(nodes))
 	for i, n := range nodes {
 		lines[i] = s.line(n)
 	}
-	return withHint("ambiguous", "pick one by snapshot id or #N", "%s:\n  %s", msg, strings.Join(lines, "\n  "))
+	return &ambiguousError{withHint("ambiguous", "pick one by snapshot id or #N", "%s:\n  %s", msg, strings.Join(lines, "\n  ")), nodes}
 }

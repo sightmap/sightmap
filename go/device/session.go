@@ -4,11 +4,13 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -19,11 +21,17 @@ import (
 
 // Config describes the app a Session drives.
 type Config struct {
-	UDID        string `json:"udid"`
-	DeviceName  string `json:"deviceName,omitempty"`
-	BundleID    string `json:"bundleId"`
-	AppPath     string `json:"appPath,omitempty"`
-	Process     string `json:"process"` // the app's executable name, for its logs
+	// Platform is PlatformIOS (the default when empty) or PlatformAndroid.
+	Platform string `json:"platform,omitempty"`
+	// UDID is the simulator's UDID, or on Android the device serial.
+	UDID       string `json:"udid"`
+	DeviceName string `json:"deviceName,omitempty"`
+	// BundleID is the app's bundle id, or on Android its package name.
+	BundleID string `json:"bundleId"`
+	AppPath  string `json:"appPath,omitempty"`
+	// Process names the app's process for its logs: the executable on iOS, the
+	// package on Android.
+	Process     string `json:"process"`
 	SightmapDir string `json:"sightmapDir"`
 	// RunDir holds the app's redirected stdout/stderr and the daemon log.
 	RunDir   string `json:"runDir,omitempty"`
@@ -49,6 +57,24 @@ type Timing struct {
 	ReadyTimeout  time.Duration // how long start waits for a readable tree
 	RetryInterval time.Duration // between re-reads while the screen moves
 	RetryTimeout  time.Duration // how long click/fill wait for a missing target or a moving screen
+}
+
+// androidTiming is the Android default: `uiautomator dump` takes a second or
+// more per read, so waits that span several reads are longer.
+var androidTiming = Timing{ReadyTimeout: 60 * time.Second, RetryTimeout: 8 * time.Second, FillReadback: 4 * time.Second}
+
+// or fills t's zero fields from d.
+func (t Timing) or(d Timing) Timing {
+	for _, f := range []struct{ field, def *time.Duration }{
+		{&t.Settle, &d.Settle}, {&t.ScrollSettle, &d.ScrollSettle}, {&t.OverlaySettle, &d.OverlaySettle},
+		{&t.FillReadback, &d.FillReadback}, {&t.ReadyTimeout, &d.ReadyTimeout}, {&t.RetryInterval, &d.RetryInterval},
+		{&t.RetryTimeout, &d.RetryTimeout},
+	} {
+		if *f.field == 0 {
+			*f.field = *f.def
+		}
+	}
+	return t
 }
 
 func (t Timing) withDefaults() Timing {
@@ -221,8 +247,8 @@ func (s *Session) fresh(ctx context.Context, view string) (*Snapshot, error) {
 // list's momentum has stopped.
 func (s *Session) settled(ctx context.Context, timeout time.Duration) (*Snapshot, error) {
 	snap, err := s.fresh(ctx, "")
-	if err != nil {
-		return nil, err
+	if err != nil || snap.Settled {
+		return snap, err
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -271,6 +297,9 @@ func (s *Session) LaunchApp(ctx context.Context, terminate bool) (map[string]any
 		return nil, err
 	}
 	s.AppPID, s.axOn, s.readable, s.last, s.secureFocus = pid, nil, false, nil, false
+	if s.Logs != nil {
+		s.Logs.SetPID(pid)
+	}
 	return map[string]any{"bundleId": s.BundleID, "pid": pid}, nil
 }
 
@@ -593,6 +622,9 @@ func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (
 		}
 		return e, nil
 	case "networkList":
+		if err := s.networkSupported(); err != nil {
+			return nil, err
+		}
 		f, err := decode[NetworkFilter](raw)
 		if err != nil {
 			return nil, err
@@ -606,6 +638,9 @@ func (s *Session) handle(ctx context.Context, cmd string, raw json.RawMessage) (
 		}
 		return s.Network.List(f, view), nil
 	case "networkGet":
+		if err := s.networkSupported(); err != nil {
+			return nil, err
+		}
 		a, err := decode[ValueArgs](raw)
 		if err != nil {
 			return nil, err
@@ -761,7 +796,7 @@ func (s *Session) assertOnScreen(ctx context.Context, cmd string, points ...[2]f
 	}
 	for _, p := range points {
 		if p[0] < 0 || p[1] < 0 || p[0] > screen.W || p[1] > screen.H {
-			return withHint("off_screen_point", fmt.Sprintf("pick a point within 0–%g x 0–%g; divide screenshot pixel coordinates by the device scale (2 or 3)", screen.W, screen.H),
+			return withHint("off_screen_point", fmt.Sprintf("pick a point within 0–%g x 0–%g; divide screenshot pixel coordinates by the device scale (2 or 3 on iOS, dpi/160 on Android)", screen.W, screen.H),
 				"(%g, %g) is outside the %gx%g pt screen; %s takes screen points (origin top-left), not pixels", p[0], p[1], screen.W, screen.H, cmd)
 		}
 	}
@@ -832,8 +867,8 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		// A screen mid-transition can already show the target; a tap then
 		// lands on whatever is passing under that point. Tap only once two
 		// reads in a row agree on where the target and the screen are.
-		stable := prev != nil && node != nil && prevNode != nil && sameElement(prevNode, node) &&
-			*prevNode.Bounds == *node.Bounds && topLayout(prev) == topLayout(snap)
+		stable := node != nil && (snap.Settled || prev != nil && prevNode != nil && sameElement(prevNode, node) &&
+			*prevNode.Bounds == *node.Bounds && topLayout(prev) == topLayout(snap))
 		outOfTime := time.Now().After(deadline)
 		if failure == nil && stable {
 			x, y := Center(node)
@@ -859,6 +894,18 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		retries++
 		prev, prevNode, snap = snap, node, next
 	}
+}
+
+var exactText = regexp.MustCompile(`\[text="([^"]*)"\]`)
+
+// exactTextHint reminds that [text="…"] matches a whole label, for a target
+// that found nothing.
+func exactTextHint(target string) string {
+	m := exactText.FindStringSubmatch(target)
+	if m == nil {
+		return ""
+	}
+	return fmt.Sprintf("; [text=%q] matches the whole label, so use [text*=%q] for part of one", m[1], m[1])
 }
 
 // sameElement reports whether a and b, from two reads, are the same element.
@@ -907,7 +954,7 @@ func (s *Session) notFound(ctx context.Context, snap *Snapshot, target string, e
 	if numeric {
 		return err
 	}
-	return withHint("not_found", fmt.Sprintf("if it is further down a list, run `sightmap device scroll down --until %s`; otherwise `sightmap device snapshot`", quote(target)),
+	return withHint("not_found", fmt.Sprintf("if it is further down a list, run `sightmap device scroll down --until %s`; otherwise `sightmap device snapshot`%s", quote(target), exactTextHint(target)),
 		"%s; long lists expose only the rows near the screen", err.Error())
 }
 
@@ -1095,6 +1142,19 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 			}
 		}
 		found, ferr := Resolve(snap, a.Until)
+		matches := 1
+		// --until asks for the target on screen; when it matches several
+		// elements, the first one that can be acted on ends the scroll.
+		var amb *ambiguousError
+		if errors.As(ferr, &amb) {
+			matches, found, ferr = len(amb.nodes), amb.nodes[0], nil
+			for _, n := range amb.nodes {
+				if snap.AssertActionable(n, a.Until) == nil {
+					found = n
+					break
+				}
+			}
+		}
 		if ferr == nil {
 			ferr = snap.AssertActionable(found, a.Until)
 		}
@@ -1111,7 +1171,11 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		}
 		if ferr == nil {
 			s.lastTarget, s.last = found, snap
-			return map[string]any{"direction": a.Direction, "scrolls": i, "found": snap.Describe(found), "id": found.Id}, nil
+			r := map[string]any{"direction": a.Direction, "scrolls": i, "found": snap.Describe(found), "id": found.Id}
+			if matches > 1 {
+				r["matches"] = matches
+			}
+			return r, nil
 		}
 		if c := Code(ferr); c != "not_found" && c != "offscreen" && c != "covered" {
 			return nil, ferr
@@ -1140,7 +1204,7 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		}
 		if stalls >= 2 {
 			s.last = snap
-			return nil, withHint("not_found", fmt.Sprintf("try `sightmap device scroll %s --until %s`", opposite[a.Direction], quote(a.Until)),
+			return nil, withHint("not_found", fmt.Sprintf("try `sightmap device scroll %s --until %s`%s", opposite[a.Direction], quote(a.Until), exactTextHint(a.Until)),
 				"%s; reached the end after scrolling %s %d time(s)", notFound, a.Direction, i)
 		}
 		previous = text
@@ -1153,7 +1217,7 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 		time.Sleep(s.Timing.ScrollSettle)
 	}
 	s.last = snap
-	return nil, withHint("not_found", "raise --max, or check the target with `sightmap device snapshot`", "%s after %d scroll(s) %s", notFound, a.Max, a.Direction)
+	return nil, withHint("not_found", "raise --max, or check the target with `sightmap device snapshot`"+exactTextHint(a.Until), "%s after %d scroll(s) %s", notFound, a.Max, a.Direction)
 }
 
 // Close stops the helper and the log and network collectors.
@@ -1169,4 +1233,12 @@ func (s *Session) closeCollectors() {
 	if s.Net != nil {
 		s.Net.Close()
 	}
+}
+
+// networkSupported refuses network commands where no source can run.
+func (s *Session) networkSupported() error {
+	if s.Platform == PlatformAndroid {
+		return withHint("unsupported", "on Android, read the app's requests from its analytics session or a proxy for now", "network capture is not available on Android yet")
+	}
+	return nil
 }

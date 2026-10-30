@@ -19,6 +19,13 @@ type Describe struct {
 	// Overlay is true when the tree belongs to a system sheet from another
 	// process (e.g. "Save Password?") rather than to the app.
 	Overlay bool `json:"overlay,omitempty"`
+	// Settled is true when the reader waited for the screen to go idle before
+	// reading it, as `uiautomator dump` does, so one read stands for two that
+	// agree.
+	Settled bool `json:"settled,omitempty"`
+	// StatusBar is the status bar's height in points when the reader knows
+	// it (Android); zero leaves it to systemTop's per-device guess.
+	StatusBar float64 `json:"statusBar,omitempty"`
 }
 
 // Size is a screen size in points.
@@ -80,10 +87,12 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 //
 // Ids are per tree: "1" is the root, in pre-order.
 type Tree struct {
-	Screen  Size
-	Root    *sightmap.ComponentNode
-	Nodes   []*sightmap.ComponentNode
-	Overlay bool
+	Screen    Size
+	Root      *sightmap.ComponentNode
+	Nodes     []*sightmap.ComponentNode
+	Overlay   bool
+	Settled   bool    // see Describe.Settled
+	StatusBar float64 // see Describe.StatusBar
 
 	parent map[*sightmap.ComponentNode]*sightmap.ComponentNode
 	traits map[*sightmap.ComponentNode][]string
@@ -259,10 +268,12 @@ var cssIdent = regexp.MustCompile(`^-?[A-Za-z_][A-Za-z0-9_-]*$`)
 // Normalize converts a describe result into a Tree.
 func Normalize(d *Describe) *Tree {
 	t := &Tree{
-		Screen:  d.Screen,
-		Overlay: d.Overlay,
-		parent:  map[*sightmap.ComponentNode]*sightmap.ComponentNode{},
-		traits:  map[*sightmap.ComponentNode][]string{},
+		Screen:    d.Screen,
+		Overlay:   d.Overlay,
+		Settled:   d.Settled,
+		StatusBar: d.StatusBar,
+		parent:    map[*sightmap.ComponentNode]*sightmap.ComponentNode{},
+		traits:    map[*sightmap.ComponentNode][]string{},
 	}
 	if d.Root == nil {
 		d.Root = &RawElement{}
