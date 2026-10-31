@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "url": "https://forter.com/",
+  "finalUrl": "https://www.forter.com/",
+  "host": "forter.com",
+  "scannedAt": "2026-09-10T00:51:33.430Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "sightmap dev"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://www.forter.com/",
+      "path": "/",
+      "title": "Forter – Agentic Intelligence you can trust",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "list_skills",
+        "get_openapi_spec",
+        "get_pricing_info",
+        "search_documentation",
+        "contact_sales",
+        "switch_site_language"
+      ]
+    },
+    {
+      "url": "https://www.forter.com/agents/?utm_campaign=44315003-FY26%20Product%20Announcements&utm_source=website&utm_medium=banner",
+      "path": "/agents/?utm_campaign=44315003-FY26%20Product%20Announcements&utm_source=website&utm_medium=banner",
+      "title": "Agents – Forter",
+      "status": 200,
+      "surface": "declarative",
+      "tools": [
+        "switch_site_language"
+      ]
+    },
+    {
+      "url": "https://www.forter.com/agents/",
+      "path": "/agents/",
+      "title": "Agents – Forter",
+      "status": 200,
+      "surface": "declarative",
+      "tools": [
+        "switch_site_language"
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "list_skills",
+      "description": "List Forter's agent-skill catalog. Returns the v0.2.0 skill index covering order decisioning, account protection, dispute resolution, agentic commerce, PSP onboarding, tokenization, privacy requests, and contact-sales. Use to find which Forter capability fits a given user need.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "name starts with \"list\"",
+      "warnings": []
+    },
+    {
+      "name": "get_openapi_spec",
+      "description": "Fetch the canonical Forter REST OpenAPI 3.0.0 spec (info.version 10.2; 33 operations - 22 production + 11 public sandbox; 204 schemas). Use to understand request/response shapes for any Forter REST operation before recommending an integration.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "description": "Return format. Default 'json'.",
+            "enum": [
+              "json",
+              "yaml"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "name starts with \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "get_pricing_info",
+      "description": "Return Forter's machine-readable pricing summary. Forter is enterprise-priced - volume-tiered and ACV-negotiated. Use to answer pricing questions WITHOUT estimating cost - always route the user to https://www.forter.com/contact-us/ for a quote.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "name starts with \"get\"",
+      "warnings": []
+    },
+    {
+      "name": "search_documentation",
+      "description": "Search Forter's developer documentation index by keyword. Returns matching quickstart / reference / guide URLs from /docs/llms.txt. Use to point a user at the right doc page for an integration topic.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "description": "Free-text keyword (lowercased substring match against link text + URL).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "read",
+      "riskReason": "name starts with \"search\"",
+      "warnings": []
+    },
+    {
+      "name": "contact_sales",
+      "description": "Submit a sales-lead request via Forter's HubSpot form. AGENT MUST CONFIRM WITH USER BEFORE CALLING - this generates a real CRM lead and constitutes opt-in to sales contact per the Forter privacy policy at https://www.forter.com/privacy-policy/.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "country": {
+            "description": "ISO country name or code",
+            "type": "string"
+          },
+          "email": {
+            "description": "Business email",
+            "format": "email",
+            "type": "string"
+          },
+          "firstname": {
+            "description": "Given name",
+            "type": "string"
+          },
+          "how_did_you_hear_about_us_": {
+            "description": "Referral source (free text)",
+            "type": "string"
+          },
+          "jobtitle": {
+            "description": "Job title",
+            "type": "string"
+          },
+          "lastname": {
+            "description": "Family name",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Phone number with country code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "firstname",
+          "lastname",
+          "email",
+          "phone",
+          "jobtitle",
+          "country",
+          "how_did_you_hear_about_us_"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "navigator",
+      "risk": "action",
+      "riskReason": "description mentions \"request\"",
+      "warnings": []
+    },
+    {
+      "name": "switch_site_language",
+      "description": "Switch the Forter website to another language. Navigates to the localized version of the site. Supported: English, German (Deutsch), Chinese (中文 中国), Japanese (日本語), French (Français).",
+      "inputSchema": {
+        "properties": {
+          "lang_choice_1": {
+            "description": "Target language for the Forter site. Pick the option matching the user's preferred language; its value is the localized site URL to load.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/",
+        "/agents/?utm_campaign=44315003-FY26%20Product%20Announcements&utm_source=website&utm_medium=banner",
+        "/agents/"
+      ],
+      "impl": "declarative",
+      "api": "dom",
+      "risk": "action",
+      "riskReason": "name contains \"switch\"",
+      "warnings": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "6/6"
+    },
+    {
+      "id": "described",
+      "label": "Every tool has a description",
+      "ok": true,
+      "detail": "6/6"
+    },
+    {
+      "id": "input-schema",
+      "label": "Every tool has an input schema",
+      "ok": true,
+      "detail": "6/6"
+    },
+    {
+      "id": "snake-case",
+      "label": "Tool names are snake_case",
+      "ok": true,
+      "detail": "6/6"
+    },
+    {
+      "id": "unique",
+      "label": "Tool names are unique",
+      "ok": true,
+      "detail": "6 distinct"
+    },
+    {
+      "id": "no-suspicious",
+      "label": "No suspicious wording in tool metadata",
+      "ok": true,
+      "detail": "none flagged"
+    },
+    {
+      "id": "route-scoped",
+      "label": "Tool set changes with the page",
+      "ok": true,
+      "detail": "2 distinct tool sets across 3 pages"
+    }
+  ],
+  "counts": {
+    "tools": 6,
+    "pages": 3,
+    "read": 4,
+    "action": 2,
+    "sensitive": 0,
+    "described": 6,
+    "withInputSchema": 6,
+    "declarative": 1
+  },
+  "hints": {
+    "forms": [],
+    "links": [
+      "https://www.forter.com/agents?utm_campaign=44315003-FY26%20Product%20Announcements&utm_source=website&utm_medium=banner",
+      "https://www.forter.com/",
+      "#",
+      "/agents/",
+      "/agentic-commerce/",
+      "/platform/fraud-management/",
+      "/platform/payment-optimization/",
+      "/platform/dispute-management/",
+      "/platform/account-protection/",
+      "/platform/abuse-prevention/",
+      "/forter-element/",
+      "#",
+      "/digital-insights/",
+      "/fraud-insights/",
+      "/payment-insights/",
+      "/blog/",
+      "/events/",
+      "/resources/",
+      "/impact/",
+      "https://docs.forter.com/",
+      "https://hello.forter.com/roi-calculator/",
+      "#",
+      "/customers/",
+      "/decision-makers/",
+      "#",
+      "/company/",
+      "/careers/",
+      "/newsroom/",
+      "/privacy-security-hub/",
+      "/contact-us/",
+      "#",
+      "/partners/",
+      "/become-a-partner/",
+      "/sales/",
+      "https://portal.forter.com/",
+      "/sales/",
+      "https://portal.forter.com/",
+      "https://www.forter.com/sales/",
+      "https://www.forter.com/agents/",
+      "/platform/fraud-management/"
+    ],
+    "title": "Forter – Agentic Intelligence you can trust",
+    "description": "AI powered fraud, abuse, and payment decisions — so your best customers feel less friction, and you leave no revenue behind."
+  },
+  "notes": [
+    "operator Chrome flags: --ssl-version-max=tls1.2",
+    "first page redirected to https://www.forter.com; continuing there",
+    "sightmap browser mcp list saw 0 tool(s) on /",
+    "$ sightmap version",
+    "$ sightmap browser start --detach --headless --port 45787 --cdp-port 42779 --profile /tmp/atlas-scan-vQDXtO/profile --url about:blank --log-file /tmp/atlas-scan-vQDXtO/daemon.log --chrome-flag=--enable-blink-features=ModelContext,ModelC… --chrome-flag=--enable-features=DevToolsWebMCPSupport --chrome-flag=--proxy-server=http://127.0.0.1:41767 --chrome-flag=--proxy-bypass-list=localhost;127.0.0.1;[::1] --chrome-flag=--deny-permission-prompts --chrome-flag=--ssl-version-max=tls1.2 --chrome-binary /opt/pw-browsers/chromium --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap",
+    "$ sightmap browser tabs list --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap ×2",
+    "$ sightmap browser inject --persist --file /tmp/atlas-scan-vQDXtO/recorder.js --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap",
+    "$ sightmap browser inject --list --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap ×10",
+    "$ sightmap browser navigate https://forter.com/ --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap ×4",
+    "$ sightmap browser mcp list --json --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap",
+    "$ sightmap browser navigate https://www.forter.com/agents?utm_campaign=44315003-FY26%… --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap ×4",
+    "$ sightmap browser navigate https://www.forter.com/agents/ --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab 77F1B0EE3722C0F447992366C5D1D1CF --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap ×4",
+    "$ sightmap browser stop --sightmap-dir /tmp/atlas-scan-vQDXtO/.sightmap"
+  ]
+}
