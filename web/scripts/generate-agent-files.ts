@@ -4,6 +4,11 @@
 //   - api/atlas.json and api/atlas/<slug>.json — JSON catalog + per-entry docs
 //   - per-page markdown twins (index.md, blog.md, developers.md, 404.md, …)
 //
+// The Atlas twin covers both halves of /atlas: the vendored community entries
+// and the WebMCP listings in src/data/directory. The listings' own JSON
+// documents are written by scripts/build-atlas.ts into public/atlas/, which
+// Vite copies into dist/ before this runs.
+//
 // Runs after prerender so dist/ already exists. Vite copies public/ first;
 // these files are generated, not authored, and must not linger after a
 // takedown the way a committed public/ file would.
@@ -12,8 +17,10 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { loadPosts } from './lib/posts'
 import { loadAtlas } from './lib/atlas'
+import { loadDirectory } from './lib/directory'
 import { primaryDomain } from '../src/lib/atlas'
-import type { FeedAtlasEntry, FeedPost } from './generate-feeds'
+import type { FeedAtlasEntry, FeedDirectoryListing, FeedPost } from './generate-feeds'
+import { toFeedListing } from './generate-feeds'
 import {
   buildAtlasApiIndex,
   buildAtlasIndexMarkdown,
@@ -32,6 +39,7 @@ import {
 const DIST = path.resolve('dist')
 const CONTENT_DIR = path.resolve('content/blog')
 const ATLAS_DIR = path.resolve('src/data/atlas')
+const DIRECTORY_DIR = path.resolve('src/data/directory')
 
 function write(rel: string, body: string) {
   const full = path.join(DIST, rel)
@@ -68,6 +76,14 @@ async function main() {
       categories: e.categories,
     }))
 
+  // The WebMCP listings that share /atlas with those entries. Only the fields
+  // the markdown twin needs — the JSON documents for a listing are written by
+  // scripts/build-atlas.ts into public/atlas/, not here.
+  const listings: FeedDirectoryListing[] = loadDirectory(
+    DIRECTORY_DIR,
+    raw.entries.map((e) => e.slug)
+  ).listings.map(toFeedListing)
+
   const spec = buildOpenApiSpec()
   write('openapi.json', JSON.stringify(spec, null, 2))
   write('api/openapi.yaml', `${toYaml(spec)}\n`)
@@ -82,7 +98,7 @@ async function main() {
   write('404.md', buildNotFoundMarkdown())
   write('index.md', buildHomeMarkdown())
   write('blog.md', buildBlogIndexMarkdown(posts))
-  write('atlas.md', buildAtlasIndexMarkdown(atlas))
+  write('atlas.md', buildAtlasIndexMarkdown(atlas, listings))
   write('developers.md', buildDevelopersMarkdown())
   write('building.md', buildBuildingMarkdown())
   write('sightkick.md', buildSightkickMarkdown())
@@ -102,7 +118,8 @@ async function main() {
   }
 
   console.log(
-    `  wrote dist/openapi.json, dist/api/* and markdown twins (${posts.length} post(s), ${atlas.length} atlas entry(s))`
+    `  wrote dist/openapi.json, dist/api/* and markdown twins (${posts.length} post(s), ` +
+      `${atlas.length} atlas entry(s), ${listings.length} listing(s))`
   )
 }
 
