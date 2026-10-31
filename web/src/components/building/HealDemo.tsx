@@ -2,15 +2,27 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { KIOSK_H, PLATE, SLAB_T, TRAVELLER_COLORS, findRoom, floorY, roomStand, surfaceAt } from './model'
+import {
+  KIOSK_H,
+  PLATE,
+  SLAB_T,
+  TRAVELLER_COLORS,
+  findRoom,
+  floorHeight,
+  floorY,
+  roomStand,
+  surfaceAt,
+  type BuildingModel,
+} from './model'
 import { pointAt, routeOnFloor, type Path } from './geometry'
 import { smoothstep } from './chapters'
+import { useBuildingModel } from './context'
 import { useShared } from './state'
 import { Walker } from './Agents'
 
-function pathFromStands(floor: number, a: THREE.Vector3, b: THREE.Vector3): Path {
-  const route = routeOnFloor(floor, a.x, a.z, b.x, b.z)
-  const points = route.map((p) => new THREE.Vector3(p.x, surfaceAt(floor, p.x, p.z), p.z))
+function pathFromStands(model: BuildingModel, floor: number, a: THREE.Vector3, b: THREE.Vector3): Path {
+  const route = routeOnFloor(model, floor, a.x, a.z, b.x, b.z)
+  const points = route.map((p) => new THREE.Vector3(p.x, surfaceAt(model, floor, p.x, p.z), p.z))
   const cum = [0]
   for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + points[i].distanceTo(points[i - 1]))
   return { points, cum, stops: [0, points.length - 1], length: cum[cum.length - 1] }
@@ -56,15 +68,16 @@ const STATUS: Record<Phase, { cls: string; text: string }> = {
 
 export default function HealDemo() {
   const s = useShared()
+  const model = useBuildingModel()
   const walker = useRef<THREE.Group>(null)
   const ghost = useRef<THREE.Mesh>(null)
   const status = useRef<HTMLDivElement>(null)
-  const room = useMemo(() => findRoom(FLOOR, 'ContinueButton'), [])
-  const from = useMemo(() => new THREE.Vector3(...roomStand(FLOOR, findRoom(FLOOR, 'PaymentForm'))), [])
-  const oldPos = useMemo(() => new THREE.Vector3(...roomStand(FLOOR, room, 0)), [room])
-  const newPos = useMemo(() => new THREE.Vector3(...roomStand(FLOOR, room, 1)), [room])
-  const walk1 = useMemo(() => pathFromStands(FLOOR, from, oldPos), [from, oldPos])
-  const walk2 = useMemo(() => pathFromStands(FLOOR, oldPos, newPos), [oldPos, newPos])
+  const room = useMemo(() => findRoom(model, FLOOR, 'ContinueButton'), [model])
+  const from = useMemo(() => new THREE.Vector3(...roomStand(model, FLOOR, findRoom(model, FLOOR, 'PaymentForm'))), [model])
+  const oldPos = useMemo(() => new THREE.Vector3(...roomStand(model, FLOOR, room, 0)), [model, room])
+  const newPos = useMemo(() => new THREE.Vector3(...roomStand(model, FLOOR, room, 1)), [model, room])
+  const walk1 = useMemo(() => pathFromStands(model, FLOOR, from, oldPos), [model, from, oldPos])
+  const walk2 = useMemo(() => pathFromStands(model, FLOOR, oldPos, newPos), [model, oldPos, newPos])
   const tmp = useMemo(() => new THREE.Vector3(), [])
   const start = useRef<number | null>(null)
   const lastPhase = useRef<Phase>('reset')
@@ -129,11 +142,11 @@ export default function HealDemo() {
   return (
     <>
       <Walker color={TRAVELLER_COLORS.test} group={walker} trail={false} />
-      <mesh ref={ghost} position={[room.x, floorY(FLOOR) + SLAB_T + PLATE + KIOSK_H / 2, room.z]} visible={false}>
+      <mesh ref={ghost} position={[room.x, floorY(FLOOR, floorHeight(model)) + SLAB_T + PLATE + KIOSK_H / 2, room.z]} visible={false}>
         <boxGeometry args={[room.w, KIOSK_H, room.d]} />
         <meshStandardMaterial color="#ffffff" transparent opacity={0} wireframe emissive="#ffffff" emissiveIntensity={0.6} />
       </mesh>
-      <Html position={[room.x - 1.6, floorY(FLOOR) + SLAB_T + KIOSK_H + 1.15, room.z - 0.4]} zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
+      <Html position={[room.x - 1.6, floorY(FLOOR, floorHeight(model)) + SLAB_T + KIOSK_H + 1.15, room.z - 0.4]} zIndexRange={[7, 0]} style={{ pointerEvents: 'none' }}>
         <div ref={status} className="bld-status bld-status--run" style={{ opacity: 0, visibility: 'hidden' }} />
       </Html>
     </>

@@ -1,0 +1,18 @@
+slug: no-tools
+name: Quiet Site
+url: https://quiet.example.org/
+host: quiet.example.org
+description: A fixture site whose pages registered nothing.
+category: other
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-01
+updated: 2026-09-07
+scan: scans/no-tools/2026-09-08.json
+tools: []
+suggested_journeys: []
+strengths: []
+improvements: []

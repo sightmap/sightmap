@@ -127,6 +127,10 @@ export const ListingSchema = z.object({
   submitted_by: z.enum(['owner', 'nominator', 'maintainer']).default('maintainer'),
   labels: z.array(z.enum(['promising', 'featured'])).default([]),
   collections: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
+  // The city lot this listing's building stands on. Assigned once, when the
+  // listing is first written, and kept for good: a building that moves when
+  // a neighbour arrives is not an address.
+  lot: z.number().int().nonnegative().optional(),
   added: z.string().regex(DATE, 'must be YYYY-MM-DD'),
   updated: z.string().regex(DATE, 'must be YYYY-MM-DD'),
   scan: z.string().regex(/^scans\/[a-z0-9-]+\/\d{4}-\d{2}-\d{2}(-\d+)?\.json$/, 'must be scans/<slug>/<date>.json'),
