@@ -125,6 +125,9 @@ are unique across both).
 | Command | Does |
 |---|---|
 | `pnpm atlas:scan <url> [--out f.json] [--md f.md] [--max-pages 3] [--intent …] [--path /p] [--allow-local]` | scan one site; needs the `sightmap` CLI (`$SIGHTMAP_BIN`) and a Chrome build (`sightmap browser install` or `$ATLAS_CHROME_PATH`) |
+| `pnpm atlas:review <scan.json> [--out review.json] [--heuristic]` | review the scan artifact with Claude (needs `ANTHROPIC_API_KEY`) or heuristics: description, category, risk corrections, journeys, strengths, improvements, recommendation |
+| `pnpm atlas:listing <scan.json> [--review review.json] [--type live] [--sightkick] [--submitted-by owner]` | write `<slug>.yaml` + copy the scan into `scans/<slug>/` |
+| `pnpm atlas:intake --url <url> [--intent …] [--submission-id …] [--type live] [--sightkick] [--submitted-by owner] [--summary summary.md]` | scan → review → listing in one go; what the review agent runs |
 
 Every step is idempotent: rerunning a scan adds a new dated report and the
 listing's `drift` block shows what changed since the one before.
