@@ -42,6 +42,8 @@ Request routes use the same glob syntax as views: `*` matches one segment, and `
 
 Use `:param` when the application already expresses the route that way. Consumers treat both forms identically.
 
+A request route can also end in query conditions, as a view route can: `/graphql?operationName=Items` matches only calls whose first `operationName` is `Items`, and `/_graphql?body=*` only calls that carry `body`. See [Query conditions](/reference/schema#query-conditions).
+
 ## Method filter
 
 `method` is an optional, case-insensitive HTTP method filter such as `GET`, `POST`, or `PUT`. If omitted, the definition matches any method.

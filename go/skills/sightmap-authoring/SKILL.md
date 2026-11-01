@@ -773,6 +773,14 @@ in the URL counts as a separator: `/app/x%2Fy%2Fz` is five segments, not three,
 and a `/app/*/*` route won't match it (use `/app/**`). When several views match,
 the most specific wins; ties go to the first-declared view.
 
+**Query conditions.** When one path is several screens told apart by a query
+parameter (`/profile?section=gift-cards`, `/page?id=101`), end the route in
+conditions: `?KEY=VALUE` requires that first value, `?KEY=:name` or `?KEY=*`
+only that the key is present; join several with `&`. Each scores like a path
+segment, so `/profile?section=gift-cards` beats `/profile` on that URL and
+`/profile` keeps the rest. Only add a condition for a key that changes the
+screen, never for tracking or UI-state parameters.
+
 **Keep routes specific.** A `route:` glob should identify *this* view, not every
 page. A catch-all like `/lightning/**` or `/**` that matches every URL is a smell:
 as you map more pages they all collapse onto the one view, and — worse —
