@@ -1,0 +1,59 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": { "ok": true, "diagnostics": [] }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/en-us/profile?section=gift-cards" },
+      "expected": { "result": { "view": { "name": "GiftCards" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/en-us/profile?utm_source=mail&section=order-again" },
+      "expected": { "result": { "view": { "name": "OrderAgain" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/en-us/profile?section=order-history" },
+      "expected": { "result": { "view": { "name": "Profile" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/en-us/profile?section=order-again&section=gift-cards" },
+      "expected": { "result": { "view": { "name": "OrderAgain" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/en-us/profile" },
+      "expected": { "result": { "view": { "name": "Profile" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/en-us/menu?section=gift-cards" },
+      "expected": { "result": { "view": { "name": "Page" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/page?id=101" },
+      "expected": { "result": { "view": { "name": "Article" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/page?id=206" },
+      "expected": { "result": { "view": { "name": "Document" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/acme/library?view=grid&type=metrics" },
+      "expected": { "result": { "view": { "name": "Library" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/graphql?operationName=Items", "method": "POST" },
+      "expected": { "result": { "requests": [{ "name": "GraphQL" }, { "name": "GraphQLItems" }] } }
+    }
+  ]
+}

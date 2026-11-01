@@ -68,6 +68,90 @@ func TestSpecConformance_EntityIDFixtures(t *testing.T) {
 	runSpecValidateFixtures(t, "*-entity-id*.fixture")
 }
 
+func TestSpecConformance_RouteQueryFixtures(t *testing.T) {
+	runSpecValidateFixtures(t, "*-route-query-*.fixture")
+	runSpecMatchFixtures(t, "*-route-query-*.fixture")
+	runSpecMatchFixtures(t, "*-route-precedence.fixture")
+	runSpecMatchFixtures(t, "*-route-trailing-slash.fixture")
+}
+
+// runSpecMatchFixtures runs each fixture's `match` cases that assert a view
+// name or a request list against ViewForURL and RequestsForURL.
+func runSpecMatchFixtures(t *testing.T, glob string) {
+	t.Helper()
+	const root = "../../spec/conformance"
+	if _, err := os.Stat(root); err != nil {
+		t.Skipf("spec conformance fixtures not reachable from the module (%v)", err)
+	}
+	fixtures, err := filepath.Glob(filepath.Join(root, glob))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fixtures) == 0 {
+		t.Fatalf("no fixtures matched %q; did a fixture move or get renamed?", glob)
+	}
+	for _, dir := range fixtures {
+		t.Run(filepath.Base(dir)+"/match", func(t *testing.T) {
+			corpus, err := sightmap.Load(filepath.Join(dir, "sightmap"))
+			if err != nil {
+				t.Fatalf("load corpus: %v", err)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, "expected.json"))
+			if err != nil {
+				t.Fatalf("read expected.json: %v", err)
+			}
+			var doc struct {
+				Cases []struct {
+					Command string `json:"command"`
+					Args    struct {
+						URL    string `json:"url"`
+						Method string `json:"method"`
+					} `json:"args"`
+					Expected struct {
+						Result struct {
+							View *struct {
+								Name string `json:"name"`
+							} `json:"view"`
+							Requests []struct {
+								Name string `json:"name"`
+							} `json:"requests"`
+						} `json:"result"`
+					} `json:"expected"`
+				} `json:"cases"`
+			}
+			if err := json.Unmarshal(data, &doc); err != nil {
+				t.Fatalf("parse expected.json: %v", err)
+			}
+			for _, c := range doc.Cases {
+				if c.Command != "match" {
+					continue
+				}
+				if want := c.Expected.Result.View; want != nil {
+					got := ""
+					if v := corpus.ViewForURL(c.Args.URL); v != nil {
+						got = v.Name
+					}
+					if got != want.Name {
+						t.Errorf("match %q: view %q, want %q", c.Args.URL, got, want.Name)
+					}
+				}
+				if want := c.Expected.Result.Requests; want != nil {
+					got := corpus.RequestsForURL(c.Args.URL, c.Args.Method)
+					if len(got) < len(want) {
+						t.Errorf("match %q: %d requests, want at least %d", c.Args.URL, len(got), len(want))
+						continue
+					}
+					for i := range want {
+						if got[i].Name != want[i].Name {
+							t.Errorf("match %q: request %d is %q, want %q", c.Args.URL, i, got[i].Name, want[i].Name)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
 func runSpecValidateFixtures(t *testing.T, glob string) {
 	t.Helper()
 	const root = "../../spec/conformance"

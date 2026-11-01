@@ -150,7 +150,8 @@
         "route": {
           "type": "string",
           "minLength": 1,
-          "description": "Glob pattern matched against the URL pathname. * matches one segment, ** matches any depth."
+          "pattern": "^[^?]*(\\?[^&=]+=[^&]+(&[^&=]+=[^&]+)*)?$",
+          "description": "Glob pattern matched against the URL pathname. * matches one segment, ** matches any depth. May end in query conditions, ?KEY=VALUE&KEY=:name&KEY=*, each matched against the first value of KEY in the URL's query string and scored as a path segment. See SEP-0025."
         },
         "environments": {
           "type": "array",
@@ -409,7 +410,8 @@
         "route": {
           "type": "string",
           "minLength": 1,
-          "description": "Glob pattern. Express-style :param segments normalize to *."
+          "pattern": "^[^?]*(\\?[^&=]+=[^&]+(&[^&=]+=[^&]+)*)?$",
+          "description": "Glob pattern. Express-style :param segments normalize to *. May end in query conditions, ?KEY=VALUE&KEY=:name&KEY=*, each matched against the first value of KEY in the URL's query string. See SEP-0025."
         },
         "method": {
           "type": "string",

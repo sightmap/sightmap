@@ -94,7 +94,7 @@ type ViewDef struct {
 	Tags []string `json:"tags,omitempty"`
 	// Environments and Origins name where this view runs (SEP-0014). Empty
 	// means unconstrained. They are metadata for consumers and never narrow
-	// ViewForURL, which matches on the path alone.
+	// ViewForURL, which matches on the route alone.
 	Environments []string `json:"environments,omitempty"`
 	Origins      []string `json:"origins,omitempty"`
 	// Properties are named values read from the matched URL (SEP-0008). A :name
@@ -215,9 +215,10 @@ func (c *Corpus) AllComponents() []ComponentDef {
 }
 
 // ViewForURL returns the View whose route most specifically matches pageURL's
-// path, or nil if no view matches. Specificity follows the spec's per-segment
-// scoring (literal > :param > * > **); when scores tie, the first-declared view
-// wins. The returned View is a copy.
+// path and query conditions (SEP-0025), or nil if no view matches. Specificity
+// follows the spec's per-segment scoring (literal > :param > * > **), with each
+// query condition scored as the segment it mirrors; when scores tie, the
+// first-declared view wins. The returned View is a copy.
 func (c *Corpus) ViewForURL(pageURL string) *ViewDef {
 	best := c.ViewIndexForURL(pageURL)
 	if best < 0 {
@@ -235,12 +236,12 @@ func (c *Corpus) ViewIndexForURL(pageURL string) int {
 	if err != nil {
 		return -1
 	}
-	path := normalizeRoutePath(u.Path)
+	path, q := normalizeRoutePath(u.Path), u.Query()
 
 	best := -1
 	bestScore := -1
 	for i := range c.Views {
-		if !MatchRoute(c.Views[i].Route, path) {
+		if !matchRouteURL(c.Views[i].Route, path, q) {
 			continue
 		}
 		if s := routeSpecificity(c.Views[i].Route); s > bestScore {
@@ -261,11 +262,11 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 	if err != nil {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
+	path, q := normalizeRoutePath(u.Path), u.Query()
 	topScore := -1
 	var names []string
 	for i := range c.Views {
-		if !MatchRoute(c.Views[i].Route, path) {
+		if !matchRouteURL(c.Views[i].Route, path, q) {
 			continue
 		}
 		s := routeSpecificity(c.Views[i].Route)
@@ -293,7 +294,18 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 //     "/admin/**" matches "/admin", "/admin/x", and "/admin/x/y"
 //   - a "**" glued into a segment (e.g. "/foo**") is treated as a regular *,
 //     matching within that one segment only
+//
+// A pattern may end in query conditions (PATH?KEY=VALUE&KEY=:name, SEP-0025),
+// read against the query string of path ("/profile?section=gift-cards"). A
+// path with no query string meets no condition.
 func MatchRoute(pattern, path string) bool {
+	p, rawQuery, _ := strings.Cut(path, "?")
+	q, _ := url.ParseQuery(rawQuery)
+	return matchRouteURL(pattern, p, q)
+}
+
+// matchRoutePath reports whether a route's path part matches a URL path.
+func matchRoutePath(pattern, path string) bool {
 	re := regexp.MustCompile(routeToRegex(normalizeRoutePath(pattern)))
 	return re.MatchString(normalizeRoutePath(path))
 }
@@ -368,8 +380,22 @@ func routeSegBody(seg string) string {
 
 // routeSpecificity scores a route pattern per the spec's most-specific-wins
 // table: literal segments score 3, :param 2, `*` 1, and `**` or empty 0. The
-// score is summed over segments; the root route "/" scores 1.
+// score is summed over segments; the root route "/" scores 1. Each query
+// condition adds the score of the segment it mirrors (SEP-0025): a literal
+// value 3, KEY=:name 2, KEY=* 1.
 func routeSpecificity(pattern string) int {
+	p, rawQuery, hasQuery := splitRoute(pattern)
+	score := pathSpecificity(p)
+	if hasQuery {
+		conds, _ := parseRouteQuery(rawQuery)
+		for _, c := range conds {
+			score += c.score()
+		}
+	}
+	return score
+}
+
+func pathSpecificity(pattern string) int {
 	pattern = normalizeRoutePath(pattern)
 	if pattern == "/" {
 		return 1
@@ -403,11 +429,11 @@ func (c *Corpus) TagsForURL(pageURL string) []string {
 	if err != nil {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
+	path, q := normalizeRoutePath(u.Path), u.Query()
 	seen := map[string]bool{}
 	var out []string
 	for i := range c.Views {
-		if !MatchRoute(c.Views[i].Route, path) {
+		if !matchRouteURL(c.Views[i].Route, path, q) {
 			continue
 		}
 		for _, t := range c.Views[i].Tags {
