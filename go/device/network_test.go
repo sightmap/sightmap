@@ -487,3 +487,78 @@ func TestNetworkCapacityIsAtLeastOne(t *testing.T) {
 		t.Errorf("capacity %d, holding %d", n.Capacity, n.CountSource(SourceHAR))
 	}
 }
+
+// har-split.ndjson holds two responses, of 31 KB and 61 KB, as CFNetwork
+// logged them: each one's Summary line, then its HAR entry in two and in
+// three parts.
+func TestHARSplitAcrossLogMessages(t *testing.T) {
+	defer func(d time.Duration) { summaryHold = d }(summaryHold)
+	summaryHold = 20 * time.Millisecond
+	lines := fixtureLines(t, "har-split.ndjson")
+	sumA, a, sumB, b := lines[0], lines[1:3], lines[3], lines[4:7]
+	const urlA, urlB = "http://127.0.0.1:18765/anything/sightmap/size/31000", "http://127.0.0.1:18765/anything/sightmap/size/61000"
+	cat := func(ls ...any) (out []cfLine) {
+		for _, l := range ls {
+			switch l := l.(type) {
+			case cfLine:
+				out = append(out, l)
+			case []cfLine:
+				out = append(out, l...)
+			}
+		}
+		return out
+	}
+	onThread := func(ls []cfLine, id int) []cfLine {
+		out := append([]cfLine(nil), ls...)
+		for i := range out {
+			out[i].ThreadID = id
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name  string
+		lines []cfLine
+		want  []string
+	}{
+		{"two parts", cat(sumA, a), []string{urlA + " har 31000"}},
+		{"three parts", cat(sumB, b), []string{urlB + " har 61000"}},
+		// Not seen from CFNetwork, which logged even concurrent requests' entries one after another.
+		{"interleaved", cat(sumA, sumB, a[0], b[0], a[1], b[1], b[2]), []string{urlA + " har 31000", urlB + " har 61000"}},
+		{"lost last part", cat(sumA, a[0], sumB, onThread(b, a[0].ThreadID)), []string{urlB + " har 61000", " summary 0"}},
+		{"lost first part", cat(sumB, b[1:], sumA, a), []string{urlA + " har 31000", " summary 0"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newTestCollector(true)
+			for _, l := range tc.lines {
+				c.handleLine(l)
+			}
+			time.Sleep(100 * time.Millisecond)
+			var got []string
+			for _, e := range c.Network.List(NetworkFilter{}, func(e NetworkEntry) NetworkEntry { return e }).Entries {
+				n := 0
+				if full, _ := c.Network.Get(e.Index); full.RspBody != nil {
+					n = len(full.RspBody.Content)
+				}
+				got = append(got, fmt.Sprintf("%s %s %d", e.URL, e.Source, n))
+			}
+			if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
+				t.Errorf("entries:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(tc.want, "\n"))
+			}
+		})
+	}
+}
+
+func TestHARJoinerDropsAStalePart(t *testing.T) {
+	lines := fixtureLines(t, "har-split.ndjson")
+	var j harJoiner
+	if _, ok := j.add(lines[1]); ok || len(j.parts) != 1 {
+		t.Fatalf("a first part was not held: %d held", len(j.parts))
+	}
+	later := lines[0]
+	later.Timestamp = "2026-11-02 10:27:45.000000-0500"
+	later.ThreadID++
+	j.add(later)
+	if len(j.parts) != 0 {
+		t.Errorf("a part with no follow-up for 2 s is still held")
+	}
+}

@@ -10,3 +10,7 @@ requests:
         extract: { from: req.body, path: order }
       - name: echoed
         extract: { from: rsp.body, path: json.order }
+  # The Network tab's Fetch Report button.
+  - name: Report
+    route: /anything/sightmap/report
+    method: GET

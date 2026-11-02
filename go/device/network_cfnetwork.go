@@ -27,6 +27,7 @@ type cfLine struct {
 	EventMessage string `json:"eventMessage"`
 	Timestamp    string `json:"timestamp"`
 	ProcessID    int    `json:"processID"`
+	ThreadID     int    `json:"threadID"`
 }
 
 func parseCFLine(line string) (cfLine, bool) {
@@ -40,11 +41,16 @@ func parseCFLine(line string) (cfLine, bool) {
 // logTime converts a `log stream` timestamp ("2026-10-29 12:13:05.652955-0400")
 // to RFC 3339 in UTC.
 func logTime(ts string) string {
-	t, err := time.Parse("2006-01-02 15:04:05.999999-0700", ts)
-	if err != nil {
+	t, ok := parseLogTime(ts)
+	if !ok {
 		return ""
 	}
 	return t.UTC().Format(time.RFC3339Nano)
+}
+
+func parseLogTime(ts string) (time.Time, bool) {
+	t, err := time.Parse("2006-01-02 15:04:05.999999-0700", ts)
+	return t, err == nil
 }
 
 type harHeader struct {
@@ -92,6 +98,74 @@ func headers(hs []harHeader) []sightmap.Header {
 		out[i] = sightmap.Header{Name: h.Name, Value: h.Value}
 	}
 	return out
+}
+
+// CFNetwork logs a HAR entry longer than one log message holds (30 KB, cut
+// on a UTF-8 character boundary) as consecutive messages from one thread,
+// each but the last starting with harContinued. The parts carry no entry id
+// or sequence number, and every entry's first part starts with harEntryStart.
+const (
+	harContinued  = "<incomplete> "
+	harEntryStart = `{"_transactionUUID":`
+)
+
+// harEntryLimit bounds a reassembled HAR entry: the body limit, base64
+// encoded and JSON escaped, for both request and response, plus headers.
+const harEntryLimit = 8 << 20
+
+// harPartGap is how long a partial entry waits for its next part. CFNetwork
+// logs the parts of one entry within milliseconds of each other.
+const harPartGap = time.Second
+
+type harPartial struct {
+	text strings.Builder
+	last time.Time
+}
+
+// harJoiner reassembles HAR entries split across log messages, per thread.
+// An entry that loses a part is dropped, which leaves its request to the
+// Summary backstop.
+type harJoiner struct {
+	parts map[[2]int]*harPartial
+}
+
+// add takes a HAR line and returns the entry whole once its last part
+// arrives; ok is false while the entry is incomplete.
+func (j *harJoiner) add(l cfLine) (whole cfLine, ok bool) {
+	at, _ := parseLogTime(l.Timestamp)
+	for key, p := range j.parts {
+		if at.Sub(p.last) > harPartGap {
+			delete(j.parts, key)
+		}
+	}
+	key := [2]int{l.ProcessID, l.ThreadID}
+	text, more := strings.CutPrefix(l.EventMessage, harContinued)
+	p := j.parts[key]
+	if p != nil && strings.HasPrefix(text, harEntryStart) {
+		delete(j.parts, key) // the thread's previous entry lost its last part
+		p = nil
+	}
+	if !more {
+		if p != nil {
+			delete(j.parts, key)
+			l.EventMessage = p.text.String() + text
+		}
+		return l, true
+	}
+	if p == nil {
+		if j.parts == nil {
+			j.parts = map[[2]int]*harPartial{}
+		}
+		p = &harPartial{}
+		j.parts[key] = p
+	}
+	if p.text.Len()+len(text) > harEntryLimit {
+		delete(j.parts, key)
+		return cfLine{}, false
+	}
+	p.text.WriteString(text)
+	p.last = at
+	return cfLine{}, false
 }
 
 // bodyText decodes a base64 HAR body; a binary one keeps only its size.

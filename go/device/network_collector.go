@@ -82,6 +82,7 @@ type NetCollector struct {
 	harArmed    bool
 	diagnostics bool
 	harTasks    map[string]bool
+	harParts    harJoiner
 	unclaimed   int
 	diag        diagQueue
 	// summaryDetail is the summary source's detail while it is active.
@@ -327,6 +328,7 @@ func (c *NetCollector) stream(ctx context.Context, har, summary bool) {
 	}
 	predicate := fmt.Sprintf(`subsystem == "com.apple.CFNetwork" AND process == %q AND (%s)`, c.Process, strings.Join(categories, " OR "))
 	for ctx.Err() == nil {
+		c.harParts = harJoiner{}
 		cmd := logStream(ctx, c.UDID, predicate)
 		out, err := cmd.StdoutPipe()
 		if err == nil {
@@ -356,6 +358,10 @@ func (c *NetCollector) stream(ctx context.Context, har, summary bool) {
 func (c *NetCollector) handleLine(l cfLine) {
 	switch l.Category {
 	case "HAR":
+		l, whole := c.harParts.add(l)
+		if !whole {
+			return
+		}
 		if e, ok := parseHAR(l); ok {
 			c.mu.Lock()
 			if len(c.harTasks) > 10000 {

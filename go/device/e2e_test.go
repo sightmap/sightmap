@@ -3,6 +3,7 @@ package device_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -168,10 +169,17 @@ func TestE2E(t *testing.T) {
 	time.Sleep(time.Second)
 	expect(must("console", "list", "--grep", "notify"), "notify off")
 
-	// The Network tab's Send Request posts to this server instead of httpbin.org.
+	// The Network tab's requests go to this server instead of httpbin.org.
+	// Fetch Report's response is large enough that CFNetwork logs its HAR
+	// entry in several parts.
+	report := `{"rows":"` + strings.Repeat("x", 200<<10-11) + `"}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			io.WriteString(w, report)
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
 		http.SetCookie(w, &http.Cookie{Name: "session", Value: "sample-cookie"})
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]any{"json": json.RawMessage(body), "url": r.URL.Path})
@@ -180,6 +188,7 @@ func TestE2E(t *testing.T) {
 	if out, err := simctl("defaults", "write", "dev.sightmap.SimSample", "networkBaseURL", server.URL+"/anything"); err != nil {
 		t.Fatalf("defaults write: %v\n%s", err, out)
 	}
+	simctl("defaults", "delete", "dev.sightmap.SimSample", "networkFetchPaths")
 	expect(must("status"), "har      active")
 	// iOS 26 can expose the SwiftUI tab bar as one element without its tabs;
 	// Network is the middle of three.
@@ -217,6 +226,21 @@ func TestE2E(t *testing.T) {
 	}
 	expect(must("network", "get", m[1], "--unredacted"), "Authorization: Bearer sample-not-a-secret")
 	expect(must("network", "list", "--json", "--grep", "createorder"), `"matches":["CreateOrder"]`, `"source":"har"`)
+
+	must("click", "network-fetch")
+	snapshotUntil(`"Fetched 1"`)
+	reportLine := regexp.MustCompile(`(?m)^#(\d+) \[Report\] +GET ` + regexp.QuoteMeta(server.URL) + `/anything/sightmap/report → 200 \(.*\)$`)
+	for range 10 {
+		if list = must("network", "list"); reportLine.MatchString(list) {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	m = reportLine.FindStringSubmatch(list)
+	if m == nil || !strings.HasSuffix(m[0], "har)") {
+		t.Fatalf("no har entry for the report:\n%s", list)
+	}
+	expect(must("network", "get", m[1]), fmt.Sprintf("Response body (application/json, %d bytes", len(report)))
 
 	shot := filepath.Join(work, "shot.png")
 	must("screenshot", "--out", shot)
