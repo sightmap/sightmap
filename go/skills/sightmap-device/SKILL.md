@@ -477,6 +477,7 @@ $SDKM --sdk_root=$ANDROID_HOME --install "cmdline-tools;latest" platform-tools e
   "platforms;android-35" "build-tools;35.0.0" "system-images;android-35;google_apis;arm64-v8a"
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/build-tools/35.0.0:$PATH"
 avdmanager create avd -n Pixel_8_API_35 -k "system-images;android-35;google_apis;arm64-v8a" -d pixel_8
+sed -i '' 's/^hw.keyboard=.*/hw.keyboard=yes/' ~/.android/avd/Pixel_8_API_35.avd/config.ini   # avdmanager can write no
 ```
 
 Put the exports in the user's shell profile. `build-tools` on PATH gives
@@ -491,8 +492,9 @@ platform it downloads on first build).
 - `QT_QPA_PLATFORM` set to anything but `cocoa` makes the macOS emulator exit;
   `start` drops it when it boots an AVD, but an emulator you launch yourself
   needs it unset.
-- Don't change the AVD's `hw.keyboard`: with it off, the person watching can't
-  type into the emulator from their own keyboard, and `fill` doesn't need it.
+- Keep the AVD's `hw.keyboard=yes` (`avdmanager` can write `no`, hence the
+  `sed` above): with it off, the person watching can't type into the emulator
+  from their own keyboard, and `fill` doesn't need it.
 
 ### Authoring for Android
 
