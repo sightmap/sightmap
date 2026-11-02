@@ -26,7 +26,8 @@ func handle(_ request: Request) async throws -> [String: Any] {
 
   case "describe":
     let udid = try request.string("udid")
-    return try await registry.withConnection(udid: udid, retry: true) { try await Describe.run($0, udid: udid) }
+    let appPID = (request.args["pid"] as? NSNumber).map { pid_t($0.int32Value) }.flatMap { $0 > 0 ? $0 : nil }
+    return try await registry.withConnection(udid: udid, retry: true) { try await Describe.run($0, udid: udid, appPID: appPID) }
 
   case "tap":
     let udid = try request.string("udid")

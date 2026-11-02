@@ -37,7 +37,7 @@ type Config struct {
 type Timing struct {
 	Settle        time.Duration // after a tap before reading a field back
 	ScrollSettle  time.Duration // after a swipe before re-reading
-	OverlaySettle time.Duration // for a system sheet to finish animating in
+	OverlaySettle time.Duration // for a system sheet to finish animating in or out
 	FillReadback  time.Duration // how long fill waits for the typed text to show
 	ReadyTimeout  time.Duration // how long start waits for a readable tree
 	RetryInterval time.Duration // between re-reads while the screen moves
@@ -53,7 +53,7 @@ func (t Timing) withDefaults() Timing {
 	}
 	def(&t.Settle, 350*time.Millisecond)
 	def(&t.ScrollSettle, 150*time.Millisecond)
-	def(&t.OverlaySettle, 800*time.Millisecond)
+	def(&t.OverlaySettle, 2*time.Second)
 	def(&t.FillReadback, 2*time.Second)
 	def(&t.ReadyTimeout, 20*time.Second)
 	def(&t.RetryInterval, 150*time.Millisecond)
@@ -166,23 +166,26 @@ func (c *corpusCache) get() (*sightmap.Corpus, *match.Matcher, error) {
 
 func (s *Session) describe(ctx context.Context) (*Describe, error) {
 	var d Describe
-	err := s.Helper.Request(ctx, "describe", map[string]any{"udid": s.UDID}, &d)
+	// The app's pid keeps the helper from taking the app itself for a system
+	// sheet from another process.
+	err := s.Helper.Request(ctx, "describe", map[string]any{"udid": s.UDID, "pid": s.AppPID}, &d)
 	return &d, err
 }
 
-// describeSettled waits out a system sheet animating in, which leaves no
-// readable tree for a moment once the app had one.
+// describeSettled waits out a system sheet animating in or out, which leaves
+// no readable tree for up to a second or so once the app had one.
 func (s *Session) describeSettled(ctx context.Context) (*Describe, error) {
 	d, err := s.describe(ctx)
-	if err == nil {
-		s.readable = true
-		return d, nil
+	deadline := time.Now().Add(s.Timing.OverlaySettle)
+	for err != nil && Code(err) == "ax_disabled" && s.readable && time.Now().Before(deadline) {
+		time.Sleep(s.Timing.RetryInterval)
+		d, err = s.describe(ctx)
 	}
-	if Code(err) != "ax_disabled" || !s.readable {
+	if err != nil {
 		return nil, err
 	}
-	time.Sleep(s.Timing.OverlaySettle)
-	return s.describe(ctx)
+	s.readable = true
+	return d, nil
 }
 
 func (s *Session) accessibilityOn(ctx context.Context) bool {

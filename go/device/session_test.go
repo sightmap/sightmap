@@ -20,7 +20,12 @@ type fakeHelper struct {
 	// repeating.
 	scenes []*Describe
 	swipes int
-	inputs []string
+	// blank is how many describes in a row fail as an empty tree, as while a
+	// system sheet animates.
+	blank int
+	// describePIDs is the app pid each describe passed.
+	describePIDs []any
+	inputs       []string
 	// inputAt is when each input arrived.
 	inputAt []time.Time
 }
@@ -28,6 +33,11 @@ type fakeHelper struct {
 func (f *fakeHelper) Request(_ context.Context, cmd string, args map[string]any, out any) error {
 	switch cmd {
 	case "describe":
+		f.describePIDs = append(f.describePIDs, args["pid"])
+		if f.blank > 0 {
+			f.blank--
+			return errorf("ax_disabled", "the app exposes no accessibility elements")
+		}
 		d := f.describe
 		if len(f.scenes) > 0 {
 			d = f.scenes[min(f.swipes, len(f.scenes)-1)]
@@ -578,5 +588,29 @@ func TestNavigationBarItemsAreNotCoveredByTheirOwnBar(t *testing.T) {
 	s, _ := Annotate(Normalize(d), nil, nil, "")
 	if err := s.AssertActionable(byIdentifier(t, s.Tree, "BackButton"), "BackButton"); err != nil {
 		t.Errorf("back button: %v", err)
+	}
+}
+
+func TestSessionWaitsOutAnEmptyTreeWhileASheetGoesAway(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	s.AppPID = 42
+	if _, err := handle(t, s, "snapshot", SnapshotArgs{}); err != nil {
+		t.Fatal(err)
+	}
+	h.blank = 4
+	if _, err := handle(t, s, "click", TargetArgs{Target: "PrimaryButton"}); err != nil {
+		t.Fatalf("click while the tree is briefly empty: %v", err)
+	}
+	if len(h.inputs) != 1 || !strings.HasPrefix(h.inputs[0], "tap ") {
+		t.Fatalf("inputs %v", h.inputs)
+	}
+	if h.describePIDs[0] != 42 {
+		t.Errorf("describe passed pid %v, want the app's 42", h.describePIDs[0])
+	}
+
+	s.Timing.OverlaySettle = 20 * time.Millisecond
+	h.blank = 1000
+	if _, err := handle(t, s, "snapshot", SnapshotArgs{}); Code(err) != "ax_disabled" {
+		t.Fatalf("a tree that stays empty: %v, want ax_disabled", err)
 	}
 }

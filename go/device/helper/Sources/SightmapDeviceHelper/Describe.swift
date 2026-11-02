@@ -3,45 +3,50 @@ import FBSimulatorControl
 import Foundation
 
 enum Describe {
-  static let keys: Set<AXKeys> = [.type, .role, .subrole, .traits, .label, .uniqueID, .value, .frameDict, .enabled]
+  static let keys: Set<AXKeys> = [.type, .role, .subrole, .traits, .label, .uniqueID, .value, .frameDict, .enabled, .pid]
 
   static let accessibilityDisabledMessage =
     "the app exposes no accessibility elements; enable app accessibility with "
     + "`xcrun simctl spawn %@ defaults write com.apple.Accessibility ApplicationAccessibilityEnabled -bool true` "
     + "and relaunch the app"
 
-  static func run(_ connection: SimulatorConnection, udid: String) async throws -> [String: Any] {
+  static func run(_ connection: SimulatorConnection, udid: String, appPID: pid_t?) async throws -> [String: Any] {
     let options = AccessibilityRequestOptions(format: .nested, keys: keys)
     let response = try await connection.automation.describe(.frontmost, options: options)
     let root = await expandOpaqueBars(connection, tree(response.elements.elements))
-    if hasChildren(root) {
+    if hasInteractive(root) {
       return ["screen": screen(connection.simulator, root: root), "root": root]
     }
     // A system sheet from another process (e.g. "Save Password?") leaves the
-    // frontmost app's tree empty; describe the process that owns the screen.
-    // Only the sheet's controls answer a hit test, not its background, so probe
-    // points from the center outward until one lands on an element.
+    // frontmost app's tree empty, or holding only some of the sheet's text;
+    // describe the process that owns the screen. Only the sheet's controls
+    // answer a hit test, not its background, so probe points from the center
+    // outward until one lands on an element of another process.
     let size = screen(connection.simulator, root: root)
-    if let pid = await overlayOwner(connection, width: size["w"] as? Double ?? 0, height: size["h"] as? Double ?? 0),
+    let app = appPID ?? response.elements.elements.first?.pid.flatMap({ $0 }).map { pid_t($0) }
+    if let pid = await overlayOwner(connection, width: size["w"] as? Double ?? 0, height: size["h"] as? Double ?? 0, excluding: app),
       let overlay = try? await connection.automation.describe(.application(pid: pid), options: options)
     {
       let overlayRoot = tree(overlay.elements.elements)
-      if hasChildren(overlayRoot) {
+      if hasInteractive(overlayRoot) {
         return ["screen": size, "root": overlayRoot, "overlay": true]
       }
+    }
+    if hasChildren(root) {
+      return ["screen": size, "root": root]
     }
     throw HelperError(code: "ax_disabled", message: String(format: accessibilityDisabledMessage, udid))
   }
 
-  private static func overlayOwner(_ connection: SimulatorConnection, width: Double, height: Double) async -> pid_t? {
+  private static func overlayOwner(_ connection: SimulatorConnection, width: Double, height: Double, excluding app: pid_t?) async -> pid_t? {
     let probe = AccessibilityRequestOptions(format: .nested, keys: [.pid])
     for fy in [0.5, 0.6, 0.4, 0.7, 0.3, 0.8, 0.2, 0.9] {
       for fx in [0.5, 0.25, 0.75] {
         let point = CGPoint(x: width * fx, y: height * fy)
         if let hit = try? await connection.automation.describe(.point(point), options: probe).elements.elements.first,
-          let pid = hit.pid.flatMap({ $0 })
+          let pid = hit.pid.flatMap({ $0 }).map({ pid_t($0) }), pid != app
         {
-          return pid_t(pid)
+          return pid
         }
       }
     }
@@ -101,6 +106,27 @@ enum Describe {
 
   private static func tree(_ elements: [AccessibilityDocumentElement]) -> [String: Any] {
     elements.count == 1 ? node(elements[0]) : syntheticRoot(children: elements.map(node))
+  }
+
+  private static let interactiveTypes: Set<String> = [
+    "button", "link", "cell", "textfield", "securetextfield", "searchfield", "textview", "checkbox", "switch",
+    "radiobutton", "tab", "slider", "stepper", "segmentedcontrol", "picker", "pickerwheel", "popupbutton", "menuitem",
+  ]
+  private static let interactiveSubroles: Set<String> = ["AXSwitch", "AXTabButton", "AXSearchField", "AXSecureTextField"]
+  private static let tappableTraits: Set<String> = ["Button", "Link", "Adjustable"]
+
+  // Mirrors the daemon's notion of an interactive element closely enough to
+  // tell a screen of controls from a few stray labels.
+  private static func hasInteractive(_ element: [String: Any]) -> Bool {
+    let traits = Set(element["traits"] as? [String] ?? [])
+    if traits.contains("KeyboardKey") { return false }
+    let type = (element["type"] as? String ?? "").lowercased()
+    if interactiveTypes.contains(type) || interactiveSubroles.contains(element["subrole"] as? String ?? "")
+      || !tappableTraits.isDisjoint(with: traits)
+    {
+      return true
+    }
+    return (element["children"] as? [[String: Any]] ?? []).contains(where: hasInteractive)
   }
 
   private static func hasChildren(_ root: [String: Any]) -> Bool {
