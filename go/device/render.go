@@ -51,6 +51,11 @@ func (s *Snapshot) body(n *sightmap.ComponentNode) string {
 	if id := Identifier(n); id != "" {
 		b += "[identifier=" + quote(id) + "]"
 	}
+	for _, k := range []string{"type", "field", "format"} {
+		if v := n.Element.Attrs[k]; v != "" {
+			b += "[" + k + "=" + quote(v) + "]"
+		}
+	}
 	if n.Name != "" {
 		b += " " + quote(n.Name)
 	}

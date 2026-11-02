@@ -30,6 +30,8 @@ type SessionInfo struct {
 	StartedAt  string `json:"startedAt"`
 	Run        string `json:"run,omitempty"`
 	LogFile    string `json:"logFile,omitempty"`
+	// Probe is true when the session loads the in-app probe.
+	Probe bool `json:"probe,omitempty"`
 
 	File string `json:"-"`
 }
@@ -211,6 +213,7 @@ func Serve(s *Session, launch bool, logFile string) (_ *Daemon, err error) {
 	d.Info = SessionInfo{
 		Socket: socket, PID: os.Getpid(), UDID: s.UDID, DeviceName: s.DeviceName, BundleID: s.BundleID, AppPath: s.AppPath,
 		StartedAt: s.StartedAt.UTC().Format(time.RFC3339), Run: s.RunLog.Current().Run, LogFile: logFile,
+		Probe: s.Probe != "",
 	}
 	go d.accept()
 	data, _ := json.MarshalIndent(d.Info, "", "  ")

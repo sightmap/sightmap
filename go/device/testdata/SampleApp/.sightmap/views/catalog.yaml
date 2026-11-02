@@ -1,0 +1,37 @@
+version: 1
+views:
+  # Placeholder route: sightmap requires one, and a native screen has no URL.
+  - name: Catalog
+    route: /catalog
+    memory:
+      - Each row's title, maker and price come from its own Text only with the
+        in-app probe (`device start --probe`); without it the row is one
+        element whose label joins them with ", ".
+    components:
+      - name: CatalogRow
+        selector: '[identifier^="catalog-row-"]'
+        properties:
+          - name: summary
+            extract: { from: dom.text }
+          - name: title
+            extract: { from: component, path: Title.text }
+          - name: maker
+            extract: { from: component, path: Maker.text }
+          - name: price
+            extract: { from: component, path: Price.value }
+        children:
+          - name: Title
+            selector: 'text[field="item.title"]'
+            properties:
+              - name: text
+                extract: { from: dom.text }
+          - name: Maker
+            selector: 'text[field="maker"]'
+            properties:
+              - name: text
+                extract: { from: dom.text }
+          - name: Price
+            selector: 'text[field="item.price"]'
+            properties:
+              - name: value
+                extract: { from: dom.attr, path: value }

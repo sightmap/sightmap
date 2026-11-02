@@ -47,6 +47,10 @@ type RawElement struct {
 	Enabled    *bool         `json:"enabled"`
 	Traits     []string      `json:"traits"`
 	Children   []*RawElement `json:"children"`
+	// Attrs are extra element attributes, from the in-app probe.
+	Attrs map[string]string `json:"attrs,omitempty"`
+	// Probe marks an element the in-app probe added.
+	Probe bool `json:"-"`
 }
 
 // Value is an element's accessibility value. The helper sends a string or null;
@@ -87,6 +91,7 @@ type Tree struct {
 
 	parent map[*sightmap.ComponentNode]*sightmap.ComponentNode
 	traits map[*sightmap.ComponentNode][]string
+	probe  map[*sightmap.ComponentNode]bool
 }
 
 var tagByType = map[string]string{
@@ -261,6 +266,7 @@ func Normalize(d *Describe) *Tree {
 		Overlay: d.Overlay,
 		parent:  map[*sightmap.ComponentNode]*sightmap.ComponentNode{},
 		traits:  map[*sightmap.ComponentNode][]string{},
+		probe:   map[*sightmap.ComponentNode]bool{},
 	}
 	if d.Root == nil {
 		d.Root = &RawElement{}
@@ -312,11 +318,17 @@ func (t *Tree) build(c collapsed, parent *sightmap.ComponentNode, nth int) *sigh
 	if !enabled {
 		attrs["disabled"] = ""
 	}
+	for k, v := range raw.Attrs {
+		attrs[k] = v
+	}
 	t.Nodes = append(t.Nodes, n)
 	if parent != nil {
 		t.parent[n] = parent
 	}
 	t.traits[n] = raw.Traits
+	if raw.Probe {
+		t.probe[n] = true
+	}
 	for i, ch := range c.children {
 		n.Children = append(n.Children, t.build(ch, n, i+1))
 	}
@@ -360,6 +372,9 @@ func truncateRunes(s string, n int) string {
 
 // Parent returns n's parent, or nil for the root.
 func (t *Tree) Parent(n *sightmap.ComponentNode) *sightmap.ComponentNode { return t.parent[n] }
+
+// FromProbe reports whether the in-app probe added n.
+func (t *Tree) FromProbe(n *sightmap.ComponentNode) bool { return t.probe[n] }
 
 // Traits returns n's accessibility traits (e.g. Button, Selected).
 func (t *Tree) Traits(n *sightmap.ComponentNode) []string { return t.traits[n] }
