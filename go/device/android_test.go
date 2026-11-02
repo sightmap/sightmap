@@ -2,6 +2,7 @@ package device
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -268,7 +269,7 @@ func TestADBHelperInputInPixels(t *testing.T) {
 		t.Errorf("unknown button = %v", err)
 	}
 	var d Describe
-	if err := h.Request(ctx, "describe", map[string]any{"udid": "emulator-5554"}, &d); err != nil || d.Root == nil || len(d.Root.Children) == 0 {
+	if err := h.Request(ctx, "describe", map[string]any{"udid": "emulator-5554", "pid": 4321}, &d); err != nil || d.Root == nil || len(d.Root.Children) == 0 {
 		t.Fatalf("describe = %+v, %v", d, err)
 	}
 	if c := f.called("uiautomator"); !strings.Contains(c, "rm -f "+dumpPath) || !strings.Contains(c, "dumpsys window InputMethod") {
@@ -469,5 +470,90 @@ func TestAndroidStatusBarComesFromTheDevice(t *testing.T) {
 	nav, _ := Resolve(snap, "nav")
 	if err := snap.AssertActionable(nav, "nav"); Code(err) != "covered" {
 		t.Errorf("a button under a 152 px status bar is covered, got %v", err)
+	}
+}
+
+func newAndroidTestSession(t *testing.T, f *fakeADB, timing Timing) *Session {
+	t.Helper()
+	adb := ADB{Run: f.run}
+	s := NewSession(Config{Platform: PlatformAndroid, UDID: "emulator-5554", BundleID: "dev.sightmap.compose", SightmapDir: t.TempDir()},
+		NewADBHelper(adb, "emulator-5554", "dev.sightmap.compose", nil), AndroidSim{ADB: adb})
+	s.Timing = timing.withDefaults()
+	return s
+}
+
+// A settled read already waited for the screen to go idle, so a screen that
+// changed on the read before is acted on without the hold-still wait.
+func TestAndroidSettledReadSkipsTheQuietWait(t *testing.T) {
+	f := newFakeADB(t, "uiautomator-compose")
+	s := newAndroidTestSession(t, f, Timing{Quiet: time.Minute, Settle: 2 * time.Second, RetryTimeout: 2 * time.Second,
+		RetryInterval: time.Millisecond, ScrollSettle: time.Millisecond})
+	for _, step := range []struct {
+		cmd  string
+		args any
+	}{
+		{"click", TargetArgs{Target: "add_to_cart"}},
+		{"scroll", ScrollArgs{Direction: "down"}},
+	} {
+		f.calls = nil
+		started := time.Now()
+		if _, err := handle(t, s, step.cmd, step.args); err != nil {
+			t.Fatalf("%s: %v", step.cmd, err)
+		}
+		if took := time.Since(started); took > time.Second {
+			t.Errorf("%s took %s; a settled read needs no hold-still wait", step.cmd, took)
+		}
+		if f.called("input tap") == "" && f.called("input swipe") == "" {
+			t.Errorf("%s sent no input: %v", step.cmd, f.calls)
+		}
+	}
+}
+
+// A switch is pressed with a stationary swipe at the trailing end of its row;
+// on Android the whole row toggles it, and 150 ms is well under a long press.
+func TestAndroidSwitchIsPressedAtItsTrailingEnd(t *testing.T) {
+	f := newFakeADB(t, "uiautomator-compose")
+	f.answers["uiautomator"] = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" package="dev.sightmap.compose" bounds="[0,0][1080,2400]">` +
+		`<node class="android.widget.Switch" package="dev.sightmap.compose" resource-id="dev.sightmap.compose:id/notifications" text="Notifications" checkable="true" checked="false" clickable="true" enabled="true" bounds="[0,400][1080,547]"/>` +
+		`</node></hierarchy>` + "\n" + imeMarker + "\n"
+	s := newAndroidTestSession(t, f, Timing{RetryTimeout: time.Millisecond, RetryInterval: time.Millisecond, Settle: time.Millisecond})
+	if _, err := handle(t, s, "click", TargetArgs{Target: "notifications"}); err != nil {
+		t.Fatal(err)
+	}
+	var x1, y1, x2, y2, ms int
+	c := f.called("input swipe")
+	if c == "" {
+		t.Fatalf("a switch is pressed with a stationary swipe: %v", f.calls)
+	}
+	if _, err := fmt.Sscanf(c[strings.Index(c, "input swipe"):], "input swipe %d %d %d %d %d", &x1, &y1, &x2, &y2, &ms); err != nil {
+		t.Fatalf("swipe = %q: %v", c, err)
+	}
+	// 1080 px is 411 dp; 44 dp in from the end is 367 dp, 963 px.
+	if x1 != x2 || y1 != y2 || ms != 150 || x1 < 900 || x1 > 1080 || y1 < 400 || y1 > 547 {
+		t.Errorf("switch press = %q; want a 150 ms press at the row's trailing end", c)
+	}
+	if f.called("input tap") != "" {
+		t.Errorf("a switch is pressed, not tapped: %v", f.calls)
+	}
+}
+
+// Only the iOS helper reports an empty tree as ax_disabled, the code a sheet
+// going away is waited out on. A screen uiautomator can't read is retried by
+// the helper itself and then reported, not re-read for OverlaySettle.
+func TestAndroidUnreadableScreenIsNotWaitedOutAsASheet(t *testing.T) {
+	f := newFakeADB(t, "uiautomator-compose")
+	s := newAndroidTestSession(t, f, Timing{OverlaySettle: time.Minute, RetryInterval: time.Millisecond})
+	if _, err := s.fresh(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	f.answers["uiautomator"] = "ERROR: null root node returned by UiTestAutomationBridge.\n" + imeMarker + "\n"
+	f.calls = nil
+	started := time.Now()
+	_, err := s.fresh(context.Background(), "")
+	if Code(err) != "ax_unavailable" || time.Since(started) > 10*time.Second {
+		t.Errorf("err = %v after %s; want ax_unavailable without waiting out OverlaySettle", err, time.Since(started))
+	}
+	if c := f.called("uiautomator"); !strings.Contains(c, "uiautomator dump") {
+		t.Errorf("no dump: %v", f.calls)
 	}
 }

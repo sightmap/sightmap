@@ -392,8 +392,8 @@ What differs from iOS:
 - `--device` is an `adb devices` serial, a model, or an AVD name (a stopped AVD
   is booted).
 - Each read is a `uiautomator dump`, a second or more, but it waits for an idle
-  screen, so `click` taps after one read instead of waiting for two to agree. If
-  it fails with "could not get idle state", turn off animations
+  screen, so `click` and `scroll` act on one read, without waiting for two to
+  agree or for the 0.75 s hold-still. If it fails with "could not get idle state", turn off animations
   (`adb shell settings put global animator_duration_scale 0`, and the
   transition and window scales). It can't run beside an Appium UiAutomator2
   server.
