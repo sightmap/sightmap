@@ -116,7 +116,9 @@ var KnownMessageLevels = []string{
 // match or a def declaring none), bringing MessageMatch to parity with
 // ComponentMatch and RequestMatch.
 type MessageMatch struct {
-	Name        string
+	Name string
+	// ID is the matched MessageDef's SEP-0020 id; "" when the sightmap declares none.
+	ID          string
 	Description string
 	Source      string
 	Tags        []string
@@ -162,6 +164,7 @@ func (c *Corpus) MessagesForRecord(rec Message) []MessageMatch {
 		}
 		out = append(out, MessageMatch{
 			Name:        m.Name,
+			ID:          m.ID,
 			Description: m.Description,
 			Source:      m.Source,
 			Tags:        m.Tags,

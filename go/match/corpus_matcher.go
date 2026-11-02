@@ -158,6 +158,7 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 			q := claims[0]
 			named = &sightmap.ComponentMatch{Name: q.Name}
 			if q.Def != nil {
+				named.ID, named.RefID = q.Def.ID, q.Def.RefID
 				named.Memory = q.Def.Memory
 				named.Tags = q.Def.Tags
 				defByNode[node] = q.Def
