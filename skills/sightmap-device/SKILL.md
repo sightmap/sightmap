@@ -203,6 +203,11 @@ views:
   `[identifier="login-submit"]`.
 - Prefer `[identifier=…]`; fall back to `[text=…]` only for copy that won't
   change or be localized.
+- **The identifier is the element's id**, so `#login-submit` works too. Escape
+  the dots in a dotted identifier and single-quote it: `'#product\.1'`.
+  Unescaped, `#checkout.submit` is id `checkout` + class `submit` and never
+  matches (native elements have no classes). An identifier starting with a
+  digit is written `'[id="1.circle"]'`.
 - The corpus reloads when a YAML file changes; snapshot again to confirm
   components resolve, and run `sightmap validate`.
 - **SwiftUI gotcha:** `.accessibilityIdentifier` on a container overwrites the

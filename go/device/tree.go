@@ -73,7 +73,7 @@ func (v *Value) UnmarshalJSON(data []byte) error {
 //
 //	Role, Element.Tag  the normalized type: button, text, textfield, switch, tab, cell, other, …
 //	Element.Attrs      identifier (testid is an alias), text (the label), value, disabled
-//	Element.Id         the identifier, when it is a valid CSS identifier
+//	Element.Id         the identifier, so `#id` and `[id=…]` select it (escape punctuation: `#product\.1`)
 //	Name               the label
 //	Text               the label, or the children's text joined
 //	State              disabled, selected (Selected trait), checked (a switch's 1 / 0)
@@ -254,8 +254,6 @@ func intersects(f Frame, s Size) bool {
 	return f.W > 0 && f.H > 0 && f.X < s.W && f.Y < s.H && f.X+f.W > 0 && f.Y+f.H > 0
 }
 
-var cssIdent = regexp.MustCompile(`^-?[A-Za-z_][A-Za-z0-9_-]*$`)
-
 // Normalize converts a describe result into a Tree.
 func Normalize(d *Describe) *Tree {
 	t := &Tree{
@@ -303,9 +301,7 @@ func (t *Tree) build(c collapsed, parent *sightmap.ComponentNode, nth int) *sigh
 		// Web and React Native corpora select on `testid`; in the simulator the
 		// same testID arrives as the accessibility identifier.
 		attrs["testid"] = raw.Identifier
-		if cssIdent.MatchString(raw.Identifier) {
-			n.Element.Id = raw.Identifier
-		}
+		n.Element.Id = raw.Identifier
 	}
 	if label != "" {
 		attrs["text"] = label

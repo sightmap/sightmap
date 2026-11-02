@@ -77,8 +77,8 @@ func TestNormalizeCollapsesWrappersAndMapsElements(t *testing.T) {
 	if field.Element.Attrs["testid"] != "simple.email" || field.Element.Attrs["value"] != "Email" {
 		t.Errorf("field attrs = %v", field.Element.Attrs)
 	}
-	if field.Element.Id != "" {
-		t.Errorf("simple.email is no CSS identifier, but Element.Id = %q", field.Element.Id)
+	if field.Element.Id != "simple.email" {
+		t.Errorf("simple.email Element.Id = %q, want the identifier", field.Element.Id)
 	}
 	if last := byIdentifier(t, tree, "lastTapped"); last.Element.Id != "lastTapped" {
 		t.Errorf("lastTapped Element.Id = %q", last.Element.Id)
@@ -282,6 +282,24 @@ func TestResolveTargets(t *testing.T) {
 	}
 	if _, err := Resolve(s, "button[[["); Code(err) != "bad_query" {
 		t.Errorf("bad selector: %v", err)
+	}
+}
+
+func TestResolveDottedIdentifier(t *testing.T) {
+	s := snapshot(t, "describe-simple", "corpus", "")
+	primary := byIdentifier(t, s.Tree, "simple.primary")
+	for _, target := range []string{`#simple\.primary`, `button#simple\.primary`, `[id="simple.primary"]`} {
+		if n, err := Resolve(s, target); err != nil || n != primary {
+			t.Errorf("Resolve(%q) = %v, %v", target, n, err)
+		}
+	}
+	// Unescaped, the dot starts a class, and device trees have none.
+	if _, err := Resolve(s, "#simple.primary"); Code(err) != "not_found" {
+		t.Errorf("#simple.primary: %v", err)
+	}
+	tab := byIdentifier(t, s.Tree, "1.circle")
+	if n, err := Resolve(s, `[id="1.circle"]`); err != nil || n != tab {
+		t.Errorf(`[id="1.circle"] = %v, %v`, n, err)
 	}
 }
 
