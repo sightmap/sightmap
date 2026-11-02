@@ -583,7 +583,7 @@ func TestADBHelperInputInPixels(t *testing.T) {
 	if err := h.Request(ctx, "describe", map[string]any{"udid": "emulator-5554", "pid": 4321}, &d); err != nil || d.Root == nil || len(d.Root.Children) == 0 {
 		t.Fatalf("describe = %+v, %v", d, err)
 	}
-	if c := f.called("uiautomator"); !strings.Contains(c, "rm -f "+dumpPath) || !strings.Contains(c, "dumpsys window InputMethod") {
+	if c := f.called("uiautomator"); !strings.Contains(c, "rm -f "+h.dumpPath) || !strings.Contains(c, "dumpsys window InputMethod") {
 		t.Errorf("describe command = %q", c)
 	}
 }
@@ -606,6 +606,22 @@ func TestADBHelperTypesANewlineAsReturn(t *testing.T) {
 	}
 	if err := h.Request(context.Background(), "type", map[string]any{"text": "a\tb"}, nil); Code(err) != "bad_request" {
 		t.Errorf("a tab = %v, want bad_request", err)
+	}
+}
+
+func TestADBHelperDumpsToItsOwnFile(t *testing.T) {
+	f := newFakeADB(t, "uiautomator-form")
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	var d Describe
+	if err := h.Request(context.Background(), "describe", nil, &d); err != nil {
+		t.Fatal(err)
+	}
+	p := fmt.Sprintf("/data/local/tmp/sightmap-%d-window.xml", os.Getpid())
+	c := f.called("uiautomator")
+	// Removed before the dump (a failed one can't read back as the screen) and
+	// after reading it.
+	if !strings.Contains(c, "uiautomator dump "+p) || strings.Count(c, "rm -f "+p) != 2 || strings.LastIndex(c, "rm -f "+p) < strings.Index(c, "cat "+p) {
+		t.Errorf("describe command = %q", c)
 	}
 }
 

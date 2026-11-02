@@ -502,6 +502,10 @@ type ADBHelper struct {
 	Package string
 	Log     func(string)
 
+	// dumpPath is where uiautomator writes its dump on the device, one file
+	// per daemon so two sessions on one device don't read each other's.
+	dumpPath string
+
 	mu       sync.Mutex
 	screen   *AndroidScreen
 	failures int
@@ -512,11 +516,9 @@ func NewADBHelper(adb ADB, serial, pkg string, log func(string)) *ADBHelper {
 	if log == nil {
 		log = func(string) {}
 	}
-	return &ADBHelper{ADB: adb, Serial: serial, Package: pkg, Log: log}
+	return &ADBHelper{ADB: adb, Serial: serial, Package: pkg, Log: log,
+		dumpPath: fmt.Sprintf("/data/local/tmp/sightmap-%d-window.xml", os.Getpid())}
 }
-
-// dumpPath is where uiautomator writes its dump on the device.
-const dumpPath = "/data/local/tmp/sightmap-window.xml"
 
 // imeMarker separates the dump from the input method window's state in one
 // round trip.
@@ -556,7 +558,8 @@ func (h *ADBHelper) describe(ctx context.Context) (*Describe, error) {
 	}
 	// The old dump is removed first so a failed dump can't read back as the
 	// current screen.
-	command := "rm -f " + dumpPath + "; uiautomator dump " + dumpPath + " 2>&1; cat " + dumpPath + " 2>/dev/null; echo; echo " + imeMarker + "; dumpsys window InputMethod"
+	p := h.dumpPath
+	command := "rm -f " + p + "; uiautomator dump " + p + " 2>&1; cat " + p + " 2>/dev/null; rm -f " + p + "; echo; echo " + imeMarker + "; dumpsys window InputMethod"
 	var lastErr error
 	// uiautomator gives up while the screen animates, and finds no window for a
 	// moment during a transition; both pass.
