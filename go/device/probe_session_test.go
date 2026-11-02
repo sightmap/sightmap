@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -28,6 +29,8 @@ type fakeProbe struct {
 	// serializing a host of that class.
 	crash    atomic.Value
 	lastArgs atomic.Value
+	// hang makes a dump send its progress line and then never finish.
+	hang atomic.Bool
 }
 
 func startFakeProbe(t *testing.T, udid string, pid int) *fakeProbe {
@@ -81,6 +84,11 @@ func (p *fakeProbe) serve(conn net.Conn) {
 		case "dump":
 			p.dumps.Add(1)
 			p.lastArgs.Store(req.Args)
+			if p.hang.Load() {
+				fmt.Fprintf(conn, `{"progress":{"cls":"SlowHostingView"}}`+"\n")
+				time.Sleep(2 * time.Second)
+				return
+			}
 			if c, _ := p.crash.Load().(string); c != "" {
 				fmt.Fprintf(conn, `{"progress":{"cls":%q}}`+"\n", c)
 				return
@@ -189,9 +197,8 @@ func TestProbeTargetOnlyTheProbeShowsIsResolvedAndKeptOutOfTheRunLog(t *testing.
 }
 
 func TestProbeThatNeverAnswersFallsBackToThePlainTree(t *testing.T) {
-	defer func(d time.Duration) { probeStartTimeout = d }(probeStartTimeout)
-	probeStartTimeout = 300 * time.Millisecond
 	s, _ := newProbeSession(t)
+	s.Timing.ProbeStart = 300 * time.Millisecond
 	if _, err := handle(t, s, "launch", nil); err != nil {
 		t.Fatal(err)
 	}
@@ -215,9 +222,8 @@ func TestProbeThatNeverAnswersFallsBackToThePlainTree(t *testing.T) {
 }
 
 func TestProbeSocketOfAnotherProcessIsNotTrusted(t *testing.T) {
-	defer func(d time.Duration) { probeStartTimeout = d }(probeStartTimeout)
-	probeStartTimeout = 300 * time.Millisecond
 	s, _ := newProbeSession(t)
+	s.Timing.ProbeStart = 300 * time.Millisecond
 	startFakeProbe(t, s.UDID, 7)
 	if _, err := handle(t, s, "launch", nil); err != nil {
 		t.Fatal(err)
@@ -277,5 +283,32 @@ func TestProbeDumpThatTakesTheAppDownExcludesThatHostClass(t *testing.T) {
 	}
 	if st := s.ProbeStatus(); st.State != "loaded" || len(st.Excluded) != 1 {
 		t.Fatalf("status after relaunch = %+v", st)
+	}
+}
+
+func TestProbeDumpThatTimesOutIsNotACrash(t *testing.T) {
+	udid := fmt.Sprintf("probe-%d-%s", os.Getpid(), t.Name())
+	p := startFakeProbe(t, udid, 42)
+	p.hang.Store(true)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	err := ProbeRequest(ctx, ProbeSocketPath(udid), "dump", nil, nil)
+	var crash *ProbeCrash
+	if errors.As(err, &crash) || Code(err) != "probe_timeout" {
+		t.Fatalf("err = %v (%T); want probe_timeout", err, err)
+	}
+}
+
+func TestProbeCrashFromAnEarlierLaunchIsIgnored(t *testing.T) {
+	s, _ := newProbeSession(t)
+	s.Timing.ProbeStart = 100 * time.Millisecond
+	s.probeLaunched(42)
+	s.probe.mu.Lock()
+	old := s.probe.gen
+	s.probe.mu.Unlock()
+	s.probeLaunched(43)
+	s.probeFailed(old, &ProbeCrash{Class: "OldHostingView", Err: io.EOF})
+	if st := s.ProbeStatus(); len(st.Excluded) != 0 || strings.Contains(st.Reason, "OldHostingView") {
+		t.Fatalf("a stale dump's crash reached the new launch: %+v", st)
 	}
 }

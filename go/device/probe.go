@@ -2,6 +2,7 @@ package device
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	_ "embed"
@@ -170,6 +171,10 @@ func ProbeRequest(ctx context.Context, socket, cmd string, args map[string]any, 
 	for {
 		line, err := r.ReadBytes('\n')
 		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				return withHint("probe_timeout", "the app may be busy or stalled; snapshot again",
+					"the in-app probe did not finish the dump in time (last host: %s)", cmp.Or(last, "none"))
+			}
 			if last != "" {
 				return &ProbeCrash{Class: last, Err: err}
 			}

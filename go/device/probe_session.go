@@ -1,6 +1,7 @@
 package device
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -43,11 +44,6 @@ type ProbeStat struct {
 	Items   int   `json:"items"`
 }
 
-// How long a launch waits for the probe's socket before calling it
-// unavailable. dyld loads it before main, so it answers within a second or two
-// of launch unless something refused it.
-var probeStartTimeout = 15 * time.Second
-
 type probeState struct {
 	mu     sync.Mutex
 	status ProbeStatus
@@ -58,8 +54,6 @@ type probeState struct {
 	// excluded outlives launches: a class that took the app down once would
 	// again.
 	excluded []string
-	// crashed is set by a dump that took the app down, for the snapshot's note.
-	crashed string
 }
 
 func (s *Session) probeSocket() string { return ProbeSocketPath(s.UDID) }
@@ -81,7 +75,7 @@ func (s *Session) probeLaunched(pid int) {
 
 func (s *Session) probeWarmup(gen, pid int, ready chan struct{}) {
 	ctx := context.Background()
-	deadline := time.Now().Add(probeStartTimeout)
+	deadline := time.Now().Add(s.probeStart())
 	var lastErr error
 	for {
 		var pong struct {
@@ -114,7 +108,7 @@ func (s *Session) probeWarmup(gen, pid int, ready chan struct{}) {
 	defer cancel()
 	var dump ProbeDump
 	if err := ProbeRequest(wctx, s.probeSocket(), "dump", s.probeDumpArgs(), &dump); err != nil {
-		s.probeFailed(err)
+		s.probeFailed(gen, err)
 		s.Log("probe: warm-up dump failed: " + err.Error())
 		return
 	}
@@ -166,7 +160,7 @@ func (s *Session) probeFailure(ctx context.Context, err error) string {
 			"build the simulator configuration with ENABLE_HARDENED_RUNTIME = NO to use --probe"
 	}
 	return fmt.Sprintf("the app did not load the probe within %s (%v); "+
-		"it may clear DYLD_* variables, or have exited", probeStartTimeout, err)
+		"it may clear DYLD_* variables, or have exited", s.probeStart(), err)
 }
 
 func (s *Session) installedApp(ctx context.Context) string {
@@ -211,7 +205,7 @@ func (s *Session) probeDumpArgs() map[string]any {
 
 // probeFailed records a dump that took the app down, so later dumps leave that
 // hosting view class out.
-func (s *Session) probeFailed(err error) {
+func (s *Session) probeFailed(gen int, err error) {
 	var crash *ProbeCrash
 	if !errors.As(err, &crash) {
 		return
@@ -219,10 +213,13 @@ func (s *Session) probeFailed(err error) {
 	p := &s.probe
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	// A relaunch ends the previous app's dump too; that is not a crash.
+	if p.gen != gen {
+		return
+	}
 	if !slices.Contains(p.excluded, crash.Class) {
 		p.excluded = append(p.excluded, crash.Class)
 	}
-	p.crashed = crash.Class
 	p.status.Excluded = p.excluded
 	p.status.State, p.status.Reason = "unavailable", crash.Error()+"; later dumps leave that view out. Relaunch the app (`sightmap device relaunch`)"
 }
@@ -243,20 +240,20 @@ func (s *Session) mergeProbe(ctx context.Context, d *Describe, mode probeMode) b
 		MergeProbe(d, items, s.mergeOptions())
 		return true
 	}
-	state := p.status.State
+	state, gen := p.status.State, p.gen
 	p.mu.Unlock()
 	if mode != probeFetch || state == "unavailable" {
 		return false
 	}
 	if state == "starting" {
-		s.probeWait(probeStartTimeout)
+		s.probeWait(s.probeStart())
 	}
 	started := time.Now()
 	var dump ProbeDump
 	dctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	if err := ProbeRequest(dctx, s.probeSocket(), "dump", s.probeDumpArgs(), &dump); err != nil {
-		s.probeFailed(err)
+		s.probeFailed(gen, err)
 		s.Log("probe: " + err.Error())
 		return false
 	}
@@ -310,3 +307,5 @@ func probeNote(st *ProbeStatus) string {
 	}
 	return "[Probe] the in-app read failed (see the daemon log); this is the plain accessibility tree."
 }
+
+func (s *Session) probeStart() time.Duration { return cmp.Or(s.Timing.ProbeStart, 15*time.Second) }

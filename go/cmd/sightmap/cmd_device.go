@@ -825,6 +825,11 @@ func deviceStart(args []string, f *deviceFlags) error {
 				Message: fmt.Sprintf("a session for %s is already running on %s; it can't switch to %s", existing.BundleID, existing.DeviceName, wanted),
 				Hint:    fmt.Sprintf("run `sightmap device stop`, then `sightmap device start %s --detach`", again)}
 		}
+		if *probe && existing.Probe && *probeFields != existing.ProbeFields {
+			return &device.Error{Code: "session_running",
+				Message: fmt.Sprintf("the running session was started with --probe-fields %q; it can't restart with %q", existing.ProbeFields, *probeFields),
+				Hint:    "run `sightmap device stop`, then start again"}
+		}
 		if *probe != existing.Probe {
 			want, have := "with", "without"
 			if !*probe {

@@ -54,7 +54,11 @@ type Timing struct {
 	ReadyTimeout  time.Duration // how long start waits for a readable tree
 	RetryInterval time.Duration // between re-reads while the screen moves
 	RetryTimeout  time.Duration // how long click/fill wait for a missing target or a moving screen
-	Quiet         time.Duration // how long the screen must hold still before a tap or swipe
+	// ProbeStart is how long a launch waits for the in-app probe to answer.
+	// dyld loads it before main, so it answers within a second or two unless
+	// something refused it.
+	ProbeStart time.Duration
+	Quiet      time.Duration // how long the screen must hold still before a tap or swipe
 }
 
 func (t Timing) withDefaults() Timing {
@@ -344,7 +348,7 @@ func (s *Session) launchEnv() []string {
 func (s *Session) WaitReady(ctx context.Context) map[string]any {
 	r := s.waitReady(ctx)
 	if s.Probe != "" {
-		r["probe"] = s.probeWait(probeStartTimeout)
+		r["probe"] = s.probeWait(s.probeStart())
 	}
 	return r
 }
