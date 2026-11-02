@@ -328,3 +328,8 @@ signing in, iOS may show a "Save Password?" sheet: it appears as `[Overlay]`.
 - The corpus is always the session's `--sightmap-dir`.
 - Scrolling to a far row takes about 3 s per screenful (more for a React Native
   `FlatList`, whose tree is larger).
+- `click` confirms the tap was delivered, not that the app handled it. On iOS 26,
+  a screen with a hidden search field and search scopes can have an invisible
+  strip up to ~35 pt below the navigation bar that swallows touches, a real
+  finger's too, with nothing in the accessibility tree to show it. Check the
+  result with `snapshot` and, if nothing changed, `tap-xy` lower in the target.

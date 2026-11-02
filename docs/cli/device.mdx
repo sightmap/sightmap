@@ -342,5 +342,6 @@ A new Xcode release can still need a sightmap update; `device doctor` says so wh
 
 - Simulator only, on Apple Silicon. Physical devices are not supported.
 - No hover or file upload. For another screen size, start on a different `--device`.
+- `click` confirms the tap was delivered, not that the app handled it. On iOS 26, a screen with a hidden search field and search scopes can have an invisible strip up to ~35 pt below the navigation bar that swallows touches (a real finger's too), with nothing in the accessibility tree to show it. Check the result with `snapshot` and, if nothing changed, use `tap-xy` lower in the target.
 
 The `sightmap-device` agent skill covers the full agent workflow, including React Native specifics. Install it with [`sightmap skills install`](/cli/integrate#sightmap-skills-install).
