@@ -1,27 +1,28 @@
 ---
 name: sightmap-device
-description: Use when driving a native iOS app in the local iOS Simulator, or an Android app on an emulator or device, with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console and network requests. Activate when the user wants to run, try, test, or reproduce a flow in an iOS app on the Simulator, inspect an iOS screen, or author `.sightmap/` definitions for an iOS or React Native app.
+description: Use when driving a native iOS app in the local iOS Simulator, or an Android app on an emulator or device, with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console and network requests. Activate when the user wants to run, try, test, or reproduce a flow in an iOS or Android app, inspect a mobile screen, or author `.sightmap/` definitions for an iOS, Android or React Native app.
 activation:
-  - .sightmap/ directory exists in an iOS or React Native project
+  - .sightmap/ directory exists in an iOS, Android or React Native project
   - driving an app in the iOS Simulator against a sightmap corpus
   - driving an Android app on an emulator or device against a sightmap corpus
 ---
 
-# Sightmap device: drive an iOS app in the Simulator
+# Sightmap device: drive an iOS or Android app
 
-`sightmap device` drives an app in the iOS Simulator on this Mac the way
+`sightmap device` drives an app in the iOS Simulator on this Mac, or on an
+Android emulator or device (see [Android](#android)), the way
 `sightmap browser` drives Chrome: it reads the app's **accessibility tree**,
 layers your `.sightmap/` corpus onto it, and lets you **act on elements by
 accessibility identifier or component query**. Matching uses sightmap's own
 matcher, so `sightmap explain` and `sightmap coverage` agree with what a device
-snapshot shows. Simulator only; nothing leaves the Mac except the app's own
-traffic. To build the corpus itself, see the `sightmap-authoring` skill.
+snapshot shows. Nothing leaves the machine except the app's own traffic. To build the corpus itself, see the `sightmap-authoring` skill.
 
 ## Prerequisites
 
-Apple Silicon Mac, macOS 15+, Xcode 26+ selected with `xcode-select` (not just
+For iOS: Apple Silicon Mac, macOS 15+, Xcode 26+ selected with `xcode-select` (not just
 the Command Line Tools), and an iOS Simulator runtime. Install the CLI if
-`sightmap version` fails (`npm install -g @sightmap/sightmap`).
+`sightmap version` fails (`npm install -g @sightmap/sightmap`). Android needs
+only adb; see [Android](#android).
 
 Run **`sightmap device doctor`** first. It prints the exact fix for anything
 missing (`--fix` runs the unprivileged ones) and builds the simulator helper on
