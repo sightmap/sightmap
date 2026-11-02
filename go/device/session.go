@@ -42,6 +42,7 @@ type Timing struct {
 	ReadyTimeout  time.Duration // how long start waits for a readable tree
 	RetryInterval time.Duration // between re-reads while the screen moves
 	RetryTimeout  time.Duration // how long click/fill wait for a missing target or a moving screen
+	Quiet         time.Duration // how long the screen must hold still before a tap or swipe
 }
 
 func (t Timing) withDefaults() Timing {
@@ -59,6 +60,9 @@ func (t Timing) withDefaults() Timing {
 	// A Debug React Native build can take a few seconds to draw a screen
 	// after a navigation.
 	def(&t.RetryTimeout, 3*time.Second)
+	// UIKit drops touches until a presentation transition ends, 0.35–0.5 s
+	// by default.
+	def(&t.Quiet, 500*time.Millisecond)
 	return t
 }
 
@@ -90,6 +94,11 @@ type Session struct {
 	secureFocus bool
 	axOn        *bool
 	readable    bool
+	// layoutSince is when the latest read's top-level layout (layoutSeen)
+	// first showed, and readAt when that read finished.
+	layoutSeen  string
+	layoutSince time.Time
+	readAt      time.Time
 }
 
 // NewSession returns a Session for cfg using helper and sim.
@@ -204,7 +213,31 @@ func (s *Session) fresh(ctx context.Context, view string) (*Snapshot, error) {
 	s.screen = snap.Screen
 	s.lastView = snap.ViewName()
 	s.lastSnap = snap
+	s.readAt = time.Now()
+	if l := topLayout(snap); l != s.layoutSeen || s.layoutSince.IsZero() {
+		s.layoutSeen, s.layoutSince = l, s.readAt
+	}
 	return snap, nil
+}
+
+// quietLeft is how much longer the screen must hold still before a touch
+// lands. The accessibility tree reports the frame an animation ends at, not
+// where it is drawn now, so a screen presented a moment ago reads the same on
+// every read until it is done; only the time since it changed tells.
+func (s *Session) quietLeft() time.Duration {
+	return s.Timing.Quiet - s.readAt.Sub(s.layoutSince)
+}
+
+// still reads the screen once it has held still for Timing.Quiet, or once
+// Timing.RetryTimeout runs out.
+func (s *Session) still(ctx context.Context) (*Snapshot, error) {
+	snap, err := s.fresh(ctx, "")
+	deadline := time.Now().Add(s.Timing.RetryTimeout)
+	for err == nil && s.quietLeft() > 0 && time.Now().Before(deadline) {
+		time.Sleep(min(s.Timing.RetryInterval, s.quietLeft()))
+		snap, err = s.fresh(ctx, "")
+	}
+	return snap, err
 }
 
 // settled re-reads until two reads agree on every element's place, so a
@@ -717,9 +750,10 @@ func (t tapped) result() map[string]any {
 }
 
 // tap re-reads the screen, re-resolves target, checks it is tappable and taps
-// its center. Right after a sheet closes or a navigation pops, the target can
-// be missing or still moving, so it re-reads until two reads agree and the
-// target is there, for up to settle.
+// its center. Right after a sheet opens or closes or a navigation pops, the
+// target can be missing or still moving, so it re-reads until two reads agree,
+// the screen has held still for Timing.Quiet and the target is there, for up
+// to settle.
 func (s *Session) tap(ctx context.Context, target string, settle time.Duration) (tapped, error) {
 	numeric := IsSnapshotID(target)
 	base := s.last
@@ -764,12 +798,18 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 			return tapped{}, failure
 		}
 		// A screen mid-transition can already show the target; a tap then
-		// lands on whatever is passing under that point. Tap only once two
-		// reads in a row agree on where the target and the screen are.
-		stable := prev != nil && node != nil && prevNode != nil && sameElement(prevNode, node) &&
-			*prevNode.Bounds == *node.Bounds && topLayout(prev) == topLayout(snap)
+		// lands on whatever is passing under that point, or is dropped. Tap
+		// only once two reads in a row agree on where the target and the
+		// screen are, and neither has moved for Timing.Quiet.
+		same := node != nil && prevNode != nil && sameElement(prevNode, node)
+		if same && *prevNode.Bounds != *node.Bounds {
+			// A list still coasting takes a tap as a stop, not a tap.
+			s.layoutSince = s.readAt
+		}
+		stable := prev != nil && same && *prevNode.Bounds == *node.Bounds && topLayout(prev) == topLayout(snap)
+		quiet := s.quietLeft() <= 0
 		outOfTime := time.Now().After(deadline)
-		if failure == nil && stable {
+		if failure == nil && stable && quiet {
 			x, y := Center(node)
 			if err := s.input(ctx, "tap", map[string]any{"x": x, "y": y}); err != nil {
 				return tapped{}, err
@@ -778,14 +818,23 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 			return tapped{snap: snap, node: node, x: x, y: y, retries: retries}, nil
 		}
 		if outOfTime && failure == nil && prev != nil {
-			return tapped{}, withHint("unstable", "retry, or wait longer with `--settle 6s`; `sightmap device snapshot` shows where the screen is",
+			hint := "retry, or wait longer with `--settle 6s`; `sightmap device snapshot` shows where the screen is"
+			if stable {
+				return tapped{}, withHint("unstable", hint,
+					"%s was found, but the screen changed less than %s before the wait ran out (%s) and may still be animating, so it was not tapped", snap.Describe(node), s.Timing.Quiet, settle)
+			}
+			return tapped{}, withHint("unstable", hint,
 				"%s was found, but the screen kept moving for %s, so it was not tapped", snap.Describe(node), settle)
 		}
 		waitable := failure != nil && (Code(failure) == "not_found" || Code(failure) == "stale_target" || !stable)
 		if failure != nil && (outOfTime || !waitable) {
 			return tapped{}, s.notFound(ctx, snap, target, failure, numeric)
 		}
-		time.Sleep(s.Timing.RetryInterval)
+		pause := s.Timing.RetryInterval
+		if failure == nil && stable {
+			pause = min(pause, s.quietLeft())
+		}
+		time.Sleep(pause)
 		next, err := s.fresh(ctx, view)
 		if err != nil {
 			return tapped{}, err
@@ -987,7 +1036,8 @@ func (s *Session) scroll(ctx context.Context, a ScrollArgs) (map[string]any, err
 	if a.Max == 0 {
 		a.Max = 20
 	}
-	snap, err := s.fresh(ctx, "")
+	// A swipe during a transition is dropped like a tap.
+	snap, err := s.still(ctx)
 	if err != nil {
 		return nil, err
 	}

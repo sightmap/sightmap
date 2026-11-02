@@ -16,3 +16,14 @@ views:
         selector: '[identifier="product-detail-name"]'
       - name: AddToCartButton
         selector: 'button[identifier="product-detail-add"]'
+      - name: OfferButton
+        selector: 'button[identifier="product-detail-offer"]'
+  - name: Offer
+    route: /products/offer
+    components:
+      - name: OfferTitle
+        selector: '[identifier="offer-title"]'
+      - name: ClaimOfferButton
+        selector: 'button[identifier="offer-claim"]'
+      - name: CloseOfferButton
+        selector: 'button[identifier="offer-close"]'

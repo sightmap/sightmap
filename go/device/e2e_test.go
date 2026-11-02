@@ -125,10 +125,19 @@ func TestE2E(t *testing.T) {
 	must("scroll", "down", "--until", `ProductRow[title^="Product 150,"]`)
 	must("click", "product-row-150")
 	snapshotUntil(`[ProductName "Product 150"]`)
+
+	// A click right after a full-screen modal starts presenting, and another
+	// right after it starts going away, land only if each waits for the
+	// transition to end; UIKit drops touches until then.
+	must("click", "OfferButton")
+	must("click", "ClaimOfferButton")
+	snapshotUntil(`[ClaimOfferButton "Claimed"]`)
+	must("click", "CloseOfferButton")
 	must("click", "AddToCartButton")
+	snapshotUntil(`[AddToCartButton "Added"]`)
 
 	time.Sleep(time.Second)
-	expect(must("console", "list", "--grep", "Product 150"), "added Product 150 to cart")
+	expect(must("console", "list", "--grep", "Product 150"), "added Product 150 to cart", "claimed the offer on Product 150")
 	expect(must("console", "list", "--grep", "signed in"), "signed in as agent@example.com")
 
 	shot := filepath.Join(work, "shot.png")

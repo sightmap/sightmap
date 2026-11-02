@@ -21,6 +21,8 @@ type fakeHelper struct {
 	scenes []*Describe
 	swipes int
 	inputs []string
+	// inputAt is when each input arrived.
+	inputAt []time.Time
 }
 
 func (f *fakeHelper) Request(_ context.Context, cmd string, args map[string]any, out any) error {
@@ -43,6 +45,7 @@ func (f *fakeHelper) Request(_ context.Context, cmd string, args map[string]any,
 	}
 	data, _ := json.Marshal(args)
 	f.inputs = append(f.inputs, cmd+" "+string(data))
+	f.inputAt = append(f.inputAt, time.Now())
 	if cmd == "swipe" {
 		f.swipes++
 	}
@@ -68,7 +71,7 @@ func newTestSession(t *testing.T, describe string) (*Session, *fakeHelper) {
 	}
 	h := &fakeHelper{describe: loadDescribe(t, describe)}
 	s := NewSession(Config{UDID: "UDID", BundleID: "dev.example", SightmapDir: dir}, h, fakeSim{})
-	s.Timing = Timing{RetryTimeout: time.Millisecond, RetryInterval: time.Millisecond, Settle: time.Millisecond}.withDefaults()
+	s.Timing = Timing{RetryTimeout: time.Millisecond, RetryInterval: time.Millisecond, Settle: time.Millisecond, Quiet: time.Millisecond}.withDefaults()
 	return s, h
 }
 
@@ -352,6 +355,88 @@ func TestClickRefusesAScreenThatKeepsMoving(t *testing.T) {
 	_, err := handle(t, s, "click", TargetArgs{Target: "participant-row-1"})
 	if Code(err) != "unstable" || len(h.inputs) != 0 {
 		t.Fatalf("err = %v, inputs %v", err, h.inputs)
+	}
+}
+
+// modal is a screen presented full screen. The accessibility tree reports
+// the frames it slides to, so every read during the slide looks the same.
+func modal() *Describe {
+	return &Describe{Screen: Size{W: 400, H: 800}, Root: &RawElement{Type: "Application", Frame: Frame{W: 400, H: 800}, Children: []*RawElement{
+		{Type: "StaticText", Label: "Offer", Frame: Frame{X: 150, Y: 100, W: 100, H: 30}},
+		{Type: "Button", Identifier: "offer-claim", Label: "Claim Offer", Frame: Frame{X: 100, Y: 400, W: 200, H: 50}},
+	}}}
+}
+
+func TestClickWaitsOutAScreenThatJustChanged(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	s.Timing.RetryTimeout, s.Timing.RetryInterval, s.Timing.Quiet = time.Minute, 10*time.Millisecond, 300*time.Millisecond
+	if _, err := handle(t, s, "snapshot", SnapshotArgs{}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(s.Timing.Quiet)
+	h.describe = modal()
+	started := time.Now()
+	if _, err := handle(t, s, "click", TargetArgs{Target: "offer-claim"}); err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(started); took < s.Timing.Quiet || len(h.inputs) != 1 {
+		t.Fatalf("tapped %v after %s, want one tap once the new screen had held still for %s", h.inputs, took, s.Timing.Quiet)
+	}
+
+	// The same screen, already still, is tapped after two reads.
+	time.Sleep(s.Timing.Quiet)
+	started = time.Now()
+	r, err := handle(t, s, "click", TargetArgs{Target: "offer-claim"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(started); took >= s.Timing.Quiet || r["retries"].(float64) != 1 {
+		t.Errorf("a still screen took %s and %v re-reads, want one re-read and no quiet wait", took, r["retries"])
+	}
+}
+
+func TestClickWaitsForACoastingListToStop(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	s.Timing.RetryTimeout, s.Timing.RetryInterval, s.Timing.Quiet = time.Minute, 10*time.Millisecond, 300*time.Millisecond
+	h.describe = productList(200)
+	if _, err := handle(t, s, "snapshot", SnapshotArgs{}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(s.Timing.Quiet)
+	h.frames = []*Describe{productList(300), productList(250), productList(240), productList(240)}
+	started := time.Now()
+	if _, err := handle(t, s, "click", TargetArgs{Target: "product-row-30"}); err != nil {
+		t.Fatal(err)
+	}
+	if took := time.Since(started); took < s.Timing.Quiet || len(h.inputs) != 1 || !strings.Contains(h.inputs[0], `"y":266`) {
+		t.Fatalf("tapped %v after %s, want one tap at the row's resting center y=266 once it had held still for %s", h.inputs, took, s.Timing.Quiet)
+	}
+}
+
+func TestClickRefusesAScreenThatChangedTooRecently(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	s.Timing.RetryTimeout, s.Timing.RetryInterval, s.Timing.Quiet = 50*time.Millisecond, 10*time.Millisecond, time.Hour
+	h.describe = modal()
+	_, err := handle(t, s, "click", TargetArgs{Target: "offer-claim"})
+	if Code(err) != "unstable" || !strings.Contains(err.Error(), "may still be animating") || len(h.inputs) != 0 {
+		t.Fatalf("err = %v, inputs %v", err, h.inputs)
+	}
+}
+
+func TestScrollWaitsOutAScreenThatJustChanged(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	s.Timing.RetryTimeout, s.Timing.RetryInterval, s.Timing.Quiet = time.Minute, 10*time.Millisecond, 300*time.Millisecond
+	if _, err := handle(t, s, "snapshot", SnapshotArgs{}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(s.Timing.Quiet)
+	h.describe = productList(200)
+	started := time.Now()
+	if _, err := handle(t, s, "scroll", ScrollArgs{Direction: "down"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.inputs) != 1 || h.inputAt[0].Sub(started) < s.Timing.Quiet {
+		t.Fatalf("swiped %v at %v (started %v), want one swipe once the new screen had held still for %s", h.inputs, h.inputAt, started, s.Timing.Quiet)
 	}
 }
 

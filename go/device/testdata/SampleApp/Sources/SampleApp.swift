@@ -129,6 +129,7 @@ struct ProductList: View {
 struct ProductDetail: View {
     let product: Product
     @State private var inCart = false
+    @State private var showOffer = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -146,10 +147,39 @@ struct ProductDetail: View {
             .buttonStyle(.borderedProminent)
             .disabled(inCart)
             .accessibilityIdentifier("product-detail-add")
+            Button("See Offer") { showOffer = true }
+                .accessibilityIdentifier("product-detail-offer")
         }
         .padding()
         .navigationTitle(product.name)
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $showOffer) { OfferView(product: product) }
+    }
+}
+
+// OfferView is presented full screen: UIKit drops touches until it has slid
+// all the way up, while the accessibility tree already reports where it ends.
+struct OfferView: View {
+    let product: Product
+    @Environment(\.dismiss) private var dismiss
+    @State private var claimed = false
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Offer on \(product.name)")
+                .font(.title.bold())
+                .accessibilityIdentifier("offer-title")
+            Button(claimed ? "Claimed" : "Claim Offer") {
+                claimed = true
+                appLog.info("claimed the offer on \(product.name, privacy: .public)")
+                print("claimed the offer on \(product.name)")
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("offer-claim")
+            Button("Close") { dismiss() }
+                .accessibilityIdentifier("offer-close")
+        }
+        .padding()
     }
 }
 
