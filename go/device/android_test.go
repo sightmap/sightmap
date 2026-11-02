@@ -588,6 +588,27 @@ func TestADBHelperInputInPixels(t *testing.T) {
 	}
 }
 
+func TestADBHelperTypesANewlineAsReturn(t *testing.T) {
+	f := newFakeADB(t, "uiautomator-form")
+	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
+	if err := h.Request(context.Background(), "type", map[string]any{"text": "first line\n\nthird"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	var typed []string
+	for _, c := range f.calls {
+		if strings.Contains(c, "shell input") {
+			typed = append(typed, strings.TrimPrefix(c, "-s emulator-5554 shell "))
+		}
+	}
+	want := "input text 'first%sline'|input keyevent 66|input keyevent 66|input text 'third'"
+	if got := strings.Join(typed, "|"); got != want {
+		t.Errorf("typed %q, want %q", got, want)
+	}
+	if err := h.Request(context.Background(), "type", map[string]any{"text": "a\tb"}, nil); Code(err) != "bad_request" {
+		t.Errorf("a tab = %v, want bad_request", err)
+	}
+}
+
 func TestAndroidSessionClicksInPixels(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.CopyFS(dir, os.DirFS(filepath.Join("testdata", "android-corpus"))); err != nil {

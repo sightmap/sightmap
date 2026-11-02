@@ -599,11 +599,15 @@ func (h *ADBHelper) px(ctx context.Context, v any) (int, error) {
 	return int(f*screen.scale() + 0.5), nil
 }
 
-// inputText escapes text for `input text`: it takes %s for a space, and the
-// device's shell parses the argument, so it is single-quoted.
+// inputText escapes one line of text for `input text` ("" for an empty
+// line): it takes %s for a space, and the device's shell parses the argument,
+// so it is single-quoted.
 func inputText(text string) (string, error) {
+	if text == "" {
+		return "", nil
+	}
 	for _, r := range text {
-		if r > 126 || (r < 32 && r != '\n') {
+		if r > 126 || r < 32 {
 			return "", withHint("bad_request", "adb can only type ASCII; type the rest on the device, or paste it into the field from the app",
 				"adb input text cannot type %q", string(r))
 		}
@@ -680,12 +684,30 @@ func (h *ADBHelper) request(ctx context.Context, cmd string, args map[string]any
 		if text == "" {
 			return nil, errorf("bad_request", "type needs text")
 		}
-		arg, err := inputText(text)
-		if err != nil {
-			return nil, err
+		// `input text` can't type a newline; each one is a return key press.
+		lines := strings.Split(text, "\n")
+		quoted := make([]string, len(lines))
+		for i, line := range lines {
+			arg, err := inputText(line)
+			if err != nil {
+				return nil, err
+			}
+			quoted[i] = arg
 		}
-		_, err = h.ADB.shell(ctx, h.Serial, time.Minute, "input text "+arg)
-		return nil, err
+		for i, arg := range quoted {
+			if i > 0 {
+				if _, err := h.ADB.shell(ctx, h.Serial, 30*time.Second, fmt.Sprintf("input keyevent %d", androidKeys["return"])); err != nil {
+					return nil, err
+				}
+			}
+			if arg == "" {
+				continue
+			}
+			if _, err := h.ADB.shell(ctx, h.Serial, time.Minute, "input text "+arg); err != nil {
+				return nil, err
+			}
+		}
+		return nil, nil
 	case "key":
 		name, _ := args["key"].(string)
 		code, ok := androidKeys[strings.ToLower(name)]

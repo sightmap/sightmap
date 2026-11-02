@@ -429,7 +429,8 @@ What differs from iOS:
 - Permission dialogs and other apps' windows appear as `[Overlay]`.
 - `button back` goes back or hides the keyboard; `button` also takes `home`,
   `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
-- `type` / `fill` are ASCII only (`adb shell input text`).
+- `type` / `fill` are ASCII only (`adb shell input text`); a newline is a
+  return key press.
 - `network` is iOS-only for now; on Android it fails with `unsupported`.
 - `console` is the logcat of the app's processes from their first line, also
   when the app was started by hand (tag as subsystem; `System.out` reads as
