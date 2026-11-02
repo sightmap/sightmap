@@ -75,13 +75,13 @@ views:
             extract: { from: dom.text, pattern: ', \$([\d,]+(?:\.\d+)?)$' }
 ```
 
-The brand is optional, so `Trail Runner, $89.99` gives `title` and `price` and no `brand`, and a comma inside a title with a brand stays in `title`. The label carries no field boundaries, though, so no pattern can tell apart two cases that read the same: a title containing a comma with no brand (`Lamp, Large, $9.99` gives `title="Lamp"`, `brand="Large"`), and a brand containing `", "`. For an exact split, read each text from inside the app rather than from the combined label, or give each child its own identifier; treat a split label as a convenience for reading, not a value to assert on.
+The brand is optional, so `Trail Runner, $89.99` gives `title` and `price` and no `brand`, and a comma inside a title with a brand stays in `title`. The label carries no field boundaries, though, so no pattern can tell apart two cases that read the same: a title containing a comma with no brand (`Lamp, Large, $9.99` gives `title="Lamp"`, `brand="Large"`), and a brand containing `", "`. For an exact split, start the session with [`--probe`](#reading-inside-the-app), which reads each text from inside the app, or give each child its own identifier; treat a split label as a convenience for reading, not a value to assert on.
 
 ---
 
 ### `device doctor`
 
-Checks macOS, Apple Silicon, `xcode-select`, the Xcode version, iOS Simulator runtimes and devices, and Swift, then builds the simulator helper if it is not built yet. Exits `1` if any check fails.
+Checks macOS, Apple Silicon, `xcode-select`, the Xcode version, iOS Simulator runtimes and devices, and Swift, then builds the simulator helper and the [in-app probe](#reading-inside-the-app) if they are not built yet. With a session running, it also reports the session's network sources and probe. Exits `1` if any check fails.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -100,6 +100,7 @@ sightmap device doctor
 [ok  ] ios-device     8 iOS simulators; booted: iPhone 17 Pro
 [ok  ] swift          Apple Swift version 6.2 (swiftlang-6.2.0.19.9 clang-1700.3.19.1)
 [ok  ] helper         /Users/you/Library/Caches/sightmap/device/helper/3f9c1a7d2b4e6f80/sightmap-device-helper
+[ok  ] probe          /Users/you/Library/Caches/sightmap/device/probe/8c41d0e9a7b25f13/sightmap-probe.dylib
 
 All checks passed.
 ```
@@ -122,6 +123,8 @@ On a running session, `start` reinstalls (with `--app`) and relaunches the same 
 | `--network` | `auto` | Network source: `auto`, `har`, `rn-cdp`, `summary` or `off` (see [`device network`](#device-network)) |
 | `--network-limit` | `1000` | How many network entries the session keeps |
 | `--metro-port` | the app's `RCT_jsLocation`, else `8081` | Where the `rn-cdp` source looks for Metro |
+| `--probe` | off | Load the in-app probe for SwiftUI view types and one node per Text (see [Reading inside the app](#reading-inside-the-app)) |
+| `--probe-fields` | all, redacted | With `--probe`, `none` leaves app views' stored fields out of the tree |
 | `--detach` | off | Run the daemon in the background and return once it is ready |
 
 ```bash
@@ -141,9 +144,54 @@ Apps must be built by Xcode (`xcodebuild` or the Xcode app) so they carry the si
 
 ---
 
+### Reading inside the app
+
+The accessibility tree is read from outside the app, and SwiftUI joins the texts inside a row, a `NavigationLink` or a `Button` into one element whose label separates them with ", ". `start --probe` also loads a small probe into the app, which reads SwiftUI's own view graph from inside it, and each snapshot merges two things from it onto the accessibility tree:
+
+- a `view` node for each instance of one of your view types, with `type` set to its name and one attribute per stored field (`item.title`, `maker`, `item.price`);
+- a `text` node for each Text in it, with `field` naming the stored field it shows, and for `Text(value, format:)` the unformatted `value` and a `format` such as `currency USD`.
+
+```text
+4 button[identifier="catalog-row-1"] "Socks, Wool, Pair of 2, Acme, Inc., $9.99"
+  5 view[type="CatalogRow"]
+    6 text[field="item.title"] "Socks, Wool, Pair of 2"
+    7 text[field="maker"] "Acme, Inc."
+    8 text[field="item.price"][format="currency USD"] "9.99" value="9.99"
+```
+
+A corpus then reads each field exactly through child components, commas and all:
+
+```yaml
+- name: CatalogRow
+  selector: '[identifier^="catalog-row-"]'
+  properties:
+    - { name: title, extract: { from: component, path: Title.text } }
+    - { name: maker, extract: { from: component, path: Maker.text } }
+    - { name: price, extract: { from: component, path: Price.value } }
+  children:
+    - { name: Title, selector: 'text[field="item.title"]', properties: [{ name: text, extract: { from: dom.text } }] }
+    - { name: Maker, selector: 'text[field="maker"]', properties: [{ name: text, extract: { from: dom.text } }] }
+    - { name: Price, selector: 'text[field="item.price"]', properties: [{ name: value, extract: { from: dom.attr, path: value } }] }
+```
+
+Without `--probe` the same corpus still names each row; the properties read from its Texts are absent. These node shapes are proposed in SEP-0026 (draft).
+
+The accessibility tree stays the source of truth for what is on screen and tappable: the probe only adds nodes under elements whose label already contains their text, never duplicates a text the tree reports separately, and adds nothing under a secure field. Its `text` nodes have real frames, so `click` can target them.
+
+How it works and what it costs:
+
+- `start --probe` compiles the probe from source embedded in `sightmap` with your Xcode (one `clang` call, cached under `~/Library/Caches/sightmap/device/probe`; `device doctor` builds it ahead of time; `SIGHTMAP_DEVICE_PROBE` names a dylib to use instead) and launches the app with `DYLD_INSERT_LIBRARIES` and `SWIFTUI_VIEW_DEBUG` set. No app code or build setting changes, and the app needs no `get-task-allow`. Every relaunch, restart and `start --app` loads it again.
+- The probe answers on a Unix socket. Right after launch the session runs a first read in the background, since SwiftUI's first walk of its graph is slow; the first read of each new screen still takes a few seconds, and later reads of it a few hundred milliseconds. Only `snapshot` reads through the probe, plus `click`/`fill` when a target is not in the plain tree; the re-reads while a screen settles reuse the last read while the layout is unchanged, and hosting views off screen are skipped.
+- If the app never loads the probe (an app signed with the hardened runtime, or one that clears `DYLD_*` variables), `start` says why, snapshots carry a `[Probe]` note and are the plain accessibility tree, and `status` and `doctor` report it.
+- Field values go through the same redaction as [network entries](#redaction): a field whose name contains `token`, `password`, `secret` or `key` reads `<redacted>`, as do a URL's credential query parameters. `--probe-fields none` leaves fields out entirely. The run log never records a probe node's text.
+
+The probe reads SwiftUI's view debug data, which is undocumented and can change with any Xcode release; when it does, snapshots fall back to the plain tree. SwiftUI's serializer for that data can also crash the app on some screens (seen once, on a detail screen); the session then reports which hosting view it was serializing, leaves that kind of view out of later reads, and you relaunch the app. UIKit-only screens gain nothing from it yet.
+
+---
+
 ### `device status`, `device stop`, `device launch`, `device relaunch`
 
-`status` reports the session's device, app, helper, console buffer, network sources, and current run; it exits `1` when no session is running. `stop` stops the daemon and the app and switches HAR capture back off; `--shutdown` also shuts the simulator down. `launch` brings the app to the foreground; `relaunch` restarts it and re-enables accessibility first.
+`status` reports the session's device, app, helper, console buffer, network sources, in-app probe (with `--probe`), and current run; it exits `1` when no session is running. `stop` stops the daemon and the app and switches HAR capture back off; `--shutdown` also shuts the simulator down. `launch` brings the app to the foreground; `relaunch` restarts it and re-enables accessibility first.
 
 ```bash
 sightmap device status
@@ -407,6 +455,7 @@ A new Xcode release can still need a sightmap update; `device doctor` says so wh
 - Simulator only, on Apple Silicon. Physical devices are not supported.
 - No hover or file upload. For another screen size, start on a different `--device`.
 - `click` confirms the tap was delivered, not that the app handled it. On iOS 26, a screen with a hidden search field and search scopes can have an invisible strip up to ~35 pt below the navigation bar that swallows touches (a real finger's too), with nothing in the accessibility tree to show it. Check the result with `snapshot` and, if nothing changed, use `tap-xy` lower in the target.
+- `--probe` reads SwiftUI views only, from Apple's undocumented view debug data.
 - Network capture covers `URLSession`/CFNetwork traffic (and, for React Native Debug builds, JS traffic through Metro); full detail needs the `get-task-allow` entitlement.
 
 The `sightmap-device` agent skill covers the full agent workflow, including React Native specifics. Install it with [`sightmap skills install`](/cli/integrate#sightmap-skills-install).

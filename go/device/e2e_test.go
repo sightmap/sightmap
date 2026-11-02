@@ -191,7 +191,7 @@ func TestE2E(t *testing.T) {
 	simctl("defaults", "delete", "dev.sightmap.SimSample", "networkFetchPaths")
 	expect(must("status"), "har      active")
 	// iOS 26 can expose the SwiftUI tab bar as one element without its tabs;
-	// Network is the middle of three.
+	// Network is the second of four.
 	if _, err := run("click", "tab-network"); err != nil {
 		var snap struct {
 			Result struct{ Tree map[string]any }
@@ -202,7 +202,7 @@ func TestE2E(t *testing.T) {
 			t.Fatal("no tab bar to switch to the Network tab")
 		}
 		b := bar["bounds"].(map[string]any)
-		x, y := b["x"].(float64)+b["width"].(float64)/2, b["y"].(float64)+b["height"].(float64)/2
+		x, y := b["x"].(float64)+b["width"].(float64)*3/8, b["y"].(float64)+b["height"].(float64)/2
 		must("tap-xy", strconv.FormatFloat(x, 'f', 0, 64), strconv.FormatFloat(y, 'f', 0, 64))
 	}
 	must("click", "network-send")
@@ -271,6 +271,51 @@ func TestE2E(t *testing.T) {
 	expect(switched, "sightmap device stop")
 	offscreen, _ := run("tap-xy", "230", "5000")
 	expect(offscreen, "not pixels")
+
+	// The Catalog tab's rows join a title and a maker that both contain ", "
+	// into one label. Without the probe the corpus still names each row and
+	// leaves unset the fields it reads from the row's Texts; with it, they are
+	// read exactly.
+	signIn := func() {
+		t.Helper()
+		snapshotUntil("[View: Login]")
+		must("fill", "login-email", "agent@example.com")
+		must("fill", "login-password", "hunter2")
+		must("click", "login-submit")
+		for i := 0; i < 15; i++ {
+			time.Sleep(time.Second)
+			snap, _ := run("snapshot")
+			if strings.Contains(snap, "[Overlay]") {
+				run("click", `button[text="Not Now"]`)
+				continue
+			}
+			if strings.Contains(snap, "[View: Products]") && i >= 3 {
+				return
+			}
+		}
+		t.Fatal("sign-in never reached the product list")
+	}
+	signIn()
+	must("click", "tab-catalog")
+	plain := snapshotUntil("[View: Catalog]")
+	expect(plain, `[CatalogRow summary="Socks, Wool, Pair of 2, Acme, Inc., $9.99"]`)
+	if strings.Contains(plain, "maker=") || strings.Contains(plain, "[Probe]") {
+		t.Fatalf("without --probe the rows should carry only their joined label:\n%s", plain)
+	}
+
+	must("stop")
+	expect(must("start", "--device", sim, "--app", app, "--probe", "--detach", "--label", "e2e-probe"), "probe:   loaded")
+	signIn()
+	must("click", "tab-catalog")
+	rich := snapshotUntil(`title="Socks, Wool, Pair of 2"`)
+	expect(rich,
+		`[CatalogRow maker="Acme, Inc." price="9.99" summary="Socks, Wool, Pair of 2, Acme, Inc., $9.99" title="Socks, Wool, Pair of 2"]`,
+		`[CatalogRow maker="Bright, Light & Co." price="24.5" summary="Desk Lamp, Bright, Light & Co., $24.50" title="Desk Lamp"]`,
+		`view[type="CatalogRow"]`)
+	expect(must("status"), "probe:   loaded", "warm-up")
+	// A Text only the probe reports is a target like any other.
+	must("click", `text[text="Kiln"]`)
+	snapshotUntil(`"Item 3"`)
 
 	must("stop")
 	if out, err := simctl("defaults", "read", "com.apple.CFNetwork", "har-capture-global"); err == nil {

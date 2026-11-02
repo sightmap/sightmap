@@ -37,6 +37,11 @@ type Config struct {
 	// MetroPort is where the rn-cdp source looks for Metro; 0 means the app's
 	// RCT_jsLocation default, else 8081.
 	MetroPort int `json:"metroPort,omitempty"`
+	// Probe is the in-app probe dylib to load at launch; "" runs without it.
+	Probe string `json:"probe,omitempty"`
+	// ProbeFields is "none" to keep app views' stored fields out of the tree
+	// (their type and Texts stay); "" includes them, redacted.
+	ProbeFields string `json:"probeFields,omitempty"`
 }
 
 // Timing tunes how long a Session waits for the screen; zero fields take the
@@ -49,7 +54,11 @@ type Timing struct {
 	ReadyTimeout  time.Duration // how long start waits for a readable tree
 	RetryInterval time.Duration // between re-reads while the screen moves
 	RetryTimeout  time.Duration // how long click/fill wait for a missing target or a moving screen
-	Quiet         time.Duration // how long the screen must hold still before a tap or swipe
+	// ProbeStart is how long a launch waits for the in-app probe to answer.
+	// dyld loads it before main, so it answers within a second or two unless
+	// something refused it.
+	ProbeStart time.Duration
+	Quiet      time.Duration // how long the screen must hold still before a tap or swipe
 }
 
 func (t Timing) withDefaults() Timing {
@@ -109,6 +118,8 @@ type Session struct {
 	layoutSeen  string
 	layoutSince time.Time
 	readAt      time.Time
+
+	probe probeState
 }
 
 // NewSession returns a Session for cfg using helper and sim.
@@ -207,9 +218,18 @@ func (s *Session) accessibilityOn(ctx context.Context) bool {
 	return *s.axOn
 }
 
-// fresh reads and annotates the screen.
+// fresh reads and annotates the screen, with the in-app probe's last dump
+// merged while the layout is unchanged.
 func (s *Session) fresh(ctx context.Context, view string) (*Snapshot, error) {
+	return s.read(ctx, view, probeCached)
+}
+
+func (s *Session) read(ctx context.Context, view string, mode probeMode) (*Snapshot, error) {
 	d, err := s.describeSettled(ctx)
+	merged := false
+	if err == nil {
+		merged = s.mergeProbe(ctx, d, mode)
+	}
 	if err != nil {
 		if Code(err) == "ax_disabled" {
 			return nil, emptyTreeError(s.UDID, s.accessibilityOn(ctx))
@@ -224,6 +244,7 @@ func (s *Session) fresh(ctx context.Context, view string) (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
+	snap.ProbeMerged = merged
 	s.screen = snap.Screen
 	s.lastView = snap.ViewName()
 	s.lastSnap = snap
@@ -303,17 +324,36 @@ func (s *Session) LaunchApp(ctx context.Context, terminate bool) (map[string]any
 			return nil, err
 		}
 	}
-	pid, err := s.Sim.Launch(ctx, s.UDID, s.BundleID, LaunchOptions{Stdout: s.stdoutPath(), Stderr: s.stderrPath(), Terminate: terminate, Env: s.Net.LaunchEnv()})
+	pid, err := s.Sim.Launch(ctx, s.UDID, s.BundleID, LaunchOptions{Stdout: s.stdoutPath(), Stderr: s.stderrPath(), Terminate: terminate, Env: s.launchEnv()})
 	if err != nil {
 		return nil, err
 	}
 	s.AppPID, s.axOn, s.readable, s.last, s.secureFocus = pid, nil, false, nil, false
+	if s.Probe != "" {
+		s.probeLaunched(pid)
+	}
 	return map[string]any{"bundleId": s.BundleID, "pid": pid}, nil
+}
+
+func (s *Session) launchEnv() []string {
+	env := s.Net.LaunchEnv()
+	if s.Probe != "" {
+		env = append(env, ProbeLaunchEnv(s.Probe, ProbeSocketPath(s.UDID))...)
+	}
+	return env
 }
 
 // WaitReady waits until the accessibility tree is readable and shows something
 // to act on, which lags a launch by a moment.
 func (s *Session) WaitReady(ctx context.Context) map[string]any {
+	r := s.waitReady(ctx)
+	if s.Probe != "" {
+		r["probe"] = s.probeWait(s.probeStart())
+	}
+	return r
+}
+
+func (s *Session) waitReady(ctx context.Context) map[string]any {
 	deadline := time.Now().Add(s.Timing.ReadyTimeout)
 	var lastErr error
 	for time.Now().Before(deadline) {
@@ -404,6 +444,11 @@ func (s *Session) runTarget() *RunTarget {
 	t := &RunTarget{ID: n.Id, Identifier: Identifier(n), Text: n.Name, Role: n.Role}
 	if s.lastSnap != nil {
 		t.Component = s.lastSnap.Component(n)
+		// What the probe read stays out of the run log: it can be any of an
+		// app view's stored fields, not only what the screen shows.
+		if s.lastSnap.FromProbe(n) {
+			t.Text = ""
+		}
 	}
 	return t
 }
@@ -717,8 +762,9 @@ type Status struct {
 		Streaming bool `json:"streaming"`
 		Entries   int  `json:"entries"`
 	} `json:"console"`
-	Network *NetStatus `json:"network,omitempty"`
-	Run     RunInfo    `json:"run"`
+	Network *NetStatus   `json:"network,omitempty"`
+	Probe   *ProbeStatus `json:"probe,omitempty"`
+	Run     RunInfo      `json:"run"`
 }
 
 func (s *Session) status() Status {
@@ -732,16 +778,20 @@ func (s *Session) status() Status {
 		net := s.Net.Status()
 		st.Network = &net
 	}
+	st.Probe = s.ProbeStatus()
 	return st
 }
 
 func (s *Session) snapshot(ctx context.Context, a SnapshotArgs) (*SnapshotResult, error) {
-	snap, err := s.fresh(ctx, a.View)
+	snap, err := s.read(ctx, a.View, probeFetch)
 	if err != nil {
 		return nil, err
 	}
 	s.last = snap
 	text := snap.Render(RenderOpts{IncludeOffscreen: a.IncludeOffscreen, UDID: s.UDID, AccessibilityOn: s.accessibilityOn(ctx)})
+	if st := s.ProbeStatus(); st != nil && !snap.ProbeMerged && !snap.Overlay {
+		text += "\n\n" + probeNote(st)
+	}
 	if a.Out != "" {
 		if err := writeFileAtomic(a.Out, []byte(text+"\n")); err != nil {
 			return nil, err
@@ -850,6 +900,7 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 	}
 	deadline := time.Now().Add(settle)
 	retries := 0
+	fetched := false
 	var prev *Snapshot
 	var prevNode *sightmap.ComponentNode
 	snap, err := s.fresh(ctx, view)
@@ -895,6 +946,14 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 			}
 			return tapped{}, withHint("unstable", hint,
 				"%s was found, but the screen kept moving for %s, so it was not tapped", snap.Describe(node), settle)
+		}
+		if failure != nil && Code(failure) == "not_found" && !fetched && s.Probe != "" && !snap.ProbeMerged {
+			// The target may be one only the probe shows: a Text inside a row.
+			fetched = true
+			if next, err := s.read(ctx, view, probeFetch); err == nil {
+				prev, prevNode, snap = snap, node, next
+				continue
+			}
 		}
 		waitable := failure != nil && (Code(failure) == "not_found" || Code(failure) == "stale_target" || !stable)
 		if failure != nil && (outOfTime || !waitable) {
