@@ -53,10 +53,20 @@ func Resolve(s *Snapshot, target string) (*sightmap.ComponentNode, error) {
 			return nil, s.ambiguous(fmt.Sprintf("identifier %s is on %d elements; use a snapshot id or `%s[identifier=%s]#N`", quote(text), len(byID), byID[0].Role, quote(text)), byID)
 		}
 	}
+	var n *sightmap.ComponentNode
+	var err error
 	if unicode.IsUpper(rune(text[0])) {
-		return s.resolveComponent(text)
+		n, err = s.resolveComponent(text)
+	} else {
+		n, err = s.resolveSelector(text)
 	}
-	return s.resolveSelector(text)
+	// A bare word that is neither a query nor a selector (`product.12`, whose
+	// `.12` is no class) can only be an identifier, one not on this screen yet:
+	// report it missing, so waits and `scroll --until` keep looking.
+	if Code(err) == "bad_query" && bareWord.MatchString(text) {
+		return nil, errorf("not_found", "no element with identifier %s", quote(text))
+	}
+	return n, err
 }
 
 func (s *Snapshot) resolveComponent(text string) (*sightmap.ComponentNode, error) {

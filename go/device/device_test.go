@@ -322,6 +322,16 @@ func TestResolveDottedIdentifier(t *testing.T) {
 	if _, err := Resolve(s, "#simple.primary"); Code(err) != "not_found" {
 		t.Errorf("#simple.primary: %v", err)
 	}
+	// A dotted identifier that isn't on screen (yet) is missing, not a bad
+	// selector, so click waits for it and scroll --until scrolls to it.
+	for _, target := range []string{"product.12", "simple.2nd", "Product.12"} {
+		if _, err := Resolve(s, target); Code(err) != "not_found" || !strings.Contains(err.Error(), "identifier") {
+			t.Errorf("Resolve(%q) = %v, want not_found for an identifier", target, err)
+		}
+	}
+	if _, err := Resolve(s, "button[identifier="); Code(err) != "bad_query" {
+		t.Errorf("a malformed selector is still a bad query: %v", err)
+	}
 	tab := byIdentifier(t, s.Tree, "1.circle")
 	for _, target := range []string{sightmap.IDSelector("1.circle"), `#\31 \.circle`, `[id="1.circle"]`} {
 		if n, err := Resolve(s, target); err != nil || n != tab {

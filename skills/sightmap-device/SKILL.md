@@ -76,7 +76,9 @@ value that starts with `-` goes after `=`: `--grep=-foo`.
 
 A word without brackets or spaces is tried as an identifier first; otherwise a
 target starting with a capital letter is a component query, and anything else
-a selector. A target matching several elements errors and
+a selector. A bare word that is neither (`product.12`) is an identifier not on
+screen yet, so `scroll down --until product.12` works before the row is
+loaded. A target matching several elements errors and
 lists them: add a predicate or append `#N`.
 
 **Off-screen and covered elements.** `click` refuses a target whose center is

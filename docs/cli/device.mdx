@@ -24,7 +24,7 @@ description: "Snapshot a native iOS app's accessibility tree against your corpus
 | Target | Example | Resolves to |
 |--------|---------|-------------|
 | Snapshot id | `12` | Element 12 of the latest snapshot |
-| Identifier | `login-submit` | The one element whose accessibility identifier is exactly this |
+| Identifier | `login-submit`, `product.12` | The one element whose accessibility identifier is exactly this. A dotted identifier works bare, also in `scroll --until` before it is on screen |
 | Component query | `ProductRow[title^="Product 15"]` | A component filtered on extracted properties; `LoginForm SignInButton` and `ProductRow#2` work as in the browser |
 | Selector | `button[identifier="login-submit"]`, `[text="Not Now"]#0` | A CSS selector over the normalized tree, for elements no component names |
 
