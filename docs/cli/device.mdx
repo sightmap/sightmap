@@ -181,11 +181,11 @@ The accessibility tree stays the source of truth for what is on screen and tappa
 How it works and what it costs:
 
 - `start --probe` compiles the probe from source embedded in `sightmap` with your Xcode (one `clang` call, cached under `~/Library/Caches/sightmap/device/probe`; `device doctor` builds it ahead of time; `SIGHTMAP_DEVICE_PROBE` names a dylib to use instead) and launches the app with `DYLD_INSERT_LIBRARIES` and `SWIFTUI_VIEW_DEBUG` set. No app code or build setting changes, and the app needs no `get-task-allow`. Every relaunch, restart and `start --app` loads it again.
-- The probe answers on a Unix socket. Right after launch the session runs a first read in the background, since SwiftUI's first walk of its graph in a process takes several seconds; later reads of a busy screen take a few hundred milliseconds. Only `snapshot` reads through the probe, plus `click`/`fill` when a target is not in the plain tree; the re-reads while a screen settles reuse the last read while the layout is unchanged, and hosting views off screen are skipped.
+- The probe answers on a Unix socket. Right after launch the session runs a first read in the background, since SwiftUI's first walk of its graph is slow; the first read of each new screen still takes a few seconds, and later reads of it a few hundred milliseconds. Only `snapshot` reads through the probe, plus `click`/`fill` when a target is not in the plain tree; the re-reads while a screen settles reuse the last read while the layout is unchanged, and hosting views off screen are skipped.
 - If the app never loads the probe (an app signed with the hardened runtime, or one that clears `DYLD_*` variables), `start` says why, snapshots carry a `[Probe]` note and are the plain accessibility tree, and `status` and `doctor` report it.
 - Field values go through the same redaction as [network entries](#redaction): a field whose name contains `token`, `password`, `secret` or `key` reads `<redacted>`, as do a URL's credential query parameters. `--probe-fields none` leaves fields out entirely. The run log never records a probe node's text.
 
-The probe reads SwiftUI's view debug data, which is undocumented and can change with any Xcode release; when it does, snapshots fall back to the plain tree. UIKit-only screens gain nothing from it yet.
+The probe reads SwiftUI's view debug data, which is undocumented and can change with any Xcode release; when it does, snapshots fall back to the plain tree. SwiftUI's serializer for that data can also crash the app on some screens (seen once, on a detail screen); the session then reports which hosting view it was serializing, leaves that kind of view out of later reads, and you relaunch the app. UIKit-only screens gain nothing from it yet.
 
 ---
 
