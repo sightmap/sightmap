@@ -1,10 +1,12 @@
 package device
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -261,6 +263,187 @@ func TestParseUIAutomatorForeignWindowIsAnOverlay(t *testing.T) {
 	}
 	if n, err := Resolve(snap, `button[text="Allow"]`); err != nil || Identifier(n) != "permission_allow_button" {
 		t.Errorf("Allow = %v, %v", n, err)
+	}
+}
+
+// wantTabs checks that bar is a tabbar whose tabs are the elements with ids,
+// each interactive and named, and only selected selected.
+func wantTabs(t *testing.T, tree *Tree, bar, selected string, ids ...string) {
+	t.Helper()
+	if b := byIdentifier(t, tree, bar); b.Role != "tabbar" {
+		t.Errorf("%s = %s, want tabbar", bar, b.Role)
+	}
+	for _, id := range ids {
+		tab := byIdentifier(t, tree, id)
+		if tab.Role != "tab" || tab.Name == "" || tab.Value != "" || !tab.IsInteractive || tab.State["selected"] != strconv.FormatBool(id == selected) {
+			t.Errorf("%s = %s %q value %q interactive %v state %v; want a tab, selected %v", id, tab.Role, tab.Name, tab.Value, tab.IsInteractive, tab.State, id == selected)
+		}
+		if _, ok := tab.State["checked"]; ok {
+			t.Errorf("%s carries checked %q; a tab is selected, not checked", id, tab.State["checked"])
+		}
+		if !tree.hasAncestor(tab, func(a *sightmap.ComponentNode) bool { return Identifier(a) == bar }) {
+			t.Errorf("%s is not inside %s", id, bar)
+		}
+	}
+}
+
+// A Material Components navigation item is a FrameLayout, checkable in some
+// releases; its library child ids make it a tab, wherever the bar is.
+func TestAndroidMaterialNavigationItemsAreTabs(t *testing.T) {
+	views := Normalize(loadUIAutomator(t, "uiautomator-views", "dev.sightmap.sample", pixel))
+	wantTabs(t, views, "bottom_nav", "nav_home", "nav_home", "nav_account")
+
+	shop := Normalize(loadUIAutomator(t, "uiautomator-views-shop", "dev.sightmap.sample", pixel))
+	wantTabs(t, shop, "bottom_nav", "nav_views", "nav_views", "nav_compose")
+	// The item's label is its content description; its text child says the
+	// same and goes, so [text="Views"] is the tab alone.
+	for _, n := range shop.Nodes {
+		if n.Role == "text" && n.Name == "Views" {
+			t.Errorf("text %s %q is left under the tab", n.Id, n.Name)
+		}
+	}
+	if bar := byIdentifier(t, shop, "bottom_nav"); bar.Bounds.X != 0 || bar.Bounds.Width != 411 {
+		t.Errorf("the bar is the whole BottomNavigationView, got %+v", *bar.Bounds)
+	}
+
+	// A NavigationRailView stacks the same items down the screen's side.
+	item := func(id, label string, y int, selected bool) string {
+		state := `clickable="true"`
+		if selected {
+			state = `selected="true"`
+		}
+		return fmt.Sprintf(`<node class="android.widget.FrameLayout" package="x" resource-id="x:id/%s" content-desc="%s" focusable="true" enabled="true" %s bounds="[0,%d][210,%d]">`+
+			`<node class="android.widget.ImageView" package="x" resource-id="x:id/navigation_bar_item_icon_view" bounds="[73,%d][136,%d]"/>`+
+			`<node class="android.widget.TextView" package="x" resource-id="x:id/navigation_bar_item_large_label_view" text="%s" bounds="[60,%d][150,%d]"/></node>`,
+			id, label, state, y, y+168, y+20, y+83, label, y+100, y+150)
+	}
+	rail := `<hierarchy rotation="0"><node class="android.widget.FrameLayout" package="x" bounds="[0,0][1080,2400]">` +
+		`<node class="android.widget.FrameLayout" package="x" resource-id="x:id/rail" bounds="[0,400][210,904]">` +
+		item("rail_inbox", "Inbox", 400, true) + item("rail_sent", "Sent", 568, false) + item("rail_drafts", "Drafts", 736, false) +
+		`</node></node></hierarchy>`
+	d, err := ParseUIAutomator([]byte(rail), "x", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTabs(t, Normalize(d), "rail", "rail_inbox", "rail_inbox", "rail_sent", "rail_drafts")
+}
+
+// tabRowDump is a row of three items with its top at y px, the one at
+// selected (if any) selected and, as Compose and TabLayout report it, not
+// clickable.
+func tabRowDump(class string, y, selected int) []byte {
+	item := func(id, label string, x int, selected bool) string {
+		attrs := `clickable="true"`
+		if selected {
+			attrs = `selected="true"`
+		}
+		return fmt.Sprintf(`<node class="android.view.View" package="x" resource-id="%s" focusable="true" enabled="true" %s bounds="[%d,%d][%d,%d]">`+
+			`<node class="android.widget.TextView" package="x" text="%s" enabled="true" bounds="[%d,%d][%d,%d]"/></node>`,
+			id, attrs, x, y, x+360, y+126, label, x+120, y+36, x+240, y+90)
+	}
+	return []byte(fmt.Sprintf(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" package="x" bounds="[0,0][1080,2400]">`+
+		`<node class="%s" package="x" resource-id="range" enabled="true" bounds="[0,%d][1080,%d]">%s%s%s</node></node></hierarchy>`,
+		class, y, y+126, item("range.day", "Day", 0, selected == 0), item("range.week", "Week", 360, selected == 1), item("range.month", "Month", 720, selected == 2)))
+}
+
+// Compose's Role.Tab, a current TabLayout tab and a React Native tab show no
+// tab class in a dump, so a row of them is known by its layout. A row like
+// it in the middle of the screen is a segmented control, not tabs.
+func TestAndroidTabRowsByLayout(t *testing.T) {
+	compose := Normalize(loadUIAutomator(t, "uiautomator-compose", "dev.sightmap.sample", pixel))
+	wantTabs(t, compose, "nav", "nav.shop", "nav.shop", "nav.plain", "nav.settings", "nav.views")
+	settings := Normalize(loadUIAutomator(t, "uiautomator-compose-settings", "dev.sightmap.sample", pixel))
+	wantTabs(t, settings, "settings.tabs", "settings.tab.general", "settings.tab.general", "settings.tab.privacy")
+	wantTabs(t, settings, "nav", "nav.settings", "nav.shop", "nav.plain", "nav.settings", "nav.views")
+	// Segments are checked, not selected: they stay radios.
+	for _, id := range []string{"shop.filter.all", "shop.filter.sale", "shop.filter.new"} {
+		if n := byIdentifier(t, compose, id); n.Role != "radio" {
+			t.Errorf("segment %s = %s, want radio", id, n.Role)
+		}
+	}
+	if n := byIdentifier(t, compose, "shop.filter"); n.Role == "tabbar" {
+		t.Error("a segmented button row is not a tab bar")
+	}
+
+	top, err := ParseUIAutomator(tabRowDump("android.view.View", 160, 0), "x", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTabs(t, Normalize(top), "range", "range.day", "range.day", "range.week", "range.month")
+	// Mid-screen, or a row of buttons with nothing selected (a dialog's
+	// actions along the bottom), is not a tab bar.
+	var tree *Tree
+	for _, c := range []struct {
+		name        string
+		y, selected int
+	}{{"a selectable row mid-screen", 1000, 0}, {"a bottom row with nothing selected", 2200, -1}} {
+		d, err := ParseUIAutomator(tabRowDump("android.view.View", c.y, c.selected), "x", pixel)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tree = Normalize(d)
+		for _, n := range tree.Nodes {
+			if n.Role == "tab" || n.Role == "tabbar" {
+				t.Errorf("%s gave %s %s %q", c.name, n.Id, n.Role, n.Name)
+			}
+		}
+	}
+	mid, err := ParseUIAutomator(tabRowDump("android.view.View", 1000, 0), "x", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree = Normalize(mid)
+	if day := byIdentifier(t, tree, "range.day"); day.Role != "other" || day.State["selected"] != "true" || !day.IsInteractive {
+		t.Errorf("range.day = %s selected %q interactive %v", day.Role, day.State["selected"], day.IsInteractive)
+	}
+}
+
+// A TabHost's TabWidget says it holds tabs, wherever it is.
+func TestAndroidTabWidgetHoldsTabs(t *testing.T) {
+	d, err := ParseUIAutomator(tabRowDump("android.widget.TabWidget", 1000, 0), "x", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTabs(t, Normalize(d), "range", "range.day", "range.day", "range.week", "range.month")
+}
+
+// Tabs match a cross-platform TabBarItem component, and the bar covers what
+// scrolls under it, even between two tabs, where no tab is drawn.
+func TestAndroidTabBarMatchesAndCovers(t *testing.T) {
+	dir := t.TempDir()
+	corpus := "version: 1\ncomponents:\n  - name: TabBarItem\n    selector: 'tab'\n    properties:\n      - name: title\n        extract: { from: dom.text }\nviews:\n  - name: Shop\n    route: /shop\n"
+	if err := os.WriteFile(filepath.Join(dir, "screens.yaml"), []byte(corpus), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := sightmap.Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join("testdata", "uiautomator-compose.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// An edge-to-edge list scrolled so its last row sits behind the bar.
+	data = bytes.Replace(data, []byte(`bounds="[0,689][1080,2127]"`), []byte(`bounds="[0,689][1080,2400]"`), 1)
+	data = bytes.Replace(data, []byte(`bounds="[0,1967][1080,2127]"`), []byte(`bounds="[0,2150][1080,2310]"`), 1)
+	d, err := ParseUIAutomator(data, "dev.sightmap.sample", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, err := Annotate(Normalize(d), c, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tab, err := Resolve(snap, `TabBarItem[title="Settings"]`)
+	if err != nil || Identifier(tab) != "nav.settings" {
+		t.Fatalf("TabBarItem Settings = %v, %v", tab, err)
+	}
+	if err := snap.AssertActionable(tab, "TabBarItem"); err != nil {
+		t.Errorf("a tab is not covered by its own bar: %v", err)
+	}
+	row := byIdentifier(t, snap.Tree, "product.7")
+	if err := snap.AssertActionable(row, "product.7"); Code(err) != "covered" || !strings.Contains(err.Error(), "tabbar") {
+		t.Errorf("a row behind the tab bar: %v", err)
 	}
 }
 

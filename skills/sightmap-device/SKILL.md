@@ -412,9 +412,15 @@ What differs from iOS:
   `switch`. A clickable `other` without text, such as a list row, is named by
   its children's text; when that is one text, the text is folded into it, as
   on iOS (`button "Sign out"`, no `text` child).
-- Tabs are not `tab`: a Compose `NavigationBarItem` or `Tab` and a
-  `BottomNavigationView` item are `other` with `(selected)` on the current
-  one. Select them by identifier.
+- Tabs are `tab` in a `tabbar`, with `(selected)` on the current one, so a
+  cross-platform `TabBarItem: 'tab'` matches them. Android has no tab class in
+  the dump, so a row counts as tabs when a library marks it (a Material
+  `BottomNavigationView` or `NavigationRailView` item, a `TabWidget`), or when
+  it looks like a tab bar: labelled tappable items side by side, exactly one
+  selected, along the top or bottom of the screen (a Compose `NavigationBar`
+  or `TabRow`, a `TabLayout`, React Navigation's tabs). A segmented control
+  mid-screen stays as it is (`radio` for Compose's). The bar covers what
+  scrolls under it, as on iOS.
 - `checked` is in the state of every checkable element, toggle-group segments
   and chips included (`(checked)` in the snapshot when it shows no value).
 - A field's label is its hint, or a Compose text field's label text; its value

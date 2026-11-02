@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -38,6 +39,8 @@ type uiNode struct {
 	Focusable     string   `xml:"focusable,attr"`
 	Bounds        string   `xml:"bounds,attr"`
 	Children      []uiNode `xml:"node"`
+
+	tab bool // a tab, by a library signal prepare found
 }
 
 // classTypes maps an Android class's simple name (lowercased, with any $inner
@@ -76,10 +79,11 @@ var classTypes = map[string]string{
 	"numberpicker": "Picker",
 	"webview":      "WebView",
 	"toolbar":      "Toolbar", "materialtoolbar": "Toolbar",
+	"tabwidget": "TabBar",
 }
 
-// tabClasses report a tab: TabLayout's tab view describes itself as an
-// ActionBar tab.
+// tabClasses report a tab: older TabLayout releases' tab view describes itself
+// as an ActionBar tab. Current ones report a LinearLayout (see markTabBars).
 var tabClasses = map[string]bool{"actionbar$tab": true, "tablayout$tabview": true}
 
 var checkedTypes = map[string]bool{"CheckBox": true, "Switch": true, "RadioButton": true}
@@ -144,6 +148,8 @@ var roleClasses = map[string]bool{"button": true, "radiobutton": true, "checkbox
 //     a focusable one that is selected or checkable counts as clickable.
 //   - Selection propagates to every descendant view (a bottom navigation
 //     item's icon and label are selected too); only the topmost is kept.
+//   - A Material Components bottom navigation or rail item reports itself as
+//     a FrameLayout, sometimes checkable; its library child ids say it is a tab.
 func prepare(n uiNode, parentSelected bool) uiNode {
 	if parentSelected {
 		n.Selected = ""
@@ -160,13 +166,20 @@ func prepare(n uiNode, parentSelected bool) uiNode {
 		kids = append(kids, prepare(ch, parentSelected || n.Selected == "true"))
 	}
 	n.Children = kids
-	if n.Checkable == "true" && classTypes[simpleClass(n.Class)] == "" && !tabClasses[simpleClass(n.Class)] {
+	n.tab = n.tab || !navItemPart(n) && slices.ContainsFunc(n.Children, navItemPart)
+	if n.Checkable == "true" && classTypes[simpleClass(n.Class)] == "" && !tabClasses[simpleClass(n.Class)] && !n.tab {
 		n.Class = "android.widget.Switch"
 	}
 	if n.Focusable == "true" && n.Enabled != "false" && (n.Selected == "true" || n.Checkable == "true") {
 		n.Clickable = "true"
 	}
 	return n
+}
+
+// navItemPart reports whether n is one of the views Material Components lays
+// out inside a navigation item (its icon, label, active indicator).
+func navItemPart(n uiNode) bool {
+	return strings.HasPrefix(resourceIDPrefix.ReplaceAllString(n.ResourceID, ""), "navigation_bar_item_")
 }
 
 // isRoleNode reports whether ch is the empty role carrier Compose adds under
@@ -222,7 +235,7 @@ func (c uiConverter) element(n uiNode) *RawElement {
 	typ := classTypes[class]
 	subrole := ""
 	switch {
-	case tabClasses[class]:
+	case tabClasses[class] || n.tab:
 		typ, subrole = "Button", "AXTabButton"
 	case typ == "TextField" && n.Password == "true":
 		subrole = "AXSecureTextField"
@@ -248,7 +261,7 @@ func (c uiConverter) element(n uiNode) *RawElement {
 	if hint == "true" || hint == "false" {
 		hint = ""
 	}
-	if n.Checkable == "true" && !checkedTypes[typ] {
+	if n.Checkable == "true" && !checkedTypes[typ] && subrole != "AXTabButton" {
 		// A checkable button: a segment of a toggle group, a filter chip.
 		checked := n.Checked == "true"
 		el.Checked = &checked
@@ -303,6 +316,96 @@ func (c uiConverter) element(n uiNode) *RawElement {
 		}
 	}
 	return el
+}
+
+// Where a row of tabs must sit for its look alone to make it a tab bar, in dp:
+// its bottom within tabEdgeBottom of the screen's bottom (room for the system
+// navigation bar), or its top within tabEdgeTop of the status bar (room for a
+// top app bar). barInset is how much taller than its row a bar can be (the
+// system navigation bar again, which a bottom bar draws behind).
+const (
+	tabEdgeBottom = 64
+	tabEdgeTop    = 72
+	barInset      = 56
+)
+
+// markTabBars finds rows of tabs and marks them and their bar, as iOS reports
+// a tab bar. Android has no tab role uiautomator shows: Compose's Role.Tab,
+// a Material navigation item and a TabLayout tab carry it only in a role
+// description, which the dump leaves out. So a row is a tab bar when a library
+// signal says so (see prepare, tabClasses, TabWidget), or when it looks like
+// one: labelled tappable items side by side, exactly one selected, along the
+// top or bottom edge of the screen. A segmented control mid-screen, or one
+// whose segments are checked rather than selected, stays as it is.
+//
+// The bar is the outermost element wrapping only the row and not much taller,
+// so it covers the whole band (a BottomNavigationView around its menu view).
+func markTabBars(el *RawElement, screen Size, statusBar float64) {
+	row := el
+	for len(row.Children) == 1 {
+		row = row.Children[0]
+	}
+	bar := el
+	if row.Type == "TabBar" {
+		bar = row
+	}
+	if tabs := tabRow(row, screen, statusBar); tabs != nil && bar.Frame.H-row.Frame.H <= barInset {
+		bar.Role, bar.Type, bar.Subrole = "AXTabBar", "TabBar", ""
+		for _, t := range tabs {
+			t.Role, t.Type, t.Subrole = "AXButton", "Button", "AXTabButton"
+			dropText(t, t.Label)
+		}
+		return
+	}
+	for _, ch := range el.Children {
+		markTabBars(ch, screen, statusBar)
+	}
+}
+
+// tabRow returns row's children if they are a row of tabs, else nil. Empty
+// children (a selection indicator, a divider) are passed over.
+func tabRow(row *RawElement, screen Size, statusBar float64) []*RawElement {
+	var tabs []*RawElement
+	signal := row.Type == "TabBar" || slices.ContainsFunc(row.Children, func(ch *RawElement) bool { return ch.Subrole == "AXTabButton" })
+	selected := 0
+	for _, ch := range row.Children {
+		tappable := slices.Contains(ch.Traits, "Button")
+		switch {
+		case ch.Subrole == "AXTabButton":
+		case ch.Label != "" && tappable && (ch.Checked == nil || signal):
+		case ch.Label == "" && ch.Identifier == "" && len(ch.Children) == 0 && !tappable:
+			continue
+		default:
+			return nil
+		}
+		tabs = append(tabs, ch)
+		if slices.Contains(ch.Traits, "Selected") {
+			selected++
+		}
+	}
+	if len(tabs) < 2 {
+		return nil
+	}
+	if signal {
+		return tabs
+	}
+	if selected != 1 {
+		return nil
+	}
+	first, last := tabs[0].Frame, tabs[len(tabs)-1].Frame
+	for i := 1; i < len(tabs); i++ {
+		a, b := tabs[i-1].Frame, tabs[i].Frame
+		if b.X < a.X+a.W-1 || math.Abs(b.Y-a.Y) > 4 || math.Abs(b.H-a.H) > 4 {
+			return nil
+		}
+	}
+	if last.X+last.W-first.X < screen.W/2 {
+		return nil
+	}
+	if first.Y+first.H < screen.H-tabEdgeBottom && first.Y > statusBar+tabEdgeTop {
+		return nil
+	}
+	return tabs
 }
 
 // dropText removes the first descendant of el that is a text labelled label
@@ -414,6 +517,9 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 			d.Untagged = true
 		}
 		root.Children = append(root.Children, c.element(n))
+	}
+	for _, w := range root.Children {
+		markTabBars(w, size, d.StatusBar)
 	}
 	if k := screen.Keyboard; k != nil && len(root.Children) > 0 {
 		f := c.frame("[" + strconv.Itoa(k[0]) + "," + strconv.Itoa(k[1]) + "][" + strconv.Itoa(k[2]) + "," + strconv.Itoa(k[3]) + "]")
