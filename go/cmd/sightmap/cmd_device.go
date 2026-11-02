@@ -1115,7 +1115,13 @@ func spawnDeviceDaemon(dc daemonConfig, sightmapDir string) (*device.SessionInfo
 // stopUnstartedDaemon ends a daemon that missed the start deadline. Left
 // running, it would hold the simulator although start reported a failure, and
 // a retried start would spawn a second daemon for the same simulator.
+//
+// A daemon still starting up has no signal handler yet, so SIGTERM ends it
+// without closing its session, and children it already started (adb logcat,
+// the simulator helper) would outlive it. They share its process group
+// (configureDetachedDaemon), so the group is killed afterwards.
 func stopUnstartedDaemon(p *os.Process, done <-chan error) {
+	defer killGroup(p.Pid)
 	if p.Signal(syscall.SIGTERM) == nil {
 		select {
 		case <-done:
