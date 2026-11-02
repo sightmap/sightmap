@@ -432,14 +432,7 @@ func parentDesc(p parentInfo) string {
 
 // elementDesc formats an element identity as tag[#id][.class1.class2...].
 func elementDesc(tag, id string, classes []string) string {
-	s := tag
-	if id != "" {
-		s += "#" + id
-	}
-	for _, c := range classes {
-		s += "." + c
-	}
-	return s
+	return (&sightmap.Element{Tag: tag, Id: id, Classes: classes}).SelectorString()
 }
 
 // runSelProbeAll navigates to each probe URL and reports how many DOM elements

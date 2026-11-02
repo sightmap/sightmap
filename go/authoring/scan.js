@@ -68,6 +68,51 @@ function __smHrefSuffix(href) {
   return "/" + seg;
 }
 
+// __smIdSelector mirrors sightmap.IDSelector (Go): "#" plus the id with ASCII
+// punctuation backslash-escaped, else [id="…"] where the portable profile can't
+// write it as an identifier (a leading digit, a space), else "". CSS.escape is
+// not used: it writes a leading digit as a hex escape, which the profile
+// excludes. Keep the two in sync.
+function __smIdSelector(id) {
+  if (!id) return "";
+  let out = "#";
+  let ok = true;
+  const chars = Array.from(id);
+  for (let i = 0; i < chars.length && ok; i++) {
+    const ch = chars[i];
+    const c = ch.codePointAt(0);
+    if (c >= 0x80) {
+      if (
+        /[\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/.test(
+          ch,
+        )
+      )
+        ok = false;
+      else out += ch;
+    } else if (/[A-Za-z_]/.test(ch)) {
+      out += ch;
+    } else if (/[0-9]/.test(ch)) {
+      if (i === 0) ok = false;
+      else out += ch;
+    } else if (ch === "-") {
+      const next = chars[1];
+      const mayLead =
+        next !== undefined &&
+        !/[0-9-]/.test(next) &&
+        next > " " &&
+        next !== "\x7f";
+      out += i === 0 && !mayLead ? "\\-" : "-";
+    } else if (c > 0x20 && c < 0x7f) {
+      out += "\\" + ch;
+    } else {
+      ok = false;
+    }
+  }
+  if (ok) return out;
+  if (/[\x00-\x1f\x7f]/.test(id)) return "";
+  return '[id="' + id.replace(/["\\]/g, "\\$&") + '"]';
+}
+
 // __smBestHook returns the single strongest stable selector for el, or "".
 // A best-effort single pick, not the full ranked list coverage.SelectorCandidates
 // (Go) returns — but the same hooks, roughly by the same priority: data-* leads
@@ -82,7 +127,10 @@ function __smBestHook(el) {
     return '[data-component^="' + dc.replace(/:v\d+\.\d+\.\d+.*$/, "") + '"]';
   if (tag.includes("-")) return tag; // custom element — stable and semantic
   const id = el.id;
-  if (id && !__smLooksHashed(id) && !/\d+$/.test(id)) return "#" + id;
+  if (id && !__smLooksHashed(id) && !/\d+$/.test(id)) {
+    const sel = __smIdSelector(id);
+    if (sel) return sel;
+  }
   const name = el.getAttribute("name");
   if (name && !__smLooksHashed(name)) return tag + '[name="' + name + '"]';
   for (const attr of el.attributes) {

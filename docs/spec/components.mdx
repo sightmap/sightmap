@@ -39,6 +39,17 @@ Use the array form to keep one name across UI variants, such as a redesigned pag
 
 If a selector matches multiple elements, all matches get the name. Selectors are not required to be unique.
 
+### Ids with special characters
+
+`#x` is the same as `[id="x"]`, and `x` must be a CSS identifier. Escape any other punctuation in an id with a backslash, and single-quote the selector so YAML keeps the backslash:
+
+```yaml
+selector: '#product\.1'      # id "product.1"
+selector: '[id="1.circle"]'  # id starts with a digit
+```
+
+Unescaped, `#product.1` is a parse error and `#checkout.submit` means id `checkout` with class `submit`, which silently matches nothing on an element whose id is `checkout.submit`. Only single-character escapes are portable (`\.`, `\:`, `\/`), not hex escapes such as `\31 `, so an id that starts with a digit is written as `[id="…"]`. The CLI writes ids this way when it suggests selectors.
+
 ## The `data-component` convention
 
 The recommended pattern is to render a `data-component="<Name>"` attribute on the root element of each named component, then select on that attribute:

@@ -141,3 +141,66 @@ describe("__smScanLinks", () => {
     expect(__smScanLinks()).toEqual(["/same-host"]);
   });
 });
+
+// Same cases as TestIDSelector in go/sightmap/sel_escape_test.go.
+describe("__smIdSelector", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test.each([
+    ["", ""],
+    ["submit", "#submit"],
+    ["search-box_2", "#search-box_2"],
+    ["product.1", "#product\\.1"],
+    ["shop.product.1", "#shop\\.product\\.1"],
+    ["checkout.submit", "#checkout\\.submit"],
+    ["a:b/c[d]", "#a\\:b\\/c\\[d\\]"],
+    ['q"x\\y', '#q\\"x\\\\y'],
+    ["-x", "#-x"],
+    ["-.x", "#-\\.x"],
+    ["-", "#\\-"],
+    ["--x", "#\\--x"],
+    ["-1", "#\\-1"],
+    ["_1", "#_1"],
+    ["café.menü", "#café\\.menü"],
+    ["1.circle", '[id="1.circle"]'],
+    ["9", '[id="9"]'],
+    ["first name", '[id="first name"]'],
+    ['2"x', '[id="2\\"x"]'],
+    ["a\u00a0b", '[id="a\u00a0b"]'],
+    ["a\nb", ""],
+    ["a\tb", ""],
+  ])("%j → %j", (id, want) => {
+    expect(__smIdSelector(id)).toBe(want);
+  });
+
+  // `#q\"x` (CSS.escape's own output for q"x) is left out: jsdom's selector
+  // engine cannot match an escaped quote or backslash in an id; browsers can.
+  test.each([
+    "checkout.submit",
+    "a:b/c[d]",
+    "-",
+    "--x",
+    "-1",
+    "1.circle",
+    "first name",
+  ])("the selector for %j finds exactly that element", (id) => {
+    const el = document.createElement("div");
+    el.id = id;
+    const decoy = document.createElement("div");
+    decoy.id = "checkout";
+    decoy.className = "submit";
+    document.body.append(el, decoy);
+    expect(Array.from(document.querySelectorAll(__smIdSelector(id)))).toEqual([
+      el,
+    ]);
+  });
+
+  test("__smScanCandidates escapes a dotted id", () => {
+    document.body.innerHTML = `<button id="checkout.submit"></button>`;
+    expect(__smScanCandidates(10)[0]).toMatchObject({
+      sel: "#checkout\\.submit",
+    });
+  });
+});

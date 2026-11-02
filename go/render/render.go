@@ -417,10 +417,7 @@ func selectorHint(sel *sightmap.Element) string {
 	if sel.Tag != "" {
 		sb.WriteString(sel.Tag)
 	}
-	if sel.Id != "" {
-		sb.WriteString("#")
-		sb.WriteString(sel.Id)
-	}
+	sb.WriteString(sightmap.IDSelector(sel.Id))
 	for _, key := range []string{"data-testid", "data-component"} {
 		if v, ok := sel.Attrs[key]; ok {
 			fmt.Fprintf(&sb, ` [%s=%q]`, key, v)

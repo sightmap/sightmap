@@ -163,6 +163,17 @@ func TestParentDesc_falls_back_to_elementDesc(t *testing.T) {
 	}
 }
 
+func TestElementDesc_escapes_id(t *testing.T) {
+	for id, want := range map[string]string{
+		"checkout.submit": `button#checkout\.submit.primary`,
+		"1.circle":        `button[id="1.circle"].primary`,
+	} {
+		if got := elementDesc("button", id, []string{"primary"}); got != want {
+			t.Errorf("elementDesc(%q) = %q, want %q", id, got, want)
+		}
+	}
+}
+
 func TestParentDesc_empty_parent(t *testing.T) {
 	p := parentInfo{Tag: "div"}
 	got := parentDesc(p)

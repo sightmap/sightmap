@@ -58,6 +58,18 @@ func TestSelectorCandidates(t *testing.T) {
 			want: []string{`[id^="combobox-button"]`},
 		},
 		{
+			name:   "dotted id is escaped, not read as id+class",
+			el:     &sightmap.Element{Tag: "button", Id: "checkout.submit"},
+			want:   []string{`#checkout\.submit`},
+			absent: []string{"#checkout.submit"},
+		},
+		{
+			name:   "digit-leading id uses [id=]",
+			el:     &sightmap.Element{Tag: "li", Id: "1.circle"},
+			want:   []string{`[id="1.circle"]`},
+			absent: []string{"#1.circle"},
+		},
+		{
 			name: "other stable data-* attr is surfaced",
 			el:   &sightmap.Element{Tag: "a", Attrs: map[string]string{"data-target-selection-name": "Home"}},
 			want: []string{`[data-target-selection-name="Home"]`},
