@@ -21,7 +21,8 @@ import (
 //
 // It snapshots the launch screen and checks the screenshot, console, run log
 // and relaunch paths. With the sample app it also checks that Compose
-// identifiers, a segment's checked state and a switch's arrive and change.
+// identifiers, a segment's checked state and a switch's arrive and change, and
+// that Compose and Material tab bars read as tabs with the current one selected.
 func TestAndroidE2E(t *testing.T) {
 	serial, app := os.Getenv("SIGHTMAP_ANDROID_E2E"), os.Getenv("SIGHTMAP_ANDROID_E2E_APP")
 	if serial == "" || app == "" {
@@ -93,15 +94,37 @@ func TestAndroidE2E(t *testing.T) {
 		if !strings.Contains(snap, `identifier="product.1"`) {
 			t.Errorf("the sample's Shop screen lacks its testTags:\n%s", snap)
 		}
+		wantAll := func(out, what string, lines ...string) {
+			t.Helper()
+			for _, l := range lines {
+				if !strings.Contains(out, l) {
+					t.Errorf("%s: no %s in\n%s", what, l, out)
+				}
+			}
+		}
+		wantAll(snap, "Compose bottom navigation", `tabbar[identifier="nav"]`, `tab[identifier="nav.shop"] "Shop" (selected)`, `tab[identifier="nav.plain"] "Plain"`+"\n")
 		must("click", "shop.filter.sale")
 		if out := must("snapshot"); !strings.Contains(out, `radio[identifier="shop.filter.sale"] "Sale" value="1"`) {
 			t.Errorf("the Sale segment is not checked after a click:\n%s", out)
 		}
 		must("click", "nav.settings")
 		must("click", "settings.notifications")
-		if out := must("snapshot"); !strings.Contains(out, `switch[identifier="settings.notifications"] "Notifications" value="1"`) {
+		out := must("snapshot")
+		if !strings.Contains(out, `switch[identifier="settings.notifications"] "Notifications" value="1"`) {
 			t.Errorf("the notifications switch is not on after a click:\n%s", out)
 		}
+		wantAll(out, "Compose tab row and bottom navigation", `tabbar[identifier="settings.tabs"]`, `tab[identifier="settings.tab.general"] "General" (selected)`,
+			`tab[identifier="nav.settings"] "Settings" (selected)`, `tab[identifier="nav.shop"] "Shop"`+"\n")
+		must("click", "nav.views")
+		var views string
+		for range 5 {
+			if views = must("snapshot"); strings.Contains(views, "bottom_nav") {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		wantAll(views, "BottomNavigationView", `tabbar[identifier="bottom_nav"]`, `tab[identifier="nav_views"] "Views" (selected)`, `tab[identifier="nav_compose"] "Compose"`+"\n")
+		must("button", "back")
 	}
 	must("relaunch")
 	if out := must("run", "tail"); !strings.Contains(out, "relaunch") {
