@@ -405,6 +405,17 @@ func TestClickWaitsOutAScreenThatJustChanged(t *testing.T) {
 	}
 }
 
+// iOS 26 drops touches until a full-screen modal has finished sliding in or
+// out, 0.50–0.53 s after it starts, and the first read showing the modal can
+// come within 10 ms of its start, so a quiet period of 0.5 s tapped as it
+// finished, or before under load.
+func TestQuietOutlastsAModalTransition(t *testing.T) {
+	const transition = 530 * time.Millisecond
+	if q := (Timing{}).withDefaults().Quiet; q < transition+200*time.Millisecond {
+		t.Fatalf("default quiet period is %s, want at least %s past a %s modal transition", q, 200*time.Millisecond, transition)
+	}
+}
+
 func TestClickWaitsForACoastingListToStop(t *testing.T) {
 	s, h := newTestSession(t, "describe-simple")
 	s.Timing.RetryTimeout, s.Timing.RetryInterval, s.Timing.Quiet = time.Minute, 10*time.Millisecond, 300*time.Millisecond

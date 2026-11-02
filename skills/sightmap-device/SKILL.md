@@ -97,7 +97,7 @@ is missing, or the screen moves between two reads ~150 ms apart (a sheet
 closing, a back navigation), they re-read for up to 3 s (`--settle 5s` to
 wait longer, e.g. for a Debug React Native build redrawing after a back
 navigation). They tap only once two reads in a row agree on where the target
-and the screen are and the screen has held still for 0.5 s, so a tap never
+and the screen are and the screen has held still for 0.75 s, so a tap never
 lands mid-transition: the tree shows where a sliding modal ends up, not where
 it is, and iOS drops touches until it gets there. A screen that was already
 still is tapped without that wait, and `scroll` waits the same way before its

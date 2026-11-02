@@ -60,9 +60,10 @@ func (t Timing) withDefaults() Timing {
 	// A Debug React Native build can take a few seconds to draw a screen
 	// after a navigation.
 	def(&t.RetryTimeout, 3*time.Second)
-	// UIKit drops touches until a presentation transition ends, 0.35–0.5 s
-	// by default.
-	def(&t.Quiet, 500*time.Millisecond)
+	// UIKit drops touches until a presentation transition ends; iOS 26 takes
+	// up to 0.53 s for a full-screen modal, and the first read showing it can
+	// come a few milliseconds after it starts.
+	def(&t.Quiet, 750*time.Millisecond)
 	return t
 }
 
