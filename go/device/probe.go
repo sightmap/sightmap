@@ -134,7 +134,20 @@ type ProbeHost struct {
 	Graph json.RawMessage `json:"graph"`
 }
 
-// ProbeRequest sends one command to the probe at socket.
+// ProbeCrash is a dump that ended with the app gone while SwiftUI serialized
+// the graph of a hosting view of Class.
+type ProbeCrash struct {
+	Class string
+	Err   error
+}
+
+func (e *ProbeCrash) Error() string {
+	return fmt.Sprintf("the app exited while SwiftUI serialized the view graph of a %s (%v)", e.Class, e.Err)
+}
+
+// ProbeRequest sends one command to the probe at socket. A dump's progress
+// lines are read past; if the connection drops after one, the error is a
+// *ProbeCrash naming the host being serialized.
 func ProbeRequest(ctx context.Context, socket, cmd string, args map[string]any, out any) error {
 	var d net.Dialer
 	conn, err := d.DialContext(ctx, "unix", socket)
@@ -152,9 +165,27 @@ func ProbeRequest(ctx context.Context, socket, cmd string, args map[string]any, 
 		return errorf("probe_unreachable", "in-app probe: %v", err)
 	}
 	r := bufio.NewReaderSize(conn, 1<<20)
-	data, err := r.ReadBytes('\n')
-	if err != nil {
-		return errorf("probe_unreachable", "in-app probe closed the connection: %v", err)
+	var data []byte
+	last := ""
+	for {
+		line, err := r.ReadBytes('\n')
+		if err != nil {
+			if last != "" {
+				return &ProbeCrash{Class: last, Err: err}
+			}
+			return errorf("probe_unreachable", "in-app probe closed the connection: %v", err)
+		}
+		var progress struct {
+			Progress *struct {
+				Class string `json:"cls"`
+			} `json:"progress"`
+		}
+		if len(line) < 512 && json.Unmarshal(line, &progress) == nil && progress.Progress != nil {
+			last = progress.Progress.Class
+			continue
+		}
+		data = line
+		break
 	}
 	var rep struct {
 		OK     bool            `json:"ok"`

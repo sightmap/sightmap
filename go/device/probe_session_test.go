@@ -24,6 +24,10 @@ type fakeProbe struct {
 	dump  []byte
 	dumps atomic.Int32
 	ln    net.Listener
+	// crash, when set, makes a dump end like an app that died while
+	// serializing a host of that class.
+	crash    atomic.Value
+	lastArgs atomic.Value
 }
 
 func startFakeProbe(t *testing.T, udid string, pid int) *fakeProbe {
@@ -66,8 +70,9 @@ func (p *fakeProbe) serve(conn net.Conn) {
 	sc := bufio.NewScanner(conn)
 	for sc.Scan() {
 		var req struct {
-			ID  int    `json:"id"`
-			Cmd string `json:"cmd"`
+			ID   int            `json:"id"`
+			Cmd  string         `json:"cmd"`
+			Args map[string]any `json:"args"`
 		}
 		json.Unmarshal(sc.Bytes(), &req)
 		switch req.Cmd {
@@ -75,6 +80,11 @@ func (p *fakeProbe) serve(conn net.Conn) {
 			fmt.Fprintf(conn, `{"id":%d,"ok":true,"result":{"pid":%d}}`+"\n", req.ID, p.pid)
 		case "dump":
 			p.dumps.Add(1)
+			p.lastArgs.Store(req.Args)
+			if c, _ := p.crash.Load().(string); c != "" {
+				fmt.Fprintf(conn, `{"progress":{"cls":%q}}`+"\n", c)
+				return
+			}
 			fmt.Fprintf(conn, `{"id":%d,"ok":true,"result":%s}`+"\n", req.ID, p.dump)
 		}
 	}
@@ -232,5 +242,40 @@ func TestBuildProbeCompilesAndLinks(t *testing.T) {
 	}
 	if again, err := BuildProbe(context.Background()); err != nil || again != path {
 		t.Fatalf("second build = %s, %v; want the cached %s", again, err, path)
+	}
+}
+
+func TestProbeDumpThatTakesTheAppDownExcludesThatHostClass(t *testing.T) {
+	s, _ := newProbeSession(t)
+	p := startFakeProbe(t, s.UDID, 42)
+	if _, err := handle(t, s, "launch", nil); err != nil {
+		t.Fatal(err)
+	}
+	s.probeWait(5 * time.Second)
+	waitFor(t, "the warm-up dump", func() bool { return p.dumps.Load() == 1 })
+	p.crash.Store("DetailHostingView")
+	r, err := handle(t, s, "snapshot", SnapshotArgs{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text := r["text"].(string); !strings.Contains(text, "[Probe] not loaded") || !strings.Contains(text, "DetailHostingView") {
+		t.Fatalf("snapshot:\n%s", text)
+	}
+	if st := s.ProbeStatus(); st.State != "unavailable" || len(st.Excluded) != 1 {
+		t.Fatalf("status = %+v", st)
+	}
+
+	p.crash.Store("")
+	if _, err := handle(t, s, "launch", nil); err != nil {
+		t.Fatal(err)
+	}
+	s.probeWait(5 * time.Second)
+	waitFor(t, "the warm-up dump", func() bool { return p.dumps.Load() == 3 })
+	args, _ := p.lastArgs.Load().(map[string]any)
+	if skip, _ := args["skipClasses"].([]any); len(skip) != 1 || skip[0] != "DetailHostingView" {
+		t.Fatalf("dump args after relaunch = %v", args)
+	}
+	if st := s.ProbeStatus(); st.State != "loaded" || len(st.Excluded) != 1 {
+		t.Fatalf("status after relaunch = %+v", st)
 	}
 }

@@ -2,9 +2,11 @@ package device
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"os/exec"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -26,6 +28,9 @@ type ProbeStatus struct {
 	// layout had not changed.
 	CacheHits int `json:"cacheHits"`
 	Dumps     int `json:"dumps"`
+	// Excluded are the hosting view classes left out of dumps because the app
+	// exited while SwiftUI serialized one of them.
+	Excluded []string `json:"excluded,omitempty"`
 }
 
 // ProbeStat describes one dump.
@@ -50,6 +55,11 @@ type probeState struct {
 	ready  chan struct{}
 	key    string
 	items  []*probeItem
+	// excluded outlives launches: a class that took the app down once would
+	// again.
+	excluded []string
+	// crashed is set by a dump that took the app down, for the snapshot's note.
+	crashed string
 }
 
 func (s *Session) probeSocket() string { return ProbeSocketPath(s.UDID) }
@@ -64,7 +74,7 @@ func (s *Session) probeLaunched(pid int) {
 	ready := make(chan struct{})
 	p.ready = ready
 	p.key, p.items = "", nil
-	p.status = ProbeStatus{State: "starting", Dylib: s.Probe, Socket: s.probeSocket()}
+	p.status = ProbeStatus{State: "starting", Dylib: s.Probe, Socket: s.probeSocket(), Excluded: p.excluded}
 	p.mu.Unlock()
 	go s.probeWarmup(gen, pid, ready)
 }
@@ -103,7 +113,8 @@ func (s *Session) probeWarmup(gen, pid int, ready chan struct{}) {
 	wctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 	var dump ProbeDump
-	if err := ProbeRequest(wctx, s.probeSocket(), "dump", probeDumpArgs, &dump); err != nil {
+	if err := ProbeRequest(wctx, s.probeSocket(), "dump", s.probeDumpArgs(), &dump); err != nil {
+		s.probeFailed(err)
 		s.Log("probe: warm-up dump failed: " + err.Error())
 		return
 	}
@@ -192,7 +203,29 @@ const (
 	probeFetch
 )
 
-var probeDumpArgs = map[string]any{"swiftui": true, "onScreen": true}
+func (s *Session) probeDumpArgs() map[string]any {
+	s.probe.mu.Lock()
+	defer s.probe.mu.Unlock()
+	return map[string]any{"swiftui": true, "onScreen": true, "skipClasses": append([]string{}, s.probe.excluded...)}
+}
+
+// probeFailed records a dump that took the app down, so later dumps leave that
+// hosting view class out.
+func (s *Session) probeFailed(err error) {
+	var crash *ProbeCrash
+	if !errors.As(err, &crash) {
+		return
+	}
+	p := &s.probe
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !slices.Contains(p.excluded, crash.Class) {
+		p.excluded = append(p.excluded, crash.Class)
+	}
+	p.crashed = crash.Class
+	p.status.Excluded = p.excluded
+	p.status.State, p.status.Reason = "unavailable", crash.Error()+"; later dumps leave that view out. Relaunch the app (`sightmap device relaunch`)"
+}
 
 // mergeProbe adds the probe's structure to d. A probe that is missing or
 // fails leaves the out-of-process tree as it is.
@@ -222,7 +255,8 @@ func (s *Session) mergeProbe(ctx context.Context, d *Describe, mode probeMode) b
 	var dump ProbeDump
 	dctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
-	if err := ProbeRequest(dctx, s.probeSocket(), "dump", probeDumpArgs, &dump); err != nil {
+	if err := ProbeRequest(dctx, s.probeSocket(), "dump", s.probeDumpArgs(), &dump); err != nil {
+		s.probeFailed(err)
 		s.Log("probe: " + err.Error())
 		return false
 	}

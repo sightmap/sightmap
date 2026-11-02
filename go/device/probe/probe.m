@@ -3,7 +3,12 @@
 // SIGHTMAP_PROBE_SOCKET. One JSON request per line, one JSON reply per line:
 //
 //	{"id":1,"cmd":"ping"}
-//	{"id":2,"cmd":"dump","args":{"ax":true,"views":false,"layers":false,"swiftui":true,"onScreen":true}}
+//	{"id":2,"cmd":"dump","args":{"ax":true,"views":false,"layers":false,"swiftui":true,"onScreen":true,"skipClasses":["…"]}}
+//
+// Before serializing each host, a dump sends {"progress":{"cls":"…"}} on its
+// own line. SwiftUI's serializer can trap on some values and take the app down
+// with it; the last progress line then tells the session which hosting view
+// class to leave out (skipClasses) from then on.
 //
 // onScreen leaves out hosting views that are hidden or entirely off screen:
 // SwiftUI's debug graph costs 15–100 ms and 0.4–2 MB per host.
@@ -108,10 +113,22 @@ static void append(NSMutableData *d, NSString *s) { [d appendData:[s dataUsingEn
 
 // dump runs on the main thread. The reply is assembled by hand so each host's
 // debug data, already JSON, is spliced in without a parse and re-encode.
-static NSData *dump(NSDictionary *args, NSNumber *rid) {
+static void sendLine(int fd, NSData *d) {
+  const char *p = d.bytes;
+  size_t left = d.length;
+  while (left > 0) {
+    ssize_t w = write(fd, p, left);
+    if (w <= 0) return;
+    p += w, left -= (size_t)w;
+  }
+  write(fd, "\n", 1);
+}
+
+static NSData *dump(NSDictionary *args, NSNumber *rid, int fd) {
   BOOL wantAX = [args[@"ax"] boolValue], wantViews = [args[@"views"] boolValue], wantLayers = [args[@"layers"] boolValue], wantUI = [args[@"swiftui"] boolValue],
        onScreen = [args[@"onScreen"] boolValue];
-  NSInteger skipped = 0;
+  NSSet *skipClasses = [NSSet setWithArray:[args[@"skipClasses"] isKindOfClass:[NSArray class]] ? args[@"skipClasses"] : @[]];
+  NSInteger skipped = 0, excluded = 0;
   NSMutableDictionary *meta = [NSMutableDictionary dictionary], *timing = [NSMutableDictionary dictionary];
   double t0 = nowMS();
   NSArray<UIWindow *> *ws = windows();
@@ -144,6 +161,12 @@ static NSData *dump(NSDictionary *args, NSNumber *rid) {
         skipped++;
         continue;
       }
+      NSString *cls = NSStringFromClass([h class]);
+      if ([skipClasses containsObject:cls]) {
+        excluded++;
+        continue;
+      }
+      sendLine(fd, json(@{@"progress" : @{@"cls" : cls}}));
       double t = nowMS();
       NSData *d = ((NSData * (*)(id, SEL)) objc_msgSend)(h, debugSel());
       double ms = nowMS() - t;
@@ -160,6 +183,7 @@ static NSData *dump(NSDictionary *args, NSNumber *rid) {
   timing[@"total"] = @(nowMS() - t0);
   meta[@"timing"] = timing;
   meta[@"skipped"] = @(skipped);
+  meta[@"excluded"] = @(excluded);
   meta[@"swiftuiDebug"] = NSProcessInfo.processInfo.environment[@"SWIFTUI_VIEW_DEBUG"] ?: @"";
 
   NSMutableData *out = [NSMutableData data];
@@ -178,7 +202,7 @@ static NSData *dump(NSDictionary *args, NSNumber *rid) {
   return out;
 }
 
-static NSData *handle(NSData *line) {
+static NSData *handle(NSData *line, int fd) {
   NSDictionary *req = [NSJSONSerialization JSONObjectWithData:line options:0 error:nil];
   if (![req isKindOfClass:[NSDictionary class]]) return json(@{@"ok" : @NO, @"error" : @{@"code" : @"bad_request", @"message" : @"unparseable request"}});
   NSString *cmd = req[@"cmd"];
@@ -195,7 +219,7 @@ static NSData *handle(NSData *line) {
     __block NSData *out;
     dispatch_sync(dispatch_get_main_queue(), ^{
       @autoreleasepool {
-        out = dump(args, rid);
+        out = dump(args, rid, fd);
       }
     });
     return out;
@@ -217,7 +241,7 @@ static void serve(int fd) {
       NSUInteger len = nl - b;
       NSData *reply;
       @autoreleasepool {
-        reply = handle([buf subdataWithRange:NSMakeRange(0, len)]);
+        reply = handle([buf subdataWithRange:NSMakeRange(0, len)], fd);
       }
       [buf replaceBytesInRange:NSMakeRange(0, len + 1) withBytes:NULL length:0];
       const char *p = reply.bytes;

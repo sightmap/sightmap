@@ -1131,6 +1131,9 @@ func probeStatusLine(p device.ProbeStatus) string {
 		}
 		line += ")"
 	}
+	if len(p.Excluded) > 0 {
+		line += "; left out after a crash: " + strings.Join(p.Excluded, ", ")
+	}
 	return line
 }
 
