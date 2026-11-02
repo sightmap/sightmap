@@ -35,6 +35,7 @@ type uiNode struct {
 	Scrollable    string   `xml:"scrollable,attr"`
 	Password      string   `xml:"password,attr"`
 	Selected      string   `xml:"selected,attr"`
+	Focusable     string   `xml:"focusable,attr"`
 	Bounds        string   `xml:"bounds,attr"`
 	Children      []uiNode `xml:"node"`
 }
@@ -42,7 +43,8 @@ type uiNode struct {
 // classTypes maps an Android class's simple name (lowercased, with any $inner
 // suffix kept) to the accessibility type Normalize understands. Jetpack
 // Compose reports semantics roles through the same widget class names
-// (Role.Button as android.widget.Button, editable text as EditText, …).
+// (Role.Button as android.widget.Button, editable text as EditText, …), on a
+// node of their own under the element (see prepare).
 var classTypes = map[string]string{
 	"button": "Button", "imagebutton": "Button", "materialbutton": "Button", "appcompatbutton": "Button",
 	"appcompatimagebutton": "Button", "floatingactionbutton": "Button", "extendedfloatingactionbutton": "Button",
@@ -102,7 +104,78 @@ func androidIdentifier(id string) string {
 	if id == "" || strings.HasPrefix(id, "android:id/") {
 		return ""
 	}
-	return resourceIDPrefix.ReplaceAllString(id, "")
+	id = resourceIDPrefix.ReplaceAllString(id, "")
+	if internalIDs[id] || strings.HasPrefix(id, "navigation_bar_item_") || strings.HasPrefix(id, "mtrl_") {
+		return ""
+	}
+	return id
+}
+
+// internalIDs are ids from AppCompat and Material Components layouts. Library
+// resources are merged into the app's package, so they look like the app's own
+// ids, but they name the library's containers (a dialog's panels, a bottom
+// navigation item's icon), the same on every screen.
+var internalIDs = map[string]bool{
+	"action_bar_root": true, "action_bar_container": true, "action_bar": true, "action_context_bar": true,
+	"decor_content_parent": true, "parentPanel": true, "topPanel": true, "title_template": true,
+	"titleDividerNoCustom": true, "alertTitle": true, "contentPanel": true, "customPanel": true,
+	"buttonPanel": true, "textSpacerNoTitle": true, "textSpacerNoButtons": true,
+	"scrollIndicatorUp": true, "scrollIndicatorDown": true, "design_bottom_sheet": true, "touch_outside": true,
+	"textinput_placeholder": true, "textinput_helper_text": true, "textinput_counter": true,
+	"text_input_end_icon": true, "text_input_start_icon": true,
+}
+
+// roleClasses are the classes Jetpack Compose gives the empty node it adds
+// under an element to carry the element's role: a Button, a RadioButton
+// (a segmented button), a CheckBox, a Switch.
+var roleClasses = map[string]bool{"button": true, "radiobutton": true, "checkbox": true, "switch": true}
+
+// prepare rewrites a dump where uiautomator's view of Jetpack Compose and of
+// Android's selection state would mislead the tree:
+//
+//   - Compose reports an element's role on an extra empty child spanning it
+//     (a Button's `android.widget.Button`, a segment's RadioButton) and the
+//     element itself as a plain View. The element takes the child's class, and
+//     the child goes.
+//   - A checkable element with no role (a Compose Switch, or a row with
+//     Modifier.toggleable) is a switch.
+//   - Compose withholds the click action from the selected tab or segment,
+//     and a checked segment, so they would read as not tappable and unnamed;
+//     a focusable one that is selected or checkable counts as clickable.
+//   - Selection propagates to every descendant view (a bottom navigation
+//     item's icon and label are selected too); only the topmost is kept.
+func prepare(n uiNode, parentSelected bool) uiNode {
+	if parentSelected {
+		n.Selected = ""
+	}
+	kids := make([]uiNode, 0, len(n.Children))
+	for _, ch := range n.Children {
+		if isRoleNode(n, ch) {
+			n.Class = ch.Class
+			if n.Checkable != "true" && ch.Checkable == "true" {
+				n.Checkable, n.Checked = "true", ch.Checked
+			}
+			continue
+		}
+		kids = append(kids, prepare(ch, parentSelected || n.Selected == "true"))
+	}
+	n.Children = kids
+	if n.Checkable == "true" && classTypes[simpleClass(n.Class)] == "" && !tabClasses[simpleClass(n.Class)] {
+		n.Class = "android.widget.Switch"
+	}
+	if n.Focusable == "true" && n.Enabled != "false" && (n.Selected == "true" || n.Checkable == "true") {
+		n.Clickable = "true"
+	}
+	return n
+}
+
+// isRoleNode reports whether ch is the empty role carrier Compose adds under
+// parent: a role class, nothing to show or call it by, nothing below it, and
+// a parent that is a plain View that can be acted on.
+func isRoleNode(parent, ch uiNode) bool {
+	return roleClasses[simpleClass(ch.Class)] && ch.Text == "" && ch.ContentDesc == "" && androidIdentifier(ch.ResourceID) == "" &&
+		len(ch.Children) == 0 && ch.Clickable != "true" && simpleClass(parent.Class) == "view" &&
+		(parent.Clickable == "true" || parent.Checkable == "true" || parent.Focusable == "true")
 }
 
 // AndroidScreen describes the display a dump was taken on.
@@ -175,6 +248,11 @@ func (c uiConverter) element(n uiNode) *RawElement {
 	if hint == "true" || hint == "false" {
 		hint = ""
 	}
+	if n.Checkable == "true" && !checkedTypes[typ] {
+		// A checkable button: a segment of a toggle group, a filter chip.
+		checked := n.Checked == "true"
+		el.Checked = &checked
+	}
 	switch {
 	case typ == "TextField" || typ == "SearchField":
 		el.Label = cmpOr(n.ContentDesc, hint)
@@ -207,11 +285,39 @@ func (c uiConverter) element(n uiNode) *RawElement {
 	// A clickable container without text of its own (a list row, a card, a
 	// Compose Row with Modifier.clickable, a Compose Button around its Text) is
 	// announced by its children's text, so it gets that as its label and counts
-	// as something to tap.
-	if clickable && el.Label == "" && (typ == "Other" || typ == "Image" || typ == "Button") {
-		el.Label = truncateRunes(strings.Join(descendantText(el), ", "), maxText)
+	// as something to tap. A Compose text field shows its label as a child
+	// text, too.
+	field := typ == "TextField" || typ == "SearchField"
+	if el.Label == "" && (field || clickable && (typ == "Other" || typ == "Image" || typ == "Button" || checkedTypes[typ])) {
+		texts := descendantText(el)
+		if field && len(texts) > 0 {
+			texts = texts[:1]
+		}
+		el.Label = truncateRunes(strings.Join(texts, ", "), maxText)
+		// One text is the element's whole label, as on iOS, where a button
+		// is one element: keeping it as a child too would make
+		// `[text="Sign out"]` match twice. Several texts (a row's title,
+		// brand and price) stay, for child components to read one by one.
+		if len(texts) == 1 {
+			dropText(el, texts[0])
+		}
 	}
 	return el
+}
+
+// dropText removes the first descendant of el that is a text labelled label
+// with no identifier and nothing below it.
+func dropText(el *RawElement, label string) bool {
+	for i, ch := range el.Children {
+		if ch.Type == "StaticText" && ch.Label == label && ch.Identifier == "" && len(ch.Children) == 0 {
+			el.Children = append(el.Children[:i:i], el.Children[i+1:]...)
+			return true
+		}
+		if dropText(ch, label) {
+			return true
+		}
+	}
+	return false
 }
 
 func descendantText(el *RawElement) []string {
@@ -224,6 +330,31 @@ func descendantText(el *RawElement) []string {
 		out = append(out, descendantText(ch)...)
 	}
 	return out
+}
+
+// untagged reports whether a window shows Jetpack Compose content that has
+// something to act on and no identifier anywhere. Compose publishes testTags as
+// resource ids only below Modifier.semantics { testTagsAsResourceId = true },
+// and a dialog, bottom sheet or popup is a window of its own that needs it
+// again. Compose content is a ComposeView, or a clickable plain View, which
+// classic views rarely are.
+func untagged(n uiNode) bool {
+	compose, actionable, ids := false, false, false
+	var walk func(n uiNode)
+	walk = func(n uiNode) {
+		cls := simpleClass(n.Class)
+		clickable := n.Clickable == "true" || n.LongClickable == "true"
+		if cls == "composeview" || cls == "view" && clickable {
+			compose = true
+		}
+		actionable = actionable || clickable
+		ids = ids || androidIdentifier(n.ResourceID) != ""
+		for _, ch := range n.Children {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return compose && actionable && !ids
 }
 
 // uiautomatorError is the line `uiautomator dump` prints instead of a dump.
@@ -278,6 +409,10 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 		root.Label = foreign
 	}
 	for _, n := range h.Nodes {
+		n = prepare(n, false)
+		if foreign == "" && untagged(n) {
+			d.Untagged = true
+		}
 		root.Children = append(root.Children, c.element(n))
 	}
 	if k := screen.Keyboard; k != nil && len(root.Children) > 0 {

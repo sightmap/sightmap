@@ -26,6 +26,9 @@ type Describe struct {
 	// StatusBar is the status bar's height in points when the reader knows
 	// it (Android); zero leaves it to systemTop's per-device guess.
 	StatusBar float64 `json:"statusBar,omitempty"`
+	// Untagged is true when the screen shows Jetpack Compose content with no
+	// identifiers, because the app doesn't publish its testTags (Android).
+	Untagged bool `json:"untagged,omitempty"`
 }
 
 // Size is a screen size in points.
@@ -44,16 +47,19 @@ type Frame struct {
 
 // RawElement is one accessibility element as the helper reports it.
 type RawElement struct {
-	Role       string        `json:"role"`
-	Subrole    string        `json:"subrole"`
-	Type       string        `json:"type"`
-	Label      string        `json:"label"`
-	Identifier string        `json:"identifier"`
-	Value      Value         `json:"value"`
-	Frame      Frame         `json:"frame"`
-	Enabled    *bool         `json:"enabled"`
-	Traits     []string      `json:"traits"`
-	Children   []*RawElement `json:"children"`
+	Role       string   `json:"role"`
+	Subrole    string   `json:"subrole"`
+	Type       string   `json:"type"`
+	Label      string   `json:"label"`
+	Identifier string   `json:"identifier"`
+	Value      Value    `json:"value"`
+	Frame      Frame    `json:"frame"`
+	Enabled    *bool    `json:"enabled"`
+	Traits     []string `json:"traits"`
+	// Checked is the state of a checkable element that reports no value for
+	// it, such as a segment of an Android toggle group; nil when not checkable.
+	Checked  *bool         `json:"checked,omitempty"`
+	Children []*RawElement `json:"children"`
 }
 
 // Value is an element's accessibility value. The helper sends a string or null;
@@ -93,6 +99,7 @@ type Tree struct {
 	Overlay   bool
 	Settled   bool    // see Describe.Settled
 	StatusBar float64 // see Describe.StatusBar
+	Untagged  bool    // see Describe.Untagged
 
 	parent map[*sightmap.ComponentNode]*sightmap.ComponentNode
 	traits map[*sightmap.ComponentNode][]string
@@ -270,6 +277,7 @@ func Normalize(d *Describe) *Tree {
 		Overlay:   d.Overlay,
 		Settled:   d.Settled,
 		StatusBar: d.StatusBar,
+		Untagged:  d.Untagged,
 		parent:    map[*sightmap.ComponentNode]*sightmap.ComponentNode{},
 		traits:    map[*sightmap.ComponentNode][]string{},
 	}
@@ -349,7 +357,9 @@ func state(raw *RawElement, tag string, enabled bool) map[string]string {
 		"disabled": strconv.FormatBool(!enabled),
 		"selected": strconv.FormatBool(slices.Contains(raw.Traits, "Selected")),
 	}
-	if tag == "switch" || tag == "checkbox" {
+	if raw.Checked != nil {
+		s["checked"] = strconv.FormatBool(*raw.Checked)
+	} else if tag == "switch" || tag == "checkbox" || tag == "radio" {
 		switch raw.Value {
 		case "1":
 			s["checked"] = "true"

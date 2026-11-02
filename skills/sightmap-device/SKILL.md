@@ -400,13 +400,26 @@ What differs from iOS:
 - Points are dp: divide screenshot pixels by dpi/160.
 - `identifier` / `testid` is the resource-id without its package
   (`login_submit`, not `com.example:id/login_submit`). Compose `testTag`s show up
-  only with `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor;
-  without it, select Compose elements by role and `text`.
+  only with `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor,
+  and a dialog, bottom sheet or popup is a window of its own that needs it
+  again inside. A snapshot of Compose content with no identifiers says
+  `[No identifiers]`.
 - Roles come from widget classes (`Button` → `button`, `TextView` → `text`,
   `EditText` → `textfield`/`securetextfield`, scrollable views → `scrollview`,
-  `RecyclerView` → `collection`, the rest → `other`). A clickable `other`
-  without text, such as a list row, is named by its children's text.
-- A field's label is its hint; its value is its text.
+  `RecyclerView` → `collection`, the rest → `other`). Compose roles arrive the
+  same way: a `Button` is a `button`, a segmented button a `radio`, a
+  checkbox row a `checkbox`, and a `Switch` or `Modifier.toggleable` row a
+  `switch`. A clickable `other` without text, such as a list row, is named by
+  its children's text; when that is one text, the text is folded into it, as
+  on iOS (`button "Sign out"`, no `text` child).
+- Tabs are not `tab`: a Compose `NavigationBarItem` or `Tab` and a
+  `BottomNavigationView` item are `other` with `(selected)` on the current
+  one. Select them by identifier.
+- `checked` is in the state of every checkable element, toggle-group segments
+  and chips included (`(checked)` in the snapshot when it shows no value).
+- A field's label is its hint, or a Compose text field's label text; its value
+  is its text. A Material `TextInputLayout` field that is empty reports its
+  hint as its text, so it reads as `value="Search products"`.
 - Permission dialogs and other apps' windows appear as `[Overlay]`.
 - `button back` goes back or hides the keyboard; `button` also takes `home`,
   `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
@@ -414,6 +427,38 @@ What differs from iOS:
 - `network` is iOS-only for now; on Android it fails with `unsupported`.
 - `console` is the app's logcat (tag as subsystem; `System.out` reads as
   `stdout`).
+
+### Authoring for Android
+
+- **Ask for identifiers first.** Without them only roles and text select
+  anything, and generic structural selectors (`scrollview > other`) match on
+  other screens too. In Compose that is one line at each composition root,
+  and again inside each dialog, sheet and popup:
+  `Modifier.semantics { testTagsAsResourceId = true }`.
+- **Rows keep their texts as children.** Unlike iOS, a clickable row (a
+  Compose `Modifier.clickable` row, a `RecyclerView` item) has its title,
+  brand and price as separate `text` children, each with its own testTag or
+  view id when the app sets one. Read them through child components, not a
+  `pattern` on the joined label:
+
+  ```yaml
+  - name: ProductRow
+    selector: 'other[identifier^="product."]'
+    properties:
+      - name: title
+        extract: { from: component, path: Title.text }
+    children:
+      - name: Title
+        selector: '#product\.title'
+        properties: [{ name: text, extract: { from: dom.text } }]
+  ```
+
+  A child id that starts like the row's (`product.title` under
+  `product.1`) also matches `[identifier^="product."]`; qualify the row's
+  role (`other[...]`) or give children their own prefix.
+- **`RecyclerView` items repeat their layout's ids**: every row is
+  `product_row`. Select rows by that id and tell them apart by a child's text
+  (`click 'ProductRow[title="Red Lipstick"]'`).
 
 ## Known limits
 

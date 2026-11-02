@@ -71,8 +71,10 @@ func TestParseUIAutomatorViews(t *testing.T) {
 	}
 }
 
-func TestParseUIAutomatorCompose(t *testing.T) {
-	d := loadUIAutomator(t, "uiautomator-compose", "dev.sightmap.compose", pixel)
+// TestParseUIAutomatorForm reads a hand-written dump in the shape older
+// Compose releases reported: widget classes on the elements themselves.
+func TestParseUIAutomatorForm(t *testing.T) {
+	d := loadUIAutomator(t, "uiautomator-form", "dev.sightmap.compose", pixel)
 	tree := Normalize(d)
 	search := byIdentifier(t, tree, "search")
 	if search.Role != "textfield" || search.Name != "Search products" || search.Value != "" {
@@ -93,6 +95,132 @@ func TestParseUIAutomatorCompose(t *testing.T) {
 	}
 }
 
+// The uiautomator-compose* and uiautomator-views-shop fixtures are real dumps
+// of a small shop app with Compose and classic-view screens (Compose UI 1.9,
+// Android 15).
+func TestParseUIAutomatorCompose(t *testing.T) {
+	tree := Normalize(loadUIAutomator(t, "uiautomator-compose", "dev.sightmap.sample", pixel))
+	if tree.Untagged {
+		t.Error("a screen with testTags is not untagged")
+	}
+	// A clickable row keeps its texts as children, each with its testTag.
+	row := byIdentifier(t, tree, "product.1")
+	if row.Role != "other" || row.Name != "Lash Mascara, Essence, $9.99" || !row.IsInteractive || len(row.Children) != 3 {
+		t.Errorf("row = %s %q interactive %v, %d children", row.Role, row.Name, row.IsInteractive, len(row.Children))
+	}
+	if title := row.Children[0]; Identifier(title) != "product.title" || title.Name != "Lash Mascara" {
+		t.Errorf("row title = %q %q", Identifier(title), title.Name)
+	}
+	// A segment is a radio carrying its checked state; Compose puts the role
+	// on an empty child, which goes, and leaves the checked segment
+	// unclickable, which still counts as interactive and named.
+	for id, checked := range map[string]string{"shop.filter.all": "true", "shop.filter.sale": "false", "shop.filter.new": "false"} {
+		seg := byIdentifier(t, tree, id)
+		if seg.Role != "radio" || seg.State["checked"] != checked || !seg.IsInteractive || seg.Name == "" || len(seg.Children) != 0 {
+			t.Errorf("%s = %s %q checked %q interactive %v, %d children", id, seg.Role, seg.Name, seg.State["checked"], seg.IsInteractive, len(seg.Children))
+		}
+	}
+	// The selected bottom navigation item is unclickable too.
+	shop := byIdentifier(t, tree, "nav.shop")
+	if shop.Name != "Shop" || shop.State["selected"] != "true" || !shop.IsInteractive {
+		t.Errorf("nav.shop = %q selected %q interactive %v", shop.Name, shop.State["selected"], shop.IsInteractive)
+	}
+	// An OutlinedTextField's label is a child text.
+	search := byIdentifier(t, tree, "shop.search")
+	if search.Role != "textfield" || search.Name != "Search products" || search.Value != "" || len(search.Children) != 0 {
+		t.Errorf("search = %s %q value %q, %d children", search.Role, search.Name, search.Value, len(search.Children))
+	}
+	for _, n := range tree.Nodes {
+		if n.IsInteractive && n.Name == "" && Identifier(n) == "" {
+			t.Errorf("unnamed interactive node %s %s", n.Id, n.Role)
+		}
+	}
+
+	settings := Normalize(loadUIAutomator(t, "uiautomator-compose-settings", "dev.sightmap.sample", pixel))
+	on := Normalize(loadUIAutomator(t, "uiautomator-compose-settings-on", "dev.sightmap.sample", pixel))
+	for id, role := range map[string]string{"settings.notifications": "switch", "settings.dark": "switch", "settings.marketing": "checkbox"} {
+		off, sw := byIdentifier(t, settings, id), byIdentifier(t, on, id)
+		if off.Role != role || sw.Role != role || off.State["checked"] != "false" || sw.State["checked"] != "true" {
+			t.Errorf("%s = %s checked %q, then %s checked %q; want %s", id, off.Role, off.State["checked"], sw.Role, sw.State["checked"], role)
+		}
+	}
+	if n := byIdentifier(t, settings, "settings.notifications"); n.Name != "Notifications" {
+		t.Errorf("a toggleable row is named by its text, got %q", n.Name)
+	}
+	// A Compose Button is one button, named by its text, with no text child.
+	signOut := byIdentifier(t, settings, "settings.signout")
+	if signOut.Role != "button" || signOut.Name != "Sign out" || len(signOut.Children) != 0 {
+		t.Errorf("sign out = %s %q, %d children", signOut.Role, signOut.Name, len(signOut.Children))
+	}
+	if tab := byIdentifier(t, on, "settings.tab.privacy"); tab.Name != "Privacy" || tab.State["selected"] != "true" || !tab.IsInteractive {
+		t.Errorf("selected tab = %q selected %q interactive %v", tab.Name, tab.State["selected"], tab.IsInteractive)
+	}
+
+	dialog := Normalize(loadUIAutomator(t, "uiautomator-compose-dialog", "dev.sightmap.sample", pixel))
+	if n := byIdentifier(t, dialog, "signout.confirm"); n.Role != "button" || n.Name != "Sign out" {
+		t.Errorf("dialog confirm = %s %q", n.Role, n.Name)
+	}
+}
+
+// A bottom sheet is a window of its own, where the screen's
+// testTagsAsResourceId doesn't reach.
+func TestParseUIAutomatorUntaggedCompose(t *testing.T) {
+	d := loadUIAutomator(t, "uiautomator-compose-sheet", "dev.sightmap.sample", pixel)
+	if !d.Untagged {
+		t.Fatal("a Compose sheet with no ids should say so")
+	}
+	snap, err := Annotate(Normalize(d), nil, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text := snap.Render(RenderOpts{}); !strings.Contains(text, "[No identifiers]") || !strings.Contains(text, "testTagsAsResourceId") {
+		t.Errorf("snapshot:\n%s", text)
+	}
+	n, err := Resolve(snap, `[text="Add to cart"]`)
+	if err != nil || n.Role != "button" {
+		t.Errorf("[text=\"Add to cart\"] = %v, %v; want the one button", n, err)
+	}
+	if plain := loadUIAutomator(t, "uiautomator-compose-plain", "dev.sightmap.sample", pixel); plain.Untagged {
+		t.Error("a screen with some ids is not untagged")
+	}
+}
+
+func TestParseUIAutomatorViewsShop(t *testing.T) {
+	tree := Normalize(loadUIAutomator(t, "uiautomator-views-shop", "dev.sightmap.sample", pixel))
+	if tree.Untagged {
+		t.Error("classic views are not untagged Compose")
+	}
+	// MaterialButtonToggleGroup segments are checkable buttons.
+	if all := byIdentifier(t, tree, "filter_all"); all.State["checked"] != "true" || all.Name != "All" {
+		t.Errorf("filter_all = %q checked %q", all.Name, all.State["checked"])
+	}
+	if sale := byIdentifier(t, tree, "filter_sale"); sale.State["checked"] != "false" {
+		t.Errorf("filter_sale checked %q", sale.State["checked"])
+	}
+	nav := byIdentifier(t, tree, "nav_views")
+	if nav.Name != "Views" || nav.State["selected"] != "true" {
+		t.Errorf("nav_views = %q selected %q", nav.Name, nav.State["selected"])
+	}
+	for _, n := range tree.Nodes {
+		id := Identifier(n)
+		if strings.HasPrefix(id, "navigation_bar_item_") || id == "action_bar_root" {
+			t.Errorf("library id %q reached the tree", id)
+		}
+		if n != nav && tree.IsAncestor(nav, n) && n.State["selected"] == "true" {
+			t.Errorf("%s %s under the selected item is marked selected too", n.Id, n.Role)
+		}
+	}
+	rows := 0
+	for _, n := range tree.Nodes {
+		if Identifier(n) == "product_row" {
+			rows++
+		}
+	}
+	if rows != 7 {
+		t.Errorf("%d product_row rows, want 7 (a RecyclerView repeats its item layout's ids)", rows)
+	}
+}
+
 func TestAnnotateAndroidInfersViews(t *testing.T) {
 	corpus := loadCorpus(t, "android-corpus")
 	snap, err := Annotate(Normalize(loadUIAutomator(t, "uiautomator-views", "dev.sightmap.sample", pixel)), corpus, nil, "")
@@ -110,7 +238,7 @@ func TestAnnotateAndroidInfersViews(t *testing.T) {
 		t.Errorf("RecentRow by title: %v", err)
 	}
 
-	snap, err = Annotate(Normalize(loadUIAutomator(t, "uiautomator-compose", "dev.sightmap.compose", pixel)), corpus, nil, "")
+	snap, err = Annotate(Normalize(loadUIAutomator(t, "uiautomator-form", "dev.sightmap.compose", pixel)), corpus, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +307,7 @@ func TestParseWMAndIME(t *testing.T) {
 	}
 	screen := pixel
 	screen.Keyboard = k
-	d := loadUIAutomator(t, "uiautomator-compose", "dev.sightmap.compose", screen)
+	d := loadUIAutomator(t, "uiautomator-form", "dev.sightmap.compose", screen)
 	snap, err := Annotate(Normalize(d), nil, nil, "")
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +368,7 @@ func newFakeADB(t *testing.T, dump string) *fakeADB {
 }
 
 func TestADBHelperInputInPixels(t *testing.T) {
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	h := NewADBHelper(ADB{Run: f.run}, "emulator-5554", "dev.sightmap.compose", nil)
 	ctx := context.Background()
 	if err := h.Request(ctx, "tap", map[string]any{"x": 100.0, "y": 200.0}, nil); err != nil {
@@ -282,7 +410,7 @@ func TestAndroidSessionClicksInPixels(t *testing.T) {
 	if err := os.CopyFS(dir, os.DirFS(filepath.Join("testdata", "android-corpus"))); err != nil {
 		t.Fatal(err)
 	}
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	adb := ADB{Run: f.run}
 	s := NewSession(Config{Platform: PlatformAndroid, UDID: "emulator-5554", BundleID: "dev.sightmap.compose", SightmapDir: dir},
 		NewADBHelper(adb, "emulator-5554", "dev.sightmap.compose", nil), AndroidSim{ADB: adb})
@@ -302,7 +430,7 @@ func TestAndroidSessionClicksInPixels(t *testing.T) {
 }
 
 func TestAndroidSimLaunch(t *testing.T) {
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	sim := AndroidSim{ADB: ADB{Run: f.run}}
 	pid, err := sim.Launch(context.Background(), "emulator-5554", "dev.sightmap.compose", LaunchOptions{Terminate: true})
 	if err != nil || pid != 4321 {
@@ -395,7 +523,7 @@ func TestParseUIAutomatorRealDump(t *testing.T) {
 
 func TestAndroidClickReadsTheScreenOnce(t *testing.T) {
 	dir := t.TempDir()
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	adb := ADB{Run: f.run}
 	s := NewSession(Config{Platform: PlatformAndroid, UDID: "emulator-5554", BundleID: "dev.sightmap.compose", SightmapDir: dir},
 		NewADBHelper(adb, "emulator-5554", "dev.sightmap.compose", nil), AndroidSim{ADB: adb})
@@ -416,7 +544,7 @@ func TestAndroidClickReadsTheScreenOnce(t *testing.T) {
 
 func TestScrollUntilStopsOnTheFirstOfSeveralMatches(t *testing.T) {
 	dir := t.TempDir()
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	adb := ADB{Run: f.run}
 	s := NewSession(Config{Platform: PlatformAndroid, UDID: "emulator-5554", BundleID: "dev.sightmap.compose", SightmapDir: dir},
 		NewADBHelper(adb, "emulator-5554", "dev.sightmap.compose", nil), AndroidSim{ADB: adb})
@@ -485,7 +613,7 @@ func newAndroidTestSession(t *testing.T, f *fakeADB, timing Timing) *Session {
 // A settled read already waited for the screen to go idle, so a screen that
 // changed on the read before is acted on without the hold-still wait.
 func TestAndroidSettledReadSkipsTheQuietWait(t *testing.T) {
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	s := newAndroidTestSession(t, f, Timing{Quiet: time.Minute, Settle: 2 * time.Second, RetryTimeout: 2 * time.Second,
 		RetryInterval: time.Millisecond, ScrollSettle: time.Millisecond})
 	for _, step := range []struct {
@@ -512,7 +640,7 @@ func TestAndroidSettledReadSkipsTheQuietWait(t *testing.T) {
 // A switch is pressed with a stationary swipe at the trailing end of its row;
 // on Android the whole row toggles it, and 150 ms is well under a long press.
 func TestAndroidSwitchIsPressedAtItsTrailingEnd(t *testing.T) {
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	f.answers["uiautomator"] = `<hierarchy rotation="0"><node class="android.widget.FrameLayout" package="dev.sightmap.compose" bounds="[0,0][1080,2400]">` +
 		`<node class="android.widget.Switch" package="dev.sightmap.compose" resource-id="dev.sightmap.compose:id/notifications" text="Notifications" checkable="true" checked="false" clickable="true" enabled="true" bounds="[0,400][1080,547]"/>` +
 		`</node></hierarchy>` + "\n" + imeMarker + "\n"
@@ -541,7 +669,7 @@ func TestAndroidSwitchIsPressedAtItsTrailingEnd(t *testing.T) {
 // going away is waited out on. A screen uiautomator can't read is retried by
 // the helper itself and then reported, not re-read for OverlaySettle.
 func TestAndroidUnreadableScreenIsNotWaitedOutAsASheet(t *testing.T) {
-	f := newFakeADB(t, "uiautomator-compose")
+	f := newFakeADB(t, "uiautomator-form")
 	s := newAndroidTestSession(t, f, Timing{OverlaySettle: time.Minute, RetryInterval: time.Millisecond})
 	if _, err := s.fresh(context.Background(), ""); err != nil {
 		t.Fatal(err)
