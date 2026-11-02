@@ -212,6 +212,29 @@ views:
   inside `.tabItem`.
 - The system keyboard is not part of the app: its keys never match components
   and are left out of coverage.
+- **Combined labels.** A tappable row (a SwiftUI `NavigationLink` or `Button`
+  around several texts) is one element whose label joins them with `", "`
+  (`Trail Runner, Acme, $89.99`). Split it with `pattern`, anchored at the
+  end, where the parts have a known shape:
+
+  ```yaml
+  - name: ProductRow
+    selector: '[identifier^="product."]'
+    properties:
+      - name: title
+        extract: { from: dom.text, pattern: '^(.+?)(?:, [^,]+)?, \$[\d,]+(?:\.\d+)?$' }
+      - name: brand
+        extract: { from: dom.text, pattern: '^.+, ([^,]+), \$[\d,]+(?:\.\d+)?$' }
+      - name: price
+        extract: { from: dom.text, pattern: ', \$([\d,]+(?:\.\d+)?)$' }
+  ```
+
+  The brand is optional: `Trail Runner, $89.99` gives `title` and `price`
+  and no `brand`. The label has no field boundaries, so no pattern can tell
+  apart a title containing a comma with no brand (`Lamp, Large, $9.99` gives
+  `title="Lamp"`, `brand="Large"`) from a brand containing `", "`. For an
+  exact split, read each text from inside the app rather than from the label,
+  or give each child its own identifier; don't assert on split values.
 
 ## React Native apps
 

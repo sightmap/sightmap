@@ -52,6 +52,29 @@ views:
         selector: 'button[identifier="login-submit"]'
 ```
 
+#### Splitting a combined label
+
+A tappable container such as a SwiftUI `NavigationLink` row is one element whose label is its texts joined with `", "`, so `dom.text` reads `Trail Runner, Acme, $89.99`, not three values. A `pattern` splits it:
+
+```yaml .sightmap/views/products.yaml
+version: 1
+views:
+  - name: Products
+    route: /products
+    components:
+      - name: ProductRow
+        selector: '[identifier^="product."]'
+        properties:
+          - name: title
+            extract: { from: dom.text, pattern: '^(.+?)(?:, [^,]+)?, \$[\d,]+(?:\.\d+)?$' }
+          - name: brand
+            extract: { from: dom.text, pattern: '^.+, ([^,]+), \$[\d,]+(?:\.\d+)?$' }
+          - name: price
+            extract: { from: dom.text, pattern: ', \$([\d,]+(?:\.\d+)?)$' }
+```
+
+The brand is optional, so `Trail Runner, $89.99` gives `title` and `price` and no `brand`, and a comma inside a title with a brand stays in `title`. The label carries no field boundaries, though, so no pattern can tell apart two cases that read the same: a title containing a comma with no brand (`Lamp, Large, $9.99` gives `title="Lamp"`, `brand="Large"`), and a brand containing `", "`. For an exact split, read each text from inside the app rather than from the combined label, or give each child its own identifier; treat a split label as a convenience for reading, not a value to assert on.
+
 ---
 
 ### `device doctor`
