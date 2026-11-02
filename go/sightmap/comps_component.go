@@ -83,19 +83,16 @@ type Element struct {
 	Attrs   map[string]string `json:"attrs,omitempty"`
 }
 
-// SelectorString formats the element as a simple CSS selector, tag[#id][.cls...].
-// Attributes are omitted (they appear only in richer trace/anchor displays). A
-// nil receiver yields "".
+// SelectorString formats the element as a simple CSS selector, tag[#id][.cls...],
+// with the id written by IDSelector. Attributes are omitted (they appear only
+// in richer trace/anchor displays). A nil receiver yields "".
 func (e *Element) SelectorString() string {
 	if e == nil {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString(e.Tag)
-	if e.Id != "" {
-		b.WriteByte('#')
-		b.WriteString(e.Id)
-	}
+	b.WriteString(IDSelector(e.Id))
 	for _, c := range e.Classes {
 		b.WriteByte('.')
 		b.WriteString(c)
