@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -176,7 +175,7 @@ func (c *Console) Get(i int) (ConsoleEntry, bool) {
 // LogCollector fills a Console from the app's process. On iOS that is `log
 // stream` for its os_log / Logger output (minus Apple frameworks' info and
 // default chatter) and the files its stdout and stderr are redirected to; on
-// Android, logcat lines from the app's pid (see SetPID).
+// Android, logcat lines from the app's processes (see appLines).
 type LogCollector struct {
 	UDID, Process  string
 	Stdout, Stderr string
@@ -190,7 +189,9 @@ type LogCollector struct {
 	cancel    context.CancelFunc
 	streams   sync.WaitGroup
 	streaming bool
-	pid       atomic.Int64
+	apps      *appLines
+	// sleep waits between logcat restarts; tests replace it.
+	sleep func(context.Context, time.Duration)
 }
 
 // Start begins collecting until Close.

@@ -431,7 +431,8 @@ What differs from iOS:
   `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
 - `type` / `fill` are ASCII only (`adb shell input text`).
 - `network` is iOS-only for now; on Android it fails with `unsupported`.
-- `console` is the app's logcat (tag as subsystem; `System.out` reads as
+- `console` is the logcat of the app's processes from their first line, also
+  when the app was started by hand (tag as subsystem; `System.out` reads as
   `stdout`).
 
 ### Authoring for Android
