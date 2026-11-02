@@ -140,6 +140,18 @@ func TestE2E(t *testing.T) {
 	expect(must("console", "list", "--grep", "Product 150"), "added Product 150 to cart", "claimed the offer on Product 150")
 	expect(must("console", "list", "--grep", "signed in"), "signed in as agent@example.com")
 
+	// A segmented control comes out of process without its segments; a Form
+	// toggle's center is its label, which ignores taps, and its switch toggles
+	// reliably only on a press.
+	must("click", "tab-account")
+	must("click", "account-controls")
+	snapshotUntil(`[RangeSegment title="Week"]`)
+	must("click", `RangeSegment[title="Week"]`)
+	snapshotUntil(`[RangeSegment title="Week"] (selected)`)
+	must("click", "NotifySwitch")
+	time.Sleep(time.Second)
+	expect(must("console", "list", "--grep", "notify"), "notify off")
+
 	shot := filepath.Join(work, "shot.png")
 	must("screenshot", "--out", shot)
 	if data, err := os.ReadFile(shot); err != nil || !bytes.HasPrefix(data, []byte("\x89PNG")) {

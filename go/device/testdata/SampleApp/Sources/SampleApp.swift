@@ -223,16 +223,57 @@ struct AccountView: View {
     let email: String
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text(email)
-                .accessibilityIdentifier("account-email")
-            Button("Sign Out") {
-                appLog.info("signed out")
-                print("signed out")
-                session.signedInEmail = nil
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text(email)
+                    .accessibilityIdentifier("account-email")
+                NavigationLink("Controls") { ControlsView() }
+                    .accessibilityIdentifier("account-controls")
+                Button("Sign Out") {
+                    appLog.info("signed out")
+                    print("signed out")
+                    session.signedInEmail = nil
+                }
+                .accessibilityIdentifier("account-sign-out")
             }
-            .accessibilityIdentifier("account-sign-out")
+            .padding()
         }
-        .padding()
+    }
+}
+
+// ControlsView holds controls that need more than a tap at their center from
+// outside the app: a segmented control that comes out as one element without
+// its segments, and a Form toggle whose center is its label.
+struct ControlsView: View {
+    @State private var segment = "Day"
+    @State private var notify = true
+
+    var body: some View {
+        Form {
+            Picker("Range", selection: $segment) {
+                ForEach(["Day", "Week", "Month"], id: \.self) { Text($0) }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("controls-range")
+            Toggle("Notify", isOn: $notify)
+                .accessibilityIdentifier("controls-notify")
+                .onChange(of: notify) { _, on in
+                    appLog.info("notify \(on ? "on" : "off", privacy: .public)")
+                    print("notify \(on ? "on" : "off")")
+                }
+        }
+        .navigationTitle("Controls")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Edit") {}.accessibilityIdentifier("controls-edit")
+            }
+            ToolbarItemGroup(placement: .bottomBar) {
+                Button("Share", systemImage: "square.and.arrow.up") {}
+                    .accessibilityIdentifier("controls-share")
+                Spacer()
+                Button("Delete", systemImage: "trash") {}
+                    .accessibilityIdentifier("controls-delete")
+            }
+        }
     }
 }

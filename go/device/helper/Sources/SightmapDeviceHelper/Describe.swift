@@ -88,8 +88,17 @@ enum Describe {
   private static let barProbeStep = 20.0
   private static let leafTraits: Set<String> = ["Button", "Link", "Adjustable", "StaticText", "Image", "SearchField", "KeyboardKey"]
 
+  // Item containers that come out of process without their items, such as a
+  // segmented control (its segments are tabs in process).
+  private static let itemContainers: Set<String> = ["tabgroup", "segmentedcontrol"]
+
   private static func isOpaqueBar(_ element: [String: Any]) -> Bool {
-    guard let frame = rect(element["frame"]), frame.width >= 88, (44...120).contains(frame.height) else { return false }
+    guard let frame = rect(element["frame"]), frame.width >= 88 else { return false }
+    let kind = ((element["type"] as? String) ?? (element["role"] as? String) ?? "").lowercased().replacingOccurrences(of: "ax", with: "")
+    if itemContainers.contains(kind) && (20...120).contains(frame.height) {
+      return true
+    }
+    guard (44...120).contains(frame.height) else { return false }
     let traits = element["traits"] as? [String] ?? []
     // UIKit names a navigation bar's group after its title, so an identifier
     // rules a leaf out only when it is not a group.

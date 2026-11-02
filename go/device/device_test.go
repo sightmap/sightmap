@@ -456,3 +456,14 @@ func TestFloatingExpoGear(t *testing.T) {
 		t.Errorf("the app's own gear button: %v", err)
 	}
 }
+
+func TestCenterOfASwitchRowIsTheSwitch(t *testing.T) {
+	row := &sightmap.ComponentNode{Role: "switch", Bounds: &sightmap.Bounds{X: 16, Y: 229, Width: 370, Height: 52}}
+	if x, y := Center(row); x != 342 || y != 255 {
+		t.Errorf("switch row: tap at (%d, %d), want (342, 255)", x, y)
+	}
+	bare := &sightmap.ComponentNode{Role: "switch", Bounds: &sightmap.Bounds{X: 300, Y: 100, Width: 63, Height: 28}}
+	if x, y := Center(bare); x != 331 || y != 114 {
+		t.Errorf("bare switch: tap at (%d, %d), want its center (331, 114)", x, y)
+	}
+}

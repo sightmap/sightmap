@@ -614,3 +614,13 @@ func TestSessionWaitsOutAnEmptyTreeWhileASheetGoesAway(t *testing.T) {
 		t.Fatalf("a tree that stays empty: %v, want ax_disabled", err)
 	}
 }
+
+func TestSessionPressesASwitchAtItsTrailingEnd(t *testing.T) {
+	s, h := newTestSession(t, "describe-simple")
+	if _, err := handle(t, s, "click", TargetArgs{Target: "NotificationsToggle"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.inputs) != 1 || !strings.HasPrefix(h.inputs[0], "swipe ") || !strings.Contains(h.inputs[0], `"x1":342`) || !strings.Contains(h.inputs[0], `"duration":0.15`) {
+		t.Fatalf("inputs %v, want one short press at the switch (x 342)", h.inputs)
+	}
+}

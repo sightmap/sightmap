@@ -814,7 +814,7 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		outOfTime := time.Now().After(deadline)
 		if failure == nil && stable && quiet {
 			x, y := Center(node)
-			if err := s.input(ctx, "tap", map[string]any{"x": x, "y": y}); err != nil {
+			if err := s.tapAt(ctx, node, x, y); err != nil {
 				return tapped{}, err
 			}
 			s.secureFocus = node.Role == "securetextfield"
@@ -845,6 +845,17 @@ func (s *Session) tap(ctx context.Context, target string, settle time.Duration) 
 		retries++
 		prev, prevNode, snap = snap, node, next
 	}
+}
+
+// switchPress is how long a tap on a switch holds: an iOS 26 switch ignores
+// most instant taps (one in four toggled it) but takes every short press.
+const switchPress = 0.15
+
+func (s *Session) tapAt(ctx context.Context, node *sightmap.ComponentNode, x, y int) error {
+	if node.Role == "switch" {
+		return s.input(ctx, "swipe", map[string]any{"x1": x, "y1": y, "x2": x, "y2": y, "duration": switchPress})
+	}
+	return s.input(ctx, "tap", map[string]any{"x": x, "y": y})
 }
 
 // sameElement reports whether a and b, from two reads, are the same element.

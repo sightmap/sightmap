@@ -114,7 +114,7 @@ re-reads it took as `retries`.
 | `status` / `stop [--shutdown]` | Session health / stop the daemon and the app (`--shutdown`: the simulator too). |
 | `launch` / `relaunch` | Foreground the app / restart it (re-enables accessibility first). |
 | `snapshot [--view V] [--include-offscreen] [--out F] [--tree-out F]` | Annotated tree. `--out F` writes the text plus `F.tree.json`, which `sightmap explain --snap` and `sightmap coverage` read. |
-| `click TARGET [--settle DUR]` | Re-resolves, checks it's on screen, uncovered and enabled, taps its center. |
+| `click TARGET [--settle DUR]` | Re-resolves, checks it's on screen, uncovered and enabled, taps its center (a switch: a short press on the switch itself). |
 | `fill TARGET TEXT [--clear] [--settle DUR]` | Taps, types (appends unless `--clear`), errors if the field doesn't show the text. `fill TARGET "" --clear` empties it; a field then showing only its placeholder reports value `""`. |
 | `scroll up\|down\|left\|right [--in TARGET] [--until TARGET] [--max N]` | One page, or until a target is tappable (default `--max 20`). `--in` scrolls inside that element. |
 | `swipe X1 Y1 X2 Y2 [--duration S]`, `tap-xy X Y`, `type TEXT`, `key NAME`, `button NAME`, `openurl URL` | Raw input in screen points. Keys: `return delete tab escape space` and arrows. Buttons: `home lock siri side apple_pay volume_up volume_down`. |

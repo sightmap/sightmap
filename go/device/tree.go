@@ -402,11 +402,22 @@ func Identifier(n *sightmap.ComponentNode) string { return n.Element.Attrs["iden
 // Enabled reports whether n is enabled.
 func Enabled(n *sightmap.ComponentNode) bool { return n.State["disabled"] != "true" }
 
-// Center returns the center of n's frame in points.
+// Center returns where a tap on n lands, in points: the center of its frame,
+// except for a switch row.
 func Center(n *sightmap.ComponentNode) (x, y int) {
 	b := n.Bounds
+	// A SwiftUI Toggle in a Form is one element spanning the row, and a tap on
+	// its label does nothing; the switch itself sits at the trailing end.
+	if n.Role == "switch" && b.Width > switchRowWidth {
+		return b.X + b.Width - switchInset, b.Y + b.Height/2
+	}
 	return b.X + b.Width/2, b.Y + b.Height/2
 }
+
+const (
+	switchRowWidth = 120
+	switchInset    = 44
+)
 
 // OnScreen reports whether n's center is on the screen.
 func (t *Tree) OnScreen(n *sightmap.ComponentNode) bool {
