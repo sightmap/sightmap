@@ -113,8 +113,8 @@ re-reads it took as `retries`.
 
 | Command | What it does |
 |---|---|
-| `doctor [--fix]` | Checks macOS, Apple Silicon, Xcode, simulator runtimes and devices, Swift; builds the helper. |
-| `start [--device NAME\|UDID] [--app PATH \| --bundle-id ID] [--label L] [--network auto\|har\|rn-cdp\|summary\|off] [--detach]` | Boots, enables app accessibility, installs, launches, runs the daemon and begins a run log. |
+| `doctor [--fix]` | Checks macOS, Apple Silicon, Xcode, simulator runtimes and devices, Swift; builds the helper and the in-app probe. |
+| `start [--device NAME\|UDID] [--app PATH \| --bundle-id ID] [--label L] [--network auto\|har\|rn-cdp\|summary\|off] [--probe [--probe-fields none]] [--detach]` | Boots, enables app accessibility, installs, launches, runs the daemon and begins a run log. `--probe`: see Combined labels. |
 | `status` / `stop [--shutdown]` | Session health / stop the daemon and the app (`--shutdown`: the simulator too). |
 | `launch` / `relaunch` | Foreground the app / restart it (re-enables accessibility first). |
 | `snapshot [--view V] [--include-offscreen] [--out F] [--tree-out F]` | Annotated tree. `--out F` writes the text plus `F.tree.json`, which `sightmap explain --snap` and `sightmap coverage` read. |
@@ -244,8 +244,31 @@ views:
   and no `brand`. The label has no field boundaries, so no pattern can tell
   apart a title containing a comma with no brand (`Lamp, Large, $9.99` gives
   `title="Lamp"`, `brand="Large"`) from a brand containing `", "`. For an
-  exact split, read each text from inside the app rather than from the label,
-  or give each child its own identifier; don't assert on split values.
+  exact split, start with `--probe` (next), or give each child its own
+  identifier; don't assert on split values.
+- **`--probe` for SwiftUI rows.** `start --probe` loads a probe into the app
+  (no app changes, no `get-task-allow`) and each snapshot adds what SwiftUI
+  knows under the row: a `view[type="ProductRow"]` node with the view's
+  stored fields as attributes, and one `text` node per Text with
+  `field="<stored field>"` (plus the unformatted `value` and a `format` for
+  `Text(value, format:)`). Read them through child components, exactly:
+
+  ```yaml
+  - name: ProductRow
+    selector: '[identifier^="product."]'
+    properties:
+      - { name: title, extract: { from: component, path: Title.text } }
+      - { name: price, extract: { from: component, path: Price.value } }   # 89.99, unformatted
+    children:
+      - { name: Title, selector: 'text[field="product.title"]', properties: [{ name: text, extract: { from: dom.text } }] }
+      - { name: Price, selector: 'text[field="product.price"]', properties: [{ name: value, extract: { from: dom.attr, path: value } }] }
+  ```
+
+  Take the field names from a `--probe` snapshot. Without `--probe` the same
+  corpus still matches the row and leaves those properties unset. If the app
+  doesn't load the probe, `start` says why and snapshots end with a `[Probe]`
+  note. Field values named like `token`/`password`/`secret`/`key` read
+  `<redacted>`; `--probe-fields none` drops fields. SwiftUI only.
 
 ## React Native apps
 
@@ -363,7 +386,8 @@ its own data (network captures, analytics, logs) with the steps by timestamp.
 ## Sample app
 
 `go/device/testdata/SampleApp/build.sh` in the sightmap repo builds a small
-SwiftUI app (login form, 200-row product list, tab bar) with `xcodebuild` and
+SwiftUI app (login form, 200-row product list, a catalog whose rows join
+texts containing commas, tab bar) with `xcodebuild` and
 prints the `.app` path; its `.sightmap/` is a worked example. Run the
 end-to-end tests with `SIGHTMAP_DEVICE_E2E="iPhone 17 Pro" go test ./device -run TestE2E`
 from `go/`.
@@ -380,6 +404,8 @@ signing in, iOS may show a "Save Password?" sheet: it appears as `[Overlay]`.
   Xcode release may need a sightmap update. `doctor` says so when the helper
   fails to build.
 - The corpus is always the session's `--sightmap-dir`.
+- `--probe` reads Apple's undocumented SwiftUI view debug data; an Xcode
+  release can change it, and snapshots then fall back to the plain tree.
 - Network capture sees `URLSession`/CFNetwork traffic (plus, via Metro, a
   React Native Debug build's JS traffic); raw sockets and custom stacks are
   invisible.
