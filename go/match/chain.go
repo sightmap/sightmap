@@ -12,8 +12,12 @@ import (
 // A chain node may appear in more than one ChainMatch when several component
 // definitions match it.
 type ChainMatch struct {
-	Depth  int
-	Name   string
+	Depth int
+	Name  string
+	// ID and RefID are the matched definition's SEP-0020 ids (see ComponentDef);
+	// "" when the sightmap declares none.
+	ID     string
+	RefID  string
 	Tags   []string
 	Memory []string
 }
@@ -73,6 +77,7 @@ func (m *Matcher) matchChain(chain []sightmap.Element, pageURL string) ([]ChainM
 	findAllMatches(nodes[0], entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
 		cm := ChainMatch{Depth: depthOf[node], Name: q.Name}
 		if q.Def != nil {
+			cm.ID, cm.RefID = q.Def.ID, q.Def.RefID
 			cm.Tags = q.Def.Tags
 			cm.Memory = q.Def.Memory
 		}

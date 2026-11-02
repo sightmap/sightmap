@@ -57,7 +57,11 @@ type ComponentPropertyDef struct {
 // its resolved property values (Properties, in the definition's order; nil
 // unless the component declares properties that resolved).
 type ComponentMatch struct {
-	Name   string
+	Name string
+	// ID and RefID are the matched definition's SEP-0020 ids (see ComponentDef);
+	// "" when the sightmap declares none.
+	ID     string
+	RefID  string
 	Memory []string
 	Tags   []string
 	// Privacy is the node's effective capture directive (SEP-0009), resolved
