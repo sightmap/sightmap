@@ -137,10 +137,11 @@ function activeComponentSet(globals, viewLists) {
 // view the CLI does. A hand-rolled matcher that only knew `*` and `**` treated
 // `:param` as literal text, so a view routed `/ui/:org/settings` never matched.
 
-/** Drop trailing slashes; the root stays "/" (Go normalizeRoutePath). */
+/** Drop trailing slashes and root a slashless page name; the root stays "/" (Go normalizeRoutePath). */
 function normalizeRoutePath(p) {
   const trimmed = (p ?? "").replace(/\/+$/, "");
-  return trimmed === "" ? "/" : trimmed;
+  if (trimmed === "") return "/";
+  return trimmed.startsWith("/") ? trimmed : "/" + trimmed;
 }
 
 /**
@@ -152,7 +153,11 @@ function routeSegBody(seg) {
   return seg.replace(/[.+?()[\]{}\\|^$]/g, "\\$&").replace(/\*+/g, "[^/]*");
 }
 
-/** Whether a view route matches a URL path (Go MatchRoute). */
+/**
+ * Whether a view route matches a URL path (Go MatchRoute). A path without a
+ * leading slash is a page name (as native apps report): it is compared
+ * case-insensitively, so `/shop` matches `Shop`. A `/` path stays case-sensitive.
+ */
 function matchRoute(pattern, pathname) {
   const pat = normalizeRoutePath(pattern);
   const path = normalizeRoutePath(pathname);
@@ -163,7 +168,8 @@ function matchRoute(pattern, pathname) {
     // A whole `**` segment matches zero or more segments, its slash included.
     re += seg === "**" ? "(?:/.*)?" : "/" + routeSegBody(seg);
   });
-  return new RegExp(re + "$").test(path);
+  const pageName = !!pathname && !pathname.startsWith("/");
+  return new RegExp(re + "$", pageName ? "i" : "").test(path);
 }
 
 /** How specific a route is: literal 3, `:param` 2, `*` 1, `**` 0 (Go routeSpecificity). */

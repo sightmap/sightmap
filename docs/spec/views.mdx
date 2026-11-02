@@ -33,6 +33,7 @@ Routes use glob patterns against the URL pathname.
 - `**` matches any depth of segments: `/admin/**` matches `/admin`, `/admin/users`, and `/admin/users/42/edit`.
 - Literal segments match themselves.
 - Matching is case-sensitive. Query strings and fragments are ignored. Trailing slashes are normalized away before matching.
+- A page URL with no leading `/` is a page name, such as the screen name a native app reports (`Shop`). It is matched as if rooted, and case-insensitively: `/shop` matches `Shop`, `shop`, and `SHOP`, but not the URL path `/Shop`. See [Schema reference](/reference/schema#route-matching).
 
 For requests, Express-style `:param` segments are normalized to `*`, so `/api/users/:id/orders` and `/api/users/*/orders` are equivalent. See [Requests](/spec/requests).
 

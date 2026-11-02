@@ -1,0 +1,91 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": {
+        "url": "Shop"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Shop"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "shop"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Shop"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "SHOP"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Shop"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "App.ProductViewController"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Product"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "/shop"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Shop"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "/Shop"
+      },
+      "expected": {
+        "result": {
+          "view": null
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "https://example.com/SHOP"
+      },
+      "expected": {
+        "result": {
+          "view": null
+        }
+      }
+    }
+  ]
+}

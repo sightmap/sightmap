@@ -1,0 +1,8 @@
+version: 1
+views:
+  # Native apps report a page name (no leading slash) in place of a URL. It is
+  # rooted and compared case-insensitively; a URL path stays case-sensitive.
+  - name: Shop
+    route: /shop
+  - name: Product
+    route: /*ProductViewController

@@ -541,9 +541,11 @@ Routes use glob patterns against the URL pathname.
 - `**` is a globstar: **as a whole path segment** it matches zero or more segments, so `/admin/**` matches `/admin`, `/admin/users`, and `/admin/users/42/edit`, and `/a/**/b` matches `/a/b`, `/a/x/b`, …
 - A `**` **glued into a segment** (e.g. `/foo**`) is treated as a regular `*` — an in-segment wildcard that does not cross a `/`. Write `**` as its own segment when you mean "any depth".
 - Literal segments match themselves
-- Matching is case-sensitive
+- Matching is case-sensitive, except against a page name (below)
 - Query string and fragment are ignored
 - Trailing slashes are normalized away before matching
+
+A **page name** is a page URL whose path has no leading `/`, such as the screen or view-controller name a native app reports in place of a URL (`Shop`, `App.ProductViewController`). It is matched as if rooted (`Shop` as `/Shop`), and compared case-insensitively, since a page name is an identifier rather than a URL path. A view routed `/shop` therefore matches `Shop`, `shop`, and `SHOP`, and `/*ViewController` matches `App.ProductViewController`. A path that starts with `/` is a URL path and stays case-sensitive: `/shop` does not match `/Shop`. Specificity is computed from the route alone and is unaffected. See [SEP-0027](../seps/0027-page-name-routes.md).
 
 For requests, Express-style `:param` segments are normalized to `*`. These are equivalent:
 

@@ -223,7 +223,7 @@ func (c *Corpus) ViewForURL(pageURL string) *ViewDef {
 	if err != nil {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
+	path := u.Path
 
 	best := -1
 	bestScore := -1
@@ -253,7 +253,7 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 	if err != nil {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
+	path := u.Path
 	topScore := -1
 	var names []string
 	for i := range c.Views {
@@ -285,18 +285,37 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 //     "/admin/**" matches "/admin", "/admin/x", and "/admin/x/y"
 //   - a "**" glued into a segment (e.g. "/foo**") is treated as a regular *,
 //     matching within that one segment only
+//
+// A path without a leading slash is a page name (as native apps report), not a
+// URL path: it is rooted before matching and compared case-insensitively, so
+// "/shop" matches "Shop". A path that starts with "/" stays case-sensitive.
+// Pass the path as parsed, before normalizeRoutePath, or the distinction is lost.
 func MatchRoute(pattern, path string) bool {
-	re := regexp.MustCompile(routeToRegex(normalizeRoutePath(pattern)))
+	expr := routeToRegex(normalizeRoutePath(pattern))
+	if isPageName(path) {
+		expr = "(?i)" + expr
+	}
+	re := regexp.MustCompile(expr)
 	return re.MatchString(normalizeRoutePath(path))
 }
 
+// isPageName reports whether path is a slashless page name rather than a URL
+// path. The empty path (a bare origin) is the root, not a page name.
+func isPageName(path string) bool {
+	return path != "" && path[0] != '/'
+}
+
 // normalizeRoutePath strips a trailing slash from a URL path or route pattern so
-// that matching is insensitive to it. The root "/" (or an all-slash/empty path)
-// normalizes to "/".
+// that matching is insensitive to it, and roots a path that lacks a leading
+// slash, so a slashless page name such as "Shop" can match a route "/shop". The
+// root "/" (or an all-slash/empty path) normalizes to "/".
 func normalizeRoutePath(p string) string {
 	trimmed := strings.TrimRight(p, "/")
 	if trimmed == "" {
 		return "/"
+	}
+	if !strings.HasPrefix(trimmed, "/") {
+		return "/" + trimmed
 	}
 	return trimmed
 }
@@ -395,7 +414,7 @@ func (c *Corpus) TagsForURL(pageURL string) []string {
 	if err != nil {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
+	path := u.Path
 	seen := map[string]bool{}
 	var out []string
 	for i := range c.Views {

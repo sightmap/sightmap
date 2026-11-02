@@ -39,6 +39,116 @@ func TestMatchRouteTrailingSlash(t *testing.T) {
 	}
 }
 
+// ---- Route matching: slashless page names ----------------------------------
+
+// Native apps report a page name as their page URL: no scheme and no leading
+// slash, such as a view-controller name.
+func TestMatchRouteSlashlessPath(t *testing.T) {
+	const vc = "App.ProductViewController"
+	cases := []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"/App.ProductViewController", vc, true},
+		{"App.ProductViewController", vc, true},
+		{"/*ProductViewController", vc, true},
+		{"*ProductViewController", vc, true},
+		{"/*", vc, true},
+		{"/**", vc, true},
+		{"/**/App.ProductViewController", vc, true},
+		{"/App.CartViewController", vc, false},
+		{"/App", vc, false},
+		{"/", vc, false},
+	}
+	for _, tc := range cases {
+		if got := sightmap.MatchRoute(tc.pattern, tc.path); got != tc.want {
+			t.Errorf("MatchRoute(%q, %q) = %v, want %v", tc.pattern, tc.path, got, tc.want)
+		}
+	}
+}
+
+// A page name is compared case-insensitively; a URL path is not.
+func TestMatchRoutePageNameCase(t *testing.T) {
+	cases := []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"/shop", "shop", true},
+		{"/shop", "Shop", true},
+		{"/shop", "SHOP", true},
+		{"/shop", "Shop/", true},
+		{"/Shop", "shop", true},
+		{"/*Controller", "App.ProductCONTROLLER", true},
+		{"/shop/:id", "Shop/42", true},
+		{"/shop", "Cart", false},
+		{"/shop", "Shopping", false},
+		// URL paths stay case-sensitive.
+		{"/shop", "/shop", true},
+		{"/shop", "/Shop", false},
+		{"/shop", "/SHOP", false},
+		{"/Shop", "/shop", false},
+	}
+	for _, tc := range cases {
+		if got := sightmap.MatchRoute(tc.pattern, tc.path); got != tc.want {
+			t.Errorf("MatchRoute(%q, %q) = %v, want %v", tc.pattern, tc.path, got, tc.want)
+		}
+	}
+}
+
+func TestViewForURLSlashlessPageName(t *testing.T) {
+	c := &sightmap.Corpus{
+		Views: []sightmap.ViewDef{
+			{Name: "Product", Route: "/App.ProductViewController"},
+			{Name: "Cart", Route: "/App.CartViewController"},
+			{Name: "Shop", Route: "/shop"},
+			{Name: "Any", Route: "/*ViewController"},
+		},
+	}
+	cases := []struct {
+		url, want string
+	}{
+		{"App.ProductViewController", "Product"},
+		{"App.CartViewController", "Cart"},
+		{"App.HomeViewController", "Any"},
+		{"App.Unrelated", ""},
+		{"Shop", "Shop"},
+		{"SHOP", "Shop"},
+		{"shop", "Shop"},
+		{"/shop", "Shop"},
+		{"https://example.com/shop", "Shop"},
+		{"https://example.com/Shop", ""},
+		{"/Shop", ""},
+	}
+	for _, tc := range cases {
+		v := c.ViewForURL(tc.url)
+		got := ""
+		if v != nil {
+			got = v.Name
+		}
+		if got != tc.want {
+			t.Errorf("ViewForURL(%q) = %q, want %q", tc.url, got, tc.want)
+		}
+	}
+}
+
+func TestTagsAndTiesForSlashlessPageName(t *testing.T) {
+	c := &sightmap.Corpus{
+		Views: []sightmap.ViewDef{
+			{Name: "Shop", Route: "/shop", Tags: []string{"commerce"}},
+			{Name: "ShopAlias", Route: "/shop"},
+		},
+	}
+	if got := c.TagsForURL("Shop"); len(got) != 1 || got[0] != "commerce" {
+		t.Errorf("TagsForURL(%q) = %v, want [commerce]", "Shop", got)
+	}
+	if got := c.TiedViews("SHOP"); len(got) != 2 {
+		t.Errorf("TiedViews(%q) = %v, want [Shop ShopAlias]", "SHOP", got)
+	}
+	if got := c.TagsForURL("/Shop"); got != nil {
+		t.Errorf("TagsForURL(%q) = %v, want nil", "/Shop", got)
+	}
+}
+
 // ---- Route matching: ** globstar semantics ----------------------------------
 
 func TestMatchRouteGlobstar(t *testing.T) {

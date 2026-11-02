@@ -95,7 +95,7 @@ func (c *Corpus) RequestsForURL(requestURL, method string) []RequestDef {
 	if err != nil {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
+	path := u.Path
 
 	var out []RequestDef
 	appendMatches := func(defs []RequestDef) {
