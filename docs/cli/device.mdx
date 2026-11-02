@@ -40,7 +40,7 @@ Each element exposes a role from its accessibility type (`button`, `text`, `text
 
 Only accessible elements reach the iOS tree. An identifier on a plain wrapper view (a React Native `testID` on a non-accessible `View`, for example) never appears there, so `[testid="login-form"] [testid="login-submit"]` matches nothing. Write leaf selectors such as `[identifier="login-submit"]`.
 
-The identifier is also the element's id, so `#login-submit` selects it. Identifiers often contain dots, which `#` reads as a class: escape them and single-quote the selector so YAML keeps the backslash, as in `'#product\.1'`. Unescaped, `#checkout.submit` means id `checkout` with class `submit` and matches nothing, since native elements have no classes. An identifier that starts with a digit (`1.circle`) can't follow `#` without a hex escape, which selectors don't portably allow, so write `'[id="1.circle"]'` or `'[identifier="1.circle"]'`.
+The identifier is also the element's id, so `#login-submit` selects it. Identifiers often contain dots, which `#` reads as a class: escape them and single-quote the selector so YAML keeps the backslashes, as in `'#product\.1'`. Unescaped, `#checkout.submit` means id `checkout` with class `submit` and matches nothing, since native elements have no classes. A leading digit takes a hex escape, its code point followed by a space: `1.circle` is `'#\31 \.circle'`. `[identifier="1.circle"]` selects the same element and reads more easily.
 
 ```yaml .sightmap/views/login.yaml
 version: 1

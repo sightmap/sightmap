@@ -285,6 +285,31 @@ func TestResolveTargets(t *testing.T) {
 	}
 }
 
+// Every identifier in a recorded tree, dotted and digit-leading ones included,
+// round-trips through the id selector sightmap suggests for it.
+func TestIDSelectorResolvesEveryIdentifier(t *testing.T) {
+	s := snapshot(t, "describe-simple", "corpus", "")
+	count := map[string]int{}
+	for _, n := range s.Nodes {
+		count[Identifier(n)]++
+	}
+	checked := 0
+	for _, n := range s.Nodes {
+		id := Identifier(n)
+		if id == "" || count[id] > 1 {
+			continue
+		}
+		sel := sightmap.IDSelector(id)
+		if got, err := Resolve(s, sel); err != nil || got != n {
+			t.Errorf("Resolve(%q) for identifier %q = %v, %v", sel, id, got, err)
+		}
+		checked++
+	}
+	if checked < 5 {
+		t.Fatalf("only %d unique identifiers in the fixture", checked)
+	}
+}
+
 func TestResolveDottedIdentifier(t *testing.T) {
 	s := snapshot(t, "describe-simple", "corpus", "")
 	primary := byIdentifier(t, s.Tree, "simple.primary")
@@ -298,8 +323,10 @@ func TestResolveDottedIdentifier(t *testing.T) {
 		t.Errorf("#simple.primary: %v", err)
 	}
 	tab := byIdentifier(t, s.Tree, "1.circle")
-	if n, err := Resolve(s, `[id="1.circle"]`); err != nil || n != tab {
-		t.Errorf(`[id="1.circle"] = %v, %v`, n, err)
+	for _, target := range []string{sightmap.IDSelector("1.circle"), `#\31 \.circle`, `[id="1.circle"]`} {
+		if n, err := Resolve(s, target); err != nil || n != tab {
+			t.Errorf("Resolve(%q) = %v, %v", target, n, err)
+		}
 	}
 }
 
