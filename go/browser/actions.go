@@ -479,16 +479,13 @@ func getLayoutMetrics(ctx context.Context, conn *CDPConn) (layoutMetrics, error)
 // full-page screenshot, at the width the page is already laid out at, and
 // returns the document clip to capture and a func that undoes the override.
 //
-// captureBeyondViewport on its own grows the view to the clip's height but
-// keeps the window's width, scrollbar included. With nothing left to scroll
-// the scrollbar goes away and the page lays out wider by its width (15 CSS px
-// with classic scrollbars): text rewraps, the document gets shorter, and the
-// screenshot drifts from the element boxes a probe took moments before, by
-// 65 px at y 7600 on a 26000 px article. Chrome also leaves the page at that
-// wider layout afterwards. The layout viewport's clientWidth excludes the
-// scrollbar, so an override to that width and the document's height, with
-// scrollbars hidden, keeps the probe's layout. With overlay scrollbars the
-// width is unchanged and the override is a no-op for layout.
+// captureBeyondViewport keeps the window width, scrollbar included. With
+// nothing left to scroll the scrollbar disappears and its width goes into the
+// layout, so text rewraps and the document gets shorter than the probe
+// measured, and Chrome leaves the page at that wider layout afterwards. The
+// layout viewport's clientWidth excludes the scrollbar, so overriding to that
+// width and the document's height, with scrollbars hidden, keeps the probe's
+// layout. With overlay scrollbars the width is unchanged and this is a no-op.
 //
 // The override belongs to this CDP session, so other clients' emulation and
 // the window size are untouched. Afterwards the session's own earlier
@@ -510,6 +507,15 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 		"scale":  1,
 	}
 	noop := func() {}
+	// Keep the pixel scale the page is drawn at: this session's ResizeViewport
+	// override if there is one, else the real devicePixelRatio (0).
+	conn.metricsMu.Lock()
+	prev := conn.metrics
+	conn.metricsMu.Unlock()
+	var dsf interface{} = 0
+	if v, ok := prev["deviceScaleFactor"]; ok {
+		dsf = v
+	}
 	vw := math.Ceil(m.CSSLayoutViewport.ClientWidth)
 	vh := math.Ceil(math.Max(m.CSSContentSize.Height, m.CSSLayoutViewport.ClientHeight))
 	if vw <= 0 || vh <= 0 {
@@ -518,7 +524,7 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 	if _, err := conn.call(ctx, "Emulation.setDeviceMetricsOverride", map[string]interface{}{
 		"width":             int(vw),
 		"height":            int(vh),
-		"deviceScaleFactor": 0, // keep the real devicePixelRatio
+		"deviceScaleFactor": dsf,
 		"mobile":            false,
 	}); err != nil {
 		// The capture still works, at captureBeyondViewport's own layout.
@@ -529,9 +535,6 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 		rctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_, _ = conn.call(rctx, "Emulation.setScrollbarsHidden", map[string]interface{}{"hidden": false})
-		conn.metricsMu.Lock()
-		prev := conn.metrics
-		conn.metricsMu.Unlock()
 		if prev != nil {
 			_, _ = conn.call(rctx, "Emulation.setDeviceMetricsOverride", prev)
 		} else {

@@ -67,8 +67,8 @@ func TestScreenshotWithOptions_FullPagePinsLayoutWidth(t *testing.T) {
 		order = append(order, c.method)
 	}
 
-	override, capture, clear := idx("Emulation.setDeviceMetricsOverride"), idx("Page.captureScreenshot"), idx("Emulation.clearDeviceMetricsOverride")
-	if override < 0 || capture < 0 || clear < 0 || !(override < capture && capture < clear) {
+	override, capture, cleared := idx("Emulation.setDeviceMetricsOverride"), idx("Page.captureScreenshot"), idx("Emulation.clearDeviceMetricsOverride")
+	if override < 0 || capture < 0 || cleared < 0 || !(override < capture && capture < cleared) {
 		t.Fatalf("want setDeviceMetricsOverride < captureScreenshot < clearDeviceMetricsOverride; calls: %v", order)
 	}
 
@@ -249,9 +249,12 @@ func TestScreenshotWithOptions_FullPageKeepsResize(t *testing.T) {
 		defer mu.Unlock()
 		switch method {
 		case "Emulation.setDeviceMetricsOverride":
-			var p struct{ Width, Height int }
+			var p struct {
+				Width, Height     int
+				DeviceScaleFactor float64
+			}
 			_ = json.Unmarshal(params, &p)
-			overrides = append(overrides, fmt.Sprintf("%dx%d", p.Width, p.Height))
+			overrides = append(overrides, fmt.Sprintf("%dx%d@%g", p.Width, p.Height, p.DeviceScaleFactor))
 		case "Emulation.clearDeviceMetricsOverride":
 			cleared = true
 		case "Page.getLayoutMetrics":
@@ -271,7 +274,7 @@ func TestScreenshotWithOptions_FullPageKeepsResize(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if want := []string{"800x600", "785x5000", "800x600"}; fmt.Sprint(overrides) != fmt.Sprint(want) {
+	if want := []string{"800x600@1", "785x5000@1", "800x600@1"}; fmt.Sprint(overrides) != fmt.Sprint(want) {
 		t.Errorf("setDeviceMetricsOverride sizes = %v, want %v", overrides, want)
 	}
 	if cleared {
