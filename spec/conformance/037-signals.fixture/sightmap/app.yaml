@@ -1,0 +1,105 @@
+version: 1
+requests:
+  # `status` shadows the reserved HTTP identity, so the filter below sees the
+  # body value. Warned about by request-property-shadows-reserved.
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    method: POST
+    properties:
+      - name: status
+        extract: { from: rsp.body, path: status }
+
+  - name: CheckoutRetryPayment
+    route: /api/checkout/pay/retry
+    method: POST
+    properties:
+      - name: rate_limit_remaining
+        extract: { from: rsp.headers, path: X-RateLimit-Remaining }
+      - name: outcome
+        extract: { from: rsp.body, path: status }
+
+views:
+  - name: CheckoutView
+    route: /checkout
+
+  - name: OrderDetail
+    route: /orders/:order_id
+    properties:
+      - name: tab
+        extract: { from: url.query, path: tab }
+    requests:
+      - name: GetOrder
+        route: /api/orders/:order_id
+
+components:
+  - name: PaymentBanner
+    selector: .payment-status-banner
+    properties:
+      - name: text
+        extract: { from: dom.text }
+
+messages:
+  - name: CartVersionMismatch
+    level: ERROR
+    message: cart version mismatch
+
+  - name: ChunkLoadFailed
+    level: EXCEPTION
+    properties:
+      - name: origin_file
+        extract: { from: stack, path: top.file, pattern: '([^/]+)$' }
+
+signals:
+  # Filters a declared property that shadows a reserved name.
+  - name: checkout.payment.declined
+    tags: [defect]
+    ref: CheckoutPayment
+    filter:
+      status: declined
+
+  # A reserved identity name needs no declaration, and an unquoted integer is
+  # accepted (compared as canonical text). Every other key is declared above.
+  - name: checkout.payment.throttled_silently
+    tags: [defect]
+    ref: CheckoutRetryPayment
+    filter:
+      method: POST
+      rate_limit_remaining: "0"
+      outcome: [queued, deferred]
+
+  # A component's declared property, plus the built-in `value`.
+  - name: checkout.payment.declined.banner
+    tags: [defect]
+    ref: PaymentBanner
+    filter:
+      text: declined
+
+  # A message ref with no filter fires on every matching record.
+  - name: cart.abandoned
+    tags: [defect]
+    ref: CartVersionMismatch
+
+  # A view ref with no filter fires on every entry to the view.
+  - name: checkout.view.active
+    tags: [checkout]
+    ref: CheckoutView
+
+  # A message's declared stack property.
+  - name: chunk.vendor.failed
+    tags: [defect]
+    ref: ChunkLoadFailed
+    filter:
+      origin_file: vendor.js
+
+  # A view's declared URL property and its route binding.
+  - name: orders.returns_tab.viewed
+    ref: OrderDetail
+    filter:
+      tab: returns
+      order_id: "123"
+
+  # A request's route binding needs no declaration.
+  - name: orders.fetched.one
+    ref: GetOrder
+    filter:
+      order_id: "123"

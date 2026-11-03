@@ -45,13 +45,14 @@ Explicit per entry type. Unknown keys preserved at the end in original order. `i
 
 | Entry type | Canonical key order |
 |---|---|
-| Top-level | `version, environments, origins, memory, views, components, definitions, requests` |
+| Top-level | `version, environments, origins, memory, views, components, definitions, requests, messages, signals` |
 | View | `id, name, route, environments, origins, description, source, components, memory, requests` |
 | Component | `id, name, selector, description, source, children, memory` |
 | Request | `id, name, route, method, environments, origins, description, source, request, response, headers, memory` |
 | Environment | `id, name, platform, app_id, build_type, backend, origins` |
+| Signal | `id, name, ref, tags, filter` |
 
-Keys within any origin map (the top-level `origins` and an environment's `origins`) are alphabetized.
+Keys within any origin map (the top-level `origins` and an environment's `origins`) and within a signal's `filter` are alphabetized. A `filter` value list preserves its order.
 
 ### List ordering
 
@@ -120,6 +121,11 @@ Structural problems in a `.sightmap/` corpus. **Errors** are inputs with no vali
 | `merge-collision-definition` | warning | Two or more root-level definitions share a `name`. `$ref` resolves to the first by source-file path. |
 | `definition-shadowed-by-global` | warning | A root-level definition has the same `name` as a root-level global. `$ref` resolves to the global; the definition is unused. |
 | `route-conflict` | warning | Two or more views share the same (normalized) `route`. Only the first-declared view applies to that URL. |
+| `missing-ref` | error | A signal is missing its required `ref`. |
+| `signal-ref-unresolved` | error | A signal's `ref` names no component, request, message, or view. |
+| `signal-ref-ambiguous` | error | A signal's `ref` names entities of more than one kind. |
+| `signal-filter-unknown` | error | A signal's `filter` key is not a property, route binding, or reserved name of the referenced entity. |
+| `merge-collision-signal` | error | Two or more signals share a `name`. |
 | `unknown-field` | warning | A key not defined by the spec at its position (a typo like `memroy:`, or an experimental field). Warned rather than rejected so authors can stash work-in-progress fields; recognized fields — including the reserved tooling fields `access` and `snapshots` — are not flagged. |
 
 ## `.sightmap/config.yaml`
