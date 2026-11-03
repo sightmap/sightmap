@@ -490,9 +490,11 @@ func getLayoutMetrics(ctx context.Context, conn *CDPConn) (layoutMetrics, error)
 // scrollbars hidden, keeps the probe's layout. With overlay scrollbars the
 // width is unchanged and the override is a no-op for layout.
 //
-// The override belongs to this CDP session, so clearing it leaves any other
-// client's emulation and the window size as they were. The scroll position is
-// put back, since a viewport as tall as the document clamps it to 0.
+// The override belongs to this CDP session, so other clients' emulation and
+// the window size are untouched. Afterwards the session's own earlier
+// override (ResizeViewport) is re-applied, or the override cleared if there
+// was none, and the scroll position is put back, since a viewport as tall as
+// the document clamps it to 0.
 func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interface{}, func(), error) {
 	m, err := getLayoutMetrics(ctx, conn)
 	if err != nil {
@@ -527,7 +529,14 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 		rctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_, _ = conn.call(rctx, "Emulation.setScrollbarsHidden", map[string]interface{}{"hidden": false})
-		_, _ = conn.call(rctx, "Emulation.clearDeviceMetricsOverride", map[string]interface{}{})
+		conn.metricsMu.Lock()
+		prev := conn.metrics
+		conn.metricsMu.Unlock()
+		if prev != nil {
+			_, _ = conn.call(rctx, "Emulation.setDeviceMetricsOverride", prev)
+		} else {
+			_, _ = conn.call(rctx, "Emulation.clearDeviceMetricsOverride", map[string]interface{}{})
+		}
 		if x, y := m.CSSLayoutViewport.PageX, m.CSSLayoutViewport.PageY; x != 0 || y != 0 {
 			_, _ = EvalJSON(rctx, conn, fmt.Sprintf("window.scrollTo(%g, %g)", x, y))
 		}

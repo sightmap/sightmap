@@ -236,3 +236,45 @@ func TestFullPageScreenshotMatchesLayout_Chrome(t *testing.T) {
 		t.Errorf("scrollbar width after capture = %s, want %v (page left at another layout)", raw, m.Scrollbar)
 	}
 }
+
+// A viewport this session set with ResizeViewport survives a full-page
+// screenshot: restore re-applies it instead of clearing the override.
+func TestScreenshotWithOptions_FullPageKeepsResize(t *testing.T) {
+	encoded := base64.StdEncoding.EncodeToString([]byte("fake"))
+	var mu sync.Mutex
+	var overrides []string
+	cleared := false
+	conn := newFakeCDP(t, func(method string, params json.RawMessage) json.RawMessage {
+		mu.Lock()
+		defer mu.Unlock()
+		switch method {
+		case "Emulation.setDeviceMetricsOverride":
+			var p struct{ Width, Height int }
+			_ = json.Unmarshal(params, &p)
+			overrides = append(overrides, fmt.Sprintf("%dx%d", p.Width, p.Height))
+		case "Emulation.clearDeviceMetricsOverride":
+			cleared = true
+		case "Page.getLayoutMetrics":
+			return json.RawMessage(`{"cssContentSize": {"width": 800, "height": 5000},
+				"cssLayoutViewport": {"clientWidth": 785, "clientHeight": 600}}`)
+		case "Page.captureScreenshot":
+			return json.RawMessage(`{"data":"` + encoded + `"}`)
+		}
+		return json.RawMessage(`{}`)
+	})
+	ctx := context.Background()
+	if err := ResizeViewport(ctx, conn, 800, 600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ScreenshotWithOptions(ctx, conn, ScreenshotOptions{FullPage: true}); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if want := []string{"800x600", "785x5000", "800x600"}; fmt.Sprint(overrides) != fmt.Sprint(want) {
+		t.Errorf("setDeviceMetricsOverride sizes = %v, want %v", overrides, want)
+	}
+	if cleared {
+		t.Error("clearDeviceMetricsOverride called; the resize should have been re-applied")
+	}
+}
