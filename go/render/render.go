@@ -113,7 +113,7 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 		}
 
 		// Text last — Rule A: suppress when it exactly equals any prop value.
-		if c.Name != "" && !anyPropEquals(c.Name, props) {
+		if c.Name != "" && !PropEquals(c.Name, props) {
 			fmt.Fprintf(&line, " %s", quoteName(c.Name))
 		}
 
@@ -148,7 +148,7 @@ func (c *Comp) formatNode(w io.Writer, indent string, depth int, opts FormatOpts
 	for _, ch := range c.Children {
 		// Rule B: suppress StaticText children whose text exactly equals
 		// any prop value of the matched parent.
-		if ch.Role == "StaticText" && parentProps != nil && anyPropEquals(ch.Name, parentProps) {
+		if ch.Role == "StaticText" && parentProps != nil && PropEquals(ch.Name, parentProps) {
 			continue
 		}
 		ch.formatNode(w, childIndent, depth+1, opts, intDesc)
@@ -338,37 +338,43 @@ func markInteractive(c *Comp, set map[*Comp]bool) bool {
 	return isInt
 }
 
-// mergedProps builds the combined property map for a matched Comp node.
-// Sightmap-extracted properties (c.Match.Properties) take precedence.
-// If no "value" key is present and the AX Comp.Value is non-empty, it is
-// added as "value" (reserved-but-overridable built-in), unless the node's
-// effective privacy withholds its content: the AX value of a blocked or masked
-// node is exactly the content SEP-0009 refuses, and surfacing it here would
-// reintroduce the value the matcher just withheld.
-// Returns nil when there are no props and no AX value.
+// mergedProps returns the properties a matched Comp shows. See Props.
 func mergedProps(c *Comp) map[string]string {
+	return Props(c.Match, c.Value)
+}
+
+// Props returns the properties a matched node shows: m's extracted properties,
+// plus value, the node's AX value, as "value" when no extracted property takes
+// that name. The AX value is left out when m's privacy is "block" or "mask":
+// it is exactly the content SEP-0009 withholds, and showing it would bring back
+// the value the matcher just withheld. Returns nil when there is nothing to show.
+//
+// Renderers that keep their own tree (and only reuse the matcher) call Props
+// and PropEquals so that their output agrees with Format.
+func Props(m *sightmap.ComponentMatch, value string) map[string]string {
 	var match []sightmap.PropertyValue
 	var privacy string
-	if c.Match != nil {
-		match, privacy = c.Match.Properties, c.Match.Privacy
+	if m != nil {
+		match, privacy = m.Properties, m.Privacy
 	}
 	withheld := privacy == "block" || privacy == "mask"
-	if len(match) == 0 && (c.Value == "" || withheld) {
+	if len(match) == 0 && (value == "" || withheld) {
 		return nil
 	}
 	props := make(map[string]string, len(match)+1)
 	for _, pv := range match {
 		props[pv.Name] = pv.Value
 	}
-	if _, hasValue := props["value"]; !hasValue && c.Value != "" && !withheld {
-		props["value"] = c.Value
+	if _, hasValue := props["value"]; !hasValue && value != "" && !withheld {
+		props["value"] = value
 	}
 	return props
 }
 
-// anyPropEquals reports whether text exactly equals any value in props.
-// Used for Rule A (name suppression) and Rule B (StaticText child suppression).
-func anyPropEquals(text string, props map[string]string) bool {
+// PropEquals reports whether text exactly equals any value in props. Format
+// leaves out a matched node's name when it does (Rule A), and any StaticText
+// child of a matched node that does (Rule B), since a property already shows it.
+func PropEquals(text string, props map[string]string) bool {
 	for _, v := range props {
 		if text == v {
 			return true
