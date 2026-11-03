@@ -944,3 +944,30 @@ func TestMergedProps_PrivacyWithholdsTheAXValueFallback(t *testing.T) {
 		t.Errorf("value should stay withheld alongside a surfaced property")
 	}
 }
+
+func TestProps(t *testing.T) {
+	m := &sightmap.ComponentMatch{Name: "Price", Properties: []sightmap.PropertyValue{{Name: "amount", Value: "$12"}}}
+	if got := Props(m, "12"); got["amount"] != "$12" || got["value"] != "12" {
+		t.Errorf("Props = %v, want amount and the AX value", got)
+	}
+	m.Properties = append(m.Properties, sightmap.PropertyValue{Name: "value", Value: "twelve"})
+	if got := Props(m, "12"); got["value"] != "twelve" {
+		t.Errorf("value = %q, want the extracted property to win", got["value"])
+	}
+	if got := Props(&sightmap.ComponentMatch{Name: "Card"}, ""); got != nil {
+		t.Errorf("Props = %v, want nil", got)
+	}
+	if got := Props(nil, "on"); got["value"] != "on" {
+		t.Errorf("Props(nil) = %v, want the AX value", got)
+	}
+}
+
+func TestPropEquals(t *testing.T) {
+	props := map[string]string{"title": "Shop", "count": "3"}
+	if !PropEquals("Shop", props) {
+		t.Error("PropEquals(Shop) = false, want true")
+	}
+	if PropEquals("Sho", props) || PropEquals("shop", props) || PropEquals("Shop", nil) {
+		t.Error("PropEquals matched a value it doesn't equal")
+	}
+}
