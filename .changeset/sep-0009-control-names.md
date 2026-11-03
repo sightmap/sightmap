@@ -1,0 +1,5 @@
+---
+"@sightmap/sightmap": minor
+---
+
+SEP-0009 (amended): under `privacy: mask`, a `dom.text` read of an `input`, `textarea` or `select` now resolves to the control's accessible name when nothing it is computed from is content. The name comes from `aria-labelledby`, `aria-label`, an associated `label`, `title` or `placeholder`, never from the value, so a masked field keeps its label ("Street address") while what was typed stays withheld. It is still withheld when `aria-labelledby` or a label reaches masked or blocked content or another control, for button-like, `image`, `file` and `hidden` inputs, under an ARIA role override, when no source on the control explains the name, and when the name contains the control's own value. `dom.raw_text`, `dom.attr` and everything under `block` are unchanged. `validate` no longer warns `extract-privacy-withheld` on a masked `dom.text` read whose component selects only `input`, `textarea` or `select`. `ComponentMatch.Withheld` lists the properties privacy withheld.

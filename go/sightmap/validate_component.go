@@ -49,7 +49,7 @@ func checkComponentProperties(c *Corpus) []ValidationError {
 			if p.Extract.IsLegacy() {
 				errs = append(errs, legacyExtractWarning(comp.Name, p.Name, p.Extract))
 			}
-			if msg := privacyWithholds(comp.Privacy, p.Extract); msg != "" {
+			if msg := privacyWithholds(comp.Privacy, p.Extract, comp.Selectors); msg != "" {
 				errs = append(errs, ValidationError{
 					Component: comp.Name,
 					Code:      "extract-privacy-withheld",
@@ -146,12 +146,14 @@ func checkComponentExtract(e Extract) (code, msg string) {
 // privacyWithholds returns a fix hint when a component's own privacy guarantees
 // that a capture consumer withholds a read from source (SEP-0009, per SEP-0017),
 // else "". A warning, not an error: a consumer that captures no content ignores
-// privacy and still resolves the value.
-func privacyWithholds(privacy string, e Extract) string {
+// privacy and still resolves the value. selectors are the component's; a
+// dom.text read under mask on a form control may still resolve its accessible
+// name, so it is not guaranteed withheld there.
+func privacyWithholds(privacy string, e Extract, selectors []string) string {
 	const hint = "change the component's privacy to extract it"
 	switch e.From {
 	case FromDOMText, FromDOMRawText:
-		if privacy == "block" || privacy == "mask" {
+		if privacy == "block" || (privacy == "mask" && !(e.From == FromDOMText && selectsFormControls(selectors))) {
 			return hint
 		}
 	case FromDOMAttr:
@@ -216,4 +218,26 @@ func checkComponentPath(path string) string {
 		}
 	}
 	return ""
+}
+
+// selectsFormControls reports whether every selector's subject names an input,
+// textarea or select element, whose accessible name SEP-0009 may let through
+// under mask. Only the tag is judged: whether a given element qualifies (its
+// type, role and labels) is decided at match time.
+func selectsFormControls(selectors []string) bool {
+	if len(selectors) == 0 {
+		return false
+	}
+	for _, s := range selectors {
+		ps, err := ParseSightmapSelector(s)
+		if err != nil || len(ps.Parts) == 0 {
+			return false
+		}
+		switch strings.ToLower(ps.Parts[len(ps.Parts)-1].Tag) {
+		case "input", "textarea", "select":
+		default:
+			return false
+		}
+	}
+	return true
 }
