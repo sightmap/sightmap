@@ -26,6 +26,7 @@ It also checks the fields added by recent SEPs:
 | --- | --- | --- |
 | [`extract`](/reference/schema#extract) on component, request, and message properties | a `from` the entity can't read, a missing or forbidden `path`, an invalid RE2 `pattern`, `join` outside `from: component` or on a single-valued path, `extract` mixed with `source`/`field`/`pattern` (`extract-shape-mixed`), a malformed body path (`request-property-path-invalid`) | `extract-legacy-form` on each deprecated string form, naming the object to write instead |
 | [`privacy`](/spec/components#privacy) | `invalid-privacy` for a value other than `block`, `mask`, or `unmask` | `extract-privacy-withheld` on a property its own component's privacy would withhold |
+| [Route matching](/reference/schema#route-matching) | `route-not-rooted` for a view or request `route` that doesn't start with `/` | |
 | [URL properties](/spec/views#url-properties) | `route-binding-conflict`, `route-param-duplicate`, `route-param-shadows-reserved` | `route-param-unbound` for a `:segment` that matches but binds nothing |
 | [Environments and origins](/spec/environments#diagnostics) | `environment-invalid`, `origin-invalid`, `environment-backend-invalid`, `environment-ref-unresolved`, `origin-ref-unresolved` | name collisions, `origin-environment-gap`, `origin-host-shared`, `environment-duplicate`, explicit empty lists |
 | [Messages and signals](/spec/messages) | `message-regex-invalid`, `signal-ref-unresolved`, `signal-ref-ambiguous` | `message-conflict` |
