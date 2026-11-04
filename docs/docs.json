@@ -79,6 +79,12 @@
             ]
           },
           {
+            "group": "iOS Simulator",
+            "pages": [
+              "cli/device"
+            ]
+          },
+          {
             "group": "Capture and coverage",
             "pages": [
               "cli/capture",

@@ -82,7 +82,11 @@ func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 // never hides a global of the same name here, since privacy and watch do not
 // depend on which component names an element.
 func captureDefsForURL(c *sightmap.Corpus, pageURL string) []sightmap.ComponentDef {
-	v := c.ViewForURL(pageURL)
+	return captureDefsForView(c, c.ViewForURL(pageURL))
+}
+
+// captureDefsForView is captureDefsForURL for a view chosen without a URL.
+func captureDefsForView(c *sightmap.Corpus, v *sightmap.ViewDef) []sightmap.ComponentDef {
 	if v == nil {
 		return c.GlobalComponents
 	}

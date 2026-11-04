@@ -127,6 +127,7 @@ same loop.
 | [docs/reference.md](docs/reference.md) | Authoring reference — coverage model, component model, the outer loop, full tool reference, lint rules, quality checklist |
 | [../skills/sightmap-authoring/SKILL.md](../skills/sightmap-authoring/SKILL.md) | Authoring skill — building/maintaining a corpus (agent workflow) |
 | [../skills/sightmap-browser/SKILL.md](../skills/sightmap-browser/SKILL.md) | Browser skill — driving a live session and interacting via a corpus |
+| [../skills/sightmap-device/SKILL.md](../skills/sightmap-device/SKILL.md) | Device skill — driving an iOS app in the Simulator via a corpus |
 
 ---
 

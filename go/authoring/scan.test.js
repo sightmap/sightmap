@@ -141,3 +141,74 @@ describe("__smScanLinks", () => {
     expect(__smScanLinks()).toEqual(["/same-host"]);
   });
 });
+
+// Same cases as TestIDSelector in go/sightmap/sel_escape_test.go.
+describe("__smIdSelector", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test.each([
+    ["", ""],
+    ["submit", "#submit"],
+    ["search-box_2", "#search-box_2"],
+    ["product.1", "#product\\.1"],
+    ["shop.product.1", "#shop\\.product\\.1"],
+    ["checkout.submit", "#checkout\\.submit"],
+    ["a:b/c[d]", "#a\\:b\\/c\\[d\\]"],
+    ['q"x\\y', '#q\\"x\\\\y'],
+    ["-x", "#-x"],
+    ["-.x", "#-\\.x"],
+    ["-", "#\\-"],
+    ["--x", "#\\--x"],
+    ["-1", "#\\-1"],
+    ["_1", "#_1"],
+    ["café.menü", "#café\\.menü"],
+    ["1.circle", "#\\31 \\.circle"],
+    ["123abc", "#\\31 23abc"],
+    ["9", "#\\39"],
+    ["0a", "#\\30 a"],
+    ["first name", "#first\\ name"],
+    ["- x", "#-\\ x"],
+    ['2"x', '#\\32 \\"x'],
+    ["a\u00a0b", "#a\\a0 b"],
+    ["a\u3000", "#a\\3000"],
+    ["a\nb", ""],
+    ["a\tb", ""],
+    ["a\x7fb", ""],
+  ])("%j → %j", (id, want) => {
+    expect(__smIdSelector(id)).toBe(want);
+  });
+
+  // `#q\"x` (CSS.escape's own output for q"x) is left out: jsdom's selector
+  // engine cannot match an escaped quote or backslash in an id; browsers can.
+  test.each([
+    "checkout.submit",
+    "a:b/c[d]",
+    "-",
+    "--x",
+    "-1",
+    "1.circle",
+    "123abc",
+    "0a",
+    "first name",
+    "a\u00a0b",
+  ])("the selector for %j finds exactly that element", (id) => {
+    const el = document.createElement("div");
+    el.id = id;
+    const decoy = document.createElement("div");
+    decoy.id = "checkout";
+    decoy.className = "submit";
+    document.body.append(el, decoy);
+    expect(Array.from(document.querySelectorAll(__smIdSelector(id)))).toEqual([
+      el,
+    ]);
+  });
+
+  test("__smScanCandidates escapes a dotted id", () => {
+    document.body.innerHTML = `<button id="checkout.submit"></button>`;
+    expect(__smScanCandidates(10)[0]).toMatchObject({
+      sel: "#checkout\\.submit",
+    });
+  });
+});
