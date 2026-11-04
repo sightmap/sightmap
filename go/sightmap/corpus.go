@@ -285,15 +285,13 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 //     matching within that one segment only
 //
 // A path without a leading slash is a page name (see pagePath), not a URL path:
-// it is matched as if rooted and compared case-insensitively, so "/shop" matches
-// "Shop". A path that starts with "/" stays case-sensitive.
+// it is matched as if rooted, so "/Shop" matches "Shop". Matching stays
+// case-sensitive.
 func MatchRoute(pattern, path string) bool {
-	expr := routeToRegex(normalizeRoutePath(pattern))
+	re := regexp.MustCompile(routeToRegex(normalizeRoutePath(pattern)))
 	if isPageName(path) {
-		expr = "(?i)" + expr
 		path = "/" + path
 	}
-	re := regexp.MustCompile(expr)
 	return re.MatchString(normalizeRoutePath(path))
 }
 

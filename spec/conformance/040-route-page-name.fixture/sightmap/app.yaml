@@ -1,15 +1,15 @@
 version: 1
 views:
-  # Native apps report a page name (no leading slash) in place of a URL. It is
-  # rooted and compared case-insensitively; a URL path stays case-sensitive.
+  # An app can report a page name (no leading slash) in place of a URL. It is
+  # matched as if rooted, and stays case-sensitive.
   - name: Shop
-    route: /shop
+    route: /Shop
   - name: Product
     route: /*ProductViewController
   # Characters that would change how a URL parses are ordinary in a page name.
   - name: ShopCart
-    route: /shop:cart
+    route: /Shop:Cart
   - name: Discount
     route: /50% off
   - name: Cart
-    route: /shopping cart
+    route: /Shopping Cart

@@ -42,8 +42,8 @@ func TestMatchRouteTrailingSlash(t *testing.T) {
 // ---- Route matching: slashless page names ----------------------------------
 
 // Native apps report a page name as their page URL: no scheme and no leading
-// slash, such as a view-controller name. It is matched as if rooted, and
-// case-insensitively; a URL path stays case-sensitive.
+// slash, such as a view-controller name. It is matched as if rooted, and stays
+// case-sensitive like any other path.
 func TestMatchRoutePageName(t *testing.T) {
 	cases := []struct {
 		pattern, path string
@@ -55,18 +55,17 @@ func TestMatchRoutePageName(t *testing.T) {
 		{"/**/App.ProductViewController", "App.ProductViewController", true},
 		{"/App", "App.ProductViewController", false},
 		{"/", "App.ProductViewController", false},
-		{"/shop", "shop", true},
-		{"/shop", "Shop", true},
-		{"/shop", "SHOP", true},
-		{"/shop", "Shop/", true},
-		{"/Shop", "shop", true},
-		{"/shop/:id", "Shop/42", true},
-		{"/shop", "Cart", false},
-		{"/shop", "Shopping", false},
-		// URL paths stay case-sensitive.
-		{"/shop", "/shop", true},
+		{"/Shop", "Shop", true},
+		{"/Shop", "Shop/", true},
+		{"/Shop/:id", "Shop/42", true},
+		{"/shop", "Shop", false},
+		{"/Shop", "shop", false},
+		{"/Shop", "SHOP", false},
+		{"/Shop", "Cart", false},
+		{"/Shop", "Shopping", false},
+		// A rooted path is a URL path, matched the same way.
+		{"/Shop", "/Shop", true},
 		{"/shop", "/Shop", false},
-		{"/Shop", "/shop", false},
 	}
 	for _, tc := range cases {
 		if got := sightmap.MatchRoute(tc.pattern, tc.path); got != tc.want {
@@ -82,10 +81,10 @@ func TestViewForURLPageName(t *testing.T) {
 	c := &sightmap.Corpus{
 		Views: []sightmap.ViewDef{
 			{Name: "Product", Route: "/App.ProductViewController"},
-			{Name: "Shop", Route: "/shop"},
-			{Name: "ShopCart", Route: "/shop:cart"},
+			{Name: "Shop", Route: "/Shop"},
+			{Name: "ShopCart", Route: "/Shop:Cart"},
 			{Name: "Discount", Route: "/50% off"},
-			{Name: "Cart", Route: "/shopping cart"},
+			{Name: "Cart", Route: "/Shopping Cart"},
 			{Name: "Any", Route: "/*ViewController"},
 			{Name: "Root", Route: "/"},
 		},
@@ -96,15 +95,16 @@ func TestViewForURLPageName(t *testing.T) {
 		{"App.ProductViewController", "Product"},
 		{"App.HomeViewController", "Any"},
 		{"App.Unrelated", ""},
-		{"SHOP", "Shop"},
+		{"SHOP", ""},
+		{"shop", ""},
 		{"Shop?tab=1#top", "Shop"},
 		{"Shop:Cart", "ShopCart"},
 		{"50% off", "Discount"},
 		{"Shopping Cart", "Cart"},
-		{"/shop", "Shop"},
-		{"/Shop", ""},
-		{"https://example.com/shop", "Shop"},
-		{"https://example.com/SHOP", ""},
+		{"/Shop", "Shop"},
+		{"/shop", ""},
+		{"https://example.com/Shop", "Shop"},
+		{"https://example.com/shop", ""},
 		{"https://example.com", "Root"},
 		{"", "Root"},
 	}

@@ -20,9 +20,7 @@
       },
       "expected": {
         "result": {
-          "view": {
-            "name": "Shop"
-          }
+          "view": null
         }
       }
     },
@@ -33,9 +31,7 @@
       },
       "expected": {
         "result": {
-          "view": {
-            "name": "Shop"
-          }
+          "view": null
         }
       }
     },
@@ -55,7 +51,7 @@
     {
       "command": "match",
       "args": {
-        "url": "/shop"
+        "url": "/Shop"
       },
       "expected": {
         "result": {
@@ -68,7 +64,7 @@
     {
       "command": "match",
       "args": {
-        "url": "/Shop"
+        "url": "/shop"
       },
       "expected": {
         "result": {
@@ -79,7 +75,20 @@
     {
       "command": "match",
       "args": {
-        "url": "https://example.com/SHOP"
+        "url": "https://example.com/Shop"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Shop"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "https://example.com/shop"
       },
       "expected": {
         "result": {
