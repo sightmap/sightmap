@@ -68,6 +68,9 @@ func (s *Snapshot) line(n *sightmap.ComponentNode) string {
 	if n.State["selected"] == "true" {
 		l += " (selected)"
 	}
+	if n.State["checked"] == "true" && n.Value == "" {
+		l += " (checked)"
+	}
 	if !n.IsVisible {
 		l += " (off-screen)"
 	} else if !s.OnScreen(n) {
@@ -101,6 +104,10 @@ func (s *Snapshot) Render(opts RenderOpts) string {
 	}
 	if note := s.sparseNote(opts.UDID, opts.AccessibilityOn); note != nil {
 		b.WriteString("[Mostly empty]\n" + strings.Join(note, "\n") + "\n\n")
+	}
+	if s.Untagged {
+		b.WriteString("[No identifiers]\nThis Jetpack Compose screen publishes no testTags, so only roles and text can select it.\n")
+		b.WriteString("Add Modifier.semantics { testTagsAsResourceId = true } at the root of each composition, and again inside each dialog, bottom sheet and popup (each is a window of its own).\n\n")
 	}
 	if lb := s.logBoxToast(); lb != nil {
 		fmt.Fprintf(&b, "[LogBox]\nA React Native LogBox toast (#%s) covers the bottom of the screen; tapping it opens the LogBox inspector.\n", lb.Node.Id)

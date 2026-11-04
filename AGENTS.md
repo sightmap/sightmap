@@ -38,7 +38,10 @@ Never change spec semantics without an SEP (`spec/seps/`).
 - `go test ./...` from `go/`.
 - `cmd/sightmap/` is the binary; library packages (`match`, `sel`, `comps`, …) at the module root.
 - Downstream consumers import the library directly, so treat exported names as public API.
-- `device/` backs `sightmap device` (the iOS Simulator counterpart of `sightmap browser`).
+- `device/` backs `sightmap device` (the iOS Simulator and Android counterpart of `sightmap browser`).
+  Android goes through adb alone (`android.go`, `uiautomator.go`, `logcat.go`); its
+  end-to-end test needs an emulator or device:
+  `SIGHTMAP_ANDROID_E2E=emulator-5554 SIGHTMAP_ANDROID_E2E_APP=app-debug.apk go test ./device -run TestAndroidE2E`.
   Its Swift helper (`device/helper/`) is embedded and built with the local Xcode on
   first use. The end-to-end tests need a simulator:
   `SIGHTMAP_DEVICE_E2E="iPhone 17 Pro" go test ./device -run TestE2E`.

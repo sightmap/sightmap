@@ -88,3 +88,23 @@ func TestNetworkCheck(t *testing.T) {
 		t.Errorf("check = %+v", c)
 	}
 }
+
+func TestDevicePlatform(t *testing.T) {
+	for _, c := range []struct{ flag, app, pkg, want string }{
+		{"", "/x/app-debug.apk", "", device.PlatformAndroid},
+		{"", "", "com.example", device.PlatformAndroid},
+		{"Android", "", "", device.PlatformAndroid},
+		{"ios", "/x/My.app", "", device.PlatformIOS},
+	} {
+		got, err := devicePlatform(c.flag, c.app, c.pkg)
+		if err != nil || got != c.want {
+			t.Errorf("devicePlatform(%q, %q, %q) = %q, %v; want %q", c.flag, c.app, c.pkg, got, err, c.want)
+		}
+	}
+	if _, err := devicePlatform("ios", "/x/app.apk", ""); device.Code(err) != "usage" {
+		t.Errorf("--platform ios with an .apk = %v", err)
+	}
+	if _, err := devicePlatform("windows", "", ""); device.Code(err) != "usage" {
+		t.Errorf("--platform windows = %v", err)
+	}
+}
