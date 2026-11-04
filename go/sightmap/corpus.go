@@ -219,11 +219,10 @@ func (c *Corpus) AllComponents() []ComponentDef {
 // scoring (literal > :param > * > **); when scores tie, the first-declared view
 // wins. The returned View is a copy.
 func (c *Corpus) ViewForURL(pageURL string) *ViewDef {
-	u, err := url.Parse(pageURL)
-	if err != nil {
+	path, ok := pagePath(pageURL)
+	if !ok {
 		return nil
 	}
-	path := u.Path
 
 	best := -1
 	bestScore := -1
@@ -249,11 +248,10 @@ func (c *Corpus) ViewForURL(pageURL string) *ViewDef {
 // depends on the exact URL, so it can't be caught statically). Length 0 or 1
 // means no conflict. Names are in declaration order.
 func (c *Corpus) TiedViews(pageURL string) []string {
-	u, err := url.Parse(pageURL)
-	if err != nil {
+	path, ok := pagePath(pageURL)
+	if !ok {
 		return nil
 	}
-	path := u.Path
 	topScore := -1
 	var names []string
 	for i := range c.Views {
@@ -286,36 +284,50 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 //   - a "**" glued into a segment (e.g. "/foo**") is treated as a regular *,
 //     matching within that one segment only
 //
-// A path without a leading slash is a page name (as native apps report), not a
-// URL path: it is rooted before matching and compared case-insensitively, so
-// "/shop" matches "Shop". A path that starts with "/" stays case-sensitive.
-// Pass the path as parsed, before normalizeRoutePath, or the distinction is lost.
+// A path without a leading slash is a page name (see pagePath), not a URL path:
+// it is matched as if rooted and compared case-insensitively, so "/shop" matches
+// "Shop". A path that starts with "/" stays case-sensitive.
 func MatchRoute(pattern, path string) bool {
 	expr := routeToRegex(normalizeRoutePath(pattern))
 	if isPageName(path) {
 		expr = "(?i)" + expr
+		path = "/" + path
 	}
 	re := regexp.MustCompile(expr)
 	return re.MatchString(normalizeRoutePath(path))
 }
 
-// isPageName reports whether path is a slashless page name rather than a URL
-// path. The empty path (a bare origin) is the root, not a page name.
+// pagePath returns the path of a page URL to match routes against. A page URL
+// is a page name unless it starts with "/" or contains "://"; a page name is
+// returned as reported, minus any query and fragment, without URL parsing, so
+// that ":", "%" and spaces in a screen name are ordinary characters. ok is false
+// when a URL does not parse.
+func pagePath(pageURL string) (path string, ok bool) {
+	if !strings.HasPrefix(pageURL, "/") && !strings.Contains(pageURL, "://") {
+		name, _, _ := strings.Cut(pageURL, "#")
+		name, _, _ = strings.Cut(name, "?")
+		return name, true
+	}
+	u, err := url.Parse(pageURL)
+	if err != nil {
+		return "", false
+	}
+	return u.Path, true
+}
+
+// isPageName reports whether path, as returned by pagePath, is a page name. The
+// empty path (a bare origin) is the root, not a page name.
 func isPageName(path string) bool {
 	return path != "" && path[0] != '/'
 }
 
 // normalizeRoutePath strips a trailing slash from a URL path or route pattern so
-// that matching is insensitive to it, and roots a path that lacks a leading
-// slash, so a slashless page name such as "Shop" can match a route "/shop". The
-// root "/" (or an all-slash/empty path) normalizes to "/".
+// that matching is insensitive to it. The root "/" (or an all-slash/empty path)
+// normalizes to "/".
 func normalizeRoutePath(p string) string {
 	trimmed := strings.TrimRight(p, "/")
 	if trimmed == "" {
 		return "/"
-	}
-	if !strings.HasPrefix(trimmed, "/") {
-		return "/" + trimmed
 	}
 	return trimmed
 }
@@ -410,11 +422,10 @@ func routeSpecificity(pattern string) int {
 // win identity. Matching follows TiedViews: same parse, same path normalization,
 // so all three agree on trailing slashes and param segments.
 func (c *Corpus) TagsForURL(pageURL string) []string {
-	u, err := url.Parse(pageURL)
-	if err != nil {
+	path, ok := pagePath(pageURL)
+	if !ok {
 		return nil
 	}
-	path := u.Path
 	seen := map[string]bool{}
 	var out []string
 	for i := range c.Views {

@@ -6,3 +6,10 @@ views:
     route: /shop
   - name: Product
     route: /*ProductViewController
+  # Characters that would change how a URL parses are ordinary in a page name.
+  - name: ShopCart
+    route: /shop:cart
+  - name: Discount
+    route: /50% off
+  - name: Cart
+    route: /shopping cart

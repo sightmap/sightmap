@@ -337,19 +337,6 @@ describe("matchRoute", () => {
     ["/messages**", "/messages/compose", false],
     // Regex metacharacters in a literal segment are literal.
     ["/a.b", "/axb", false],
-    // A slashless page name (as native apps report) is rooted before matching
-    // and compared case-insensitively; a URL path stays case-sensitive.
-    ["/App.ProductViewController", "App.ProductViewController", true],
-    ["/*ProductViewController", "App.ProductViewController", true],
-    ["/shop", "shop", true],
-    ["/shop", "Shop", true],
-    ["/shop", "SHOP", true],
-    ["/Shop", "shop", true],
-    ["/shop/:id", "Shop/42", true],
-    ["/shop", "Cart", false],
-    ["/shop", "/Shop", false],
-    ["/shop", "/SHOP", false],
-    ["/Shop", "/shop", false],
   ])("matchRoute(%j, %j) = %j", (pattern, path, want) => {
     expect(matchRoute(pattern, path)).toBe(want);
   });

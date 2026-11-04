@@ -86,6 +86,58 @@
           "view": null
         }
       }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "Shop:Cart"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "ShopCart"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "50% off"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Discount"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "Shopping Cart"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Cart"
+          }
+        }
+      }
+    },
+    {
+      "command": "match",
+      "args": {
+        "url": "Shop?tab=1#top"
+      },
+      "expected": {
+        "result": {
+          "view": {
+            "name": "Shop"
+          }
+        }
+      }
     }
   ]
 }

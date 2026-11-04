@@ -88,6 +88,16 @@ func checkBindingConflicts(owner, route string, props []namedExtract) []Validati
 // collides with a reserved name. reserved is nil for views, which have none.
 func checkRouteBindings(owner, route string, reserved []string) []ValidationError {
 	var errs []ValidationError
+	// A route pattern is matched against a rooted path, so one without a leading
+	// slash would only ever match a page name, and only by being silently rooted.
+	if route != "" && !strings.HasPrefix(route, "/") {
+		errs = append(errs, ValidationError{
+			Component: owner,
+			Code:      "route-not-rooted",
+			Severity:  SeverityError,
+			Message:   fmt.Sprintf("%q route %q must start with \"/\"; write %q", owner, route, "/"+route),
+		})
+	}
 	// Route matching treats any :segment as a parameter, but only a name that is
 	// also a valid property name binds; say so rather than bind nothing silently.
 	for _, seg := range strings.Split(route, "/") {

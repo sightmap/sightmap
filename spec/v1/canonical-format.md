@@ -112,6 +112,7 @@ Structural problems in a `.sightmap/` corpus. **Errors** are inputs with no vali
 |---|---|---|
 | `missing-name` | error | A view or component is missing its required `name`. |
 | `missing-route` | error | A view is missing its required `route`. |
+| `route-not-rooted` | error | A view or request `route` does not start with `/`. |
 | `missing-selector` | error | A component is missing its required `selector`. |
 | `ref-unresolved` | error | A `$ref` names a component that no file's root `components:` or `definitions:` defines. |
 | `ref-circular` | error | A `$ref` chain is circular (e.g. `A → B → A`, or a component referencing itself). |

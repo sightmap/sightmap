@@ -53,12 +53,16 @@ views:
 
 ### Semantics
 
-The page URL's path is its path after parsing as a URL reference, with the query and fragment removed. A path that is non-empty and does not start with `/` is a page name. The empty path (a bare origin such as `https://example.com`) is the root, as before.
+A page URL is a **page name** when it does not start with `/` and does not contain `://`. A page name is taken as reported, minus any query (`?`) and fragment (`#`). It is not parsed as a URL, so `:`, `%`, and spaces are ordinary characters in it: `Shop:Cart` is a page name, not a URL with scheme `shop`, and `50% off` is a page name, not a malformed escape.
+
+Any other page URL is parsed as a URL, and its path is the URL path. A URL whose path is empty (a bare origin such as `https://example.com`) is the root, as before.
 
 When matching a route against a page name, an SDK:
 
 1. roots the path by prepending `/`, then normalizes trailing slashes as for any path;
 2. matches the route exactly as it would a URL path, with `*`, `**`, and `:param` keeping their meaning, except that literal characters compare case-insensitively.
+
+A route must start with `/`. A route that does not is an error (`route-not-rooted`), so a corpus never relies on a pattern being rooted implicitly. No existing corpus is affected: every route in the spec's examples and fixtures already starts with `/`.
 
 Specificity is computed from the route alone and does not change. Requests are matched by the same rule, though request URLs are full URLs in practice and so always have URL paths.
 
@@ -66,7 +70,7 @@ Specificity is computed from the route alone and does not change. Requests are m
 
 - An SDK MUST match a page name as specified above: rooted, then case-insensitively.
 - An SDK MUST continue to match a path that starts with `/` case-sensitively.
-- An SDK MUST decide whether a path is a page name from the path as parsed, before rooting it. A page name and the URL path it roots to (`Shop` and `/Shop`) are different inputs and may match different routes.
+- An SDK MUST decide whether a page URL is a page name by the rule above, without parsing it as a URL, and before rooting it. A page name and the URL path it roots to (`Shop` and `/Shop`) are different inputs and may match different routes.
 - Case folding MUST cover at least ASCII letters. An SDK MAY apply Unicode simple case folding beyond that.
 
 ## Alternatives considered
@@ -81,11 +85,12 @@ Specificity is computed from the route alone and does not change. Requests are m
 
 ## Migration
 
-No existing sightmap needs to change. Web page URLs always have a path starting with `/` (or empty), so they match exactly as before. SDKs that rejected or failed to match slashless paths now match them. The reference CLI and its browser extension implement this rule; conformance fixture `040-route-page-name` covers it.
+A sightmap whose route lacks a leading `/` now fails validation; adding the slash is the fix. Otherwise no existing sightmap needs to change. Web page URLs always have a path starting with `/` (or empty), so they match exactly as before. SDKs that rejected or failed to match slashless paths now match them. The reference CLI implements this rule. The browser extension is unaffected, since a browser pathname always starts with `/`; conformance fixture `040-route-page-name` covers it.
 
 ## Open questions
 
-None.
+- A page name that contains `://` is a URL by this rule. A screen name containing it would have to be reported with a scheme or leading `/` to avoid that; none is known to exist.
+
 
 ## References
 
