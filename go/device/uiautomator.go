@@ -3,6 +3,7 @@ package device
 import (
 	"bytes"
 	"encoding/xml"
+	"fmt"
 	"math"
 	"regexp"
 	"slices"
@@ -545,6 +546,7 @@ func ParseUIAutomator(data []byte, appPackage string, screen AndroidScreen) (*De
 	}
 	for _, n := range h.Nodes {
 		n = prepare(n, false)
+		repairSheetBackdrop(&n)
 		if foreign == "" && untagged(n) {
 			d.Untagged = true
 		}
@@ -690,4 +692,69 @@ func parseIMEWindow(out string) [][4]int {
 		return nil
 	}
 	return [][4]int{frame}
+}
+
+// repairSheetBackdrop fixes a Compose modal sheet's bounds. Compose reports
+// the sheet's container at its layout position, without the offset that puts
+// it at the bottom of the screen, and the dimmed backdrop as the rest of the
+// screen: the two tile the window, while the sheet's content sits outside the
+// container. A tap at the backdrop's reported center then lands on the sheet.
+// The part of the window above the sheet's content is what the backdrop shows.
+func repairSheetBackdrop(n *uiNode) {
+	for i := range n.Children {
+		repairSheetBackdrop(&n.Children[i])
+	}
+	for i := 0; i+1 < len(n.Children); i++ {
+		for _, pair := range [][2]int{{i, i + 1}, {i + 1, i}} {
+			scrim, sheet := &n.Children[pair[0]], &n.Children[pair[1]]
+			if scrim.Clickable != "true" || len(scrim.Children) > 0 || sheet.Clickable == "true" || len(sheet.Children) == 0 ||
+				simpleClass(scrim.Class) != "view" || simpleClass(sheet.Class) != "view" {
+				continue
+			}
+			sb, ok1 := parseBounds(scrim.Bounds)
+			pb, ok2 := parseBounds(sheet.Bounds)
+			if !ok1 || !ok2 || sb[0] != pb[0] || sb[2] != pb[2] || pb[3] != sb[1] || pb[1] >= sb[1] {
+				continue
+			}
+			top, bottom, found := descendantsSpan(sheet)
+			if !found || top <= pb[1] || bottom <= pb[3] {
+				continue
+			}
+			scrim.Bounds = fmt.Sprintf("[%d,%d][%d,%d]", sb[0], pb[1], sb[2], top)
+		}
+	}
+}
+
+func parseBounds(bounds string) ([4]int, bool) {
+	var v [4]int
+	m := boundsPattern.FindStringSubmatch(bounds)
+	if m == nil {
+		return v, false
+	}
+	for i := range v {
+		v[i], _ = strconv.Atoi(m[i+1])
+	}
+	return v, v[2] > v[0] && v[3] > v[1]
+}
+
+// descendantsSpan returns the topmost and bottommost edge of n's descendants.
+func descendantsSpan(n *uiNode) (top, bottom int, found bool) {
+	var walk func(*uiNode)
+	walk = func(c *uiNode) {
+		for i := range c.Children {
+			ch := &c.Children[i]
+			if b, ok := parseBounds(ch.Bounds); ok {
+				if !found || b[1] < top {
+					top = b[1]
+				}
+				if !found || b[3] > bottom {
+					bottom = b[3]
+				}
+				found = true
+			}
+			walk(ch)
+		}
+	}
+	walk(n)
+	return
 }

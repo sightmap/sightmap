@@ -3,6 +3,7 @@ package device
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1246,5 +1247,50 @@ func TestEnableAccessibilityKeepsAnEmulatorAwake(t *testing.T) {
 	sim.EnableAccessibility(context.Background(), "R5CT1234ABC")
 	if f.called("svc power stayon") != "" || f.called("KEYCODE_WAKEUP") == "" {
 		t.Errorf("a device's settings are left alone, but its display is woken: %q", f.calls)
+	}
+}
+
+// Compose reports a modal sheet's container without its offset and the
+// backdrop as the screen outside that box, so the backdrop's reported center
+// is under the sheet. The repaired backdrop is the part above the sheet.
+func TestComposeSheetBackdropIsAboveTheSheet(t *testing.T) {
+	tree := Normalize(loadUIAutomator(t, "uiautomator-compose-sheet", "dev.sightmap.sample", pixel))
+	var backdrop, handle *sightmap.ComponentNode
+	for _, n := range tree.Nodes {
+		switch n.Name {
+		case "Close sheet":
+			backdrop = n
+		case "Drag handle":
+			handle = n
+		}
+	}
+	if backdrop == nil || handle == nil {
+		t.Fatalf("backdrop %v, handle %v", backdrop, handle)
+	}
+	if _, y := Center(backdrop); y >= handle.Bounds.Y {
+		t.Errorf("the backdrop's center (y=%d) is not above the sheet's handle (y=%d)", y, handle.Bounds.Y)
+	}
+	if bottom := backdrop.Bounds.Y + backdrop.Bounds.Height; bottom > handle.Bounds.Y {
+		t.Errorf("the backdrop reaches y=%d, into the sheet at y=%d", bottom, handle.Bounds.Y)
+	}
+}
+
+func TestSheetBackdropRepairLeavesOtherScreensAlone(t *testing.T) {
+	for _, name := range []string{"uiautomator-compose", "uiautomator-compose-dialog", "uiautomator-views-shop", "uiautomator-rn-sheet"} {
+		data, err := os.ReadFile(filepath.Join("testdata", name+".xml"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var h uiHierarchy
+		if err := xml.Unmarshal(data[bytes.Index(data, []byte("<hierarchy")):], &h); err != nil {
+			t.Fatal(err)
+		}
+		before := fmt.Sprint(h.Nodes)
+		for i := range h.Nodes {
+			repairSheetBackdrop(&h.Nodes[i])
+		}
+		if after := fmt.Sprint(h.Nodes); after != before {
+			t.Errorf("%s: the sheet repair changed a screen without a sheet", name)
+		}
 	}
 }
