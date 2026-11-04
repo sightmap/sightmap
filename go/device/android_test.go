@@ -1131,6 +1131,34 @@ func TestBackdropSpotAvoidsKeyboard(t *testing.T) {
 	}
 }
 
+// The tap-xy point offered for a partly covered target stays out of the band
+// below a JS tab bar, which has tabs but no container, even between the tabs.
+func TestBackdropSpotAvoidsTabBand(t *testing.T) {
+	tab := func(n, x int) string {
+		return fmt.Sprintf(`<node class="android.view.ViewGroup" package="x" content-desc="Tab %d, tab, %d of 3" clickable="true" focusable="true" enabled="true" bounds="[%d,1950][%d,2250]"/>`, n, n, x, x+200)
+	}
+	dump := []byte(`<hierarchy rotation="0"><node class="android.widget.FrameLayout" package="x" bounds="[0,0][1080,2400]">` +
+		`<node class="android.view.View" package="x" resource-id="backdrop" clickable="true" focusable="true" enabled="true" bounds="[0,1000][1080,2400]"/>` +
+		`<node class="android.view.View" package="x" resource-id="sheet" clickable="true" focusable="true" enabled="true" bounds="[0,1000][1080,1900]"/>` +
+		tab(1, 100) + tab(2, 440) + tab(3, 780) +
+		`</node></hierarchy>`)
+	d, err := ParseUIAutomator(dump, "x", pixel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, _ := Annotate(Normalize(d), nil, nil, "")
+	if band := snap.tabBand(); band == nil || (band.Bounds.Y < 742 || band.Bounds.Y > 743) {
+		t.Fatalf("tabBand = %+v, want one starting at the tabs", band)
+	}
+	err = snap.AssertActionable(byIdentifier(t, snap.Tree, "backdrop"), "backdrop")
+	if Code(err) != "covered" || !strings.Contains(err.Error(), "sheet") {
+		t.Fatalf("backdrop: %v", err)
+	}
+	if hint := AsError(err).Hint; strings.Contains(hint, "tap-xy ") {
+		t.Errorf("hint %q offers a point, but every free one is in the tab band", hint)
+	}
+}
+
 func mustRead(t *testing.T, name string) []byte {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", name))
