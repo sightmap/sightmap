@@ -26,6 +26,13 @@ type CDPConn struct {
 	subs      map[string][]chan json.RawMessage
 	closeOnce sync.Once
 	done      chan struct{}
+
+	// metricsMu guards metrics, the device metrics override this session set
+	// through ResizeViewport (nil: none). Chrome drops a session's emulation
+	// when it detaches, so it only lives as long as this connection, and a
+	// full-page screenshot that pins the viewport re-applies it afterwards.
+	metricsMu sync.Mutex
+	metrics   map[string]interface{}
 }
 
 // DialCDP connects to a Chrome remote debugging address (e.g. "localhost:7892")

@@ -163,13 +163,19 @@ func CloseTab(ctx context.Context, addr, targetID string) error {
 // ResizeViewport sets the current page's viewport size using
 // Emulation.setDeviceMetricsOverride.
 func ResizeViewport(ctx context.Context, conn *CDPConn, width, height int) error {
-	_, err := conn.call(ctx, "Emulation.setDeviceMetricsOverride", map[string]interface{}{
+	params := map[string]interface{}{
 		"width":             width,
 		"height":            height,
 		"deviceScaleFactor": 1,
 		"mobile":            false,
-	})
-	return err
+	}
+	if _, err := conn.call(ctx, "Emulation.setDeviceMetricsOverride", params); err != nil {
+		return err
+	}
+	conn.metricsMu.Lock()
+	conn.metrics = params
+	conn.metricsMu.Unlock()
+	return nil
 }
 
 // dialCDPWebSocket creates a CDPConn by dialing a WebSocket URL directly,

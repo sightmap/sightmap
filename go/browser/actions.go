@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -399,25 +400,12 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 	// A full-page capture clips to the document's content size, which is already
 	// in document coordinates (no scroll offset), from the beyond-viewport surface.
 	if opts.FullPage {
-		raw, err := conn.call(ctx, "Page.getLayoutMetrics", map[string]interface{}{})
+		clip, restore, err := pinFullPageViewport(ctx, conn)
 		if err != nil {
-			return nil, fmt.Errorf("Screenshot: layout metrics: %w", err)
+			return nil, err
 		}
-		var m struct {
-			CSSContentSize struct {
-				Width  float64 `json:"width"`
-				Height float64 `json:"height"`
-			} `json:"cssContentSize"`
-		}
-		if err := json.Unmarshal(raw, &m); err != nil {
-			return nil, fmt.Errorf("Screenshot: layout metrics: %w", err)
-		}
-		params["clip"] = map[string]interface{}{
-			"x": 0, "y": 0,
-			"width":  m.CSSContentSize.Width,
-			"height": m.CSSContentSize.Height,
-			"scale":  1,
-		}
+		defer restore()
+		params["clip"] = clip
 		params["captureBeyondViewport"] = true
 	}
 
@@ -460,6 +448,103 @@ func ScreenshotWithOptions(ctx context.Context, conn *CDPConn, opts ScreenshotOp
 		return nil, fmt.Errorf("Screenshot: base64 decode: %w", err)
 	}
 	return data, nil
+}
+
+type layoutMetrics struct {
+	CSSContentSize struct {
+		Width  float64 `json:"width"`
+		Height float64 `json:"height"`
+	} `json:"cssContentSize"`
+	CSSLayoutViewport struct {
+		PageX        float64 `json:"pageX"`
+		PageY        float64 `json:"pageY"`
+		ClientWidth  float64 `json:"clientWidth"`
+		ClientHeight float64 `json:"clientHeight"`
+	} `json:"cssLayoutViewport"`
+}
+
+func getLayoutMetrics(ctx context.Context, conn *CDPConn) (layoutMetrics, error) {
+	var m layoutMetrics
+	raw, err := conn.call(ctx, "Page.getLayoutMetrics", map[string]interface{}{})
+	if err != nil {
+		return m, fmt.Errorf("Screenshot: layout metrics: %w", err)
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return m, fmt.Errorf("Screenshot: layout metrics: %w", err)
+	}
+	return m, nil
+}
+
+// pinFullPageViewport sizes the viewport to the whole document for a
+// full-page screenshot, at the width the page is already laid out at, and
+// returns the document clip to capture and a func that undoes the override.
+//
+// captureBeyondViewport keeps the window width, scrollbar included. With
+// nothing left to scroll the scrollbar disappears and its width goes into the
+// layout, so text rewraps and the document gets shorter than the probe
+// measured, and Chrome leaves the page at that wider layout afterwards. The
+// layout viewport's clientWidth excludes the scrollbar, so overriding to that
+// width and the document's height, with scrollbars hidden, keeps the probe's
+// layout. With overlay scrollbars the width is unchanged and this is a no-op.
+//
+// The override belongs to this CDP session, so other clients' emulation and
+// the window size are untouched. Afterwards the session's own earlier
+// override (ResizeViewport) is re-applied, or the override cleared if there
+// was none, and the scroll position is put back, since a viewport as tall as
+// the document clamps it to 0.
+func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interface{}, func(), error) {
+	m, err := getLayoutMetrics(ctx, conn)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Clip to the size measured before the override: that is the layout the
+	// probe saw. Read again under the override, Chrome can report the content
+	// a scrollbar narrower, or taller on pages that size themselves by vh.
+	clip := map[string]interface{}{
+		"x": 0, "y": 0,
+		"width":  m.CSSContentSize.Width,
+		"height": m.CSSContentSize.Height,
+		"scale":  1,
+	}
+	noop := func() {}
+	// Keep the pixel scale the page is drawn at: this session's ResizeViewport
+	// override if there is one, else the real devicePixelRatio (0).
+	conn.metricsMu.Lock()
+	prev := conn.metrics
+	conn.metricsMu.Unlock()
+	var dsf interface{} = 0
+	if v, ok := prev["deviceScaleFactor"]; ok {
+		dsf = v
+	}
+	vw := math.Ceil(m.CSSLayoutViewport.ClientWidth)
+	vh := math.Ceil(math.Max(m.CSSContentSize.Height, m.CSSLayoutViewport.ClientHeight))
+	if vw <= 0 || vh <= 0 {
+		return clip, noop, nil
+	}
+	if _, err := conn.call(ctx, "Emulation.setDeviceMetricsOverride", map[string]interface{}{
+		"width":             int(vw),
+		"height":            int(vh),
+		"deviceScaleFactor": dsf,
+		"mobile":            false,
+	}); err != nil {
+		// The capture still works, at captureBeyondViewport's own layout.
+		return clip, noop, nil
+	}
+	_, _ = conn.call(ctx, "Emulation.setScrollbarsHidden", map[string]interface{}{"hidden": true})
+	restore := func() {
+		rctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_, _ = conn.call(rctx, "Emulation.setScrollbarsHidden", map[string]interface{}{"hidden": false})
+		if prev != nil {
+			_, _ = conn.call(rctx, "Emulation.setDeviceMetricsOverride", prev)
+		} else {
+			_, _ = conn.call(rctx, "Emulation.clearDeviceMetricsOverride", map[string]interface{}{})
+		}
+		if x, y := m.CSSLayoutViewport.PageX, m.CSSLayoutViewport.PageY; x != 0 || y != 0 {
+			_, _ = EvalJSON(rctx, conn, fmt.Sprintf("window.scrollTo(%g, %g)", x, y))
+		}
+	}
+	return clip, restore, nil
 }
 
 // ResolveBySightmapID resolves a probe id to a live element via its persisted
