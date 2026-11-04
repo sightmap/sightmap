@@ -192,6 +192,8 @@ struct NetworkView: View {
             Button("Send Request", action: send)
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("network-send")
+            Button("Fetch Report", action: fetch)
+                .accessibilityIdentifier("network-fetch")
             Text(status)
                 .accessibilityIdentifier("network-status")
         }
@@ -201,10 +203,15 @@ struct NetworkView: View {
     private func send() {
         requestCount += 1
         let path = "sightmap/order-\(requestCount)"
-        var request = URLRequest(url: URL(string: "https://httpbin.org/anything/\(path)")!)
+        // The networkBaseURL default points the request at a local server.
+        let base = UserDefaults.standard.string(forKey: "networkBaseURL") ?? "https://httpbin.org/anything"
+        var request = URLRequest(url: URL(string: "\(base)/\(path)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["order": requestCount, "items": ["Product 1", "Product 2"]])
+        request.setValue("Bearer sample-not-a-secret", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "order": requestCount, "items": ["Product 1", "Product 2"], "sessionToken": "sample-not-a-secret",
+        ])
         status = "Sending…"
         appLog.info("POST \(path, privacy: .public)")
         print("POST /anything/\(path)")
@@ -215,6 +222,28 @@ struct NetworkView: View {
             print("POST /anything/\(path) -> \(result)")
             DispatchQueue.main.async { status = result }
         }.resume()
+    }
+
+    // fetch GETs every path in the networkFetchPaths default at once, each on
+    // its own URLSession, so CFNetwork can log their HAR entries concurrently.
+    private func fetch() {
+        let base = UserDefaults.standard.string(forKey: "networkBaseURL") ?? "https://httpbin.org/anything"
+        let paths = UserDefaults.standard.stringArray(forKey: "networkFetchPaths") ?? ["sightmap/report"]
+        status = "Fetching…"
+        let group = DispatchGroup()
+        for path in paths {
+            group.enter()
+            let session = URLSession(configuration: .ephemeral)
+            session.dataTask(with: URL(string: "\(base)/\(path)")!) { data, response, error in
+                let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+                let result = error.map { "failed: \($0.localizedDescription)" } ?? "HTTP \(code), \(data?.count ?? 0) bytes"
+                appLog.info("GET \(path, privacy: .public) -> \(result, privacy: .public)")
+                print("GET /anything/\(path) -> \(result)")
+                group.leave()
+            }.resume()
+            session.finishTasksAndInvalidate()
+        }
+        group.notify(queue: .main) { status = "Fetched \(paths.count)" }
     }
 }
 
