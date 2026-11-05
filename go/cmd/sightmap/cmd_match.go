@@ -33,7 +33,7 @@ type matchRecord struct {
 	Nodes      int            `json:"nodes"`      // visible nodes considered
 	Named      int            `json:"named"`      // visible nodes a component names directly
 	Inside     int            `json:"inside"`     // visible nodes under a named ancestor (not named themselves)
-	Components map[string]int `json:"components"` // component name -> visible nodes it names, containers included
+	Components map[string]int `json:"components"` // component name -> nodes it names anywhere in the DOM
 	Unmatched  []matchGap     `json:"unmatched"`  // regions nothing names or encloses
 	Conflicts  []matchClash   `json:"conflicts"`  // nodes claimed by more than one definition
 	Error      string         `json:"error,omitempty"`
@@ -145,15 +145,16 @@ func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnl
 		if n == root {
 			return true
 		}
-		if visibleOnly && (!n.IsVisible || n.IsIgnored) {
-			return true
-		}
 		mm := matches[n]
 		if mm != nil {
-			// Every visible node a component names counts toward its presence,
-			// containers included: a header or panel is matched even when it
-			// holds no text of its own.
+			// Every node a component names counts toward its presence, hidden
+			// and AX-ignored ones and containers included: an icon is usually
+			// AX-ignored, a closed menu is in the DOM but hidden, and a header
+			// holds no text of its own; all of them are still matched.
 			rec.Components[mm.Name]++
+		}
+		if visibleOnly && (!n.IsVisible || n.IsIgnored) {
+			return true
 		}
 		content := !n.IsInteractive && strings.TrimSpace(n.Name) != ""
 		if !n.IsInteractive && !content {
