@@ -57,18 +57,20 @@ func runBrowserStart(args []string) error {
 		}
 	}
 
+	// Detached mode: re-exec ourselves as a background daemon and return once it
+	// is serving, so the launching shell is never held. Must come before any of
+	// the launch work below — the re-exec'd child does all of that — and before
+	// attach, whose session blocks just as a launched one does (the attach daemon
+	// writes the same session file, so readiness is checked the same way).
+	if *detachFlag {
+		return startDetached(args, *sightmapDir, *logFileFlag)
+	}
+
 	// Attach mode: hand off to the degraded, browser-not-owned path. It shares the
 	// devtools server + collector with the owned-launch path below but skips the
 	// launch/profile/extension machinery entirely.
 	if *attachFlag != "" {
 		return runAttachedSession(*attachFlag, *sightmapDir, *portFlag, *urlFlag)
-	}
-
-	// Detached mode: re-exec ourselves as a background daemon and return once it
-	// is serving, so the launching shell is never held. Must come before any of
-	// the launch work below — the re-exec'd child does all of that.
-	if *detachFlag {
-		return startDetached(args, *sightmapDir, *logFileFlag)
 	}
 
 	// Resolve profile early so the existing-Chrome check can match it.
@@ -433,7 +435,11 @@ func startDevtoolsServer(sightmapDir, siteName string, serverPort int, cdpAddr s
 // tears down (it setsid's into its own session).
 func startDetached(args []string, sightmapDir, logFile string) error {
 	// Idempotent: if a live daemon already owns this corpus, don't spawn another.
-	if info, err := browser.ReadSessionInfo(sightmapDir); err == nil && info.Port > 0 && isPortAlive(info.Port) {
+	// An attached browser outlives its daemon, so a live CDP port alone is not
+	// a live daemon there: require the server too, or a reaped attach daemon
+	// could never be restarted with --detach.
+	if info, err := browser.ReadSessionInfo(sightmapDir); err == nil && info.Port > 0 && isPortAlive(info.Port) &&
+		(!info.Attached || (info.ServerPort > 0 && serverAlive(info.ServerPort))) {
 		fmt.Fprintf(os.Stderr, "● already running  cdp=%d  server=%d  (see 'sightmap browser status')\n", info.Port, info.ServerPort)
 		return nil
 	}
