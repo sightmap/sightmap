@@ -32,15 +32,16 @@ type matchRecord struct {
 	TiedViews  []string       `json:"tiedViews,omitempty"`
 	Nodes      int            `json:"nodes"`      // visible nodes considered
 	Named      int            `json:"named"`      // visible nodes a component names directly
-	Inside     int            `json:"inside"`     // visible nodes under a named ancestor (not named themselves)
+	Inside     int            `json:"inside"`     // visible nodes whose nearest named ancestor holds <= 20 nodes
 	Components map[string]int `json:"components"` // component name -> nodes it names anywhere in the DOM
 	Unmatched  []matchGap     `json:"unmatched"`  // regions nothing names or encloses
 	Conflicts  []matchClash   `json:"conflicts"`  // nodes claimed by more than one definition
 	Error      string         `json:"error,omitempty"`
 }
 
-// matchGap is a region of nodes with no component on or above them, keyed by
-// the nearest ancestor that carries a test hook (or the page root).
+// matchGap is a region of nodes no small component names, keyed by the nearest
+// ancestor that carries a test hook (or the page root), prefixed with the large
+// component enclosing them when there is one ("MainContent > thead[...]").
 type matchGap struct {
 	Anchor      string   `json:"anchor"`
 	Interactive int      `json:"interactive"`
@@ -108,6 +109,12 @@ func runMatchOut(args []string, out io.Writer) error {
 
 const matchGapSamples = 3
 
+// matchSmallComponent is the most nodes a named ancestor may hold for the nodes
+// under it to count as named by it (surveyor's held-out coverage uses the same
+// bound). Under a larger one, a node is reported unmatched with that
+// component's name in its anchor.
+const matchSmallComponent = 20
+
 func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnly bool) matchRecord {
 	rec := matchRecord{Capture: snap, URL: viewset.URLOf(snap), Components: map[string]int{}}
 	data, err := os.ReadFile(snap + ".tree.json")
@@ -132,13 +139,27 @@ func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnl
 	}
 	matches := m.Match(root, rec.URL)
 	parents := coverage.BuildParentMap(root)
-	namedUnder := func(n *sightmap.ComponentNode) bool {
+	// A node counts as inside a component only when its nearest named ancestor
+	// is small enough to say what the node is: a page-wide container
+	// (MainContent, a layout pane) encloses everything and names nothing.
+	size := map[*sightmap.ComponentNode]int{}
+	var count func(n *sightmap.ComponentNode) int
+	count = func(n *sightmap.ComponentNode) int {
+		c := 1
+		for _, k := range n.Children {
+			c += count(k)
+		}
+		size[n] = c
+		return c
+	}
+	count(root)
+	nearestNamed := func(n *sightmap.ComponentNode) *sightmap.ComponentNode {
 		for p := parents[n]; p != nil; p = parents[p] {
 			if matches[p] != nil {
-				return true
+				return p
 			}
 		}
-		return false
+		return nil
 	}
 	gaps := map[string]*matchGap{}
 	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
@@ -165,13 +186,17 @@ func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnl
 			rec.Named++
 			return true
 		}
-		if namedUnder(n) {
+		holder := nearestNamed(n)
+		if holder != nil && size[holder] <= matchSmallComponent {
 			rec.Inside++
 			return true
 		}
 		anchor := "(page)"
 		if a := coverage.NearestDataAttrAncestor(n, parents); a != nil {
 			anchor = coverage.DataAttrSelector(a)
+		}
+		if holder != nil {
+			anchor = matches[holder].Name + " > " + anchor
 		}
 		g := gaps[anchor]
 		if g == nil {
