@@ -152,7 +152,7 @@ SEP-0009 governs extracted values, judged at the node a value is read from. Rest
 
 | `from` | Withheld when |
 |---|---|
-| `dom.text`, `dom.raw_text` | the node's effective privacy is `mask` or `block` |
+| `dom.text`, `dom.raw_text` | the node's effective privacy is `mask` or `block`; under `mask`, `dom.text` on a form control may still resolve its accessible name (SEP-0009, amended 2026-11-03) |
 | `dom.attr` | `block`; or `mask`, unless `path` is `checked`, `selected`, `disabled` or `expanded` |
 | `dom.state` | the node's effective privacy is `block` |
 | `component` | the target's own property is withheld, judged at the target node |
