@@ -120,6 +120,27 @@ Pages: `/atlas` lists community maps and directory listings together with a
 type filter; `/atlas/<slug>` renders a listing (or a community entry — slugs
 are unique across both).
 
+## Sightkick tool layer
+
+The Atlas is also the first page of sightmap.org to expose WebMCP tools of its
+own, so the site is scannable by the pipeline described above. They are not
+hand-written: `.sightkick/tools.yaml` names them over the components already
+declared in `.sightmap/app.yaml`, and `scripts/build-sightkick.ts` compiles the
+pair with `sightkick build` into `public/atlas/tools.ir.json` plus the runtime
+bundle that registers them. `src/lib/sightkick-boot.ts` loads both on `/atlas`
+paths only. `/atlas` gets `search_atlas`, `list_community_maps`,
+`filter_atlas_by_type` and `submit_site`; `/atlas/<slug>` gets `get_listing`,
+`list_listing_tools` and `share_listing`. Every one drives the same visible
+controls a person uses — the search box, the type chips, the submit form — so
+there is no second, agent-only surface to keep in step.
+
+The layer is optional by construction: if `sightkick` is missing or the corpus
+stops compiling, the build step warns loudly, writes nothing and exits 0, and
+the loader's two requests 404 quietly. A deploy never fails over it. After
+changing a selector or a declared property in `.sightmap/app.yaml`, re-run
+`pnpm build:sightkick` (or `sightkick build .`) to catch the break at build time
+rather than in a browser.
+
 ## Scripts
 
 | Command | Does |
