@@ -20,16 +20,17 @@ export const SITE_DESCRIPTION =
 export const BLOG_DESCRIPTION =
   'Research and release notes from the people building the sightmap spec.'
 
-// The atlas gallery's tagline, distinct again from both of the above: the
-// atlas is community-contributed maps of other people's sites, not the spec
-// pitch and not the blog. Used for /atlas's meta description and the copy
-// under its heading, and imported by src/pages/AtlasIndex.tsx for the same
-// single-source reason BLOG_DESCRIPTION is.
-// Sits directly under the /atlas heading ("Sightmaps of real sites"), so it
-// must not restate it — and it has to stand alone as the page's meta
-// description and its llms.txt section summary.
+// The atlas gallery's tagline: other people's sites, not the spec pitch and
+// not the blog. It sits directly under the /atlas heading ("Apps with WebMCP
+// tools, and maps of the ones without"), so it must not restate it, and it has
+// to stand alone as the page's meta description and its llms.txt section
+// summary — one sentence covering both halves of the gallery, WebMCP listings
+// (src/data/directory/) and community sightmaps (src/data/atlas/), since a
+// description of only one would be wrong for half the page. Imported by
+// src/pages/AtlasIndex.tsx for the same single-source reason BLOG_DESCRIPTION
+// is.
 export const ATLAS_DESCRIPTION =
-  'Community-contributed maps of views, components, and requests, made by browsing the live site with no source access.'
+  'Apps with callable WebMCP tools, scanned and reviewed, alongside community-contributed sightmaps of real sites.'
 
 // Per-route <title> builders. scripts/prerender.tsx (the source of truth
 // crawlers and unfurlers read) and src/components/Seo.tsx (which fixes the

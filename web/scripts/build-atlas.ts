@@ -18,6 +18,12 @@
 // every run so a slug removed upstream (a takedown) actually disappears from
 // dist/ instead of lingering as an orphaned file.
 //
+// The same two outputs cover the WebMCP directory (src/data/directory/): the
+// manifest gains `directoryListings` / `directoryCategories`, and public/atlas/
+// gains the agent-facing documents its README's "What the build generates"
+// table names — directory.json, stats.json, sites/, scans/, hosts/, one .md
+// twin and one badge per listing. Same no-network, wipe-and-rewrite contract.
+//
 // The screenshots have to be copied rather than imported from src/: they are
 // referenced from React components that scripts/prerender.tsx renders under
 // tsx, where Vite's asset pipeline (`import.meta.glob`, `?url`) does not
@@ -26,11 +32,39 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { atlasCategories, loadAtlas, resolveCorpus, resolveScreenshots } from './lib/atlas'
+import { directoryCategories, loadDirectory, scanDateOf, scanFilesFor } from './lib/directory'
+import { listingMarkdown } from './lib/directory-markdown'
+import {
+  directoryIndexDocument,
+  directoryStatsDocument,
+  hostDocuments,
+  reportWithoutTranscript,
+  siteDocument,
+  toolsDocument,
+} from './lib/directory-outputs'
+import { listingBadgeSvg } from './lib/badge'
+import { sightkickStarter } from './lib/sightkick-starter'
 import { tarGz } from './lib/tar'
+import type { DirectoryListingView } from '../src/types/directory'
 
 const DATA_DIR = path.resolve('src/data/atlas')
+const DATA_DIR_DIRECTORY = path.resolve('src/data/directory')
 const GENERATED_DIR = path.resolve('src/generated')
 const PUBLIC_DIR = path.resolve('public/atlas')
+
+/** Writes one generated JSON document under public/atlas/. */
+function writeJson(rel: string, value: unknown) {
+  const full = path.join(PUBLIC_DIR, rel)
+  fs.mkdirSync(path.dirname(full), { recursive: true })
+  fs.writeFileSync(full, `${JSON.stringify(value, null, 2)}\n`)
+}
+
+/** Copies a vendored file into public/atlas/ byte for byte. */
+function copyInto(from: string, rel: string) {
+  const full = path.join(PUBLIC_DIR, rel)
+  fs.mkdirSync(path.dirname(full), { recursive: true })
+  fs.copyFileSync(from, full)
+}
 
 async function main() {
   const atlas = await loadAtlas(DATA_DIR)
@@ -92,17 +126,88 @@ async function main() {
     )
   }
 
+  // ---- WebMCP directory ----
+  //
+  // Read after the community atlas and with its slugs reserved: both kinds of
+  // listing render at /atlas/<slug> and publish files into this same
+  // directory, so a slug already taken by an entry has to lose here rather
+  // than silently overwrite that entry's .md twin (see loadDirectory).
+  const directory = loadDirectory(DATA_DIR_DIRECTORY, atlas.entries.map((e) => e.slug))
+  const generatedAt = new Date().toISOString()
+
+  for (const listing of directory.listings) {
+    // Every scan on file, verbatim. Copied rather than re-serialized from the
+    // parsed report for the same reason index.json is: the published artifact
+    // has to be the file the scanner wrote, or it is not evidence.
+    const scanFiles = scanFilesFor(DATA_DIR_DIRECTORY, listing.slug)
+    for (const rel of scanFiles) {
+      copyInto(path.join(DATA_DIR_DIRECTORY, rel), `scans/${listing.slug}/${scanDateOf(rel)}.json`)
+    }
+    // /atlas/scans/<slug>.json is the one the listing was reviewed against —
+    // the report every other document on this page summarises, which is what
+    // makes it the right one to serve unversioned.
+    copyInto(path.join(DATA_DIR_DIRECTORY, listing.scan), `scans/${listing.slug}.json`)
+
+    writeJson(`sites/${listing.slug}.json`, siteDocument(listing))
+    writeJson(`sites/${listing.slug}/tools.json`, toolsDocument(listing))
+
+    // The markdown twin of the listing page, and the badge a listed site can
+    // embed. Both are generated from the listing, never copied: unlike a
+    // community README there is no authored file behind them.
+    fs.writeFileSync(path.join(PUBLIC_DIR, `${listing.slug}.md`), listingMarkdown(listing))
+    const badgeDir = path.join(PUBLIC_DIR, listing.slug)
+    fs.mkdirSync(badgeDir, { recursive: true })
+    fs.writeFileSync(path.join(badgeDir, 'badge.svg'), listingBadgeSvg(listing))
+
+    // Host lookup, served at /api/atlas/lookup/<host> by a netlify.toml
+    // rewrite. Both the bare and the www. spelling, so an agent holding a
+    // hostname off the address bar never has to normalise it first.
+    const hosts = hostDocuments(listing)
+    for (const { host, document } of hosts) writeJson(`hosts/${host}.json`, document)
+
+    console.log(
+      `  listed ${listing.slug} (${listing.counts.tools} tool(s), ${listing.counts.pages} page(s), ` +
+        `${scanFiles.length} scan(s), ${hosts.length} host lookup(s))`
+    )
+  }
+
+  // Written whichever way the directory came out, including empty: an agent
+  // that fetches these should read "nothing listed yet", not a 404 it has to
+  // interpret.
+  writeJson('directory.json', directoryIndexDocument(directory.listings, generatedAt))
+  writeJson(
+    'stats.json',
+    directoryStatsDocument(directory.listings, { generatedAt, communityMaps: atlas.entries.length })
+  )
+
+  // What the app imports. The scan report rides along so the listing page can
+  // render checks and pages without a fetch — minus the `$ ` CLI transcript,
+  // which nothing on the page renders and which is already published in full
+  // in the scan JSON above.
+  const directoryListings: DirectoryListingView[] = directory.listings.map((listing) => ({
+    ...listing,
+    report: reportWithoutTranscript(listing.report),
+    starter: sightkickStarter(listing.report),
+  }))
+
   fs.writeFileSync(
     path.join(GENERATED_DIR, 'atlas-manifest.ts'),
     `// Auto-generated by scripts/build-atlas.ts — do not edit\n` +
-      `import type { AtlasEntry } from '@/types/atlas'\n\n` +
+      `import type { AtlasEntry } from '@/types/atlas'\n` +
+      `import type { DirectoryListingView } from '@/types/directory'\n\n` +
       `export const atlasGeneratedAt = ${JSON.stringify(atlas.generatedAt)}\n\n` +
       `export const atlasEntries: AtlasEntry[] = ${JSON.stringify(atlas.entries, null, 2)}\n\n` +
-      `export const atlasCategories: string[] = ${JSON.stringify(atlasCategories(atlas.entries))}\n`
+      `export const atlasCategories: string[] = ${JSON.stringify(atlasCategories(atlas.entries))}\n\n` +
+      `export const directoryListings: DirectoryListingView[] = ${JSON.stringify(directoryListings, null, 2)}\n\n` +
+      `export const directoryCategories: string[] = ${JSON.stringify(directoryCategories(directory.listings))}\n`
   )
 
   const skipped = atlas.skipped.length > 0 ? `, ${atlas.skipped.length} skipped` : ''
-  console.log(`\n  atlas build complete: ${atlas.entries.length} entry(s)${skipped}`)
+  const skippedListings = directory.skipped.length > 0 ? `, ${directory.skipped.length} skipped` : ''
+  console.log(
+    `\n  atlas build complete: ${atlas.entries.length} entry(s)${skipped}, ` +
+      `${directory.listings.length} listing(s)${skippedListings}`
+  )
 }
 
 main().catch((err) => {

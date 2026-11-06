@@ -3,7 +3,7 @@ import Home from '@/pages/Home'
 import BlogIndex from '@/pages/BlogIndex'
 import BlogPost from '@/pages/BlogPost'
 import AtlasIndex from '@/pages/AtlasIndex'
-import AtlasEntry from '@/pages/AtlasEntry'
+import AtlasSlug from '@/pages/AtlasSlug'
 import Developers from '@/pages/Developers'
 import Building from '@/pages/Building'
 import Sightkick from '@/pages/Sightkick'
@@ -23,7 +23,11 @@ export default function App() {
         {/* Every route here needs a matching entry in scripts/prerender.tsx —
             one declared only in this file ships as a client-only page. */}
         <Route path="/atlas" element={<AtlasIndex />} />
-        <Route path="/atlas/:slug" element={<AtlasEntry />} />
+        {/* One route, two pages: AtlasSlug picks the WebMCP listing when the
+            slug is in directoryListings and the community entry otherwise.
+            Keep this on one literal line — check-route-coverage.ts reads the
+            route table straight out of this file. */}
+        <Route path="/atlas/:slug" element={<AtlasSlug />} />
         <Route path="/developers" element={<Developers />} />
         <Route path="/building" element={<Building />} />
         <Route path="/sightkick" element={<Sightkick />} />
