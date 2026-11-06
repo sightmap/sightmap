@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/sightmap/sightmap/go/match"
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -118,36 +119,44 @@ func findLintSnapshotTreeFiles(sightmapDir string) ([]string, error) {
 
 // computeSnapshotCounts walks each tree JSON file and counts, for every
 // component in the corpus, how many tree nodes match the component's selector
-// (last part only). It returns a map of component name → max count across all
-// provided tree files and all selectors for that component.
+// (the full compound selector, including ancestor combinators). It returns a
+// map of component name → max count across all provided tree files and all
+// selectors for that component.
 //
 // Components absent from any of the tree files will have a count of 0 in the
 // returned map.
+//
+// Matching uses the ancestor-aware NFA in package match — the same engine that
+// powers live capture reconciliation — so a compound selector such as
+// ".sidebar div.card" only counts nodes whose ancestor chain satisfies the
+// preceding parts, not every node whose leaf happens to repeat elsewhere in
+// the tree. This keeps the count aligned with the documented LintWithCounts
+// contract (count == 1 suppresses, count == 0 flags a possibly-broken
+// selector, count > 1 annotates the real match count).
 func computeSnapshotCounts(corpus *sightmap.Corpus, treeFiles []string) (map[string]int, error) {
-	// Pre-parse selectors: component index → slice of last SelectorParts.
-	type parsedEntry struct {
-		name      string
-		lastParts []*sightmap.SelectorPart
-	}
 	all := corpus.AllComponents()
-	parsed := make([]parsedEntry, 0, len(all))
-	for _, comp := range all {
-		var lasts []*sightmap.SelectorPart
-		for _, selStr := range comp.Selectors {
-			ps, err := sightmap.ParseSightmapSelector(selStr)
-			if err != nil || len(ps.Parts) == 0 {
-				continue
-			}
-			lasts = append(lasts, ps.Parts[len(ps.Parts)-1])
-		}
-		parsed = append(parsed, parsedEntry{name: comp.Name, lastParts: lasts})
+
+	// Compile one ancestor-aware match query per (component, selector). The
+	// NFA enforces combinators across the entire selector chain, unlike a
+	// leaf-only MatchesNode check against every node. Invalid selectors are
+	// skipped here (silently — Lint surfaces them via validation warnings).
+	queries, _ := match.ParseQueries(all)
+
+	// indexes[componentName] holds pointers into queries for that component's
+	// selectors. We keep per-query counts per tree and reduce them to a
+	// per-component max below, preserving the prior "max across selectors"
+	// reduction so a multi-selector component reports its broadest selector.
+	indexes := make(map[string][]*match.MatchQuery)
+	for i := range queries {
+		q := &queries[i]
+		indexes[q.Name] = append(indexes[q.Name], q)
 	}
 
 	// counts starts at 0 for every component (explicit presence distinguishes
 	// "0 matches in snapshot" from "component not checked").
-	counts := make(map[string]int, len(parsed))
-	for _, pe := range parsed {
-		counts[pe.name] = 0
+	counts := make(map[string]int, len(all))
+	for _, comp := range all {
+		counts[comp.Name] = 0
 	}
 
 	for _, tf := range treeFiles {
@@ -162,26 +171,24 @@ func computeSnapshotCounts(corpus *sightmap.Corpus, treeFiles []string) (map[str
 			continue
 		}
 
-		// For each component, count matching nodes using its last selector parts.
-		for _, pe := range parsed {
-			if len(pe.lastParts) == 0 {
-				continue
-			}
+		// Count matched nodes per query in this tree. FindAllMatches fires the
+		// callback at most once per (node, query) (its matchedQueries dedup),
+		// so each selector's count is its number of matching nodes, computed
+		// independently of any sibling query that also matches the same node.
+		perQuery := make(map[*match.MatchQuery]int)
+		match.FindAllMatches(&root, queries, func(_ *sightmap.ComponentNode, q *match.MatchQuery) {
+			perQuery[q]++
+		})
+
+		for name, qs := range indexes {
 			maxForTree := 0
-			for _, lastPart := range pe.lastParts {
-				count := 0
-				sightmap.Walk(&root, func(node *sightmap.ComponentNode, _ int) bool {
-					if sightmap.MatchesNode(node, lastPart) {
-						count++
-					}
-					return true
-				})
-				if count > maxForTree {
-					maxForTree = count
+			for _, q := range qs {
+				if c := perQuery[q]; c > maxForTree {
+					maxForTree = c
 				}
 			}
-			if maxForTree > counts[pe.name] {
-				counts[pe.name] = maxForTree
+			if maxForTree > counts[name] {
+				counts[name] = maxForTree
 			}
 		}
 	}
