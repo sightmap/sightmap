@@ -79,7 +79,7 @@ Setup:
   install                                                           download Chrome for Testing
 
 Session:
-  start [--detach] [--port N] [--extensions PATH] [--url URL] [--profile DIR]  launch Chrome + sightmap server (blocks the shell; --detach backgrounds it)
+  start [--detach] [--attach HOST:PORT] [--port N] [--extensions PATH] [--url URL] [--profile DIR]  launch (or attach to) Chrome + sightmap server (blocks the shell; --detach backgrounds it)
   stop
   status
   navigate <url>
