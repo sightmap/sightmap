@@ -1,0 +1,358 @@
+{
+  "version": 1,
+  "url": "https://webmcp.com/",
+  "finalUrl": "https://webmcp.com/",
+  "host": "webmcp.com",
+  "scannedAt": "2026-09-10T00:48:34.882Z",
+  "scanner": {
+    "name": "sightmap-atlas-scan",
+    "version": "1.0.0",
+    "browser": "sightmap dev"
+  },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": null,
+  "pages": [
+    {
+      "url": "https://webmcp.com/",
+      "path": "/",
+      "title": "WebMCP Directory — Websites & Shopify Stores for AI Agents",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "about",
+        "request_listing",
+        "surprise_me",
+        "share_on_x",
+        "share_on_linkedin",
+        "record_unsupported_request"
+      ]
+    },
+    {
+      "url": "https://webmcp.com/resources",
+      "path": "/resources",
+      "title": "Resources — WebMCP specs, docs, tools & talks | webmcp.com",
+      "status": 200,
+      "surface": "polyfilled",
+      "tools": [
+        "suggest_resource"
+      ]
+    },
+    {
+      "url": "https://webmcp.com/ecosystem-tracker",
+      "path": "/ecosystem-tracker",
+      "title": "WebMCP Support: Browsers, Agents & Frameworks | webmcp.com",
+      "status": 200,
+      "surface": "absent",
+      "tools": []
+    }
+  ],
+  "tools": [
+    {
+      "name": "about",
+      "description": "Returns information about the WebMCP Directory: what it is, who built it, and where to learn more about the Model Context Protocol.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "read",
+      "riskReason": "name starts with \"about\"",
+      "warnings": []
+    },
+    {
+      "name": "request_listing",
+      "description": "Submit a request to have a WebMCP-enabled site added to the WebMCP Directory at webmcp.com. Provide the requester's email plus the URL of the site to be listed. A human reviews each request before it appears.",
+      "inputSchema": {
+        "properties": {
+          "email": {
+            "description": "Contact email for the requester.",
+            "type": "string"
+          },
+          "site_url": {
+            "description": "URL of the site to be listed (https://…).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "site_url"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"request\"",
+      "warnings": []
+    },
+    {
+      "name": "surprise_me",
+      "description": "Hatches a pixelated, exotic, not-real animal with dinosaur lineage. Each call returns a brand-new species with a generated Latinate name, classification, geological period, and pixel art (also returned as SVG in structuredContent for visual rendering).",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"surprise\"",
+      "warnings": []
+    },
+    {
+      "name": "share_on_x",
+      "description": "Open X (Twitter) with a pre-filled tweet recommending the WebMCP Directory at webmcp.com. Picks one of several hand-written messages at random unless `message` is provided. Returns the share URL and the message that was used so an agent can confirm or repost it.",
+      "inputSchema": {
+        "properties": {
+          "message": {
+            "description": "Optional custom tweet text. If omitted, a random message from the directory's curated pool is used.",
+            "maxLength": 240,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"share\"",
+      "warnings": []
+    },
+    {
+      "name": "share_on_linkedin",
+      "description": "Open the LinkedIn share composer for webmcp.com in a new tab. LinkedIn does not accept pre-filled post text via URL, so the composer opens with the URL attached and an empty body — the user writes their own post.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"share\"",
+      "warnings": []
+    },
+    {
+      "name": "record_unsupported_request",
+      "description": "Last-resort fallback. Call this ONLY when the user wants to DO something on webmcp.com that none of the other registered tools can accomplish. Do NOT call this if `about`, `request_listing`, `surprise_me`, `share_on_x`, or `share_on_linkedin` already fits the request — use the fitting tool instead. Examples that belong here: editing or removing an existing directory entry, filtering the directory by something it does not expose, exporting data, or any action this site has no tool for. Recording the request helps the maintainers decide which tool to build next. After calling, tell the user their request was noted and that no tool exists for it yet.",
+      "inputSchema": {
+        "properties": {
+          "interpreted_goal": {
+            "description": "Your one-line interpretation of what the user is ultimately trying to accomplish.",
+            "type": "string"
+          },
+          "request": {
+            "description": "The user's request, in their own words, that no existing tool on this site can satisfy.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "type": "object"
+      },
+      "page": "/",
+      "pages": [
+        "/"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"request\"",
+      "warnings": []
+    },
+    {
+      "name": "suggest_resource",
+      "description": "Suggest a new WebMCP resource (article, doc, tool, talk, or community) to be considered for the webmcp.com resources list. Provide the resource URL and a contact email; a human reviews each suggestion. Returns confirmation, or an error if the URL/email is invalid.",
+      "inputSchema": {
+        "properties": {
+          "email": {
+            "description": "Contact email for the person suggesting it.",
+            "type": "string"
+          },
+          "url": {
+            "description": "URL of the resource to suggest (https://…).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "email"
+        ],
+        "type": "object"
+      },
+      "page": "/resources",
+      "pages": [
+        "/resources"
+      ],
+      "impl": "imperative",
+      "api": "document",
+      "risk": "action",
+      "riskReason": "name contains \"suggest\"",
+      "warnings": []
+    }
+  ],
+  "checks": [
+    {
+      "id": "named",
+      "label": "Every tool has a name",
+      "ok": true,
+      "detail": "7/7"
+    },
+    {
+      "id": "described",
+      "label": "Every tool has a description",
+      "ok": true,
+      "detail": "7/7"
+    },
+    {
+      "id": "input-schema",
+      "label": "Every tool has an input schema",
+      "ok": true,
+      "detail": "7/7"
+    },
+    {
+      "id": "snake-case",
+      "label": "Tool names are snake_case",
+      "ok": true,
+      "detail": "7/7"
+    },
+    {
+      "id": "unique",
+      "label": "Tool names are unique",
+      "ok": true,
+      "detail": "7 distinct"
+    },
+    {
+      "id": "no-suspicious",
+      "label": "No suspicious wording in tool metadata",
+      "ok": true,
+      "detail": "none flagged"
+    },
+    {
+      "id": "route-scoped",
+      "label": "Tool set changes with the page",
+      "ok": true,
+      "detail": "3 distinct tool sets across 3 pages"
+    }
+  ],
+  "counts": {
+    "tools": 7,
+    "pages": 3,
+    "read": 1,
+    "action": 6,
+    "sensitive": 0,
+    "described": 7,
+    "withInputSchema": 7,
+    "declarative": 0
+  },
+  "hints": {
+    "forms": [
+      {
+        "page": "/",
+        "action": "",
+        "fields": [],
+        "method": "get"
+      },
+      {
+        "page": "/",
+        "action": "",
+        "fields": [
+          "email",
+          "site_url",
+          "company"
+        ],
+        "method": "get"
+      },
+      {
+        "page": "/ecosystem-tracker",
+        "action": "",
+        "fields": [
+          "site"
+        ],
+        "method": "get"
+      }
+    ],
+    "links": [
+      "https://luma.com/d9epljk6?utm_source=webmcp.com&utm_medium=website&utm_campaign=workshop_sep_2026&utm_content=banner",
+      "/",
+      "/",
+      "/resources",
+      "/ecosystem-tracker",
+      "/benchmark",
+      "/blog",
+      "/methodology",
+      "/methodology",
+      "https://docs.nekuda.ai",
+      "https://github.com/nekuda-ai/webmcp-kit",
+      "/sites/developers.openai.com",
+      "/sites/forter.com",
+      "/sites/visapaymentsfrontier.io",
+      "/sites/razorpay.com",
+      "/sites/omio.com",
+      "/sites/render.com",
+      "/sites/netgear.com",
+      "/sites/quicknode.com",
+      "/sites/feverup.com",
+      "/sites/attio.com",
+      "/sites/crewai.com",
+      "/sites/redbus.in",
+      "/sites/monday.com",
+      "/sites/telnyx.com",
+      "/sites/ziprecruiter.com",
+      "/sites/btosports.com",
+      "/sites/aloyoga.com",
+      "/sites/myhaldirams.uk",
+      "/sites/reebok.com",
+      "/sites/shop.zimaspace.com",
+      "/sites/teacollection.com",
+      "/sites/awaytravel.com",
+      "/sites/paintscratch.com",
+      "/sites/soarmedia.agency",
+      "/sites/theprotoclinical.com",
+      "/sites/partakefoods.com",
+      "/sites/presscoffee.com",
+      "/sites/nutrimuscle.com",
+      "/sites/brooklinen.com"
+    ],
+    "title": "WebMCP Directory — Websites & Shopify Stores for AI Agents",
+    "description": "Explore websites and Shopify stores with WebMCP tools for AI agents. Browse capabilities, inspect tool schemas, and search the directory or API."
+  },
+  "notes": [
+    "operator Chrome flags: --ssl-version-max=tls1.2",
+    "sightmap browser mcp list saw 6 tool(s) on /",
+    "$ sightmap version",
+    "$ sightmap browser start --detach --headless --port 43243 --cdp-port 42281 --profile /tmp/atlas-scan-pEv9Nx/profile --url about:blank --log-file /tmp/atlas-scan-pEv9Nx/daemon.log --chrome-flag=--enable-blink-features=ModelContext,ModelC… --chrome-flag=--enable-features=DevToolsWebMCPSupport --chrome-flag=--proxy-server=http://127.0.0.1:41767 --chrome-flag=--proxy-bypass-list=localhost;127.0.0.1;[::1] --chrome-flag=--deny-permission-prompts --chrome-flag=--ssl-version-max=tls1.2 --chrome-binary /opt/pw-browsers/chromium --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap",
+    "$ sightmap browser tabs list --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap ×2",
+    "$ sightmap browser inject --persist --file /tmp/atlas-scan-pEv9Nx/recorder.js --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap",
+    "$ sightmap browser inject --list --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap ×9",
+    "$ sightmap browser navigate https://webmcp.com/ --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap ×4",
+    "$ sightmap browser mcp list --json --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap",
+    "$ sightmap browser navigate https://webmcp.com/resources --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap ×4",
+    "$ sightmap browser navigate https://webmcp.com/ecosystem-tracker --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap",
+    "$ sightmap browser eval (() => {\n  const KEY = \"__sightmapAtlasScan\";\n  const sta… --tab A3412C6F64F215A4151EF2E46F795D3C --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap ×4",
+    "$ sightmap browser stop --sightmap-dir /tmp/atlas-scan-pEv9Nx/.sightmap"
+  ]
+}

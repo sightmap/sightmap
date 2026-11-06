@@ -1,0 +1,107 @@
+slug: flatwrite-md
+name: flatwrite.md
+url: https://flatwrite.md/
+host: flatwrite.md
+description: A minimalist markdown editor with live preview and a paged document layout, whose tools read and change the open document.
+  export to HTML, PDF, or shareable URL.
+category: other
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-10
+updated: 2026-09-10
+scan: scans/flatwrite-md/2026-09-10.json
+tools:
+  - name: render_markdown
+    kind: action
+    description: Render markdown into FlatWrite-styled HTML <head> and <body> fragments, with optional
+      typography and page-layout controls. Provide either the raw markdown inline (`markdown`) or an
+      allowlisted URL (`markdownUrl`) pointing to raw markdown content. Use this when you need the
+      rendered HTML artifacts.
+    page: /
+  - name: list_render_options
+    kind: read
+    description: Return the supported fonts, UI frameworks, document engines, page sizes, orientations,
+      margins, and surface modes for the render_markdown tool. Call this before rendering if you
+      need to know which enum values are valid; call render_markdown when you have the options and
+      are ready to render.
+    page: /
+  - name: get_document_state
+    kind: read
+    description: "Return the current state of the active document in the FlatWrite editor: title, word
+      count, render mode, unsaved changes flag, and available export formats. Use this before export
+      or share tools to check readiness; use update_document_content to change the content."
+    page: /
+  - name: create_document
+    kind: action
+    description: Create a new blank document in the FlatWrite editor, optionally with initial markdown
+      content. Use this to start a new document; use open_document to load an existing one from a
+      URL or share link.
+    page: /
+  - name: open_document
+    kind: action
+    description: Open an existing document from a URL or share link in the FlatWrite editor. Use this to
+      load a remote markdown file or a previously shared document; use create_document to start
+      blank.
+    page: /
+  - name: update_document_content
+    kind: action
+    description: Update the markdown content of the active document in the FlatWrite editor. Use this to
+      edit the document programmatically; use get_document_state to inspect the result.
+    page: /
+  - name: list_recent_documents
+    kind: read
+    description: Return a list of recently opened documents from the editor session. Use this to
+      discover what the user has been working on; use open_document to load one.
+    page: /
+  - name: render_markdown_preview
+    kind: read
+    description: Triggers the editor's built-in preview pane. No HTML is returned — this tool produces a
+      visual side-effect only. Agents that need HTML output must use render_markdown instead.
+    page: /
+  - name: export_document_html
+    kind: action
+    description: Export the active document as a self-contained HTML file. The export opens in a new
+      browser tab for human users. Completes synchronously. Use export_document_pdf for print-ready
+      output.
+    page: /
+  - name: export_document_pdf
+    kind: action
+    description: Export the active document as a PDF by triggering the browser print dialog with the
+      rendered preview. Completes synchronously. The print dialog opens for human users. Use
+      export_document_html for a downloadable HTML file.
+    page: /
+  - name: create_share_link
+    kind: action
+    description: Create a shareable URL for the active document and copy it to the clipboard. Use this
+      to share the document; the link expires after 30 days. Use get_document_state to check
+      canShare before calling.
+    page: /
+  - name: assist_document
+    kind: sensitive
+    description: "Rewrite, shorten, fix grammar, or apply a custom instruction to markdown via FlatWrite
+      Assist (Morph: Reflex + Router + Compact + Fast Models). Returns full markdown plus the edited
+      piece. Does not modify the editor — apply with update_document_content if desired. When
+      selectionStart and selectionEnd are provided, only that span is rewritten."
+    page: /
+suggested_journeys:
+  - intent: Call list_render_options and read what it returns.
+    tools:
+      - list_render_options
+  - intent: Call get_document_state and read what it returns.
+    tools:
+      - get_document_state
+  - intent: Call list_recent_documents and read what it returns.
+    tools:
+      - list_recent_documents
+strengths:
+  - Every tool has a name (12/12).
+  - Every tool has a description (12/12).
+  - Every tool has an input schema (12/12).
+  - Tool names are snake_case (12/12).
+  - Tool names are unique (12 distinct).
+  - No suspicious wording in tool metadata (none flagged).
+improvements:
+  - The tool set does not change with the page (only one page checked).
