@@ -1,19 +1,21 @@
 import { useFrame } from '@react-three/fiber'
 import { Html, Line } from '@react-three/drei'
 import { useMemo, useRef, type ComponentRef } from 'react'
-import { JOURNEYS, TRAVELLER_COLORS } from './model'
+import { TRAVELLER_COLORS, type Journey } from './model'
 import { buildPath } from './geometry'
+import { useBuildingModel } from './context'
 import { useShared } from './state'
 
 // Chapter 06. The BookFlight journey as a named route: a ribbon through the
 // building with a numbered pin at every stop.
 export default function Trajectory() {
   const s = useShared()
-  const journey = JOURNEYS[0]
-  const path = useMemo(() => buildPath(journey, 0.16), [journey])
+  const model = useBuildingModel()
+  // A building whose scan found no journeys has no route to highlight.
+  const journey: Journey | undefined = model.journeys[0]
+  const path = useMemo(() => (journey ? buildPath(model, journey, 0.16) : null), [model, journey])
   const line = useRef<ComponentRef<typeof Line>>(null)
   const pins = useRef<(HTMLDivElement | null)[]>([])
-  const color = TRAVELLER_COLORS[journey.who]
 
   useFrame(() => {
     const o = s.cur.trajectory
@@ -30,6 +32,9 @@ export default function Trajectory() {
       el.style.transform = `scale(${(0.6 + 0.4 * po).toFixed(3)})`
     })
   })
+
+  if (!journey || !path) return null
+  const color = TRAVELLER_COLORS[journey.who]
 
   return (
     <>

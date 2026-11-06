@@ -27,6 +27,7 @@ import {
   buildBlogIndexMarkdown,
   buildBlogPostMarkdown,
   buildBuildingMarkdown,
+  buildCityMarkdown,
   buildSightkickMarkdown,
   buildDevelopersMarkdown,
   buildHomeMarkdown,
@@ -79,10 +80,8 @@ async function main() {
   // The WebMCP listings that share /atlas with those entries. Only the fields
   // the markdown twin needs — the JSON documents for a listing are written by
   // scripts/build-atlas.ts into public/atlas/, not here.
-  const listings: FeedDirectoryListing[] = loadDirectory(
-    DIRECTORY_DIR,
-    raw.entries.map((e) => e.slug)
-  ).listings.map(toFeedListing)
+  const directory = loadDirectory(DIRECTORY_DIR, raw.entries.map((e) => e.slug))
+  const listings: FeedDirectoryListing[] = directory.listings.map(toFeedListing)
 
   const spec = buildOpenApiSpec()
   write('openapi.json', JSON.stringify(spec, null, 2))
@@ -101,6 +100,10 @@ async function main() {
   write('atlas.md', buildAtlasIndexMarkdown(atlas, listings))
   write('developers.md', buildDevelopersMarkdown())
   write('building.md', buildBuildingMarkdown())
+  write(
+    'atlas/city.md',
+    buildCityMarkdown(directory.listings.map((l) => ({ name: l.name, slug: l.slug, lot: l.lot })))
+  )
   write('sightkick.md', buildSightkickMarkdown())
 
   for (const post of loaded) {

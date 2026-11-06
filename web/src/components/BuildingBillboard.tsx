@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Poster from './building/Poster'
 import { createSharedState } from './building/state'
 import { webglAvailable } from './building/webgl'
-import { JOURNEYS } from './building/model'
+import { DEMO_MODEL } from './building/model'
 
 // Homepage billboard for the /building tour: headline, subcopy, CTA, and a
 // live slice of the model. The WebGL chunk loads only once the frame has
@@ -79,7 +79,7 @@ export default function BuildingBillboard() {
           )}
           <span className="billboard__chip" aria-hidden="true">
             <span className="dot" />
-            live · {JOURNEYS.length} journeys walking
+            live · {DEMO_MODEL.journeys.length} journeys walking
           </span>
           <span className="billboard__enter" aria-hidden="true">
             Enter the building →

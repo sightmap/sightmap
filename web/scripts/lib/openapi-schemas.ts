@@ -182,6 +182,12 @@ export const directoryListingSchema = {
       },
     },
     scan_dates: { type: 'array', items: { type: 'string' } },
+    blueprint: {
+      type: 'string',
+      format: 'uri',
+      description:
+        "The building this listing's scan derives — floors for pages, rooms for tools — as JSON. Carried under `links` in /atlas/sites/{slug}.json. A drawing of what was observed, not a rating.",
+    },
     html: { type: 'string', format: 'uri' },
     json: { type: 'string', format: 'uri' },
     scan: { type: 'string', format: 'uri' },
