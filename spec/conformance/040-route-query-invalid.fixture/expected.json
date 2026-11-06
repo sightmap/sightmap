@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": false,
+        "diagnostics": [
+          { "code": "route-conflict", "severity": "warning" },
+          { "code": "route-query-invalid", "severity": "error" },
+          { "code": "route-query-invalid", "severity": "error" }
+        ]
+      }
+    }
+  ]
+}
