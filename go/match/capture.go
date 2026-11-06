@@ -48,7 +48,7 @@ func foldRank(parent, local int) int {
 // selector of every component that declares privacy or watch.
 type captureSet struct {
 	queries []MatchQuery // each with privacyRank and/or watch set
-	index   *firstPartIndex
+	index   *queryIndex
 }
 
 func compileCapture(defs []sightmap.ComponentDef) *captureSet {
@@ -73,7 +73,7 @@ func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 			})
 		}
 	}
-	cs.index = newFirstPartIndex(cs.queries)
+	cs.index = newQueryIndex(cs.queries)
 	return cs
 }
 

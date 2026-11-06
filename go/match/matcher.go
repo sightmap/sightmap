@@ -1,8 +1,6 @@
 package match
 
 import (
-	"slices"
-
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
@@ -37,7 +35,7 @@ func FindAllMatches(
 	queries []MatchQuery,
 	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 ) {
-	findAllMatches(root, queries, newFirstPartIndex(queries), onMatch)
+	findAllMatches(root, queries, newQueryIndex(queries), onMatch)
 }
 
 // findAllMatches is FindAllMatches with a prebuilt index, so a Matcher can
@@ -45,7 +43,7 @@ func FindAllMatches(
 func findAllMatches(
 	root *sightmap.ComponentNode,
 	queries []MatchQuery,
-	index *firstPartIndex,
+	index *queryIndex,
 	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 ) {
 	if root == nil || len(queries) == 0 {
@@ -61,130 +59,193 @@ func findAllMatches(
 func walkMatches(
 	root *sightmap.ComponentNode,
 	queries []MatchQuery,
-	index *firstPartIndex,
+	index *queryIndex,
 	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 	onNode func(*sightmap.ComponentNode, int),
 ) {
-	w := &nfaWalker{
-		queries: queries,
-		index:   index,
-		onMatch: onMatch,
-		onNode:  onNode,
-		chain:   []*sightmap.ComponentNode{root},
+	// The walker's tables are sized to the whole query set, which on a large
+	// corpus dwarfs a small tree, so they are reused across walks: a walk
+	// leaves inDesc all false, and hasKey and inDir are stamped with a serial
+	// that keeps counting up across walks.
+	w, _ := index.walkers.Get().(*nfaWalker)
+	if w == nil {
+		w = &nfaWalker{
+			hasKey: make([]uint32, index.keys.n),
+			inDesc: make([]bool, len(index.partKey)),
+			inDir:  make([]uint32, len(index.partKey)),
+		}
 	}
-	w.visit(nil, nil)
+	w.queries, w.index, w.onMatch, w.onNode = queries, index, onMatch, onNode
+	w.chain = append(w.chain[:0], root)
+	w.visit(0, nil)
+	w.queries, w.onMatch, w.onNode = nil, nil, nil
+	clear(w.chain)
+	index.walkers.Put(w)
 }
 
 // ---- NFA internals ----------------------------------------------------------
 
 // selectorState tracks a single in-flight position in a MatchQuery's selector
-// chain: we are looking for Parts[idx] to match the next candidate node.
+// chain: we are looking for Parts[idx] to match the next candidate node. part is
+// the dense id of Parts[idx] in the walk's queryIndex (partBase[query]+idx),
+// which keys the walker's per-part tables.
 type selectorState struct {
-	q   *MatchQuery
-	idx int
+	q    *MatchQuery
+	idx  int
+	part int32
 }
 
 // nfaWalker holds the state shared across one FindAllMatches traversal.
+//
+// The descendant set of a node is its parent's plus whatever advanced at the
+// parent, so the sets along the current path form a stack: desc[:top] is the
+// set a node inherits, and states that advance at it are pushed above top for
+// its subtree and popped when the walk leaves it. This keeps the order the
+// sets always had (inherited first, then new states in discovery order) without
+// copying the inherited set at each node.
 type nfaWalker struct {
 	queries []MatchQuery
-	index   *firstPartIndex
+	index   *queryIndex
 	onMatch func(*sightmap.ComponentNode, *MatchQuery)
 	onNode  func(*sightmap.ComponentNode, int)
 	// chain is the root-first path to the node being visited, pushed and popped
 	// as the walk descends. MatchesNodeChain needs the ancestor path to evaluate a
 	// :not() argument that carries a combinator.
 	chain []*sightmap.ComponentNode
-	// fresh is scratch space for the current node's fresh-start candidates. It is
-	// fully consumed before the walk recurses, so one buffer serves every node.
+	// desc is the descendant-state stack (see above).
+	desc []selectorState
+	// inDesc[part] is set when the state is on the desc stack, so a state
+	// that advances again in a subtree where it is already live is not pushed
+	// twice.
+	inDesc []bool
+	// dir holds the direct-child sets of the nodes on the path, each a slice of
+	// it, the same stack discipline as desc. inDir[part] == serial marks a state
+	// already in the current node's direct set.
+	dir   []selectorState
+	inDir []uint32
+	// hasKey[key] == serial marks a part key the current node meets; serial
+	// numbers the visited nodes from 1, so the table never needs clearing.
+	hasKey []uint32
+	serial uint32
+	// keys and fresh are scratch for the current node, fully consumed before
+	// the walk recurses, so one buffer serves every node.
+	keys  []int32
 	fresh []int
 }
 
 // visit is the recursive DFS core for the last node of w.chain.
 //
-//	descendant – states that must be checked at this node AND all descendants.
-//	direct     – states that must be checked at this node ONLY (direct-child
-//	             combinator consumed one level).
+//	w.desc[:top] – states that must be checked at this node AND all descendants.
+//	direct       – states that must be checked at this node ONLY (direct-child
+//	               combinator consumed one level).
 //
-// Neither slice is modified: siblings share them.
-func (w *nfaWalker) visit(descendant, direct []selectorState) {
+// Neither is modified: siblings share them.
+func (w *nfaWalker) visit(top int, direct []selectorState) {
 	chain := w.chain
 	node := chain[len(chain)-1]
-
-	// nextDescendant starts as the inherited descendant set — those states keep
-	// propagating through the subtree whether or not they match here. The capped
-	// capacity makes the first append copy, so the parent's slice is never written.
-	nextDescendant := descendant[:len(descendant):len(descendant)]
-	var nextDirect []selectorState
+	w.serial++
+	if w.serial == 0 {
+		// Wrapped: old stamps could collide with new ones.
+		clear(w.hasKey)
+		clear(w.inDir)
+		w.serial = 1
+	}
+	serial := w.serial
+	w.keys = w.index.keys.nodeKeys(node.Element, w.keys[:0])
+	for _, k := range w.keys {
+		w.hasKey[k] = serial
+	}
+	dirBase := len(w.dir)
 
 	// Inherited states first: these represent in-progress multi-part selector
 	// matches that have already matched ancestor nodes. Giving them priority
 	// over fresh starts ensures that a scoped child definition (e.g.
 	// "[data-component^=X] a") beats a broad global definition (e.g. just
 	// "a") when both could claim the same node — regardless of query order.
-	for _, s := range descendant {
-		nextDescendant, nextDirect = w.step(chain, s, nextDescendant, nextDirect)
+	//
+	// A state whose pending part requires a key this node lacks cannot match
+	// here, so it is skipped without testing; it stays in the set either way.
+	// w.desc may grow while this runs, but only above top.
+	for i := 0; i < top; i++ {
+		if s := w.desc[i]; w.mayMatch(s, serial) {
+			w.step(chain, s, serial)
+		}
 	}
+	// A state is never in both sets: whether Parts[idx] is pending as a direct
+	// or a descendant state depends only on Combinators[idx].
 	for _, s := range direct {
-		if !slices.Contains(descendant, s) {
-			nextDescendant, nextDirect = w.step(chain, s, nextDescendant, nextDirect)
+		if w.mayMatch(s, serial) {
+			w.step(chain, s, serial)
 		}
 	}
 	// Fresh starts after, in query order: any node can begin a match chain. Only
 	// queries whose first part this node could satisfy are tried. Inherited states
 	// are never at index 0, so a fresh start never duplicates one.
-	w.fresh = w.index.candidates(node.Element, w.fresh[:0])
+	w.fresh = w.index.fresh(w.keys, w.fresh[:0])
 	for _, qi := range w.fresh {
-		nextDescendant, nextDirect = w.step(chain, selectorState{&w.queries[qi], 0}, nextDescendant, nextDirect)
+		w.step(chain, selectorState{&w.queries[qi], 0, w.index.partBase[qi]}, serial)
 	}
 
 	if w.onNode != nil {
 		w.onNode(node, len(chain)-1)
 	}
 
-	// Recurse into children. Direct children receive both nextDescendant and
-	// nextDirect; deeper descendants receive only nextDescendant (nextDirect
-	// is consumed after one hop because those children won't re-include it in
-	// their own nextDescendant when recursing further).
+	// Recurse into children. Direct children receive both the grown descendant
+	// set and this node's direct set; deeper descendants receive only the
+	// descendant set (a direct state is consumed after one hop because those
+	// children won't re-include it in their own descendant set).
+	nextTop := len(w.desc)
+	nextDirect := w.dir[dirBase:len(w.dir):len(w.dir)]
 	for _, child := range node.Children {
 		w.chain = append(w.chain, child)
-		w.visit(nextDescendant, nextDirect)
+		w.visit(nextTop, nextDirect)
 		w.chain = w.chain[:len(w.chain)-1]
 	}
+
+	for _, s := range w.desc[top:] {
+		w.inDesc[s.part] = false
+	}
+	w.desc = w.desc[:top]
+	w.dir = w.dir[:dirBase]
+}
+
+// mayMatch reports whether s's pending part could match the current node:
+// false only when the part requires a key the node lacks.
+func (w *nfaWalker) mayMatch(s selectorState, serial uint32) bool {
+	for _, k := range w.index.partNeeds[s.part] {
+		if w.hasKey[k] != serial {
+			return false
+		}
+	}
+	return true
 }
 
 // step evaluates one state at the last node of chain. A completed selector is
 // reported through onMatch; a partially matched one advances into the
-// descendant or direct set for the node's children. States are unique per
-// (query, index) and each query has a single terminal index, so a query is
-// reported at most once per node.
-func (w *nfaWalker) step(chain []*sightmap.ComponentNode, s selectorState, descendant, direct []selectorState) ([]selectorState, []selectorState) {
+// descendant set (pushed on w.desc) or the node's direct set (on w.dir) for
+// its children. States are unique per (query, index) and each query has a
+// single terminal index, so a query is reported at most once per node.
+func (w *nfaWalker) step(chain []*sightmap.ComponentNode, s selectorState, serial uint32) {
 	// MatchesNodeChain honors :has() (node's subtree) and a combinator-bearing
 	// :not() (node's ancestor chain); falls back to the flat checks otherwise.
-	if !sightmap.MatchesNodeChain(chain, s.q.Parts[s.idx]) {
-		return descendant, direct
+	if pm := w.index.parts[s.part]; pm != nil && !pm.MatchesNodeChain(chain) {
+		return
 	}
 	nextIdx := s.idx + 1
 	if nextIdx == len(s.q.Parts) {
 		w.onMatch(chain[len(chain)-1], s.q)
-		return descendant, direct
+		return
 	}
 	// The combinator before Parts[nextIdx] determines whether the next match
 	// must be a direct child (">") or any descendant (" ").
-	ns := selectorState{s.q, nextIdx}
+	ns := selectorState{s.q, nextIdx, s.part + 1}
 	if s.q.Combinators[nextIdx] == ">" {
-		direct = appendStateIfNew(direct, ns)
-	} else {
-		descendant = appendStateIfNew(descendant, ns)
+		if w.inDir[ns.part] != serial {
+			w.inDir[ns.part] = serial
+			w.dir = append(w.dir, ns)
+		}
+	} else if !w.inDesc[ns.part] {
+		w.desc = append(w.desc, ns)
+		w.inDesc[ns.part] = true
 	}
-	return descendant, direct
-}
-
-// appendStateIfNew appends s to ss only if no existing entry has the same
-// (query pointer, part index). Linear scan — acceptable for the small state
-// counts typical of sightmap rule sets.
-func appendStateIfNew(ss []selectorState, s selectorState) []selectorState {
-	if slices.Contains(ss, s) {
-		return ss
-	}
-	return append(ss, s)
 }
