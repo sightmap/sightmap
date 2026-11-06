@@ -74,7 +74,7 @@ sightmap sel-probe '[data-testid="product-pod"] button'
    sightmap snapshot --coverage --trace --url 'https://example.com/products'
    ```
 2. For each T2 scope with > 1 child: run `sel-probe` on candidate selectors. If nothing stable exists, classify and document (A/B/C/D) in `memory:`.
-3. Check every T1 interactive leaf has at least one property **in its ancestry chain** (either on the leaf itself or on a parent component).
+3. Check every T1 interactive leaf is **identifiable** — by its accessible name, or by a property **in its ancestry chain** (either on the leaf itself or on a parent component).
 4. Investigate all `[Warnings]` entries in the snap (zero-match components).
 
 See the [Quality checklist](quality-checklist.md) for the full review pass.
