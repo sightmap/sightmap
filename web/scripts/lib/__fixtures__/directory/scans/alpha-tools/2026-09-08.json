@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "url": "https://alpha.example.org/",
+  "finalUrl": "https://alpha.example.org/",
+  "host": "alpha.example.org",
+  "scannedAt": "2026-09-08T10:00:00.000Z",
+  "scanner": { "name": "sightmap-atlas-scan", "version": "1.0.0", "browser": "chromium" },
+  "surface": "polyfilled",
+  "status": "tools-found",
+  "intent": "Find the pricing page",
+  "pages": [
+    { "url": "https://alpha.example.org/", "path": "/", "title": "Alpha", "status": 200, "surface": "polyfilled", "tools": ["search", "open_page"] },
+    { "url": "https://alpha.example.org/docs", "path": "/docs", "title": "Alpha Docs", "status": 200, "surface": "polyfilled", "tools": ["search"] }
+  ],
+  "tools": [
+    { "name": "search", "description": "Search the docs.", "inputSchema": { "type": "object", "properties": { "q": { "type": "string" } }, "required": ["q"] }, "page": "/", "pages": ["/", "/docs"], "impl": "imperative", "api": "navigator", "risk": "read", "riskReason": "name starts with \"search\"", "warnings": [] },
+    { "name": "open_page", "description": "Open a page by slug.", "inputSchema": { "type": "object", "properties": { "slug": { "type": "string" } } }, "page": "/", "pages": ["/"], "impl": "imperative", "api": "navigator", "risk": "action", "riskReason": "name contains \"open\"", "warnings": [] }
+  ],
+  "checks": [
+    { "id": "named", "label": "Every tool has a name", "ok": true, "detail": "2/2" },
+    { "id": "route-scoped", "label": "Tool set changes with the page", "ok": true, "detail": "2 distinct tool sets across 2 pages" }
+  ],
+  "counts": { "tools": 2, "pages": 2, "read": 1, "action": 1, "sensitive": 0, "described": 2, "withInputSchema": 2, "declarative": 0 },
+  "hints": { "forms": [{ "page": "/", "action": "/search", "method": "get", "fields": ["q"] }], "links": ["/docs"], "title": "Alpha", "description": "Alpha does things." },
+  "notes": []
+}

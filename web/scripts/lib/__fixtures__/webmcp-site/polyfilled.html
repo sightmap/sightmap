@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fixture Shop — Polyfilled</title>
+  <meta name="description" content="A fixture page that brings its own WebMCP polyfill.">
+</head>
+<body>
+  <main><h1>Polyfilled</h1><a href="/">Home</a></main>
+
+  <!-- 1. The mcp-b @mcp-b/webmcp-polyfill pattern: install a surface only if
+       `document.modelContext` is absent, using defineProperty with
+       writable:false, then register through `document.modelContext ??
+       navigator.modelContext` the way the @nekuda/webmcp-sdk does. Against the
+       scanner the surface is *not* absent — the recorder is already there — so
+       this branch is skipped and the registrations land on the recorder. -->
+  <script>
+    class MiniPolyfill {
+      constructor() { this.tools = new Map() }
+      registerTool(def) { this.tools.set(String(def.name), def); return Promise.resolve() }
+      // What the mcp-b polyfill exposes synchronously; inputSchema is a JSON string there too.
+      getToolInfos() {
+        return [...this.tools.values()].map((t) => ({
+          name: t.name,
+          description: t.description,
+          inputSchema: t.inputSchema === undefined ? undefined : JSON.stringify(t.inputSchema),
+        }))
+      }
+      getTools() { return Promise.resolve([...this.tools.values()]) }
+      executeTool() { return Promise.reject(new Error('never called')) }
+    }
+
+    if (!document.modelContext) {
+      Object.defineProperty(document, 'modelContext', {
+        configurable: true, enumerable: true, writable: false, value: new MiniPolyfill(),
+      })
+    }
+    const surface = document.modelContext ?? navigator.modelContext
+    surface.registerTool({
+      name: 'track_package',
+      description: 'Look up the delivery status of one order by tracking number.',
+      inputSchema: { type: 'object', properties: { tracking_number: { type: 'string' } }, required: ['tracking_number'] },
+      execute: () => ({ content: [{ type: 'text', text: 'never called' }] }),
+    })
+  </script>
+
+  <!-- 2. A page that *assigns* its own surface over whatever is there. The
+       recorder installs an accessor, so the assignment lands in its setter and
+       the replacement is wrapped in place: later registrations still record. -->
+  <script>
+    navigator.modelContext = new MiniPolyfill()
+    navigator.modelContext.registerTool({
+      name: 'list_stores',
+      description: 'List retail store locations near a postcode.',
+      inputSchema: { type: 'object', properties: { postcode: { type: 'string' } } },
+      execute: () => ({ content: [] }),
+    })
+  </script>
+
+  <!-- 3. A page that *redefines* the property, throwing the recorder's
+       accessor away. Nothing after this can be observed live, so the scanner
+       has to enumerate the replacement at collect time (getToolInfos here) and
+       record what it finds as `via: 'replaced-surface'`. -->
+  <script>
+    const hidden = new MiniPolyfill()
+    hidden.registerTool({
+      name: 'quote_shipping',
+      description: 'Quote a shipping price for a basket to one destination.',
+      inputSchema: { type: 'object', properties: { destination: { type: 'string' } }, required: ['destination'] },
+      execute: () => ({ content: [] }),
+    })
+    Object.defineProperty(navigator, 'modelContext', {
+      configurable: true, enumerable: true, writable: false, value: hidden,
+    })
+  </script>
+
+  <!-- 4. A late registration, the way an SDK that waits on a fetch behaves.
+       Past the old fixed 1.5s settle for one of them, so the driver has to
+       keep polling until the tool set stops changing. -->
+  <script>
+    setTimeout(() => {
+      document.modelContext.registerTool({
+        name: 'check_stock',
+        description: 'Check whether a product is in stock at a given store.',
+        inputSchema: { type: 'object', properties: { sku: { type: 'string' } }, required: ['sku'] },
+        execute: () => ({ content: [] }),
+      })
+    }, 800)
+    setTimeout(() => {
+      // On the surface that replaced ours, so it is only ever seen by enumerating.
+      hidden.registerTool({
+        name: 'find_warranty',
+        description: 'Look up the warranty terms that apply to a product.',
+        inputSchema: { type: 'object', properties: { sku: { type: 'string' } } },
+        execute: () => ({ content: [] }),
+      })
+    }, 2000)
+  </script>
+
+  <!-- 5. A script that will never load, standing in for a polyfill served from
+       a CDN the runner cannot reach. The recorder reports it by name. -->
+  <script src="/missing-polyfill.js"></script>
+</body>
+</html>
