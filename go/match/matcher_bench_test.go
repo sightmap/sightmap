@@ -299,17 +299,24 @@ func TestFindAllMatchesEquivalentToReference(t *testing.T) {
 			t.Fatal(errs)
 		}
 		want := collectCalls(referenceFindAllMatches, root, queries)
-		got := collectCalls(match.FindAllMatches, root, queries)
 		if len(want) == 0 {
 			t.Fatalf("%+v: reference produced no matches; the generator is not exercising the matcher", c)
 		}
-		if len(got) != len(want) {
-			t.Fatalf("%+v: got %d calls, want %d", c, len(got), len(want))
+		// A prepared set walked twice must answer as the one-shot call does.
+		prepared := match.Prepare(queries)
+		findPrepared := func(root *sightmap.ComponentNode, _ []match.MatchQuery, f func(*sightmap.ComponentNode, *match.MatchQuery)) {
+			prepared.FindAll(root, f)
 		}
-		for i := range want {
-			if got[i] != want[i] {
-				t.Fatalf("%+v call %d: got (%s, %s), want (%s, %s)",
-					c, i, got[i].node.Id, got[i].q.Name, want[i].node.Id, want[i].q.Name)
+		for _, find := range []func(*sightmap.ComponentNode, []match.MatchQuery, func(*sightmap.ComponentNode, *match.MatchQuery)){match.FindAllMatches, findPrepared, findPrepared} {
+			got := collectCalls(find, root, queries)
+			if len(got) != len(want) {
+				t.Fatalf("%+v: got %d calls, want %d", c, len(got), len(want))
+			}
+			for i := range want {
+				if got[i] != want[i] {
+					t.Fatalf("%+v call %d: got (%s, %s), want (%s, %s)",
+						c, i, got[i].node.Id, got[i].q.Name, want[i].node.Id, want[i].q.Name)
+				}
 			}
 		}
 	}
