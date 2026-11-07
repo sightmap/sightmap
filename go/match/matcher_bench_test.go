@@ -3,6 +3,7 @@ package match_test
 import (
 	"fmt"
 	"math/rand/v2"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -317,6 +318,25 @@ func TestFindAllMatchesEquivalentToReference(t *testing.T) {
 					t.Fatalf("%+v call %d: got (%s, %s), want (%s, %s)",
 						c, i, got[i].node.Id, got[i].q.Name, want[i].node.Id, want[i].q.Name)
 				}
+			}
+		}
+	}
+}
+
+// MatchConflicts must answer exactly what Match and Conflicts answer apart.
+func TestMatchConflictsEqualsMatchAndConflicts(t *testing.T) {
+	for seed := uint64(1); seed <= 30; seed++ {
+		for _, exotic := range []bool{false, true} {
+			comps := 10 + int(seed)*3
+			root := benchTree(seed, 400, comps, exotic)
+			m := match.NewMatcher(benchCorpus(seed, comps, exotic))
+			wantM, wantC := m.Match(root, "/"), m.Conflicts(root, "/")
+			gotM, gotC := m.MatchConflicts(root, "/")
+			if !reflect.DeepEqual(gotM, wantM) {
+				t.Fatalf("seed %d exotic %v: matches differ", seed, exotic)
+			}
+			if !reflect.DeepEqual(gotC, wantC) {
+				t.Fatalf("seed %d exotic %v: conflicts differ: got %d, want %d", seed, exotic, len(gotC), len(wantC))
 			}
 		}
 	}

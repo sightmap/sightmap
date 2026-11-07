@@ -70,10 +70,25 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 // queries if not already cached, then runs the NFA matcher over root. Returns
 // nil when root is nil or no queries apply.
 func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode]*sightmap.ComponentMatch {
+	result, _ := m.match(root, pageURL, false)
+	return result
+}
+
+// MatchConflicts is Match and Conflicts in one traversal of root: the same
+// two answers, for half the walking.
+func (m *Matcher) MatchConflicts(root *sightmap.ComponentNode, pageURL string) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict) {
+	return m.match(root, pageURL, true)
+}
+
+// match is Match, and with conflicts also what Conflicts reports: a capture
+// rule never names a node, so the naming claims a node collects here are the
+// claims Conflicts walks for, in the same order.
+func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts bool) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict) {
 	entry := m.entryFor(pageURL)
 	if root == nil || len(entry.queries) == 0 {
-		return nil
+		return nil, nil
 	}
+	var out []sightmap.Conflict
 
 	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
@@ -122,7 +137,12 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 		}
 		// The most specific claim names the node; among claims the selector text
 		// cannot order, the first in match order does, as before.
-		if claims = entry.narrow.mostSpecific(claims); len(claims) > 0 {
+		if claims = entry.narrow.mostSpecific(claims); conflicts && len(claims) >= 2 {
+			if c, ok := conflictAt(node, claims); ok {
+				out = append(out, c)
+			}
+		}
+		if len(claims) > 0 {
 			q := claims[0]
 			named = &sightmap.ComponentMatch{Name: q.Name}
 			if q.Def != nil {
@@ -151,7 +171,7 @@ func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sight
 		return restricted[n]
 	}
 	resolveComponentProperties(&propResolver{root: root, result: result, defByNode: defByNode, privacy: privacy})
-	return result
+	return result, out
 }
 
 // Components returns the merged component list for pageURL (view components plus
