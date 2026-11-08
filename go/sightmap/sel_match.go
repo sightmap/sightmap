@@ -55,6 +55,72 @@ func matchesNodeChain(chain []*ComponentNode, i int, rule *SelectorPart) bool {
 	if !matchesIdentity(el, rule) {
 		return false
 	}
+	return matchesPseudos(chain, i, rule)
+}
+
+// PartMatcher is a SelectorPart prepared for matching against many nodes: its
+// attribute tests are flattened into a slice once, rather than read out of the
+// Attrs and AttrOps maps at every test. It matches exactly as MatchesNodeChain
+// does with the same part. It snapshots the part's attribute tests, so the part
+// must not be modified after the PartMatcher is built.
+type PartMatcher struct {
+	rule  *SelectorPart
+	attrs []AttrTest
+}
+
+// NewPartMatcher prepares rule (non-nil) for repeated matching.
+func NewPartMatcher(rule *SelectorPart) *PartMatcher {
+	m := &PartMatcher{rule: rule}
+	for key, val := range rule.Attrs {
+		op := "="
+		if o, ok := rule.AttrOps[key]; ok {
+			op = o
+		}
+		m.attrs = append(m.attrs, AttrTest{Key: key, Op: op, Value: val})
+	}
+	// Every test must hold, so their order cannot change the result; sorting
+	// only makes it deterministic.
+	slices.SortFunc(m.attrs, func(a, b AttrTest) int { return strings.Compare(a.Key, b.Key) })
+	m.attrs = append(m.attrs, rule.RepeatAttrs...)
+	return m
+}
+
+// MatchesNodeChain reports whether the last node of chain satisfies the part,
+// as the package-level MatchesNodeChain does.
+func (m *PartMatcher) MatchesNodeChain(chain []*ComponentNode) bool {
+	if len(chain) == 0 {
+		return MatchesNodeChain(chain, m.rule)
+	}
+	i := len(chain) - 1
+	el := chain[i].Element
+	if el == nil {
+		el = &emptyElement
+	}
+	rule := m.rule
+	if rule.Tag != "" && !asciiEqualFold(el.Tag, rule.Tag) {
+		return false
+	}
+	if rule.Id != "" && el.Id != rule.Id {
+		return false
+	}
+	for _, cls := range rule.Classes {
+		if !slices.Contains(el.Classes, cls) {
+			return false
+		}
+	}
+	for k := range m.attrs {
+		at := &m.attrs[k]
+		if !attrTestHolds(el, at.Key, at.Op, at.Value) {
+			return false
+		}
+	}
+	return matchesPseudos(chain, i, rule)
+}
+
+// matchesPseudos checks the logical and relational pseudo-classes of rule
+// (:is()/:where(), :not(), :has()) at chain[i], whose identity already matched.
+func matchesPseudos(chain []*ComponentNode, i int, rule *SelectorPart) bool {
+	node := chain[i]
 	// :is() / :where() — the subject must match at least one alternative of
 	// every list on the compound. Evaluated node-aware so an alternative may
 	// itself carry :has()/:not().

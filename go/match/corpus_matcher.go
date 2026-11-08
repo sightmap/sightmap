@@ -30,12 +30,12 @@ func NewMatcher(corpus *sightmap.Corpus) *Matcher {
 type queryCacheEntry struct {
 	components []sightmap.ComponentDef
 	queries    []MatchQuery
-	index      *firstPartIndex
+	index      *queryIndex
 	capture    *captureSet
 	// combined is queries followed by the capture rules, so Match resolves
 	// names, privacy and watch in one traversal.
 	combined      []MatchQuery
-	combinedIndex *firstPartIndex
+	combinedIndex *queryIndex
 	// narrow orders this entry's queries by selector specificity, so a node
 	// claimed by several definitions goes to the most specific (SEP-0023).
 	narrow specificity
@@ -56,11 +56,11 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	e := &queryCacheEntry{
 		components: compList,
 		queries:    queries,
-		index:      newFirstPartIndex(queries),
+		index:      newQueryIndex(queries),
 		capture:    compileCapture(captureDefsForURL(m.corpus, pageURL)),
 	}
 	e.combined = append(append([]MatchQuery(nil), queries...), e.capture.queries...)
-	e.combinedIndex = newFirstPartIndex(e.combined)
+	e.combinedIndex = newQueryIndex(e.combined)
 	m.cache[pageURL] = e
 	return e
 }
@@ -174,37 +174,46 @@ func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sigh
 		return nil
 	}
 
-	byNode := make(map[*sightmap.ComponentNode][]*MatchQuery)
-	var order []*sightmap.ComponentNode
-	findAllMatches(root, entry.queries, entry.index, func(node *sightmap.ComponentNode, q *MatchQuery) {
-		if _, ok := byNode[node]; !ok {
-			order = append(order, node)
-		}
-		byNode[node] = append(byNode[node], q)
-	})
-
+	// A node's matches all arrive before onNode fires for it, so each node's
+	// claims are resolved there, in depth-first order, without a map.
 	var out []sightmap.Conflict
-	for _, node := range order {
-		var c sightmap.Conflict
-		for _, q := range entry.narrow.mostSpecific(byNode[node]) {
-			dup := false
-			for i, d := range c.Defs {
-				if sameClaimant(d, q.Def, c.Names[i], q.Name) {
-					dup = true
-					break
-				}
-			}
-			if !dup {
-				c.Defs = append(c.Defs, q.Def)
-				c.Names = append(c.Names, q.Name)
+	var claims []*MatchQuery
+	onMatch := func(_ *sightmap.ComponentNode, q *MatchQuery) { claims = append(claims, q) }
+	onNode := func(node *sightmap.ComponentNode, _ int) {
+		if len(claims) >= 2 {
+			if c, ok := conflictAt(node, entry.narrow.mostSpecific(claims)); ok {
+				out = append(out, c)
 			}
 		}
-		if len(c.Defs) >= 2 {
-			c.Node = node
-			out = append(out, c)
+		claims = claims[:0]
+	}
+	walkMatches(root, entry.queries, entry.index, onMatch, onNode)
+	return out
+}
+
+// conflictAt reports the conflict on node among claims, its most specific
+// claims: one entry per distinct definition, a conflict when there are two or
+// more.
+func conflictAt(node *sightmap.ComponentNode, claims []*MatchQuery) (sightmap.Conflict, bool) {
+	var c sightmap.Conflict
+	for _, q := range claims {
+		dup := false
+		for i, d := range c.Defs {
+			if sameClaimant(d, q.Def, c.Names[i], q.Name) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			c.Defs = append(c.Defs, q.Def)
+			c.Names = append(c.Names, q.Name)
 		}
 	}
-	return out
+	if len(c.Defs) < 2 {
+		return sightmap.Conflict{}, false
+	}
+	c.Node = node
+	return c, true
 }
 
 // sameClaimant reports whether two claims on a node come from one definition.
