@@ -13,8 +13,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -57,22 +59,22 @@ type matchClash struct {
 func runMatch(args []string) error { return runMatchOut(args, os.Stdout) }
 
 func runMatchOut(args []string, out io.Writer) error {
-	fs := flag.NewFlagSet("match", flag.ContinueOnError)
-	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to the .sightmap/ dir whose corpus is matched")
-	includeHidden := fs.Bool("include-hidden", false, "Count hidden and AX-ignored nodes too")
-	fs.Usage = func() {
+	flags := flag.NewFlagSet("match", flag.ContinueOnError)
+	sightmapDir := flags.String("sightmap-dir", ".sightmap", "Path to the .sightmap/ dir whose corpus is matched")
+	includeHidden := flags.Bool("include-hidden", false, "Count hidden and AX-ignored nodes too")
+	flags.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: sightmap match [--sightmap-dir DIR] [--include-hidden] FILE.snap|DIR ...\n\n"+
 			"Matches each capture against the corpus by its URL (not the route header a\n"+
 			"capture was filed with), as a session pipeline would, and prints one JSON\n"+
 			"record per line: view (or tiedViews), components matched, unmatched regions\n"+
 			"by nearest hooked ancestor, and nodes several definitions claim.\n\n")
-		fs.PrintDefaults()
+		flags.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() == 0 {
-		fs.Usage()
+	if flags.NArg() == 0 {
+		flags.Usage()
 		return fmt.Errorf("match: no captures given")
 	}
 	corpus, err := sightmap.Load(*sightmapDir)
@@ -80,7 +82,7 @@ func runMatchOut(args []string, out io.Writer) error {
 		return fmt.Errorf("match: load corpus: %w", err)
 	}
 	var snaps []string
-	for _, a := range fs.Args() {
+	for _, a := range flags.Args() {
 		info, err := os.Stat(a)
 		if err != nil {
 			return fmt.Errorf("match: %w", err)
@@ -89,14 +91,23 @@ func runMatchOut(args []string, out io.Writer) error {
 			snaps = append(snaps, a)
 			continue
 		}
-		_ = filepath.Walk(a, func(p string, fi os.FileInfo, err error) error {
-			if err == nil && !fi.IsDir() && strings.HasSuffix(p, ".snap") {
+		err = filepath.WalkDir(a, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() && strings.HasSuffix(p, ".snap") {
 				snaps = append(snaps, p)
 			}
 			return nil
 		})
+		if err != nil {
+			return fmt.Errorf("match: %w", err)
+		}
 	}
-	sort.Strings(snaps)
+	if len(snaps) == 0 {
+		return fmt.Errorf("match: no .snap captures found")
+	}
+	slices.Sort(snaps)
 	m := match.NewMatcher(corpus)
 	enc := json.NewEncoder(out)
 	for _, s := range snaps {
@@ -116,7 +127,8 @@ const matchGapSamples = 3
 const matchSmallComponent = 20
 
 func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnly bool) matchRecord {
-	rec := matchRecord{Capture: snap, URL: viewset.URLOf(snap), Components: map[string]int{}}
+	rec := matchRecord{Capture: snap, URL: viewset.URLOf(snap), Components: map[string]int{},
+		Unmatched: []matchGap{}, Conflicts: []matchClash{}}
 	data, err := os.ReadFile(snap + ".tree.json")
 	if err != nil {
 		rec.Error = err.Error()
@@ -211,8 +223,8 @@ func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnl
 		if len(g.Samples) < matchGapSamples {
 			label := n.Role
 			if name := strings.TrimSpace(n.Name); name != "" {
-				if len(name) > 40 {
-					name = name[:40] + "…"
+				if r := []rune(name); len(r) > 40 {
+					name = string(r[:40]) + "…"
 				}
 				label += fmt.Sprintf(" %q", name)
 			}
@@ -236,12 +248,6 @@ func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnl
 			node = c.Node.Element.SelectorString()
 		}
 		rec.Conflicts = append(rec.Conflicts, matchClash{Node: node, Names: c.Names})
-	}
-	if rec.Unmatched == nil {
-		rec.Unmatched = []matchGap{}
-	}
-	if rec.Conflicts == nil {
-		rec.Conflicts = []matchClash{}
 	}
 	return rec
 }
