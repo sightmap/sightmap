@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/match"
@@ -294,28 +295,22 @@ func TestMatcherReuseAcrossWalks(t *testing.T) {
 	for i, root := range trees {
 		want[i] = summary(match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}), root)
 	}
-	errs := make(chan string, len(trees)*3)
-	done := make(chan struct{})
+	var wg sync.WaitGroup
 	for w := range 4 {
+		wg.Add(1)
 		go func() {
-			defer func() { done <- struct{}{} }()
+			defer wg.Done()
 			for rep := range 3 {
 				for i := range trees {
 					j := (i + w*5 + rep) % len(trees)
 					if got := summary(shared, trees[j]); got != want[j] {
-						errs <- fmt.Sprintf("tree %d differs on reuse", j)
+						t.Errorf("tree %d differs on reuse", j)
 					}
 				}
 			}
 		}()
 	}
-	for range 4 {
-		<-done
-	}
-	close(errs)
-	for e := range errs {
-		t.Error(e)
-	}
+	wg.Wait()
 }
 
 // BenchmarkMatcherDeep matches and checks conflicts on a deep corpus, the
