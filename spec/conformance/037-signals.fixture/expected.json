@@ -1,0 +1,14 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": true,
+        "diagnostics": [
+          { "code": "request-property-shadows-reserved", "severity": "warning" }
+        ]
+      }
+    }
+  ]
+}

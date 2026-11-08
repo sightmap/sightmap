@@ -28,7 +28,7 @@ It also checks the fields added by recent SEPs:
 | [`privacy`](/spec/components#privacy) | `invalid-privacy` for a value other than `block`, `mask`, or `unmask` | `extract-privacy-withheld` on a property its own component's privacy would withhold |
 | [URL properties](/spec/views#url-properties) | `route-binding-conflict`, `route-param-duplicate`, `route-param-shadows-reserved` | `route-param-unbound` for a `:segment` that matches but binds nothing |
 | [Environments and origins](/spec/environments#diagnostics) | `environment-invalid`, `origin-invalid`, `environment-backend-invalid`, `environment-ref-unresolved`, `origin-ref-unresolved` | name collisions, `origin-environment-gap`, `origin-host-shared`, `environment-duplicate`, explicit empty lists |
-| [Messages and signals](/spec/messages) | `message-regex-invalid`, `signal-ref-unresolved`, `signal-ref-ambiguous` | `message-conflict` |
+| [Messages and signals](/spec/messages) | `message-regex-invalid`, `signal-ref-unresolved`, `signal-ref-ambiguous`, `signal-filter-unknown` for a filter key the referenced entity doesn't have, `field-type-invalid` for a filter value that isn't a string, integer, or boolean | `message-conflict` |
 
 The command also rejects selector syntax outside Sightmap's supported subset. For example, `:nth-child()` produces a parse error; the supported pseudo-classes are `:not()`, `:is()`, `:where()`, and `:has()`.
 

@@ -107,7 +107,7 @@ func main() {
 | `RequestsForRecord(rec Request) []RequestMatch` | Matching requests for an observed request, with extracted properties |
 | `MessagesForRecord(rec Message) []MessageMatch` | Matching messages for a console record, with stack properties |
 | `TagsForRecord(rec Message) []string` | Message tags unioned across every matching entry |
-| `SignalByName`, `ResolveSignal`, `ResolveSignalRef`, `TagsForSignal` | Look up a signal and the component or view its `ref` names |
+| `SignalByName`, `ResolveSignal`, `ResolveSignalRef`, `TagsForSignal` | Look up a signal, the component, request, message, or view its `ref` names, and its resolved tags |
 | `EnvironmentByName(name) *EnvironmentDef` | An environment from the project-wide registry |
 | `ResolveOrigin(environment, origin) (string, bool)` | An origin's URL in an environment: its own map, then its backend's, then the shared map |
 | `ResolveComponentRead(owner, extract) (ComponentRead, error)` | Resolve a component property against the definitions, without a tree (see below) |

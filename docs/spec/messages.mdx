@@ -1,10 +1,10 @@
 ---
-title: "Sightmap Messages and Signals: Console Patterns and Named Predicates"
+title: "Sightmap Messages and Signals: Console Patterns and Named Classifications"
 sidebarTitle: "Messages and signals"
-description: "Name console output and exceptions, extract values from a stack, and define named boolean predicates over components and views."
+description: "Name console output and exceptions, extract values from a stack, and define signals: named, countable classifications of components, requests, messages, and views."
 ---
 
-`messages` does for console activity what `requests` does for network activity: it gives a console line or an uncaught exception a name the rest of the corpus can point at. `signals` names a boolean about the page's current state. Both live at the file root only; neither has a view-scoped form.
+`messages` does for console activity what `requests` does for network activity: it gives a console line or an uncaught exception a name the rest of the corpus can point at. `signals` names a classification of an entity the corpus already defines, and turns it into an event you can count. Both live at the file root only; neither has a view-scoped form.
 
 ## Messages
 
@@ -49,18 +49,55 @@ A property that doesn't resolve (no stack, a frame out of range, no pattern matc
 
 ## Signals
 
-A signal names an existing component or view with `ref` and stands for the boolean of its *current* state: a component being present, or a view's route being active.
+A signal is a named classification of something the corpus already defines. It names a component, request, message, or view with `ref`, optionally narrows it with `filter`, and never declares a selector, route, or body pattern of its own, so it can't drift away from the entity it is about.
 
 ```yaml
+requests:
+  - name: CheckoutPayment
+    route: /api/checkout/pay
+    method: POST
+    tags: [payments]
+    properties:
+      - name: outcome
+        extract: { from: rsp.body, path: status }
+      - name: decline_code
+        extract: { from: rsp.body, path: error.code }
+
 signals:
-  - name: checkout.reached
-    ref: Checkout           # a view: its route is active
-  - name: upsell.present
-    ref: UpsellModal        # a component: it currently matches
+  - name: checkout.payment.declined   # 200 OK, but the body says declined
+    ref: CheckoutPayment
+    tags: [defect]
+    filter:
+      status: 200
+      outcome: declined
+  - name: checkout.reached            # a view: no filter, every arrival
+    ref: Checkout
+  - name: upsell.present              # a component: every appearance
+    ref: UpsellModal
     tags: [interstitial]
 ```
 
-`ref` must resolve to exactly one entity. A name that matches nothing is `signal-ref-unresolved`, and one that matches both a component and a view is `signal-ref-ambiguous`. Signal names must be unique across the corpus. This is a subset of [SEP-0007](https://github.com/sightmap/sightmap/blob/main/spec/seps/0007-signals.md): request and message refs, and windows over time, are not part of it.
+### Filter
+
+`filter` maps a property name to one value (equality) or a list (membership). Keys are ANDed; for OR, write two signals. A key must be something the referenced entity has:
+
+- a property it declares, on any of the four kinds (a view's [URL properties](/spec/views#url-properties), a message's stack properties)
+- a `:name` binding its route produces, on a view or request
+- `status`, `method`, or `duration` on a request
+- `value` on a component
+
+Anything else is `signal-filter-unknown`, so renaming a property can't silently stop a signal from firing. Values compare as text; an unquoted `200` or `true` is fine, while a float, a bare `key:`, an empty list, or an integer YAML parsers read differently (`0200`, `1_000`) is `field-type-invalid`.
+
+### What a signal emits
+
+Over a session, a signal produces events, and counting is the number of events:
+
+- **Request or message**: one event per matching record.
+- **View or component**: one event each time the state starts to hold (arriving on the view, an element appearing, or a filtered property changing to a matching value). Re-renders don't count; leaving and coming back does. A component counts only the elements it names, so a general definition doesn't also count what a more specific one names.
+
+Each event carries the signal's name and `id`, its resolved tags, the `ref` and its kind, the time, the page's view, and the referenced instance's resolved properties, so `checkout.payment.declined` can still be split by `decline_code`. See [Signal events](/reference/schema#signal-events).
+
+`ref` must resolve to exactly one kind. A name that matches nothing is `signal-ref-unresolved`, and one that matches two kinds (a component and a view, say) is `signal-ref-ambiguous`. Signal names must be unique across the corpus. See [SEP-0007](https://github.com/sightmap/sightmap/blob/main/spec/seps/0007-signals.md).
 
 ## Tags
 
