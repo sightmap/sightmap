@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -78,5 +79,61 @@ views:
 	}
 	if len(rec.Conflicts) != 1 || len(rec.Conflicts[0].Names) != 2 {
 		t.Errorf("conflicts = %+v, want the Save button claimed by ToolbarButton and SaveButton", rec.Conflicts)
+	}
+}
+
+// Captures that cannot be matched still yield one record each, with an error
+// and empty (not null) slices; a directory argument is walked, and one with no
+// captures fails.
+func TestMatchErrorRecords(t *testing.T) {
+	dir := t.TempDir()
+	sm := filepath.Join(dir, ".sightmap")
+	if err := os.MkdirAll(filepath.Join(sm, "views"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sm, "views", "home.yaml"), []byte("version: 1\nviews:\n  - name: Home\n    route: /home\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	caps := filepath.Join(dir, "caps")
+	if err := os.MkdirAll(caps, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(name, s string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(caps, name), []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("a.snap", "url: https://example.com/home\n\n") // no .tree.json
+	write("b.snap", "\n")                                // no url header
+	write("b.snap.tree.json", `{}`)
+
+	var out bytes.Buffer
+	if err := runMatchOut([]string{"--sightmap-dir", sm, caps}, &out); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("got %d records, want 2: %s", len(lines), out.String())
+	}
+	for i, l := range lines {
+		var rec matchRecord
+		if err := json.Unmarshal([]byte(l), &rec); err != nil {
+			t.Fatal(err)
+		}
+		if rec.Error == "" {
+			t.Errorf("record %d: want an error: %s", i, l)
+		}
+		if !strings.Contains(l, `"unmatched":[]`) || !strings.Contains(l, `"conflicts":[]`) {
+			t.Errorf("record %d: unmatched and conflicts must be [], got %s", i, l)
+		}
+	}
+
+	empty := filepath.Join(dir, "empty")
+	if err := os.MkdirAll(empty, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := runMatchOut([]string{"--sightmap-dir", sm, empty}, &out); err == nil {
+		t.Error("a directory with no .snap files should fail")
 	}
 }

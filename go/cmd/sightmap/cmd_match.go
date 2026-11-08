@@ -121,9 +121,9 @@ func runMatchOut(args []string, out io.Writer) error {
 const matchGapSamples = 3
 
 // matchSmallComponent is the most nodes a named ancestor may hold for the nodes
-// under it to count as named by it (surveyor's held-out coverage uses the same
-// bound). Under a larger one, a node is reported unmatched with that
-// component's name in its anchor.
+// under it to count as named by it. A larger one is a page-level container
+// that encloses nearly everything and says nothing about what is under it, so
+// those nodes are reported unmatched with its name in the anchor.
 const matchSmallComponent = 20
 
 func matchOne(snap string, corpus *sightmap.Corpus, m *match.Matcher, visibleOnly bool) matchRecord {
