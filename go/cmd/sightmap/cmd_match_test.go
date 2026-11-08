@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -82,58 +84,186 @@ views:
 	}
 }
 
-// Captures that cannot be matched still yield one record each, with an error
-// and empty (not null) slices; a directory argument is walked, and one with no
-// captures fails.
-func TestMatchErrorRecords(t *testing.T) {
-	dir := t.TempDir()
-	sm := filepath.Join(dir, ".sightmap")
-	if err := os.MkdirAll(filepath.Join(sm, "views"), 0o755); err != nil {
-		t.Fatal(err)
+func matchNode(role, name, tag string, classes []string, interactive, visible bool, kids ...map[string]any) map[string]any {
+	return map[string]any{
+		"id": name, "role": role, "name": name, "isVisible": visible, "isInteractive": interactive,
+		"element":  map[string]any{"tag": tag, "classes": classes},
+		"children": kids,
 	}
-	if err := os.WriteFile(filepath.Join(sm, "views", "home.yaml"), []byte("version: 1\nviews:\n  - name: Home\n    route: /home\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	caps := filepath.Join(dir, "caps")
-	if err := os.MkdirAll(caps, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	write := func(name, s string) {
-		t.Helper()
-		if err := os.WriteFile(filepath.Join(caps, name), []byte(s), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
-	write("a.snap", "url: https://example.com/home\n\n") // no .tree.json
-	write("b.snap", "\n")                                // no url header
-	write("b.snap.tree.json", `{}`)
+}
 
-	var out bytes.Buffer
-	if err := runMatchOut([]string{"--sightmap-dir", sm, caps}, &out); err != nil {
-		t.Fatal(err)
+func matchButtons(n int, visible bool) []map[string]any {
+	var b []map[string]any
+	for i := 0; i < n; i++ {
+		b = append(b, matchNode("button", fmt.Sprintf("b%d", i), "button", nil, true, visible))
 	}
-	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
-	if len(lines) != 2 {
-		t.Fatalf("got %d records, want 2: %s", len(lines), out.String())
-	}
-	for i, l := range lines {
-		var rec matchRecord
-		if err := json.Unmarshal([]byte(l), &rec); err != nil {
-			t.Fatal(err)
-		}
-		if rec.Error == "" {
-			t.Errorf("record %d: want an error: %s", i, l)
-		}
-		if !strings.Contains(l, `"unmatched":[]`) || !strings.Contains(l, `"conflicts":[]`) {
-			t.Errorf("record %d: unmatched and conflicts must be [], got %s", i, l)
-		}
-	}
+	return b
+}
 
-	empty := filepath.Join(dir, "empty")
-	if err := os.MkdirAll(empty, 0o755); err != nil {
-		t.Fatal(err)
+// One capture per case, matched through a directory argument.
+func TestMatchCases(t *testing.T) {
+	const home = "version: 1\nviews:\n  - name: Home\n    route: /home\n"
+	const bigSmall = home + "    components:\n      - name: Box\n        selector: div.box\n"
+	root := func(kids ...map[string]any) map[string]any {
+		return matchNode("RootWebArea", "", "body", nil, false, true, kids...)
 	}
-	if err := runMatchOut([]string{"--sightmap-dir", sm, empty}, &out); err == nil {
-		t.Error("a directory with no .snap files should fail")
+	box := func(n int) map[string]any {
+		return matchNode("generic", "", "div", []string{"box"}, false, true, matchButtons(n, true)...)
+	}
+	long := strings.Repeat("€", 41)
+
+	tests := []struct {
+		name       string
+		yaml       string
+		header     string         // capture header; "" writes no url: line
+		tree       map[string]any // nil writes no .tree.json
+		noCapture  bool           // the directory holds no .snap
+		args       []string       // extra flags
+		wantErr    string         // run error substring
+		wantRecErr string         // record error substring
+		wantView   string
+		wantTied   []string
+		wantNodes  int
+		wantInside int
+		wantGaps   int // number of unmatched regions
+		wantAnchor string
+		wantSample string
+	}{
+		{
+			name:   "url resolves to no view",
+			yaml:   home,
+			header: "https://example.com/other",
+			tree:   root(),
+		},
+		{
+			name:   "tied routes",
+			yaml:   "version: 1\nviews:\n  - name: A\n    route: /t/:x\n  - name: B\n    route: /t/:y\n",
+			header: "https://example.com/t/1", tree: root(),
+			wantView: "A", wantTied: []string{"A", "B"},
+		},
+		{
+			name: "missing url header", yaml: home, header: "", tree: root(),
+			wantRecErr: "no url: header",
+		},
+		{
+			name: "missing tree", yaml: home, header: "https://example.com/home",
+			wantRecErr: "tree.json",
+		},
+		{
+			name: "no captures", yaml: home, noCapture: true,
+			wantErr: "no .snap captures found",
+		},
+		{
+			name: "hidden node skipped", yaml: home, header: "https://example.com/home",
+			tree:     root(matchNode("button", "x", "button", nil, true, false)),
+			wantView: "Home",
+		},
+		{
+			name: "hidden node counted with --include-hidden", yaml: home, header: "https://example.com/home",
+			tree:     root(matchNode("button", "x", "button", nil, true, false)),
+			args:     []string{"--include-hidden"},
+			wantView: "Home", wantNodes: 1, wantGaps: 1, wantAnchor: "(page)",
+		},
+		{
+			name: "named ancestor of 20 nodes encloses", yaml: bigSmall, header: "https://example.com/home",
+			tree:     root(box(19)),
+			wantView: "Home", wantNodes: 19, wantInside: 19,
+		},
+		{
+			name: "named ancestor of 21 nodes only prefixes the gap", yaml: bigSmall, header: "https://example.com/home",
+			tree:     root(box(20)),
+			wantView: "Home", wantNodes: 20, wantGaps: 1, wantAnchor: "Box > (page)",
+		},
+		{
+			name: "sample name cut on a rune boundary", yaml: home, header: "https://example.com/home",
+			tree:     root(matchNode("button", long, "button", nil, true, true)),
+			wantView: "Home", wantNodes: 1, wantGaps: 1, wantAnchor: "(page)",
+			wantSample: fmt.Sprintf("button %q", strings.Repeat("€", 40)+"…"),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			sm := filepath.Join(dir, ".sightmap")
+			caps := filepath.Join(dir, "caps")
+			for p, s := range map[string]string{filepath.Join(sm, "views", "v.yaml"): tc.yaml} {
+				if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(p, []byte(s), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.MkdirAll(caps, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			snap := filepath.Join(caps, "c.snap")
+			if !tc.noCapture {
+				body := "\n"
+				if tc.header != "" {
+					body = "url: " + tc.header + "\n\n"
+				}
+				if err := os.WriteFile(snap, []byte(body), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				if tc.tree != nil {
+					b, _ := json.Marshal(tc.tree)
+					if err := os.WriteFile(snap+".tree.json", b, 0o644); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+
+			var out bytes.Buffer
+			args := append(append([]string{"--sightmap-dir", sm}, tc.args...), caps)
+			err := runMatchOut(args, &out)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("err = %v, want %q", err, tc.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw := strings.TrimSpace(out.String())
+			var rec matchRecord
+			if err := json.Unmarshal([]byte(raw), &rec); err != nil {
+				t.Fatalf("%v: %s", err, raw)
+			}
+			if strings.Contains(raw, "null") {
+				t.Errorf("record must not contain null: %s", raw)
+			}
+			if tc.wantRecErr != "" {
+				if !strings.Contains(rec.Error, tc.wantRecErr) {
+					t.Fatalf("record error = %q, want %q", rec.Error, tc.wantRecErr)
+				}
+				return
+			}
+			if rec.Error != "" {
+				t.Fatalf("unexpected record error: %s", rec.Error)
+			}
+			if rec.View != tc.wantView {
+				t.Errorf("view = %q, want %q", rec.View, tc.wantView)
+			}
+			if !slices.Equal(rec.TiedViews, tc.wantTied) {
+				t.Errorf("tiedViews = %v, want %v", rec.TiedViews, tc.wantTied)
+			}
+			if rec.Nodes != tc.wantNodes || rec.Inside != tc.wantInside {
+				t.Errorf("nodes/inside = %d/%d, want %d/%d", rec.Nodes, rec.Inside, tc.wantNodes, tc.wantInside)
+			}
+			if len(rec.Unmatched) != tc.wantGaps {
+				t.Fatalf("unmatched = %+v, want %d region(s)", rec.Unmatched, tc.wantGaps)
+			}
+			if tc.wantGaps > 0 {
+				g := rec.Unmatched[0]
+				if g.Anchor != tc.wantAnchor {
+					t.Errorf("anchor = %q, want %q", g.Anchor, tc.wantAnchor)
+				}
+				if tc.wantSample != "" && (len(g.Samples) == 0 || g.Samples[0] != tc.wantSample) {
+					t.Errorf("samples = %q, want %q first", g.Samples, tc.wantSample)
+				}
+			}
+		})
 	}
 }
