@@ -88,8 +88,8 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 	if root == nil || len(entry.queries) == 0 {
 		return nil, nil
 	}
-	var out []sightmap.Conflict
 
+	var out []sightmap.Conflict
 	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
 

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/match"
@@ -421,4 +422,31 @@ func refAppendIfNew(ss []refState, s refState) []refState {
 		return ss
 	}
 	return append(ss, s)
+}
+
+// Goroutines sharing one Matcher share its specificity memo; every one must
+// get the answer a lone caller gets. Run under -race.
+func TestMatchConcurrentOnOneMatcher(t *testing.T) {
+	const comps = 40
+	root := benchTree(7, 400, comps, true)
+	m := match.NewMatcher(benchCorpus(7, comps, true))
+	wantM, wantC := m.MatchConflicts(root, "/")
+
+	var wg sync.WaitGroup
+	errs := make(chan string, 8)
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			gotM, gotC := m.MatchConflicts(root, "/")
+			if !reflect.DeepEqual(gotM, wantM) || !reflect.DeepEqual(gotC, wantC) {
+				errs <- "concurrent MatchConflicts differs from a lone call"
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for e := range errs {
+		t.Error(e)
+	}
 }
