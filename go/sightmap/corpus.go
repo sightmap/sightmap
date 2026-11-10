@@ -297,8 +297,10 @@ func (c *Corpus) TiedViews(pageURL string) []string {
 //
 // A pattern may end in query conditions (PATH?KEY=VALUE&KEY=:name, SEP-0025),
 // read against the query string of path ("/profile?section=gift-cards"). A
-// path with no query string meets no condition.
+// path with no query string meets no condition. A fragment ("#...") on path is
+// ignored.
 func MatchRoute(pattern, path string) bool {
+	path, _, _ = strings.Cut(path, "#")
 	p, rawQuery, _ := strings.Cut(path, "?")
 	q, _ := url.ParseQuery(rawQuery)
 	return matchRouteURL(pattern, p, q)

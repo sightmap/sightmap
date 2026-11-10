@@ -67,6 +67,11 @@ func TestMatchRouteQueryConditions(t *testing.T) {
 		{"/page?id=1#top", "/page?id=1", false},
 		{"/page?id=%FF", "/page?id=%FF", false},
 		{"/page?id=%23top", "/page?id=%23top", true},
+		// The URL's fragment is ignored, as ViewForURL ignores it.
+		{"/profile?section=gift-cards", "/profile?section=gift-cards#reviews", true},
+		{"/profile?section=gift-cards", "/profile#section=gift-cards", false},
+		{"/profile", "/profile#top", true},
+		{"/profile?section=gift-cards", "/profile?section=x#section=gift-cards", false},
 	}
 	for _, tc := range cases {
 		if got := sightmap.MatchRoute(tc.pattern, tc.url); got != tc.want {
