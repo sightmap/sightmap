@@ -1,7 +1,6 @@
 package sightmap
 
 import (
-	"net/url"
 	"strings"
 )
 
@@ -91,11 +90,10 @@ type Field struct {
 // Global requests are returned first (corpus-file order), then view-scoped
 // requests in view-declaration order. All matches apply — there is no winner.
 func (c *Corpus) RequestsForURL(requestURL, method string) []RequestDef {
-	u, err := url.Parse(requestURL)
-	if err != nil {
+	path, ok := pagePath(requestURL)
+	if !ok {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
 
 	var out []RequestDef
 	appendMatches := func(defs []RequestDef) {

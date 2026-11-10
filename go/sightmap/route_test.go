@@ -39,6 +39,86 @@ func TestMatchRouteTrailingSlash(t *testing.T) {
 	}
 }
 
+// ---- Route matching: slashless page names ----------------------------------
+
+// Native apps report a page name as their page URL: no scheme and no leading
+// slash, such as a view-controller name. It is matched as if rooted, and stays
+// case-sensitive like any other path.
+func TestMatchRoutePageName(t *testing.T) {
+	cases := []struct {
+		pattern, path string
+		want          bool
+	}{
+		{"/App.ProductViewController", "App.ProductViewController", true},
+		{"/*ProductViewController", "App.ProductViewController", true},
+		{"/*", "App.ProductViewController", true},
+		{"/**/App.ProductViewController", "App.ProductViewController", true},
+		{"/App", "App.ProductViewController", false},
+		{"/", "App.ProductViewController", false},
+		{"/Shop", "Shop", true},
+		{"/Shop", "Shop/", true},
+		{"/Shop/:id", "Shop/42", true},
+		{"/shop", "Shop", false},
+		{"/Shop", "shop", false},
+		{"/Shop", "SHOP", false},
+		{"/Shop", "Cart", false},
+		{"/Shop", "Shopping", false},
+		// A rooted path is a URL path, matched the same way.
+		{"/Shop", "/Shop", true},
+		{"/shop", "/Shop", false},
+	}
+	for _, tc := range cases {
+		if got := sightmap.MatchRoute(tc.pattern, tc.path); got != tc.want {
+			t.Errorf("MatchRoute(%q, %q) = %v, want %v", tc.pattern, tc.path, got, tc.want)
+		}
+	}
+}
+
+// A page URL without a leading "/" or a scheme separator is a page name taken
+// as reported, so characters that would change how a URL parses (":", "%", a
+// space) are ordinary characters in it.
+func TestViewForURLPageName(t *testing.T) {
+	c := &sightmap.Corpus{
+		Views: []sightmap.ViewDef{
+			{Name: "Product", Route: "/App.ProductViewController"},
+			{Name: "Shop", Route: "/Shop"},
+			{Name: "ShopCart", Route: "/Shop:Cart"},
+			{Name: "Discount", Route: "/50% off"},
+			{Name: "Cart", Route: "/Shopping Cart"},
+			{Name: "Any", Route: "/*ViewController"},
+			{Name: "Root", Route: "/"},
+		},
+	}
+	cases := []struct {
+		url, want string
+	}{
+		{"App.ProductViewController", "Product"},
+		{"App.HomeViewController", "Any"},
+		{"App.Unrelated", ""},
+		{"SHOP", ""},
+		{"shop", ""},
+		{"Shop?tab=1#top", "Shop"},
+		{"Shop:Cart", "ShopCart"},
+		{"50% off", "Discount"},
+		{"Shopping Cart", "Cart"},
+		{"/Shop", "Shop"},
+		{"/shop", ""},
+		{"https://example.com/Shop", "Shop"},
+		{"https://example.com/shop", ""},
+		{"https://example.com", "Root"},
+		{"", "Root"},
+	}
+	for _, tc := range cases {
+		got := ""
+		if v := c.ViewForURL(tc.url); v != nil {
+			got = v.Name
+		}
+		if got != tc.want {
+			t.Errorf("ViewForURL(%q) = %q, want %q", tc.url, got, tc.want)
+		}
+	}
+}
+
 // ---- Route matching: ** globstar semantics ----------------------------------
 
 func TestMatchRouteGlobstar(t *testing.T) {

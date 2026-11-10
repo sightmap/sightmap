@@ -1,0 +1,15 @@
+version: 1
+views:
+  # An app can report a page name (no leading slash) in place of a URL. It is
+  # matched as if rooted, and stays case-sensitive.
+  - name: Shop
+    route: /Shop
+  - name: Product
+    route: /*ProductViewController
+  # Characters that would change how a URL parses are ordinary in a page name.
+  - name: ShopCart
+    route: /Shop:Cart
+  - name: Discount
+    route: /50% off
+  - name: Cart
+    route: /Shopping Cart

@@ -182,6 +182,30 @@ func TestValidate_RouteParamUnbound(t *testing.T) {
 	}
 }
 
+// A route must start with "/": a pattern without one is rooted when matched, but
+// the corpus should say what it means.
+func TestValidate_RouteNotRooted(t *testing.T) {
+	for route, want := range map[string]bool{
+		"/shop":   false,
+		"/":       false,
+		"/**":     false,
+		"shop":    true,
+		"*":       true,
+		"**":      true,
+		":id":     true,
+		"shop/:x": true,
+	} {
+		errs := sightmap.Validate(viewCorpus(sightmap.ViewDef{Name: "V", Route: route}))
+		if got := hasCode(errs, "route-not-rooted"); got != want {
+			t.Errorf("view route %q: route-not-rooted = %v, want %v (%v)", route, got, want, findingCodes(errs))
+		}
+	}
+	errs := loadAndValidate(t, "requests:\n  - name: R\n    route: api/r\n")
+	if !hasCode(errs, "route-not-rooted") {
+		t.Errorf("request route without a leading slash: want route-not-rooted, got %v", findingCodes(errs))
+	}
+}
+
 // url.query and url.path are reachable only through the extract object; the
 // deprecated source key never accepted them.
 func TestValidate_LegacySourceRejectsURL(t *testing.T) {
