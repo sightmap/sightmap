@@ -219,9 +219,21 @@ func (c *Corpus) AllComponents() []ComponentDef {
 // scoring (literal > :param > * > **); when scores tie, the first-declared view
 // wins. The returned View is a copy.
 func (c *Corpus) ViewForURL(pageURL string) *ViewDef {
+	best := c.ViewIndexForURL(pageURL)
+	if best < 0 {
+		return nil
+	}
+	v := c.Views[best] // copy so caller doesn't share Corpus internals
+	return &v
+}
+
+// ViewIndexForURL is the index in Views of the view ViewForURL returns, or
+// -1 when none matches: a stable key for what a URL selects (ViewForURL
+// returns a fresh copy each call).
+func (c *Corpus) ViewIndexForURL(pageURL string) int {
 	u, err := url.Parse(pageURL)
 	if err != nil {
-		return nil
+		return -1
 	}
 	path := normalizeRoutePath(u.Path)
 
@@ -236,11 +248,7 @@ func (c *Corpus) ViewForURL(pageURL string) *ViewDef {
 			best = i
 		}
 	}
-	if best < 0 {
-		return nil
-	}
-	v := c.Views[best] // copy so caller doesn't share Corpus internals
-	return &v
+	return best
 }
 
 // TiedViews returns the names of the views that tie for the most specific match

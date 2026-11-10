@@ -112,11 +112,20 @@ func impliesPositivePart(a, b *SelectorPart) bool {
 	if b.Tag != "" && b.Tag != "*" && a.Tag != b.Tag {
 		return false
 	}
-	at := attrTests(a)
-	for _, bt := range attrTests(b) {
-		if !impliedByAny(at, bt) {
-			return false
-		}
+	// Walked in place, not listed: MoreSpecific asks this of millions of
+	// compound pairs, and listing both sides allocated on every one.
+	ok := true
+	eachAttrTest(b, func(bt AttrTest) bool {
+		found := false
+		eachAttrTest(a, func(at AttrTest) bool {
+			found = impliesTest(at, bt)
+			return !found
+		})
+		ok = found
+		return ok
+	})
+	if !ok {
+		return false
 	}
 	// Relational and logical pseudo-classes are opaque: one of b's is implied
 	// only by an identical one of a's.
@@ -166,33 +175,32 @@ func containsDeepEqual[T any](xs []T, x T) bool {
 	return false
 }
 
-// attrTests lists a compound's attribute tests in one vocabulary: #id as
-// [id="x"], .c as [class~="c"], then the attribute selectors themselves.
-func attrTests(p *SelectorPart) []AttrTest {
-	var out []AttrTest
-	if p.Id != "" {
-		out = append(out, AttrTest{Key: "id", Op: "=", Value: p.Id})
+// eachAttrTest calls f with each of a compound's attribute tests, in one
+// vocabulary (#id as [id="x"], .c as [class~="c"], then the attribute
+// selectors themselves), until f returns false.
+func eachAttrTest(p *SelectorPart, f func(AttrTest) bool) {
+	if p.Id != "" && !f(AttrTest{Key: "id", Op: "=", Value: p.Id}) {
+		return
 	}
 	for _, c := range p.Classes {
-		out = append(out, AttrTest{Key: "class", Op: "~=", Value: c})
+		if !f(AttrTest{Key: "class", Op: "~=", Value: c}) {
+			return
+		}
 	}
 	for k, v := range p.Attrs {
 		op := p.AttrOps[k]
 		if op == "" {
 			op = "="
 		}
-		out = append(out, AttrTest{Key: k, Op: op, Value: v})
-	}
-	return append(out, p.RepeatAttrs...)
-}
-
-func impliedByAny(tests []AttrTest, t AttrTest) bool {
-	for _, s := range tests {
-		if impliesTest(s, t) {
-			return true
+		if !f(AttrTest{Key: k, Op: op, Value: v}) {
+			return
 		}
 	}
-	return false
+	for _, t := range p.RepeatAttrs {
+		if !f(t) {
+			return
+		}
+	}
 }
 
 // impliesTest reports whether attribute test s implies t. Values compare

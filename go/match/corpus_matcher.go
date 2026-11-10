@@ -8,16 +8,21 @@ import (
 )
 
 // Matcher is the matching engine for a Corpus. It compiles the corpus's
-// component definitions into NFA queries — lazily, cached per page URL — and
+// component definitions into NFA queries — lazily, cached per view — and
 // runs them against a live component tree. The Corpus itself is pure data; build
 // a Matcher when you need to match against it.
 //
-// A Matcher holds a per-URL compiled-query cache and is safe for concurrent use.
+// A Matcher holds a per-view compiled-query cache and is safe for concurrent use.
 // Create one per Corpus and reuse it so the cache is shared across calls.
 type Matcher struct {
 	corpus *sightmap.Corpus
 	mu     sync.Mutex
-	cache  map[string]*queryCacheEntry
+	// cache is keyed by the view a URL selects (Corpus.ViewIndexForURL;
+	// -1: none, globals only): what is compiled depends on nothing else,
+	// and a site has many more URLs than views. views memoizes URL -> view, one
+	// small int per distinct URL string for the matcher's lifetime.
+	cache map[int]*queryCacheEntry
+	views map[string]int
 }
 
 // NewMatcher returns a Matcher bound to corpus.
@@ -26,7 +31,7 @@ func NewMatcher(corpus *sightmap.Corpus) *Matcher {
 }
 
 // queryCacheEntry stores the merged component list and compiled queries for one
-// page URL. Compilation is the expensive step, so it is cached per URL.
+// view. Compilation is the expensive step, so it is cached per view.
 type queryCacheEntry struct {
 	components []sightmap.ComponentDef
 	queries    []MatchQuery
@@ -46,9 +51,15 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.cache == nil {
-		m.cache = make(map[string]*queryCacheEntry)
+		m.cache = make(map[int]*queryCacheEntry)
+		m.views = make(map[string]int)
 	}
-	if e, ok := m.cache[pageURL]; ok {
+	v, ok := m.views[pageURL]
+	if !ok {
+		v = m.corpus.ViewIndexForURL(pageURL)
+		m.views[pageURL] = v
+	}
+	if e, ok := m.cache[v]; ok {
 		return e
 	}
 	compList := m.corpus.ComponentsForURL(pageURL)
@@ -61,7 +72,7 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 	}
 	e.combined = append(append([]MatchQuery(nil), queries...), e.capture.queries...)
 	e.combinedIndex = newQueryIndex(e.combined)
-	m.cache[pageURL] = e
+	m.cache[v] = e
 	return e
 }
 
