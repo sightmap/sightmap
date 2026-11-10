@@ -1,6 +1,7 @@
 package match
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -18,34 +19,36 @@ func TestMatcherCachesPerView(t *testing.T) {
 		},
 	}
 	m := NewMatcher(c)
-	urls := []string{
-		"https://shop.test/item/1", "https://shop.test/item/2?ref=x", "https://shop.test/item/3",
-		"https://shop.test/cart", "https://shop.test/about", "https://shop.test/help",
+	// "https://shop.test/%zz" does not parse, so no view selects it.
+	cases := []struct{ url, want string }{
+		{"https://shop.test/item/1", "Price,Nav"},
+		{"https://shop.test/item/2?ref=x", "Price,Nav"},
+		{"https://shop.test/item/3", "Price,Nav"},
+		{"https://shop.test/cart", "Total,Nav"},
+		{"https://shop.test/about", "Nav"},
+		{"https://shop.test/help", "Nav"},
+		{"https://shop.test/%zz", "Nav"},
 	}
-	names := func(u string) []string {
-		var out []string
-		for _, d := range m.Components(u) {
-			out = append(out, d.Name)
+	for _, tc := range cases {
+		var names []string
+		for _, d := range m.Components(tc.url) {
+			names = append(names, d.Name)
 		}
-		return out
-	}
-	want := map[string]string{"/item/1": "Price,Nav", "/item/2?ref=x": "Price,Nav", "/item/3": "Price,Nav", "/cart": "Total,Nav", "/about": "Nav", "/help": "Nav"}
-	for _, u := range urls {
-		got := ""
-		for i, n := range names(u) {
-			if i > 0 {
-				got += ","
-			}
-			got += n
-		}
-		if w := want[u[len("https://shop.test"):]]; got != w {
-			t.Errorf("%s: components %s, want %s", u, got, w)
+		if got := strings.Join(names, ","); got != tc.want {
+			t.Errorf("%s: components %s, want %s", tc.url, got, tc.want)
 		}
 	}
 	if len(m.cache) != 3 {
-		t.Errorf("%d compiled entries for 6 URLs over 2 views and globals, want 3", len(m.cache))
+		t.Errorf("%d compiled entries for 7 URLs over 2 views and globals, want 3", len(m.cache))
 	}
-	if m.entryFor(urls[0]) != m.entryFor(urls[2]) || m.entryFor(urls[0]) == m.entryFor(urls[3]) || m.entryFor(urls[4]) != m.entryFor(urls[5]) {
-		t.Error("entries are not shared exactly by view")
+	entry := func(i int) *queryCacheEntry { return m.entryFor(cases[i].url) }
+	if entry(0) != entry(2) {
+		t.Error("URLs of one view do not share an entry")
+	}
+	if entry(0) == entry(3) {
+		t.Error("different views share an entry")
+	}
+	if entry(4) != entry(5) || entry(4) != entry(6) {
+		t.Error("URLs no view routes (including an unparseable one) do not share the globals-only entry")
 	}
 }

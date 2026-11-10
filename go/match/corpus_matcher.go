@@ -19,7 +19,8 @@ type Matcher struct {
 	mu     sync.Mutex
 	// cache is keyed by the view a URL selects (Corpus.ViewIndexForURL;
 	// -1: none, globals only): what is compiled depends on nothing else,
-	// and a site has many more URLs than views. views memoizes URL -> view.
+	// and a site has many more URLs than views. views memoizes URL -> view, one
+	// small int per distinct URL string for the matcher's lifetime.
 	cache map[int]*queryCacheEntry
 	views map[string]int
 }
