@@ -12,9 +12,39 @@ type propResolver struct {
 	root      *sightmap.ComponentNode
 	result    map[*sightmap.ComponentNode]*sightmap.ComponentMatch
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef
-	// privacy is the effective privacy of any node in the tree, named or not.
-	privacy func(*sightmap.ComponentNode) string
-	index   *treeIndex // built on first use
+	// declared is the strictest privacy declared on each node that has one.
+	declared map[*sightmap.ComponentNode]int
+	index    *treeIndex                      // built on first use
+	ranks    map[*sightmap.ComponentNode]int // effective ranks of unnamed nodes, folded on first use
+}
+
+// privacy is the effective privacy of any node in the tree, named or not. A
+// named node carries it; an unnamed one, which only vetting a masked control's
+// name asks about, folds its ancestors' declarations once and memoizes them.
+func (r *propResolver) privacy(n *sightmap.ComponentNode) string {
+	if cm := r.result[n]; cm != nil {
+		return cm.Privacy
+	}
+	if r.declared == nil {
+		return ""
+	}
+	return rankNames[r.rank(n)]
+}
+
+func (r *propResolver) rank(n *sightmap.ComponentNode) int {
+	if e, ok := r.ranks[n]; ok {
+		return e
+	}
+	parent := rankNone
+	if p := r.treeIndex().parent[n]; p != nil {
+		parent = r.rank(p)
+	}
+	e := foldRank(parent, r.declared[n])
+	if r.ranks == nil {
+		r.ranks = map[*sightmap.ComponentNode]int{}
+	}
+	r.ranks[n] = e
+	return e
 }
 
 func (r *propResolver) treeIndex() *treeIndex {
