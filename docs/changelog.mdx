@@ -8,6 +8,28 @@ rss: true
     Add an entry in changelog/entries/, then run: node scripts/build-changelog.mjs
     Docs: changelog/README.md */}
 
+<Update label="sightmap 0.39.0" description="Released November 10, 2026" tags={["cli"]}>
+
+New `sightmap match FILE.snap|DIR ...`: one JSON record per capture, matched by its URL as a session pipeline would. Each record gives the view (or the tied views), nodes per component, unmatched regions grouped by nearest hooked ancestor, and nodes claimed by more than one definition: the signals a capture sampler reads to fill gaps and retire stale components.
+
+Faster matching when one query set is walked over many trees, with identical results. `match.Prepare` indexes a compiled query set once and `Queries.FindAll` walks any number of trees with it, where `FindAllMatches` re-indexed on every call; `Matcher.MatchConflicts` answers `Match` and `Conflicts` in one traversal instead of two; and the specificity memo is a `sync.Map`, so parallel matches no longer queue on a lock. On a 292-capture, 1,381-definition corpus, a selector derivation that matches every capture dozens of times spends several seconds less in the matcher.
+
+Query conditions in routes (SEP-0025, Draft): a view or request `route` may end in `?KEY=VALUE&KEY=:name&KEY=*`. Each condition reads the first decoded value of its key: `KEY=VALUE` requires that value (a `*` inside it is a wildcard within the value), `KEY=:name` and `KEY=*` require the key to be present. Keys the route doesn't name are ignored, so a route without conditions matches exactly as before. For views, each condition adds the score of the path segment it mirrors (3, 2, 1), so `/profile?section=gift-cards` wins over `/profile` on that section and `/profile` keeps the rest. `ViewForURL`, `TiedViews`, `TagsForURL`, `RequestsForURL` and `MatchRoute` read the URL's query string; `validate` reports `route-query-invalid` for a malformed query part and compares conditions in any order for `route-conflict`. The browser overlay picks views the same way.
+
+SEP-0009 (amended): under `privacy: mask`, a `dom.text` read of an `input`, `textarea` or `select` now resolves to the control's accessible name when nothing it is computed from is content. The name comes from `aria-labelledby`, `aria-label`, an associated `label`, `title` or `placeholder`, never from the value, so a masked field keeps its label ("Street address") while what was typed stays withheld. It is still withheld when `aria-labelledby` or a label reaches masked or blocked content or another control, for button-like, `image`, `file` and `hidden` inputs, under an ARIA role override, when no source on the control explains the name, and when the name contains the control's own value. `dom.raw_text`, `dom.attr` and everything under `block` are unchanged. `validate` no longer warns `extract-privacy-withheld` on a masked `dom.text` read whose component selects only `input`, `textarea` or `select`. `ComponentMatch.Withheld` lists the properties privacy withheld.
+
+`browser start --attach HOST:PORT --detach` now backgrounds the attach daemon and returns once it is ready, instead of ignoring `--detach` and holding the shell. A reaped attach daemon can be restarted with `--detach` while the attached Chrome is still running.
+
+Full-page screenshots (`capture --screenshot`, `capture --inbox`, `browser screenshot --full-page`) now keep the page's layout. `captureBeyondViewport` alone kept the window's width, so with classic scrollbars the page relaid out 15 px wider for the shot: text rewrapped and a capture's element boxes drifted from the screenshot down the page (65 px by y 7600 on a 26000 px article). Chrome also left the tab at that wider layout afterwards. The viewport is now pinned to the page's client width and document height, with scrollbars hidden, for the screenshot, then restored along with the scroll position.
+
+Faster component matching on large, deeply nested corpora, with identical results. The matcher now skips an in-flight selector at any node missing an id, exact attribute value, `^=` prefix, class or tag its next compound requires. It keeps in-flight selectors on one shared stack instead of copying them at every node, flattens each compound's attribute tests once per compiled corpus, and reuses walk scratch between calls. On a 54-view, 1,335-definition corpus, matching all 187 captures takes 8x less CPU, and `Matcher.Conflicts` no longer builds a per-node map.
+
+match: a Matcher compiles its queries once per view rather than once per page URL, so a long-lived matcher that sees many URLs of the same views holds far less (`sightmap match` over 292 Fullstory captures: peak RSS 618 MB to 189 MB, identical output). `Corpus.ViewIndexForURL` names the view a URL selects by index. Selector specificity no longer allocates per compound pair.
+
+The `sightmap-authoring` skill now warns that a partial-wildcard catch-all route like `/*-settings` ties an exact route under most-specific-wins (a segment mixing a wildcard with literal text scores as a literal), so it must be declared after the exact views. Matching behavior is unchanged.
+
+</Update>
+
 <Update label="sightmap 0.38.0" description="Released November 3, 2026" tags={["cli"]}>
 
 `render.Props` and `render.PropEquals` export the rules `Format` uses for a matched node's properties: which properties it shows (the extracted ones, plus the AX value as `value` unless privacy withholds it), and which name or StaticText child it leaves out because a property already shows it. Renderers that keep their own tree and only reuse the matcher can call them so their output agrees with `Format`.
