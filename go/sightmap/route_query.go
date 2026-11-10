@@ -197,7 +197,10 @@ func matchRouteURL(route, path string, q url.Values) bool {
 }
 
 // canonicalRoute spells a route with its path normalized and its conditions
-// sorted by key, so two spellings of one route compare equal.
+// sorted by key, so two routes that differ only in condition order compare
+// equal. Each condition keeps its own percent-encoding: `/x?a+b=1` and
+// `/x?a%20b=1` match the same URLs but canonicalize differently, so no
+// route-conflict warning pairs them.
 func canonicalRoute(route string) string {
 	p, rawQuery, hasQuery := splitRoute(route)
 	p = normalizeRoutePath(p)
