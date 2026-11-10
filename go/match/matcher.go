@@ -30,12 +30,34 @@ type MatchQuery struct {
 // Frame subtrees (nodes whose IDs carry a frame prefix) are traversed without
 // special handling — component IDs are globally unique and require no frame
 // boundary logic here.
+//
+// It indexes queries on every call; to walk many trees with one query set,
+// prepare it once with Prepare and call Queries.FindAll.
 func FindAllMatches(
 	root *sightmap.ComponentNode,
 	queries []MatchQuery,
 	onMatch func(*sightmap.ComponentNode, *MatchQuery),
 ) {
 	findAllMatches(root, queries, newQueryIndex(queries), onMatch)
+}
+
+// Queries is a query set indexed once for any number of walks: FindAll is
+// FindAllMatches without rebuilding the index, which on a large set costs
+// more than walking a page. Safe for concurrent use.
+type Queries struct {
+	queries []MatchQuery
+	index   *queryIndex
+}
+
+// Prepare indexes queries for FindAll. The slice must not change afterwards.
+func Prepare(queries []MatchQuery) *Queries {
+	return &Queries{queries: queries, index: newQueryIndex(queries)}
+}
+
+// FindAll is FindAllMatches over the prepared set; onMatch receives pointers
+// into the slice given to Prepare.
+func (q *Queries) FindAll(root *sightmap.ComponentNode, onMatch func(*sightmap.ComponentNode, *MatchQuery)) {
+	findAllMatches(root, q.queries, q.index, onMatch)
 }
 
 // findAllMatches is FindAllMatches with a prebuilt index, so a Matcher can

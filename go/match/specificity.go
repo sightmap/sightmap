@@ -8,24 +8,20 @@ import (
 
 // specificity memoises ParsedSelector.MoreSpecific over the queries of one
 // compiled query set, so a page with a thousand nodes each claimed by the same
-// two definitions compares their selectors once.
+// two definitions compares their selectors once. A Matcher matches many pages
+// at once, so the memo is a sync.Map: almost every call is a read of a pair
+// already compared, which must not queue behind a lock.
 type specificity struct {
-	mu   sync.Mutex
-	memo map[[2]*MatchQuery]bool
+	memo sync.Map // [2]*MatchQuery -> bool
 }
 
 func (n *specificity) moreSpecific(a, b *MatchQuery) bool {
 	key := [2]*MatchQuery{a, b}
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	if v, ok := n.memo[key]; ok {
-		return v
-	}
-	if n.memo == nil {
-		n.memo = make(map[[2]*MatchQuery]bool)
+	if v, ok := n.memo.Load(key); ok {
+		return v.(bool)
 	}
 	v := selectorOf(a).MoreSpecific(selectorOf(b))
-	n.memo[key] = v
+	n.memo.Store(key, v)
 	return v
 }
 
