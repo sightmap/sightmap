@@ -11,3 +11,9 @@ views:
   # Keys and values are percent-encoded as in a URL.
   - name: BadEscape
     route: /page?id=%zz
+  # A URL's query never holds a raw "#": the fragment starts there.
+  - name: Fragment
+    route: /page?id=1#top
+  # An escape must decode to UTF-8, as a browser's decoder requires.
+  - name: NotUTF8
+    route: /page?id=%FF

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // A route may end in query conditions (SEP-0025): PATH?KEY=VALUE&KEY=:name.
@@ -58,6 +59,11 @@ func parseRouteQuery(raw string) ([]queryCond, error) {
 	if raw == "" {
 		return nil, fmt.Errorf("the query part after \"?\" is empty")
 	}
+	if strings.Contains(raw, "#") {
+		// A URL's query never holds a raw "#": the fragment starts there. A
+		// condition carrying one could never match (write %23 for a literal).
+		return nil, fmt.Errorf("the query part contains \"#\", which no URL's query can hold (a literal is %%23)")
+	}
 	var out []queryCond
 	seen := map[string]bool{}
 	for _, part := range strings.Split(raw, "&") {
@@ -65,7 +71,7 @@ func parseRouteQuery(raw string) ([]queryCond, error) {
 		if !ok || rk == "" || rv == "" {
 			return nil, fmt.Errorf("condition %q is not KEY=VALUE, KEY=:name or KEY=*", part)
 		}
-		key, err := url.QueryUnescape(rk)
+		key, err := unescapeQuery(rk)
 		if err != nil {
 			return nil, fmt.Errorf("condition %q: key: %v", part, err)
 		}
@@ -89,7 +95,7 @@ func parseRouteQuery(raw string) ([]queryCond, error) {
 			}
 			c.kind, c.re = condGlob, re
 		default:
-			v, err := url.QueryUnescape(rv)
+			v, err := unescapeQuery(rv)
 			if err != nil {
 				return nil, fmt.Errorf("condition %q: value: %v", part, err)
 			}
@@ -98,6 +104,20 @@ func parseRouteQuery(raw string) ([]queryCond, error) {
 		out = append(out, c)
 	}
 	return out, nil
+}
+
+// unescapeQuery decodes a route's key or value as url.QueryUnescape does, and
+// also rejects an escape that does not decode to UTF-8 (%FF): a browser's
+// decoder rejects it, so the overlay could not read the route the CLI reads.
+func unescapeQuery(s string) (string, error) {
+	v, err := url.QueryUnescape(s)
+	if err != nil {
+		return "", err
+	}
+	if !utf8.ValidString(v) {
+		return "", fmt.Errorf("%q does not decode to UTF-8", s)
+	}
+	return v, nil
 }
 
 // queryGlob compiles a value holding "*" runs into an anchored regexp over the
@@ -115,7 +135,7 @@ func queryGlob(raw string) (*regexp.Regexp, error) {
 			continue
 		}
 		star = false
-		v, err := url.QueryUnescape(piece)
+		v, err := unescapeQuery(piece)
 		if err != nil {
 			return nil, err
 		}

@@ -57,6 +57,16 @@ func TestMatchRouteQueryConditions(t *testing.T) {
 		{"/profile?section", "/profile?section=x", false},
 		{"/profile?", "/profile", false},
 		{"/page?id=1&id=2", "/page?id=1", false},
+		// url.ParseQuery drops a pair with a malformed escape or a ";", and the
+		// overlay does the same. A route may hold neither a raw "#" (the URL's
+		// fragment starts there) nor an escape that is not UTF-8.
+		{"/page?id=:id", "/page?id=%zz", false},
+		{"/page?id=:id", "/page?id=1;x=2", false},
+		{"/page?lang=en", "/page?id=%zz&lang=en", true},
+		{"/page?id=:id", "/page?id=%FF", true},
+		{"/page?id=1#top", "/page?id=1", false},
+		{"/page?id=%FF", "/page?id=%FF", false},
+		{"/page?id=%23top", "/page?id=%23top", true},
 	}
 	for _, tc := range cases {
 		if got := sightmap.MatchRoute(tc.pattern, tc.url); got != tc.want {

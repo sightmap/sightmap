@@ -594,7 +594,7 @@ A condition reads the **first** value of its key in the URL's query string, deco
 - A condition is a retention request: a consumer that scrubs captured URLs SHOULD retain the query keys a corpus's routes name, as for [declared URL properties](#url-properties), and SHOULD surface a dropped one. Naming a key is not a privacy grant; a consumer MUST NOT retain a value its own policy, or [`privacy`](#privacy), would withhold.
 - A literal value is stored in the corpus. Write one only where it names a screen (`section=gift-cards`); for a key that identifies a person or session (`email`, `token`, `user_id`) use `KEY=:name` or `KEY=*`, which still retains the key.
 - The path part ends at the first `?`, and keeps every rule above (trailing slashes are normalized off the path part).
-- A query part that is empty, or has a condition without `=`, an empty key or value, a repeated key, or a malformed percent-escape, is invalid (`route-query-invalid`), and the route matches nothing.
+- A query part that is empty, or has a condition without `=`, an empty key or value, a repeated key, a malformed or non-UTF-8 percent-escape, or a raw `#` (write `%23`), is invalid (`route-query-invalid`), and the route matches nothing.
 
 The same conditions apply to requests, which are filtered by them like by `method`.
 

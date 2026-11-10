@@ -357,6 +357,16 @@ describe("matchRoute", () => {
     ["/profile", "/profile?section=gift-cards", true],
     ["/profile?section", "/profile?section=x", false],
     ["/page?id=1&id=2", "/page?id=1", false],
+    // As Go's url.ParseQuery: a pair with a malformed escape or a ";" is
+    // dropped. A route may hold neither
+    // a raw "#" nor a non-UTF-8 escape.
+    ["/page?id=:id", "/page?id=%zz", false],
+    ["/page?id=:id", "/page?id=1;x=2", false],
+    ["/page?lang=en", "/page?id=%zz&lang=en", true],
+    ["/page?id=:id", "/page?id=%FF", true],
+    ["/page?id=1#top", "/page?id=1", false],
+    ["/page?id=%FF", "/page?id=%FF", false],
+    ["/page?id=%23top", "/page?id=%23top", true],
   ])("matchRoute(%j, %j) = %j", (pattern, path, want) => {
     expect(matchRoute(pattern, path)).toBe(want);
   });

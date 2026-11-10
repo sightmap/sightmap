@@ -152,13 +152,35 @@ function decodeQueryPart(s) {
 }
 
 /**
+ * A URL's query values by key, first value kept, decoded as Go's
+ * url.ParseQuery does: a pair holding a malformed escape (`%zz`) or a `;` is
+ * dropped, where URLSearchParams would keep it. (An escape that is not UTF-8,
+ * `%FF`, still decodes differently: U+FFFD here, the raw byte in Go; a route
+ * cannot name such a value, so no condition can tell them apart.)
+ */
+function queryParams(search) {
+  const out = new Map();
+  for (const pair of search.split("&")) {
+    if (pair === "") continue;
+    const eq = pair.indexOf("=");
+    const rk = eq < 0 ? pair : pair.slice(0, eq);
+    const rv = eq < 0 ? "" : pair.slice(eq + 1);
+    if (pair.includes(";") || /%(?![0-9A-Fa-f]{2})/.test(rk + rv)) continue;
+    const key = new URLSearchParams("k=" + rk).get("k");
+    if (!out.has(key)) out.set(key, new URLSearchParams("v=" + rv).get("v"));
+  }
+  return out;
+}
+
+/**
  * A route's query conditions (Go parseRouteQuery, SEP-0025), or null when the
  * query part is malformed. Each is { key, kind, value?, re? }: kind "literal"
  * (score 3), "glob" (a `*` inside the value, 3), "param" (`:name`, 2) or
  * "any" (`*`, 1).
  */
 function parseRouteQuery(raw) {
-  if (raw === "") return null;
+  // A URL's query never holds a raw `#` (Go rejects it as route-query-invalid).
+  if (raw === "" || raw.includes("#")) return null;
   const out = [];
   const seen = new Set();
   try {
@@ -202,10 +224,10 @@ export function matchRoute(pattern, pathname) {
   if (q < 0) return true;
   const conds = parseRouteQuery(pattern.slice(q + 1));
   if (!conds) return false;
-  const params = new URLSearchParams(search);
+  const params = queryParams(search);
   return conds.every((c) => {
     const v = params.get(c.key);
-    if (v === null) return false;
+    if (v === undefined) return false;
     if (c.kind === "literal") return v === c.value;
     if (c.kind === "glob") return c.re.test(v);
     return true;
