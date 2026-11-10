@@ -591,6 +591,7 @@ A condition reads the **first** value of its key in the URL's query string, deco
 - Keys the route does not name are ignored, so extra parameters (tracking, state) never stop a match.
 - `KEY` and `VALUE` are written percent-encoded, as in a URL. A `*` is read before decoding, so `%2A` is a literal star, and a value starting with a literal `:` is written `%3A`.
 - A `KEY=:name` condition binds nothing (see [URL properties](#url-properties)).
+- A condition is a retention request: a consumer that scrubs captured URLs SHOULD retain the query keys a corpus's routes name, as for [declared URL properties](#url-properties), and SHOULD surface a dropped one. Naming a key is not a privacy grant; a consumer MUST NOT retain a value its own policy, or [`privacy`](#privacy), would withhold.
 - The path part ends at the first `?`, and keeps every rule above (trailing slashes are normalized off the path part).
 - A query part that is empty, or has a condition without `=`, an empty key or value, a repeated key, or a malformed percent-escape, is invalid (`route-query-invalid`), and the route matches nothing.
 
