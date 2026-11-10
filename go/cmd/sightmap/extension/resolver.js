@@ -132,8 +132,8 @@ function routeSegBody(seg) {
   return seg.replace(/[.+?()[\]{}\\|^$]/g, "\\$&").replace(/\*+/g, "[^/]*");
 }
 
-/** Whether a view route matches a URL path (Go MatchRoute). */
-export function matchRoute(pattern, pathname) {
+/** Whether a route's path part matches a URL path (Go matchRoutePath). */
+function matchRoutePath(pattern, pathname) {
   const pat = normalizeRoutePath(pattern);
   const path = normalizeRoutePath(pathname);
   if (pat === "/") return path === "/";
@@ -146,22 +146,120 @@ export function matchRoute(pattern, pathname) {
   return new RegExp(re + "$").test(path);
 }
 
-/** How specific a route is: literal 3, `:param` 2, `*` 1, `**` 0 (Go routeSpecificity). */
+/** Decode a query key or value as URLSearchParams does: `+` is a space. */
+function decodeQueryPart(s) {
+  return decodeURIComponent(s.replace(/\+/g, " "));
+}
+
+/**
+ * A URL's query values by key, first value kept, decoded as Go's
+ * url.ParseQuery does: a pair holding a malformed escape (`%zz`) or a `;` is
+ * dropped, where URLSearchParams would keep it. (An escape that is not UTF-8,
+ * `%FF`, still decodes differently: U+FFFD here, the raw byte in Go; a route
+ * cannot name such a value, so no condition can tell them apart.)
+ */
+function queryParams(search) {
+  const out = new Map();
+  for (const pair of search.split("&")) {
+    if (pair === "") continue;
+    const eq = pair.indexOf("=");
+    const rk = eq < 0 ? pair : pair.slice(0, eq);
+    const rv = eq < 0 ? "" : pair.slice(eq + 1);
+    if (pair.includes(";") || /%(?![0-9A-Fa-f]{2})/.test(rk + rv)) continue;
+    const key = new URLSearchParams("k=" + rk).get("k");
+    if (!out.has(key)) out.set(key, new URLSearchParams("v=" + rv).get("v"));
+  }
+  return out;
+}
+
+/**
+ * A route's query conditions (Go parseRouteQuery, SEP-0025), or null when the
+ * query part is malformed. Each is { key, kind, value?, re? }: kind "literal"
+ * (score 3), "glob" (a `*` inside the value, 3), "param" (`:name`, 2) or
+ * "any" (`*`, 1).
+ */
+function parseRouteQuery(raw) {
+  // A URL's query never holds a raw `#` (Go rejects it as route-query-invalid).
+  if (raw === "" || raw.includes("#")) return null;
+  const out = [];
+  const seen = new Set();
+  try {
+    for (const part of raw.split("&")) {
+      const eq = part.indexOf("=");
+      if (eq <= 0 || eq === part.length - 1) return null;
+      const rv = part.slice(eq + 1);
+      const key = decodeQueryPart(part.slice(0, eq));
+      if (seen.has(key)) return null;
+      seen.add(key);
+      if (rv.startsWith(":")) {
+        if (rv.length === 1) return null;
+        out.push({ key, kind: "param" });
+      } else if (rv.replace(/\*/g, "") === "") {
+        out.push({ key, kind: "any" });
+      } else if (rv.includes("*")) {
+        const body = rv
+          .split(/\*+/)
+          .map((p) => decodeQueryPart(p).replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+          .join(".*");
+        out.push({ key, kind: "glob", re: new RegExp("^" + body + "$", "s") });
+      } else {
+        out.push({ key, kind: "literal", value: decodeQueryPart(rv) });
+      }
+    }
+  } catch {
+    return null; // a malformed percent-escape
+  }
+  return out;
+}
+
+/**
+ * Whether a route matches a URL path, which may carry a query string (Go
+ * MatchRoute). A condition reads its key's first value; a route without
+ * conditions matches whatever the query string holds.
+ */
+export function matchRoute(pattern, pathname) {
+  const [path, search = ""] = (pathname ?? "").split(/\?(.*)/s);
+  const q = pattern.indexOf("?");
+  if (!matchRoutePath(q < 0 ? pattern : pattern.slice(0, q), path)) return false;
+  if (q < 0) return true;
+  const conds = parseRouteQuery(pattern.slice(q + 1));
+  if (!conds) return false;
+  const params = queryParams(search);
+  return conds.every((c) => {
+    const v = params.get(c.key);
+    if (v === undefined) return false;
+    if (c.kind === "literal") return v === c.value;
+    if (c.kind === "glob") return c.re.test(v);
+    return true;
+  });
+}
+
+/**
+ * How specific a route is: literal 3, `:param` 2, `*` 1, `**` 0, plus each
+ * query condition as the segment it mirrors (Go routeSpecificity).
+ */
 export function routeSpecificity(pattern) {
-  const pat = normalizeRoutePath(pattern);
-  if (pat === "/") return 1;
+  const q = pattern.indexOf("?");
+  const pat = normalizeRoutePath(q < 0 ? pattern : pattern.slice(0, q));
   let score = 0;
-  for (const seg of pat.split("/")) {
-    if (seg === "" || seg === "**") continue;
-    score += seg === "*" ? 1 : seg.startsWith(":") ? 2 : 3;
+  if (pat === "/") score = 1;
+  else
+    for (const seg of pat.split("/")) {
+      if (seg === "" || seg === "**") continue;
+      score += seg === "*" ? 1 : seg.startsWith(":") ? 2 : 3;
+    }
+  if (q >= 0) {
+    const weight = { literal: 3, glob: 3, param: 2, any: 1 };
+    for (const c of parseRouteQuery(pattern.slice(q + 1)) ?? []) score += weight[c.kind];
   }
   return score;
 }
 
 /**
- * The view for a URL path: the most specific matching route, the first declared
- * on a tie, or null (Go Corpus.ViewForURL). Exactly one view is active, so a
- * generic route can't add its components to a page a specific route owns.
+ * The view for a URL path (with its query string, if any): the most specific
+ * matching route, the first declared on a tie, or null (Go Corpus.ViewForURL).
+ * Exactly one view is active, so a generic route can't add its components to
+ * a page a specific route owns.
  */
 export function viewForPath(views, pathname) {
   let best = null;

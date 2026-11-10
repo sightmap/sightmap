@@ -69,7 +69,10 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 031 | `route-binding-conflict` | A property named like a `:name` binding the view or request still produces → `route-binding-conflict`, whatever its source; a `url.path` entry renames its segment and frees the name ([SEP-0008](../seps/0008-url-properties.md)) |
 | 033 | `component-definitions` | File-root `definitions:` are `$ref` targets that are never matched on their own; a view gets one only where it references it, scoped by the reference ([SEP-0019](../seps/0019-component-definitions.md)) |
 | 034 | `entity-id` | `id:` validates on every entity kind (environments, views, components at every depth, definitions, `$ref` entries, properties, requests, payload fields, messages, signals, snapshots); a definition referenced from two places is one declaration, not a duplicate ([SEP-0020](../seps/0020-entity-id.md)) |
-| 035 | `entity-id-errors` | A view and a component sharing an id across files → `id-duplicate`; an entity without an id in a sightmap that declares ids → `id-missing` ([SEP-0020](../seps/0020-entity-id.md))
+| 035 | `entity-id-errors` | A view and a component sharing an id across files → `id-duplicate`; an entity without an id in a sightmap that declares ids → `id-missing` ([SEP-0020](../seps/0020-entity-id.md)) |
+| 039 | `route-query-conditions` | Query conditions in view and request routes: a literal value outranks the bare path and a broader path view, `:name` and `*` require presence, extra keys are ignored, only a key's first value counts, and a request route's condition filters requests ([SEP-0025](../seps/0025-query-route-conditions.md)) |
+| 040 | `route-query-invalid` | A repeated key or a malformed percent-escape in a route's query part → `route-query-invalid`; one route with its conditions in another order → `route-conflict` ([SEP-0025](../seps/0025-query-route-conditions.md)) |
+| 041 | `route-query-order` | Neither the order of a URL's parameters, the order of a route's conditions nor the order views are declared in changes the match; a route with more satisfied conditions outranks one with fewer, and extra keys are ignored ([SEP-0025](../seps/0025-query-route-conditions.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

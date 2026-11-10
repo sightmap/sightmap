@@ -32,9 +32,25 @@ Routes use glob patterns against the URL pathname.
 - `*` matches exactly one path segment: `/users/*` matches `/users/42`, not `/users/42/edit`.
 - `**` matches any depth of segments: `/admin/**` matches `/admin`, `/admin/users`, and `/admin/users/42/edit`.
 - Literal segments match themselves.
-- Matching is case-sensitive. Query strings and fragments are ignored. Trailing slashes are normalized away before matching.
+- Matching is case-sensitive. Fragments are ignored, and so is the query string unless the route names query conditions (below). Trailing slashes are normalized away before matching.
 
 For requests, Express-style `:param` segments are normalized to `*`, so `/api/users/:id/orders` and `/api/users/*/orders` are equivalent. See [Requests](/spec/requests).
+
+### Query conditions
+
+When one path serves several screens told apart by a query parameter, a route can end in query conditions:
+
+```yaml
+views:
+  - name: ProfileMenu
+    route: /en-us/profile
+  - name: GiftCards
+    route: /en-us/profile?section=gift-cards   # this value of section
+  - name: Document
+    route: /page?id=:id                        # id present, any value
+```
+
+Each condition reads the first value of its key, decoded, and compares case-sensitively. `KEY=VALUE` requires that value (a `*` inside it is a wildcard within the value); `KEY=:name` and `KEY=*` require the key to be present with any value. Every condition must hold, and keys the route does not name are ignored. A `KEY=:name` condition binds nothing; read the value with `from: url.query`. See [Route matching](/reference/schema#query-conditions).
 
 ## Most specific wins
 
@@ -42,12 +58,12 @@ When more than one view route matches a URL, the route with the highest specific
 
 Specificity is the sum of per-segment scores:
 
-| Segment | Score |
-|---|---|
-| Literal (e.g. `users`) | 3 |
-| `:param` (e.g. `:id`) | 2 |
-| `*` (single segment) | 1 |
-| `**` or empty | 0 |
+| Segment | Query condition | Score |
+|---|---|---|
+| Literal (e.g. `users`) | `KEY=VALUE` | 3 |
+| `:param` (e.g. `:id`) | `KEY=:name` | 2 |
+| `*` (single segment) | `KEY=*` | 1 |
+| `**` or empty | | 0 |
 
 The root route `/` scores `1` — more specific than any wildcard-only pattern. When two routes score equal, the **first declared** view wins.
 
@@ -60,6 +76,8 @@ views:
 ```
 
 `/users/admin` matches both routes and resolves to `UserAdmin`. `/users/42` matches only `UserProfile`.
+
+A query condition scores as the segment it mirrors, so `/en-us/profile?section=gift-cards` (9) wins over `/en-us/profile` (6) on that section, and `/en-us/profile` keeps every other URL at that path.
 
 <Note>
 This specificity rule applies only to views. Every matching request applies. See [Requests](/spec/requests#all-matches-apply).

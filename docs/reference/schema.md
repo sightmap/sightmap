@@ -68,7 +68,7 @@ A named screen in the app, identified by a URL route.
 |---|---|---|---|
 | `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Shown in the snapshot header. Should be unique across the sightmap. |
-| `route` | string | yes | Glob pattern matched against the URL pathname. See [Route matching](#route-matching). |
+| `route` | string | yes | Glob pattern matched against the URL pathname, optionally followed by [query conditions](#query-conditions) (`/profile?section=gift-cards`). See [Route matching](#route-matching). |
 | `environments` | string[] | no | Names of the environments this view exists in. Absent or empty means every environment. See [Environments and origins](#environments-and-origins). |
 | `origins` | string[] | no | Names of the origins this view is served from, resolved per environment. Absent or empty means unconstrained. |
 | `url` | string | no | Representative URL for this view — a concrete address that resolves to it. Tooling uses it to navigate to the view (e.g. coverage reporting and bulk capture/probe). A file-root `url` supplies a default for every view in the file that omits its own. |
@@ -235,7 +235,7 @@ A named API endpoint.
 |---|---|---|---|
 | `id` | string | no | Stable identity across versions of the sightmap. See [Identity](#identity). |
 | `name` | string | yes | Shown in network list and detail output. |
-| `route` | string | yes | Glob pattern. Express-style `:param` segments are normalized to `*`. See [Route matching](#route-matching). |
+| `route` | string | yes | Glob pattern. Express-style `:param` segments are normalized to `*`. May end in [query conditions](#query-conditions) (`/graphql?operationName=Items`). See [Route matching](#route-matching). |
 | `method` | string | no | HTTP method filter (`GET`, `POST`, …). Match-any if omitted. |
 | `environments` | string[] | no | Names of the environments this endpoint exists in. Absent or empty means every environment; a view-scoped request is further limited to its view's. See [Environments and origins](#environments-and-origins). |
 | `origins` | string[] | no | Names of the origins this endpoint is called on, resolved per environment. Absent or empty means unconstrained. Never inherited from the enclosing view. |
@@ -533,6 +533,8 @@ Given `route: /shop/p/:product_id` and a property `{ name: variant, extract: { f
 
 **Binding is implicit**: a `:name` needs no `properties[]` entry, the same way a request's reserved identity names do not. An entry reading `from: url.path` renames that segment: its value arrives under the entry's name and the implicit `:name` is no longer produced. Every name an entity produces must be unique, so a declared property, of any source, named like a binding the entity still produces is an error (`route-binding-conflict`); rename the binding first to free its name. A binding name must match `^[a-z][a-z0-9_]*$`: a `:segment` that does not (`:orgId`) still matches but binds nothing, and the reference CLI warns (`route-param-unbound`). A `:name` MUST NOT repeat within one route, and on a request a bound name colliding with a reserved identity name (`status`, `method`, `duration`) is an error rather than a silent precedence rule.
 
+A `KEY=:name` [query condition](#query-conditions) binds nothing: it only requires the key to be present. Read the value with `from: url.query`, `path: KEY`.
+
 **This changes what `:param` produces, never what it matches.** [Route matching](#route-matching) still normalizes `:param` to `*` for requests, and a view `:param` still scores specificity `2`, so every existing route matches exactly the URL set it matched before. `**` cannot bind: it spans a variable number of segments, so there is no single value to name.
 
 **These resolve statically.** Both sources read a URL string rather than live DOM state or live traffic, so a saved session, a coverage report, or a lint pass over a URL alone produces every declared URL property with no live observation.
@@ -543,14 +545,14 @@ See [SEP-0008](https://github.com/sightmap/sightmap/blob/main/spec/seps/0008-url
 
 ## Route matching
 
-Routes use glob patterns against the URL pathname.
+Routes use glob patterns against the URL pathname, optionally followed by [query conditions](#query-conditions).
 
 - `*` matches exactly one path segment: `/users/*` matches `/users/42`, not `/users/42/edit`
 - `**` is a globstar: **as a whole path segment** it matches zero or more segments, so `/admin/**` matches `/admin`, `/admin/users`, and `/admin/users/42/edit`, and `/a/**/b` matches `/a/b`, `/a/x/b`, …
 - A `**` **glued into a segment** (e.g. `/foo**`) is treated as a regular `*` — an in-segment wildcard that does not cross a `/`. Write `**` as its own segment when you mean "any depth".
 - Literal segments match themselves
 - Matching is case-sensitive
-- Query string and fragment are ignored
+- The fragment is ignored. The query string is read only by a route's [query conditions](#query-conditions); a route without them matches whatever the query string holds
 - Trailing slashes are normalized away before matching
 
 For requests, Express-style `:param` segments are normalized to `*`. These are equivalent:
@@ -560,24 +562,62 @@ For requests, Express-style `:param` segments are normalized to `*`. These are e
 - route: /api/users/*/orders
 ```
 
+### Query conditions
+
+A route may end in `?` and one or more **query conditions** joined by `&`. Each condition names a query key and what its value must be. See [SEP-0025](https://github.com/sightmap/sightmap/blob/main/spec/seps/0025-query-route-conditions.md).
+
+```yaml
+views:
+  - name: ProfileMenu
+    route: /en-us/profile
+  - name: GiftCards
+    route: /en-us/profile?section=gift-cards   # this value of section
+  - name: Document
+    route: /page?id=:id                        # id present, any value
+  - name: Library
+    route: /:org/library?type=metrics&view=*   # both must hold
+```
+
+A condition reads the **first** value of its key in the URL's query string, decoded as `url.query` reads it (percent-decoding, `+` as a space; see [URL properties](#url-properties)), and compares keys and values case-sensitively. Its value is matched like a path segment:
+
+| Condition | Holds when |
+|---|---|
+| `KEY=VALUE` | the key's first value equals `VALUE` (decoded) |
+| `KEY=VAL*` | `*` runs inside a value are wildcards within it; the first value matches the rest literally |
+| `KEY=:name` | the key is present, with any value (an empty one included) |
+| `KEY=*` | the same: the key is present, with any value |
+
+- Every condition must hold. Conditions may appear in any order; a key may be named once.
+- Keys the route does not name are ignored, so extra parameters (tracking, state) never stop a match.
+- `KEY` and `VALUE` are written percent-encoded, as in a URL. A `*` is read before decoding, so `%2A` is a literal star, and a value starting with a literal `:` is written `%3A`.
+- A `KEY=:name` condition binds nothing (see [URL properties](#url-properties)).
+- A condition is a retention request: a consumer that scrubs captured URLs SHOULD retain the query keys a corpus's routes name, as for [declared URL properties](#url-properties), and SHOULD surface a dropped one. Naming a key is not a privacy grant; a consumer MUST NOT retain a value its own policy, or [`privacy`](#privacy), would withhold.
+- A literal value is stored in the corpus. Write one only where it names a screen (`section=gift-cards`); for a key that identifies a person or session (`email`, `token`, `user_id`) use `KEY=:name` or `KEY=*`, which still retains the key.
+- The path part ends at the first `?`, and keeps every rule above (trailing slashes are normalized off the path part).
+- A query part that is empty, or has a condition without `=`, an empty key or value, a repeated key, a malformed or non-UTF-8 percent-escape, or a raw `#` (write `%23`), is invalid (`route-query-invalid`), and the route matches nothing.
+
+The same conditions apply to requests, which are filtered by them like by `method`.
+
 ### View matching: most specific wins
 
-When multiple views could match a URL, the most specific wins. Specificity is the sum of per-segment scores:
+When multiple views could match a URL, the most specific wins. Specificity is the sum of per-segment scores, plus a score for each [query condition](#query-conditions), which counts as the segment it mirrors:
 
-| Segment | Score |
-|---|---|
-| Literal (e.g. `users`) | 3 |
-| `:param` (e.g. `:id`) | 2 |
-| `*` (single-segment wildcard) | 1 |
-| `**` or empty | 0 |
+| Segment | Query condition | Score |
+|---|---|---|
+| Literal (e.g. `users`) | `KEY=VALUE` (also with a `*` inside the value) | 3 |
+| `:param` (e.g. `:id`) | `KEY=:name` | 2 |
+| `*` (single-segment wildcard) | `KEY=*` | 1 |
+| `**` or empty | | 0 |
 
 The root route `/` scores `1` — more specific than any wildcard-only pattern. When two patterns score equal, the **first declared** view wins.
 
 For example, given `/users/*` (score 4) and `/users/admin` (score 6), the URL `/users/admin` matches the literal — `/users/*` only wins for paths like `/users/42`.
 
+A route with conditions always outranks the same path without them: `/en-us/profile?section=gift-cards` (9) wins over `/en-us/profile` (6) on `?section=gift-cards`, and `/en-us/profile` still takes every other `section` and the bare page. Against a different path the scores simply add: `/users/*?tab=billing` (7) beats `/users/admin` (6) on `/users/admin?tab=billing`, while `/users/*?tab=:t` (6) ties it and falls to declaration order.
+
 ### Request matching: all matches apply
 
-Requests are matched independently. Every request whose `route` matches the URL — and whose optional `method` matches the request method — is applied. There is no "winning" request; all matches contribute to the enriched output.
+Requests are matched independently. Every request whose `route` matches the URL — its path and any [query conditions](#query-conditions) — and whose optional `method` matches the request method — is applied. There is no "winning" request; all matches contribute to the enriched output.
 
 ## Environments and origins
 
@@ -685,7 +725,7 @@ A **native** session belongs to the environment whose `platform` and `app_id` ma
 
 ### Not a route-matching input
 
-A URL matches a view or request by path alone, exactly as in [Route matching](#route-matching). A session outside an entity's environments, or a URL outside its origins, still matches that entity's route. Environments and origins are data about an entity for consumers to use as they need: choosing a publish target, compiling host-scoped page definitions per environment, anchoring request matchers.
+A URL matches a view or request by its route alone, exactly as in [Route matching](#route-matching). A session outside an entity's environments, or a URL outside its origins, still matches that entity's route. Environments and origins are data about an entity for consumers to use as they need: choosing a publish target, compiling host-scoped page definitions per environment, anchoring request matchers.
 
 `url:` is complementary. It is one concrete, navigable address and implies neither an environment nor an origin; a consumer MUST NOT derive either from it. A consumer that needs a host MAY fall back to a view's `url:` host, but only for a corpus that declares no environments and no origins anywhere; once a corpus declares either, every host comes from `origins`. A page host is a web concept, so a view that runs only in native environments needs none and the fallback does not apply to it.
 
@@ -931,7 +971,7 @@ A conforming SDK:
 
 - MUST accept any file that validates against `sightmap.schema.json`
 - MUST reject any file that does not
-- MUST implement route matching as specified
+- MUST implement route matching as specified, including [query conditions](#query-conditions) on view and request routes and their contribution to view specificity
 - MUST implement global vs view-scoped precedence as specified
 - MUST name an element claimed by several definitions by the strictly most specific one when there is one, deciding specificity by exactly the procedure in [Selector semantics](#selector-semantics) and [SEP-0023](https://github.com/sightmap/sightmap/blob/main/spec/seps/0023-most-specific-definition-wins.md), so that two SDKs agree on which pairs are ordered
 - MUST implement tag resolution as a union across every applicable definition, as specified in [Tags](#tags) — never narrowed by identity-resolution rules (nearest-wins, most-specific-wins)

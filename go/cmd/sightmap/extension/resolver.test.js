@@ -337,6 +337,36 @@ describe("matchRoute", () => {
     ["/messages**", "/messages/compose", false],
     // Regex metacharacters in a literal segment are literal.
     ["/a.b", "/axb", false],
+    // Query conditions (SEP-0025): first value, decoded, case-sensitive.
+    ["/profile?section=gift-cards", "/profile?section=gift-cards", true],
+    ["/profile?section=gift-cards", "/profile?utm=x&section=gift-cards", true],
+    ["/profile?section=gift-cards", "/profile?section=x&section=gift-cards", false],
+    ["/profile?section=gift-cards", "/profile?section=Gift-Cards", false],
+    ["/profile?section=gift-cards", "/profile", false],
+    ["/profile/?section=gift-cards", "/profile/?section=gift-cards", true],
+    ["/page?id=7&lang=en", "/page?lang=en&id=7", true],
+    ["/page?id=7&lang=en", "/page?id=7", false],
+    ["/page?id=:id", "/page?id=", true],
+    ["/page?id=:id", "/page", false],
+    ["/page?id=*", "/page?id=101", true],
+    ["/graphs?type=sparkline*", "/graphs?type=sparkline-weekly", true],
+    ["/graphs?type=sparkline*", "/graphs?type=bar", false],
+    ["/graphs?type=%2A", "/graphs?type=*", true],
+    ["/search?q=a+b", "/search?q=a%20b", true],
+    ["/search?q=a%2Bb", "/search?q=a+b", false],
+    ["/profile", "/profile?section=gift-cards", true],
+    ["/profile?section", "/profile?section=x", false],
+    ["/page?id=1&id=2", "/page?id=1", false],
+    // As Go's url.ParseQuery: a pair with a malformed escape or a ";" is
+    // dropped. A route may hold neither
+    // a raw "#" nor a non-UTF-8 escape.
+    ["/page?id=:id", "/page?id=%zz", false],
+    ["/page?id=:id", "/page?id=1;x=2", false],
+    ["/page?lang=en", "/page?id=%zz&lang=en", true],
+    ["/page?id=:id", "/page?id=%FF", true],
+    ["/page?id=1#top", "/page?id=1", false],
+    ["/page?id=%FF", "/page?id=%FF", false],
+    ["/page?id=%23top", "/page?id=%23top", true],
   ])("matchRoute(%j, %j) = %j", (pattern, path, want) => {
     expect(matchRoute(pattern, path)).toBe(want);
   });
@@ -364,6 +394,22 @@ describe("viewForPath", () => {
     ["/nope/nowhere", null],
   ])("viewForPath(%j) = %j", (path, want) => {
     expect(viewForPath(views, path)?.name ?? null).toBe(want);
+  });
+
+  test("query conditions outrank the bare path (SEP-0025)", () => {
+    const profile = [
+      { name: "Page", route: "/en-us/:page" },
+      { name: "ProfileMenu", route: "/en-us/profile" },
+      { name: "GiftCards", route: "/en-us/profile?section=gift-cards" },
+      { name: "Admin", route: "/users/admin" },
+      { name: "Tabbed", route: "/users/*?tab=:t" },
+      { name: "Billing", route: "/users/*?tab=billing" },
+    ];
+    expect(viewForPath(profile, "/en-us/profile?section=gift-cards").name).toBe("GiftCards");
+    expect(viewForPath(profile, "/en-us/profile?section=other").name).toBe("ProfileMenu");
+    expect(viewForPath(profile, "/en-us/menu?section=gift-cards").name).toBe("Page");
+    expect(viewForPath(profile, "/users/admin?tab=x").name).toBe("Admin"); // 6 = 6, first declared
+    expect(viewForPath(profile, "/users/admin?tab=billing").name).toBe("Billing"); // 7 > 6
   });
 
   test("ties go to the first declared view", () => {
