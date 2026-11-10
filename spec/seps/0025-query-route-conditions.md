@@ -2,9 +2,9 @@
 sep: 0025
 title: Query conditions in routes
 author: Joel Webber (@joelgwebber)
-status: Draft
+status: Review
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-10
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -107,6 +107,8 @@ Keys the route does not name are never read: extra parameters (tracking, UI stat
 
 **A condition is a retention request.** A consumer that scrubs captured URLs SHOULD retain the query keys a corpus's routes name, as it does for [declared URL properties](0008-url-properties.md), and SHOULD surface the case where it dropped one anyway. Naming a key is not a privacy grant: a consumer MUST NOT retain a value its own policy, or [`privacy`](../v1/schema.md#privacy), would withhold. Without this, a scrubber that strips `section` makes a captured `/en-us/profile?section=gift-cards` resolve to `ProfileMenu`, silently.
 
+**Prefer presence for identifying keys.** A literal value is stored in the corpus file, and corpora are often public. Write a literal only when the value names a screen (`section=gift-cards`, `action=edit`), never a person, account or session: for a key such as `email`, `token` or `user_id`, `KEY=:name` or `KEY=*` says the key is there without storing a value, and still makes it a retention request. `route: /account?email=:email`, not `route: /account?email=bob@example.com`. Telling the two apart is a judgment, so this is guidance, not a validation rule.
+
 A condition's value is matched like a path segment on purpose: a literal, a wildcard inside text, a named parameter, a bare wildcard. An author who knows the path grammar knows this one.
 
 **Specificity.** A view's score is its path score plus a score per condition, each condition scoring as the segment it mirrors:
@@ -173,7 +175,7 @@ Fixtures: `039-route-query-conditions` (the match tables above, and a request fi
       when: { tab: billing }                      # error: `tab` is not declared
   ```
 
-  Fully layered, and the declaration is also the retention request. Not chosen here because a view's properties are read from the *matched* URL, so using them to pick the view is circular; it needs a corpus-level properties layer that does not exist, and a specificity rule for `when`, which is not a path segment. It is the natural follow-up if the layering matters more than the address staying in one string; the retention rule above closes most of the practical gap in the meantime.
+  Fully layered, and the declaration is also the retention request. Not chosen here because a view's properties are read from the *matched* URL, so using them to pick the view is circular; it needs a corpus-level properties layer that does not exist, and a specificity rule for `when`, which is not a path segment. It is the natural follow-up if the layering matters more than the address staying in one string ([#545](https://github.com/sightmap/sightmap/issues/545)); the retention rule above closes most of the practical gap in the meantime.
 - **A separate `query:` map on the view** (`query: { section: gift-cards }`). Explicit, and it keeps `route` a pure path pattern. Rejected because it splits one address across two fields, needs the same grammar for values anyway, and does not match how URLs are written, read, or pasted from a browser; the atlas authors reached for `?` unprompted.
 - **Only `KEY=VALUE` and `KEY=:name`, no `*`.** Smaller, and enough for the motivating view cases. But `KEY=*` and `*` inside values are what existing request routes already use, and leaving them out would make those routes match a literal `*` now and change meaning if a later SEP added wildcards. Mirroring the path segment grammar costs one table row each.
 - **Any value of a repeated key may satisfy a condition**, rather than the first. Closer to how some servers read `?tag=a&tag=b`. Rejected for now because `url.query` already resolves to the first occurrence, and matching and reading should agree on which value a key has; see Open questions.
@@ -193,6 +195,7 @@ No existing route changes meaning unless it contains `?`.
 - **Encoding.** Values compare after `url.query` decoding, where `+` is a space. Some applications put a literal `+` in an unencoded query value; this SEP follows the form-decoding rule for consistency with `url.query` rather than per-application behaviour.
 - **Case.** Keys and values are case-sensitive, as paths and `url.query` keys are. Some applications treat `?Section=Gift-Cards` as `?section=gift-cards`; a case-insensitive form (a flag, or a per-condition marker) is left out.
 - **Absence.** There is no way to say "this key must be absent" (`/profile` only when `section` is missing). The bare path plus specificity covers the cases seen so far.
+- **A retained key that was dropped anyway.** The retention rule asks a consumer to surface a dropped key, but not what resolution returns for such a URL: falling back to the bare-path view (`/en-us/profile` → `ProfileMenu`) hides the loss, where an "unresolvable" result, or the set of views it could have matched, would not. Left to a follow-up ([#544](https://github.com/sightmap/sightmap/issues/544)).
 - **Fragments.** Hash-routed applications put the screen in the fragment, which stays ignored:
 
   ```
