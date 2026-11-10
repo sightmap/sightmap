@@ -950,9 +950,11 @@ The governing node is the one the value is **read from**, not the component that
 - If it has `aria-labelledby`, every referenced element is present, and nothing in its subtree is masked, blocked, or a control whose value the name computation would embed (an `input`, `textarea`, `select`, a `contenteditable` element, or a textbox, combobox, listbox or range role). This includes the labelled control itself.
 - Otherwise, if it has a non-empty `aria-label`, the name equals it.
 - Otherwise, every associated `label` (one that encloses the control, or names its `id` in `for`) is likewise free of masked or blocked content and of controls other than this one. With no such label, the name equals the control's `title` or `placeholder`.
-- The name does not contain the control's own content: its current value, a text field's `value`, a `textarea`'s text, or the text of a `select`'s options.
+- The name does not contain the control's own content: its current value, a text field's `value`, a `textarea`'s text, or the text of a `select`'s options. Containment fails closed: a value that happens to be part of the label withholds it.
 
 The exception covers the name only. `dom.raw_text` and every `dom.attr` read stay withheld, `aria-label`, `title` and `placeholder` included, and nothing changes under `block`.
+
+`title` and `placeholder` remain name sources although a recording masks those attributes: on a vetted control they are the developer's hint for the field, never what was entered, and they label most fields in practice. A deployment whose policy masks a field's hint text should mark the control `block`. See [SEP-0009](https://github.com/sightmap/sightmap/blob/main/spec/seps/0009-component-privacy.md#a-form-controls-name-under-mask) for the reasoning and a non-normative list of what capture pipelines typically mask.
 
 A property that reads `dom.text`, `dom.raw_text` or `dom.attr` from a component whose own `privacy` is `block` or `mask` (a `dom.attr` read of an interactive-state attribute only under `block`, and a `dom.text` read only under `block` when every selector of the component targets an `input`, `textarea` or `select`), or `dom.state` from one whose own `privacy` is `block`, is withheld by every capture consumer, so the reference CLI warns (`extract-privacy-withheld`). The remedy is to change the component's privacy, where a privacy review sees it.
 

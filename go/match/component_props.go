@@ -43,11 +43,11 @@ func resolveComponentProperties(r *propResolver) {
 		var props []sightmap.PropertyValue
 		var withheld []string
 		for _, p := range def.Properties {
-			v, ok, held := r.resolveExtract(node, p.Extract)
+			x := r.resolveExtract(node, p.Extract)
 			switch {
-			case ok:
-				props = append(props, sightmap.PropertyValue{Name: p.Name, Value: v})
-			case held:
+			case x.ok:
+				props = append(props, sightmap.PropertyValue{Name: p.Name, Value: x.value})
+			case x.withheld:
 				withheld = append(withheld, p.Name)
 			}
 		}
@@ -80,24 +80,40 @@ func Withholds(p string, e sightmap.Extract) bool {
 	return false
 }
 
-// resolveExtract resolves one SEP-0017 directive against node, reporting the
-// value, whether it resolved, and, when it did not, whether privacy withheld it.
+// extracted is one directive's outcome: the value when it resolved, and when
+// it did not, whether privacy withheld it (as opposed to nothing being there).
+type extracted struct {
+	value    string
+	ok       bool
+	withheld bool
+}
+
+// unresolved is a directive that found nothing; held, one privacy withheld.
+var (
+	unresolved = extracted{}
+	held       = extracted{withheld: true}
+)
+
+// found is refine's result as an outcome: a value that did not resolve here
+// was not withheld.
+func found(v string, ok bool) extracted { return extracted{value: v, ok: ok} }
+
+// resolveExtract resolves one SEP-0017 directive against node.
 // References descend only, so recursion strictly enters smaller subtrees and
 // always terminates.
 //
 // Privacy is judged at the node a value is read from: a component read recurses
 // into the target, whose own effective privacy then applies, so an unrestricted
 // ancestor cannot surface a value out of a blocked descendant.
-func (r *propResolver) resolveExtract(node *sightmap.ComponentNode, e sightmap.Extract) (string, bool, bool) {
+func (r *propResolver) resolveExtract(node *sightmap.ComponentNode, e sightmap.Extract) extracted {
 	if p := r.privacy(node); Withholds(p, e) {
 		// Under mask a form control's accessible name labels the field and never
 		// carries what was entered in it. Only the name: the rendered-text
 		// fallback below is content.
 		if p == "mask" && e.From == sightmap.FromDOMText && controlNameSurvives(node, r.treeIndex, r.privacy) {
-			v, ok := refine(e, node.Name)
-			return v, ok, false
+			return found(refine(e, node.Name))
 		}
-		return "", false, true
+		return held
 	}
 	switch e.From {
 	case sightmap.FromDOMText:
@@ -105,84 +121,80 @@ func (r *propResolver) resolveExtract(node *sightmap.ComponentNode, e sightmap.E
 		// (populated for role-less nodes that have no accessible name). Both are
 		// already whitespace-normalized to the same shape at capture time.
 		if node.Name != "" {
-			return resolved(refine(e, node.Name))
+			return found(refine(e, node.Name))
 		}
-		return resolved(refine(e, node.Text))
+		return found(refine(e, node.Text))
 
 	case sightmap.FromDOMRawText:
 		// The node's own literal text (direct text nodes, normalized), never the
 		// accessibility name (SEP-0013): the deterministic escape when the
 		// accessible name welds in extra text, e.g. a CSS ::after badge.
-		return resolved(refine(e, node.RawText))
+		return found(refine(e, node.RawText))
 
 	case sightmap.FromDOMAttr:
 		if node.Element == nil {
-			return "", false, false
+			return unresolved
 		}
-		return resolved(refine(e, node.Element.Attrs[e.Path]))
+		return found(refine(e, node.Element.Attrs[e.Path]))
 
 	case sightmap.FromDOMState:
 		// Current interactive state, never the markup attribute of the same
 		// name, which records only initial state. A tree captured before State
 		// existed still carries the accessibility layer's value in Properties.
 		if v := node.State[e.Path]; v != "" {
-			return resolved(refine(e, v))
+			return found(refine(e, v))
 		}
-		return resolved(refine(e, node.Properties[e.Path]))
+		return found(refine(e, node.Properties[e.Path]))
 
 	case sightmap.FromComponentExists:
 		target := resolvePath(node, e.Path, r.result)
 		if target == nil {
-			return "", false, false
+			return unresolved
 		}
 		if r.privacy(target) == "block" {
-			return "", false, true
+			return held
 		}
-		return "true", true, false
+		return extracted{value: "true", ok: true}
 
 	case sightmap.FromComponent:
 		dot := strings.LastIndex(e.Path, ".")
 		if dot <= 0 || dot == len(e.Path)-1 {
-			return "", false, false
+			return unresolved
 		}
 		path, prop := e.Path[:dot], e.Path[dot+1:]
 		if !strings.Contains(path, "[]") {
 			target := resolvePath(node, path, r.result)
 			if target == nil {
-				return "", false, false
+				return unresolved
 			}
-			v, ok, held := r.readProperty(target, prop)
-			if !ok {
-				return "", false, held
+			x := r.readProperty(target, prop)
+			if !x.ok {
+				return x
 			}
-			return resolved(refine(e, v))
+			return found(refine(e, x.value))
 		}
 		if e.Join == "" {
-			return "", false, false // an array-valued result is reserved; validation rejects it
+			return unresolved // an array-valued result is reserved; validation rejects it
 		}
 		var vals []string
 		anyHeld := false
 		for _, target := range resolvePathAll(node, path, r.result) {
-			v, ok, held := r.readProperty(target, prop)
-			if !ok {
-				anyHeld = anyHeld || held
+			x := r.readProperty(target, prop)
+			if !x.ok {
+				anyHeld = anyHeld || x.withheld
 				continue
 			}
-			if v, ok = refine(e, v); ok {
+			if v, ok := refine(e, x.value); ok {
 				vals = append(vals, v)
 			}
 		}
 		if len(vals) == 0 {
-			return "", false, anyHeld
+			return extracted{withheld: anyHeld}
 		}
-		return strings.Join(vals, e.Join), true, false
+		return extracted{value: strings.Join(vals, e.Join), ok: true}
 	}
-	return "", false, false
+	return unresolved
 }
-
-// resolved adapts refine's result to resolveExtract's: a value that did not
-// resolve here was not withheld.
-func resolved(v string, ok bool) (string, bool, bool) { return v, ok, false }
 
 // refine applies e's pattern to a resolved value; an empty value is omitted.
 func refine(e sightmap.Extract, v string) (string, bool) {
@@ -195,17 +207,17 @@ func refine(e sightmap.Extract, v string) (string, bool) {
 
 // readProperty resolves the property named prop on target's own component
 // definition.
-func (r *propResolver) readProperty(target *sightmap.ComponentNode, prop string) (string, bool, bool) {
+func (r *propResolver) readProperty(target *sightmap.ComponentNode, prop string) extracted {
 	tdef := r.defByNode[target]
 	if tdef == nil {
-		return "", false, false
+		return unresolved
 	}
 	for _, tp := range tdef.Properties {
 		if tp.Name == prop {
 			return r.resolveExtract(target, tp.Extract)
 		}
 	}
-	return "", false, false
+	return unresolved
 }
 
 // resolvePathAll resolves a multi-valued component path, backing `join`. A segment

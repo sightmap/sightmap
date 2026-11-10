@@ -4,7 +4,7 @@ title: Component capture privacy via `privacy`
 author: Clint Ayres (@jurassix)
 status: Accepted
 created: 2026-09-29
-updated: 2026-11-03
+updated: 2026-11-10
 spec-version-target: 1
 related-issues: []
 related-discussions: []
@@ -208,12 +208,26 @@ could still carry content; otherwise the read is withheld like any other text:
   `placeholder`; a name nothing on the control explains is withheld.
 - **The name does not repeat the control's content.** It must not contain the current value, a text
   field's `value`, a `textarea`'s text, or any of a `select`'s option text. This holds the line if
-  an engine folds an enclosing label's own control into the name.
+  an engine folds an enclosing label's own control into the name. The test is containment of the
+  normalized text, so it fails closed: typing "pass" into a field labelled "Password" withholds the
+  label for as long as the value is a substring of it.
 
 The exception covers the name only: `raw_text` and every `attr=` read stay withheld, `aria-label`,
 `title` and `placeholder` included, and under `block` nothing resolves. The attribute rule below
 protects what a recording retains on any element; the name is let through only where the control's
 construction fixes what it can be computed from.
+
+**Why `title` and `placeholder` stay name sources, although recordings mask them.** A recording
+masks those attributes because, on an arbitrary element, it cannot tell whether they hold content.
+On a labelled form control that question is settled: they are the developer's hint for the field
+("Search", "Street address"), and the conditions above exclude the cases where they could hold what
+the user entered. They are also how most fields are labelled in practice. Across one product's
+captures, 276 of 478 visible text fields took their name from `placeholder` alone, against 87 from a
+`label` and 22 from ARIA, so withholding them would leave most masked fields anonymous again. A
+consumer that retains the masked recording and resolves the name does not contradict itself: the
+attribute stays withheld, and only the computed name of a vetted control is read. A deployment
+whose own policy masks a field's hint text (for example, a placeholder that echoes account data)
+should mark the control `block`, which a matcher can see.
 
 #### Attributes under `mask`
 
@@ -230,6 +244,21 @@ A consumer MUST withhold, under `mask`:
   what keeps it from going stale.
 - **The value of any `data-*` attribute**, and of `value`, `title`, `alt`, `placeholder`, and
   `aria-label`. These routinely carry user-visible or user-derived text.
+
+*Non-normative.* Capture pipelines that support masking commonly erase, on a masked subtree, the
+following; matching and extraction under `mask` should not resolve them either, and the rules above
+already cover each:
+
+- Attributes holding entered or displayed content: `value`, `placeholder`, `title`, `alt`, an
+  `option`'s `label`, and `checked` (a control's state is retained under the state rule below, but
+  a recording may still erase the markup attribute).
+- `data-*` attributes carrying values or identifiers: form-field state or values (`data-value`,
+  `data-*-value`); record or row identifiers (`data-id`, `data-*-id`); table cell and column identity,
+  often tied to a record; display names (`data-name`); and values injected by password managers and
+  autofill (`data-*cachedvalue`, `data-*autofill*`, and vendor-prefixed `data-*` attributes).
+- `aria-label` is left as is by many pipelines by default, which is why it may supply a control's
+  name above. A deployment that adds its own mask rule for it applies a policy a matcher cannot see;
+  `block` is the way to say so in the corpus.
 
 A consumer MAY retain, under `mask`:
 

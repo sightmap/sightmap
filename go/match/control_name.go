@@ -49,6 +49,11 @@ var labelledInputTypes = []string{
 	"checkbox", "radio", "range", "color",
 }
 
+// unlabelledInputTypes are the input types whose name is not a label: a
+// button's is its own text, an image's its alt, a file input's the chosen file,
+// and a hidden input has none.
+var unlabelledInputTypes = []string{"button", "submit", "reset", "image", "file", "hidden"}
+
 // valueRoles are the roles of an element whose value the accessible name
 // computation embeds when it meets one inside a label (accname 1.2, step 2C).
 var valueRoles = []string{
@@ -118,10 +123,14 @@ func attr(n *sightmap.ComponentNode, name string) string {
 
 func inputType(n *sightmap.ComponentNode) string {
 	t := strings.ToLower(strings.TrimSpace(attr(n, "type")))
-	if t == "" || !slices.Contains(labelledInputTypes, t) && !slices.Contains([]string{"button", "submit", "reset", "image", "file", "hidden"}, t) {
+	switch {
+	case slices.Contains(labelledInputTypes, t):
+		return t
+	case slices.Contains(unlabelledInputTypes, t):
+		return t
+	default:
 		return "text" // HTML: a missing or unknown type is the text state
 	}
-	return t
 }
 
 // isLabelledControl reports whether n is a form control whose accessible name
