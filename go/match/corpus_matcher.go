@@ -115,6 +115,10 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 		watched  []string                 // watched components matching the node
 		watchDef []*sightmap.ComponentDef // their definitions, for identity dedup
 		eff      []int                    // effective privacy by depth
+		// declared is the strictest privacy declared on each node that has one.
+		// A form control's name is vetted against unnamed nodes too, whose
+		// effective privacy the resolver folds from these on demand.
+		declared map[*sightmap.ComponentNode]int
 	)
 	onMatch := func(node *sightmap.ComponentNode, q *MatchQuery) {
 		if q.privacyRank != rankNone || q.watch {
@@ -137,6 +141,12 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 		}
 		e := foldRank(parent, local)
 		eff = append(eff[:depth], e)
+		if local != rankNone {
+			if declared == nil {
+				declared = map[*sightmap.ComponentNode]int{}
+			}
+			declared[node] = local
+		}
 		// The most specific claim names the node; among claims the selector text
 		// cannot order, the first in match order does, as before.
 		if claims = entry.narrow.mostSpecific(claims); conflicts && len(claims) >= 2 {
@@ -166,13 +176,7 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 	// Declared component properties resolve over the matched tree (SEP-0010):
 	// dom.* sources read the node itself; component and component.exists resolve
 	// a descendant matched component. No live DOM is required.
-	privacy := func(n *sightmap.ComponentNode) string {
-		if cm := result[n]; cm != nil {
-			return cm.Privacy
-		}
-		return ""
-	}
-	resolveComponentProperties(result, defByNode, privacy)
+	resolveComponentProperties(&propResolver{root: root, result: result, defByNode: defByNode, declared: declared})
 	return result, out
 }
 

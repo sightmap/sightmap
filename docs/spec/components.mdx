@@ -203,7 +203,7 @@ Rules worth knowing before you add the field:
 
 - **Omission declares nothing.** A component with no `privacy` leaves the consumer's own default unchanged, so you can adopt the field one component at a time.
 - **The corpus is a floor.** A consumer may withhold more than the corpus asks, never less. `unmask` does not override a consumer's own policy.
-- **Properties are governed too**, at the node each value is read from. A property that reads a blocked or masked node is dropped, exactly as if it had not resolved. `component.exists` and `dom.state` may still resolve under `mask`, because they report structure and state rather than content. `sightmap validate` warns `extract-privacy-withheld` on a property its own component's `privacy` would withhold.
+- **Properties are governed too**, at the node each value is read from. A property that reads a blocked or masked node is dropped, exactly as if it had not resolved. `component.exists` and `dom.state` may still resolve under `mask`, because they report structure and state rather than content. So may `dom.text` on an `input`, `textarea` or `select` whose accessible name comes only from its own `aria-label`, `title` or `placeholder` or from unmasked labels: that name labels the field and never holds what was typed. The field's value stays withheld. `sightmap validate` warns `extract-privacy-withheld` on a property its own component's `privacy` would withhold.
 - **`class`, `style`, and `id` survive `mask`**, because replay needs them to render. If one of them carries user data, use `block`.
 
 `privacy` takes no part in matching or identity. See the [schema reference](/reference/schema#privacy) and [SEP-0009](https://github.com/sightmap/sightmap/blob/main/spec/seps/0009-component-privacy.md).

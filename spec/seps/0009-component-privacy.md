@@ -4,13 +4,15 @@ title: Component capture privacy via `privacy`
 author: Clint Ayres (@jurassix)
 status: Accepted
 created: 2026-09-29
-updated: 2026-10-07
+updated: 2026-11-10
 spec-version-target: 1
 related-issues: []
 related-discussions: []
 ---
 
 > **Extract forms restated by [SEP-0017](0017-extract-object.md).** The rules below name the string extract forms; SEP-0017 restates them per `from` source (`dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`, `component`, `component.exists`) without changing them.
+
+> **Amended 2026-11-03.** Under `mask`, a `dom.text` read of an `input`, `textarea` or `select` MAY resolve to the control's accessible name, which labels the field and is never computed from what was entered, when nothing it could be computed from is content (see *A form control's name under `mask`* below and [`schema.md#privacy`](../v1/schema.md#privacy)). Everything else this SEP withholds stays withheld.
 
 > **Amended 2026-10-07.** Two points of resolution are made precise. Every component whose selector matches an element contributes its declaration, whichever component names the element, and where several declare on one element the strictest wins. And `block` is absolute: an `unmask` overrides an enclosing `mask`, never a `block`.
 
@@ -167,11 +169,65 @@ declaration of its own therefore cannot launder a value out of a blocked descend
 `exists:PATH` is the one exception, because it reports presence rather than content. Under `mask`
 it MAY be surfaced, since `mask` already permits structure. Under `block` it MUST NOT be, since a
 blocked element is not reported at all. Every other extract form (`text`, `raw_text`, `attr=NAME`,
-`PATH.prop`) yields content and is withheld under either.
+`PATH.prop`) yields content and is withheld under either, except a form control's accessible name
+under `mask` (below).
 
 `attr=` is withheld under `mask` for every attribute **except** the four interactive-state names
 below, which resolve normally. Under `block` nothing resolves, state included, because a blocked
 element is not reported at all.
+
+#### A form control's name under `mask`
+
+The accessible name of an `input`, `textarea` or `select` labels the field. HTML-AAM computes it
+from `aria-labelledby`, `aria-label`, an associated `label`, `title` or `placeholder`, and never
+from the value, so by construction it says which field this is and not what was entered in it.
+Withholding it makes a masked field anonymous: the corpus can read neither what the user typed (as
+intended) nor that the field is "Street address".
+
+A `text` (`dom.text`) read of such a control MAY therefore resolve under `mask` to its accessible
+name, never to its rendered text, when every condition below holds. Each closes a way the name
+could still carry content; otherwise the read is withheld like any other text:
+
+- **A control whose name labels it.** An `input` of any type but `button`, `submit`, `reset`
+  (their name is their own visible text), `image` (its `alt` stands for the image), `file`
+  (engines describe the chosen file) and `hidden`; a `textarea`; a `select`. Its role is a
+  form-control role: an ARIA override such as `role="button"` lets name-from-content reach it.
+  A `contenteditable` element or a `role="textbox"` that is not one of these elements holds the
+  user's text as content and is never covered, nor is `output`.
+- **`aria-labelledby` points only at vetted text.** It can reference anything, including the
+  control itself (`aria-labelledby="label self"` embeds the value) or a masked element elsewhere.
+  Every referenced element must be present, and nothing in its subtree may be masked, blocked, or a
+  control whose value the name computation embeds (accname step 2C: an `input`, `textarea`,
+  `select`, a `contenteditable` element, a textbox, combobox, listbox or range role).
+- **Otherwise `aria-label` is the name.** A non-empty `aria-label` wins over labels, and the name
+  must equal it.
+- **Otherwise labels are vetted the same way.** Every associated `label`, whether it encloses the
+  control or names its `id` in `for`, must be free of masked or blocked content and of controls
+  other than this one. A label inside a masked form is masked content, so a mask on the form
+  withholds the names its labels supply. With no label, the name must equal `title` or
+  `placeholder`; a name nothing on the control explains is withheld.
+- **The name does not repeat the control's content.** It must not contain the current value, a text
+  field's `value`, a `textarea`'s text, or any of a `select`'s option text. This holds the line if
+  an engine folds an enclosing label's own control into the name. The test is containment of the
+  normalized text, so it fails closed: typing "pass" into a field labelled "Password" withholds the
+  label for as long as the value is a substring of it.
+
+The exception covers the name only: `raw_text` and every `attr=` read stay withheld, `aria-label`,
+`title` and `placeholder` included, and under `block` nothing resolves. The attribute rule below
+protects what a recording retains on any element; the name is let through only where the control's
+construction fixes what it can be computed from.
+
+**Why `title` and `placeholder` stay name sources, although recordings mask them.** A recording
+masks those attributes because, on an arbitrary element, it cannot tell whether they hold content.
+On a labelled form control that question is settled: they are the developer's hint for the field
+("Search", "Street address"), and the conditions above exclude the cases where they could hold what
+the user entered. They are also how most fields are labelled in practice. Across one product's
+captures, 276 of 478 visible text fields took their name from `placeholder` alone, against 87 from a
+`label` and 22 from ARIA, so withholding them would leave most masked fields anonymous again. A
+consumer that retains the masked recording and resolves the name does not contradict itself: the
+attribute stays withheld, and only the computed name of a vetted control is read. A deployment
+whose own policy masks a field's hint text (for example, a placeholder that echoes account data)
+should mark the control `block`, which a matcher can see.
 
 #### Attributes under `mask`
 
@@ -188,6 +244,21 @@ A consumer MUST withhold, under `mask`:
   what keeps it from going stale.
 - **The value of any `data-*` attribute**, and of `value`, `title`, `alt`, `placeholder`, and
   `aria-label`. These routinely carry user-visible or user-derived text.
+
+*Non-normative.* Capture pipelines that support masking commonly erase, on a masked subtree, the
+following; matching and extraction under `mask` should not resolve them either, and the rules above
+already cover each:
+
+- Attributes holding entered or displayed content: `value`, `placeholder`, `title`, `alt`, an
+  `option`'s `label`, and `checked` (a control's state is retained under the state rule below, but
+  a recording may still erase the markup attribute).
+- `data-*` attributes carrying values or identifiers: form-field state or values (`data-value`,
+  `data-*-value`); record or row identifiers (`data-id`, `data-*-id`); table cell and column identity,
+  often tied to a record; display names (`data-name`); and values injected by password managers and
+  autofill (`data-*cachedvalue`, `data-*autofill*`, and vendor-prefixed `data-*` attributes).
+- `aria-label` is left as is by many pipelines by default, which is why it may supply a control's
+  name above. A deployment that adds its own mask rule for it applies a policy a matcher cannot see;
+  `block` is the way to say so in the corpus.
 
 A consumer MAY retain, under `mask`:
 
@@ -230,8 +301,9 @@ A conforming capture consumer MUST:
 - Never capture content the resolved value marks `block` or `mask`, regardless of its own defaults.
 - Withhold any `properties[]` value whose node resolves to `block` or `mask`, judged at the node
   the value is read from rather than at the declaring component, and omit it the way an unresolved
-  property is omitted. Under `mask`, `exists:PATH` and the four interactive-state attributes MAY
-  still resolve; under `block` nothing resolves.
+  property is omitted. Under `mask`, `exists:PATH`, the four interactive-state attributes and a
+  form control's accessible name, under the conditions above, MAY still resolve; under `block`
+  nothing resolves.
 - Under `mask`, withhold from the captured recording the value of every `data-*` attribute, of
   `value`/`title`/`alt`/`placeholder`/`aria-label`, and of any attribute named by an `attr=` extract
   anywhere in the corpus.
