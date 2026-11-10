@@ -1,10 +1,11 @@
 package sightmap
 
 import (
+	"cmp"
 	"fmt"
 	"net/url"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -187,7 +188,7 @@ func canonicalRoute(route string) string {
 	if err != nil {
 		return p + "?" + rawQuery
 	}
-	sort.Slice(conds, func(i, j int) bool { return conds[i].key < conds[j].key })
+	slices.SortFunc(conds, func(a, b queryCond) int { return cmp.Compare(a.key, b.key) })
 	parts := make([]string, len(conds))
 	for i, c := range conds {
 		parts[i] = c.raw

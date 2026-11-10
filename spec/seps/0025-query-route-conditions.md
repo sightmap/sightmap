@@ -132,7 +132,7 @@ A literal query value scores like a literal path segment because it is the same 
 
 **Tags.** [Tags](../v1/schema.md#tags) on views are a union across every view whose route matches the URL. Conditions apply there too: `GiftCards`'s tags reach `?section=gift-cards` URLs and no others, while `ProfileMenu`'s reach every URL at the path, as before.
 
-**Validation.** A query part that is empty (`/a?`), has a condition without `=` or with an empty key or value, names a key twice, or contains a malformed percent-escape is invalid. The schema pattern rejects the first three; a validator reports all of them (`route-query-invalid`, an error in the reference implementation). A route with an invalid query part matches nothing. `route-conflict`, which warns when two views share a route, compares routes with their conditions in a canonical order, so `/a?x=1&y=2` and `/a?y=2&x=1` are one route; routes differing only in a condition's value are different routes.
+**Validation.** A query part that is empty (`/a?`), has a condition without `=` or with an empty key or value, names a key twice, or contains a malformed percent-escape is invalid. The schema pattern rejects the first three; a validator reports all of them (`route-query-invalid`, an error in the reference implementation). A route with an invalid query part matches nothing. `route-conflict`, which warns when two views share a route, compares routes with their conditions in a canonical order, so `/a?x=1&y=2` and `/a?y=2&x=1` are one route; routes differing only in a condition's value are different routes. Conditions are compared as spelled, so `?q=a+b` and `?q=a%20b`, or `?id=:id` and `?id=:other`, are different routes although they match the same URLs, as `/:a` and `/:b` are.
 
 ### Conformance
 
@@ -146,7 +146,7 @@ A conforming SDK:
 - MUST reject a route whose query part does not validate (empty, malformed condition, repeated key, malformed percent-escape), and MUST NOT match a URL against it.
 - MUST NOT bind a property for a `KEY=:name` condition.
 
-Fixtures: `039-route-query-conditions` (the match tables above, and a request filtered by a condition) and `040-route-query-invalid` (a repeated key and a malformed escape → `route-query-invalid`; one route with its conditions reordered → `route-conflict`).
+Fixtures: `039-route-query-conditions` (the match tables above, and a request filtered by a condition) and `040-route-query-invalid` (a repeated key and a malformed escape → `route-query-invalid`; one route with its conditions reordered → `route-conflict`) and `041-route-query-order` (URL, condition and declaration order never change the match).
 
 ## Alternatives considered
 

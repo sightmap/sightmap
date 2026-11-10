@@ -235,8 +235,9 @@ export function routeSpecificity(pattern) {
 
 /**
  * The view for a URL path (with its query string, if any): the most specific
- * matching route, the first declared on a tie, or null (Go Corpus.ViewForURL). Exactly one view is active, so a
- * generic route can't add its components to a page a specific route owns.
+ * matching route, the first declared on a tie, or null (Go Corpus.ViewForURL).
+ * Exactly one view is active, so a generic route can't add its components to
+ * a page a specific route owns.
  */
 export function viewForPath(views, pathname) {
   let best = null;

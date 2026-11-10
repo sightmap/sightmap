@@ -109,9 +109,9 @@ func runSpecMatchFixtures(t *testing.T, glob string) {
 					} `json:"args"`
 					Expected struct {
 						Result struct {
-							View *struct {
-								Name string `json:"name"`
-							} `json:"view"`
+							// A pointer to a RawMessage tells "view": null (a
+							// pointer to JSON null) from an absent key (nil).
+							View     *json.RawMessage `json:"view"`
 							Requests []struct {
 								Name string `json:"name"`
 							} `json:"requests"`
@@ -126,7 +126,14 @@ func runSpecMatchFixtures(t *testing.T, glob string) {
 				if c.Command != "match" {
 					continue
 				}
-				if want := c.Expected.Result.View; want != nil {
+				if raw := c.Expected.Result.View; raw != nil {
+					var want struct {
+						Name string `json:"name"`
+					}
+					// null decodes to the zero value: no view expected.
+					if err := json.Unmarshal(*raw, &want); err != nil {
+						t.Fatalf("match %q: parse expected view: %v", c.Args.URL, err)
+					}
 					got := ""
 					if v := corpus.ViewForURL(c.Args.URL); v != nil {
 						got = v.Name
