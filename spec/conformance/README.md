@@ -72,6 +72,7 @@ For arrays in `expected`, the actual array must be at least as long, and the pre
 | 035 | `entity-id-errors` | A view and a component sharing an id across files → `id-duplicate`; an entity without an id in a sightmap that declares ids → `id-missing` ([SEP-0020](../seps/0020-entity-id.md)) |
 | 039 | `route-query-conditions` | Query conditions in view and request routes: a literal value outranks the bare path and a broader path view, `:name` and `*` require presence, extra keys are ignored, only a key's first value counts, and a request route's condition filters requests ([SEP-0025](../seps/0025-query-route-conditions.md)) |
 | 040 | `route-query-invalid` | A repeated key or a malformed percent-escape in a route's query part → `route-query-invalid`; one route with its conditions in another order → `route-conflict` ([SEP-0025](../seps/0025-query-route-conditions.md)) |
+| 041 | `route-query-order` | Neither the order of a URL's parameters, the order of a route's conditions nor the order views are declared in changes the match; a route with more satisfied conditions outranks one with fewer, and extra keys are ignored ([SEP-0025](../seps/0025-query-route-conditions.md)) |
 
 The `1NN` series verifies the [canonical format](../v1/canonical-format.md) (byte-level formatter output):
 

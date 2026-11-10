@@ -2,6 +2,7 @@ package sightmap_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -220,4 +221,74 @@ views:
 		}
 		t.Errorf("Validate codes = %v, want %v", got, want)
 	}
+}
+
+// permutations returns every ordering of xs.
+func permutations[T any](xs []T) [][]T {
+	if len(xs) <= 1 {
+		return [][]T{slices.Clone(xs)}
+	}
+	var out [][]T
+	for i := range xs {
+		rest := slices.Concat(xs[:i:i], xs[i+1:])
+		for _, p := range permutations(rest) {
+			out = append(out, append([]T{xs[i]}, p...))
+		}
+	}
+	return out
+}
+
+// Order is not significant: the same URL with its parameters shuffled, against
+// the same views declared in any order, with any route's conditions in either
+// order, resolves to one view.
+func TestViewForURLQueryOrderInsensitive(t *testing.T) {
+	views := []sightmap.ViewDef{
+		{Name: "Page", Route: "/test"},
+		{Name: "CooView", Route: "/test?b=coo"},
+		{Name: "FooView", Route: "/test?a=foo"},
+		{Name: "FooCooView", Route: "/test?a=foo&b=coo"},
+	}
+	cases := []struct {
+		params []string
+		want   string
+	}{
+		{[]string{"a=foo", "b=coo"}, "FooCooView"},
+		{[]string{"a=foo", "b=coo", "x=1"}, "FooCooView"},
+		{[]string{"b=coo"}, "CooView"},
+		{[]string{"b=coo", "a=other", "x=1"}, "CooView"},
+		{[]string{"a=foo", "b=other"}, "FooView"},
+		{[]string{"a=other", "b=other", "x=1"}, "Page"},
+		{[]string{"x=1"}, "Page"},
+	}
+	// The spelling of FooCooView's conditions, both ways.
+	for _, fooCoo := range []string{"/test?a=foo&b=coo", "/test?b=coo&a=foo"} {
+		views[3].Route = fooCoo
+		for _, order := range permutations(views) {
+			c := &sightmap.Corpus{Views: order}
+			for _, tc := range cases {
+				for _, params := range permutations(tc.params) {
+					u := "/test?" + strings.Join(params, "&")
+					got := ""
+					if v := c.ViewForURL(u); v != nil {
+						got = v.Name
+					}
+					if got != tc.want {
+						t.Errorf("ViewForURL(%q) with FooCooView %q, declared %v = %q, want %q",
+							u, fooCoo, viewNames(order), got, tc.want)
+					}
+					if tied := c.TiedViews(u); tied != nil {
+						t.Errorf("TiedViews(%q) = %v, want none", u, tied)
+					}
+				}
+			}
+		}
+	}
+}
+
+func viewNames(vs []sightmap.ViewDef) []string {
+	names := make([]string, len(vs))
+	for i, v := range vs {
+		names[i] = v.Name
+	}
+	return names
 }

@@ -1,0 +1,87 @@
+{
+  "cases": [
+    {
+      "command": "validate",
+      "args": {},
+      "expected": {
+        "ok": true,
+        "diagnostics": []
+      }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?a=foo&b=coo" },
+      "expected": { "result": { "view": { "name": "FooCooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?b=coo&a=foo" },
+      "expected": { "result": { "view": { "name": "FooCooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?x=1&b=coo&y=2&a=foo" },
+      "expected": { "result": { "view": { "name": "FooCooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?b=coo" },
+      "expected": { "result": { "view": { "name": "CooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?a=foo" },
+      "expected": { "result": { "view": { "name": "FooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?a=foo&b=other" },
+      "expected": { "result": { "view": { "name": "FooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?b=other&a=foo" },
+      "expected": { "result": { "view": { "name": "FooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?a=other&b=coo" },
+      "expected": { "result": { "view": { "name": "CooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?b=coo&a=other" },
+      "expected": { "result": { "view": { "name": "CooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?c=1&b=coo&d=2" },
+      "expected": { "result": { "view": { "name": "CooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?b=coo&b=x" },
+      "expected": { "result": { "view": { "name": "CooView" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?b=x&b=coo" },
+      "expected": { "result": { "view": { "name": "Page" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?a=other&b=other" },
+      "expected": { "result": { "view": { "name": "Page" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test?c=1" },
+      "expected": { "result": { "view": { "name": "Page" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/test" },
+      "expected": { "result": { "view": { "name": "Page" } } }
+    }
+  ]
+}
