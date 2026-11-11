@@ -44,6 +44,9 @@ type queryCacheEntry struct {
 	// narrow orders this entry's queries by selector specificity, so a node
 	// claimed by several definitions goes to the most specific (SEP-0023).
 	narrow specificity
+	// ids are combined's key ids in idsFor (MatchConflictsCached).
+	ids    []int32
+	idsFor *ClaimCache
 }
 
 // entryFor returns the cached (or freshly compiled) queries for pageURL.
