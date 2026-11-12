@@ -475,23 +475,29 @@ func getLayoutMetrics(ctx context.Context, conn *CDPConn) (layoutMetrics, error)
 	return m, nil
 }
 
-// pinFullPageViewport sizes the viewport to the whole document for a
-// full-page screenshot, at the width the page is already laid out at, and
-// returns the document clip to capture and a func that undoes the override.
+// pinFullPageViewport pins the viewport width for a full-page screenshot to
+// the width the page is already laid out at, and returns the document clip to
+// capture and a func that undoes the override.
 //
 // captureBeyondViewport keeps the window width, scrollbar included. With
 // nothing left to scroll the scrollbar disappears and its width goes into the
 // layout, so text rewraps and the document gets shorter than the probe
 // measured, and Chrome leaves the page at that wider layout afterwards. The
 // layout viewport's clientWidth excludes the scrollbar, so overriding to that
-// width and the document's height, with scrollbars hidden, keeps the probe's
-// layout. With overlay scrollbars the width is unchanged and this is a no-op.
+// width, with scrollbars hidden, keeps the probe's layout. With overlay
+// scrollbars the width is unchanged and this is a no-op.
+//
+// The height is left at the window's. captureBeyondViewport renders the whole
+// document without a taller viewport, and a taller one changes what the probe
+// measured: vh, svh and dvh lengths resolve against the viewport, so a 72vh
+// hero came out 898 px taller in the screenshot than in the probe's boxes and
+// pushed everything under it down, and a position:fixed bottom bar moved to the
+// document's bottom. Both are as the probe saw them now.
 //
 // The override belongs to this CDP session, so other clients' emulation and
 // the window size are untouched. Afterwards the session's own earlier
 // override (ResizeViewport) is re-applied, or the override cleared if there
-// was none, and the scroll position is put back, since a viewport as tall as
-// the document clamps it to 0.
+// was none.
 func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interface{}, func(), error) {
 	m, err := getLayoutMetrics(ctx, conn)
 	if err != nil {
@@ -499,7 +505,7 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 	}
 	// Clip to the size measured before the override: that is the layout the
 	// probe saw. Read again under the override, Chrome can report the content
-	// a scrollbar narrower, or taller on pages that size themselves by vh.
+	// a scrollbar narrower.
 	clip := map[string]interface{}{
 		"x": 0, "y": 0,
 		"width":  m.CSSContentSize.Width,
@@ -517,7 +523,7 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 		dsf = v
 	}
 	vw := math.Ceil(m.CSSLayoutViewport.ClientWidth)
-	vh := math.Ceil(math.Max(m.CSSContentSize.Height, m.CSSLayoutViewport.ClientHeight))
+	vh := math.Ceil(m.CSSLayoutViewport.ClientHeight)
 	if vw <= 0 || vh <= 0 {
 		return clip, noop, nil
 	}
