@@ -1,5 +1,15 @@
 # @sightmap/sightmap
 
+## 0.40.0
+
+### Minor Changes
+
+- 082dfec: `match.ClaimCache`: matching the same trees against a run of similar corpora walks each tree only for selectors it has not met. `Matcher.MatchConflictsCached` / `ConflictsCached` return exactly what `MatchConflicts` / `Conflicts` do; `CachedQueries.Claims` / `FindAll` are `FindAll` from the cache. `MatchQuery` gains `Key`, the selector text. `ClaimCache.Stats` / `ClaimStats` report what a cache holds (trees, keys, match lists, nodes).
+
+### Patch Changes
+
+- d324809: A full-page screenshot (`capture --screenshot`, `browser screenshot --full-page`) no longer stretches `vh`-sized elements. The viewport was pinned to the document's height, so `vh`, `svh` and `dvh` lengths resolved against the document: a `72vh` hero drew 898 px taller than the box the probe measured, and everything under it was drawn that far below its box (a `position: fixed; bottom: 0` bar drew at the document's end). Only the width is pinned now, to keep the page at the layout the probe saw; the whole document is still captured.
+
 ## 0.39.0
 
 ### Minor Changes
