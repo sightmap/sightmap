@@ -1,6 +1,7 @@
 package match
 
 import (
+	"encoding/binary"
 	"slices"
 	"sync"
 
@@ -34,11 +35,22 @@ type ClaimCache struct {
 const maxMissingSets = 16
 
 // missingSet is a set of queries walked together and its index, which reports
-// matches as pointers into queries.
+// matches as pointers into queries; at maps each of those pointers back to its
+// position in queries.
 type missingSet struct {
 	queries []MatchQuery
 	ids     []int32
 	index   *queryIndex
+	at      map[*MatchQuery]int
+}
+
+// newMissingSet readies queries (with their key ids) to be walked together,
+// building the index unless one is given.
+func newMissingSet(queries []MatchQuery, ids []int32, index *queryIndex) *missingSet {
+	if index == nil {
+		index = newQueryIndex(queries)
+	}
+	return &missingSet{queries: queries, ids: ids, index: index, at: positions(queries)}
 }
 
 // NewClaimCache returns an empty cache.
@@ -103,7 +115,7 @@ func (c *ClaimCache) keyIDs(queries []MatchQuery) []int32 {
 // claims returns, for each query, the nodes of root it matches in document
 // order, walking root once for every query whose key has not been walked for
 // (and for every query without a key). The tree's lock is held by the caller.
-func (c *ClaimCache) claims(t *treeClaims, root *sightmap.ComponentNode, queries []MatchQuery, ids []int32, full func() *queryIndex) [][]*sightmap.ComponentNode {
+func (c *ClaimCache) claims(t *treeClaims, root *sightmap.ComponentNode, queries []MatchQuery, ids []int32, full func() *missingSet) [][]*sightmap.ComponentNode {
 	out := make([][]*sightmap.ComponentNode, len(queries))
 	var missing []int // indices into queries, one per missing key, then every keyless one
 	queued := map[int32]bool{}
@@ -122,25 +134,27 @@ func (c *ClaimCache) claims(t *treeClaims, root *sightmap.ComponentNode, queries
 		var set *missingSet
 		switch {
 		case len(missing) == len(queries) && full != nil:
-			// A tree met for the first time misses everything: walk the whole
-			// set with its own index, built once for every tree.
-			set = &missingSet{queries: queries, ids: ids, index: full()}
+			// A tree met for the first time misses everything when every key is
+			// distinct: walk the whole set with its own index, built once for
+			// every tree.
+			set = full()
 		case keyless:
 			sub := make([]MatchQuery, len(missing))
 			for j, i := range missing {
 				sub[j] = queries[i]
 			}
-			set = &missingSet{queries: sub, ids: make([]int32, len(missing)), index: newQueryIndex(sub)}
+			subIDs := make([]int32, len(missing))
 			for j, i := range missing {
-				set.ids[j] = ids[i]
+				subIDs[j] = ids[i]
 			}
+			set = newMissingSet(sub, subIDs, nil)
 		default:
 			set = c.setFor(queries, ids, missing)
 		}
 		found := make([][]*sightmap.ComponentNode, len(set.queries))
-		at := positions(set.queries)
 		walkMatches(root, set.queries, set.index, func(n *sightmap.ComponentNode, q *MatchQuery) {
-			found[at[q]] = append(found[at[q]], n)
+			j := set.at[q]
+			found[j] = append(found[j], n)
 		}, nil)
 		keylessAt := 0
 		for j, id := range set.ids {
@@ -176,7 +190,7 @@ func (c *ClaimCache) setFor(queries []MatchQuery, ids []int32, missing []int) *m
 	key := make([]byte, 0, 4*len(missing))
 	for _, i := range missing {
 		id := ids[i]
-		key = append(key, byte(id), byte(id>>8), byte(id>>16), byte(id>>24))
+		key = binary.LittleEndian.AppendUint32(key, uint32(id))
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -189,11 +203,11 @@ func (c *ClaimCache) setFor(queries []MatchQuery, ids []int32, missing []int) *m
 	if len(c.sets) >= maxMissingSets {
 		clear(c.sets)
 	}
-	set := &missingSet{queries: make([]MatchQuery, len(missing)), ids: make([]int32, len(missing))}
+	subQueries, subIDs := make([]MatchQuery, len(missing)), make([]int32, len(missing))
 	for j, i := range missing {
-		set.queries[j], set.ids[j] = queries[i], ids[i]
+		subQueries[j], subIDs[j] = queries[i], ids[i]
 	}
-	set.index = newQueryIndex(set.queries)
+	set := newMissingSet(subQueries, subIDs, nil)
 	c.sets[string(key)] = set
 	return set
 }
@@ -205,12 +219,13 @@ type CachedQueries struct {
 	queries []MatchQuery
 	ids     []int32
 	once    sync.Once
-	index   *queryIndex
+	set     *missingSet
 }
 
-func (q *CachedQueries) fullIndex() *queryIndex {
-	q.once.Do(func() { q.index = newQueryIndex(q.queries) })
-	return q.index
+// fullSet is the whole query set, indexed on first use.
+func (q *CachedQueries) fullSet() *missingSet {
+	q.once.Do(func() { q.set = newMissingSet(q.queries, q.ids, nil) })
+	return q.set
 }
 
 // Prepare readies queries for matching through c.
@@ -228,7 +243,7 @@ func (q *CachedQueries) Claims(root *sightmap.ComponentNode) [][]*sightmap.Compo
 	t := q.cache.tree(root)
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return q.cache.claims(t, root, q.queries, q.ids, q.fullIndex)
+	return q.cache.claims(t, root, q.queries, q.ids, q.fullSet)
 }
 
 // FindAll calls onMatch for every node of root each query matches, as
@@ -262,10 +277,10 @@ func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, p
 		return nil, nil
 	}
 	qs := entry.combined
-	ids := m.entryIDs(entry, cache)
+	full := m.entrySet(entry, cache)
 	t := cache.tree(root)
 	t.mu.Lock()
-	per := cache.claims(t, root, qs, ids, func() *queryIndex { return entry.combinedIndex })
+	per := cache.claims(t, root, qs, full.ids, func() *missingSet { return full })
 	t.mu.Unlock()
 
 	// Each node's claims, as indices into qs in query order.
@@ -283,7 +298,7 @@ func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, p
 	naming := map[*sightmap.ComponentNode][]*MatchQuery{}
 	ambiguous := map[*sightmap.ComponentNode]bool{}
 	var again []int
-	var at map[*MatchQuery]int // qs positions, built only if needed
+	at := map[*MatchQuery]int{} // qs positions of the claims of ambiguous nodes
 	for n, is := range byNode {
 		var cl []*MatchQuery
 		for _, i := range is {
@@ -296,8 +311,8 @@ func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, p
 		}
 		if len(cl) >= 2 {
 			ambiguous[n] = true
-			if at == nil {
-				at = positions(qs)
+			for _, i := range is {
+				at[&qs[i]] = i
 			}
 			for _, q := range cl {
 				again = append(again, at[q])
@@ -394,17 +409,17 @@ func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, p
 	return result, out
 }
 
-// entryIDs are entry.combined's key ids in cache, interned once per entry.
-// They live on the Matcher's entry, so a cache that outlives a run of
+// entrySet is entry.combined as a missingSet, its key ids interned once per
+// entry. It lives on the Matcher's entry, so a cache that outlives a run of
 // corpora keeps none of their compiled queries alive; the entry holds the
 // cache only while the Matcher lives.
-func (m *Matcher) entryIDs(entry *queryCacheEntry, cache *ClaimCache) []int32 {
+func (m *Matcher) entrySet(entry *queryCacheEntry, cache *ClaimCache) *missingSet {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if entry.idsFor != cache {
-		entry.ids, entry.idsFor = cache.keyIDs(entry.combined), cache
+	if entry.setFor != cache {
+		entry.set, entry.setFor = newMissingSet(entry.combined, cache.keyIDs(entry.combined), entry.combinedIndex), cache
 	}
-	return entry.ids
+	return entry.set
 }
 
 // positions maps each query's address in qs to its index.
