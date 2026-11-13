@@ -456,8 +456,6 @@ type layoutMetrics struct {
 		Height float64 `json:"height"`
 	} `json:"cssContentSize"`
 	CSSLayoutViewport struct {
-		PageX        float64 `json:"pageX"`
-		PageY        float64 `json:"pageY"`
 		ClientWidth  float64 `json:"clientWidth"`
 		ClientHeight float64 `json:"clientHeight"`
 	} `json:"cssLayoutViewport"`
@@ -475,23 +473,30 @@ func getLayoutMetrics(ctx context.Context, conn *CDPConn) (layoutMetrics, error)
 	return m, nil
 }
 
-// pinFullPageViewport sizes the viewport to the whole document for a
-// full-page screenshot, at the width the page is already laid out at, and
-// returns the document clip to capture and a func that undoes the override.
+// pinFullPageViewport pins the viewport width for a full-page screenshot to
+// the width the page is already laid out at, and returns the document clip to
+// capture and a func that undoes the override.
 //
 // captureBeyondViewport keeps the window width, scrollbar included. With
 // nothing left to scroll the scrollbar disappears and its width goes into the
 // layout, so text rewraps and the document gets shorter than the probe
 // measured, and Chrome leaves the page at that wider layout afterwards. The
 // layout viewport's clientWidth excludes the scrollbar, so overriding to that
-// width and the document's height, with scrollbars hidden, keeps the probe's
-// layout. With overlay scrollbars the width is unchanged and this is a no-op.
+// width, with scrollbars hidden, keeps the probe's layout. With overlay
+// scrollbars the width is unchanged and this is a no-op.
+//
+// The height is left at the window's: vh, svh and dvh resolve against the
+// viewport, so a taller one would stretch vh-sized elements and move
+// position:fixed ones to the document's bottom, away from the boxes the probe
+// measured. captureBeyondViewport renders the whole document without it.
+// Because the viewport keeps its size, the page keeps its scroll position
+// (the capture runs there, and fixed elements are drawn at that offset), so
+// nothing needs restoring but the override.
 //
 // The override belongs to this CDP session, so other clients' emulation and
 // the window size are untouched. Afterwards the session's own earlier
 // override (ResizeViewport) is re-applied, or the override cleared if there
-// was none, and the scroll position is put back, since a viewport as tall as
-// the document clamps it to 0.
+// was none.
 func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interface{}, func(), error) {
 	m, err := getLayoutMetrics(ctx, conn)
 	if err != nil {
@@ -499,7 +504,7 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 	}
 	// Clip to the size measured before the override: that is the layout the
 	// probe saw. Read again under the override, Chrome can report the content
-	// a scrollbar narrower, or taller on pages that size themselves by vh.
+	// a scrollbar narrower.
 	clip := map[string]interface{}{
 		"x": 0, "y": 0,
 		"width":  m.CSSContentSize.Width,
@@ -517,7 +522,10 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 		dsf = v
 	}
 	vw := math.Ceil(m.CSSLayoutViewport.ClientWidth)
-	vh := math.Ceil(math.Max(m.CSSContentSize.Height, m.CSSLayoutViewport.ClientHeight))
+	// clientHeight excludes a classic horizontal scrollbar, which vh includes:
+	// on a page that overflows sideways 100vh comes out about 15 px shorter
+	// than the probe saw, the same skew vw has from the width pin. Accepted.
+	vh := math.Ceil(m.CSSLayoutViewport.ClientHeight)
 	if vw <= 0 || vh <= 0 {
 		return clip, noop, nil
 	}
@@ -539,9 +547,6 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 			_, _ = conn.call(rctx, "Emulation.setDeviceMetricsOverride", prev)
 		} else {
 			_, _ = conn.call(rctx, "Emulation.clearDeviceMetricsOverride", map[string]interface{}{})
-		}
-		if x, y := m.CSSLayoutViewport.PageX, m.CSSLayoutViewport.PageY; x != 0 || y != 0 {
-			_, _ = EvalJSON(rctx, conn, fmt.Sprintf("window.scrollTo(%g, %g)", x, y))
 		}
 	}
 	return clip, restore, nil

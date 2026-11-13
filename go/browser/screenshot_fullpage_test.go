@@ -18,9 +18,9 @@ import (
 )
 
 // A full-page screenshot pins the viewport to the page's own layout width
-// (clientWidth, which excludes a classic scrollbar) and the document height
-// before capturing, clips to the pre-override content size, and undoes the
-// override and the scroll clamp afterwards.
+// (clientWidth, which excludes a classic scrollbar) and leaves its height at
+// the window's, so vh units resolve as the probe saw them. It clips to the
+// pre-override content size and undoes the override afterwards.
 func TestScreenshotWithOptions_FullPagePinsLayoutWidth(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte("fake"))
 
@@ -80,8 +80,8 @@ func TestScreenshotWithOptions_FullPagePinsLayoutWidth(t *testing.T) {
 	if err := json.Unmarshal(got[override].params, &dm); err != nil {
 		t.Fatal(err)
 	}
-	if dm.Width != 1153 || dm.Height != 26212 || dm.DeviceScaleFactor != 0 || dm.Mobile {
-		t.Errorf("setDeviceMetricsOverride = %+v, want 1153x26212, deviceScaleFactor 0, not mobile", dm)
+	if dm.Width != 1153 || dm.Height != 913 || dm.DeviceScaleFactor != 0 || dm.Mobile {
+		t.Errorf("setDeviceMetricsOverride = %+v, want 1153x913 (the layout viewport), deviceScaleFactor 0, not mobile", dm)
 	}
 
 	var shot struct {
@@ -110,26 +110,21 @@ func TestScreenshotWithOptions_FullPagePinsLayoutWidth(t *testing.T) {
 		t.Errorf("setScrollbarsHidden = %v, want [true false]", hidden)
 	}
 
-	scrolled := false
-	for _, c := range got[capture:] {
-		if c.method == "Runtime.evaluate" && strings.Contains(string(c.params), "scrollTo(0, 3000)") {
-			scrolled = true
+	// The viewport keeps the window's size, so the scroll position is never
+	// disturbed and there is nothing to restore (the real-Chrome scrolled test
+	// checks it).
+	for _, c := range got[override:] {
+		if c.method == "Runtime.evaluate" {
+			t.Errorf("want no script run once the override is set (no scroll restore); calls: %v", order)
 		}
-	}
-	if !scrolled {
-		t.Errorf("want the scroll position (0, 3000) restored after capture; calls: %v", order)
 	}
 }
 
-// TestFullPageScreenshotMatchesLayout_Chrome checks against a real Chrome
-// that an element's box, measured before a full-page screenshot, is where the
-// screenshot draws it on a page whose height depends on its width, and that
-// the page is left at its own layout. With captureBeyondViewport alone the
-// classic scrollbar's 15 px go to the layout and the marker is drawn 60 px
-// below its box.
-//
-// Opt-in: SIGHTMAP_CHROME_E2E=1 (uses FindChrome, or SIGHTMAP_CHROME).
-func TestFullPageScreenshotMatchesLayout_Chrome(t *testing.T) {
+// fullPageChrome starts a headless Chrome at a 700x600 window, DPR 2, and
+// returns a context bounding the test and a connection to its tab. It skips
+// unless SIGHTMAP_CHROME_E2E=1.
+func fullPageChrome(t *testing.T) (context.Context, *CDPConn) {
+	t.Helper()
 	if os.Getenv("SIGHTMAP_CHROME_E2E") == "" {
 		t.Skip("set SIGHTMAP_CHROME_E2E=1 to run against a real Chrome")
 	}
@@ -164,7 +159,7 @@ func TestFullPageScreenshotMatchesLayout_Chrome(t *testing.T) {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
+	t.Cleanup(cancel)
 	var conn *CDPConn
 	for conn == nil {
 		if ctx.Err() != nil {
@@ -176,7 +171,21 @@ func TestFullPageScreenshotMatchesLayout_Chrome(t *testing.T) {
 			time.Sleep(200 * time.Millisecond)
 		}
 	}
-	defer conn.Close()
+	t.Cleanup(func() { conn.Close() })
+
+	return ctx, conn
+}
+
+// TestFullPageScreenshotMatchesLayout_Chrome checks against a real Chrome
+// that an element's box, measured before a full-page screenshot, is where the
+// screenshot draws it on a page whose height depends on its width, and that
+// the page is left at its own layout. With captureBeyondViewport alone the
+// classic scrollbar's 15 px go to the layout and the marker is drawn 60 px
+// below its box.
+//
+// Opt-in: SIGHTMAP_CHROME_E2E=1 (uses FindChrome, or SIGHTMAP_CHROME).
+func TestFullPageScreenshotMatchesLayout_Chrome(t *testing.T) {
+	ctx, conn := fullPageChrome(t)
 
 	// The tall block's height follows the layout width, as wrapped text does
 	// on a long article, so any change of width moves the marker below it.
@@ -274,10 +283,104 @@ func TestScreenshotWithOptions_FullPageKeepsResize(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if want := []string{"800x600@1", "785x5000@1", "800x600@1"}; fmt.Sprint(overrides) != fmt.Sprint(want) {
+	if want := []string{"800x600@1", "785x600@1", "800x600@1"}; fmt.Sprint(overrides) != fmt.Sprint(want) {
 		t.Errorf("setDeviceMetricsOverride sizes = %v, want %v", overrides, want)
 	}
 	if cleared {
 		t.Error("clearDeviceMetricsOverride called; the resize should have been re-applied")
+	}
+}
+
+// TestFullPageScreenshotKeepsViewportUnits_Chrome checks against a real Chrome
+// that a full-page screenshot draws vh-sized and viewport-fixed elements where
+// the probe measured them. Pinning the viewport to the document's height made
+// a 50vh block as tall as half the document and moved a bottom:0 bar to the
+// document's end, so everything under the block was drawn far below its box.
+//
+// Opt-in: SIGHTMAP_CHROME_E2E=1 (uses FindChrome, or SIGHTMAP_CHROME).
+func TestFullPageScreenshotKeepsViewportUnits_Chrome(t *testing.T) {
+	ctx, conn := fullPageChrome(t)
+	checkViewportUnits(t, ctx, conn, 0)
+}
+
+// The same page, scrolled first. A full-page capture now runs at the page's
+// scroll offset (a viewport as tall as the document used to clamp it to 0), so
+// this checks that the marker and the fixed bar still land on their boxes and
+// that the scroll position survives the capture.
+func TestFullPageScreenshotKeepsViewportUnitsWhenScrolled_Chrome(t *testing.T) {
+	ctx, conn := fullPageChrome(t)
+	checkViewportUnits(t, ctx, conn, 800)
+}
+
+// checkViewportUnits loads a page with a 50vh block, a marker under it and a
+// bottom:0 fixed bar, scrolls it to scrollY, measures the boxes in document
+// coordinates, takes a full-page screenshot and compares where each is drawn.
+func checkViewportUnits(t *testing.T, ctx context.Context, conn *CDPConn, scrollY float64) {
+	t.Helper()
+	page := `<!doctype html><html><body style="margin:0">` +
+		`<div id="hero" style="height:50vh;background:#00f"></div>` +
+		`<div id="marker" style="height:40px;background:#f00"></div>` +
+		`<div style="height:3000px;background:#ccc"></div>` +
+		`<div id="bar" style="position:fixed;bottom:0;left:0;right:0;height:30px;background:#0a0"></div>` +
+		`</body></html>`
+	if err := NavigateAndWaitIdle(ctx, conn, "data:text/html,"+url.PathEscape(page), 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if scrollY != 0 {
+		if _, err := EvalJSON(ctx, conn, fmt.Sprintf("window.scrollTo(0, %g)", scrollY)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	measure := func() (m struct{ Marker, Bar, DPR, ScrollY float64 }) {
+		raw, err := EvalJSON(ctx, conn, `(() => {
+			const top = id => document.getElementById(id).getBoundingClientRect().top + scrollY;
+			return {marker: top("marker"), bar: top("bar"), dpr: devicePixelRatio, scrollY: scrollY};
+		})()`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	m := measure()
+	if math.Abs(m.ScrollY-scrollY) > 1 {
+		t.Fatalf("page scrolled to %.0f, want %.0f", m.ScrollY, scrollY)
+	}
+
+	shot, err := ScreenshotWithOptions(ctx, conn, ScreenshotOptions{Format: "png", FullPage: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := png.Decode(bytes.NewReader(shot))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := img.Bounds()
+	firstRow := func(match func(r, g, bl uint32) bool) float64 {
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			r, g, bl, _ := img.At(b.Min.X+10, y).RGBA()
+			if match(r>>8, g>>8, bl>>8) {
+				return float64(y-b.Min.Y) / m.DPR
+			}
+		}
+		return -1
+	}
+	red := firstRow(func(r, g, bl uint32) bool { return r > 200 && g < 60 && bl < 60 })
+	green := firstRow(func(r, g, bl uint32) bool { return g > 130 && r < 60 && bl < 60 })
+	t.Logf("scroll %.0f: marker box %.1f drawn %.1f; bar box %.1f drawn %.1f; scroll after %.1f",
+		scrollY, m.Marker, red, m.Bar, green, measure().ScrollY)
+	if red < 0 || green < 0 {
+		t.Fatalf("marker (%.1f) or bar (%.1f) not found in the %dx%d screenshot", red, green, b.Dx(), b.Dy())
+	}
+	if math.Abs(red-m.Marker) > 1 {
+		t.Errorf("marker below a 50vh block: box top %.0f CSS px, drawn at %.1f: the block was drawn at another height", m.Marker, red)
+	}
+	if math.Abs(green-m.Bar) > 1 {
+		t.Errorf("fixed bottom bar: box top %.0f CSS px, drawn at %.1f", m.Bar, green)
+	}
+	if after := measure().ScrollY; math.Abs(after-scrollY) > 1 {
+		t.Errorf("scroll position %.0f before the capture, %.1f after", scrollY, after)
 	}
 }
