@@ -21,6 +21,8 @@ import (
 //
 // Trees must not change while they are cached. A ClaimCache is safe for
 // concurrent use; calls on different trees run in parallel.
+// Nothing drops a tree or resets the cache, so its trees and keys grow for
+// its whole life: make one per run of corpora, not one per process.
 type ClaimCache struct {
 	mu    sync.Mutex
 	keys  map[string]int32
