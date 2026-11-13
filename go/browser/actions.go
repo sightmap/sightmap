@@ -456,8 +456,6 @@ type layoutMetrics struct {
 		Height float64 `json:"height"`
 	} `json:"cssContentSize"`
 	CSSLayoutViewport struct {
-		PageX        float64 `json:"pageX"`
-		PageY        float64 `json:"pageY"`
 		ClientWidth  float64 `json:"clientWidth"`
 		ClientHeight float64 `json:"clientHeight"`
 	} `json:"cssLayoutViewport"`
@@ -487,12 +485,13 @@ func getLayoutMetrics(ctx context.Context, conn *CDPConn) (layoutMetrics, error)
 // width, with scrollbars hidden, keeps the probe's layout. With overlay
 // scrollbars the width is unchanged and this is a no-op.
 //
-// The height is left at the window's. captureBeyondViewport renders the whole
-// document without a taller viewport, and a taller one changes what the probe
-// measured: vh, svh and dvh lengths resolve against the viewport, so a 72vh
-// hero came out 898 px taller in the screenshot than in the probe's boxes and
-// pushed everything under it down, and a position:fixed bottom bar moved to the
-// document's bottom. Both are as the probe saw them now.
+// The height is left at the window's: vh, svh and dvh resolve against the
+// viewport, so a taller one would stretch vh-sized elements and move
+// position:fixed ones to the document's bottom, away from the boxes the probe
+// measured. captureBeyondViewport renders the whole document without it.
+// Because the viewport keeps its size, the page keeps its scroll position
+// (the capture runs there, and fixed elements are drawn at that offset), so
+// nothing needs restoring but the override.
 //
 // The override belongs to this CDP session, so other clients' emulation and
 // the window size are untouched. Afterwards the session's own earlier
@@ -523,6 +522,9 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 		dsf = v
 	}
 	vw := math.Ceil(m.CSSLayoutViewport.ClientWidth)
+	// clientHeight excludes a classic horizontal scrollbar, which vh includes:
+	// on a page that overflows sideways 100vh comes out about 15 px shorter
+	// than the probe saw, the same skew vw has from the width pin. Accepted.
 	vh := math.Ceil(m.CSSLayoutViewport.ClientHeight)
 	if vw <= 0 || vh <= 0 {
 		return clip, noop, nil
@@ -545,9 +547,6 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 			_, _ = conn.call(rctx, "Emulation.setDeviceMetricsOverride", prev)
 		} else {
 			_, _ = conn.call(rctx, "Emulation.clearDeviceMetricsOverride", map[string]interface{}{})
-		}
-		if x, y := m.CSSLayoutViewport.PageX, m.CSSLayoutViewport.PageY; x != 0 || y != 0 {
-			_, _ = EvalJSON(rctx, conn, fmt.Sprintf("window.scrollTo(%g, %g)", x, y))
 		}
 	}
 	return clip, restore, nil
