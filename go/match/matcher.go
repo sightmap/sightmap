@@ -16,6 +16,11 @@ type MatchQuery struct {
 	// def for this match (component names are unique only per parent, so a name
 	// lookup would collide). Consumers read Memory/Tags/Properties from it.
 	Def *sightmap.ComponentDef
+	// Key identifies the selector the query was compiled from: two queries with
+	// the same Key match the same nodes of any tree. ParseQueries sets it to the
+	// selector text. A ClaimCache shares matches between queries by Key, across
+	// Matchers; an empty Key is never cached.
+	Key string
 	// privacyRank and watch mark a capture rule (see capture.go), which declares
 	// privacy or watch for the elements it matches and never names one.
 	privacyRank int

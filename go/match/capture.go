@@ -68,7 +68,7 @@ func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 				continue // reported by validation
 			}
 			cs.queries = append(cs.queries, MatchQuery{
-				Name: d.Name, Parts: ps.Parts, Combinators: ps.Combinators, Def: d,
+				Name: d.Name, Parts: ps.Parts, Combinators: ps.Combinators, Def: d, Key: sel,
 				privacyRank: rank, watch: d.Watch,
 			})
 		}
