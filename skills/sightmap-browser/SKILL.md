@@ -109,7 +109,7 @@ probe ID from snapshot output **or** a component query (see below):
 | `sightmap browser click 'ComponentQuery'` | Click element by sightmap identity (preferred on dynamic pages) |
 | `sightmap browser fill [--clear] <id-or-query> "text"` | Type into an input. Errors if the value doesn't stick — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
-| `sightmap browser keypress Enter` | Press a key (optionally focused on `<id>`) |
+| `sightmap browser keypress Enter` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)) |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |
@@ -117,6 +117,31 @@ probe ID from snapshot output **or** a component query (see below):
 | `sightmap browser wait-for --component '<Query>'` | Wait until a component query matches a node |
 | `sightmap browser wait-for --selector "[data-loaded]"` | Wait until a CSS selector matches (also `--url SUBSTRING` (plain substring, not glob), `--load`) |
 | `sightmap browser tabs list` | List open tabs |
+
+### Keyboard
+
+`keypress` takes one key or a chord, `Modifier+…+Key`, the way Playwright's `press` does:
+
+```bash
+sightmap browser keypress c               # key "c", code "KeyC"
+sightmap browser keypress Shift+KeyV      # key "V", code "KeyV", shiftKey
+sightmap browser keypress Meta+K          # ⌘K; no "k" is typed
+sightmap browser keypress Alt+Shift+P
+sightmap browser keypress ControlOrMeta+Enter   # Meta on macOS, Control elsewhere
+```
+
+- **Modifiers:** `Shift`, `Control` (`Ctrl`), `Alt` (`Option`), `Meta` (`Cmd`, `Command`),
+  `ControlOrMeta`. The page gets the modifier state on keydown/keyup and key events for
+  the modifiers themselves.
+- **Keys:** a character (`c`, `C`, `5`, `.`, `?`, `[`), a code name (`KeyC`, `Digit1`,
+  `Period`, `BracketLeft`), or `Enter`, `Tab`, `Escape`, `Space`, `Backspace`, `Delete`,
+  `Home`, `End`, `PageUp`, `PageDown`, `ArrowUp/Down/Left/Right`, `F1`–`F12`. Both forms
+  give the same `event.code` (US layout), so apps that match `event.code` plus modifiers
+  work. A character is not a modifier: `C` is key `C` with no `shiftKey`; use
+  `Shift+KeyC` or `Shift+c` for Shift held.
+- **Text:** a character is typed (into a focused input) only when no Control, Meta or Alt
+  is held.
+- **Sequences** (`G` then `I`) are separate calls: `keypress g` then `keypress i`.
 
 ### Component queries (CSS-shaped, over sightmap components + extracted properties)
 

@@ -217,8 +217,12 @@ func runKeyPress(args []string) error {
 		return err
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: browser keypress KEY\n" +
-			"  KEY examples: Enter Tab Escape Backspace Delete ArrowUp ArrowDown Space")
+		return fmt.Errorf("usage: browser keypress KEY | MODIFIER+...+KEY\n" +
+			"  KEY: a character (c C 5 . ? [), a code name (KeyC Digit1 Period BracketLeft),\n" +
+			"       or a named key (Enter Tab Escape Space Backspace Delete Home End PageUp PageDown\n" +
+			"       ArrowUp ArrowDown ArrowLeft ArrowRight F1-F12)\n" +
+			"  MODIFIER: Shift Control|Ctrl Alt|Option Meta|Cmd|Command ControlOrMeta\n" +
+			"  examples: Escape  Shift+KeyV  Meta+K  Alt+Shift+P  Ctrl+r  ControlOrMeta+Enter")
 	}
 
 	ctx := context.Background()
