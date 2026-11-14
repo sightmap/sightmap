@@ -1,7 +1,15 @@
 // This script injects sightmap ids and computes all component properties
 // in a single JavaScript execution, eliminating the need for multiple CDP calls.
-function computeCompProps(isLogicalRoot, useScrollOffset) {
+//
+// idPrefix is prepended to every id the run mints ("" for the top document,
+// "2_" for the page's third frame), so ids stay unique across the documents of
+// one page and an id alone says which frame holds the element. maxNodes caps
+// how many ids (elements plus text nodes) the run mints: past it the walk
+// stops and the result says so (truncated). 0 or absent means no cap.
+function computeCompProps(isLogicalRoot, useScrollOffset, idPrefix, maxNodes) {
     'use strict';
+    idPrefix = idPrefix || '';
+    maxNodes = maxNodes || 0;
 
     // NOTE: Sync these to cdp_components.go
     const ATTR_PREFIX = 'data-sightmap-';
@@ -12,7 +20,7 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
      * Generates a sequential sightmap id for an element.
      */
     function genSightmapId(element, idCounter) {
-        const id = idCounter.value.toString();
+        const id = idPrefix + idCounter.value.toString();
         idCounter.value++;
         return id;
     }
@@ -21,7 +29,7 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
      * Generates a sequential sightmap id for a text node.
      */
     function genTextSightmapId(textNode, fallbackCounter) {
-        const id = fallbackCounter.value.toString();
+        const id = idPrefix + fallbackCounter.value.toString();
         fallbackCounter.value++;
         return id;
     }
@@ -539,8 +547,15 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
         const idCounter = { value: 1 };
 
         // Single-pass DOM traversal: inject ids and compute properties simultaneously
+        let truncated = false;
         function procNode(node) {
             if (node.nodeType === Node.ELEMENT_NODE) {
+                // Past the cap nothing more is stamped: the subtree is left out
+                // whole, and the caller is told the document was cut short.
+                if (maxNodes > 0 && idCounter.value > maxNodes) {
+                    truncated = true;
+                    return;
+                }
                 // Generate sightmap id
                 const sightmapId = genSightmapId(node, idCounter);
                 node.setAttribute(SIGHTMAP_ATTR, sightmapId);
@@ -607,6 +622,8 @@ function computeCompProps(isLogicalRoot, useScrollOffset) {
         return {
             success: true,
             results: results,
+            truncated: truncated,
+            viewport: { width: window.innerWidth, height: window.innerHeight },
             debug: debugInfo.join('\n'),
         };
     } catch (error) {

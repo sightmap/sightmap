@@ -109,6 +109,48 @@ func newFakeCDP(t *testing.T, handler func(method string, params json.RawMessage
 	return conn
 }
 
+// newFakeCDPSessions is newFakeCDP for a handler that also wants the sessionId
+// a command was addressed to.
+func newFakeCDPSessions(t *testing.T, handler func(session, method string, params json.RawMessage) json.RawMessage) *CDPConn {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/json/list" {
+			json.NewEncoder(w).Encode([]map[string]string{{"type": "page", "webSocketDebuggerUrl": "ws://" + r.Host + "/ws", "url": "about:blank"}})
+			return
+		}
+		ws, err := wsUpgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		go func() {
+			for {
+				_, raw, err := ws.ReadMessage()
+				if err != nil {
+					return
+				}
+				var req struct {
+					ID        int64           `json:"id"`
+					Method    string          `json:"method"`
+					SessionID string          `json:"sessionId"`
+					Params    json.RawMessage `json:"params"`
+				}
+				if json.Unmarshal(raw, &req) != nil {
+					continue
+				}
+				res := handler(req.SessionID, req.Method, req.Params)
+				ws.WriteJSON(map[string]interface{}{"id": req.ID, "result": res})
+			}
+		}()
+	}))
+	t.Cleanup(srv.Close)
+	conn, err := DialCDP(context.Background(), srv.Listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	return conn
+}
+
 // TestSubscribeUnsubscribe verifies that Subscribe delivers events and
 // Unsubscribe stops delivery.
 func TestSubscribeUnsubscribe(t *testing.T) {

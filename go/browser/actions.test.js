@@ -226,3 +226,22 @@ describe("__smClearActiveElement", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("__smFocusBySelector", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("scrolls to and focuses the element, reporting that it exists", () => {
+    document.body.innerHTML = '<input id="in">';
+    const el = document.getElementById("in");
+    el.scrollIntoView = jest.fn();
+    expect(__smFocusBySelector("#in")).toBe(true);
+    expect(el.scrollIntoView).toHaveBeenCalled();
+    expect(document.activeElement).toBe(el);
+  });
+
+  test("returns false when nothing matches", () => {
+    expect(__smFocusBySelector("#missing")).toBe(false);
+  });
+});

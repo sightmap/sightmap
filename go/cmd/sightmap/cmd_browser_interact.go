@@ -212,13 +212,14 @@ func runKeyPress(args []string) error {
 	fs := flag.NewFlagSet("keypress", flag.ContinueOnError)
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: browser keypress KEY\n" +
-			"  KEY examples: Enter Tab Escape Backspace Delete ArrowUp ArrowDown Space")
+		return fmt.Errorf("usage: browser keypress KEY [COMPONENT-ID | 'ComponentQuery']\n" +
+			"  KEY examples: Enter Tab Escape Backspace Delete ArrowUp ArrowDown Space\n" +
+			"  the optional target is given keyboard focus first, in whichever frame holds it")
 	}
 
 	ctx := context.Background()
@@ -228,6 +229,15 @@ func runKeyPress(args []string) error {
 	}
 	defer conn.Close()
 
+	if fs.NArg() > 1 {
+		node, err := resolveTarget(ctx, conn, *sightmapDirFlag, fs.Arg(1))
+		if err != nil {
+			return err
+		}
+		if err := browser.Focus(ctx, conn, node); err != nil {
+			return err
+		}
+	}
 	if err := browser.KeyPress(ctx, conn, fs.Arg(0)); err != nil {
 		return err
 	}

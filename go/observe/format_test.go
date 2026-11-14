@@ -157,3 +157,38 @@ func TestObserve_ViewTagsUnionAcrossMatchingViews(t *testing.T) {
 		t.Errorf("expected a tags line under the view, got:\n%s", out)
 	}
 }
+
+// TestObserve_FramesSection: each child frame document is listed with the view
+// its own URL resolves to, and what extraction left out is reported.
+func TestObserve_FramesSection(t *testing.T) {
+	corpus := &sightmap.Corpus{Views: []sightmap.ViewDef{
+		{Name: "Host", Route: "/"},
+		{Name: "Widget", Route: "/sandbox"},
+	}}
+	doc := &sightmap.ComponentNode{Id: "1_1", Role: "document", IsVisible: true, FrameURL: "http://127.0.0.1:5274/sandbox?csp=x"}
+	other := &sightmap.ComponentNode{Id: "2_1", Role: "document", IsVisible: true, FrameURL: "https://ads.example.com/slot"}
+	root := &sightmap.ComponentNode{Id: "1", Role: "document", IsVisible: true, Children: []*sightmap.ComponentNode{
+		{Id: "5", Role: "Iframe", IsVisible: true, Children: []*sightmap.ComponentNode{doc}},
+		{Id: "6", Role: "Iframe", IsVisible: true, Children: []*sightmap.ComponentNode{other}},
+	}}
+	r := apply(root, "http://localhost:5274/", corpus, Options{})
+	r.Notes = []string{"frame https://ads.example.com/slot cut at 3000 nodes (raise --frame-max-nodes, or --no-frames to leave frames out)"}
+	out := renderResult(r)
+
+	for _, want := range []string{
+		"[Frames]\n",
+		"1_1  http://127.0.0.1:5274/sandbox?csp=x  view: Widget\n",
+		"2_1  https://ads.example.com/slot  (no view matched)\n",
+		"\xe2\x9a\xa0 frame https://ads.example.com/slot cut at 3000 nodes",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+
+	// A page with no frames and no notes has no section.
+	plain := renderResult(apply(&sightmap.ComponentNode{Id: "1", Role: "document", IsVisible: true}, "http://localhost:5274/", corpus, Options{}))
+	if strings.Contains(plain, "[Frames]") {
+		t.Errorf("a page without frames printed a [Frames] section:\n%s", plain)
+	}
+}

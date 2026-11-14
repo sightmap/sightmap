@@ -120,7 +120,9 @@ type Bounds struct {
 // full field contract.
 type ComponentNode struct {
 	// Id is a globally unique identifier assigned during extraction.
-	// For multi-frame pages, frame-prefixed IDs are used (e.g. "1_5").
+	// For multi-frame pages, frame-prefixed IDs are used (e.g. "1_5"): the
+	// top document's ids are bare numbers and the Nth child frame's carry
+	// the prefix "N_".
 	Id string `json:"id"`
 
 	// Role is the WAI-ARIA role from the accessibility tree. (post-merge)
@@ -189,9 +191,22 @@ type ComponentNode struct {
 	// NthChild is the 1-based position of this node among its parent's children. (pre-merge)
 	NthChild int `json:"nthChild"`
 
+	// FrameURL is set only on the root of a child frame's document, which sits
+	// as the single child of its owning <iframe> node. It is the URL the
+	// document is matched at: its own, except that an about:blank or
+	// about:srcdoc document takes its parent's, as a srcdoc document's base URL
+	// does. Matching treats such a root as the top of a page of its own: a
+	// selector does not cross the boundary, and the corpus's view for FrameURL,
+	// not the page's, supplies the components. Empty on every other node,
+	// including the top document's root.
+	FrameURL string `json:"frameUrl,omitempty"`
+
 	// Children holds the direct children of this node in document order.
 	Children []*ComponentNode `json:"children,omitempty"`
 }
+
+// IsFrameRoot reports whether n is the root of a child frame's document.
+func (n *ComponentNode) IsFrameRoot() bool { return n.FrameURL != "" }
 
 // UnmarshalJSON implements lenient unmarshaling with sensible defaults for test fixtures.
 // This allows minimal JSON fixtures to omit common default values while maintaining
