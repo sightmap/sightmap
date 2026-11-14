@@ -8,6 +8,7 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -539,6 +540,143 @@ func TestKeyPress_Enter(t *testing.T) {
 	}
 	if keyEvents[1].Type != "keyUp" || keyEvents[1].Key != "Enter" {
 		t.Errorf("event 1: type=%q key=%q, want keyUp/Enter", keyEvents[1].Type, keyEvents[1].Key)
+	}
+}
+
+// TestKeyPress_Chords asserts the exact Input.dispatchKeyEvent params that
+// KeyPress sends for single keys and Playwright-style chords.
+func TestKeyPress_Chords(t *testing.T) {
+	defer func(old bool) { controlOrMetaIsMeta = old }(controlOrMetaIsMeta)
+	controlOrMetaIsMeta = true
+
+	type ev = map[string]interface{}
+	// key builds the main key's down/up pair. text != "" makes the down a
+	// keyDown carrying it; otherwise the down is a rawKeyDown.
+	key := func(k, code string, vk, mods int, text string) []ev {
+		down := ev{"type": "rawKeyDown", "key": k, "code": code, "windowsVirtualKeyCode": vk, "modifiers": mods}
+		if text != "" {
+			down["type"] = "keyDown"
+			down["text"] = text
+		}
+		return []ev{down, {"type": "keyUp", "key": k, "code": code, "windowsVirtualKeyCode": vk, "modifiers": mods}}
+	}
+	mod := func(typ, k, code string, vk, mods int) ev {
+		return ev{"type": typ, "key": k, "code": code, "windowsVirtualKeyCode": vk, "location": 1, "modifiers": mods}
+	}
+	// wrap surrounds the main events with modifier downs and (reversed) ups.
+	// Each mod is {key, code, vk, bit}; the bit accumulates down and unwinds up.
+	type m struct {
+		key, code string
+		vk, bit   int
+	}
+	wrap := func(mods []m, main []ev) []ev {
+		var out []ev
+		acc := 0
+		for _, x := range mods {
+			acc |= x.bit
+			out = append(out, mod("rawKeyDown", x.key, x.code, x.vk, acc))
+		}
+		out = append(out, main...)
+		for i := len(mods) - 1; i >= 0; i-- {
+			acc &^= mods[i].bit
+			out = append(out, mod("keyUp", mods[i].key, mods[i].code, mods[i].vk, acc))
+		}
+		return out
+	}
+	shift := m{"Shift", "ShiftLeft", 16, 8}
+	ctrl := m{"Control", "ControlLeft", 17, 2}
+	alt := m{"Alt", "AltLeft", 18, 1}
+	meta := m{"Meta", "MetaLeft", 91, 4}
+
+	tests := []struct {
+		chord string
+		want  []ev
+	}{
+		{"c", key("c", "KeyC", 67, 0, "c")},
+		{"C", key("C", "KeyC", 67, 0, "C")},
+		{"Shift+KeyC", wrap([]m{shift}, key("C", "KeyC", 67, 8, "C"))},
+		{"KeyC", key("c", "KeyC", 67, 0, "c")},
+		{"5", key("5", "Digit5", 53, 0, "5")},
+		{".", key(".", "Period", 190, 0, ".")},
+		{"?", key("?", "Slash", 191, 0, "?")},
+		{"[", key("[", "BracketLeft", 219, 0, "[")},
+		{"Escape", key("Escape", "Escape", 27, 0, "")},
+		{"Enter", key("Enter", "Enter", 13, 0, "\r")},
+		{"Shift+Tab", wrap([]m{shift}, key("Tab", "Tab", 9, 8, ""))},
+		{"Meta+K", wrap([]m{meta}, key("K", "KeyK", 75, 4, ""))},
+		{"Control+Enter", wrap([]m{ctrl}, key("Enter", "Enter", 13, 2, ""))},
+		{"Alt+Shift+KeyP", wrap([]m{alt, shift}, key("P", "KeyP", 80, 9, ""))},
+		{"Ctrl+r", wrap([]m{ctrl}, key("r", "KeyR", 82, 2, ""))},
+		{"ControlOrMeta+B", wrap([]m{meta}, key("B", "KeyB", 66, 4, ""))},
+		// More of the vocabulary.
+		{"Space", key(" ", "Space", 32, 0, " ")},
+		{"Digit1", key("1", "Digit1", 49, 0, "1")},
+		{"Shift+Digit1", wrap([]m{shift}, key("!", "Digit1", 49, 8, "!"))},
+		{"PageDown", key("PageDown", "PageDown", 34, 0, "")},
+		{"F5", key("F5", "F5", 116, 0, "")},
+		{"Cmd+Option+i", wrap([]m{meta, alt}, key("i", "KeyI", 73, 5, ""))},
+		{"Shift++", wrap([]m{shift}, key("+", "", 0, 8, "+"))},
+	}
+	// Shift++: "+" is the shifted face of Equal.
+	tests[len(tests)-1].want = wrap([]m{shift}, key("+", "Equal", 187, 8, "+"))
+
+	for _, tc := range tests {
+		t.Run(tc.chord, func(t *testing.T) {
+			var mu sync.Mutex
+			var got []ev
+			conn := newFakeCDP(t, func(method string, params json.RawMessage) json.RawMessage {
+				if method == "Input.dispatchKeyEvent" {
+					var e ev
+					json.Unmarshal(params, &e)
+					mu.Lock()
+					got = append(got, e)
+					mu.Unlock()
+				}
+				return json.RawMessage(`{}`)
+			})
+			if err := KeyPress(context.Background(), conn, tc.chord); err != nil {
+				t.Fatal(err)
+			}
+			// Normalize the expectation the way the wire does (ints -> float64).
+			var want []ev
+			raw, _ := json.Marshal(tc.want)
+			json.Unmarshal(raw, &want)
+			mu.Lock()
+			defer mu.Unlock()
+			if !reflect.DeepEqual(got, want) {
+				g, _ := json.MarshalIndent(got, "", " ")
+				w, _ := json.MarshalIndent(want, "", " ")
+				t.Errorf("events for %q:\n got: %s\nwant: %s", tc.chord, g, w)
+			}
+		})
+	}
+}
+
+// TestKeyPress_ControlOrMeta checks the platform choice.
+func TestKeyPress_ControlOrMeta(t *testing.T) {
+	defer func(old bool) { controlOrMetaIsMeta = old }(controlOrMetaIsMeta)
+	for _, meta := range []bool{true, false} {
+		controlOrMetaIsMeta = meta
+		events, err := keyEventParams("ControlOrMeta+B")
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantKey, wantMods := "Control", 2
+		if meta {
+			wantKey, wantMods = "Meta", 4
+		}
+		if events[0]["key"] != wantKey || events[1]["modifiers"] != wantMods {
+			t.Errorf("meta=%v: modifier key %v, main modifiers %v; want %s, %d", meta, events[0]["key"], events[1]["modifiers"], wantKey, wantMods)
+		}
+	}
+}
+
+// TestKeyPress_Invalid checks that bad chords fail before anything is sent.
+func TestKeyPress_Invalid(t *testing.T) {
+	for _, chord := range []string{"", "Hyper+K", "Shift+", "+K", "Shift+Shift+K", "Shift+Bogus", "Bogus", "Shift++K"} {
+		if _, err := keyEventParams(chord); err == nil {
+			t.Errorf("keyEventParams(%q): want an error", chord)
+		}
 	}
 }
 
