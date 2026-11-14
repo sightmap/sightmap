@@ -13,6 +13,52 @@ function __smBoundsBySelector(sel) {
   };
 }
 
+// __smDragPrepare scrolls the element to the center of the viewport and picks
+// the point a drag starts from, in viewport coordinates. With an offset
+// (offX/offY, from the element's top-left corner) that is the point; without
+// one it is the first point of a coarse grid over the element whose top-most
+// element is the element itself or a descendant that is not interactive (a chip,
+// a button, a link, an input), because pressing those starts a click or a
+// focus, not a drag. It falls back to the center. Returns null when the element
+// is gone.
+function __smDragPrepare(sel, offX, offY) {
+  const el = __smDeepQuery(document, sel);
+  if (!el) return null;
+  el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+  const r = el.getBoundingClientRect();
+  const bounds = {
+    x: Math.round(r.left),
+    y: Math.round(r.top),
+    width: Math.round(r.width),
+    height: Math.round(r.height),
+  };
+  const view = { width: window.innerWidth, height: window.innerHeight };
+  if (offX != null && offY != null) {
+    return { bounds, view, x: bounds.x + offX, y: bounds.y + offY };
+  }
+  const interactive =
+    'button,a[href],input,select,textarea,label,summary,[role=button],[role=link],[role=checkbox],[role=menuitem],[role=switch],[contenteditable=""],[contenteditable=true]';
+  const fracs = [0.5, 0.15, 0.85, 0.3, 0.7];
+  for (const fy of fracs) {
+    for (const fx of fracs) {
+      const x = Math.floor(r.left + r.width * fx);
+      const y = Math.floor(r.top + r.height * fy);
+      if (x < 0 || y < 0 || x >= view.width || y >= view.height) continue;
+      const at = document.elementFromPoint(x, y);
+      if (!at || !(at === el || el.contains(at))) continue;
+      const hot = at.closest(interactive);
+      if (hot && (hot === el ? false : el.contains(hot))) continue;
+      return { bounds, view, x, y };
+    }
+  }
+  return {
+    bounds,
+    view,
+    x: Math.floor(r.left + r.width / 2),
+    y: Math.floor(r.top + r.height / 2),
+  };
+}
+
 // __smLocateForClick scrolls the element to the center of the viewport and
 // reports whether its center is actually the top-most element there (so a
 // target hidden behind an overlay is reported as not-hit rather than clicked
