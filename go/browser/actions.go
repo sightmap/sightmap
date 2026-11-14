@@ -606,41 +606,6 @@ func ClickAt(ctx context.Context, conn *CDPConn, x, y int) error {
 	return nil
 }
 
-// Drag moves a component by (deltaX, deltaY) pixels via CDP mouse events.
-// Sequence: move to center → press → move to target → release.
-func Drag(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, deltaX, deltaY int) error {
-	if node.Bounds == nil {
-		return fmt.Errorf("drag: node %q has no bounds", node.Id)
-	}
-	cx := node.Bounds.X + node.Bounds.Width/2
-	cy := node.Bounds.Y + node.Bounds.Height/2
-	tx, ty := cx+deltaX, cy+deltaY
-
-	for _, ev := range []struct {
-		evType  string
-		x, y    int
-		pressed bool
-	}{
-		{"mouseMoved", cx, cy, false},
-		{"mousePressed", cx, cy, true},
-		{"mouseMoved", tx, ty, false},
-		{"mouseReleased", tx, ty, true},
-	} {
-		params := map[string]interface{}{"type": ev.evType, "x": ev.x, "y": ev.y}
-		if ev.pressed {
-			params["button"] = "left"
-			params["clickCount"] = 1
-		} else {
-			params["button"] = "none"
-			params["clickCount"] = 0
-		}
-		if _, err := conn.call(ctx, "Input.dispatchMouseEvent", params); err != nil {
-			return fmt.Errorf("Drag %s: %w", ev.evType, err)
-		}
-	}
-	return nil
-}
-
 // clickTarget is the live geometry of an element after scrolling it to the
 // center of the viewport: whether it is reachable (on-screen and not covered by
 // another element) and the viewport coordinates of its center.
@@ -946,4 +911,219 @@ func HandleDialog(ctx context.Context, conn *CDPConn, action, text string) error
 		"promptText": text,
 	})
 	return err
+}
+
+// dragStepDelay is the pause between the mouse moves of a drag, about one frame
+// at 60 Hz, so a page's pointermove and animation-frame handlers see a gesture
+// and not a teleport. Tests set it to zero.
+var dragStepDelay = 16 * time.Millisecond
+
+// DefaultDragSteps is the number of mouse moves a drag makes when DragOptions
+// does not say.
+const DefaultDragSteps = 10
+
+// DragOptions says where a drag goes and how it gets there. The drop point is
+// To when set (see ToPosition), otherwise the start point plus (DeltaX, DeltaY).
+type DragOptions struct {
+	// Steps is the number of mouseMoved events between press and release; the
+	// last lands on the drop point. 0 means DefaultDragSteps.
+	Steps int
+	// FromOffset is where inside the source to press, in pixels from its
+	// top-left corner. Nil: a point on the source that is not an interactive
+	// child.
+	FromOffset *[2]int
+	// To is the component to drop on; its Id must be set (a node resolved from
+	// a probe id or a component query has one). Mutually exclusive with a delta.
+	To *sightmap.ComponentNode
+	// ToPosition picks the drop point inside To: "center" (the default), "above"
+	// (4 px inside its top edge) or "below" (4 px inside its bottom edge).
+	ToPosition string
+	// DeltaX and DeltaY move the drop point from the start point when To is nil.
+	DeltaX, DeltaY int
+}
+
+// dragEdgeInset is how far inside To's edge an "above" or "below" drop lands.
+const dragEdgeInset = 4
+
+// dragPrep is what __smDragPrepare returns.
+type dragPrep struct {
+	Bounds sightmap.Bounds `json:"bounds"`
+	View   struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"view"`
+	X   int  `json:"x"`
+	Y   int  `json:"y"`
+	Hit bool `json:"hit"` // the source is what is top-most at (X, Y)
+}
+
+// Drag moves a component by (deltaX, deltaY) pixels. See DragWith.
+func Drag(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, deltaX, deltaY int) error {
+	return DragWith(ctx, conn, node, DragOptions{DeltaX: deltaX, DeltaY: deltaY})
+}
+
+// dropPoint is the viewport point a drag ends at.
+func dropPoint(startX, startY int, to *sightmap.Bounds, opts DragOptions) (int, int, error) {
+	if to == nil {
+		return startX + opts.DeltaX, startY + opts.DeltaY, nil
+	}
+	x := to.X + to.Width/2
+	switch opts.ToPosition {
+	case "", "center":
+		return x, to.Y + to.Height/2, nil
+	case "above":
+		return x, to.Y + min(dragEdgeInset, to.Height/2), nil
+	case "below":
+		return x, to.Y + to.Height - 1 - min(dragEdgeInset-1, to.Height/2), nil
+	}
+	return 0, 0, fmt.Errorf("drag: unknown drop position %q (use above, below or center)", opts.ToPosition)
+}
+
+// dropEdge names the part of the target a drop position aims at, for errors.
+func dropEdge(position string) string {
+	switch position {
+	case "above":
+		return "top edge"
+	case "below":
+		return "bottom edge"
+	}
+	return "center"
+}
+
+// DragWith drags src with a pointer, the way a person does: scroll src to the
+// middle of the viewport unless it is already fully visible, press inside it,
+// move to the drop point in Steps small steps with the button held, release.
+// Pointer-event drags (sortable lists, boards, sliders)
+// ignore a press that jumps straight to the target, because they wait for the
+// pointer to travel past an activation distance and then follow it.
+//
+// It drives the pointer only; it does not start a native HTML5 drag-and-drop.
+func DragWith(ctx context.Context, conn *CDPConn, src *sightmap.ComponentNode, opts DragOptions) error {
+	if src.Id == "" {
+		return fmt.Errorf("drag: source has no id to scroll to")
+	}
+	if opts.To != nil && (opts.DeltaX != 0 || opts.DeltaY != 0) {
+		return fmt.Errorf("drag: give a target component or a delta, not both")
+	}
+	if opts.To == nil && opts.DeltaX == 0 && opts.DeltaY == 0 {
+		return fmt.Errorf("drag: nowhere to drag to (give a target component or a delta)")
+	}
+	if opts.To != nil && opts.To.Id == "" {
+		return fmt.Errorf("drag: target has no id")
+	}
+	steps := opts.Steps
+	if steps == 0 {
+		steps = DefaultDragSteps
+	}
+	if steps < 1 {
+		return fmt.Errorf("drag: steps must be at least 1, got %d", steps)
+	}
+
+	selJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", src.Id))
+	off := "null, null"
+	if opts.FromOffset != nil {
+		off = fmt.Sprintf("%d, %d", opts.FromOffset[0], opts.FromOffset[1])
+	}
+	raw, err := EvalJSON(ctx, conn, actionsJS+fmt.Sprintf("\n__smDragPrepare(%s, %s)", selJSON, off))
+	if err != nil {
+		return fmt.Errorf("drag: locate source %q: %w", src.Id, err)
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return fmt.Errorf("drag: source %q not found in live DOM (re-run sightmap snapshot)", src.Id)
+	}
+	var prep dragPrep
+	if err := json.Unmarshal(raw, &prep); err != nil {
+		return fmt.Errorf("drag: locate source %q: %w", src.Id, err)
+	}
+	sx, sy := prep.X, prep.Y
+	inView := func(x, y int) bool { return x >= 0 && y >= 0 && x < prep.View.Width && y < prep.View.Height }
+	if !inView(sx, sy) {
+		return fmt.Errorf("drag: start point (%d,%d) is outside the %dx%d viewport", sx, sy, prep.View.Width, prep.View.Height)
+	}
+	if !prep.Hit {
+		return fmt.Errorf("drag: start point (%d,%d) is not over the source %q (covered or clipped); choose another --from-offset", sx, sy, src.Id)
+	}
+
+	// The target is read after the source was scrolled, so its bounds are the
+	// ones the pointer will meet.
+	var toBounds *sightmap.Bounds
+	if opts.To != nil {
+		to, err := ResolveBySightmapID(ctx, conn, opts.To.Id)
+		if err != nil {
+			return fmt.Errorf("drag: locate target: %w", err)
+		}
+		toBounds = to.Bounds
+	}
+	tx, ty, err := dropPoint(sx, sy, toBounds, opts)
+	if err != nil {
+		return err
+	}
+	if !inView(tx, ty) {
+		return fmt.Errorf("drag: drop point (%d,%d) is outside the %dx%d viewport; the source and the target must both fit on screen (resize with 'tabs resize', or drag by a smaller delta)", tx, ty, prep.View.Width, prep.View.Height)
+	}
+
+	// A point inside the target's box can still be clipped by a scrolling
+	// ancestor or covered by a sticky header, so ask the page whether the
+	// target is what is top-most at the drop point.
+	if opts.To != nil {
+		toJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", opts.To.Id))
+		raw, err := EvalJSON(ctx, conn, actionsJS+fmt.Sprintf("\n__smDropCheck(%s, %d, %d)", toJSON, tx, ty))
+		if err != nil {
+			return fmt.Errorf("drag: check drop point: %w", err)
+		}
+		var chk struct {
+			Hit     bool   `json:"hit"`
+			Covered string `json:"covered"`
+		}
+		if err := json.Unmarshal(raw, &chk); err != nil {
+			return fmt.Errorf("drag: check drop point: %w", err)
+		}
+		if !chk.Hit {
+			what := "nothing"
+			if chk.Covered != "" {
+				what = chk.Covered
+			}
+			return fmt.Errorf("drag: drop point (%d,%d) is not over the target %q: %s is there (the target's %s is clipped by a scrolling ancestor or covered by another element; scroll it fully into view first)", tx, ty, opts.To.Id, what, dropEdge(opts.ToPosition))
+		}
+	}
+
+	mouse := func(typ string, x, y, buttons int) error {
+		params := map[string]interface{}{
+			"type": typ, "x": x, "y": y, "buttons": buttons,
+			"button": "none", "clickCount": 0,
+		}
+		switch {
+		case typ == "mousePressed":
+			params["button"], params["clickCount"] = "left", 1
+		case typ == "mouseReleased":
+			params["button"], params["clickCount"] = "left", 1
+		case buttons != 0:
+			params["button"] = "left"
+		}
+		if _, err := conn.call(ctx, "Input.dispatchMouseEvent", params); err != nil {
+			return fmt.Errorf("Drag %s: %w", typ, err)
+		}
+		return nil
+	}
+	if err := mouse("mouseMoved", sx, sy, 0); err != nil {
+		return err
+	}
+	if err := mouse("mousePressed", sx, sy, 1); err != nil {
+		return err
+	}
+	for i := 1; i <= steps; i++ {
+		if dragStepDelay > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(dragStepDelay):
+			}
+		}
+		x := sx + int(math.Round(float64(tx-sx)*float64(i)/float64(steps)))
+		y := sy + int(math.Round(float64(ty-sy)*float64(i)/float64(steps)))
+		if err := mouse("mouseMoved", x, y, 1); err != nil {
+			return err
+		}
+	}
+	return mouse("mouseReleased", tx, ty, 0)
 }

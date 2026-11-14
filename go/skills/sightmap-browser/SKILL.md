@@ -113,10 +113,42 @@ probe ID from snapshot output **or** a component query (see below):
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |
+| `sightmap browser drag <src> --to <target> [--to-position above\|below\|center]` | Pointer-drag one component onto another (see [Dragging](#dragging)) |
+| `sightmap browser drag <src> --delta-x N --delta-y N` | Pointer-drag a component by a pixel offset |
 | `sightmap browser wait-for --view <Name>` | Wait until the URL resolves to a sightmap view (the step boundary after a navigating action) |
 | `sightmap browser wait-for --component '<Query>'` | Wait until a component query matches a node |
 | `sightmap browser wait-for --selector "[data-loaded]"` | Wait until a CSS selector matches (also `--url SUBSTRING` (plain substring, not glob), `--load`) |
 | `sightmap browser tabs list` | List open tabs |
+
+### Dragging
+
+`drag` moves the pointer the way a person does, so pointer-event drags (boards, sortable
+lists, sliders) register it: it scrolls the source into view (only if it is not already
+fully visible, so a visible-to-visible drag leaves the layout alone), presses inside it, makes
+`--steps N` mouse moves (default 10, about 16 ms apart, button held), and releases at the
+drop point. Jumping straight to the target would never pass the app's activation distance.
+
+```bash
+# Drop WEB-143 on the top edge of the first card of another column (inserts above it).
+sightmap browser drag 'IssueCard[identifier="WEB-143"]' \
+  --to 'BoardColumn[group="status:in progress"] IssueCard#0' --to-position above
+```
+
+- **Source and target** are probe ids or component queries (both the same kind: resolving a
+  query re-probes the page and invalidates probe ids). Queries are resolved in one pass.
+- **`--to-position`:** `center` (default), `above` (4 px inside the target's top edge) or
+  `below` (4 px inside its bottom edge). Use `--delta-x/--delta-y` instead of `--to` to drag
+  by an offset; give one or the other.
+- **Where it presses:** a point on the source that is not an interactive child (button,
+  link, input, chip). Override with `--from-offset X,Y` (pixels from the source's top-left).
+- **Both ends must be reachable.** Before pressing, `drag` checks that the start point is
+  over the source and the drop point is over the target (`elementFromPoint`), so a target
+  scrolled under a column header or a sticky bar, or outside the viewport, fails with what
+  is in the way instead of dropping on nothing. Scroll the target fully into view (or
+  `tabs resize` for a taller window) and retry.
+- It drives the pointer only: native HTML5 drag-and-drop (`draggable` + `dragstart`) is not
+  started by it. Confirm the result with `eval` or a fresh `snapshot`; `drag` reports only
+  that the gesture was sent.
 
 ### Component queries (CSS-shaped, over sightmap components + extracted properties)
 

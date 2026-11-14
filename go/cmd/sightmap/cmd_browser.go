@@ -98,7 +98,8 @@ Interaction (IDs from sightmap snapshot output):
   hover    COMPONENT-ID | --x N --y N
   keypress KEY                        (Enter Tab Escape ArrowUp/Down Backspace ...)
   scroll   [--component-id ID] [--delta-x N] [--delta-y N]
-  drag        COMPONENT-ID --delta-x N --delta-y N
+  drag        SOURCE (--to TARGET [--to-position above|below|center] | --delta-x N --delta-y N) [--steps N] [--from-offset X,Y]
+                pointer drag: scrolls SOURCE into view, presses inside it, moves in N steps (default 10), releases
   wait-for    --url PATTERN | --selector SEL | --component QUERY | --view NAME | --load  [--timeout-ms N]
   dialog      accept|dismiss [--text INPUT]
   screenshot  [--out FILE] [--stdout] [--full-page | --component NAME | --selector SEL] [--expand-pct N]

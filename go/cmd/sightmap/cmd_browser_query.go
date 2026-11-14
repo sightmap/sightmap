@@ -38,6 +38,45 @@ func resolveTarget(ctx context.Context, conn *browser.CDPConn, sightmapDir, arg 
 	return resolveComponentQuery(ctx, conn, sightmapDir, arg)
 }
 
+// resolveTargetPair resolves two interaction targets (a drag's source and its
+// drop target) that are probe ids or component queries. Two queries are
+// resolved from ONE extraction: extracting again reassigns every
+// data-sightmap-id, which would invalidate the first node's id before the
+// second is found. Mixing a probe id with a query is refused for the same
+// reason: the id would be stale by the time the query's extraction ran.
+func resolveTargetPair(ctx context.Context, conn *browser.CDPConn, sightmapDir, a, b string) (*sightmap.ComponentNode, *sightmap.ComponentNode, error) {
+	aID, bID := looksLikeProbeID(a), looksLikeProbeID(b)
+	switch {
+	case aID && bID:
+		na, err := resolveNode(ctx, conn, a)
+		if err != nil {
+			return nil, nil, err
+		}
+		nb, err := resolveNode(ctx, conn, b)
+		return na, nb, err
+	case aID || bID:
+		return nil, nil, fmt.Errorf("give both %q and %q as probe ids or both as component queries: resolving a query re-probes the page and invalidates probe ids", a, b)
+	}
+	qa, err := compquery.ParseQuery(a)
+	if err != nil {
+		return nil, nil, err
+	}
+	qb, err := compquery.ParseQuery(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	root, matches, props, err := extractMatchedComponents(ctx, conn, sightmapDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	na, err := compquery.Resolve(root, matches, props, qa)
+	if err != nil {
+		return nil, nil, err
+	}
+	nb, err := compquery.Resolve(root, matches, props, qb)
+	return na, nb, err
+}
+
 // resolveComponentQuery extracts the live component tree once, applies the
 // sightmap, projects the matches' resolved properties, and resolves the query
 // to a single node. Everything happens within one extraction, so the returned
