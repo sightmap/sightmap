@@ -87,6 +87,43 @@ tree). Each line starts with a numeric component ID, then the node content:
 Properties are sorted alphabetically. The accessible name is shown last inside
 brackets when not suppressed (an exact match with a property value).
 
+### Iframes
+
+A snapshot descends into every iframe — same-origin, cross-origin (a separate
+process) and nested at any depth — and hangs each frame's tree under its
+`Iframe` node, so an MCP Apps widget's controls show up as ordinary components:
+
+```
+70 Iframe "destination_dates view"
+  1_9 Iframe
+    2_13 [DateWindows destination="seville"]
+      2_26 [DateWindow start="2027-03-03" end="2027-03-06"]
+```
+
+- **Ids carry a frame prefix.** The top document's ids are bare (`42`); the Nth
+  frame's are `N_…` (`2_26`). Click, fill, hover, keypress, scroll, `bounds`,
+  `wait-for` and `screenshot --component` all take them like any other id, and
+  find the right frame. Bounds are in top-page coordinates, and a click's point
+  is worked out from the live layout right before it is sent, so it lands after
+  a scroll. A click refuses (`covered by another element`) when something in the
+  page is drawn over the frame at that point.
+- **A frame is matched as a page of its own, at its own URL** — so the corpus
+  view whose route matches the *frame's* URL (e.g. a widget host's `/sandbox`)
+  supplies its components, not the page's view. A selector does not cross a
+  frame boundary in either direction. A `srcdoc` / `about:blank` frame takes its
+  parent's URL. A masked or blocked `<iframe>` masks or blocks its document.
+- **A `[Frames]` section** lists each frame document (its root id, URL, and the
+  view that URL resolved to) and then any `⚠` notes about what was left out.
+  `no view matched` on a frame means the corpus has no view for the frame's
+  path: add one (a widget's route is its host's sandbox path).
+- **Size.** Each frame is capped at 3000 nodes and a page at 32 frames; a frame
+  past the cap is cut and the `[Frames]` notes say so. `--frame-max-nodes N` and
+  `--max-frames N` change the caps; `--no-frames` leaves frames out (an `Iframe`
+  is a leaf, the old behaviour). Chrome gives out-of-process frames to the
+  session on its own; nothing to configure.
+- `keypress KEY <id-or-query>` focuses the target first (in its frame); with no
+  target the key goes to whatever is focused.
+
 The `[View: …]` header may be followed by a `tags:` line: the union of tags
 across every view whose route matches the page. A component the corpus marks
 `privacy: block` or `mask` renders **without** its content properties or AX
@@ -109,7 +146,7 @@ probe ID from snapshot output **or** a component query (see below):
 | `sightmap browser click 'ComponentQuery'` | Click element by sightmap identity (preferred on dynamic pages) |
 | `sightmap browser fill [--clear] <id-or-query> "text"` | Type into an input. Errors if the value doesn't stick — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
-| `sightmap browser keypress Enter` | Press a key (optionally focused on `<id>`) |
+| `sightmap browser keypress Enter [<id-or-query>]` | Press a key; with a target, focus it first (in whichever frame holds it) |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |

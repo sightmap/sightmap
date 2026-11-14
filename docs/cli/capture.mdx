@@ -18,6 +18,8 @@ Connects to Chrome, extracts the component tree, applies the corpus, and emits a
 
 The output contains a `[View: ...]` header when the URL matches a view (followed by a `tags:` line with the union of tags across every view whose route matches the page, when any are declared), a `[Guide]` with match counts by component, the component tree, and a `[Coverage]` summary. `[Warnings]` lists declared components that matched no nodes. `[Conflicts]` flags runtime ambiguities: two or more views matching this URL at equal specificity (declaration order picked the winner), and any single DOM node matched by more than one component definition that the selector text cannot order (the most specific definition names a node when there is one; otherwise the first declared is kept, which also explains a component that otherwise looks like it matched zero nodes). Two claimants can share a name, since names are unique only within a parent; the report then adds each one's selector to tell them apart. When a corpus is loaded but **no** view's route matches the URL (for example after an auth redirect), the header is replaced by a `[No view matched] <url>` notice so you know the page is off the map. The `[Coverage]` summary is printed whenever a corpus is applied — even for a matched view with no components yet, where every interactive node reads as an orphan — so the `snapshot --coverage` bootstrap always has something to iterate on.
 
+A `[Frames]` section follows when the page has iframes. Snapshots descend into every iframe, same-origin, cross-origin (out-of-process) and nested, and place each frame's tree under its `<iframe>` node. The section lists each frame document with the URL it is matched at and the view that URL resolves to, then a `⚠` note for anything left out (a frame cut at its node cap, frames past the frame cap, a frame that could not be read). See [Iframes](#iframes).
+
 Each tree line starts with a numeric probe ID, then the node content:
 
 - **Matched nodes** render as `ID [ComponentName prop="val"]`. The component name replaces the ARIA role, properties are sorted alphabetically, and the accessible name appears last unless it duplicates a property value.
@@ -34,7 +36,10 @@ The probe ID is a handle for the [interaction commands](/cli/interaction). Compo
 | `--depth` | `0` | Max tree depth (0 = unlimited). |
 | `--include-hidden` | `false` | Include hidden/off-screen nodes in analysis. |
 | `--interactive` | `false` | Show interactive nodes only. |
+| `--frame-max-nodes` | `3000` | Cap on the nodes taken from each child frame. A frame past it is cut and the `[Frames]` notes say so. |
 | `--json` | — | Write annotated tree JSON to this file. It adds component names, memory, and extracted properties to the raw tree. |
+| `--max-frames` | `32` | Cap on the child frames taken from a page, in document order. |
+| `--no-frames` | `false` | Leave iframes out: an `<iframe>` is a leaf, as before frames were supported. |
 | `--out` | — | Write the annotated output to this file instead of stdout. No view set, no novelty gate. |
 | `--screenshot` | — | Save a PNG screenshot to this file alongside the tree, from the same page state. |
 | `--selectors` | `false` | Show `tag #id [data-testid]` selector hints (no CSS classes). |
@@ -49,6 +54,22 @@ The probe ID is a handle for the [interaction commands](/cli/interaction). Compo
 ```bash
 sightmap snapshot --url 'https://example.com/products/outdoor'
 ```
+
+#### Iframes
+
+Widgets, embedded dashboards and checkout forms live in iframes, often in another origin and often nested. `snapshot` (and every command that extracts a tree: `capture`, `inspect`, `explain`, `gap`, `suggest`) descends into all of them by default.
+
+```text Snapshot excerpt
+70 Iframe "destination_dates view"
+  1_9 Iframe
+    2_13 [DateWindows destination="seville"]
+      2_26 [DateWindow start="2027-03-03" end="2027-03-06"]
+```
+
+- **IDs carry a frame prefix.** The top document's IDs are bare numbers; the Nth frame's are `N_…`. The [interaction commands](/cli/interaction) take them like any other ID and resolve the frame themselves.
+- **A frame is matched as a page of its own, at its own URL.** The view whose `route` matches the frame's URL supplies its components, not the page's view, so a widget host's sandbox path needs a view of its own in the corpus. A selector never crosses a frame boundary, in either direction. A `srcdoc` or `about:blank` frame takes its parent's URL. A masked or blocked `<iframe>` masks or blocks its whole document.
+- **Bounds are in top-page coordinates**, so a frame's boxes line up with a screenshot of the page.
+- **Size.** Descending is the default, with a cap per frame (`--frame-max-nodes`, 3000) and per page (`--max-frames`, 32), so one oversized ad or embedded document cannot swamp the snapshot; whatever is cut is reported in `[Frames]`. `--no-frames` turns it off. Frames whose `<iframe>` has no box (`display: none`) or a 0×0 viewport are skipped silently.
 
 ```text Snapshot excerpt
 [View: ProductListPage]

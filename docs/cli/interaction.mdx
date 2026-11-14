@@ -10,6 +10,10 @@ Once a session is running ([Browser sessions](/cli/browser)), these commands act
 All commands on this page except `tabs` subcommands resolve a session with `--addr` (default `localhost:7892`) and `--tab`. Pass `--tab` whenever two or more content tabs are open. Session lifecycle commands are documented under [Browser sessions](/cli/browser).
 </Note>
 
+## Iframes
+
+Probe IDs and component queries reach into iframes, including cross-origin and nested ones. An ID minted in a frame carries the frame's prefix (`2_26`; the top document's IDs are bare numbers), and `click`, `fill`, `hover`, `keypress`, `scroll`, `wait-for` (`--component` and `--selector`), `bounds` and `screenshot --component` resolve it to the frame that holds the element. Boxes are in top-page coordinates. A click's point is computed from the live layout right before the event is sent, after the element is scrolled into view, and `click` refuses (`covered by another element`) when something in the page is drawn over the frame at that point. See [Iframes](/cli/capture#iframes) for how snapshots include frames and match them.
+
 ## Component queries
 
 Probe IDs belong to one extraction. A later extraction reassigns them, and a page re-render can replace the target node. Component queries reduce that risk by extracting the live tree and applying the corpus immediately before acting. Prefer queries on pages that re-render often.
@@ -109,16 +113,18 @@ sightmap browser hover 'AccountMenu'
 
 ### `browser keypress`
 
-Sends a key event to the focused element. Click or fill a field first when it needs focus. The key name is a positional argument, such as `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, or `Space`. On success it echoes `pressed KEY` to stderr.
+Sends a key event to the focused element. Click or fill a field first when it needs focus, or pass a target after the key and it is focused first, in whichever frame holds it. The key name is a positional argument, such as `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, or `Space`. On success it echoes `pressed KEY` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | `localhost:7892` | CDP address |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir (for a component query target) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
 ```bash
 sightmap browser fill SearchInput 'garden hose'
 sightmap browser keypress Enter
+sightmap browser keypress ArrowDown 'DateWindows'   # focus the target first
 ```
 
 ---

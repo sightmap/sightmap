@@ -32,9 +32,9 @@ type MatchQuery struct {
 // for M nodes). The onMatch callback may be called more than once per node if
 // multiple queries match; call order follows queries slice order.
 //
-// Frame subtrees (nodes whose IDs carry a frame prefix) are traversed without
-// special handling — component IDs are globally unique and require no frame
-// boundary logic here.
+// A child frame's document (a node with FrameURL set, below its <iframe>) is
+// not entered: it is a tree of its own, which Matcher matches at the frame's
+// URL. Walking one directly, by passing its root, is fine.
 //
 // It indexes queries on every call; to walk many trees with one query set,
 // prepare it once with Prepare and call Queries.FindAll.
@@ -224,6 +224,11 @@ func (w *nfaWalker) visit(top int, direct []selectorState) {
 	nextTop := len(w.desc)
 	nextDirect := w.dir[dirBase:len(w.dir):len(w.dir)]
 	for _, child := range node.Children {
+		// A child frame's document is a tree of its own, matched at its own URL
+		// (see frames.go): a selector does not cross into it.
+		if child.IsFrameRoot() {
+			continue
+		}
 		w.chain = append(w.chain, child)
 		w.visit(nextTop, nextDirect)
 		w.chain = w.chain[:len(w.chain)-1]

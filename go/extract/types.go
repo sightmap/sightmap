@@ -6,8 +6,17 @@ import "github.com/sightmap/sightmap/go/sightmap"
 type ProbeResult struct {
 	Success bool             `json:"success"`
 	Results []ProbeComponent `json:"results"`
-	Error   string           `json:"error,omitempty"`
-	Debug   string           `json:"debug,omitempty"`
+	// Truncated is set when the run stopped at its node cap (probe.js's maxNodes
+	// argument), leaving part of the document unmapped.
+	Truncated bool `json:"truncated,omitempty"`
+	// Viewport is the document's own viewport: the iframe's content box for a
+	// child frame.
+	Viewport struct {
+		Width  int `json:"width"`
+		Height int `json:"height"`
+	} `json:"viewport"`
+	Error string `json:"error,omitempty"`
+	Debug string `json:"debug,omitempty"`
 }
 
 // ProbeComponent is the JSON output of probe.js for one element.
@@ -68,4 +77,9 @@ type DOMNode struct {
 	Attributes    []string   `json:"attributes"` // flat [name, val, name, val, ...]
 	Children      []*DOMNode `json:"children"`
 	ShadowRoots   []*DOMNode `json:"shadowRoots,omitempty"`
+	// FrameID is, on an <iframe>/<frame> element, the id of the frame it hosts.
+	FrameID string `json:"frameId,omitempty"`
+	// ContentDocument is the hosted document of a same-process frame (a frame in
+	// another process has none: its DOM comes from its own CDP session).
+	ContentDocument *DOMNode `json:"contentDocument,omitempty"`
 }

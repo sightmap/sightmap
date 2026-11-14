@@ -99,12 +99,39 @@ func (m *Matcher) MatchConflicts(root *sightmap.ComponentNode, pageURL string) (
 // rule never names a node, so the naming claims a node collects here are the
 // claims Conflicts walks for, in the same order.
 func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts bool) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict) {
-	entry := m.entryFor(pageURL)
-	if root == nil || len(entry.queries) == 0 {
+	if root == nil {
 		return nil, nil
+	}
+	var result map[*sightmap.ComponentNode]*sightmap.ComponentMatch
+	var out []sightmap.Conflict
+	eachDoc(root, pageURL, func(d frameDoc) []frameDoc {
+		r, c, frames := m.matchDoc(d, conflicts)
+		out = append(out, c...)
+		switch {
+		case r == nil:
+		case result == nil:
+			result = r
+		default:
+			for n, cm := range r {
+				result[n] = cm
+			}
+		}
+		return frames
+	})
+	return result, out
+}
+
+// matchDoc is match for one document, without descending into the frame
+// documents it hosts: it returns them for the caller to match in their turn.
+func (m *Matcher) matchDoc(d frameDoc, conflicts bool) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict, []frameDoc) {
+	root, pageURL := d.root, d.url
+	entry := m.entryFor(pageURL)
+	if len(entry.queries) == 0 {
+		return nil, nil, framesIn(root, d.inherit)
 	}
 
 	var out []sightmap.Conflict
+	var frames []frameDoc
 	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
 
@@ -139,12 +166,13 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 		claims = append(claims, q)
 	}
 	onNode := func(node *sightmap.ComponentNode, depth int) {
-		parent := rankNone
+		parent := d.inherit
 		if depth > 0 {
 			parent = eff[depth-1]
 		}
 		e := foldRank(parent, local)
 		eff = append(eff[:depth], e)
+		frames = append(frames, framesOf(node, e)...)
 		if local != rankNone {
 			if declared == nil {
 				declared = map[*sightmap.ComponentNode]int{}
@@ -180,8 +208,8 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 	// Declared component properties resolve over the matched tree (SEP-0010):
 	// dom.* sources read the node itself; component and component.exists resolve
 	// a descendant matched component. No live DOM is required.
-	resolveComponentProperties(&propResolver{root: root, result: result, defByNode: defByNode, declared: declared})
-	return result, out
+	resolveComponentProperties(&propResolver{root: root, result: result, defByNode: defByNode, declared: declared, rootRank: d.inherit})
+	return result, out, frames
 }
 
 // Components returns the merged component list for pageURL (view components plus
@@ -208,25 +236,32 @@ func (m *Matcher) Components(pageURL string) []sightmap.ComponentDef {
 // still counts once, since they are one definition, and so do a global and its
 // $ref expansions, which are copies of one definition.
 func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sightmap.Conflict {
-	entry := m.entryFor(pageURL)
-	if root == nil || len(entry.queries) == 0 {
+	if root == nil {
 		return nil
 	}
-
-	// A node's matches all arrive before onNode fires for it, so each node's
-	// claims are resolved there, in depth-first order, without a map.
 	var out []sightmap.Conflict
-	var claims []*MatchQuery
-	onMatch := func(_ *sightmap.ComponentNode, q *MatchQuery) { claims = append(claims, q) }
-	onNode := func(node *sightmap.ComponentNode, _ int) {
-		if len(claims) >= 2 {
-			if c, ok := conflictAt(node, entry.narrow.mostSpecific(claims)); ok {
-				out = append(out, c)
-			}
+	eachDoc(root, pageURL, func(d frameDoc) []frameDoc {
+		entry := m.entryFor(d.url)
+		if len(entry.queries) == 0 {
+			return framesIn(d.root, rankNone)
 		}
-		claims = claims[:0]
-	}
-	walkMatches(root, entry.queries, entry.index, onMatch, onNode)
+		// A node's matches all arrive before onNode fires for it, so each node's
+		// claims are resolved there, in depth-first order, without a map.
+		var frames []frameDoc
+		var claims []*MatchQuery
+		onMatch := func(_ *sightmap.ComponentNode, q *MatchQuery) { claims = append(claims, q) }
+		onNode := func(node *sightmap.ComponentNode, _ int) {
+			frames = append(frames, framesOf(node, rankNone)...)
+			if len(claims) >= 2 {
+				if c, ok := conflictAt(node, entry.narrow.mostSpecific(claims)); ok {
+					out = append(out, c)
+				}
+			}
+			claims = claims[:0]
+		}
+		walkMatches(d.root, entry.queries, entry.index, onMatch, onNode)
+		return frames
+	})
 	return out
 }
 

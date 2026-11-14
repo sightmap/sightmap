@@ -59,6 +59,16 @@ function __smScrollIntoViewBySelector(sel) {
   } catch (_) {}
 }
 
+// __smFocusBySelector gives the element keyboard focus (and reports whether it
+// exists), for a keypress that should land on it without a click.
+function __smFocusBySelector(sel) {
+  const el = __smDeepQuery(document, sel);
+  if (!el) return false;
+  el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+  if (typeof el.focus === "function") el.focus();
+  return true;
+}
+
 function __smSelectorExists(sel) {
   return !!__smDeepQuery(document, sel);
 }

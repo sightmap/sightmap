@@ -238,11 +238,22 @@ func NavigateAndWaitIdle(ctx context.Context, conn *CDPConn, url string, maxWait
 // (e.g. an awaited executeTool()) returns the real value instead of an opaque
 // unresolved-promise handle. Callers bound long-running work via ctx.
 func EvalJSON(ctx context.Context, conn *CDPConn, script string) (json.RawMessage, error) {
-	result, err := conn.call(ctx, "Runtime.evaluate", map[string]interface{}{
+	return evalJSONIn(ctx, conn, "", 0, script)
+}
+
+// evalJSONIn is EvalJSON addressed to a child session ("" is the connection's
+// own target) and an execution context within it (0 is the session's default,
+// the frame's page world).
+func evalJSONIn(ctx context.Context, conn *CDPConn, session string, contextID int64, script string) (json.RawMessage, error) {
+	params := map[string]interface{}{
 		"expression":    script,
 		"returnByValue": true,
 		"awaitPromise":  true,
-	})
+	}
+	if contextID != 0 {
+		params["contextId"] = contextID
+	}
+	result, err := conn.callSession(ctx, session, "Runtime.evaluate", params)
 	if err != nil {
 		return nil, err
 	}
@@ -565,20 +576,29 @@ func pinFullPageViewport(ctx context.Context, conn *CDPConn) (map[string]interfa
 //
 // Returns an error when no element carries the id (the node was removed or the
 // page was re-probed since), so callers can prompt for a fresh snapshot.
+//
+// An id minted in a child frame ("2_17") is looked up in that frame, and its
+// bounds come back in top-page viewport coordinates, like every other node's.
 func ResolveBySightmapID(ctx context.Context, conn *CDPConn, id string) (*sightmap.ComponentNode, error) {
-	selJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", id))
-	script := actionsJS + fmt.Sprintf("\n__smBoundsBySelector(%s)", selJSON)
-	raw, err := EvalJSON(ctx, conn, script)
+	script := actionsJS + fmt.Sprintf("\n__smBoundsBySelector(%s)", idSelectorJSON(id))
+	raw, f, err := evalForID(ctx, conn, id, script)
 	if err != nil {
 		return nil, fmt.Errorf("resolve %q: %w", id, err)
 	}
 	if len(raw) == 0 || string(raw) == "null" {
-		return nil, fmt.Errorf(
-			"component %q not found in live DOM (data-sightmap-id absent; re-run sightmap snapshot)", id)
+		return nil, notFoundErr(id)
 	}
 	var b sightmap.Bounds
 	if err := json.Unmarshal(raw, &b); err != nil {
 		return nil, fmt.Errorf("resolve %q: unmarshal bounds: %w", id, err)
+	}
+	if f != nil {
+		ox, oy, err := f.Origin(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %q: %w", id, err)
+		}
+		b.X += int(math.Round(ox))
+		b.Y += int(math.Round(oy))
 	}
 	return &sightmap.ComponentNode{Id: id, Bounds: &b}, nil
 }
@@ -656,16 +676,51 @@ type clickTarget struct {
 // of the viewport and reports its resulting geometry, including whether its
 // center is actually the top-most element there (so a target hidden behind an
 // overlay is reported as not-hit rather than clicked through).
+//
+// The point is in top-page viewport coordinates, which is what the mouse event
+// takes whatever frame the element is in. For an element in a child frame it is
+// the point found in the frame plus the frame's origin, read after the scroll
+// has settled; "hit" then also asks that nothing in an enclosing document is
+// drawn over the frame at that point.
 func locateForClick(ctx context.Context, conn *CDPConn, id string) (clickTarget, error) {
-	selJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", id))
-	script := actionsJS + fmt.Sprintf("\n__smLocateForClick(%s)", selJSON)
-	raw, err := EvalJSON(ctx, conn, script)
+	script := actionsJS + fmt.Sprintf("\n__smLocateForClick(%s)", idSelectorJSON(id))
+	raw, f, err := evalForID(ctx, conn, id, script)
 	if err != nil {
 		return clickTarget{}, err
 	}
 	var t clickTarget
 	if err := json.Unmarshal(raw, &t); err != nil {
 		return clickTarget{}, err
+	}
+	if f == nil || !t.Found || !t.InViewport {
+		return t, nil
+	}
+
+	ox, oy, err := settleOrigin(ctx, f)
+	if err != nil {
+		return clickTarget{}, err
+	}
+	x, y := ox+float64(t.CX), oy+float64(t.CY)
+	t.CX, t.CY = int(math.Floor(x)), int(math.Floor(y))
+
+	// The frame's own viewport can extend past what the top page shows (the
+	// frame is taller than the window, or clipped by a scrolling parent).
+	vp, err := EvalJSON(ctx, conn, `({w: window.innerWidth, h: window.innerHeight})`)
+	if err != nil {
+		return clickTarget{}, err
+	}
+	var size struct{ W, H float64 }
+	if err := json.Unmarshal(vp, &size); err != nil {
+		return clickTarget{}, err
+	}
+	if x < 0 || y < 0 || x >= size.W || y >= size.H {
+		t.InViewport, t.Hit = false, false
+		return t, nil
+	}
+	if t.Hit {
+		if t.Hit, err = f.ownersShow(ctx, x, y); err != nil {
+			return clickTarget{}, err
+		}
 	}
 	return t, nil
 }
@@ -711,13 +766,21 @@ func Click(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) (in
 	return x, y, nil
 }
 
-// Hover moves the mouse to the center of node's bounding box.
+// Hover moves the mouse to the center of node's bounding box. A node with an id
+// is measured again first, in whichever frame holds it: the bounds a snapshot
+// recorded go stale as soon as anything scrolls.
 func Hover(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) error {
-	if node.Bounds == nil {
+	bounds := node.Bounds
+	if node.Id != "" {
+		if fresh, err := ResolveBySightmapID(ctx, conn, node.Id); err == nil {
+			bounds = fresh.Bounds
+		}
+	}
+	if bounds == nil {
 		return fmt.Errorf("Hover: node %q has no bounds", node.Id)
 	}
-	x := node.Bounds.X + node.Bounds.Width/2
-	y := node.Bounds.Y + node.Bounds.Height/2
+	x := bounds.X + bounds.Width/2
+	y := bounds.Y + bounds.Height/2
 	_, err := conn.call(ctx, "Input.dispatchMouseEvent", map[string]interface{}{
 		"type": "mouseMoved", "x": x, "y": y, "button": "none", "clickCount": 0,
 	})
@@ -780,8 +843,7 @@ func readInputValue(ctx context.Context, conn *CDPConn, id string) (string, bool
 	if id == "" {
 		return "", false
 	}
-	selJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", id))
-	raw, err := EvalJSON(ctx, conn, actionsJS+fmt.Sprintf("\n__smReadValueBySelector(%s)", selJSON))
+	raw, _, err := evalForID(ctx, conn, id, actionsJS+fmt.Sprintf("\n__smReadValueBySelector(%s)", idSelectorJSON(id)))
 	if err != nil || len(raw) == 0 || string(raw) == "null" {
 		return "", false
 	}
@@ -801,9 +863,9 @@ func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNo
 		return fmt.Errorf("ClearAndFill: click to focus: %w", err)
 	}
 	// Clear the field via JS native setter — works on React-controlled inputs.
-	if _, err := conn.call(ctx, "Runtime.evaluate", map[string]interface{}{
-		"expression": actionsJS + "\n__smClearActiveElement()",
-	}); err != nil {
+	// The focused element is the one in the document that holds the target: in
+	// the top document's own, a frame is merely the <iframe> that hosts it.
+	if err := clearActiveElement(ctx, conn, node.Id); err != nil {
 		return fmt.Errorf("ClearAndFill: clear: %w", err)
 	}
 	// Type the new value character by character (same as Fill).
@@ -821,6 +883,18 @@ func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNo
 		}
 	}
 	return verifyFilled(ctx, conn, node.Id, value)
+}
+
+// clearActiveElement clears the focused element of the document holding id (the
+// top document when id is empty or not found in a frame).
+func clearActiveElement(ctx context.Context, conn *CDPConn, id string) error {
+	script := actionsJS + "\n__smClearActiveElement()"
+	if id == "" {
+		_, err := EvalJSON(ctx, conn, script)
+		return err
+	}
+	_, _, err := evalForID(ctx, conn, id, script)
+	return err
 }
 
 // keyMap maps common key names to their CDP key/code/text representations.
@@ -873,6 +947,15 @@ func KeyPress(ctx context.Context, conn *CDPConn, key string) error {
 // (e.g. a bare numeric probe ID) degrades silently to the bounds path rather
 // than surfacing as an EvalJSON JS exception.
 func ScrollIntoView(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) error {
+	// An id names its element exactly, and in whichever frame holds it.
+	if node.Id != "" {
+		if raw, _, err := evalForID(ctx, conn, node.Id, actionsJS+fmt.Sprintf("\n__smLocateForClick(%s)", idSelectorJSON(node.Id))); err == nil {
+			var t clickTarget
+			if json.Unmarshal(raw, &t) == nil && t.Found {
+				return nil
+			}
+		}
+	}
 	if sel := node.Element.SelectorString(); sel != "" {
 		selJSON, _ := json.Marshal(sel)
 		script := actionsJS + fmt.Sprintf("\n__smScrollIntoViewBySelector(%s)", selJSON)
@@ -918,7 +1001,8 @@ func WaitForURL(ctx context.Context, conn *CDPConn, pattern string) error {
 }
 
 // WaitForSelector polls document.querySelector every 200ms until the element
-// exists in the DOM or ctx is done.
+// exists in the DOM or ctx is done. The top document is asked first and the
+// frames nested in it after, so a selector finds its element wherever it is.
 func WaitForSelector(ctx context.Context, conn *CDPConn, selector string) error {
 	for {
 		select {
@@ -931,6 +1015,9 @@ func WaitForSelector(ctx context.Context, conn *CDPConn, selector string) error 
 		if err == nil {
 			var found bool
 			if json.Unmarshal(result, &found) == nil && found {
+				return nil
+			}
+			if frameSelectorExists(ctx, conn, selector) {
 				return nil
 			}
 		}
