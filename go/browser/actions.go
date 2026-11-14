@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"runtime"
 	"strings"
 	"time"
 
@@ -253,14 +254,24 @@ func EvalJSON(ctx context.Context, conn *CDPConn, script string) (json.RawMessag
 			Value json.RawMessage `json:"value"`
 		} `json:"result"`
 		ExceptionDetails *struct {
-			Text string `json:"text"`
+			Text      string `json:"text"`
+			Exception struct {
+				Description string `json:"description"`
+			} `json:"exception"`
 		} `json:"exceptionDetails"`
 	}
 	if err := json.Unmarshal(result, &evalResp); err != nil {
 		return nil, fmt.Errorf("EvalJSON: unmarshal eval response: %w", err)
 	}
 	if evalResp.ExceptionDetails != nil {
-		return nil, fmt.Errorf("EvalJSON: JS exception: %s", evalResp.ExceptionDetails.Text)
+		// Text is only "Uncaught"; the description carries the error and its message.
+		msg := evalResp.ExceptionDetails.Text
+		if d := evalResp.ExceptionDetails.Exception.Description; d != "" {
+			if first, _, _ := strings.Cut(d, "\n"); first != "" {
+				msg = first
+			}
+		}
+		return nil, fmt.Errorf("EvalJSON: JS exception: %s", msg)
 	}
 	return evalResp.Result.Value, nil
 }
@@ -724,51 +735,133 @@ func Hover(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) err
 	return err
 }
 
-// Fill clears the current value of a form field and types value into it.
-// Clicks the element first, then Ctrl+A to select all, then types each rune.
-func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
-	if _, _, err := Click(ctx, conn, node); err != nil {
-		return fmt.Errorf("Fill: click to focus: %w", err)
+// selectAllIsMeta says which modifier the select-all fallback chord uses: Cmd on
+// macOS, Ctrl elsewhere. It follows the host running the CLI, where the browser
+// normally runs.
+var selectAllIsMeta = runtime.GOOS == "darwin"
+
+// activeSelection is what __smSelectActive reports: whether it selected the
+// focused element's content, and that content as it was.
+type activeSelection struct {
+	Selected bool   `json:"selected"`
+	Value    string `json:"value"`
+}
+
+// selectAllActive selects everything in the focused element (an input,
+// a textarea or a contenteditable) through the DOM, which works the same on
+// every platform and whatever the page does with keyboard shortcuts. Selected
+// is false when the focused element is none of those.
+func selectAllActive(ctx context.Context, conn *CDPConn) (activeSelection, error) {
+	raw, err := EvalJSON(ctx, conn, actionsJS+"\n__smSelectActive()")
+	if err != nil {
+		return activeSelection{}, err
 	}
-	// Select all: modifiers=10 (Ctrl=2 | Meta/Cmd=8)
-	if _, err := conn.call(ctx, "Input.dispatchKeyEvent", map[string]interface{}{
-		"type": "keyDown", "key": "a", "modifiers": 10,
-	}); err != nil {
-		return fmt.Errorf("Fill: select-all keyDown: %w", err)
+	var sel activeSelection
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &sel); err != nil {
+			return activeSelection{}, err
+		}
 	}
-	if _, err := conn.call(ctx, "Input.dispatchKeyEvent", map[string]interface{}{
-		"type": "keyUp", "key": "a", "modifiers": 0,
-	}); err != nil {
-		return fmt.Errorf("Fill: select-all keyUp: %w", err)
+	return sel, nil
+}
+
+// selectAllChord presses Ctrl+A (Cmd+A on macOS) with the key, code and key code
+// of the A key and the selectAll editing command. Chrome does not derive editing
+// commands from key events on macOS (headless included), so the command is sent
+// explicitly, as Playwright does. It is the fallback for a focused element the
+// DOM cannot select, such as a custom widget that handles the shortcut itself.
+func selectAllChord(ctx context.Context, conn *CDPConn) error {
+	mods := 2 // Ctrl
+	if selectAllIsMeta {
+		mods = 4 // Meta
 	}
-	// Type each rune.
+	down := map[string]interface{}{
+		"type": "keyDown", "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65,
+		"modifiers": mods, "commands": []string{"selectAll"},
+	}
+	if _, err := conn.call(ctx, "Input.dispatchKeyEvent", down); err != nil {
+		return fmt.Errorf("select-all keyDown: %w", err)
+	}
+	up := map[string]interface{}{
+		"type": "keyUp", "key": "a", "code": "KeyA", "windowsVirtualKeyCode": 65,
+		"modifiers": mods,
+	}
+	if _, err := conn.call(ctx, "Input.dispatchKeyEvent", up); err != nil {
+		return fmt.Errorf("select-all keyUp: %w", err)
+	}
+	return nil
+}
+
+// typeText types value into the focused element, one key event pair per rune.
+func typeText(ctx context.Context, conn *CDPConn, value string) error {
 	for _, r := range value {
 		ch := string(r)
 		if _, err := conn.call(ctx, "Input.dispatchKeyEvent", map[string]interface{}{
 			"type": "keyDown", "key": ch, "text": ch,
 		}); err != nil {
-			return fmt.Errorf("Fill: keyDown %q: %w", ch, err)
+			return fmt.Errorf("keyDown %q: %w", ch, err)
 		}
 		if _, err := conn.call(ctx, "Input.dispatchKeyEvent", map[string]interface{}{
 			"type": "keyUp", "key": ch,
 		}); err != nil {
-			return fmt.Errorf("Fill: keyUp %q: %w", ch, err)
+			return fmt.Errorf("keyUp %q: %w", ch, err)
 		}
 	}
-	return verifyFilled(ctx, conn, node.Id, value)
+	return nil
 }
 
-// verifyFilled reads the target's value back after typing and reports an error
-// when a non-empty value was typed but the field is still empty — the signature
-// of a React-controlled input where plain Fill's select-all+type does not stick.
-// It is best-effort: an unreadable value (no id, non-input element) is not an
-// error, and a non-empty-but-transformed value (masked inputs) is accepted.
-func verifyFilled(ctx context.Context, conn *CDPConn, id, value string) error {
+// Fill replaces the value of a form field with value: it clicks the element to
+// focus it, selects everything in the focused field through the DOM (falling
+// back to a select-all chord with the selectAll command for elements the DOM
+// cannot select), then types each rune so the page sees real key events. It
+// reads the value back and errors when the old value was kept or the field is
+// empty.
+func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
+	if _, _, err := Click(ctx, conn, node); err != nil {
+		return fmt.Errorf("Fill: click to focus: %w", err)
+	}
+	sel, err := selectAllActive(ctx, conn)
+	if err != nil {
+		return fmt.Errorf("Fill: select: %w", err)
+	}
+	before := sel.Value
+	if !sel.Selected {
+		if err := selectAllChord(ctx, conn); err != nil {
+			return fmt.Errorf("Fill: %w", err)
+		}
+		before, _ = readInputValue(ctx, conn, node.Id)
+	}
+	if err := typeText(ctx, conn, value); err != nil {
+		return fmt.Errorf("Fill: %w", err)
+	}
+	return verifyFilled(ctx, conn, node.Id, value, before)
+}
+
+// verifyFilled reads the target's value back after typing value into a field
+// that held before, and reports an error when the fill did not take:
+//
+//   - the field is empty although a non-empty value was typed (a React-controlled
+//     input that dropped the keystrokes), or
+//   - the old value was not replaced: the field holds at least old+new characters
+//     and the typed value (the signature of text typed after or inside what was
+//     there, as when select-all did not select).
+//
+// A value that merely differs (a masked, formatted or truncated field) is
+// accepted. It is best-effort: an unreadable value (no id, non-input element) is
+// not an error.
+func verifyFilled(ctx context.Context, conn *CDPConn, id, value, before string) error {
 	if strings.TrimSpace(value) == "" {
 		return nil
 	}
-	if v, ok := readInputValue(ctx, conn, id); ok && strings.TrimSpace(v) == "" {
+	got, ok := readInputValue(ctx, conn, id)
+	if !ok {
+		return nil
+	}
+	if strings.TrimSpace(got) == "" {
 		return fmt.Errorf("fill: typed %q but the field is still empty afterwards — it may be a React-controlled input; retry with --clear", value)
+	}
+	if before != "" && got != value && strings.Contains(got, value) && len(got) >= len(before)+len(value) {
+		return fmt.Errorf("fill: typed %q but the field reads %q: the old value %q was not replaced; retry with --clear", value, got, before)
 	}
 	return nil
 }
@@ -793,34 +886,25 @@ func readInputValue(ctx context.Context, conn *CDPConn, id string) (string, bool
 }
 
 // ClearAndFill focuses node, clears its current value via the native JS setter
-// (reliable on React-controlled inputs where Ctrl+A may not select), then types
-// value using keystroke events. Use instead of Fill when a React input accumulates
-// text across multiple fill calls.
+// (the way to empty a React-controlled input whose state ignores a selection),
+// then types value using keystroke events.
 func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("ClearAndFill: click to focus: %w", err)
 	}
-	// Clear the field via JS native setter — works on React-controlled inputs.
-	if _, err := conn.call(ctx, "Runtime.evaluate", map[string]interface{}{
-		"expression": actionsJS + "\n__smClearActiveElement()",
-	}); err != nil {
+	// Clear the field via the element's native value setter. A failure (nothing
+	// focused, an element with no value) is an error: typing on regardless would
+	// append to what was there and still report success.
+	raw, err := EvalJSON(ctx, conn, actionsJS+"\n__smClearActiveElement()")
+	if err != nil {
 		return fmt.Errorf("ClearAndFill: clear: %w", err)
 	}
-	// Type the new value character by character (same as Fill).
-	for _, r := range value {
-		ch := string(r)
-		if _, err := conn.call(ctx, "Input.dispatchKeyEvent", map[string]interface{}{
-			"type": "keyDown", "key": ch, "text": ch,
-		}); err != nil {
-			return fmt.Errorf("ClearAndFill: keyDown %q: %w", ch, err)
-		}
-		if _, err := conn.call(ctx, "Input.dispatchKeyEvent", map[string]interface{}{
-			"type": "keyUp", "key": ch,
-		}); err != nil {
-			return fmt.Errorf("ClearAndFill: keyUp %q: %w", ch, err)
-		}
+	var before string
+	_ = json.Unmarshal(raw, &before)
+	if err := typeText(ctx, conn, value); err != nil {
+		return fmt.Errorf("ClearAndFill: %w", err)
 	}
-	return verifyFilled(ctx, conn, node.Id, value)
+	return verifyFilled(ctx, conn, node.Id, value, before)
 }
 
 // keyMap maps common key names to their CDP key/code/text representations.
