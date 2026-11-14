@@ -533,3 +533,113 @@ func TestCollectorStop_DuringStalledPoll(t *testing.T) {
 		t.Fatal("Collector.Stop deadlocked while the tab poll was stalled")
 	}
 }
+
+func TestIsOwnRequest(t *testing.T) {
+	c := NewCollector("unused")
+	c.IgnoreServerPort(7891)
+	for url, want := range map[string]bool{
+		// The tool's own traffic.
+		"http://localhost:7891/sightmap/version":    true,
+		"http://127.0.0.1:7891/sightmap":            true,
+		"http://localhost:7891/anything/else":       true, // the session's server port
+		"http://localhost:7893/sightmap/version":    true, // the extension probing another port
+		"http://127.0.0.1:7892/sightmap":            true,
+		"chrome-extension://abcdef/side-panel.html": true,
+		"http://[::1]:7891/sightmap/version":        true,
+		// The page's.
+		"http://localhost:5291/api/issues":               false,
+		"http://localhost:5291/sightmap/version-history": false,
+		"https://example.com/sightmap/version":           false, // another host's own path
+		"http://localhost:5291/":                         false,
+		"http://localhost:78910/api":                     false,
+		"https://api.example.com:7891/v1/things":         false, // same port, not loopback
+		"not a url \x7f":                                 false,
+		"data:text/plain,hi":                             false,
+	} {
+		if got := c.isOwnRequest(url); got != want {
+			t.Errorf("isOwnRequest(%q) = %v, want %v", url, got, want)
+		}
+	}
+	// Without a known port only the endpoint paths are recognised.
+	c = NewCollector("unused")
+	if c.isOwnRequest("http://localhost:7891/other") {
+		t.Error("an unknown server port must not swallow arbitrary loopback requests")
+	}
+	if !c.isOwnRequest("http://localhost:7891/sightmap/version") {
+		t.Error("the version endpoint is the tool's on any loopback port")
+	}
+}
+
+// The extension's poll must not displace the page's requests: after far more
+// poll requests than the ring holds, the app's calls are all still there with
+// nothing reported dropped, and the polls never appear.
+func TestDrainKeepsOwnRequestsOutOfTheBuffer(t *testing.T) {
+	c := NewCollector("unused")
+	c.IgnoreServerPort(7891)
+	c.maxEntries = 10
+
+	reqCh := make(chan json.RawMessage, 8)
+	respCh := make(chan json.RawMessage, 8)
+	otherCh := make(chan json.RawMessage)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.wg.Add(1)
+	go c.drain(ctx, "T1", nil, otherCh, otherCh, reqCh, respCh, otherCh)
+	t.Cleanup(func() { cancel(); c.wg.Wait() })
+
+	req := func(id, url string) json.RawMessage {
+		return json.RawMessage(fmt.Sprintf(`{"requestId":%q,"type":"Fetch","request":{"url":%q,"method":"GET","headers":{}}}`, id, url))
+	}
+	resp := func(id string) json.RawMessage {
+		return json.RawMessage(fmt.Sprintf(`{"requestId":%q,"type":"Fetch","response":{"status":200,"statusText":"OK","headers":{}}}`, id))
+	}
+
+	apiURLs := []string{"http://localhost:5291/api/issues", "http://localhost:5291/api/projects", "http://localhost:5291/api/me"}
+	for i := 0; i < 200; i++ {
+		id := fmt.Sprintf("poll-%d", i)
+		reqCh <- req(id, "http://localhost:7891/sightmap/version")
+		respCh <- resp(id)
+		if i%70 == 0 { // i = 0, 70, 140
+			k := i / 70
+			reqCh <- req(fmt.Sprintf("api-%d", k), apiURLs[k])
+			// drain selects between its channels at random, so let the request
+			// land before its response is sent, as it does on a real connection.
+			waitFor(t, func() bool { got, _ := c.Network(NetworkFilter{}); return len(got) > k }, "app request buffered")
+			respCh <- resp(fmt.Sprintf("api-%d", k))
+		}
+	}
+
+	deadline := time.After(3 * time.Second)
+	for {
+		got, dropped := c.Network(NetworkFilter{})
+		if len(got) == len(apiURLs) && got[len(got)-1].Status == 200 {
+			if dropped != 0 {
+				t.Errorf("dropped = %d, want 0: own requests overflowed the buffer", dropped)
+			}
+			for i, r := range got {
+				if r.URL != apiURLs[i] {
+					t.Errorf("entry %d = %s, want %s", i, r.URL, apiURLs[i])
+				}
+				if r.Status != 200 {
+					t.Errorf("entry %d status = %d, want 200 (its response was applied)", i, r.Status)
+				}
+			}
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("buffer holds %d entries (dropped %d), want %d app requests", len(got), dropped, len(apiURLs))
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
+func waitFor(t *testing.T, cond func() bool, what string) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for: %s", what)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -41,6 +42,10 @@ type networkRecord struct {
 type Collector struct {
 	addr       string
 	maxEntries int
+	// ownPort is the port of this session's sightmap HTTP server (0: unknown).
+	// Requests to it are the tool's own traffic and are never buffered; see
+	// isOwnRequest.
+	ownPort int
 
 	mu             sync.Mutex
 	console        []sightmap.Message
@@ -114,6 +119,36 @@ func NewCollector(addr string) *Collector {
 		ctx:        ctx,
 		cancel:     cancel,
 	}
+}
+
+// IgnoreServerPort tells the collector the port of the session's sightmap HTTP
+// server so its traffic is kept out of the network buffer. Call it before Start.
+func (c *Collector) IgnoreServerPort(port int) { c.ownPort = port }
+
+// isOwnRequest reports whether rawURL is the tool's own traffic rather than the
+// page's: a chrome-extension:// URL, anything on the session's sightmap server
+// port, or the sightmap server's version/corpus endpoints on any loopback port
+// (the extension's content script polls /sightmap/version every few seconds,
+// and probes 7891-7900 for the server when its hint is stale). Left in, the
+// poll alone fills the 1000-entry ring in about an hour and pushes every
+// request of the app out of it.
+func (c *Collector) isOwnRequest(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme == "chrome-extension" {
+		return true
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1", "0.0.0.0":
+	default:
+		return false
+	}
+	if c.ownPort > 0 && u.Port() == fmt.Sprint(c.ownPort) {
+		return true
+	}
+	return u.Path == "/sightmap" || u.Path == "/sightmap/version"
 }
 
 // Start begins the tab-attach loop. It returns immediately; capture runs in the
@@ -267,6 +302,11 @@ func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, cons
 			}
 		case raw := <-reqCh:
 			if e, ok := parseRequest(raw); ok {
+				// Dropped here, so its response and finish events find no record
+				// (applyResponse and retainResponseBody look it up by requestId).
+				if c.isOwnRequest(e.URL) {
+					continue
+				}
 				e.Tab = tabID
 				e.conn = conn
 				c.addNetwork(e)
