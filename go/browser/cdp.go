@@ -33,6 +33,17 @@ type CDPConn struct {
 	// full-page screenshot that pins the viewport re-applies it afterwards.
 	metricsMu sync.Mutex
 	metrics   map[string]interface{}
+
+	// targetsMu guards the child-frame bookkeeping (see frames.go): the iframe
+	// targets Chrome has attached to this connection as flattened sessions, and
+	// the sessions whose own auto-attach is already on. Both live as long as the
+	// connection, as Chrome's attachments do.
+	targetsMu    sync.Mutex
+	targets      []*attachedTarget
+	autoAttached map[string]bool
+	// frameOpts is how this connection's page extractions treat child frames
+	// (nil: the defaults). See SetFrameOptions.
+	frameOpts *FrameOptions
 }
 
 // DialCDP connects to a Chrome remote debugging address (e.g. "localhost:7892")
@@ -119,6 +130,9 @@ type cdpRequest struct {
 	ID     int64       `json:"id"`
 	Method string      `json:"method"`
 	Params interface{} `json:"params,omitempty"`
+	// SessionID addresses a flattened child session (an out-of-process iframe)
+	// instead of the connection's own target.
+	SessionID string `json:"sessionId,omitempty"`
 }
 
 type cdpResponse struct {
@@ -142,11 +156,12 @@ func (c *CDPConn) readLoop() {
 
 		// Unified peek: detect response (has "id") vs event (no "id", has "method").
 		var peek struct {
-			ID     *int64          `json:"id"`
-			Method string          `json:"method"`
-			Params json.RawMessage `json:"params"`
-			Result json.RawMessage `json:"result"`
-			Error  *cdpError       `json:"error"`
+			ID        *int64          `json:"id"`
+			Method    string          `json:"method"`
+			Params    json.RawMessage `json:"params"`
+			Result    json.RawMessage `json:"result"`
+			Error     *cdpError       `json:"error"`
+			SessionID string          `json:"sessionId"`
 		}
 		if err := json.Unmarshal(raw, &peek); err != nil {
 			continue
@@ -164,6 +179,14 @@ func (c *CDPConn) readLoop() {
 				ch <- resp
 			}
 		} else if peek.Method != "" {
+			// Target attach/detach is bookkeeping, applied here rather than through
+			// a subscriber so a burst of iframes can never drop one.
+			c.noteTargetEvent(peek.SessionID, peek.Method, peek.Params)
+			// Subscribers know only the connection's own target: an event from a
+			// child session is about another document and must not reach them.
+			if peek.SessionID != "" {
+				continue
+			}
 			// CDP event — fan out to subscribers.
 			c.subMu.RLock()
 			chs := c.subs[peek.Method]
@@ -217,6 +240,12 @@ func (c *CDPConn) EnableDomain(ctx context.Context, domain string) error {
 
 // call sends a CDP command and blocks until the response arrives or ctx is cancelled.
 func (c *CDPConn) call(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
+	return c.callSession(ctx, "", method, params)
+}
+
+// callSession is call addressed to a child session ("" is the connection's own
+// target).
+func (c *CDPConn) callSession(ctx context.Context, session, method string, params interface{}) (json.RawMessage, error) {
 	id := c.nextID.Add(1)
 	ch := make(chan cdpResponse, 1)
 
@@ -224,7 +253,7 @@ func (c *CDPConn) call(ctx context.Context, method string, params interface{}) (
 	c.pending[id] = ch
 	c.pendMu.Unlock()
 
-	req := cdpRequest{ID: id, Method: method, Params: params}
+	req := cdpRequest{ID: id, Method: method, Params: params, SessionID: session}
 	c.writeMu.Lock()
 	err := c.ws.WriteJSON(req)
 	c.writeMu.Unlock()
@@ -261,18 +290,25 @@ type cdpPage struct {
 func (p *cdpPage) URL() string { return p.pageURL }
 
 func (p *cdpPage) RunProbe(ctx context.Context, isLogicalRoot, useScrollOffset bool) (*extract.ProbeResult, error) {
-	// Wrap probe.js in an IIFE that calls computeCompProps with the given args.
-	script := fmt.Sprintf(
-		"(function(){\n%s\nreturn computeCompProps(%v,%v);\n})()",
-		probe.ProbeJS, isLogicalRoot, useScrollOffset,
-	)
-
 	// EvalJSON handles the Runtime.evaluate double-envelope unwrap and JS exception check.
-	value, err := EvalJSON(ctx, p.conn, script)
+	value, err := EvalJSON(ctx, p.conn, probeScript(isLogicalRoot, useScrollOffset, "", 0))
 	if err != nil {
 		return nil, fmt.Errorf("runtime.evaluate probe: %w", err)
 	}
+	return parseProbe(value)
+}
 
+// probeScript wraps probe.js in an IIFE that calls computeCompProps with the
+// given arguments (see probe.js for idPrefix and maxNodes).
+func probeScript(isLogicalRoot, useScrollOffset bool, idPrefix string, maxNodes int) string {
+	prefix, _ := json.Marshal(idPrefix)
+	return fmt.Sprintf(
+		"(function(){\n%s\nreturn computeCompProps(%v,%v,%s,%d);\n})()",
+		probe.ProbeJS, isLogicalRoot, useScrollOffset, prefix, maxNodes,
+	)
+}
+
+func parseProbe(value json.RawMessage) (*extract.ProbeResult, error) {
 	var probeResult extract.ProbeResult
 	if err := json.Unmarshal(value, &probeResult); err != nil {
 		return nil, fmt.Errorf("probe: unmarshal result: %w", err)
