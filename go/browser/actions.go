@@ -952,8 +952,9 @@ type dragPrep struct {
 		Width  int `json:"width"`
 		Height int `json:"height"`
 	} `json:"view"`
-	X int `json:"x"`
-	Y int `json:"y"`
+	X   int  `json:"x"`
+	Y   int  `json:"y"`
+	Hit bool `json:"hit"` // the source is what is top-most at (X, Y)
 }
 
 // Drag moves a component by (deltaX, deltaY) pixels. See DragWith.
@@ -978,9 +979,21 @@ func dropPoint(startX, startY int, to *sightmap.Bounds, opts DragOptions) (int, 
 	return 0, 0, fmt.Errorf("drag: unknown drop position %q (use above, below or center)", opts.ToPosition)
 }
 
-// DragWith drags src with a pointer, the way a person does: scroll src into
-// view, press inside it, move to the drop point in Steps small steps with the
-// button held, release. Pointer-event drags (sortable lists, boards, sliders)
+// dropEdge names the part of the target a drop position aims at, for errors.
+func dropEdge(position string) string {
+	switch position {
+	case "above":
+		return "top edge"
+	case "below":
+		return "bottom edge"
+	}
+	return "center"
+}
+
+// DragWith drags src with a pointer, the way a person does: scroll src to the
+// middle of the viewport unless it is already fully visible, press inside it,
+// move to the drop point in Steps small steps with the button held, release.
+// Pointer-event drags (sortable lists, boards, sliders)
 // ignore a press that jumps straight to the target, because they wait for the
 // pointer to travel past an activation distance and then follow it.
 //
@@ -1027,6 +1040,9 @@ func DragWith(ctx context.Context, conn *CDPConn, src *sightmap.ComponentNode, o
 	if !inView(sx, sy) {
 		return fmt.Errorf("drag: start point (%d,%d) is outside the %dx%d viewport", sx, sy, prep.View.Width, prep.View.Height)
 	}
+	if !prep.Hit {
+		return fmt.Errorf("drag: start point (%d,%d) is not over the source %q (covered or clipped); choose another --from-offset", sx, sy, src.Id)
+	}
 
 	// The target is read after the source was scrolled, so its bounds are the
 	// ones the pointer will meet.
@@ -1044,6 +1060,31 @@ func DragWith(ctx context.Context, conn *CDPConn, src *sightmap.ComponentNode, o
 	}
 	if !inView(tx, ty) {
 		return fmt.Errorf("drag: drop point (%d,%d) is outside the %dx%d viewport; the source and the target must both fit on screen (resize with 'tabs resize', or drag by a smaller delta)", tx, ty, prep.View.Width, prep.View.Height)
+	}
+
+	// A point inside the target's box can still be clipped by a scrolling
+	// ancestor or covered by a sticky header, so ask the page whether the
+	// target is what is top-most at the drop point.
+	if opts.To != nil {
+		toJSON, _ := json.Marshal(fmt.Sprintf("[data-sightmap-id=%q]", opts.To.Id))
+		raw, err := EvalJSON(ctx, conn, actionsJS+fmt.Sprintf("\n__smDropCheck(%s, %d, %d)", toJSON, tx, ty))
+		if err != nil {
+			return fmt.Errorf("drag: check drop point: %w", err)
+		}
+		var chk struct {
+			Hit     bool   `json:"hit"`
+			Covered string `json:"covered"`
+		}
+		if err := json.Unmarshal(raw, &chk); err != nil {
+			return fmt.Errorf("drag: check drop point: %w", err)
+		}
+		if !chk.Hit {
+			what := "nothing"
+			if chk.Covered != "" {
+				what = chk.Covered
+			}
+			return fmt.Errorf("drag: drop point (%d,%d) is not over the target %q: %s is there (the target's %s is clipped by a scrolling ancestor or covered by another element; scroll it fully into view first)", tx, ty, opts.To.Id, what, dropEdge(opts.ToPosition))
+		}
 	}
 
 	mouse := func(typ string, x, y, buttons int) error {

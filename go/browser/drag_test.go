@@ -19,6 +19,7 @@ type dragRecorder struct {
 	mouse  []map[string]interface{}
 	prep   string
 	to     string
+	drop   string // __smDropCheck answer; default: the target is hit
 	script []string
 }
 
@@ -39,8 +40,14 @@ func (d *dragRecorder) conn(t *testing.T) *CDPConn {
 			call := p.Expression[strings.LastIndex(p.Expression, "\n")+1:]
 			d.script = append(d.script, call)
 			value := d.to
-			if strings.HasPrefix(call, "__smDragPrepare") {
+			switch {
+			case strings.HasPrefix(call, "__smDragPrepare"):
 				value = d.prep
+			case strings.HasPrefix(call, "__smDropCheck"):
+				value = d.drop
+				if value == "" {
+					value = `{"inViewport":true,"hit":true,"covered":""}`
+				}
 			}
 			return json.RawMessage(`{"result":{"type":"object","value":` + value + `}}`)
 		}
@@ -48,7 +55,7 @@ func (d *dragRecorder) conn(t *testing.T) *CDPConn {
 	})
 }
 
-const testDragPrep = `{"bounds":{"x":100,"y":100,"width":200,"height":80},"view":{"width":1280,"height":800},"x":200,"y":140}`
+const testDragPrep = `{"bounds":{"x":100,"y":100,"width":200,"height":80},"view":{"width":1280,"height":800},"x":200,"y":140,"hit":true}`
 
 func TestDragWith_Delta(t *testing.T) {
 	defer func(d time.Duration) { dragStepDelay = d }(dragStepDelay)
@@ -140,6 +147,54 @@ func TestDragWith_ToTarget(t *testing.T) {
 				t.Errorf("release = %v, want (%v,%v)", rel, tc.x, tc.y)
 			}
 		})
+	}
+}
+
+// A drop point that is inside the target's box but clipped or covered (the
+// page's elementFromPoint says something else is there) fails before any mouse
+// event, naming what is in the way.
+func TestDragWith_DropPointCovered(t *testing.T) {
+	defer func(d time.Duration) { dragStepDelay = d }(dragStepDelay)
+	dragStepDelay = 0
+	rec := &dragRecorder{
+		prep: testDragPrep,
+		to:   `{"x":500,"y":61,"width":200,"height":100}`,
+		drop: `{"inViewport":true,"hit":false,"covered":"header[data-component=ColumnHeader]"}`,
+	}
+	conn := rec.conn(t)
+	err := DragWith(context.Background(), conn, &sightmap.ComponentNode{Id: "7"},
+		DragOptions{To: &sightmap.ComponentNode{Id: "9"}, ToPosition: "above"})
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	for _, want := range []string{"(600,65)", "not over the target", "ColumnHeader", "top edge"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q lacks %q", err, want)
+		}
+	}
+	if len(rec.mouse) != 0 {
+		t.Errorf("sent %d mouse events before failing", len(rec.mouse))
+	}
+	// The check asks about the drop point and the target it was given.
+	last := rec.script[len(rec.script)-1]
+	if !strings.HasPrefix(last, `__smDropCheck("[data-sightmap-id=\"9\"]", 600, 65)`) {
+		t.Errorf("drop check call = %q", last)
+	}
+}
+
+// A start point that is not over the source (covered, or clipped by an overflow
+// ancestor) fails before any mouse event.
+func TestDragWith_StartCovered(t *testing.T) {
+	defer func(d time.Duration) { dragStepDelay = d }(dragStepDelay)
+	dragStepDelay = 0
+	rec := &dragRecorder{prep: strings.Replace(testDragPrep, `"hit":true`, `"hit":false`, 1)}
+	conn := rec.conn(t)
+	err := DragWith(context.Background(), conn, &sightmap.ComponentNode{Id: "7"}, DragOptions{DeltaX: 10})
+	if err == nil || !strings.Contains(err.Error(), "not over the source") {
+		t.Fatalf("err = %v", err)
+	}
+	if len(rec.mouse) != 0 {
+		t.Errorf("sent %d mouse events before failing", len(rec.mouse))
 	}
 }
 

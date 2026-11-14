@@ -123,7 +123,8 @@ probe ID from snapshot output **or** a component query (see below):
 ### Dragging
 
 `drag` moves the pointer the way a person does, so pointer-event drags (boards, sortable
-lists, sliders) register it: it scrolls the source into view, presses inside it, makes
+lists, sliders) register it: it scrolls the source into view (only if it is not already
+fully visible, so a visible-to-visible drag leaves the layout alone), presses inside it, makes
 `--steps N` mouse moves (default 10, about 16 ms apart, button held), and releases at the
 drop point. Jumping straight to the target would never pass the app's activation distance.
 
@@ -140,8 +141,11 @@ sightmap browser drag 'IssueCard[identifier="WEB-143"]' \
   by an offset; give one or the other.
 - **Where it presses:** a point on the source that is not an interactive child (button,
   link, input, chip). Override with `--from-offset X,Y` (pixels from the source's top-left).
-- **Both ends must fit in the viewport** once the source is scrolled to the middle of it;
-  otherwise the command fails before pressing (`tabs resize` for a taller window).
+- **Both ends must be reachable.** Before pressing, `drag` checks that the start point is
+  over the source and the drop point is over the target (`elementFromPoint`), so a target
+  scrolled under a column header or a sticky bar, or outside the viewport, fails with what
+  is in the way instead of dropping on nothing. Scroll the target fully into view (or
+  `tabs resize` for a taller window) and retry.
 - It drives the pointer only: native HTML5 drag-and-drop (`draggable` + `dragstart`) is not
   started by it. Confirm the result with `eval` or a fresh `snapshot`; `drag` reports only
   that the gesture was sent.
