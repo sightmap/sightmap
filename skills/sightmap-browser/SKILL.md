@@ -145,7 +145,7 @@ probe ID from snapshot output **or** a component query (see below):
 |---------|-------------|
 | `sightmap browser click <id>` | Click element by probe ID |
 | `sightmap browser click 'ComponentQuery'` | Click element by sightmap identity (preferred on dynamic pages) |
-| `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing. Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
+| `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing (date/time/color/range inputs are set, not typed). Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
 | `sightmap browser keypress Enter [<id-or-query>]` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)); with a target, focus it first (in whichever frame holds it) |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
@@ -311,6 +311,9 @@ fails loudly when nothing editable is focused instead of typing on regardless.
 ```bash
 sightmap browser fill --clear 'SearchInput' 'burrito'
 ```
+
+**`browser fill` sets, not types, date/time/color/range inputs.**
+Typing into `<input type=date>` goes through Chrome's segmented year/month/day editor and mangles the value. For `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range`, `fill` sets the value whole (native setter, then `input` and `change`), including in iframes, and reads it back. Pass the format the control stores: `fill 214 2027-04-16`, not `04/16/2027`. A value the control can't parse errors rather than leaving the field empty.
 
 **`browser click` scrolls the target into view and refuses off-screen / covered clicks.**
 `click` scrolls the element to the center of the viewport, then verifies its center is actually the top-most element there before dispatching. It **errors** (rather than silently no-op'ing) when the target can't be positioned in the viewport, or is `covered by another element` — the signal of an open overlay/modal or a target you need to reveal first. The confirmation line reports the real post-scroll coordinates it clicked.

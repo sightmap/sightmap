@@ -72,6 +72,8 @@ Off-screen targets can be missed. Scroll the element into view first with `brows
 
 Replaces the value of an input, textarea or contenteditable by typing. Takes two positionals: the target (probe ID or component query) and the value. It selects the field's whole content through the DOM first, then types real key events. After typing it reads the value back and **errors** when the field is still empty (a React-controlled input where plain typing doesn't stick) or when the old value was not replaced (the field now holds old and new text); retry with `--clear`, which empties the field through its native value setter first. On success it echoes `filled TARGET = "value"` to stderr.
 
+Inputs whose value is not typed characters — `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range` — are not typed into: Chrome routes keystrokes into a date control's segmented year/month/day editor, which mangles them. `fill` sets their value whole, the way a script would with the native setter, fires `input` and `change`, and reads it back. Give the value in the format the control stores (`2027-04-16` for a date, `14:45` for a time, `#ff0000` for a color); a value the control cannot parse leaves it empty and is an error, and a disabled or read-only control is refused. This works inside iframes too.
+
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | `localhost:7892` | CDP address |
