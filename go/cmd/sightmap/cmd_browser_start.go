@@ -240,6 +240,7 @@ func runBrowserStart(args []string) error {
 	// Start the console/network collector against the now-ready session and
 	// publish it to the devtools handlers registered above.
 	collector := browser.NewCollector(cdpAddr)
+	collector.IgnoreServerPort(resolvedServerPort)
 	collector.Start()
 	collectorPtr.Store(collector)
 	defer collector.Stop()
@@ -669,6 +670,7 @@ func runAttachedSession(attachAddr, sightmapDir string, serverPortFlag int, urlF
 	}
 
 	collector := browser.NewCollector(cdpAddr)
+	collector.IgnoreServerPort(resolvedServerPort)
 	collector.Start()
 	collectorPtr.Store(collector)
 	defer collector.Stop()
