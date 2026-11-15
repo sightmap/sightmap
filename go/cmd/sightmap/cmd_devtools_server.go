@@ -8,8 +8,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -21,6 +24,27 @@ import (
 // maxInjectBytes caps a persisted script's size. Generous enough for a bundled
 // runtime while refusing a pathological upload.
 const maxInjectBytes = 16 << 20 // 16 MiB
+
+// networkFilterFromQuery reads /devtools/network's query parameters: type, url
+// (substring), filter (regular expression), tab, limit, and static=1 to include
+// successful static requests.
+func networkFilterFromQuery(q url.Values) (browser.NetworkFilter, error) {
+	f := browser.NetworkFilter{
+		ResourceType:  q.Get("type"),
+		URLSubstr:     q.Get("url"),
+		Tab:           q.Get("tab"),
+		Limit:         atoiDefault(q.Get("limit"), 0),
+		IncludeStatic: q.Get("static") == "1",
+	}
+	if expr := q.Get("filter"); expr != "" {
+		re, err := regexp.Compile(expr)
+		if err != nil {
+			return f, fmt.Errorf("invalid filter: %w", err)
+		}
+		f.URLPattern = re
+	}
+	return f, nil
+}
 
 // registerDevtoolsHandlers wires the /devtools/* endpoints onto mux. The
 // collector is supplied via ptr because it is created only after Chrome is
@@ -72,13 +96,13 @@ func registerDevtoolsHandlers(mux *http.ServeMux, ptr *atomic.Pointer[browser.Co
 			return
 		}
 		q := r.URL.Query()
-		entries, dropped := c.Network(browser.NetworkFilter{
-			ResourceType: q.Get("type"),
-			URLSubstr:    q.Get("url"),
-			Tab:          q.Get("tab"),
-			Limit:        atoiDefault(q.Get("limit"), 0),
-		})
-		writeJSON(w, map[string]any{"entries": annotateNetwork(corpusNow(), entries), "dropped": dropped})
+		f, err := networkFilterFromQuery(q)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		entries, drops := c.Network(f)
+		writeJSON(w, map[string]any{"entries": annotateNetwork(corpusNow(), entries), "dropped": drops.Main, "droppedStatic": drops.Static})
 	})
 
 	// Persistent script injection. POST registers a script (raw body) and returns

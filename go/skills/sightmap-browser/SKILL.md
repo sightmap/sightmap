@@ -213,7 +213,9 @@ so nothing goes stale. Prefer queries on dynamic pages.
 
 The `browser start` daemon owns the session and runs a **collector** that buffers
 console messages and network requests from every tab for the life of the session
-(bounded ring buffers, ~1000 of each). Read them with thin query commands — no
+(bounded ring buffers, ~1000 of each; successful scripts, styles, images and fonts
+get a ring of their own so a dev server's hundreds of module scripts cannot evict the
+app's `/api` calls). Read them with thin query commands — no
 re-attaching to Chrome, and with history the transient page commands never saw.
 
 These are not just raw debug streams. Each captured record is matched against the
@@ -227,7 +229,7 @@ properties**.
 |---------|-------------|
 | `sightmap console list [--level error] [--tab ID] [--limit N]` | Console messages, each led by its `messages:` match (uncaught exceptions fold in as `level=exception`). |
 | `sightmap console get <index>` | One console message + any extracted stack `properties:`. |
-| `sightmap network list [--type XHR] [--url /api] [--tab ID] [--limit N]` | Requests: `[Match] method url → status (type) {prop=value}`. |
+| `sightmap network list [--type XHR] [--url /api] [--filter REGEXP] [--static] [--tab ID] [--limit N]` | Requests: `[Match] method url → status (type) {prop=value}`. Successful static assets are hidden unless `--static`. |
 | `sightmap network get <index> [--response-file F]` | One request + its `requests:` match, a `Properties:` block, and response body (save with `--response-file`). |
 
 Reading the slot:
@@ -246,8 +248,15 @@ drowning the matched ones.
   refresh the page or re-trigger the action, then read. (A SPA may never reach
   `wait-for --load`; prefer `wait-for --url`/`--selector`, or just re-read after
   a short pause.)
+- `network list` **hides successful static requests** (Script, Stylesheet, Image,
+  Font, Media, Manifest with a 2xx or 304) by default, as `playwright-cli requests`
+  does, so a Vite page's ~200 `/src/...` modules don't bury the app's calls. A failed
+  asset (404, 5xx, refused) still shows. Pass `--static` to see scripts and styles
+  too; `--type`, `--url` and `--filter` narrow either list further. `network get
+  <index>` works for hidden requests as well.
 - `--url` is a substring match, not a path anchor (`--url /aura` also catches
-  `.../auraFW/...`) — narrow it when a route is noisy.
+  `.../auraFW/...`) — narrow it when a route is noisy. `--filter` takes a regular
+  expression (`--filter '/api/(issues|me)$'`), unanchored.
 - To find failures: reproduce, then scan the `[...]` slots in `console list`
   (`--level error`) and `network list`; `network get <index>` pulls the body +
   properties.

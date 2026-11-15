@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +77,9 @@ type consoleResult struct {
 type networkResult struct {
 	Entries []networkEntry `json:"entries"`
 	Dropped int            `json:"dropped"`
+	// DroppedStatic counts the static ring's drops; the daemon reports it only
+	// to a query that asked for static requests.
+	DroppedStatic int `json:"droppedStatic"`
 }
 
 // annotateConsole / annotateNetwork project each observed record together with
@@ -226,7 +230,7 @@ func runConsoleList(args []string) error {
 			}
 		}
 	}
-	reportDropped(res.Dropped, "console")
+	reportDropped(os.Stdout, res.Dropped, "console")
 	return nil
 }
 
@@ -281,18 +285,27 @@ func runNetworkList(args []string) error {
 	fs := flag.NewFlagSet("network list", flag.ContinueOnError)
 	rtype := fs.String("type", "", "Filter by resource type (Document, XHR, Fetch, Stylesheet, Image, Script, Font, ...)")
 	urlSub := fs.String("url", "", "Filter by URL substring")
+	urlRe := fs.String("filter", "", "Filter by URL regular expression (Go syntax, unanchored)")
+	static := fs.Bool("static", false, "Include successful static requests (scripts, styles, images, fonts, ...), hidden by default")
 	tab := fs.String("tab", "", "Filter by tab ID")
 	limit := fs.Int("limit", 0, "Show only the most recent N requests (0 = all)")
 	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	if _, err := regexp.Compile(*urlRe); err != nil {
+		return fmt.Errorf("network list: --filter: %w", err)
+	}
 	q := url.Values{}
 	setNonEmpty(q, "type", *rtype)
 	setNonEmpty(q, "url", *urlSub)
+	setNonEmpty(q, "filter", *urlRe)
 	setNonEmpty(q, "tab", *tab)
 	if *limit > 0 {
 		q.Set("limit", strconv.Itoa(*limit))
+	}
+	if *static {
+		q.Set("static", "1")
 	}
 	body, err := devtoolsGet(*sightmapDir, "/devtools/network", q)
 	if err != nil {
@@ -302,15 +315,25 @@ func runNetworkList(args []string) error {
 	if err := json.Unmarshal(body, &res); err != nil {
 		return fmt.Errorf("parse response: %w", err)
 	}
+	printNetworkList(os.Stdout, res, *static)
+	return nil
+}
+
+// printNetworkList renders a `network list` result. The static ring's drops are
+// reported only when the query covered it: otherwise they describe entries the
+// listing was never going to show.
+func printNetworkList(w io.Writer, res networkResult, static bool) {
 	if len(res.Entries) == 0 {
-		fmt.Println("No network requests captured.")
+		fmt.Fprintln(w, "No network requests captured.")
 	} else {
 		for _, e := range res.Entries {
-			fmt.Printf("[%d] %s %s %s → %s (%s)%s\n", e.Index, matchSlot(e.Matches), e.Method, e.URL, statusStr(e.Request), e.ResourceType, propsSlot(e.Props))
+			fmt.Fprintf(w, "[%d] %s %s %s → %s (%s)%s\n", e.Index, matchSlot(e.Matches), e.Method, e.URL, statusStr(e.Request), e.ResourceType, propsSlot(e.Props))
 		}
 	}
-	reportDropped(res.Dropped, "network")
-	return nil
+	reportDropped(w, res.Dropped, "network")
+	if static {
+		reportDropped(w, res.DroppedStatic, "static network")
+	}
 }
 
 func runNetworkGet(args []string) error {
@@ -326,7 +349,8 @@ func runNetworkGet(args []string) error {
 		return err
 	}
 
-	body, err := devtoolsGet(*sightmapDir, "/devtools/network", nil)
+	// An index may name a hidden static request, so ask for both rings.
+	body, err := devtoolsGet(*sightmapDir, "/devtools/network", url.Values{"static": {"1"}})
 	if err != nil {
 		return err
 	}
@@ -426,9 +450,9 @@ func statusStr(e sightmap.Request) string {
 	return fmt.Sprintf("%d %s", e.Status, e.StatusText)
 }
 
-func reportDropped(n int, stream string) {
+func reportDropped(w io.Writer, n int, stream string) {
 	if n > 0 {
-		fmt.Printf("(%d earlier %s entries dropped — buffer overflowed)\n", n, stream)
+		fmt.Fprintf(w, "(%d earlier %s entries dropped — buffer overflowed)\n", n, stream)
 	}
 }
 
