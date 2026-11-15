@@ -21,6 +21,8 @@ type dragRecorder struct {
 	to     string
 	drop   string // __smDropCheck answer; default: the target is hit
 	script []string
+	// onMouse, when set, runs after each recorded mouse event with the count so far.
+	onMouse func(n int)
 }
 
 func (d *dragRecorder) conn(t *testing.T) *CDPConn {
@@ -32,6 +34,9 @@ func (d *dragRecorder) conn(t *testing.T) *CDPConn {
 			var ev map[string]interface{}
 			json.Unmarshal(params, &ev)
 			d.mouse = append(d.mouse, ev)
+			if d.onMouse != nil {
+				d.onMouse(len(d.mouse))
+			}
 		case "Runtime.evaluate":
 			var p struct {
 				Expression string `json:"expression"`
@@ -46,7 +51,7 @@ func (d *dragRecorder) conn(t *testing.T) *CDPConn {
 			case strings.HasPrefix(call, "__smDropCheck"):
 				value = d.drop
 				if value == "" {
-					value = `{"inViewport":true,"hit":true,"covered":""}`
+					value = `{"hit":true,"covered":""}`
 				}
 			}
 			return json.RawMessage(`{"result":{"type":"object","value":` + value + `}}`)
@@ -55,7 +60,7 @@ func (d *dragRecorder) conn(t *testing.T) *CDPConn {
 	})
 }
 
-const testDragPrep = `{"bounds":{"x":100,"y":100,"width":200,"height":80},"view":{"width":1280,"height":800},"x":200,"y":140,"hit":true}`
+const testDragPrep = `{"view":{"width":1280,"height":800},"x":200,"y":140,"hit":true}`
 
 func TestDragWith_Delta(t *testing.T) {
 	defer func(d time.Duration) { dragStepDelay = d }(dragStepDelay)
@@ -159,7 +164,7 @@ func TestDragWith_DropPointCovered(t *testing.T) {
 	rec := &dragRecorder{
 		prep: testDragPrep,
 		to:   `{"x":500,"y":61,"width":200,"height":100}`,
-		drop: `{"inViewport":true,"hit":false,"covered":"header[data-component=ColumnHeader]"}`,
+		drop: `{"hit":false,"covered":"header[data-component=ColumnHeader]"}`,
 	}
 	conn := rec.conn(t)
 	err := DragWith(context.Background(), conn, &sightmap.ComponentNode{Id: "7"},
@@ -211,6 +216,7 @@ func TestDragWith_Errors(t *testing.T) {
 		"both":            {DragOptions{To: to, DeltaX: 5}, testDragPrep, "not both"},
 		"bad steps":       {DragOptions{DeltaX: 5, Steps: -1}, testDragPrep, "steps"},
 		"bad position":    {DragOptions{To: to, ToPosition: "left"}, testDragPrep, "unknown drop position"},
+		"position+delta":  {DragOptions{DeltaX: 5, ToPosition: "above"}, testDragPrep, "needs a target"},
 		"source gone":     {DragOptions{DeltaX: 5}, `null`, "not found"},
 		"drop off screen": {DragOptions{DeltaX: 5000}, testDragPrep, "outside the 1280x800 viewport"},
 	} {
@@ -225,5 +231,31 @@ func TestDragWith_Errors(t *testing.T) {
 				t.Errorf("sent %d mouse events before failing", len(rec.mouse))
 			}
 		})
+	}
+}
+
+// A drag that fails after the press still releases the button, even though the
+// context that failed it is canceled.
+func TestDragWith_ReleasesAfterMidDragFailure(t *testing.T) {
+	defer func(d time.Duration) { dragStepDelay = d }(dragStepDelay)
+	dragStepDelay = time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rec := &dragRecorder{prep: testDragPrep}
+	rec.onMouse = func(n int) {
+		if n == 5 { // move, press, then three drag moves
+			cancel()
+		}
+	}
+	conn := rec.conn(t)
+	err := DragWith(ctx, conn, &sightmap.ComponentNode{Id: "7"}, DragOptions{DeltaX: 100, DeltaY: 40})
+	if err == nil {
+		t.Fatal("want an error from the canceled drag")
+	}
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	last := rec.mouse[len(rec.mouse)-1]
+	if last["type"] != "mouseReleased" || last["buttons"] != float64(0) {
+		t.Fatalf("last event = %v, want a mouseReleased with no buttons held", last)
 	}
 }

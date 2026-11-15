@@ -145,7 +145,9 @@ sightmap browser drag 'IssueCard[identifier="WEB-143"]' \
   over the source and the drop point is over the target (`elementFromPoint`), so a target
   scrolled under a column header or a sticky bar, or outside the viewport, fails with what
   is in the way instead of dropping on nothing. Scroll the target fully into view (or
-  `tabs resize` for a taller window) and retry.
+  `tabs resize` for a taller window) and retry. A source or target inside a shadow root is
+  refused the same way: `document.elementFromPoint` reports the shadow host there, not the
+  element (`click` has the same limit).
 - It drives the pointer only: native HTML5 drag-and-drop (`draggable` + `dragstart`) is not
   started by it. Confirm the result with `eval` or a fresh `snapshot`; `drag` reports only
   that the gesture was sent.

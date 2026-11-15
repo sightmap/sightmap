@@ -50,7 +50,7 @@ function __smFullyVisible(el) {
 }
 
 // __smDragPrepare picks the point a drag starts from, in viewport coordinates,
-// and returns the element's bounds and the viewport size. The element is
+// and returns the viewport size. The element is
 // scrolled to the center of the viewport only when it is not already fully
 // visible: scrolling a visible element moves the layout the caller measured the
 // drop target in (an inner list scrolls under its header and the target's top
@@ -74,12 +74,6 @@ function __smDragPrepare(sel, offX, offY) {
     });
   }
   const r = el.getBoundingClientRect();
-  const bounds = {
-    x: Math.round(r.left),
-    y: Math.round(r.top),
-    width: Math.round(r.width),
-    height: Math.round(r.height),
-  };
   const view = { width: window.innerWidth, height: window.innerHeight };
   const onScreen = (x, y) =>
     x >= 0 && y >= 0 && x < view.width && y < view.height;
@@ -89,9 +83,9 @@ function __smDragPrepare(sel, offX, offY) {
     return !!at && (at === el || el.contains(at));
   };
   if (offX != null && offY != null) {
-    const x = bounds.x + offX,
-      y = bounds.y + offY;
-    return { bounds, view, x, y, hit: inside(x, y) };
+    const x = Math.round(r.left) + offX,
+      y = Math.round(r.top) + offY;
+    return { view, x, y, hit: inside(x, y) };
   }
   const interactive =
     'button,a[href],input,select,textarea,label,summary,[role=button],[role=link],[role=checkbox],[role=menuitem],[role=switch],[contenteditable=""],[contenteditable=true]';
@@ -103,12 +97,12 @@ function __smDragPrepare(sel, offX, offY) {
       if (!inside(x, y)) continue;
       const hot = document.elementFromPoint(x, y).closest(interactive);
       if (hot && hot !== el && el.contains(hot)) continue;
-      return { bounds, view, x, y, hit: true };
+      return { view, x, y, hit: true };
     }
   }
   const x = Math.floor(r.left + r.width / 2),
     y = Math.floor(r.top + r.height / 2);
-  return { bounds, view, x, y, hit: inside(x, y) };
+  return { view, x, y, hit: inside(x, y) };
 }
 
 // __smDropCheck says whether the viewport point (x, y) is on screen and is
@@ -119,7 +113,7 @@ function __smDragPrepare(sel, offX, offY) {
 function __smDropCheck(sel, x, y) {
   const inViewport =
     x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
-  if (!inViewport) return { inViewport: false, hit: false, covered: "" };
+  if (!inViewport) return { hit: false, covered: "" };
   const el = __smDeepQuery(document, sel);
   const at = document.elementFromPoint(x, y);
   const hit = !!el && !!at && (at === el || el.contains(at));
@@ -131,7 +125,7 @@ function __smDropCheck(sel, x, y) {
       covered += "[data-component=" + comp.getAttribute("data-component") + "]";
     else if (at.id) covered += "#" + at.id;
   }
-  return { inViewport: true, hit, covered };
+  return { hit, covered };
 }
 
 // __smLocateForClick scrolls the element to the center of the viewport and

@@ -340,7 +340,6 @@ describe("__smDragPrepare", () => {
     const p = __smDragPrepare("#card", null, null);
     expect(p.hit).toBe(true);
     expect([p.x, p.y]).not.toEqual([170, 586]);
-    expect(p.bounds).toEqual({ x: 20, y: 527, width: 300, height: 118 });
     expect(p.view).toEqual({ width: 1440, height: 900 });
   });
 
@@ -378,7 +377,6 @@ describe("__smDropCheck", () => {
       .fn()
       .mockReturnValue(document.getElementById("inner"));
     expect(__smDropCheck("#t", 600, 150)).toEqual({
-      inViewport: true,
       hit: true,
       covered: "",
     });
@@ -391,7 +389,6 @@ describe("__smDropCheck", () => {
       .fn()
       .mockReturnValue(document.getElementById("title"));
     expect(__smDropCheck("#t", 600, 65)).toEqual({
-      inViewport: true,
       hit: false,
       covered: "b[data-component=ColumnHeader]",
     });
@@ -401,7 +398,6 @@ describe("__smDropCheck", () => {
     document.body.innerHTML = '<div id="t"></div>';
     document.elementFromPoint = jest.fn().mockReturnValue(null);
     expect(__smDropCheck("#t", 600, 65)).toMatchObject({
-      inViewport: true,
       hit: false,
       covered: "",
     });
@@ -410,7 +406,6 @@ describe("__smDropCheck", () => {
   test("not in the viewport", () => {
     document.body.innerHTML = '<div id="t"></div>';
     expect(__smDropCheck("#t", 600, 5000)).toEqual({
-      inViewport: false,
       hit: false,
       covered: "",
     });

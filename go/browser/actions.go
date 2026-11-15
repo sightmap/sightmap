@@ -947,8 +947,7 @@ const dragEdgeInset = 4
 
 // dragPrep is what __smDragPrepare returns.
 type dragPrep struct {
-	Bounds sightmap.Bounds `json:"bounds"`
-	View   struct {
+	View struct {
 		Width  int `json:"width"`
 		Height int `json:"height"`
 	} `json:"view"`
@@ -993,9 +992,9 @@ func dropEdge(position string) string {
 // DragWith drags src with a pointer, the way a person does: scroll src to the
 // middle of the viewport unless it is already fully visible, press inside it,
 // move to the drop point in Steps small steps with the button held, release.
-// Pointer-event drags (sortable lists, boards, sliders)
-// ignore a press that jumps straight to the target, because they wait for the
-// pointer to travel past an activation distance and then follow it.
+// Pointer-event drags (sortable lists, boards, sliders) ignore a press that
+// jumps straight to the target, because they wait for the pointer to travel
+// past an activation distance and then follow it.
 //
 // It drives the pointer only; it does not start a native HTML5 drag-and-drop.
 func DragWith(ctx context.Context, conn *CDPConn, src *sightmap.ComponentNode, opts DragOptions) error {
@@ -1007,6 +1006,9 @@ func DragWith(ctx context.Context, conn *CDPConn, src *sightmap.ComponentNode, o
 	}
 	if opts.To == nil && opts.DeltaX == 0 && opts.DeltaY == 0 {
 		return fmt.Errorf("drag: nowhere to drag to (give a target component or a delta)")
+	}
+	if opts.To == nil && opts.ToPosition != "" && opts.ToPosition != "center" {
+		return fmt.Errorf("drag: drop position %q needs a target component; it does nothing with a delta", opts.ToPosition)
 	}
 	if opts.To != nil && opts.To.Id == "" {
 		return fmt.Errorf("drag: target has no id")
@@ -1087,7 +1089,7 @@ func DragWith(ctx context.Context, conn *CDPConn, src *sightmap.ComponentNode, o
 		}
 	}
 
-	mouse := func(typ string, x, y, buttons int) error {
+	mouseCtx := func(ctx context.Context, typ string, x, y, buttons int) error {
 		params := map[string]interface{}{
 			"type": typ, "x": x, "y": y, "buttons": buttons,
 			"button": "none", "clickCount": 0,
@@ -1105,25 +1107,43 @@ func DragWith(ctx context.Context, conn *CDPConn, src *sightmap.ComponentNode, o
 		}
 		return nil
 	}
+	mouse := func(typ string, x, y, buttons int) error {
+		return mouseCtx(ctx, typ, x, y, buttons)
+	}
 	if err := mouse("mouseMoved", sx, sy, 0); err != nil {
 		return err
 	}
 	if err := mouse("mousePressed", sx, sy, 1); err != nil {
 		return err
 	}
+	// Once the button is down, any failure (a dropped connection, a canceled
+	// ctx) would leave it held in the page, so the next command would start
+	// mid-drag. Release it at the last point reached, on a context that
+	// outlives ctx's cancellation, and report the original error.
+	lastX, lastY := sx, sy
+	fail := func(err error) error {
+		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer cancel()
+		_ = mouseCtx(rctx, "mouseReleased", lastX, lastY, 0)
+		return err
+	}
 	for i := 1; i <= steps; i++ {
 		if dragStepDelay > 0 {
 			select {
 			case <-ctx.Done():
-				return ctx.Err()
+				return fail(ctx.Err())
 			case <-time.After(dragStepDelay):
 			}
 		}
 		x := sx + int(math.Round(float64(tx-sx)*float64(i)/float64(steps)))
 		y := sy + int(math.Round(float64(ty-sy)*float64(i)/float64(steps)))
 		if err := mouse("mouseMoved", x, y, 1); err != nil {
-			return err
+			return fail(err)
 		}
+		lastX, lastY = x, y
 	}
-	return mouse("mouseReleased", tx, ty, 0)
+	if err := mouse("mouseReleased", tx, ty, 0); err != nil {
+		return fail(err)
+	}
+	return nil
 }
