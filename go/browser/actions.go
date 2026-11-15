@@ -1003,6 +1003,9 @@ func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, valu
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("Fill: click to focus: %w", err)
 	}
+	if err := checkFocused(ctx, conn, node.Id); err != nil {
+		return fmt.Errorf("Fill: %w", err)
+	}
 	sel, err := selectAllActive(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("Fill: select: %w", err)
@@ -1144,9 +1147,38 @@ func fillNative(ctx context.Context, conn *CDPConn, id, value string) (done bool
 	return true, nil
 }
 
+// focusProblem is what __smFocusProblem reports for the document holding an
+// element: why keyboard focus is not on a field there.
+type focusProblem struct {
+	Nothing bool   `json:"nothing"`
+	Reason  string `json:"reason"`
+}
+
+// checkFocused confirms the click that was meant to focus id did. It errors
+// only when focus stayed on the page itself (activeElement is BODY), which is
+// what a click leaves when it never reached the page or hit something that
+// takes no focus: typing would go nowhere. Focus on another kind of element
+// (a contenteditable) is a field to type into, and an unreadable state is not
+// an error.
+func checkFocused(ctx context.Context, conn *CDPConn, id string) error {
+	if id == "" {
+		return nil
+	}
+	raw, _, err := evalForID(ctx, conn, id, actionsJS+"\n__smFocusProblem()")
+	if err != nil {
+		return nil
+	}
+	var p *focusProblem
+	if json.Unmarshal(raw, &p) != nil || p == nil || !p.Nothing {
+		return nil
+	}
+	return fmt.Errorf("clicking %q did not focus it: %s", id, p.Reason)
+}
+
 // clearActiveElement clears the focused element of the document holding id (the
 // top document when id is empty or not found in a frame) and returns the value
-// it had.
+// it had. It errors, saying so, when what has focus is not a field it can
+// clear.
 func clearActiveElement(ctx context.Context, conn *CDPConn, id string) (string, error) {
 	script := actionsJS + "\n__smClearActiveElement()"
 	var raw json.RawMessage
@@ -1159,9 +1191,15 @@ func clearActiveElement(ctx context.Context, conn *CDPConn, id string) (string, 
 	if err != nil {
 		return "", err
 	}
-	var before string
-	_ = json.Unmarshal(raw, &before)
-	return before, nil
+	var res struct {
+		Ok     bool   `json:"ok"`
+		Reason string `json:"reason"`
+		Old    string `json:"old"`
+	}
+	if json.Unmarshal(raw, &res) == nil && !res.Ok && res.Reason != "" {
+		return "", fmt.Errorf("the field did not take focus: %s", res.Reason)
+	}
+	return res.Old, nil
 }
 
 // ScrollIntoView scrolls node into the visible viewport.

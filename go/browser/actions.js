@@ -246,14 +246,14 @@ function __smSelectActive() {
 // value tracking a framework like React installs (assigning el.value directly
 // is swallowed there), then fires the input and change events a user's edit
 // would.
-function __smNativeSetValue(el, value, verb = "set") {
+function __smNativeSetValue(el, value) {
   const proto = [HTMLInputElement, HTMLTextAreaElement, HTMLSelectElement].find(
     (C) => el instanceof C,
   )?.prototype;
   const setter = proto && Object.getOwnPropertyDescriptor(proto, "value")?.set;
   if (!setter) {
     throw new Error(
-      "the focused <" + el.tagName.toLowerCase() + "> has no value to " + verb,
+      "the focused <" + el.tagName.toLowerCase() + "> has no value to set",
     );
   }
   setter.call(el, value);
@@ -297,13 +297,41 @@ function __smSetValueIfNative(sel, value) {
   return { native: true, type, blocked: false, value: el.value };
 }
 
+// __smFocusProblem says why the focused element cannot be typed into, or is
+// null when focus is on a field. `nothing` means focus is on the page itself
+// (activeElement is BODY): what a click leaves behind when it never reached the
+// page (a hidden tab) or landed on something that cannot take focus.
+function __smFocusProblem() {
+  const a = __smActiveElement();
+  if (!a || a === document.body || a === document.documentElement) {
+    return {
+      nothing: true,
+      reason: `nothing has focus (activeElement is ${a ? a.tagName : "absent"}, visibilityState=${document.visibilityState})`,
+    };
+  }
+  if (!(a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement)) {
+    return {
+      nothing: false,
+      reason: `focus is on <${a.tagName.toLowerCase()}>, not an input or textarea`,
+    };
+  }
+  return null;
+}
+
 // __smClearActiveElement empties the focused input, textarea, select or
-// contenteditable and returns what it held, or throws when it cannot. Inputs go
+// contenteditable and returns {ok:true, old} with what it held, or
+// {ok:false, reason} when nothing it can clear has focus (so the caller can say
+// the field did not take focus, rather than the page's exception). Inputs go
 // through __smNativeSetValue, which is what React-controlled fields listen to.
 function __smClearActiveElement() {
   const el = __smActiveElement();
-  if (!el || el === document.body || el === document.documentElement) {
-    throw new Error("nothing is focused to clear");
+  const problem = __smFocusProblem();
+  if (
+    problem &&
+    (problem.nothing ||
+      !(el.isContentEditable || el instanceof HTMLSelectElement))
+  ) {
+    return { ok: false, reason: problem.reason };
   }
   if (el.isContentEditable && el.value == null) {
     const old = el.textContent || "";
@@ -316,9 +344,9 @@ function __smClearActiveElement() {
     el.dispatchEvent(
       new InputEvent("input", { bubbles: true, inputType: "deleteContent" }),
     );
-    return old;
+    return { ok: true, old };
   }
   const old = String(el.value);
-  __smNativeSetValue(el, "", "clear");
-  return old;
+  __smNativeSetValue(el, "");
+  return { ok: true, old };
 }

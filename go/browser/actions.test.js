@@ -262,7 +262,7 @@ describe("__smClearActiveElement", () => {
     input.addEventListener("input", onInput);
     input.addEventListener("change", onChange);
 
-    expect(__smClearActiveElement()).toBe("hello");
+    expect(__smClearActiveElement()).toEqual({ ok: true, old: "hello" });
 
     expect(input.value).toBe("");
     expect(onInput).toHaveBeenCalledTimes(1);
@@ -277,7 +277,10 @@ describe("__smClearActiveElement", () => {
     const onInput = jest.fn();
     ta.addEventListener("input", onInput);
 
-    expect(__smClearActiveElement()).toBe("Reminder scheduling overhaul");
+    expect(__smClearActiveElement()).toEqual({
+      ok: true,
+      old: "Reminder scheduling overhaul",
+    });
 
     expect(ta.value).toBe("");
     expect(onInput).toHaveBeenCalledTimes(1);
@@ -320,21 +323,26 @@ describe("__smClearActiveElement", () => {
     Object.defineProperty(ce, "isContentEditable", { value: true });
     const onInput = jest.fn();
     ce.addEventListener("input", onInput);
-    expect(__smClearActiveElement()).toBe("hello");
+    expect(__smClearActiveElement()).toEqual({ ok: true, old: "hello" });
     expect(ce.textContent).toBe("");
     expect(onInput).toHaveBeenCalledTimes(1);
   });
 
-  test("throws when nothing is focused", () => {
-    document.body.innerHTML = "<div></div>";
-    document.activeElement && document.activeElement.blur();
-    expect(() => __smClearActiveElement()).toThrow(/nothing is focused/);
+  test("reports, rather than throws, when nothing has focus", () => {
+    document.body.innerHTML = '<input id="in" value="keep" />';
+    document.activeElement.blur();
+    const res = __smClearActiveElement();
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/nothing has focus/);
+    expect(document.getElementById("in").value).toBe("keep");
   });
 
-  test("throws when the focused element has no value", () => {
+  test("reports, rather than throws, when a non-field has focus", () => {
     document.body.innerHTML = '<button id="b">x</button>';
     document.getElementById("b").focus();
-    expect(() => __smClearActiveElement()).toThrow(/no value to clear/);
+    const res = __smClearActiveElement();
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/<button>/);
   });
 });
 
@@ -527,6 +535,32 @@ describe("__smDropCheck", () => {
       hit: false,
       covered: "",
     });
+  });
+});
+
+describe("__smFocusProblem", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("is null when a field has focus", () => {
+    document.body.innerHTML = '<input id="in">';
+    document.getElementById("in").focus();
+    expect(__smFocusProblem()).toBeNull();
+  });
+
+  test("says nothing has focus when the page itself does", () => {
+    document.body.innerHTML = '<input id="in">';
+    document.activeElement.blur();
+    expect(__smFocusProblem().nothing).toBe(true);
+  });
+
+  test("says another kind of element has focus, without calling it nothing", () => {
+    document.body.innerHTML = '<button id="b">x</button>';
+    document.getElementById("b").focus();
+    const p = __smFocusProblem();
+    expect(p.nothing).toBe(false);
+    expect(p.reason).toMatch(/not an input or textarea/);
   });
 });
 

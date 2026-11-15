@@ -285,3 +285,31 @@ func TestInteractInBackgroundTab_Chrome(t *testing.T) {
 		t.Errorf("input in the formerly hidden tab = %q, want world", got)
 	}
 }
+
+// TestClearActiveElementWithoutFocus_Chrome checks that clearing with nothing
+// focused (the state a missed focusing click leaves) is reported as the field
+// not taking focus, not as a raw JS exception, and that Fill refuses to type
+// when its click did not focus the target.
+func TestClearActiveElementWithoutFocus_Chrome(t *testing.T) {
+	ctx, conn := fullPageChrome(t)
+	loadTabPage(t, ctx, conn)
+	root, _ := extractFixture(t, ctx, conn)
+	if _, err := EvalJSON(ctx, conn, `document.activeElement && document.activeElement.blur()`); err != nil {
+		t.Fatal(err)
+	}
+	_, err := clearActiveElement(ctx, conn, "")
+	if err == nil || !strings.Contains(err.Error(), "did not take focus") || strings.Contains(err.Error(), "JS exception") {
+		t.Errorf("clear with nothing focused: err = %v, want a did-not-take-focus error", err)
+	}
+
+	// A click that lands on a control that is not the input leaves BODY focused:
+	// the label of Fill's check. Simulate a click that never focuses by making
+	// the input unfocusable.
+	if _, err := EvalJSON(ctx, conn, `document.getElementById("in").style.pointerEvents="none"`); err != nil {
+		t.Fatal(err)
+	}
+	err = Fill(ctx, conn, byDOMID(root, "in"), "x")
+	if err == nil || !strings.Contains(err.Error(), "did not focus") {
+		t.Errorf("fill whose click does not focus: err = %v, want a did-not-focus error", err)
+	}
+}
