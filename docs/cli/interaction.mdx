@@ -109,7 +109,13 @@ sightmap browser hover 'AccountMenu'
 
 ### `browser keypress`
 
-Sends a key event to the focused element. Click or fill a field first when it needs focus. The key name is a positional argument, such as `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, or `Space`. On success it echoes `pressed KEY` to stderr.
+Sends a key, or a Playwright-style chord, to the focused element. Click or fill a field first when it needs focus. The key is a positional argument in the form `KEY` or `MODIFIER+...+KEY`.
+
+- **Modifiers:** `Shift`, `Control` (`Ctrl`), `Alt` (`Option`), `Meta` (`Cmd`, `Command`), and `ControlOrMeta` (Meta on macOS, Control elsewhere, chosen by the machine running the CLI).
+- **Keys:** a character (`c`, `C`, `5`, `.`, `?`), a code name (`KeyC`, `Digit1`, `Period`, `BracketLeft`), or one of `Enter`, `Tab`, `Escape`, `Space`, `Backspace`, `Delete`, `Home`, `End`, `PageUp`, `PageDown`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `F1`–`F12`. A name outside this list is an error and nothing is sent.
+- **Text:** a character is typed only when no Control, Meta, or Alt is held, so `Meta+K` does not insert a `k`.
+
+On success it echoes `pressed KEY` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -119,6 +125,8 @@ Sends a key event to the focused element. Click or fill a field first when it ne
 ```bash
 sightmap browser fill SearchInput 'garden hose'
 sightmap browser keypress Enter
+sightmap browser keypress Shift+KeyV
+sightmap browser keypress ControlOrMeta+K
 ```
 
 ---
