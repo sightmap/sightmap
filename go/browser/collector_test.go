@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -587,7 +588,7 @@ func TestDrainKeepsOwnRequestsOutOfTheBuffer(t *testing.T) {
 	otherCh := make(chan json.RawMessage)
 	ctx, cancel := context.WithCancel(context.Background())
 	c.wg.Add(1)
-	go c.drain(ctx, "T1", nil, otherCh, otherCh, reqCh, respCh, otherCh)
+	go c.drain(ctx, "T1", nil, otherCh, otherCh, reqCh, respCh, otherCh, otherCh)
 	t.Cleanup(func() { cancel(); c.wg.Wait() })
 
 	req := func(id, url string) json.RawMessage {
@@ -616,7 +617,7 @@ func TestDrainKeepsOwnRequestsOutOfTheBuffer(t *testing.T) {
 	for {
 		got, dropped := c.Network(NetworkFilter{})
 		if len(got) == len(apiURLs) && got[len(got)-1].Status == 200 {
-			if dropped != 0 {
+			if dropped.Main != 0 {
 				t.Errorf("dropped = %d, want 0: own requests overflowed the buffer", dropped)
 			}
 			for i, r := range got {
@@ -646,4 +647,239 @@ func waitFor(t *testing.T, cond func() bool, what string) {
 		}
 		time.Sleep(time.Millisecond)
 	}
+}
+
+func TestIsStaticType(t *testing.T) {
+	for _, rt := range []string{"Script", "Stylesheet", "Image", "Font", "Media", "Manifest", "TextTrack", "script", "FONT"} {
+		if !isStaticType(rt) {
+			t.Errorf("isStaticType(%q) = false, want true", rt)
+		}
+	}
+	// An unknown or empty type is not static: better to show it than hide it.
+	for _, rt := range []string{"Document", "XHR", "Fetch", "EventSource", "WebSocket", "Other", "Ping", "Preflight", "", "Hologram"} {
+		if isStaticType(rt) {
+			t.Errorf("isStaticType(%q) = true, want false", rt)
+		}
+	}
+}
+
+func TestInStaticRing(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		rtype  string
+		status int
+		want   bool
+	}{
+		{"script ok", "Script", 200, true},
+		{"script cached", "Script", 304, true},
+		{"script 204", "Script", 204, true},
+		{"image pending", "Image", 0, true},
+		{"script missing", "Script", 404, false},
+		{"stylesheet server error", "Stylesheet", 500, false},
+		{"script redirect", "Script", 302, false},
+		{"fetch ok", "Fetch", 200, false},
+		{"document ok", "Document", 200, false},
+		{"unknown type ok", "Hologram", 200, false},
+		{"no type", "", 200, false},
+	} {
+		if got := inStaticRing(tc.rtype, tc.status); got != tc.want {
+			t.Errorf("%s: inStaticRing(%q, %d) = %v, want %v", tc.name, tc.rtype, tc.status, got, tc.want)
+		}
+	}
+}
+
+func TestParseLoadingFailed(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want bool
+	}{
+		{`{"requestId":"r","errorText":"net::ERR_CONNECTION_REFUSED"}`, true},
+		{`{"requestId":"r","errorText":"net::ERR_ABORTED","canceled":true}`, false},
+		{`{"requestId":"r","canceled":true,"blockedReason":"csp"}`, true},
+	} {
+		id, failed := parseLoadingFailed(json.RawMessage(tc.raw))
+		if id != "r" || failed != tc.want {
+			t.Errorf("parseLoadingFailed(%s) = %q, %v; want r, %v", tc.raw, id, failed, tc.want)
+		}
+	}
+	if id, failed := parseLoadingFailed(json.RawMessage(`{}`)); id != "" || failed {
+		t.Errorf("no requestId = %q, %v", id, failed)
+	}
+}
+
+// settled adds a request and applies its response, as the drain loop does.
+func settled(c *Collector, id, url, rtype string, status int) {
+	// The body is the URL, so a lookup by index can tell which record it reached.
+	c.addNetwork(networkRecord{Request: sightmap.Request{Method: "GET", URL: url, ResourceType: rtype, RspBody: &sightmap.Body{Content: url}}, requestID: id})
+	c.applyResponse(responseInfo{reqID: id, status: status, rtype: rtype})
+}
+
+func urls(rs []sightmap.Request) []string {
+	var out []string
+	for _, r := range rs {
+		out = append(out, r.URL)
+	}
+	return out
+}
+
+func TestStaticRequestsHiddenUnlessAsked(t *testing.T) {
+	c := NewCollector("unused")
+	settled(c, "a", "/src/main.tsx", "Script", 200)
+	settled(c, "b", "/api/me", "Fetch", 200)
+	settled(c, "c", "/src/app.css", "Stylesheet", 304)
+	settled(c, "d", "/src/gone.js", "Script", 404)
+	settled(c, "e", "/", "Document", 200)
+
+	got, _ := c.Network(NetworkFilter{})
+	if want := []string{"/api/me", "/src/gone.js", "/"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("default = %v, want %v (a failed script stays visible)", urls(got), want)
+	}
+	got, _ = c.Network(NetworkFilter{IncludeStatic: true})
+	if want := []string{"/src/main.tsx", "/api/me", "/src/app.css", "/src/gone.js", "/"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("--static = %v, want all five in index order %v", urls(got), want)
+	}
+	got, _ = c.Network(NetworkFilter{IncludeStatic: true, ResourceType: "script"})
+	if want := []string{"/src/main.tsx", "/src/gone.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("--static --type script = %v, want %v", urls(got), want)
+	}
+	got, _ = c.Network(NetworkFilter{IncludeStatic: true, Limit: 2})
+	if want := []string{"/src/gone.js", "/"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("--static --limit 2 = %v, want the newest two %v", urls(got), want)
+	}
+}
+
+func TestNetworkURLPattern(t *testing.T) {
+	c := NewCollector("unused")
+	settled(c, "a", "http://x/api/issues", "Fetch", 200)
+	settled(c, "b", "http://x/api/me", "Fetch", 200)
+	settled(c, "c", "http://x/src/api.ts", "Script", 200)
+	settled(c, "d", "http://x/static/logo.png", "Image", 200)
+
+	got, _ := c.Network(NetworkFilter{URLPattern: regexp.MustCompile(`/api/(issues|me)$`)})
+	if want := []string{"http://x/api/issues", "http://x/api/me"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("filter = %v, want %v", urls(got), want)
+	}
+	// The pattern narrows the static ring too once it is asked for.
+	got, _ = c.Network(NetworkFilter{URLPattern: regexp.MustCompile(`api`), IncludeStatic: true})
+	if len(got) != 3 {
+		t.Errorf("filter+static = %v, want 3 api URLs", urls(got))
+	}
+	got, _ = c.Network(NetworkFilter{URLPattern: regexp.MustCompile(`(?i)LOGO`)})
+	if len(got) != 0 {
+		t.Errorf("a hidden static request matched without --static: %v", urls(got))
+	}
+}
+
+// The reason for the second ring: a dev server's module scripts fill only their
+// own ring, the page's calls all survive, and the drops are charged to the ring
+// that dropped.
+func TestStaticBurstDoesNotEvictAppRequests(t *testing.T) {
+	c := NewCollector("unused")
+	c.maxEntries = 10
+	c.maxStatic = 20
+	for i := 0; i < 200; i++ {
+		id := fmt.Sprintf("s-%d", i)
+		settled(c, id, fmt.Sprintf("/src/m%d.ts", i), "Script", 200)
+		if i%70 == 0 {
+			settled(c, fmt.Sprintf("api-%d", i), fmt.Sprintf("/api/%d", i), "Fetch", 200)
+		}
+	}
+
+	got, drops := c.Network(NetworkFilter{})
+	if want := []string{"/api/0", "/api/70", "/api/140"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("default = %v, want all 3 Fetch requests %v", urls(got), want)
+	}
+	if drops != (NetworkDrops{Main: 0}) {
+		t.Errorf("default drops = %+v, want none: the static ring's drops are not reported without static", drops)
+	}
+	got, drops = c.Network(NetworkFilter{IncludeStatic: true})
+	if len(got) != 3+20 {
+		t.Errorf("--static returned %d entries, want 3 Fetch + 20 newest scripts", len(got))
+	}
+	if drops != (NetworkDrops{Main: 0, Static: 180}) {
+		t.Errorf("--static drops = %+v, want {Main:0 Static:180}", drops)
+	}
+	// The main ring still drops on its own overflow.
+	for i := 0; i < 15; i++ {
+		settled(c, fmt.Sprintf("x-%d", i), fmt.Sprintf("/api/x%d", i), "XHR", 200)
+	}
+	if _, drops = c.Network(NetworkFilter{IncludeStatic: true}); drops != (NetworkDrops{Main: 8, Static: 180}) {
+		t.Errorf("after main overflow drops = %+v, want {Main:8 Static:180}", drops)
+	}
+}
+
+func TestNetworkIndexesUniqueAcrossRings(t *testing.T) {
+	c := NewCollector("unused")
+	settled(c, "a", "/a.js", "Script", 200)
+	settled(c, "b", "/api/b", "Fetch", 200)
+	settled(c, "c", "/c.css", "Stylesheet", 200)
+	settled(c, "d", "/missing.js", "Script", 404) // moves static→main after its response
+	settled(c, "e", "/api/e", "XHR", 200)
+
+	all, _ := c.Network(NetworkFilter{IncludeStatic: true})
+	seen := map[int]string{}
+	for i, r := range all {
+		if prev, dup := seen[r.Index]; dup {
+			t.Errorf("index %d used by %s and %s", r.Index, prev, r.URL)
+		}
+		seen[r.Index] = r.URL
+		if r.Index != i {
+			t.Errorf("entry %d (%s) has index %d, want the order requests were made", i, r.URL, r.Index)
+		}
+	}
+	// `network get N` works for either ring, including a record that moved.
+	for _, r := range all {
+		if _, _, found := c.lookupRequest(r.Index); !found {
+			t.Errorf("lookupRequest(%d) (%s) not found", r.Index, r.URL)
+		}
+		if body, found, err := c.ResponseBody(context.Background(), r.Index); !found || err != nil || string(body) != r.URL {
+			t.Errorf("ResponseBody(%d) = %q, found=%v, err=%v; want %q", r.Index, body, found, err, r.URL)
+		}
+	}
+}
+
+// A script is static while pending, becomes main when it fails, and a cancelled
+// load (navigated away) stays out of the main ring.
+func TestFailedStaticRequestMovesToMainRing(t *testing.T) {
+	c := NewCollector("unused")
+	add := func(id, url string) {
+		c.addNetwork(networkRecord{Request: sightmap.Request{Method: "GET", URL: url, ResourceType: "Script"}, requestID: id})
+	}
+	add("a", "/refused.js")
+	add("b", "/ok.js")
+	add("c", "/aborted.js")
+	c.applyResponse(responseInfo{reqID: "b", status: 200, rtype: "Script"})
+
+	if got, _ := c.Network(NetworkFilter{}); len(got) != 0 {
+		t.Fatalf("pending scripts visible by default: %v", urls(got))
+	}
+	c.failRequest("a")
+	got, _ := c.Network(NetworkFilter{})
+	if want := []string{"/refused.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("after failure default = %v, want %v", urls(got), want)
+	}
+	if got[0].Index != 0 {
+		t.Errorf("moved record index = %d, want 0 (indexes survive a move)", got[0].Index)
+	}
+	got, _ = c.Network(NetworkFilter{IncludeStatic: true})
+	if want := []string{"/refused.js", "/ok.js", "/aborted.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("--static = %v, want index order %v", urls(got), want)
+	}
+}
+
+// The same flow through drain, with loadingFailed delivered as CDP sends it.
+func TestDrainRoutesLoadingFailed(t *testing.T) {
+	c := NewCollector("unused")
+	reqCh := make(chan json.RawMessage, 8)
+	failedCh := make(chan json.RawMessage, 8)
+	otherCh := make(chan json.RawMessage)
+	ctx, cancel := context.WithCancel(context.Background())
+	c.wg.Add(1)
+	go c.drain(ctx, "T1", nil, otherCh, otherCh, reqCh, otherCh, otherCh, failedCh)
+	t.Cleanup(func() { cancel(); c.wg.Wait() })
+
+	reqCh <- json.RawMessage(`{"requestId":"a","type":"Script","request":{"url":"/refused.js","method":"GET","headers":{}}}`)
+	waitFor(t, func() bool { got, _ := c.Network(NetworkFilter{IncludeStatic: true}); return len(got) == 1 }, "request buffered")
+	failedCh <- json.RawMessage(`{"requestId":"a","errorText":"net::ERR_CONNECTION_REFUSED"}`)
+	waitFor(t, func() bool { got, _ := c.Network(NetworkFilter{}); return len(got) == 1 }, "failed script visible by default")
 }
