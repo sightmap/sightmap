@@ -8,6 +8,7 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -431,45 +432,130 @@ func TestResolveBySightmapID_NotFound(t *testing.T) {
 	}
 }
 
-// TestKeyPress_Enter verifies keyDown+keyUp with key="Enter" and text="\r".
-func TestKeyPress_Enter(t *testing.T) {
-	type keyEv struct {
-		Type string `json:"type"`
-		Key  string `json:"key"`
-		Text string `json:"text"`
-	}
-	var mu sync.Mutex
-	var keyEvents []keyEv
+// TestKeyPress_Chords asserts the exact Input.dispatchKeyEvent params that
+// KeyPress sends for single keys and Playwright-style chords.
+func TestKeyPress_Chords(t *testing.T) {
+	defer func(old bool) { controlOrMetaIsMeta = old }(controlOrMetaIsMeta)
+	controlOrMetaIsMeta = true
 
-	conn := newFakeCDP(t, func(method string, params json.RawMessage) json.RawMessage {
-		if method == "Input.dispatchKeyEvent" {
-			var ev keyEv
-			json.Unmarshal(params, &ev)
-			mu.Lock()
-			keyEvents = append(keyEvents, ev)
-			mu.Unlock()
+	type ev = map[string]interface{}
+	// key builds the main key's down/up pair. text != "" makes the down a
+	// keyDown carrying it; otherwise the down is a rawKeyDown.
+	key := func(k, code string, vk, mods int, text string) []ev {
+		down := ev{"type": "rawKeyDown", "key": k, "code": code, "windowsVirtualKeyCode": vk, "modifiers": mods}
+		if text != "" {
+			down["type"] = "keyDown"
+			down["text"] = text
 		}
-		return json.RawMessage(`{}`)
+		return []ev{down, {"type": "keyUp", "key": k, "code": code, "windowsVirtualKeyCode": vk, "modifiers": mods}}
+	}
+	mod := func(typ, k, code string, vk, mods int) ev {
+		return ev{"type": typ, "key": k, "code": code, "windowsVirtualKeyCode": vk, "location": 1, "modifiers": mods}
+	}
+	// wrap surrounds the main events with modifier downs and (reversed) ups.
+	// Each mod is {key, code, vk, bit}; the bit accumulates down and unwinds up.
+	type m struct {
+		key, code string
+		vk, bit   int
+	}
+	wrap := func(mods []m, main []ev) []ev {
+		var out []ev
+		acc := 0
+		for _, x := range mods {
+			acc |= x.bit
+			out = append(out, mod("rawKeyDown", x.key, x.code, x.vk, acc))
+		}
+		out = append(out, main...)
+		for i := len(mods) - 1; i >= 0; i-- {
+			acc &^= mods[i].bit
+			out = append(out, mod("keyUp", mods[i].key, mods[i].code, mods[i].vk, acc))
+		}
+		return out
+	}
+	shift := m{"Shift", "ShiftLeft", 16, 8}
+	ctrl := m{"Control", "ControlLeft", 17, 2}
+	alt := m{"Alt", "AltLeft", 18, 1}
+	meta := m{"Meta", "MetaLeft", 91, 4}
+
+	tests := []struct {
+		chord string
+		want  []ev
+	}{
+		{"c", key("c", "KeyC", 67, 0, "c")},
+		{"C", key("C", "KeyC", 67, 0, "C")},
+		{"Shift+KeyC", wrap([]m{shift}, key("C", "KeyC", 67, 8, "C"))},
+		{"KeyC", key("c", "KeyC", 67, 0, "c")},
+		{"5", key("5", "Digit5", 53, 0, "5")},
+		{".", key(".", "Period", 190, 0, ".")},
+		{"?", key("?", "Slash", 191, 0, "?")},
+		{"[", key("[", "BracketLeft", 219, 0, "[")},
+		{"Escape", key("Escape", "Escape", 27, 0, "")},
+		{"Enter", key("Enter", "Enter", 13, 0, "\r")},
+		{"Shift+Tab", wrap([]m{shift}, key("Tab", "Tab", 9, 8, ""))},
+		{"Meta+K", wrap([]m{meta}, key("K", "KeyK", 75, 4, ""))},
+		{"Control+Enter", wrap([]m{ctrl}, key("Enter", "Enter", 13, 2, ""))},
+		{"Alt+Shift+KeyP", wrap([]m{alt, shift}, key("P", "KeyP", 80, 9, ""))},
+		{"Ctrl+r", wrap([]m{ctrl}, key("r", "KeyR", 82, 2, ""))},
+		// More of the vocabulary.
+		{"Space", key(" ", "Space", 32, 0, " ")},
+		{"Digit1", key("1", "Digit1", 49, 0, "1")},
+		{"Shift+Digit1", wrap([]m{shift}, key("!", "Digit1", 49, 8, "!"))},
+		{"PageDown", key("PageDown", "PageDown", 34, 0, "")},
+		{"F5", key("F5", "F5", 116, 0, "")},
+		{"Cmd+Option+i", wrap([]m{meta, alt}, key("i", "KeyI", 73, 5, ""))},
+		// "+" is the shifted face of Equal.
+		{"Shift++", wrap([]m{shift}, key("+", "Equal", 187, 8, "+"))},
+	}
+
+	check := func(t *testing.T, chord string, want []ev) {
+		var mu sync.Mutex
+		var got []ev
+		conn := newFakeCDP(t, func(method string, params json.RawMessage) json.RawMessage {
+			if method == "Input.dispatchKeyEvent" {
+				var e ev
+				json.Unmarshal(params, &e)
+				mu.Lock()
+				got = append(got, e)
+				mu.Unlock()
+			}
+			return json.RawMessage(`{}`)
+		})
+		if err := KeyPress(context.Background(), conn, chord); err != nil {
+			t.Fatal(err)
+		}
+		// Normalize the expectation the way the wire does (ints -> float64).
+		var wantWire []ev
+		raw, _ := json.Marshal(want)
+		json.Unmarshal(raw, &wantWire)
+		mu.Lock()
+		defer mu.Unlock()
+		if !reflect.DeepEqual(got, wantWire) {
+			g, _ := json.MarshalIndent(got, "", " ")
+			w, _ := json.MarshalIndent(wantWire, "", " ")
+			t.Errorf("events for %q:\n got: %s\nwant: %s", chord, g, w)
+		}
+	}
+	for _, tc := range tests {
+		t.Run(tc.chord, func(t *testing.T) { check(t, tc.chord, tc.want) })
+	}
+
+	// ControlOrMeta is Meta on macOS and Control elsewhere.
+	t.Run("ControlOrMeta+B/mac", func(t *testing.T) {
+		controlOrMetaIsMeta = true
+		check(t, "ControlOrMeta+B", wrap([]m{meta}, key("B", "KeyB", 66, 4, "")))
 	})
+	t.Run("ControlOrMeta+B/other", func(t *testing.T) {
+		controlOrMetaIsMeta = false
+		check(t, "ControlOrMeta+B", wrap([]m{ctrl}, key("B", "KeyB", 66, 2, "")))
+	})
+}
 
-	if err := KeyPress(context.Background(), conn, "Enter"); err != nil {
-		t.Fatal(err)
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	if len(keyEvents) != 2 {
-		t.Fatalf("expected 2 key events, got %d", len(keyEvents))
-	}
-	if keyEvents[0].Type != "keyDown" || keyEvents[0].Key != "Enter" {
-		t.Errorf("event 0: type=%q key=%q, want keyDown/Enter", keyEvents[0].Type, keyEvents[0].Key)
-	}
-	if keyEvents[0].Text != "\r" {
-		t.Errorf("keyDown text=%q, want \\r", keyEvents[0].Text)
-	}
-	if keyEvents[1].Type != "keyUp" || keyEvents[1].Key != "Enter" {
-		t.Errorf("event 1: type=%q key=%q, want keyUp/Enter", keyEvents[1].Type, keyEvents[1].Key)
+// TestKeyPress_Invalid checks that bad chords fail before anything is sent.
+func TestKeyPress_Invalid(t *testing.T) {
+	for _, chord := range []string{"", "Hyper+K", "Shift+", "+K", "Shift+Shift+K", "Shift+Bogus", "Bogus", "Shift++K"} {
+		if _, err := keyEventParams(chord); err == nil {
+			t.Errorf("keyEventParams(%q): want an error", chord)
+		}
 	}
 }
 

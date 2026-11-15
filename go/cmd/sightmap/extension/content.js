@@ -850,7 +850,16 @@ async function fetchVersionValue() {
   return resp.version;
 }
 
-async function fetchSightmap() {
+// Concurrent callers share one load: with the side panel already open at page
+// load, setOverlayVisible(true) polls while init() fetches the corpus itself.
+let sightmapLoad = null;
+function fetchSightmap() {
+  return (sightmapLoad ??= loadSightmap().finally(() => {
+    sightmapLoad = null;
+  }));
+}
+
+async function loadSightmap() {
   const data = await fetchSightmapData();
   if (!data) return false; // server unreachable — retry on next poll
   const corpus = data.corpus ?? {};
@@ -885,6 +894,12 @@ async function fetchSightmap() {
 }
 
 async function pollVersion() {
+  // The corpus is only used while the overlay is shown (hover, click and input
+  // capture all return early when it is hidden), and it is shown only while the
+  // side panel is open. A CDP-driven or headless session never opens the panel,
+  // so polling there would be a request every few seconds that nothing reads, in
+  // the page's network log. setOverlayVisible(true) polls once to catch up.
+  if (!state.enabled) return;
   // Keep retrying until we have a non-empty corpus. state.version is only set
   // once a load succeeded WITH components, so this also covers the "server
   // answered empty at startup" case that used to stick permanently.
@@ -1167,6 +1182,7 @@ function attachListeners(signal) {
 function setOverlayVisible(v) {
   state.enabled = v;
   if (!v) clearOverlay();
+  else pollVersion(); // the interval skipped its ticks while hidden: catch up now
   // Show or hide the floating pill inversely: pill when panel is closed
   const pill = document.getElementById("__sightmap-pill");
   if (pill) pill.style.display = v ? "none" : "flex";
