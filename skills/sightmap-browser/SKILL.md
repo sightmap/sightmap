@@ -315,6 +315,9 @@ sightmap browser fill --clear 'SearchInput' 'burrito'
 **`browser fill` sets, not types, date/time/color/range inputs.**
 Typing into `<input type=date>` goes through Chrome's segmented year/month/day editor and mangles the value. For `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range`, `fill` sets the value whole (native setter, then `input` and `change`), including in iframes, and reads it back. Pass the format the control stores: `fill 214 2027-04-16`, not `04/16/2027`. A value the control can't parse errors rather than leaving the field empty.
 
+**Input commands foreground a hidden tab.**
+Chrome is reported to hit-test and focus only on the visible tab, so a click sent to a background one could print success and do nothing. `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` now bring a hidden `--tab` to the front first and print `brought tab ID to front` on stderr; the tab stays in front.
+
 **`browser click` scrolls the target into view and refuses off-screen / covered clicks.**
 `click` scrolls the element to the center of the viewport, then verifies its center is actually the top-most element there before dispatching. It **errors** (rather than silently no-op'ing) when the target can't be positioned in the viewport, or is `covered by another element` — the signal of an open overlay/modal or a target you need to reveal first. The confirmation line reports the real post-scroll coordinates it clicked.
 

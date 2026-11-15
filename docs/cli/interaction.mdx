@@ -14,6 +14,10 @@ All commands on this page except `tabs` subcommands resolve a session with `--ad
 
 Probe IDs and component queries reach into iframes, including cross-origin and nested ones. An ID minted in a frame carries the frame's prefix (`2_26`; the top document's IDs are bare numbers), and `click`, `fill`, `hover`, `drag`, `keypress`, `scroll`, `wait-for` (`--component` and `--selector`), `bounds` and `screenshot --component` resolve it to the frame that holds the element. Boxes are in top-page coordinates. A click's point is computed from the live layout right before the event is sent, after the element is scrolled into view, and `click` refuses (`covered by another element`) when something in the page is drawn over the frame at that point. `drag` measures its start and drop points the same way and checks the drop target the same way, but the source and the target must be in the same document or in frames of one process: the pointer is sent to one process and cannot be carried into another. See [Iframes](/cli/capture#iframes) for how snapshots include frames and match them.
 
+## Background tabs
+
+Chrome is reported to deliver mouse and focus events only to the visible tab, accepting them on a background one and doing nothing. So `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` first bring the target tab to the front when it is hidden (as [`browser front`](/cli/browser) does), and say so on stderr: `brought tab TAB to front`. The tab stays in front afterward.
+
 ## Component queries
 
 Probe IDs belong to one extraction. A later extraction reassigns them, and a page re-render can replace the target node. Component queries reduce that risk by extracting the live tree and applying the corpus immediately before acting. Prefer queries on pages that re-render often.

@@ -154,6 +154,58 @@ func BringToFront(ctx context.Context, conn *CDPConn) error {
 	return nil
 }
 
+// EnsureVisible brings the tab to the front when it is hidden, and reports
+// whether it did. Input.dispatchMouseEvent hit-tests and focuses only on the
+// visible tab: on a background one the event is accepted and does nothing, so
+// a click that "succeeds" never happened. Every command that dispatches input
+// calls this first. A tab whose visibility cannot be read is left alone.
+func EnsureVisible(ctx context.Context, conn *CDPConn) (bool, error) {
+	visibility := func() string {
+		raw, err := EvalJSON(ctx, conn, `document.visibilityState`)
+		if err != nil {
+			return ""
+		}
+		var v string
+		_ = json.Unmarshal(raw, &v)
+		return v
+	}
+	if visibility() != "hidden" {
+		return false, nil
+	}
+	if err := BringToFront(ctx, conn); err != nil {
+		return false, err
+	}
+	// The page learns it is visible a moment after the window does.
+	for range 20 {
+		if visibility() != "hidden" {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return true, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+	return true, nil
+}
+
+// TargetID is the CDP target ID of the connection's tab, the ID `--tab` takes.
+func TargetID(ctx context.Context, conn *CDPConn) (string, error) {
+	result, err := conn.call(ctx, "Target.getTargetInfo", map[string]interface{}{})
+	if err != nil {
+		return "", fmt.Errorf("TargetID: %w", err)
+	}
+	var resp struct {
+		TargetInfo struct {
+			TargetID string `json:"targetId"`
+		} `json:"targetInfo"`
+	}
+	if err := json.Unmarshal(result, &resp); err != nil {
+		return "", fmt.Errorf("TargetID: unmarshal: %w", err)
+	}
+	return resp.TargetInfo.TargetID, nil
+}
+
 func GetURL(ctx context.Context, conn *CDPConn) (string, error) {
 	result, err := conn.call(ctx, "Target.getTargetInfo", map[string]interface{}{})
 	if err != nil {
