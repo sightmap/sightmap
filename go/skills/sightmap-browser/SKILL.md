@@ -318,6 +318,8 @@ Typing into `<input type=date>` goes through Chrome's segmented year/month/day e
 **Input commands foreground a hidden tab.**
 Chrome is reported to hit-test and focus only on the visible tab, so a click sent to a background one could print success and do nothing. `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` now bring a hidden `--tab` to the front first and print `brought tab ID to front` on stderr; the tab stays in front.
 
+**`fill` errors when its click did not focus the field** (`did not focus it`), instead of typing into nothing; `fill --clear` says `the field did not take focus` where it used to print a raw JS exception.
+
 **`browser click` scrolls the target into view and refuses off-screen / covered clicks.**
 `click` scrolls the element to the center of the viewport, then verifies its center is actually the top-most element there before dispatching. It **errors** (rather than silently no-op'ing) when the target can't be positioned in the viewport, or is `covered by another element` — the signal of an open overlay/modal or a target you need to reveal first. The confirmation line reports the real post-scroll coordinates it clicked.
 
