@@ -406,3 +406,35 @@ views:
 		}
 	}
 }
+
+// TestFrameHover_Chrome hovers a control two levels down in another process,
+// below the fold, and checks the frame saw the pointer arrive over it: a hover
+// goes by the same route as a click, on the frame's own session.
+func TestFrameHover_Chrome(t *testing.T) {
+	ctx, conn, _, _ := loadFrameFixture(t)
+	root, _ := extractFixture(t, ctx, conn)
+	btn := byDOMID(root, "nested-btn")
+	if _, err := EvalJSON(ctx, conn, `scrollTo(0, 1000)`); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range ChildFrames(ctx, conn) {
+		if strings.HasPrefix(f.URL, "about:srcdoc") {
+			if _, err := f.EvalJSON(ctx, `document.getElementById("nested-btn").addEventListener("mouseover", () => { document.body.dataset.hovered = "yes" }); true`); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := Hover(ctx, conn, btn); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if got := frameValue(t, ctx, conn, "about:srcdoc", `document.body.dataset.hovered||""`); got == "yes" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the nested button never saw the pointer over it")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}

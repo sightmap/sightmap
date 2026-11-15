@@ -433,6 +433,13 @@ describe("__smDragPrepare", () => {
     });
   });
 
+  test("force scrolls a source that is fully visible in its own viewport", () => {
+    const el = card();
+    document.elementFromPoint = jest.fn().mockReturnValue(el);
+    __smDragPrepare("#card", null, null, true);
+    expect(el.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
   test("scrolls a source that is below the viewport", () => {
     const el = card();
     box(el, 20, 950, 300, 118);

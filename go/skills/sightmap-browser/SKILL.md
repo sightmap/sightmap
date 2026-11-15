@@ -101,12 +101,13 @@ process) and nested at any depth — and hangs each frame's tree under its
 ```
 
 - **Ids carry a frame prefix.** The top document's ids are bare (`42`); the Nth
-  frame's are `N_…` (`2_26`). Click, fill, hover, keypress, scroll, `bounds`,
+  frame's are `N_…` (`2_26`). Click, fill, hover, drag, keypress, scroll, `bounds`,
   `wait-for` and `screenshot --component` all take them like any other id, and
   find the right frame. Bounds are in top-page coordinates, and a click's point
   is worked out from the live layout right before it is sent, so it lands after
   a scroll. A click refuses (`covered by another element`) when something in the
-  page is drawn over the frame at that point.
+  page is drawn over the frame at that point. `drag` works the same way, but
+  its source and target must be in one document or in frames of one process.
 - **A frame is matched as a page of its own, at its own URL** — so the corpus
   view whose route matches the *frame's* URL (e.g. a widget host's `/sandbox`)
   supplies its components, not the page's view. A selector does not cross a
