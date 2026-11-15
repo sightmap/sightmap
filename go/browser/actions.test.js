@@ -205,12 +205,55 @@ describe("scroll and location helpers", () => {
   });
 });
 
+describe("__smSelectActive", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("selects an input's whole value and returns it", () => {
+    document.body.innerHTML = '<input id="in" value="2026-04-10" />';
+    const input = document.getElementById("in");
+    input.focus();
+    expect(__smSelectActive()).toEqual({ selected: true, value: "2026-04-10" });
+    expect([input.selectionStart, input.selectionEnd]).toEqual([0, 10]);
+  });
+
+  test("selects a textarea's whole value", () => {
+    document.body.innerHTML =
+      '<textarea id="ta">Reminder scheduling overhaul</textarea>';
+    const ta = document.getElementById("ta");
+    ta.focus();
+    expect(__smSelectActive()).toEqual({
+      selected: true,
+      value: "Reminder scheduling overhaul",
+    });
+    expect([ta.selectionStart, ta.selectionEnd]).toEqual([0, 28]);
+  });
+
+  test("selects the content of a contenteditable", () => {
+    document.body.innerHTML =
+      '<div id="ce" contenteditable="true" tabindex="0">hello</div>';
+    const ce = document.getElementById("ce");
+    ce.focus();
+    // jsdom has no isContentEditable; stand in for what Chrome reports.
+    Object.defineProperty(ce, "isContentEditable", { value: true });
+    expect(__smSelectActive()).toEqual({ selected: true, value: "hello" });
+    expect(document.getSelection().toString()).toBe("hello");
+  });
+
+  test("reports not selected when nothing editable is focused", () => {
+    document.body.innerHTML = '<button id="b">x</button>';
+    document.getElementById("b").focus();
+    expect(__smSelectActive()).toEqual({ selected: false, value: "" });
+  });
+});
+
 describe("__smClearActiveElement", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
 
-  test("clears the focused input's value and fires input/change events", () => {
+  test("clears the focused input's value, fires input/change, returns the old value", () => {
     document.body.innerHTML = '<input id="in" value="hello" />';
     const input = document.getElementById("in");
     input.focus();
@@ -219,11 +262,79 @@ describe("__smClearActiveElement", () => {
     input.addEventListener("input", onInput);
     input.addEventListener("change", onChange);
 
-    __smClearActiveElement();
+    expect(__smClearActiveElement()).toBe("hello");
 
     expect(input.value).toBe("");
     expect(onInput).toHaveBeenCalledTimes(1);
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  test("clears a textarea (the input setter would throw Illegal invocation on it)", () => {
+    document.body.innerHTML =
+      '<textarea id="ta">Reminder scheduling overhaul</textarea>';
+    const ta = document.getElementById("ta");
+    ta.focus();
+    const onInput = jest.fn();
+    ta.addEventListener("input", onInput);
+
+    expect(__smClearActiveElement()).toBe("Reminder scheduling overhaul");
+
+    expect(ta.value).toBe("");
+    expect(onInput).toHaveBeenCalledTimes(1);
+  });
+
+  test("clears a select by resetting it", () => {
+    document.body.innerHTML =
+      '<select id="s"><option value="a">a</option><option value="b" selected>b</option></select>';
+    const sel = document.getElementById("s");
+    sel.focus();
+    expect(() => __smClearActiveElement()).not.toThrow();
+    expect(sel.value).toBe("");
+  });
+
+  test("uses the native setter, so a framework that wraps .value still sees the change", () => {
+    document.body.innerHTML = '<input id="in" value="old" />';
+    const input = document.getElementById("in");
+    // A React-style tracker: an own-property override that swallows plain assignment.
+    const seen = [];
+    Object.defineProperty(input, "value", {
+      configurable: true,
+      get: () =>
+        Object.getOwnPropertyDescriptor(
+          HTMLInputElement.prototype,
+          "value",
+        ).get.call(input),
+      set: (v) => seen.push(v),
+    });
+    input.focus();
+    __smClearActiveElement();
+    expect(seen).toEqual([]); // the override was bypassed
+    expect(input.value).toBe("");
+  });
+
+  test("clears a contenteditable and fires input", () => {
+    document.body.innerHTML =
+      '<div id="ce" contenteditable="true" tabindex="0">hello</div>';
+    const ce = document.getElementById("ce");
+    ce.focus();
+    Object.defineProperty(ce, "isContentEditable", { value: true });
+    const onInput = jest.fn();
+    ce.addEventListener("input", onInput);
+    expect(__smClearActiveElement()).toBe("hello");
+    expect(ce.textContent).toBe("");
+    expect(onInput).toHaveBeenCalledTimes(1);
+  });
+
+  test("throws when nothing is focused", () => {
+    document.body.innerHTML = "<div></div>";
+    document.activeElement && document.activeElement.blur();
+    expect(() => __smClearActiveElement()).toThrow(/nothing is focused/);
+  });
+
+  test("throws when the focused element has no value", () => {
+    document.body.innerHTML = '<button id="b">x</button>';
+    document.getElementById("b").focus();
+    expect(() => __smClearActiveElement()).toThrow(/no value to clear/);
   });
 });
 

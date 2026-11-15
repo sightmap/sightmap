@@ -206,8 +206,8 @@ sightmap browser navigate 'https://...'   # ✓ correct
 sightmap browser navigate --url 'https://'  # ✗ wrong — passes literal "--url" as URL
 ```
 
-**`browser fill` may append on React-controlled inputs.**
-If filling the same field multiple times accumulates text, use `browser eval` with the native value setter:
+**`browser fill` replaces the field's value, and errors when it can't.**
+It errors when the field is still empty or the old text was kept. Retry with `--clear`, or, if that also fails, use `browser eval` with the native value setter:
 ```bash
 sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "new value"); el.dispatchEvent(new Event("input", {bubbles: true}))'
 ```

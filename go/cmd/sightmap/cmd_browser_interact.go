@@ -135,7 +135,7 @@ func runFill(args []string) error {
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
-	clearFlag := fs.Bool("clear", false, "Clear the field via JS before typing (use for React-controlled inputs)")
+	clearFlag := fs.Bool("clear", false, "Empty the field through its native value setter before typing (for React-controlled inputs where select-all does not stick)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
