@@ -850,7 +850,16 @@ async function fetchVersionValue() {
   return resp.version;
 }
 
-async function fetchSightmap() {
+// Concurrent callers share one load: with the side panel already open at page
+// load, setOverlayVisible(true) polls while init() fetches the corpus itself.
+let sightmapLoad = null;
+function fetchSightmap() {
+  return (sightmapLoad ??= loadSightmap().finally(() => {
+    sightmapLoad = null;
+  }));
+}
+
+async function loadSightmap() {
   const data = await fetchSightmapData();
   if (!data) return false; // server unreachable — retry on next poll
   const corpus = data.corpus ?? {};

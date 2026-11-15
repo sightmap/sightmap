@@ -100,26 +100,41 @@ func TestContentScriptPollsOnlyWhileOverlayShown(t *testing.T) {
 	}
 	src := string(data)
 
+	// fn returns the body of the named function, found by matching braces so it
+	// does not depend on how the function is indented or what follows it.
 	fn := func(name string) string {
 		t.Helper()
 		start := strings.Index(src, "function "+name+"(")
 		if start < 0 {
 			t.Fatalf("content.js: function %s is gone", name)
 		}
-		end := strings.Index(src[start:], "\n}\n")
-		if end < 0 {
-			t.Fatalf("content.js: cannot find the end of %s", name)
+		open := strings.Index(src[start:], "{")
+		if open < 0 {
+			t.Fatalf("content.js: cannot find the body of %s", name)
 		}
-		return src[start : start+end]
+		depth := 0
+		for i := start + open; i < len(src); i++ {
+			switch src[i] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					return src[start : i+1]
+				}
+			}
+		}
+		t.Fatalf("content.js: cannot find the end of %s", name)
+		return ""
 	}
 
 	poll := fn("pollVersion")
 	guard := strings.Index(poll, "if (!state.enabled) return;")
-	fetch := strings.Index(poll, "fetch")
+	request := strings.Index(poll, "await ")
 	if guard < 0 {
 		t.Error("pollVersion must return early while the overlay is hidden (state.enabled false)")
-	} else if fetch >= 0 && guard > fetch {
-		t.Error("pollVersion's overlay guard must come before any fetch")
+	} else if request >= 0 && guard > request {
+		t.Error("pollVersion's overlay guard must come before any request")
 	}
 
 	show := fn("setOverlayVisible")

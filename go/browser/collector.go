@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -121,17 +122,25 @@ func NewCollector(addr string) *Collector {
 	}
 }
 
+// The ports the extension probes for the sightmap server when its stored hint
+// is stale (discoverDirect in extension/content.js, discoverServer in
+// extension/background.js). Keep in step with those.
+const (
+	probePortMin = 7891
+	probePortMax = 7900
+)
+
 // IgnoreServerPort tells the collector the port of the session's sightmap HTTP
 // server so its traffic is kept out of the network buffer. Call it before Start.
 func (c *Collector) IgnoreServerPort(port int) { c.ownPort = port }
 
 // isOwnRequest reports whether rawURL is the tool's own traffic rather than the
 // page's: a chrome-extension:// URL, anything on the session's sightmap server
-// port, or the sightmap server's version/corpus endpoints on any loopback port
-// (the extension's content script polls /sightmap/version every few seconds,
-// and probes 7891-7900 for the server when its hint is stale). Left in, the
-// poll alone fills the 1000-entry ring in about an hour and pushes every
-// request of the app out of it.
+// port, or the sightmap server's version/corpus endpoints on a loopback port
+// the extension probes (its content script polls /sightmap/version every few
+// seconds, and probes 7891-7900 for the server when its hint is stale). Left
+// in, the poll alone fills the 1000-entry ring in about an hour and pushes
+// every request of the app out of it.
 func (c *Collector) isOwnRequest(rawURL string) bool {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -145,10 +154,18 @@ func (c *Collector) isOwnRequest(rawURL string) bool {
 	default:
 		return false
 	}
-	if c.ownPort > 0 && u.Port() == fmt.Sprint(c.ownPort) {
+	port, _ := strconv.Atoi(u.Port())
+	if port == 0 {
+		return false
+	}
+	if port == c.ownPort {
 		return true
 	}
-	return u.Path == "/sightmap" || u.Path == "/sightmap/version"
+	// Another port is the tool's only if it is one the extension probes and the
+	// path is the server's. An app on localhost:3000 with its own /sightmap
+	// route stays visible.
+	return port >= probePortMin && port <= probePortMax &&
+		(u.Path == "/sightmap" || u.Path == "/sightmap/version")
 }
 
 // Start begins the tab-attach loop. It returns immediately; capture runs in the

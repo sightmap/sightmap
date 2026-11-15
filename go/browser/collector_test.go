@@ -551,6 +551,10 @@ func TestIsOwnRequest(t *testing.T) {
 		"http://localhost:5291/sightmap/version-history": false,
 		"https://example.com/sightmap/version":           false, // another host's own path
 		"http://localhost:5291/":                         false,
+		"http://localhost:3000/sightmap":                 false, // the app's own route, outside the probe range
+		"http://localhost:3000/sightmap/version":         false,
+		"http://localhost:7901/sightmap/version":         false, // just past the probe range
+		"http://localhost/sightmap":                      false, // no port
 		"http://localhost:78910/api":                     false,
 		"https://api.example.com:7891/v1/things":         false, // same port, not loopback
 		"not a url \x7f":                                 false,
@@ -566,7 +570,7 @@ func TestIsOwnRequest(t *testing.T) {
 		t.Error("an unknown server port must not swallow arbitrary loopback requests")
 	}
 	if !c.isOwnRequest("http://localhost:7891/sightmap/version") {
-		t.Error("the version endpoint is the tool's on any loopback port")
+		t.Error("the version endpoint is the tool's on any port the extension probes")
 	}
 }
 
