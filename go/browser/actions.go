@@ -736,8 +736,9 @@ func Hover(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) err
 }
 
 // selectAllIsMeta says which modifier the select-all fallback chord uses: Cmd on
-// macOS, Ctrl elsewhere. It follows the host running the CLI, where the browser
-// normally runs.
+// macOS, Ctrl elsewhere. It follows the host running the CLI, not the browser's:
+// a macOS CLI driving a Linux Chrome over --addr sends Cmd+A, which that Chrome
+// ignores (the selectAll command is sent either way).
 var selectAllIsMeta = runtime.GOOS == "darwin"
 
 // activeSelection is what __smSelectActive reports: whether it selected the
@@ -826,10 +827,10 @@ func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, valu
 	}
 	before := sel.Value
 	if !sel.Selected {
+		before, _ = readInputValue(ctx, conn, node.Id)
 		if err := selectAllChord(ctx, conn); err != nil {
 			return fmt.Errorf("Fill: %w", err)
 		}
-		before, _ = readInputValue(ctx, conn, node.Id)
 	}
 	if err := typeText(ctx, conn, value); err != nil {
 		return fmt.Errorf("Fill: %w", err)
@@ -842,13 +843,13 @@ func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, valu
 //
 //   - the field is empty although a non-empty value was typed (a React-controlled
 //     input that dropped the keystrokes), or
-//   - the old value was not replaced: the field holds at least old+new characters
-//     and the typed value (the signature of text typed after or inside what was
-//     there, as when select-all did not select).
+//   - the old value was not replaced: the field now reads as the old value with
+//     the typed value inserted somewhere in it (the signature of text typed after
+//     or inside what was there, as when select-all did not select).
 //
-// A value that merely differs (a masked, formatted or truncated field) is
-// accepted. It is best-effort: an unreadable value (no id, non-input element) is
-// not an error.
+// A value that merely differs (a masked, formatted or truncated field, or one
+// that adds its own "$" or "%") is accepted. It is best-effort: an unreadable
+// value (no id, non-input element) is not an error.
 func verifyFilled(ctx context.Context, conn *CDPConn, id, value, before string) error {
 	if strings.TrimSpace(value) == "" {
 		return nil
@@ -860,10 +861,24 @@ func verifyFilled(ctx context.Context, conn *CDPConn, id, value, before string) 
 	if strings.TrimSpace(got) == "" {
 		return fmt.Errorf("fill: typed %q but the field is still empty afterwards — it may be a React-controlled input; retry with --clear", value)
 	}
-	if before != "" && got != value && strings.Contains(got, value) && len(got) >= len(before)+len(value) {
+	if before != "" && got != value && insertedInto(got, value, before) {
 		return fmt.Errorf("fill: typed %q but the field reads %q: the old value %q was not replaced; retry with --clear", value, got, before)
 	}
 	return nil
+}
+
+// insertedInto reports whether got is old with ins inserted at some position:
+// removing one occurrence of ins from got leaves old.
+func insertedInto(got, ins, old string) bool {
+	if len(got) != len(old)+len(ins) {
+		return false
+	}
+	for i := 0; i+len(ins) <= len(got); i++ {
+		if got[i:i+len(ins)] == ins && got[:i]+got[i+len(ins):] == old {
+			return true
+		}
+	}
+	return false
 }
 
 // readInputValue returns the current .value of the element carrying

@@ -265,6 +265,9 @@ func TestVerifyFilled(t *testing.T) {
 		"truncated by maxlength":   {"abcdefgh", "zz", "abcde", ""},
 		"still empty":              {"abc", "old", "", "still empty"},
 		"no old value, appended":   {"abc", "", "abcabc", ""},
+		"field adds a prefix":      {"25", "x", "$25", ""},
+		"field adds a suffix":      {"25", "7", "25%", ""},
+		"old text kept and more":   {"25", "x", "x25", "not replaced"},
 		"blank value is not check": {"  ", "old", "old", ""},
 	} {
 		t.Run(name, func(t *testing.T) {
