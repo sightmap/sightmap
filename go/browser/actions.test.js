@@ -530,6 +530,76 @@ describe("__smDropCheck", () => {
   });
 });
 
+describe("__smSetValueIfNative", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test.each([
+    ["date", "2027-04-16"],
+    ["time", "14:45"],
+    ["datetime-local", "2027-04-16T14:45"],
+    ["month", "2027-04"],
+    ["week", "2027-W15"],
+    ["color", "#ff0000"],
+    ["range", "7"],
+  ])("sets a %s input natively and fires input then change", (type, value) => {
+    document.body.innerHTML = `<input id="in" type="${type}">`;
+    const input = document.getElementById("in");
+    const seen = [];
+    input.addEventListener("input", () => seen.push("input"));
+    input.addEventListener("change", () => seen.push("change"));
+
+    expect(__smSetValueIfNative("#in", value)).toEqual({
+      native: true,
+      type,
+      blocked: false,
+      value,
+    });
+    expect(input.value).toBe(value);
+    expect(seen).toEqual(["input", "change"]);
+  });
+
+  test("leaves text-like inputs, textareas and other elements to typing", () => {
+    document.body.innerHTML =
+      '<input id="t" type="text"><input id="e" type="email"><textarea id="a"></textarea><div id="d"></div>';
+    for (const id of ["t", "e", "a", "d"]) {
+      expect(__smSetValueIfNative("#" + id, "x")).toEqual({ native: false });
+    }
+    expect(document.getElementById("t").value).toBe("");
+    expect(__smSetValueIfNative("#missing", "x")).toEqual({ native: false });
+  });
+
+  test("reports the sanitized value when the control cannot take it", () => {
+    document.body.innerHTML = '<input id="in" type="date" value="2027-04-09">';
+    const res = __smSetValueIfNative("#in", "next tuesday");
+    expect(res.native).toBe(true);
+    expect(res.value).toBe("");
+  });
+
+  test("refuses a disabled or read-only control", () => {
+    document.body.innerHTML =
+      '<input id="d" type="date" disabled value="2027-04-09"><input id="r" type="date" readonly value="2027-04-09">';
+    expect(__smSetValueIfNative("#d", "2028-01-01").blocked).toBe(true);
+    expect(__smSetValueIfNative("#r", "2028-01-01").blocked).toBe(true);
+    expect(document.getElementById("d").value).toBe("2027-04-09");
+  });
+
+  test("works through React-style value tracking by using the prototype setter", () => {
+    document.body.innerHTML = '<input id="in" type="date">';
+    const input = document.getElementById("in");
+    // A framework shadows the instance's value property; an assignment to it is
+    // swallowed, the prototype setter is not.
+    Object.defineProperty(input, "value", { set() {}, get: () => "stuck" });
+    __smSetValueIfNative("#in", "2027-04-16");
+    const proto = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    );
+    expect(proto.get.call(input)).toBe("2027-04-16");
+  });
+});
+
 describe("__smFocusBySelector", () => {
   afterEach(() => {
     document.body.innerHTML = "";

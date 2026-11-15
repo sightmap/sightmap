@@ -948,6 +948,9 @@ func typeText(ctx context.Context, conn *CDPConn, value string) error {
 // reads the value back and errors when the old value was kept or the field is
 // empty.
 func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
+	if done, err := fillNative(ctx, conn, node.Id, value); done || err != nil {
+		return err
+	}
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("Fill: click to focus: %w", err)
 	}
@@ -1031,8 +1034,13 @@ func readInputValue(ctx context.Context, conn *CDPConn, id string) (string, bool
 
 // ClearAndFill focuses node, clears its current value via the native JS setter
 // (the way to empty a React-controlled input whose state ignores a selection),
-// then types value using keystroke events.
+// then types value using keystroke events. An input whose entry is not typed
+// characters (date, time, color, range, see fillNative) has its value set
+// instead.
 func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
+	if done, err := fillNative(ctx, conn, node.Id, value); done || err != nil {
+		return err
+	}
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("ClearAndFill: click to focus: %w", err)
 	}
@@ -1049,6 +1057,42 @@ func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNo
 		return fmt.Errorf("ClearAndFill: %w", err)
 	}
 	return verifyFilled(ctx, conn, node.Id, value, before)
+}
+
+// fillNative sets the value of an input of a type that typing cannot enter (see
+// __smIsNativeValueType in actions.js) with the native HTMLInputElement value
+// setter, firing input and change, and reports whether it handled node. Chrome
+// routes typed characters into such a control's segmented editor, which mangles
+// them. It reads the value back as Fill does: a value the control would not
+// take (a malformed date sanitizes to "") is an error, a clamped one is not. It
+// is not done for a node with no id, a non-input, or a text input, which keep
+// the keystroke path; a lookup that fails is left for that path to report. The
+// input is looked up in whichever frame holds it.
+func fillNative(ctx context.Context, conn *CDPConn, id, value string) (done bool, err error) {
+	if id == "" {
+		return false, nil
+	}
+	valJSON, _ := json.Marshal(value)
+	raw, _, evalErr := evalForID(ctx, conn, id, actionsJS+fmt.Sprintf("\n__smSetValueIfNative(%s, %s)", idSelectorJSON(id), valJSON))
+	if evalErr != nil {
+		return false, nil
+	}
+	var res struct {
+		Native  bool   `json:"native"`
+		Type    string `json:"type"`
+		Blocked bool   `json:"blocked"`
+		Value   string `json:"value"`
+	}
+	if json.Unmarshal(raw, &res) != nil || !res.Native {
+		return false, nil
+	}
+	if res.Blocked {
+		return true, fmt.Errorf("fill: %q is a disabled or read-only %s input", id, res.Type)
+	}
+	if value != "" && res.Value == "" {
+		return true, fmt.Errorf("fill: the %s input did not accept %q (it holds nothing); give it the format its value takes, such as 2027-04-16 for a date", res.Type, value)
+	}
+	return true, nil
 }
 
 // clearActiveElement clears the focused element of the document holding id (the
