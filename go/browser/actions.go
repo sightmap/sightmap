@@ -823,49 +823,6 @@ func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNo
 	return verifyFilled(ctx, conn, node.Id, value)
 }
 
-// keyMap maps common key names to their CDP key/code/text representations.
-var keyMap = map[string]struct{ key, code, text string }{
-	"Enter":      {"Enter", "Enter", "\r"},
-	"Tab":        {"Tab", "Tab", "\t"},
-	"Escape":     {"Escape", "Escape", ""},
-	"Backspace":  {"Backspace", "Backspace", ""},
-	"Delete":     {"Delete", "Delete", ""},
-	"ArrowUp":    {"ArrowUp", "ArrowUp", ""},
-	"ArrowDown":  {"ArrowDown", "ArrowDown", ""},
-	"ArrowLeft":  {"ArrowLeft", "ArrowLeft", ""},
-	"ArrowRight": {"ArrowRight", "ArrowRight", ""},
-	" ":          {" ", "Space", " "},
-}
-
-// KeyPress dispatches a key down + key up event pair.
-// key names: "Enter", "Tab", "Escape", "ArrowDown", "ArrowUp", "Backspace", etc.
-func KeyPress(ctx context.Context, conn *CDPConn, key string) error {
-	k, ok := keyMap[key]
-	if !ok {
-		k = struct{ key, code, text string }{key, key, ""}
-	}
-	downParams := map[string]interface{}{
-		"type": "keyDown",
-		"key":  k.key,
-		"code": k.code,
-	}
-	if k.text != "" {
-		downParams["text"] = k.text
-	}
-	if _, err := conn.call(ctx, "Input.dispatchKeyEvent", downParams); err != nil {
-		return fmt.Errorf("KeyPress: keyDown %q: %w", key, err)
-	}
-	upParams := map[string]interface{}{
-		"type": "keyUp",
-		"key":  k.key,
-		"code": k.code,
-	}
-	if _, err := conn.call(ctx, "Input.dispatchKeyEvent", upParams); err != nil {
-		return fmt.Errorf("KeyPress: keyUp %q: %w", key, err)
-	}
-	return nil
-}
-
 // ScrollIntoView scrolls node into the visible viewport.
 // Tries querySelector(selector) first; falls back to window.scrollTo using the
 // node's bounds when no selector is available or querySelector fails.
