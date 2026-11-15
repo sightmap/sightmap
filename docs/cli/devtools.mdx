@@ -10,7 +10,7 @@ description: "Read captured browser console messages and network requests from a
 Devtools commands require a running `browser start` session — the collector lives in that daemon. With no session they print `no running session — start one with 'sightmap browser start'`. Entries captured before the session started are not available.
 </Note>
 
-Buffers are invisible until they overflow: a long burst of activity (or a client that stays away for a while) drops the oldest entries, which `list` reports as `(N earlier entries dropped — buffer overflowed)`.
+Buffers are invisible until they overflow: a long burst of activity (or a client that stays away for a while) drops the oldest entries, which `list` reports as `(N earlier console entries dropped — buffer overflowed)` (`network` for requests). Successful static requests overflow their own ring, which `network list --static` reports as `(N earlier static network entries dropped — buffer overflowed)`; the default listing never mentions it.
 
 ---
 

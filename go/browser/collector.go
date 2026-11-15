@@ -18,10 +18,11 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-// DefaultMaxEntries is the per-stream ring-buffer cap (console and network are
-// buffered independently). Sized so a normal session never overflows; only a
-// long burst — or a client that stays away for a while — drops the oldest
-// entries, which the query surface then reports as "N earlier entries dropped".
+// DefaultMaxEntries is the cap of each of the console ring and the main network
+// ring (every request except a successful static one; see DefaultMaxStatic). The
+// rings are independent. Sized so a normal session never overflows; only a long
+// burst — or a client that stays away for a while — drops the oldest entries,
+// which the query surface then reports as "N earlier network entries dropped".
 const DefaultMaxEntries = 1000
 
 // DefaultMaxStatic is the cap of the separate ring that holds successful static
@@ -444,32 +445,26 @@ func inStaticRing(resourceType string, status int) bool {
 
 // recordByReqID finds the buffered record with the given CDP requestId in either
 // ring, returning which ring (static) and the position in it. A redirect reuses
-// its requestId for each hop, so the newest record (highest Index) wins. Caller
-// must hold c.mu.
+// its requestId for each hop, so the newest record (highest Index) wins. It walks
+// both rings from the tail in descending Index order and stops at the first
+// match, so a live request costs only the entries newer than it, not a scan of
+// the ring it isn't in. Caller must hold c.mu.
 func (c *Collector) recordByReqID(reqID string) (static bool, i int, ok bool) {
-	mi := lastByReqID(c.network, reqID)
-	si := lastByReqID(c.static, reqID)
-	switch {
-	case mi < 0 && si < 0:
-		return false, -1, false
-	case mi < 0:
-		return true, si, true
-	case si < 0:
-		return false, mi, true
-	case c.static[si].Index > c.network[mi].Index:
-		return true, si, true
-	}
-	return false, mi, true
-}
-
-// lastByReqID scans from the tail, where a match almost always is.
-func lastByReqID(ring []networkRecord, reqID string) int {
-	for i := len(ring) - 1; i >= 0; i-- {
-		if ring[i].requestID == reqID {
-			return i
+	mi, si := len(c.network)-1, len(c.static)-1
+	for mi >= 0 || si >= 0 {
+		if mi < 0 || (si >= 0 && c.static[si].Index > c.network[mi].Index) {
+			if c.static[si].requestID == reqID {
+				return true, si, true
+			}
+			si--
+		} else {
+			if c.network[mi].requestID == reqID {
+				return false, mi, true
+			}
+			mi--
 		}
 	}
-	return -1
+	return false, -1, false
 }
 
 // record returns a pointer into the ring recordByReqID named; it is valid only

@@ -867,6 +867,47 @@ func TestFailedStaticRequestMovesToMainRing(t *testing.T) {
 	}
 }
 
+// A redirect reuses its requestId for each hop. When the hops sit in different
+// rings, a response must land on the newest one.
+func TestRecordByReqIDPrefersNewestHopAcrossRings(t *testing.T) {
+	tests := []struct {
+		name       string
+		hop1Status int // response applied to hop 1 before hop 2 arrives; 0 leaves it pending
+		hop2Type   string
+		wantStatic bool
+	}{
+		{"hop 1 main, newest hop static", 302, "Script", true},
+		{"hop 1 static, newest hop main", 0, "Fetch", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := NewCollector("unused")
+			add := func(url, rtype string) {
+				c.addNetwork(networkRecord{Request: sightmap.Request{Method: "GET", URL: url, ResourceType: rtype}, requestID: "r"})
+			}
+			add("/hop1.js", "Script")
+			if tt.hop1Status != 0 {
+				c.applyResponse(responseInfo{reqID: "r", status: tt.hop1Status, rtype: "Script"})
+			}
+			add("/hop2", tt.hop2Type)
+			if len(c.network) != 1 || len(c.static) != 1 {
+				t.Fatalf("hops share a ring: main %d, static %d; want one in each", len(c.network), len(c.static))
+			}
+
+			static, i, ok := c.recordByReqID("r")
+			if !ok || static != tt.wantStatic {
+				t.Fatalf("recordByReqID = static %v, ok %v; want static %v", static, ok, tt.wantStatic)
+			}
+			if got := c.record(static, i).URL; got != "/hop2" {
+				t.Errorf("found %q, want the newest hop /hop2", got)
+			}
+			if _, _, ok := c.recordByReqID("missing"); ok {
+				t.Error("found a record for an unknown requestId")
+			}
+		})
+	}
+}
+
 // The same flow through drain, with loadingFailed delivered as CDP sends it.
 func TestDrainRoutesLoadingFailed(t *testing.T) {
 	c := NewCollector("unused")
@@ -882,4 +923,40 @@ func TestDrainRoutesLoadingFailed(t *testing.T) {
 	waitFor(t, func() bool { got, _ := c.Network(NetworkFilter{IncludeStatic: true}); return len(got) == 1 }, "request buffered")
 	failedCh <- json.RawMessage(`{"requestId":"a","errorText":"net::ERR_CONNECTION_REFUSED"}`)
 	waitFor(t, func() bool { got, _ := c.Network(NetworkFilter{}); return len(got) == 1 }, "failed script visible by default")
+}
+
+// BenchmarkRecordByReqID measures the lookup every response and finished event
+// does under c.mu, against two full rings as a Vite page load leaves them: the
+// static ring holds older scripts, the main ring 1000 API calls, and a burst of
+// newer scripts sits on top.
+func BenchmarkRecordByReqID(b *testing.B) {
+	c := NewCollector("unused")
+	add := func(prefix string, n int, rtype string) {
+		for i := range n {
+			c.addNetwork(networkRecord{
+				Request:   sightmap.Request{Method: "GET", URL: "/x", ResourceType: rtype},
+				requestID: fmt.Sprintf("%s%05d", prefix, i),
+			})
+		}
+	}
+	add("old", DefaultMaxStatic, "Script")
+	add("api", DefaultMaxEntries, "Fetch")
+	add("new", 200, "Script")
+
+	for _, bc := range []struct{ name, id string }{
+		{"newest static request", "new00199"},
+		{"newest API call behind a 200-script burst", "api00999"},
+		{"oldest API call", "api00000"},
+		{"unknown requestId", "gone"},
+	} {
+		b.Run(bc.name, func(b *testing.B) {
+			if _, _, ok := c.recordByReqID(bc.id); ok != (bc.id != "gone") {
+				b.Fatalf("lookup of %q: ok = %v", bc.id, ok)
+			}
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				c.recordByReqID(bc.id)
+			}
+		})
+	}
 }
