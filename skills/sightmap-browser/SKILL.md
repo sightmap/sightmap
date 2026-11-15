@@ -107,7 +107,7 @@ probe ID from snapshot output **or** a component query (see below):
 |---------|-------------|
 | `sightmap browser click <id>` | Click element by probe ID |
 | `sightmap browser click 'ComponentQuery'` | Click element by sightmap identity (preferred on dynamic pages) |
-| `sightmap browser fill [--clear] <id-or-query> "text"` | Type into an input. Errors if the value doesn't stick — retry with `--clear` (see gotchas). |
+| `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing. Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
 | `sightmap browser keypress Enter` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)) |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
@@ -226,8 +226,16 @@ sightmap browser navigate 'https://...'     # ✓ correct
 sightmap browser navigate --url 'https://'  # ✗ wrong — passes literal "--url" as the URL
 ```
 
-**`browser fill` detects when a value doesn't stick.**
-On some React-controlled inputs plain `fill` (select-all + type) leaves the field empty. `fill` now reads the value back and **errors** in that case, telling you to retry with `--clear` (which clears via the native value setter first). If filling the same field repeatedly *accumulates* text, also use `--clear`.
+**`browser fill` replaces the value and checks that it did.**
+`fill` focuses the field, selects its whole content through the DOM (input, textarea,
+contenteditable; a Ctrl/Cmd+A chord with the `selectAll` command is the fallback for
+anything else), then types, so the page sees real key events. It reads the value back and
+**errors** when the field is still empty (a React-controlled input that dropped the keys) or
+when the old value was **not replaced** (the field now holds old and new text, e.g.
+`2026-04-102026-04-17`); the message names both. A masked or reformatted value is accepted.
+On such an error retry with `--clear`, which empties the field through the element's native
+value setter first (input, textarea, select, contenteditable) and then types. `--clear`
+fails loudly when nothing editable is focused instead of typing on regardless.
 ```bash
 sightmap browser fill --clear 'SearchInput' 'burrito'
 ```

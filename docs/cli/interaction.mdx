@@ -66,12 +66,12 @@ Off-screen targets can be missed. Scroll the element into view first with `brows
 
 ### `browser fill`
 
-Types a value into an input. Takes two positionals: the target (probe ID or component query) and the value. After typing it reads the value back and **errors** when a non-empty value was typed but the field is still empty — the signature of a React-controlled input where plain typing doesn't stick; retry with `--clear`, which clears via the native value setter first. On success it echoes `filled TARGET = "value"` to stderr.
+Replaces the value of an input, textarea or contenteditable by typing. Takes two positionals: the target (probe ID or component query) and the value. It selects the field's whole content through the DOM first, then types real key events. After typing it reads the value back and **errors** when the field is still empty (a React-controlled input where plain typing doesn't stick) or when the old value was not replaced (the field now holds old and new text); retry with `--clear`, which empties the field through its native value setter first. On success it echoes `filled TARGET = "value"` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | `localhost:7892` | CDP address |
-| `--clear` | off | Clear the field via JS before typing (use for React-controlled inputs) |
+| `--clear` | off | Empty the field through its native value setter before typing (for React-controlled inputs where select-all does not stick) |
 | `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
@@ -80,7 +80,7 @@ sightmap browser fill --clear SearchInput 'garden hose'
 ```
 
 <Tip>
-React-controlled inputs may append instead of replace. Pass `--clear`, or set the value through the native setter with `browser eval`:
+If `fill` reports that the old value was not replaced, pass `--clear`, or set the value through the native setter with `browser eval`:
 
 ```bash
 sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "new value"); el.dispatchEvent(new Event("input", {bubbles: true}))'

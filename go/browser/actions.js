@@ -79,15 +79,76 @@ function __smScrollBy(deltaX, deltaY) {
   window.scrollBy(deltaX, deltaY);
 }
 
-// __smClearActiveElement clears document.activeElement's value via the native
-// JS setter — works on React-controlled inputs where Ctrl+A may not select.
+// __smActiveElement is the focused element, looking through open shadow roots.
+function __smActiveElement() {
+  let el = document.activeElement;
+  while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+    el = el.shadowRoot.activeElement;
+  }
+  return el;
+}
+
+// __smSelectActive selects all the content of the focused input, textarea or
+// contenteditable, so the next typed text replaces it. It returns whether it
+// could, and the content as it was, for the caller to compare with afterwards.
+// Doing it through the DOM works on every platform; a Ctrl+A key event does not
+// select on macOS Chrome unless the editing command is sent with it.
+function __smSelectActive() {
+  const el = __smActiveElement();
+  if (!el || el === document.body || el === document.documentElement) {
+    return { selected: false, value: "" };
+  }
+  if (typeof el.select === "function" && el.value != null) {
+    el.select();
+    return { selected: true, value: String(el.value) };
+  }
+  if (el.isContentEditable) {
+    const sel = el.ownerDocument.getSelection();
+    const range = el.ownerDocument.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return { selected: true, value: el.textContent || "" };
+  }
+  return { selected: false, value: "" };
+}
+
+// __smClearActiveElement empties the focused input, textarea, select or
+// contenteditable and returns what it held, or throws when it cannot. Inputs go
+// through the native value setter of the element's own prototype, which is what
+// React-controlled fields listen to: HTMLInputElement's setter called on a
+// textarea throws "Illegal invocation", so the setter is picked by the
+// element, not by whichever prototype has one.
 function __smClearActiveElement() {
-  const el = document.activeElement;
-  if (!el) return;
-  const setter =
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value") ||
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value");
-  if (setter && setter.set) setter.set.call(el, "");
+  const el = __smActiveElement();
+  if (!el || el === document.body || el === document.documentElement) {
+    throw new Error("nothing is focused to clear");
+  }
+  if (el.isContentEditable && el.value == null) {
+    const old = el.textContent || "";
+    const sel = el.ownerDocument.getSelection();
+    const range = el.ownerDocument.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    range.deleteContents();
+    el.dispatchEvent(
+      new InputEvent("input", { bubbles: true, inputType: "deleteContent" }),
+    );
+    return old;
+  }
+  const proto = [HTMLInputElement, HTMLTextAreaElement, HTMLSelectElement].find(
+    (C) => el instanceof C,
+  )?.prototype;
+  const setter = proto && Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  if (!setter) {
+    throw new Error(
+      "the focused <" + el.tagName.toLowerCase() + "> has no value to clear",
+    );
+  }
+  const old = String(el.value);
+  setter.call(el, "");
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
+  return old;
 }
