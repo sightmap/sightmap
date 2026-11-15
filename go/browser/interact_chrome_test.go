@@ -1,6 +1,7 @@
 package browser
 
-// Real-Chrome tests of how input is dispatched: native-value inputs (dates).
+// Real-Chrome tests of how input is dispatched: native-value inputs (dates), and
+// a click and a fill in a background tab.
 // Opt-in: SIGHTMAP_CHROME_E2E=1 (uses FindChrome, or SIGHTMAP_CHROME).
 
 import (
@@ -10,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -188,5 +190,98 @@ func TestFillNativeInputs_Chrome(t *testing.T) {
 		if got := frameString(t, ctx, conn, c.urlPart+":", `document.body.dataset.events`); got != want {
 			t.Errorf("events seen in the frame of %s = %q, want %q", c.domID, got, want)
 		}
+	}
+}
+
+// A page for the background-tab and drag tests: a button that counts clicks, a
+// text input, and a draggable box that logs the mouse events it sees.
+const interactTabPage = `<!doctype html><html><body style="margin:0">
+<button id="btn" style="position:absolute;left:10px;top:10px;width:100px;height:30px" onclick="document.body.dataset.clicks=(+document.body.dataset.clicks||0)+1">Go</button>
+<input id="in" type="text" style="position:absolute;left:10px;top:60px;width:160px;height:30px">
+<div id="box" style="position:absolute;left:20px;top:120px;width:60px;height:40px;background:#ccc"></div>
+<script>
+const log = [];
+const box = document.getElementById('box');
+box.addEventListener('mousedown', e => log.push('down:' + e.clientX + ',' + e.clientY));
+addEventListener('mousemove', e => { if (e.buttons & 1) log.push('move:' + e.clientX + ',' + e.clientY); });
+addEventListener('mouseup', e => log.push('up:' + e.clientX + ',' + e.clientY));
+window.__log = () => log.join(' ');
+</script>
+</body></html>`
+
+func loadTabPage(t *testing.T, ctx context.Context, conn *CDPConn) {
+	t.Helper()
+	if err := NavigateAndWaitIdle(ctx, conn, "data:text/html;charset=utf-8,"+url.PathEscape(interactTabPage), 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestInteractInBackgroundTab_Chrome opens two tabs and checks that
+// EnsureVisible brings the one behind to the front (once, not again when it is
+// already visible), and that a click and a fill work in it afterwards.
+//
+// It does NOT show the bug EnsureVisible is for: headless Chrome delivers mouse
+// events to a hidden tab just the same, so the click and the fill pass without
+// the call too (checked by taking it out). The bug, a click accepted and lost on
+// a background tab of a headed Chrome, is as reported and not reproduced here.
+func TestInteractInBackgroundTab_Chrome(t *testing.T) {
+	ctx, addr := chromeBrowser(t)
+	back := chromeTab(t, ctx, addr)
+	loadTabPage(t, ctx, back)
+	// Opening another tab puts the first behind it.
+	front := chromeTab(t, ctx, addr)
+	if err := BringToFront(ctx, front); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; evalString(t, ctx, back, `document.visibilityState`) != "hidden"; i++ {
+		if i > 50 {
+			t.Fatal("the first tab never became hidden; the test cannot show the bug")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	root, _ := extractFixture(t, ctx, back)
+	moved, err := EnsureVisible(ctx, back)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !moved {
+		t.Error("EnsureVisible on a hidden tab reported it had nothing to do")
+	}
+	if got := evalString(t, ctx, back, `document.visibilityState`); got != "visible" {
+		t.Fatalf("visibilityState after EnsureVisible = %q, want visible", got)
+	}
+	if moved, _ := EnsureVisible(ctx, back); moved {
+		t.Error("EnsureVisible on a visible tab brought it to the front again")
+	}
+
+	// Put it behind again; this time the interactions do the foregrounding, as
+	// the CLI does before each command.
+	if err := BringToFront(ctx, front); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; evalString(t, ctx, back, `document.visibilityState`) != "hidden"; i++ {
+		if i > 50 {
+			t.Fatal("the first tab never became hidden again")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err := EnsureVisible(ctx, back); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Click(ctx, back, byDOMID(root, "btn")); err != nil {
+		t.Fatal(err)
+	}
+	if got := evalString(t, ctx, back, `document.body.dataset.clicks||"0"`); got != "1" {
+		t.Errorf("clicks in the formerly hidden tab = %q, want 1", got)
+	}
+	if err := Fill(ctx, back, byDOMID(root, "in"), "hello"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ClearAndFill(ctx, back, byDOMID(root, "in"), "world"); err != nil {
+		t.Fatal(err)
+	}
+	if got := evalString(t, ctx, back, `document.getElementById("in").value`); got != "world" {
+		t.Errorf("input in the formerly hidden tab = %q, want world", got)
 	}
 }
