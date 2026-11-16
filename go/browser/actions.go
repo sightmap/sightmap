@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1141,10 +1142,31 @@ func fillNative(ctx context.Context, conn *CDPConn, id, value string) (done bool
 	if res.Blocked {
 		return true, fmt.Errorf("fill: %q is a disabled or read-only %s input", id, res.Type)
 	}
-	if value != "" && res.Value == "" {
-		return true, fmt.Errorf("fill: the %s input did not accept %q (it holds nothing); give it the format its value takes, such as 2027-04-16 for a date", res.Type, value)
+	if nativeValueRejected(res.Type, value, res.Value) {
+		return true, fmt.Errorf("fill: the %s input did not accept %q (it holds %q); give it the format its value takes, such as 2027-04-16 for a date", res.Type, value, res.Value)
 	}
 	return true, nil
+}
+
+// nativeValueRejected reports whether a native-value input of the given type
+// refused want and kept got instead. The date-like types sanitize a value they
+// cannot parse to "". A color input sanitizes one to "#000000" and a range input
+// to its midpoint, so for those the empty check never fires: a color holds
+// exactly the (lowercased) value it was given, and a range was given a number
+// unless it is not one. A range may still clamp a number into its bounds, which
+// is accepted.
+func nativeValueRejected(typ, want, got string) bool {
+	if want == "" {
+		return false
+	}
+	switch typ {
+	case "color":
+		return !strings.EqualFold(got, want)
+	case "range":
+		_, err := strconv.ParseFloat(want, 64)
+		return err != nil
+	}
+	return got == ""
 }
 
 // focusProblem is what __smFocusProblem reports for the document holding an
