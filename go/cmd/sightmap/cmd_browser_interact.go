@@ -88,8 +88,11 @@ func foreground(ctx context.Context, conn *browser.CDPConn) error {
 		return err
 	}
 	if moved {
-		id, _ := browser.TargetID(ctx, conn)
-		fmt.Fprintf(os.Stderr, "brought tab %s to front\n", id)
+		msg := "brought tab to front"
+		if id, err := browser.TargetID(ctx, conn); err == nil && id != "" {
+			msg = "brought tab " + id + " to front"
+		}
+		fmt.Fprintln(os.Stderr, msg)
 	}
 	return nil
 }
