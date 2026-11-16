@@ -578,6 +578,13 @@ function computeCompProps(isLogicalRoot, useScrollOffset, idPrefix, maxNodes) {
                         childNode.textContent &&
                         childNode.textContent.trim()) {
 
+                        // The cap holds for text nodes too, so a cut frame
+                        // never exceeds it by this element's text children.
+                        if (maxNodes > 0 && idCounter.value > maxNodes) {
+                            truncated = true;
+                            break;
+                        }
+
                         // Generate stable sightmap id for text node
                         const textSightmapId = genTextSightmapId(childNode, idCounter);
                         textNodeIds.push(textSightmapId);

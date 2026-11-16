@@ -312,6 +312,44 @@ func TestResolve_NoMatch(t *testing.T) {
 	}
 }
 
+// A frame is a page of its own: a chain part naming an ancestor outside the
+// frame does not scope a component inside it, as for corpus selectors.
+func TestFindCandidates_ChainStopsAtFrameBoundary(t *testing.T) {
+	inner := &sightmap.ComponentNode{Id: "2_5"}
+	doc := &sightmap.ComponentNode{Id: "2_1", FrameURL: "http://x/sandbox", Children: []*sightmap.ComponentNode{inner}}
+	frameEl := &sightmap.ComponentNode{Id: "4", Children: []*sightmap.ComponentNode{doc}}
+	shell := &sightmap.ComponentNode{Id: "3", Children: []*sightmap.ComponentNode{frameEl}}
+	root := &sightmap.ComponentNode{Id: "1", Children: []*sightmap.ComponentNode{shell}}
+	frameShell := &sightmap.ComponentNode{Id: "2_2"}
+	doc.Children = append(doc.Children, frameShell)
+	inner2 := &sightmap.ComponentNode{Id: "2_6"}
+	frameShell.Children = []*sightmap.ComponentNode{inner2}
+	matches := map[*sightmap.ComponentNode]*sightmap.ComponentMatch{
+		shell:      {Name: "Shell"},
+		inner:      {Name: "DateWindow"},
+		frameShell: {Name: "Shell"},
+		inner2:     {Name: "DateWindow"},
+	}
+	ids := func(qs string) []string {
+		q, err := ParseQuery(qs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, n := range FindCandidates(root, matches, nil, q) {
+			out = append(out, n.Id)
+		}
+		return out
+	}
+	// The host's Shell does not scope the frame's DateWindow; the frame's own does.
+	if got := ids("Shell DateWindow"); len(got) != 1 || got[0] != "2_6" {
+		t.Errorf("Shell DateWindow = %v, want only the one under the frame's own Shell [2_6]", got)
+	}
+	if got := ids("DateWindow"); len(got) != 2 {
+		t.Errorf("DateWindow = %v, want both", got)
+	}
+}
+
 func TestResolve_IndexOutOfRange(t *testing.T) {
 	root, matches, props := buildFixture()
 	q, _ := ParseQuery("FulfillmentTileButton#5")
