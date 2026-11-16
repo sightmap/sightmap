@@ -618,7 +618,7 @@ func TestDrainKeepsOwnRequestsOutOfTheBuffer(t *testing.T) {
 		got, dropped := c.Network(NetworkFilter{})
 		if len(got) == len(apiURLs) && got[len(got)-1].Status == 200 {
 			if dropped.Main != 0 {
-				t.Errorf("dropped = %d, want 0: own requests overflowed the buffer", dropped)
+				t.Errorf("dropped = %d, want 0: own requests overflowed the buffer", dropped.Main)
 			}
 			for i, r := range got {
 				if r.URL != apiURLs[i] {
@@ -632,7 +632,7 @@ func TestDrainKeepsOwnRequestsOutOfTheBuffer(t *testing.T) {
 		}
 		select {
 		case <-deadline:
-			t.Fatalf("buffer holds %d entries (dropped %d), want %d app requests", len(got), dropped, len(apiURLs))
+			t.Fatalf("buffer holds %d entries (dropped %d), want %d app requests", len(got), dropped.Main, len(apiURLs))
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
@@ -649,41 +649,48 @@ func waitFor(t *testing.T, cond func() bool, what string) {
 	}
 }
 
-func TestIsStaticType(t *testing.T) {
-	for _, rt := range []string{"Script", "Stylesheet", "Image", "Font", "Media", "Manifest", "TextTrack", "script", "FONT"} {
-		if !isStaticType(rt) {
-			t.Errorf("isStaticType(%q) = false, want true", rt)
-		}
-	}
-	// An unknown or empty type is not static: better to show it than hide it.
-	for _, rt := range []string{"Document", "XHR", "Fetch", "EventSource", "WebSocket", "Other", "Ping", "Preflight", "", "Hologram"} {
-		if isStaticType(rt) {
-			t.Errorf("isStaticType(%q) = true, want false", rt)
-		}
-	}
-}
-
+// TestInStaticRing covers the one rule for which ring a record is in, and the
+// type list it rests on: an unknown or empty type is not static (better to show
+// it than hide it), matching is case-insensitive, and a failed load never is.
 func TestInStaticRing(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		rtype  string
 		status int
+		failed bool
 		want   bool
 	}{
-		{"script ok", "Script", 200, true},
-		{"script cached", "Script", 304, true},
-		{"script 204", "Script", 204, true},
-		{"image pending", "Image", 0, true},
-		{"script missing", "Script", 404, false},
-		{"stylesheet server error", "Stylesheet", 500, false},
-		{"script redirect", "Script", 302, false},
-		{"fetch ok", "Fetch", 200, false},
-		{"document ok", "Document", 200, false},
-		{"unknown type ok", "Hologram", 200, false},
-		{"no type", "", 200, false},
+		{"script ok", "Script", 200, false, true},
+		{"script cached", "Script", 304, false, true},
+		{"script 204", "Script", 204, false, true},
+		{"image pending", "Image", 0, false, true},
+		{"stylesheet ok", "Stylesheet", 200, false, true},
+		{"font ok", "Font", 200, false, true},
+		{"media ok", "Media", 206, false, true},
+		{"manifest ok", "Manifest", 200, false, true},
+		{"text track ok", "TextTrack", 200, false, true},
+		{"lower case", "script", 200, false, true},
+		{"upper case", "FONT", 200, false, true},
+		{"script missing", "Script", 404, false, false},
+		{"stylesheet server error", "Stylesheet", 500, false, false},
+		{"script redirect", "Script", 302, false, false},
+		{"script failed while pending", "Script", 0, true, false},
+		{"script failed after a 200", "Script", 200, true, false},
+		{"fetch ok", "Fetch", 200, false, false},
+		{"xhr ok", "XHR", 200, false, false},
+		{"document ok", "Document", 200, false, false},
+		{"event source", "EventSource", 200, false, false},
+		{"websocket", "WebSocket", 101, false, false},
+		{"other", "Other", 200, false, false},
+		{"ping", "Ping", 200, false, false},
+		{"preflight", "Preflight", 204, false, false},
+		{"unknown type ok", "Hologram", 200, false, false},
+		{"no type", "", 200, false, false},
+		{"no type pending", "", 0, false, false},
 	} {
-		if got := inStaticRing(tc.rtype, tc.status); got != tc.want {
-			t.Errorf("%s: inStaticRing(%q, %d) = %v, want %v", tc.name, tc.rtype, tc.status, got, tc.want)
+		r := networkRecord{Request: sightmap.Request{ResourceType: tc.rtype, Status: tc.status}, failed: tc.failed}
+		if got := inStaticRing(r); got != tc.want {
+			t.Errorf("%s: inStaticRing(%q, %d, failed=%v) = %v, want %v", tc.name, tc.rtype, tc.status, tc.failed, got, tc.want)
 		}
 	}
 }
@@ -741,6 +748,18 @@ func TestStaticRequestsHiddenUnlessAsked(t *testing.T) {
 	got, _ = c.Network(NetworkFilter{IncludeStatic: true, ResourceType: "script"})
 	if want := []string{"/src/main.tsx", "/src/gone.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
 		t.Errorf("--static --type script = %v, want %v", urls(got), want)
+	}
+	// Asking for a static type by name searches the static ring without --static.
+	got, drops := c.Network(NetworkFilter{ResourceType: "Script"})
+	if want := []string{"/src/main.tsx", "/src/gone.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("--type Script = %v, want %v (a static type implies --static)", urls(got), want)
+	}
+	c.staticDropped = 5
+	if _, drops = c.Network(NetworkFilter{ResourceType: "Script"}); drops.Static != 5 {
+		t.Errorf("--type Script drops = %+v, want the static ring's 5 reported", drops)
+	}
+	if _, drops = c.Network(NetworkFilter{ResourceType: "Fetch"}); drops.Static != 0 {
+		t.Errorf("--type Fetch drops = %+v, want the static ring's drops left out", drops)
 	}
 	got, _ = c.Network(NetworkFilter{IncludeStatic: true, Limit: 2})
 	if want := []string{"/src/gone.js", "/"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
@@ -863,6 +882,61 @@ func TestFailedStaticRequestMovesToMainRing(t *testing.T) {
 	}
 	got, _ = c.Network(NetworkFilter{IncludeStatic: true})
 	if want := []string{"/refused.js", "/ok.js", "/aborted.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("--static = %v, want index order %v", urls(got), want)
+	}
+}
+
+// drain reads responseReceived and loadingFailed from separate channels, so a
+// response can be applied after the failure of the same request (headers, then
+// net::ERR_CONTENT_LENGTH_MISMATCH). Either order leaves the record failed and
+// visible by default.
+func TestFailureSticksWhateverOrder(t *testing.T) {
+	for _, order := range []string{"response first", "failure first"} {
+		t.Run(order, func(t *testing.T) {
+			c := NewCollector("unused")
+			c.addNetwork(networkRecord{Request: sightmap.Request{Method: "GET", URL: "/cut.js", ResourceType: "Script"}, requestID: "a"})
+			respond := func() { c.applyResponse(responseInfo{reqID: "a", status: 200, rtype: "Script"}) }
+			if order == "response first" {
+				respond()
+				c.failRequest("a")
+			} else {
+				c.failRequest("a")
+				respond()
+			}
+			got, _ := c.Network(NetworkFilter{})
+			if fmt.Sprint(urls(got)) != "[/cut.js]" || got[0].Status != 200 {
+				t.Errorf("default = %v, want the failed /cut.js with its 200 status", got)
+			}
+			if len(c.static) != 0 {
+				t.Errorf("static ring holds %d records, want 0", len(c.static))
+			}
+		})
+	}
+}
+
+// requestWillBeSent often carries no type; the response brings it. A typeless
+// pending request starts in the main ring, then moves by what its response says.
+func TestResourceTypeArrivesWithResponse(t *testing.T) {
+	c := NewCollector("unused")
+	add := func(id, url string) {
+		c.addNetwork(networkRecord{Request: sightmap.Request{Method: "GET", URL: url}, requestID: id})
+	}
+	add("a", "/ok.js")
+	add("b", "/api/me")
+	add("c", "/gone.js")
+	if got, _ := c.Network(NetworkFilter{}); len(got) != 3 {
+		t.Fatalf("typeless pending requests hidden: %v (an unknown type is shown)", urls(got))
+	}
+	c.applyResponse(responseInfo{reqID: "a", status: 200, rtype: "Script"})
+	c.applyResponse(responseInfo{reqID: "b", status: 200, rtype: "Fetch"})
+	c.applyResponse(responseInfo{reqID: "c", status: 404, rtype: "Script"})
+
+	got, _ := c.Network(NetworkFilter{})
+	if want := []string{"/api/me", "/gone.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
+		t.Errorf("default = %v, want %v (the 200 script moved to the static ring, the 404 stayed)", urls(got), want)
+	}
+	got, _ = c.Network(NetworkFilter{IncludeStatic: true})
+	if want := []string{"/ok.js", "/api/me", "/gone.js"}; fmt.Sprint(urls(got)) != fmt.Sprint(want) {
 		t.Errorf("--static = %v, want index order %v", urls(got), want)
 	}
 }

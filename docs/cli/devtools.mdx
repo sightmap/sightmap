@@ -54,11 +54,11 @@ Uncaught TypeError: cart.total is not a function
 
 ### `network list`
 
-Lists captured network requests, oldest to newest. Successful static requests (Script, Stylesheet, Image, Font, Media and Manifest with a 2xx or 304 status) are hidden unless you pass `--static`, so a dev server's module scripts don't bury the page's own calls. A failed static request is always listed.
+Lists captured network requests, oldest to newest. Successful static requests (Script, Stylesheet, Image, Font, Media, Manifest and TextTrack with a 2xx or 304 status) are hidden unless you pass `--static` or name a static type with `--type`, so a dev server's module scripts don't bury the page's own calls. A failed static request (404, 5xx, refused, blocked, or cut off mid-transfer) is always listed.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--type` | all | Filter by resource type (`Document`, `XHR`, `Fetch`, `Stylesheet`, `Image`, `Script`, `Font`, …) |
+| `--type` | all | Filter by resource type (`Document`, `XHR`, `Fetch`, `Stylesheet`, `Image`, `Script`, `Font`, …); a static type implies `--static` |
 | `--url` | all | Filter by URL substring (case-insensitive) |
 | `--filter` | all | Filter by URL regular expression (Go syntax, unanchored) |
 | `--static` | off | Include successful static requests, merged in request order |

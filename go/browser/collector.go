@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,6 +44,10 @@ type networkRecord struct {
 
 	requestID string   // CDP requestId, for lazy body fetch
 	conn      *CDPConn // the collector connection that observed this request
+	// failed is set by Network.loadingFailed and is sticky: drain reads
+	// responseReceived and loadingFailed from separate channels, so a 200 can be
+	// applied after the failure, and the record must stay out of the static ring.
+	failed bool
 }
 
 // Collector attaches to every tab of a running Chrome session and buffers
@@ -392,7 +398,7 @@ func (c *Collector) addNetwork(e networkRecord) {
 // module requests evict the page's calls from the main ring first. Caller must
 // hold c.mu.
 func (c *Collector) place(e networkRecord) {
-	if inStaticRing(e.ResourceType, e.Status) {
+	if inStaticRing(e) {
 		c.static = insertByIndex(c.static, e)
 		if over := len(c.static) - c.maxStatic; over > 0 {
 			c.static = c.static[over:]
@@ -411,11 +417,8 @@ func (c *Collector) place(e networkRecord) {
 // the newest and lands at the end; a record moving between rings can land
 // earlier.
 func insertByIndex(ring []networkRecord, e networkRecord) []networkRecord {
-	i := sort.Search(len(ring), func(i int) bool { return ring[i].Index > e.Index })
-	ring = append(ring, networkRecord{})
-	copy(ring[i+1:], ring[i:])
-	ring[i] = e
-	return ring
+	i, _ := slices.BinarySearchFunc(ring, e.Index, func(r networkRecord, index int) int { return cmp.Compare(r.Index, index) })
+	return slices.Insert(ring, i, e)
 }
 
 // staticTypes are the CDP resource types of page assets as opposed to the
@@ -431,16 +434,17 @@ func isStaticType(resourceType string) bool {
 	return staticTypes[strings.ToLower(resourceType)]
 }
 
-// inStaticRing reports whether a request of this type and status belongs in the
-// static ring: a static type that has not failed. A request still waiting for
-// its response (status 0) counts as not failed. Success is 2xx or 304, so a
-// 404 script, a 5xx stylesheet and (via failRequest) a script that never loaded
-// stay in the main ring, where a person looking for what went wrong finds them.
-func inStaticRing(resourceType string, status int) bool {
-	if !isStaticType(resourceType) {
+// inStaticRing reports whether a record belongs in the static ring: a static
+// type that has not failed. A request still waiting for its response (status 0)
+// counts as not failed. Success is 2xx or 304, so a 404 script, a 5xx stylesheet
+// and a script whose load failed (r.failed, whatever status arrived) stay in the
+// main ring, where a person looking for what went wrong finds them. This is the
+// one rule for which ring a record is in; place and settle both apply it.
+func inStaticRing(r networkRecord) bool {
+	if r.failed || !isStaticType(r.ResourceType) {
 		return false
 	}
-	return status == 0 || (status >= 200 && status < 300) || status == http.StatusNotModified
+	return r.Status == 0 || (r.Status >= 200 && r.Status < 300) || r.Status == http.StatusNotModified
 }
 
 // recordByReqID finds the buffered record with the given CDP requestId in either
@@ -480,34 +484,30 @@ func (c *Collector) record(static bool, i int) *networkRecord {
 // status now say it belongs there. Caller must hold c.mu.
 func (c *Collector) settle(static bool, i int) {
 	r := *c.record(static, i)
-	if inStaticRing(r.ResourceType, r.Status) == static {
+	if inStaticRing(r) == static {
 		return
 	}
 	if static {
-		c.static = append(c.static[:i], c.static[i+1:]...)
+		c.static = slices.Delete(c.static, i, i+1)
 	} else {
-		c.network = append(c.network[:i], c.network[i+1:]...)
+		c.network = slices.Delete(c.network, i, i+1)
 	}
 	c.place(r)
 }
 
-// failRequest handles a Network.loadingFailed: a request that never got a
-// response (refused, DNS, blocked, aborted by a script) is not a successful
-// static resource, so it leaves the static ring for the main one.
+// failRequest handles a Network.loadingFailed: a request that never finished
+// loading (refused, DNS, blocked, aborted by a script, or cut off after its
+// headers) is not a successful static resource. It is marked failed, which moves
+// it to the main ring and keeps it there whatever response is applied after.
 func (c *Collector) failRequest(reqID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	static, i, ok := c.recordByReqID(reqID)
-	if !ok || !static {
+	if !ok {
 		return
 	}
-	r := c.static[i]
-	c.static = append(c.static[:i], c.static[i+1:]...)
-	c.network = insertByIndex(c.network, r)
-	if over := len(c.network) - c.maxEntries; over > 0 {
-		c.network = c.network[over:]
-		c.networkDropped += over
-	}
+	c.record(static, i).failed = true
+	c.settle(static, i)
 }
 
 // applyResponse matches a response back to its pending request and fills in
@@ -566,18 +566,19 @@ type NetworkFilter struct {
 	URLPattern    *regexp.Regexp // URL must match, or nil for all
 	Tab           string         // exact tab match, or "" for all
 	Limit         int            // keep only the most recent N (0 = all)
-	IncludeStatic bool           // also return successful static requests (see inStaticRing)
+	IncludeStatic bool           // also return successful static requests (see inStaticRing); implied by a static ResourceType
 }
 
 // NetworkDrops counts the entries each ring has dropped from its front.
 type NetworkDrops struct {
 	Main   int
-	Static int // always 0 unless the query asked for the static ring (IncludeStatic)
+	Static int // always 0 unless the query covered the static ring
 }
 
 // Network returns the buffered network entries matching f (oldest→newest) plus
 // the number dropped from the front of each ring the query covers. Successful
-// static requests are left out unless f.IncludeStatic.
+// static requests are left out unless f.IncludeStatic, or f.ResourceType names a
+// static type: asking for scripts by type means the successful ones too.
 func (c *Collector) Network(f NetworkFilter) ([]sightmap.Request, NetworkDrops) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -589,27 +590,15 @@ func (c *Collector) Network(f NetworkFilter) ([]sightmap.Request, NetworkDrops) 
 			(f.URLPattern == nil || f.URLPattern.MatchString(e.URL)) &&
 			(f.Tab == "" || e.Tab == f.Tab)
 	}
-	rings := [][]networkRecord{c.network}
+	records := c.network
 	drops := NetworkDrops{Main: c.networkDropped}
-	if f.IncludeStatic {
-		rings = append(rings, c.static)
+	if f.IncludeStatic || isStaticType(f.ResourceType) {
+		records = slices.Concat(c.network, c.static)
+		slices.SortFunc(records, func(a, b networkRecord) int { return cmp.Compare(a.Index, b.Index) })
 		drops.Static = c.staticDropped
 	}
-	out := make([]sightmap.Request, 0, len(c.network))
-	// Merge the rings in Index order; each is already sorted.
-	pos := make([]int, len(rings))
-	for {
-		next := -1
-		for r := range rings {
-			if pos[r] < len(rings[r]) && (next < 0 || rings[r][pos[r]].Index < rings[next][pos[next]].Index) {
-				next = r
-			}
-		}
-		if next < 0 {
-			break
-		}
-		e := rings[next][pos[next]]
-		pos[next]++
+	out := make([]sightmap.Request, 0, len(records))
+	for _, e := range records {
 		if match(e) {
 			out = append(out, e.Request)
 		}

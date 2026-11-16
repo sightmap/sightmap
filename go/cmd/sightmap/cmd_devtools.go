@@ -286,7 +286,7 @@ func runNetworkList(args []string) error {
 	rtype := fs.String("type", "", "Filter by resource type (Document, XHR, Fetch, Stylesheet, Image, Script, Font, ...)")
 	urlSub := fs.String("url", "", "Filter by URL substring")
 	urlRe := fs.String("filter", "", "Filter by URL regular expression (Go syntax, unanchored)")
-	static := fs.Bool("static", false, "Include successful static requests (scripts, styles, images, fonts, ...), hidden by default")
+	static := fs.Bool("static", false, "Include successful static requests (scripts, styles, images, fonts, ...), hidden by default; a static --type implies it")
 	tab := fs.String("tab", "", "Filter by tab ID")
 	limit := fs.Int("limit", 0, "Show only the most recent N requests (0 = all)")
 	sightmapDir := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
@@ -319,21 +319,24 @@ func runNetworkList(args []string) error {
 	return nil
 }
 
-// printNetworkList renders a `network list` result. The static ring's drops are
-// reported only when the query covered it: otherwise they describe entries the
-// listing was never going to show.
+// printNetworkList renders a `network list` result. The server reports the static
+// ring's drops only when the query covered it (--static or a static --type):
+// otherwise they describe entries the listing was never going to show. When
+// nothing matched and --static was off, it says the static requests were not
+// searched, since a `--filter '\.js$'` without it finds nothing.
 func printNetworkList(w io.Writer, res networkResult, static bool) {
 	if len(res.Entries) == 0 {
 		fmt.Fprintln(w, "No network requests captured.")
+		if !static {
+			fmt.Fprintln(w, "(successful static requests are hidden; pass --static to search them too)")
+		}
 	} else {
 		for _, e := range res.Entries {
 			fmt.Fprintf(w, "[%d] %s %s %s → %s (%s)%s\n", e.Index, matchSlot(e.Matches), e.Method, e.URL, statusStr(e.Request), e.ResourceType, propsSlot(e.Props))
 		}
 	}
 	reportDropped(w, res.Dropped, "network")
-	if static {
-		reportDropped(w, res.DroppedStatic, "static network")
-	}
+	reportDropped(w, res.DroppedStatic, "static network")
 }
 
 func runNetworkGet(args []string) error {

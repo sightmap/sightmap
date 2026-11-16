@@ -191,12 +191,13 @@ func TestNetworkEndpointRejectsBadFilter(t *testing.T) {
 
 func TestPrintNetworkListDroppedNotes(t *testing.T) {
 	res := networkResult{
-		Entries:       []networkEntry{{Request: sightmap.Request{Index: 7, Method: "GET", URL: "http://x/api/me", Status: 200, StatusText: "OK", ResourceType: "Fetch"}}},
-		Dropped:       3,
-		DroppedStatic: 476,
+		Entries: []networkEntry{{Request: sightmap.Request{Index: 7, Method: "GET", URL: "http://x/api/me", Status: 200, StatusText: "OK", ResourceType: "Fetch"}}},
+		Dropped: 3,
 	}
 	var hidden, shown bytes.Buffer
+	// The server sends the static ring's drops only for a query that covered it.
 	printNetworkList(&hidden, res, false)
+	res.DroppedStatic = 476
 	printNetworkList(&shown, res, true)
 	if !strings.Contains(hidden.String(), "[7]") || !strings.Contains(hidden.String(), "(3 earlier network entries dropped") {
 		t.Errorf("default output = %q", hidden.String())
@@ -206,5 +207,19 @@ func TestPrintNetworkListDroppedNotes(t *testing.T) {
 	}
 	if !strings.Contains(shown.String(), "(476 earlier static network entries dropped") || !strings.Contains(shown.String(), "(3 earlier network entries dropped") {
 		t.Errorf("--static output = %q, want both notes", shown.String())
+	}
+}
+
+// An empty default listing says the static ring was not searched; an empty
+// --static one has nothing to add.
+func TestPrintNetworkListEmptyHint(t *testing.T) {
+	var hidden, shown bytes.Buffer
+	printNetworkList(&hidden, networkResult{}, false)
+	printNetworkList(&shown, networkResult{}, true)
+	if !strings.Contains(hidden.String(), "pass --static") {
+		t.Errorf("empty default output = %q, want the --static hint", hidden.String())
+	}
+	if strings.Contains(shown.String(), "--static") {
+		t.Errorf("empty --static output = %q, want no hint", shown.String())
 	}
 }

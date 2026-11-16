@@ -287,11 +287,11 @@ drowning the matched ones.
   `wait-for --load`; prefer `wait-for --url`/`--selector`, or just re-read after
   a short pause.)
 - `network list` **hides successful static requests** (Script, Stylesheet, Image,
-  Font, Media, Manifest with a 2xx or 304) by default, as `playwright-cli requests`
-  does, so a Vite page's ~200 `/src/...` modules don't bury the app's calls. A failed
-  asset (404, 5xx, refused) still shows. Pass `--static` to see scripts and styles
-  too; `--type`, `--url` and `--filter` narrow either list further. `network get
-  <index>` works for hidden requests as well.
+  Font, Media, Manifest, TextTrack with a 2xx or 304) by default, as `playwright-cli
+  requests` does, so a Vite page's ~200 `/src/...` modules don't bury the app's calls.
+  A failed asset (404, 5xx, refused) still shows. Pass `--static` to see scripts and
+  styles too (`--type Script` implies it); `--type`, `--url` and `--filter` narrow
+  either list further. `network get <index>` works for hidden requests as well.
 - `--url` is a substring match, not a path anchor (`--url /aura` also catches
   `.../auraFW/...`) — narrow it when a route is noisy. `--filter` takes a regular
   expression (`--filter '/api/(issues|me)$'`), unanchored.
