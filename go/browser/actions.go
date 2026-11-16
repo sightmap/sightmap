@@ -159,7 +159,8 @@ func BringToFront(ctx context.Context, conn *CDPConn) error {
 // whether it did. Input.dispatchMouseEvent hit-tests and focuses only on the
 // visible tab: on a background one the event is accepted and does nothing, so
 // a click that "succeeds" never happened. Every command that dispatches input
-// calls this first. A tab whose visibility cannot be read is left alone.
+// calls this first. A tab whose visibility cannot be read is left alone, and a
+// tab that stays hidden after bringToFront is an error.
 func EnsureVisible(ctx context.Context, conn *CDPConn) (bool, error) {
 	visibility := func() string {
 		raw, err := EvalJSON(ctx, conn, `document.visibilityState`)
@@ -179,7 +180,7 @@ func EnsureVisible(ctx context.Context, conn *CDPConn) (bool, error) {
 	// The page learns it is visible a moment after the window does.
 	for range 20 {
 		if visibility() != "hidden" {
-			break
+			return true, nil
 		}
 		select {
 		case <-ctx.Done():
@@ -187,7 +188,10 @@ func EnsureVisible(ctx context.Context, conn *CDPConn) (bool, error) {
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
-	return true, nil
+	// A minimized or occluded window can ignore bringToFront. Input sent now
+	// would be accepted and dropped, so say so instead of going on.
+	id, _ := TargetID(ctx, conn)
+	return true, fmt.Errorf("tab %s is still hidden after bringing it to the front; input to it would be lost", id)
 }
 
 // TargetID is the CDP target ID of the connection's tab, the ID `--tab` takes.
