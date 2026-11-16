@@ -126,6 +126,31 @@ func TestScreenshotWithOptions_FullPagePinsLayoutWidth(t *testing.T) {
 // unless SIGHTMAP_CHROME_E2E=1.
 func fullPageChrome(t *testing.T) (context.Context, *CDPConn) {
 	t.Helper()
+	ctx, addr := chromeBrowser(t)
+	return ctx, chromeTab(t, ctx, addr)
+}
+
+// chromeTab opens a tab in the browser at addr, retrying until its CDP endpoint
+// is up, and closes the connection when the test ends.
+func chromeTab(t *testing.T, ctx context.Context, addr string) *CDPConn {
+	t.Helper()
+	for {
+		if ctx.Err() != nil {
+			t.Fatal("Chrome's CDP endpoint never came up")
+		}
+		if _, conn, err := CreateTab(ctx, addr, ""); err == nil {
+			t.Cleanup(func() { conn.Close() })
+			return conn
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// chromeBrowser starts a headless Chrome at a 700x600 window, DPR 2, and returns
+// a context bounding the test and the CDP endpoint's address (not necessarily up
+// yet: open tabs with chromeTab). It skips unless SIGHTMAP_CHROME_E2E=1.
+func chromeBrowser(t *testing.T) (context.Context, string) {
+	t.Helper()
 	if os.Getenv("SIGHTMAP_CHROME_E2E") == "" {
 		t.Skip("set SIGHTMAP_CHROME_E2E=1 to run against a real Chrome")
 	}
@@ -174,20 +199,7 @@ func fullPageChrome(t *testing.T) (context.Context, *CDPConn) {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	var conn *CDPConn
-	for conn == nil {
-		if ctx.Err() != nil {
-			t.Fatal("Chrome's CDP endpoint never came up")
-		}
-		if _, c, err := CreateTab(ctx, addr, ""); err == nil {
-			conn = c
-		} else {
-			time.Sleep(200 * time.Millisecond)
-		}
-	}
-	t.Cleanup(func() { conn.Close() })
-
-	return ctx, conn
+	return ctx, addr
 }
 
 // TestFullPageScreenshotMatchesLayout_Chrome checks against a real Chrome

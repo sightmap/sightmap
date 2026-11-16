@@ -14,6 +14,10 @@ All commands on this page except `tabs` subcommands resolve a session with `--ad
 
 Probe IDs and component queries reach into iframes, including cross-origin and nested ones. An ID minted in a frame carries the frame's prefix (`2_26`; the top document's IDs are bare numbers), and `click`, `fill`, `hover`, `drag`, `keypress`, `scroll`, `wait-for` (`--component` and `--selector`), `bounds` and `screenshot --component` resolve it to the frame that holds the element. Boxes are in top-page coordinates. A click's point is computed from the live layout right before the event is sent, after the element is scrolled into view, and `click` refuses (`covered by another element`) when something in the page is drawn over the frame at that point. `drag` measures its start and drop points the same way and checks the drop target the same way, but the source and the target must be in the same document or in frames of one process: the pointer is sent to one process and cannot be carried into another. See [Iframes](/cli/capture#iframes) for how snapshots include frames and match them.
 
+## Background tabs
+
+Chrome is reported to deliver mouse and focus events only to the visible tab, accepting them on a background one and doing nothing. So `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` first bring the target tab to the front when it is hidden (as [`browser front`](/cli/browser) does), and say so on stderr: `brought tab TAB to front`. The tab stays in front afterward.
+
 ## Component queries
 
 Probe IDs belong to one extraction. A later extraction reassigns them, and a page re-render can replace the target node. Component queries reduce that risk by extracting the live tree and applying the corpus immediately before acting. Prefer queries on pages that re-render often.
@@ -71,6 +75,10 @@ Off-screen targets can be missed. Scroll the element into view first with `brows
 ### `browser fill`
 
 Replaces the value of an input, textarea or contenteditable by typing. Takes two positionals: the target (probe ID or component query) and the value. It selects the field's whole content through the DOM first, then types real key events. After typing it reads the value back and **errors** when the field is still empty (a React-controlled input where plain typing doesn't stick) or when the old value was not replaced (the field now holds old and new text); retry with `--clear`, which empties the field through its native value setter first. On success it echoes `filled TARGET = "value"` to stderr.
+
+`fill` also **errors** when the click meant to focus the field left focus on the page (`clicking "N" did not focus it`), rather than typing into nothing; with `--clear`, a field that took no focus is reported as `the field did not take focus` instead of a raw `JS exception`.
+
+Inputs whose value is not typed characters — `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range` — are not typed into: Chrome routes keystrokes into a date control's segmented year/month/day editor, which mangles them. `fill` sets their value whole, the way a script would with the native setter, fires `input` and `change`, and reads it back. Give the value in the format the control stores (`2027-04-16` for a date, `14:45` for a time, `#ff0000` for a color); a value the control does not take (a date it cannot parse, a color that is not `#rrggbb`, a range value that is not a number) is an error, and a range given a number outside its `min`/`max` holds the nearest bound, as the control clamps it, and a disabled or read-only control is refused. This works inside iframes too.
 
 | Flag | Default | Description |
 |------|---------|-------------|

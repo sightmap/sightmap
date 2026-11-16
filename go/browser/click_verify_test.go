@@ -110,7 +110,7 @@ func TestFill_StuckSucceeds(t *testing.T) {
 type fillPage struct {
 	selectResp string
 	readResp   string
-	clearResp  string // __smClearActiveElement envelope; default: it returns ""
+	clearResp  string // __smClearActiveElement envelope; default: {ok:true, old:""}
 	mu         sync.Mutex
 	keys       []map[string]interface{}
 	calls      []string // "mouse", "key", or the JS function evaluated
@@ -144,7 +144,9 @@ func (f *fillPage) conn(t *testing.T) *CDPConn {
 				if f.clearResp != "" {
 					return json.RawMessage(f.clearResp)
 				}
-				return evalResult(`""`)
+				return evalResult(`{"ok":true,"old":""}`)
+			case "__smFocusProblem":
+				return evalResult(`null`)
 			}
 		}
 		return json.RawMessage(`{}`)
@@ -292,7 +294,7 @@ func strconvQuote(s string) string {
 // typed text is what is read afterwards, and no select-all chord is sent.
 func TestClearAndFill_Textarea(t *testing.T) {
 	page := &fillPage{
-		clearResp: string(evalResult(`"Reminder scheduling overhaul"`)),
+		clearResp: string(evalResult(`{"ok":true,"old":"Reminder scheduling overhaul"}`)),
 		readResp:  `"Reminder scheduling engine"`,
 	}
 	if err := ClearAndFill(context.Background(), page.conn(t), nodeWithID("3"), "Reminder scheduling engine"); err != nil {
@@ -328,7 +330,7 @@ func TestClearAndFill_ClearFailureIsAnError(t *testing.T) {
 // read-back catches it.
 func TestClearAndFill_AppendIsAnError(t *testing.T) {
 	page := &fillPage{
-		clearResp: string(evalResult(`"old title"`)),
+		clearResp: string(evalResult(`{"ok":true,"old":"old title"}`)),
 		readResp:  `"old titlenew title"`,
 	}
 	err := ClearAndFill(context.Background(), page.conn(t), nodeWithID("3"), "new title")

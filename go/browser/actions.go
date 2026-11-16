@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -152,6 +153,62 @@ func BringToFront(ctx context.Context, conn *CDPConn) error {
 		return fmt.Errorf("BringToFront: %w", err)
 	}
 	return nil
+}
+
+// EnsureVisible brings the tab to the front when it is hidden, and reports
+// whether it did. Input.dispatchMouseEvent hit-tests and focuses only on the
+// visible tab: on a background one the event is accepted and does nothing, so
+// a click that "succeeds" never happened. Every command that dispatches input
+// calls this first. A tab whose visibility cannot be read is left alone, and a
+// tab that stays hidden after bringToFront is an error.
+func EnsureVisible(ctx context.Context, conn *CDPConn) (bool, error) {
+	visibility := func() string {
+		raw, err := EvalJSON(ctx, conn, `document.visibilityState`)
+		if err != nil {
+			return ""
+		}
+		var v string
+		_ = json.Unmarshal(raw, &v)
+		return v
+	}
+	if visibility() != "hidden" {
+		return false, nil
+	}
+	if err := BringToFront(ctx, conn); err != nil {
+		return false, err
+	}
+	// The page learns it is visible a moment after the window does.
+	for range 20 {
+		if visibility() != "hidden" {
+			return true, nil
+		}
+		select {
+		case <-ctx.Done():
+			return true, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+	// A minimized or occluded window can ignore bringToFront. Input sent now
+	// would be accepted and dropped, so say so instead of going on.
+	id, _ := TargetID(ctx, conn)
+	return true, fmt.Errorf("tab %s is still hidden after bringing it to the front; input to it would be lost", id)
+}
+
+// TargetID is the CDP target ID of the connection's tab, the ID `--tab` takes.
+func TargetID(ctx context.Context, conn *CDPConn) (string, error) {
+	result, err := conn.call(ctx, "Target.getTargetInfo", map[string]interface{}{})
+	if err != nil {
+		return "", fmt.Errorf("TargetID: %w", err)
+	}
+	var resp struct {
+		TargetInfo struct {
+			TargetID string `json:"targetId"`
+		} `json:"targetInfo"`
+	}
+	if err := json.Unmarshal(result, &resp); err != nil {
+		return "", fmt.Errorf("TargetID: unmarshal: %w", err)
+	}
+	return resp.TargetInfo.TargetID, nil
 }
 
 func GetURL(ctx context.Context, conn *CDPConn) (string, error) {
@@ -945,8 +1002,14 @@ func typeText(ctx context.Context, conn *CDPConn, value string) error {
 // reads the value back and errors when the old value was kept or the field is
 // empty.
 func Fill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
+	if done, err := fillNative(ctx, conn, node.Id, value); done || err != nil {
+		return err
+	}
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("Fill: click to focus: %w", err)
+	}
+	if err := checkFocused(ctx, conn, node.Id); err != nil {
+		return fmt.Errorf("Fill: %w", err)
 	}
 	sel, err := selectAllActive(ctx, conn)
 	if err != nil {
@@ -1028,8 +1091,13 @@ func readInputValue(ctx context.Context, conn *CDPConn, id string) (string, bool
 
 // ClearAndFill focuses node, clears its current value via the native JS setter
 // (the way to empty a React-controlled input whose state ignores a selection),
-// then types value using keystroke events.
+// then types value using keystroke events. An input whose entry is not typed
+// characters (date, time, color, range, see fillNative) has its value set
+// instead.
 func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode, value string) error {
+	if done, err := fillNative(ctx, conn, node.Id, value); done || err != nil {
+		return err
+	}
 	if _, _, err := Click(ctx, conn, node); err != nil {
 		return fmt.Errorf("ClearAndFill: click to focus: %w", err)
 	}
@@ -1048,9 +1116,95 @@ func ClearAndFill(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNo
 	return verifyFilled(ctx, conn, node.Id, value, before)
 }
 
+// fillNative sets the value of an input of a type that typing cannot enter (see
+// __smIsNativeValueType in actions.js) with the native HTMLInputElement value
+// setter, firing input and change, and reports whether it handled node. Chrome
+// routes typed characters into such a control's segmented editor, which mangles
+// them. It reads the value back as Fill does: a value the control would not
+// take (a malformed date sanitizes to "") is an error, a clamped one is not. It
+// is not done for a node with no id, a non-input, or a text input, which keep
+// the keystroke path; a lookup that fails is left for that path to report. The
+// input is looked up in whichever frame holds it.
+func fillNative(ctx context.Context, conn *CDPConn, id, value string) (done bool, err error) {
+	if id == "" {
+		return false, nil
+	}
+	valJSON, _ := json.Marshal(value)
+	raw, _, evalErr := evalForID(ctx, conn, id, actionsJS+fmt.Sprintf("\n__smSetValueIfNative(%s, %s)", idSelectorJSON(id), valJSON))
+	if evalErr != nil {
+		return false, nil
+	}
+	var res struct {
+		Native  bool   `json:"native"`
+		Type    string `json:"type"`
+		Blocked bool   `json:"blocked"`
+		Value   string `json:"value"`
+	}
+	if json.Unmarshal(raw, &res) != nil || !res.Native {
+		return false, nil
+	}
+	if res.Blocked {
+		return true, fmt.Errorf("fill: %q is a disabled or read-only %s input", id, res.Type)
+	}
+	if nativeValueRejected(res.Type, value, res.Value) {
+		return true, fmt.Errorf("fill: the %s input did not accept %q (it holds %q); give it the format its value takes, such as 2027-04-16 for a date", res.Type, value, res.Value)
+	}
+	return true, nil
+}
+
+// nativeValueRejected reports whether a native-value input of the given type
+// refused want and kept got instead. The date-like types sanitize a value they
+// cannot parse to "". A color input sanitizes one to "#000000" and a range input
+// to its midpoint, so for those the empty check never fires: a color holds
+// exactly the (lowercased) value it was given, and a range was given a number
+// unless it is not one. A range may still clamp a number into its bounds, which
+// is accepted.
+func nativeValueRejected(typ, want, got string) bool {
+	if want == "" {
+		return false
+	}
+	switch typ {
+	case "color":
+		return !strings.EqualFold(got, want)
+	case "range":
+		_, err := strconv.ParseFloat(want, 64)
+		return err != nil
+	}
+	return got == ""
+}
+
+// focusProblem is what __smFocusProblem reports for the document holding an
+// element: why keyboard focus is not on a field there.
+type focusProblem struct {
+	Nothing bool   `json:"nothing"`
+	Reason  string `json:"reason"`
+}
+
+// checkFocused confirms the click that was meant to focus id did. It errors
+// only when focus stayed on the page itself (activeElement is BODY), which is
+// what a click leaves when it never reached the page or hit something that
+// takes no focus: typing would go nowhere. Focus on another kind of element
+// (a contenteditable) is a field to type into, and an unreadable state is not
+// an error.
+func checkFocused(ctx context.Context, conn *CDPConn, id string) error {
+	if id == "" {
+		return nil
+	}
+	raw, _, err := evalForID(ctx, conn, id, actionsJS+"\n__smFocusProblem()")
+	if err != nil {
+		return nil
+	}
+	var p *focusProblem
+	if json.Unmarshal(raw, &p) != nil || p == nil || !p.Nothing {
+		return nil
+	}
+	return fmt.Errorf("clicking %q did not focus it: %s", id, p.Reason)
+}
+
 // clearActiveElement clears the focused element of the document holding id (the
 // top document when id is empty or not found in a frame) and returns the value
-// it had.
+// it had. It errors, saying so, when what has focus is not a field it can
+// clear.
 func clearActiveElement(ctx context.Context, conn *CDPConn, id string) (string, error) {
 	script := actionsJS + "\n__smClearActiveElement()"
 	var raw json.RawMessage
@@ -1063,9 +1217,15 @@ func clearActiveElement(ctx context.Context, conn *CDPConn, id string) (string, 
 	if err != nil {
 		return "", err
 	}
-	var before string
-	_ = json.Unmarshal(raw, &before)
-	return before, nil
+	var res struct {
+		Ok     bool   `json:"ok"`
+		Reason string `json:"reason"`
+		Old    string `json:"old"`
+	}
+	if json.Unmarshal(raw, &res) == nil && !res.Ok && res.Reason != "" {
+		return "", fmt.Errorf("the field did not take focus: %s", res.Reason)
+	}
+	return res.Old, nil
 }
 
 // ScrollIntoView scrolls node into the visible viewport.
