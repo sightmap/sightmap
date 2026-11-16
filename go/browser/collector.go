@@ -1,12 +1,16 @@
 package browser
 
 import (
+	"cmp"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,11 +20,18 @@ import (
 	"github.com/sightmap/sightmap/go/sightmap"
 )
 
-// DefaultMaxEntries is the per-stream ring-buffer cap (console and network are
-// buffered independently). Sized so a normal session never overflows; only a
-// long burst — or a client that stays away for a while — drops the oldest
-// entries, which the query surface then reports as "N earlier entries dropped".
+// DefaultMaxEntries is the cap of each of the console ring and the main network
+// ring (every request except a successful static one; see DefaultMaxStatic). The
+// rings are independent. Sized so a normal session never overflows; only a long
+// burst — or a client that stays away for a while — drops the oldest entries,
+// which the query surface then reports as "N earlier network entries dropped".
 const DefaultMaxEntries = 1000
+
+// DefaultMaxStatic is the cap of the separate ring that holds successful static
+// requests (scripts, styles, images, fonts, ...). A dev server's page load
+// fetches hundreds of module scripts; kept apart, they can fill only this ring
+// and never evict the page's own calls from the main one.
+const DefaultMaxStatic = 1000
 
 // networkRecord is one buffered request/response: the tool-free sightmap.Request
 // the query surface returns, plus the CDP handle this tool keeps for lazy body
@@ -33,6 +44,10 @@ type networkRecord struct {
 
 	requestID string   // CDP requestId, for lazy body fetch
 	conn      *CDPConn // the collector connection that observed this request
+	// failed is set by Network.loadingFailed and is sticky: drain reads
+	// responseReceived and loadingFailed from separate channels, so a 200 can be
+	// applied after the failure, and the record must stay out of the static ring.
+	failed bool
 }
 
 // Collector attaches to every tab of a running Chrome session and buffers
@@ -43,18 +58,25 @@ type networkRecord struct {
 type Collector struct {
 	addr       string
 	maxEntries int
+	maxStatic  int
 	// ownPort is the port of this session's sightmap HTTP server (0: unknown).
 	// Requests to it are the tool's own traffic and are never buffered; see
 	// isOwnRequest.
 	ownPort int
 
-	mu             sync.Mutex
-	console        []sightmap.Message
+	mu      sync.Mutex
+	console []sightmap.Message
+	// network and static are two rings over one index space (nextNetwork), each
+	// ordered by Index. static holds requests of a static resource type that have
+	// not failed (see inStaticRing); network holds everything else. A record moves
+	// between them when its response or failure settles which it belongs to.
 	network        []networkRecord
+	static         []networkRecord
 	nextConsole    int
 	nextNetwork    int
 	consoleDropped int
 	networkDropped int
+	staticDropped  int
 
 	tabsMu sync.Mutex
 	tabs   map[string]*tabColl
@@ -116,6 +138,7 @@ func NewCollector(addr string) *Collector {
 	return &Collector{
 		addr:       addr,
 		maxEntries: DefaultMaxEntries,
+		maxStatic:  DefaultMaxStatic,
 		tabs:       make(map[string]*tabColl),
 		ctx:        ctx,
 		cancel:     cancel,
@@ -265,6 +288,7 @@ func (c *Collector) attachTab(tabID string) {
 	reqCh := conn.Subscribe("Network.requestWillBeSent")
 	respCh := conn.Subscribe("Network.responseReceived")
 	finishedCh := conn.Subscribe("Network.loadingFinished")
+	failedCh := conn.Subscribe("Network.loadingFailed")
 
 	// Enable the domains after subscribing so buffered replays aren't missed.
 	if err := conn.EnableDomain(ctx, "Runtime"); err != nil {
@@ -290,7 +314,7 @@ func (c *Collector) attachTab(tabID string) {
 	c.wg.Add(1)
 	c.tabsMu.Unlock()
 
-	go c.drain(ctx, tabID, conn, consoleCh, excCh, reqCh, respCh, finishedCh)
+	go c.drain(ctx, tabID, conn, consoleCh, excCh, reqCh, respCh, finishedCh, failedCh)
 
 	// A newly-attached tab (a fresh tab, or the initial one) must carry every
 	// persistent script so injection survives new tabs, not just navigations
@@ -301,7 +325,7 @@ func (c *Collector) attachTab(tabID string) {
 // drain funnels one tab's CDP events into the shared buffers until ctx is
 // cancelled. It does minimal work per event so the cap-8 subscription channels
 // don't drop during bursts.
-func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, consoleCh, excCh, reqCh, respCh, finishedCh <-chan json.RawMessage) {
+func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, consoleCh, excCh, reqCh, respCh, finishedCh, failedCh <-chan json.RawMessage) {
 	defer c.wg.Done()
 	for {
 		select {
@@ -340,6 +364,10 @@ func (c *Collector) drain(ctx context.Context, tabID string, conn *CDPConn, cons
 				c.wg.Add(1)
 				go c.retainResponseBody(ctx, conn, reqID)
 			}
+		case raw := <-failedCh:
+			if reqID, failed := parseLoadingFailed(raw); failed {
+				c.failRequest(reqID)
+			}
 		}
 	}
 }
@@ -361,43 +389,148 @@ func (c *Collector) addNetwork(e networkRecord) {
 	defer c.mu.Unlock()
 	e.Index = c.nextNetwork
 	c.nextNetwork++
-	c.network = append(c.network, e)
+	c.place(e)
+}
+
+// place puts e in the ring inStaticRing picks for it, keeping that ring ordered
+// by Index and within its cap. A request of a static type enters the static ring
+// while still pending: waiting for its response would let a burst of pending
+// module requests evict the page's calls from the main ring first. Caller must
+// hold c.mu.
+func (c *Collector) place(e networkRecord) {
+	if inStaticRing(e) {
+		c.static = insertByIndex(c.static, e)
+		if over := len(c.static) - c.maxStatic; over > 0 {
+			c.static = c.static[over:]
+			c.staticDropped += over
+		}
+		return
+	}
+	c.network = insertByIndex(c.network, e)
 	if over := len(c.network) - c.maxEntries; over > 0 {
 		c.network = c.network[over:]
 		c.networkDropped += over
 	}
 }
 
+// insertByIndex inserts e into ring, which is ordered by Index. A new record is
+// the newest and lands at the end; a record moving between rings can land
+// earlier.
+func insertByIndex(ring []networkRecord, e networkRecord) []networkRecord {
+	i, _ := slices.BinarySearchFunc(ring, e.Index, func(r networkRecord, index int) int { return cmp.Compare(r.Index, index) })
+	return slices.Insert(ring, i, e)
+}
+
+// staticTypes are the CDP resource types of page assets as opposed to the
+// page's own calls (Document, XHR, Fetch, EventSource, WebSocket, Other, ...).
+var staticTypes = map[string]bool{
+	"script": true, "stylesheet": true, "image": true, "font": true,
+	"media": true, "manifest": true, "texttrack": true,
+}
+
+// isStaticType reports whether a CDP resource type names a page asset.
+// Case-insensitive; an empty or unknown type is not static.
+func isStaticType(resourceType string) bool {
+	return staticTypes[strings.ToLower(resourceType)]
+}
+
+// inStaticRing reports whether a record belongs in the static ring: a static
+// type that has not failed. A request still waiting for its response (status 0)
+// counts as not failed. Success is 2xx or 304, so a 404 script, a 5xx stylesheet
+// and a script whose load failed (r.failed, whatever status arrived) stay in the
+// main ring, where a person looking for what went wrong finds them. This is the
+// one rule for which ring a record is in; place and settle both apply it.
+func inStaticRing(r networkRecord) bool {
+	if r.failed || !isStaticType(r.ResourceType) {
+		return false
+	}
+	return r.Status == 0 || (r.Status >= 200 && r.Status < 300) || r.Status == http.StatusNotModified
+}
+
+// recordByReqID finds the buffered record with the given CDP requestId in either
+// ring, returning which ring (static) and the position in it. A redirect reuses
+// its requestId for each hop, so the newest record (highest Index) wins. It walks
+// both rings from the tail in descending Index order and stops at the first
+// match, so a live request costs only the entries newer than it, not a scan of
+// the ring it isn't in. Caller must hold c.mu.
+func (c *Collector) recordByReqID(reqID string) (static bool, i int, ok bool) {
+	mi, si := len(c.network)-1, len(c.static)-1
+	for mi >= 0 || si >= 0 {
+		if mi < 0 || (si >= 0 && c.static[si].Index > c.network[mi].Index) {
+			if c.static[si].requestID == reqID {
+				return true, si, true
+			}
+			si--
+		} else {
+			if c.network[mi].requestID == reqID {
+				return false, mi, true
+			}
+			mi--
+		}
+	}
+	return false, -1, false
+}
+
+// record returns a pointer into the ring recordByReqID named; it is valid only
+// until the next insert or move. Caller must hold c.mu.
+func (c *Collector) record(static bool, i int) *networkRecord {
+	if static {
+		return &c.static[i]
+	}
+	return &c.network[i]
+}
+
+// settle moves the record at (static, i) to the other ring if its type and
+// status now say it belongs there. Caller must hold c.mu.
+func (c *Collector) settle(static bool, i int) {
+	r := *c.record(static, i)
+	if inStaticRing(r) == static {
+		return
+	}
+	if static {
+		c.static = slices.Delete(c.static, i, i+1)
+	} else {
+		c.network = slices.Delete(c.network, i, i+1)
+	}
+	c.place(r)
+}
+
+// failRequest handles a Network.loadingFailed: a request that never finished
+// loading (refused, DNS, blocked, aborted by a script, or cut off after its
+// headers) is not a successful static resource. It is marked failed, which moves
+// it to the main ring and keeps it there whatever response is applied after.
+func (c *Collector) failRequest(reqID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	static, i, ok := c.recordByReqID(reqID)
+	if !ok {
+		return
+	}
+	c.record(static, i).failed = true
+	c.settle(static, i)
+}
+
 // applyResponse matches a response back to its pending request and fills in
 // status, type, response headers, and the observed request→response duration.
+// The response also settles which ring the record belongs in.
 func (c *Collector) applyResponse(info responseInfo) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	i := c.networkIndexByReqID(info.reqID)
-	if i < 0 {
+	static, i, ok := c.recordByReqID(info.reqID)
+	if !ok {
 		return
 	}
-	c.network[i].Status = info.status
-	c.network[i].StatusText = info.statusText
+	r := c.record(static, i)
+	r.Status = info.status
+	r.StatusText = info.statusText
 	if info.rtype != "" {
-		c.network[i].ResourceType = info.rtype
+		r.ResourceType = info.rtype
 	}
-	c.network[i].RspHeaders = info.headers
-	if ts := c.network[i].Ts; ts > 0 {
-		c.network[i].DurationMs = time.Now().UnixMilli() - ts
+	r.RspHeaders = info.headers
+	if ts := r.Ts; ts > 0 {
+		r.DurationMs = time.Now().UnixMilli() - ts
 	}
-}
-
-// networkIndexByReqID returns the index of the network record with the given
-// CDP requestId, or -1 if none is buffered. Scans from the tail, where a match
-// almost always is. Caller must hold c.mu.
-func (c *Collector) networkIndexByReqID(reqID string) int {
-	for i := len(c.network) - 1; i >= 0; i-- {
-		if c.network[i].requestID == reqID {
-			return i
-		}
-	}
-	return -1
+	c.settle(static, i)
 }
 
 // ConsoleFilter narrows a Console query.
@@ -428,34 +561,49 @@ func (c *Collector) Console(f ConsoleFilter) ([]sightmap.Message, int) {
 
 // NetworkFilter narrows a Network query.
 type NetworkFilter struct {
-	ResourceType string // exact resourceType match (case-insensitive), or "" for all
-	URLSubstr    string // case-insensitive URL substring, or "" for all
-	Tab          string // exact tab match, or "" for all
-	Limit        int    // keep only the most recent N (0 = all)
+	ResourceType  string         // exact resourceType match (case-insensitive), or "" for all
+	URLSubstr     string         // case-insensitive URL substring, or "" for all
+	URLPattern    *regexp.Regexp // URL must match, or nil for all
+	Tab           string         // exact tab match, or "" for all
+	Limit         int            // keep only the most recent N (0 = all)
+	IncludeStatic bool           // also return successful static requests (see inStaticRing); implied by a static ResourceType
+}
+
+// NetworkDrops counts the entries each ring has dropped from its front.
+type NetworkDrops struct {
+	Main   int
+	Static int // always 0 unless the query covered the static ring
 }
 
 // Network returns the buffered network entries matching f (oldest→newest) plus
-// the number dropped from the front of the ring.
-func (c *Collector) Network(f NetworkFilter) ([]sightmap.Request, int) {
+// the number dropped from the front of each ring the query covers. Successful
+// static requests are left out unless f.IncludeStatic, or f.ResourceType names a
+// static type: asking for scripts by type means the successful ones too.
+func (c *Collector) Network(f NetworkFilter) ([]sightmap.Request, NetworkDrops) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	rt := strings.ToLower(f.ResourceType)
 	sub := strings.ToLower(f.URLSubstr)
-	out := make([]sightmap.Request, 0, len(c.network))
-	for _, e := range c.network {
-		if rt != "" && strings.ToLower(e.ResourceType) != rt {
-			continue
-		}
-		if sub != "" && !strings.Contains(strings.ToLower(e.URL), sub) {
-			continue
-		}
-		if f.Tab != "" && e.Tab != f.Tab {
-			continue
-		}
-		out = append(out, e.Request)
+	match := func(e networkRecord) bool {
+		return (rt == "" || strings.ToLower(e.ResourceType) == rt) &&
+			(sub == "" || strings.Contains(strings.ToLower(e.URL), sub)) &&
+			(f.URLPattern == nil || f.URLPattern.MatchString(e.URL)) &&
+			(f.Tab == "" || e.Tab == f.Tab)
 	}
-	out = tailLimit(out, f.Limit)
-	return out, c.networkDropped
+	records := c.network
+	drops := NetworkDrops{Main: c.networkDropped}
+	if f.IncludeStatic || isStaticType(f.ResourceType) {
+		records = slices.Concat(c.network, c.static)
+		slices.SortFunc(records, func(a, b networkRecord) int { return cmp.Compare(a.Index, b.Index) })
+		drops.Static = c.staticDropped
+	}
+	out := make([]sightmap.Request, 0, len(records))
+	for _, e := range records {
+		if match(e) {
+			out = append(out, e.Request)
+		}
+	}
+	return tailLimit(out, f.Limit), drops
 }
 
 // ResponseBody fetches the response body for the network entry with the given
@@ -497,12 +645,14 @@ func (c *Collector) RequestBody(ctx context.Context, index int) ([]byte, bool, e
 func (c *Collector) bodyLookup(index int, pick func(networkRecord) *sightmap.Body) (retained []byte, reqID string, conn *CDPConn, found bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for i := range c.network {
-		if c.network[i].Index == index {
-			if b := pick(c.network[i]); b != nil {
-				return []byte(b.Content), "", nil, true
+	for _, ring := range [][]networkRecord{c.network, c.static} {
+		for i := range ring {
+			if ring[i].Index == index {
+				if b := pick(ring[i]); b != nil {
+					return []byte(b.Content), "", nil, true
+				}
+				return nil, ring[i].requestID, ring[i].conn, true
 			}
-			return nil, c.network[i].requestID, c.network[i].conn, true
 		}
 	}
 	return nil, "", nil, false
@@ -519,14 +669,15 @@ func (c *Collector) retainResponseBody(ctx context.Context, conn *CDPConn, reqID
 	defer c.wg.Done()
 
 	c.mu.Lock()
-	i := c.networkIndexByReqID(reqID)
+	static, i, found := c.recordByReqID(reqID)
 	var rtype, ctype string
-	if i >= 0 {
-		rtype = c.network[i].ResourceType
-		ctype = contentTypeFromHeaders(c.network[i].RspHeaders)
+	if found {
+		r := c.record(static, i)
+		rtype = r.ResourceType
+		ctype = contentTypeFromHeaders(r.RspHeaders)
 	}
 	c.mu.Unlock()
-	if i < 0 || !wantsBody(rtype) {
+	if !found || !wantsBody(rtype) {
 		return
 	}
 
@@ -536,8 +687,8 @@ func (c *Collector) retainResponseBody(ctx context.Context, conn *CDPConn, reqID
 	}
 
 	c.mu.Lock()
-	if i := c.networkIndexByReqID(reqID); i >= 0 {
-		c.network[i].RspBody = &sightmap.Body{
+	if static, i, ok := c.recordByReqID(reqID); ok {
+		c.record(static, i).RspBody = &sightmap.Body{
 			Content:     string(body),
 			Size:        len(body),
 			ContentType: ctype,
@@ -579,9 +730,11 @@ func contentTypeFromHeaders(hs []sightmap.Header) string {
 func (c *Collector) lookupRequest(index int) (string, *CDPConn, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	for _, e := range c.network {
-		if e.Index == index {
-			return e.requestID, e.conn, true
+	for _, ring := range [][]networkRecord{c.network, c.static} {
+		for _, e := range ring {
+			if e.Index == index {
+				return e.requestID, e.conn, true
+			}
 		}
 	}
 	return "", nil, false
@@ -872,6 +1025,23 @@ func parseLoadingFinished(raw json.RawMessage) string {
 		return ""
 	}
 	return ev.RequestID
+}
+
+// parseLoadingFailed extracts the requestId from a Network.loadingFailed event
+// and reports whether it is a failure worth surfacing. A request the browser
+// cancelled (the page navigated away mid-load, so every in-flight module script
+// is aborted) is not: it says nothing about the app. A cancellation with a
+// blockedReason (CSP, mixed content, CORS) is.
+func parseLoadingFailed(raw json.RawMessage) (reqID string, failed bool) {
+	var ev struct {
+		RequestID     string `json:"requestId"`
+		Canceled      bool   `json:"canceled"`
+		BlockedReason string `json:"blockedReason"`
+	}
+	if json.Unmarshal(raw, &ev) != nil || ev.RequestID == "" {
+		return "", false
+	}
+	return ev.RequestID, !ev.Canceled || ev.BlockedReason != ""
 }
 
 // responseInfo is the parsed Network.responseReceived event, applied back onto
