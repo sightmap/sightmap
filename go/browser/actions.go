@@ -844,9 +844,10 @@ func Click(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) (in
 // recorded go stale as soon as anything scrolls.
 func Hover(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) error {
 	bounds := node.Bounds
+	var f *Frame
 	if node.Id != "" {
-		if fresh, err := ResolveBySightmapID(ctx, conn, node.Id); err == nil {
-			bounds = fresh.Bounds
+		if fresh, ff, err := resolveInFrame(ctx, conn, node.Id); err == nil {
+			bounds, f = fresh, ff
 		}
 	}
 	if bounds == nil {
@@ -854,10 +855,6 @@ func Hover(ctx context.Context, conn *CDPConn, node *sightmap.ComponentNode) err
 	}
 	x := bounds.X + bounds.Width/2
 	y := bounds.Y + bounds.Height/2
-	var f *Frame
-	if node.Id != "" {
-		f, _ = frameOfID(ctx, conn, node.Id)
-	}
 	p, err := mousePointFor(ctx, f, x, y)
 	if err != nil {
 		return err

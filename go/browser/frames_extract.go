@@ -205,10 +205,13 @@ func (p *cdpPage) attachFrames(ctx context.Context, fs *frameSet, topDOM *extrac
 			continue
 		}
 
-		url := f.URL
-		if isBlankURL(url) {
-			url = effective[f.Parent]
+		// The document hosting f is the top one (not in effective: its URL is the
+		// frame tree's) or a frame attached before f, parents coming first.
+		hostURL := f.Parent.URL
+		if u, ok := effective[f.Parent]; ok {
+			hostURL = u
 		}
+		url := frameMatchURL(f.URL, hostURL)
 		effective[f] = url
 		stitchFrame(ownerNode, froot, url, fp.ox, fp.oy, fp.visible)
 		indexIDs(froot, byID)

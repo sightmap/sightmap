@@ -91,9 +91,12 @@ func evalForID(ctx context.Context, conn *CDPConn, id, script string) (json.RawM
 // scroll of an element inside a cross-process frame reaches the enclosing
 // documents asynchronously, so the origin read straight after it can be the
 // one from before; the origin is read until two reads 40 ms apart agree. A
-// frame in the top process settles on the second read.
+// frame in the top process has no such delay and is read once.
 func settleOrigin(ctx context.Context, f *Frame) (ox, oy float64, err error) {
 	ox, oy, err = f.Origin(ctx)
+	if !f.crossProcess() {
+		return ox, oy, err
+	}
 	for range 25 {
 		if err != nil {
 			return 0, 0, err

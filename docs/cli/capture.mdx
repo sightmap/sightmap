@@ -55,22 +55,6 @@ The probe ID is a handle for the [interaction commands](/cli/interaction). Compo
 sightmap snapshot --url 'https://example.com/products/outdoor'
 ```
 
-#### Iframes
-
-Widgets, embedded dashboards and checkout forms live in iframes, often in another origin and often nested. `snapshot` (and every command that extracts a tree: `capture`, `inspect`, `explain`, `gap`, `suggest`) descends into all of them by default.
-
-```text Snapshot excerpt
-70 Iframe "destination_dates view"
-  1_9 Iframe
-    2_13 [DateWindows destination="seville"]
-      2_26 [DateWindow start="2027-03-03" end="2027-03-06"]
-```
-
-- **IDs carry a frame prefix.** The top document's IDs are bare numbers; the Nth frame's are `N_…`. The [interaction commands](/cli/interaction) take them like any other ID and resolve the frame themselves.
-- **A frame is matched as a page of its own, at its own URL.** The view whose `route` matches the frame's URL supplies its components, not the page's view, so a widget host's sandbox path needs a view of its own in the corpus. A selector never crosses a frame boundary, in either direction. A `srcdoc` or `about:blank` frame takes its parent's URL. A masked or blocked `<iframe>` masks or blocks its whole document.
-- **Bounds are in top-page coordinates**, so a frame's boxes line up with a screenshot of the page.
-- **Size.** Descending is the default, with a cap per frame (`--frame-max-nodes`, 3000) and per page (`--max-frames`, 32), so one oversized ad or embedded document cannot swamp the snapshot; whatever is cut is reported in `[Frames]`. `--no-frames` turns it off. Frames whose `<iframe>` has no box (`display: none`) or a 0×0 viewport are skipped silently.
-
 ```text Snapshot excerpt
 [View: ProductListPage]
 route: /products/**
@@ -128,6 +112,22 @@ Component `properties:` (shown as `prop="val"` in the annotated output and inclu
 <Tip>
 Defaults for `--wait`, `--trace`, and `--include-hidden` can be set once in `.sightmap/config.yaml` (`snapshot.wait`, `snapshot.trace`, `snapshot.include_hidden`) instead of repeating them per invocation. Async-rendered pages that populate after load usually need `--wait 1` or `--wait 2`.
 </Tip>
+
+#### Iframes
+
+Widgets, embedded dashboards and checkout forms live in iframes, often in another origin and often nested. `snapshot` (and every command that extracts a tree: `capture`, `inspect`, `explain`, `gap`, `suggest`) descends into all of them by default.
+
+```text Snapshot excerpt
+70 Iframe "destination_dates view"
+  1_9 Iframe
+    2_13 [DateWindows destination="seville"]
+      2_26 [DateWindow start="2027-03-03" end="2027-03-06"]
+```
+
+- **IDs carry a frame prefix.** The top document's IDs are bare numbers; the Nth frame's are `N_…`. The [interaction commands](/cli/interaction) take them like any other ID and resolve the frame themselves.
+- **A frame is matched as a page of its own, at its own URL.** The view whose `route` matches the frame's URL supplies its components, not the page's view, so a widget host's sandbox path needs a view of its own in the corpus. A selector never crosses a frame boundary, in either direction. A `srcdoc` or `about:blank` frame takes its parent's URL. A masked or blocked `<iframe>` masks or blocks its whole document.
+- **Bounds are in top-page coordinates**, so a frame's boxes line up with a screenshot of the page.
+- **Size.** Descending is the default, with a cap per frame (`--frame-max-nodes`, 3000) and per page (`--max-frames`, 32), so one oversized ad or embedded document cannot swamp the snapshot; whatever is cut is reported in `[Frames]`. `--no-frames` turns it off. Frames whose `<iframe>` has no box (`display: none`) or a 0×0 viewport are skipped silently.
 
 ---
 

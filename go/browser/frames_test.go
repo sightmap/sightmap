@@ -47,6 +47,23 @@ func TestStitchFrame(t *testing.T) {
 	}
 }
 
+// A frame with no URL of its own is matched at its host's, whether the host is
+// the top page or another frame; an empty FrameURL would make the frame's
+// document an ordinary subtree of its <iframe> instead of a page of its own.
+func TestFrameMatchURL(t *testing.T) {
+	for _, tc := range []struct{ name, own, host, want string }{
+		{"own URL wins", "https://w.example/x", "https://p.example/", "https://w.example/x"},
+		{"srcdoc takes the host's", "about:srcdoc", "https://p.example/", "https://p.example/"},
+		{"about:blank takes the host's", "about:blank", "https://p.example/", "https://p.example/"},
+		{"empty takes the host's", "", "https://p.example/", "https://p.example/"},
+		{"blank host stays blank-but-set", "about:srcdoc", "about:blank", "about:blank"},
+	} {
+		if got := frameMatchURL(tc.own, tc.host); got != tc.want {
+			t.Errorf("%s: frameMatchURL(%q, %q) = %q, want %q", tc.name, tc.own, tc.host, got, tc.want)
+		}
+	}
+}
+
 func TestIndexIframesOnlyTakesIframeElements(t *testing.T) {
 	doc := &extract.DOMNode{NodeName: "#document", FrameID: "top", Children: []*extract.DOMNode{{
 		NodeName: "HTML", FrameID: "top", Children: []*extract.DOMNode{
@@ -113,5 +130,22 @@ func TestFrameOptionsDefaults(t *testing.T) {
 	c.SetFrameOptions(FrameOptions{MaxNodes: 7})
 	if o := c.frameOptions(); o.MaxNodes != 7 || o.MaxFrames != DefaultMaxFrames {
 		t.Errorf("options after set = %+v, want MaxNodes 7 and the default frame cap", o)
+	}
+}
+
+// A frame needs the settle wait only if it, or a frame enclosing it, has a
+// session of its own.
+func TestFrameCrossProcess(t *testing.T) {
+	top := &Frame{ID: "top"}
+	same := &Frame{ID: "same", Parent: top}
+	oop := &Frame{ID: "oop", session: "s1", Parent: top}
+	inOOP := &Frame{ID: "in", session: "s1", Parent: oop}
+	for _, tc := range []struct {
+		f    *Frame
+		want bool
+	}{{top, false}, {same, false}, {oop, true}, {inOOP, true}} {
+		if got := tc.f.crossProcess(); got != tc.want {
+			t.Errorf("%s: crossProcess = %v, want %v", tc.f.ID, got, tc.want)
+		}
 	}
 }

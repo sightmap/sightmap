@@ -195,6 +195,17 @@ type Frame struct {
 // the session's default execution context and its own DOM document.
 func (f *Frame) ownRoot() bool { return f.Parent == nil || f.Parent.session != f.session }
 
+// crossProcess reports whether f, or a frame enclosing it, lives in a CDP
+// session of its own, which is to say in another process than the top page.
+func (f *Frame) crossProcess() bool {
+	for g := f; g != nil; g = g.Parent {
+		if g.session != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // descendants lists f's children, depth-first in discovery order.
 func (f *Frame) descendants() []*Frame {
 	var out []*Frame
@@ -355,6 +366,10 @@ func (f *Frame) ownerBackendID(ctx context.Context) (int64, error) {
 // read from the live layout every time, so it is right at the moment of the
 // call whatever scrolled since the last one; the cost is a round trip per level
 // of nesting.
+//
+// Each level's origin is the top-left of its <iframe>'s content box, and a point
+// inside the frame is added to it unscaled, so an iframe under a CSS transform
+// that scales it is not located correctly.
 func (f *Frame) Origin(ctx context.Context) (ox, oy float64, err error) {
 	for g := f; g.Parent != nil; g = g.Parent {
 		x, y, err := g.ownerBox(ctx)
@@ -420,4 +435,14 @@ func (f *Frame) ownersShow(ctx context.Context, x, y float64) (bool, error) {
 // its parent's, as a srcdoc document's base URL does.
 func isBlankURL(u string) bool {
 	return u == "" || strings.HasPrefix(u, "about:")
+}
+
+// frameMatchURL is the URL a frame's document is matched at: its own, except
+// that a document with none (about:blank, srcdoc) takes the URL of the document
+// that hosts it.
+func frameMatchURL(own, hostURL string) string {
+	if isBlankURL(own) {
+		return hostURL
+	}
+	return own
 }
