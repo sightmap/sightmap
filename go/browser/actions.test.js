@@ -433,6 +433,13 @@ describe("__smDragPrepare", () => {
     });
   });
 
+  test("force scrolls a source that is fully visible in its own viewport", () => {
+    const el = card();
+    document.elementFromPoint = jest.fn().mockReturnValue(el);
+    __smDragPrepare("#card", null, null, true);
+    expect(el.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
   test("scrolls a source that is below the viewport", () => {
     const el = card();
     box(el, 20, 950, 300, 118);
@@ -520,5 +527,24 @@ describe("__smDropCheck", () => {
       hit: false,
       covered: "",
     });
+  });
+});
+
+describe("__smFocusBySelector", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("scrolls to and focuses the element, reporting that it exists", () => {
+    document.body.innerHTML = '<input id="in">';
+    const el = document.getElementById("in");
+    el.scrollIntoView = jest.fn();
+    expect(__smFocusBySelector("#in")).toBe(true);
+    expect(el.scrollIntoView).toHaveBeenCalled();
+    expect(document.activeElement).toBe(el);
+  });
+
+  test("returns false when nothing matches", () => {
+    expect(__smFocusBySelector("#missing")).toBe(false);
   });
 });

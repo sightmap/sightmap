@@ -54,7 +54,9 @@ function __smFullyVisible(el) {
 // scrolled to the center of the viewport only when it is not already fully
 // visible: scrolling a visible element moves the layout the caller measured the
 // drop target in (an inner list scrolls under its header and the target's top
-// ends up clipped).
+// ends up clipped). force scrolls it regardless: for an element in a frame,
+// "fully visible" is judged in the frame's own viewport, and the frame itself
+// can still be off the top page's screen.
 //
 // With an offset (offX/offY, from the element's top-left corner) that is the
 // point; hit says whether the element is what is top-most there. Without one it
@@ -63,10 +65,10 @@ function __smFullyVisible(el) {
 // button, a link, an input), because pressing those starts a click or a focus,
 // not a drag. It falls back to the center. Returns null when the element is
 // gone.
-function __smDragPrepare(sel, offX, offY) {
+function __smDragPrepare(sel, offX, offY, force) {
   const el = __smDeepQuery(document, sel);
   if (!el) return null;
-  if (!__smFullyVisible(el)) {
+  if (force || !__smFullyVisible(el)) {
     el.scrollIntoView({
       block: "center",
       inline: "center",
@@ -172,6 +174,16 @@ function __smScrollIntoViewBySelector(sel) {
     const el = __smDeepQuery(document, sel);
     if (el) el.scrollIntoView({ block: "center", behavior: "instant" });
   } catch (_) {}
+}
+
+// __smFocusBySelector gives the element keyboard focus (and reports whether it
+// exists), for a keypress that should land on it without a click.
+function __smFocusBySelector(sel) {
+  const el = __smDeepQuery(document, sel);
+  if (!el) return false;
+  el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+  if (typeof el.focus === "function") el.focus();
+  return true;
 }
 
 function __smSelectorExists(sel) {

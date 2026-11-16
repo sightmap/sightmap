@@ -274,9 +274,34 @@ func (m *Matcher) ConflictsCached(cache *ClaimCache, root *sightmap.ComponentNod
 // matchCached is MatchConflictsCached; without names it skips resolving
 // properties, which only names need.
 func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, pageURL string, names bool) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict) {
-	entry := m.entryFor(pageURL)
-	if root == nil || len(entry.queries) == 0 {
+	if root == nil {
 		return nil, nil
+	}
+	var result map[*sightmap.ComponentNode]*sightmap.ComponentMatch
+	var out []sightmap.Conflict
+	eachDoc(root, pageURL, func(d frameDoc) []frameDoc {
+		r, c, frames := m.matchCachedDoc(cache, d, names)
+		out = append(out, c...)
+		switch {
+		case r == nil:
+		case result == nil:
+			result = r
+		default:
+			for n, cm := range r {
+				result[n] = cm
+			}
+		}
+		return frames
+	})
+	return result, out
+}
+
+// matchCachedDoc is matchCached for one document (see matchDoc).
+func (m *Matcher) matchCachedDoc(cache *ClaimCache, d frameDoc, names bool) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict, []frameDoc) {
+	root := d.root
+	entry := m.entryFor(d.url)
+	if len(entry.queries) == 0 {
+		return nil, nil, framesIn(root, d.inherit)
 	}
 	qs := entry.combined
 	full := m.entrySet(entry, cache)
@@ -350,11 +375,15 @@ func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, p
 	// Then the walk Match makes, node by node in document order, from the
 	// claims instead of the NFA.
 	var out []sightmap.Conflict
+	var frames []frameDoc
 	result := make(map[*sightmap.ComponentNode]*sightmap.ComponentMatch)
 	defByNode := make(map[*sightmap.ComponentNode]*sightmap.ComponentDef)
 	var eff []int
 	var declared map[*sightmap.ComponentNode]int
 	sightmap.Walk(root, func(node *sightmap.ComponentNode, depth int) bool {
+		if depth > 0 && node.IsFrameRoot() {
+			return false // a document of its own; the caller matches it
+		}
 		local := rankNone
 		var watched []string
 		var watchDef []*sightmap.ComponentDef
@@ -369,12 +398,13 @@ func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, p
 				watched = append(watched, q.Name)
 			}
 		}
-		parent := rankNone
+		parent := d.inherit
 		if depth > 0 {
 			parent = eff[depth-1]
 		}
 		e := foldRank(parent, local)
 		eff = append(eff[:depth], e)
+		frames = append(frames, framesOf(node, e)...)
 		if local != rankNone {
 			if declared == nil {
 				declared = map[*sightmap.ComponentNode]int{}
@@ -405,10 +435,10 @@ func (m *Matcher) matchCached(cache *ClaimCache, root *sightmap.ComponentNode, p
 		return true
 	})
 	if !names {
-		return nil, out
+		return nil, out, frames
 	}
-	resolveComponentProperties(&propResolver{root: root, result: result, defByNode: defByNode, declared: declared})
-	return result, out
+	resolveComponentProperties(&propResolver{root: root, result: result, defByNode: defByNode, declared: declared, rootRank: d.inherit})
+	return result, out, frames
 }
 
 // entrySet is entry.combined as a missingSet, its key ids interned once per

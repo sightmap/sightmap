@@ -14,6 +14,9 @@ type propResolver struct {
 	defByNode map[*sightmap.ComponentNode]*sightmap.ComponentDef
 	// declared is the strictest privacy declared on each node that has one.
 	declared map[*sightmap.ComponentNode]int
+	// rootRank is the privacy root inherits from the element hosting its
+	// document (rankNone for a page's top document).
+	rootRank int
 	index    *treeIndex                      // built on first use
 	ranks    map[*sightmap.ComponentNode]int // effective ranks of unnamed nodes, folded on first use
 }
@@ -25,7 +28,7 @@ func (r *propResolver) privacy(n *sightmap.ComponentNode) string {
 	if cm := r.result[n]; cm != nil {
 		return cm.Privacy
 	}
-	if r.declared == nil {
+	if r.declared == nil && r.rootRank == rankNone {
 		return ""
 	}
 	return rankNames[r.rank(n)]
@@ -35,7 +38,7 @@ func (r *propResolver) rank(n *sightmap.ComponentNode) int {
 	if e, ok := r.ranks[n]; ok {
 		return e
 	}
-	parent := rankNone
+	parent := r.rootRank
 	if p := r.treeIndex().parent[n]; p != nil {
 		parent = r.rank(p)
 	}
@@ -280,7 +283,9 @@ func resolvePathAll(
 				continue
 			}
 			for _, child := range n.Children {
-				collectNamed(child, seg.Name, result, add)
+				if !child.IsFrameRoot() {
+					collectNamed(child, seg.Name, result, add)
+				}
 			}
 		}
 		if len(next) == 0 {
@@ -301,7 +306,9 @@ func collectNamed(
 		emit(node)
 	}
 	for _, child := range node.Children {
-		collectNamed(child, name, result, emit)
+		if !child.IsFrameRoot() {
+			collectNamed(child, name, result, emit)
+		}
 	}
 }
 
@@ -334,6 +341,9 @@ func firstDescendantNamed(
 	result map[*sightmap.ComponentNode]*sightmap.ComponentMatch,
 ) *sightmap.ComponentNode {
 	for _, child := range root.Children {
+		if child.IsFrameRoot() {
+			continue // another document: its components are not this one's descendants
+		}
 		if found := searchNamed(child, name, result); found != nil {
 			return found
 		}
@@ -350,6 +360,9 @@ func searchNamed(
 		return node
 	}
 	for _, child := range node.Children {
+		if child.IsFrameRoot() {
+			continue
+		}
 		if found := searchNamed(child, name, result); found != nil {
 			return found
 		}
