@@ -262,7 +262,7 @@ describe("__smClearActiveElement", () => {
     input.addEventListener("input", onInput);
     input.addEventListener("change", onChange);
 
-    expect(__smClearActiveElement()).toBe("hello");
+    expect(__smClearActiveElement()).toEqual({ ok: true, old: "hello" });
 
     expect(input.value).toBe("");
     expect(onInput).toHaveBeenCalledTimes(1);
@@ -277,7 +277,10 @@ describe("__smClearActiveElement", () => {
     const onInput = jest.fn();
     ta.addEventListener("input", onInput);
 
-    expect(__smClearActiveElement()).toBe("Reminder scheduling overhaul");
+    expect(__smClearActiveElement()).toEqual({
+      ok: true,
+      old: "Reminder scheduling overhaul",
+    });
 
     expect(ta.value).toBe("");
     expect(onInput).toHaveBeenCalledTimes(1);
@@ -320,21 +323,26 @@ describe("__smClearActiveElement", () => {
     Object.defineProperty(ce, "isContentEditable", { value: true });
     const onInput = jest.fn();
     ce.addEventListener("input", onInput);
-    expect(__smClearActiveElement()).toBe("hello");
+    expect(__smClearActiveElement()).toEqual({ ok: true, old: "hello" });
     expect(ce.textContent).toBe("");
     expect(onInput).toHaveBeenCalledTimes(1);
   });
 
-  test("throws when nothing is focused", () => {
-    document.body.innerHTML = "<div></div>";
-    document.activeElement && document.activeElement.blur();
-    expect(() => __smClearActiveElement()).toThrow(/nothing is focused/);
+  test("reports, rather than throws, when nothing has focus", () => {
+    document.body.innerHTML = '<input id="in" value="keep" />';
+    document.activeElement.blur();
+    const res = __smClearActiveElement();
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/nothing has focus/);
+    expect(document.getElementById("in").value).toBe("keep");
   });
 
-  test("throws when the focused element has no value", () => {
+  test("reports, rather than throws, when a non-field has focus", () => {
     document.body.innerHTML = '<button id="b">x</button>';
     document.getElementById("b").focus();
-    expect(() => __smClearActiveElement()).toThrow(/no value to clear/);
+    const res = __smClearActiveElement();
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/<button>/);
   });
 });
 
@@ -433,6 +441,13 @@ describe("__smDragPrepare", () => {
     });
   });
 
+  test("force scrolls a source that is fully visible in its own viewport", () => {
+    const el = card();
+    document.elementFromPoint = jest.fn().mockReturnValue(el);
+    __smDragPrepare("#card", null, null, true);
+    expect(el.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
   test("scrolls a source that is below the viewport", () => {
     const el = card();
     box(el, 20, 950, 300, 118);
@@ -520,5 +535,120 @@ describe("__smDropCheck", () => {
       hit: false,
       covered: "",
     });
+  });
+});
+
+describe("__smFocusProblem", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("is null when a field has focus", () => {
+    document.body.innerHTML = '<input id="in">';
+    document.getElementById("in").focus();
+    expect(__smFocusProblem()).toBeNull();
+  });
+
+  test("says nothing has focus when the page itself does", () => {
+    document.body.innerHTML = '<input id="in">';
+    document.activeElement.blur();
+    expect(__smFocusProblem().nothing).toBe(true);
+  });
+
+  test("says another kind of element has focus, without calling it nothing", () => {
+    document.body.innerHTML = '<button id="b">x</button>';
+    document.getElementById("b").focus();
+    const p = __smFocusProblem();
+    expect(p.nothing).toBe(false);
+    expect(p.reason).toMatch(/not an input or textarea/);
+  });
+});
+
+describe("__smSetValueIfNative", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test.each([
+    ["date", "2027-04-16"],
+    ["time", "14:45"],
+    ["datetime-local", "2027-04-16T14:45"],
+    ["month", "2027-04"],
+    ["week", "2027-W15"],
+    ["color", "#ff0000"],
+    ["range", "7"],
+  ])("sets a %s input natively and fires input then change", (type, value) => {
+    document.body.innerHTML = `<input id="in" type="${type}">`;
+    const input = document.getElementById("in");
+    const seen = [];
+    input.addEventListener("input", () => seen.push("input"));
+    input.addEventListener("change", () => seen.push("change"));
+
+    expect(__smSetValueIfNative("#in", value)).toEqual({
+      native: true,
+      type,
+      blocked: false,
+      value,
+    });
+    expect(input.value).toBe(value);
+    expect(seen).toEqual(["input", "change"]);
+  });
+
+  test("leaves text-like inputs, textareas and other elements to typing", () => {
+    document.body.innerHTML =
+      '<input id="t" type="text"><input id="e" type="email"><textarea id="a"></textarea><div id="d"></div>';
+    for (const id of ["t", "e", "a", "d"]) {
+      expect(__smSetValueIfNative("#" + id, "x")).toEqual({ native: false });
+    }
+    expect(document.getElementById("t").value).toBe("");
+    expect(__smSetValueIfNative("#missing", "x")).toEqual({ native: false });
+  });
+
+  test("reports the sanitized value when the control cannot take it", () => {
+    document.body.innerHTML = '<input id="in" type="date" value="2027-04-09">';
+    const res = __smSetValueIfNative("#in", "next tuesday");
+    expect(res.native).toBe(true);
+    expect(res.value).toBe("");
+  });
+
+  test("refuses a disabled or read-only control", () => {
+    document.body.innerHTML =
+      '<input id="d" type="date" disabled value="2027-04-09"><input id="r" type="date" readonly value="2027-04-09">';
+    expect(__smSetValueIfNative("#d", "2028-01-01").blocked).toBe(true);
+    expect(__smSetValueIfNative("#r", "2028-01-01").blocked).toBe(true);
+    expect(document.getElementById("d").value).toBe("2027-04-09");
+  });
+
+  test("works through React-style value tracking by using the prototype setter", () => {
+    document.body.innerHTML = '<input id="in" type="date">';
+    const input = document.getElementById("in");
+    // A framework shadows the instance's value property; an assignment to it is
+    // swallowed, the prototype setter is not.
+    Object.defineProperty(input, "value", { set() {}, get: () => "stuck" });
+    __smSetValueIfNative("#in", "2027-04-16");
+    const proto = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    );
+    expect(proto.get.call(input)).toBe("2027-04-16");
+  });
+});
+
+describe("__smFocusBySelector", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("scrolls to and focuses the element, reporting that it exists", () => {
+    document.body.innerHTML = '<input id="in">';
+    const el = document.getElementById("in");
+    el.scrollIntoView = jest.fn();
+    expect(__smFocusBySelector("#in")).toBe(true);
+    expect(el.scrollIntoView).toHaveBeenCalled();
+    expect(document.activeElement).toBe(el);
+  });
+
+  test("returns false when nothing matches", () => {
+    expect(__smFocusBySelector("#missing")).toBe(false);
   });
 });

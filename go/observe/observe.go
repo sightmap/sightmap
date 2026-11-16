@@ -40,6 +40,21 @@ type Result struct {
 	// ComponentConflicts holds DOM nodes claimed by more than one distinct
 	// component definition (first-match-wins keeps only one; the rest are dropped).
 	ComponentConflicts []sightmap.Conflict
+
+	// Frames lists the child frame documents in the tree, outermost first, with
+	// the view the corpus resolves each frame's own URL to (nil: none). A frame
+	// is matched as a page of its own, so its components come from that view.
+	Frames []FrameInfo
+	// Notes says what extraction left out of the frames: a frame cut at its node
+	// cap, frames past the frame cap, a frame that could not be read.
+	Notes []string
+}
+
+// FrameInfo is one child frame document of a snapshot.
+type FrameInfo struct {
+	Root *sightmap.ComponentNode // the frame document's root
+	URL  string                  // the URL it is matched at
+	View *sightmap.ViewDef       // the view that URL resolves to; nil when none or no corpus
 }
 
 // Options controls how a page is observed.
@@ -59,7 +74,7 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 	if err != nil {
 		return nil, err
 	}
-	root, err := browser.ExtractComponents(ctx, page)
+	root, notes, err := browser.ExtractComponentsNotes(ctx, page)
 	if err != nil {
 		return nil, err
 	}
@@ -68,13 +83,25 @@ func Page(ctx context.Context, conn *browser.CDPConn, corpus *sightmap.Corpus, o
 		return nil, err
 	}
 
-	return apply(root, url, corpus, opts), nil
+	res := apply(root, url, corpus, opts)
+	res.Notes = notes
+	return res, nil
 }
 
 // apply annotates an extracted tree with corpus (when non-nil). It is the
 // browser-free half of Page.
 func apply(root *sightmap.ComponentNode, url string, corpus *sightmap.Corpus, opts Options) *Result {
 	res := &Result{Root: root, URL: url}
+	sightmap.Walk(root, func(n *sightmap.ComponentNode, _ int) bool {
+		if n.IsFrameRoot() {
+			fi := FrameInfo{Root: n, URL: n.FrameURL}
+			if corpus != nil {
+				fi.View = corpus.ViewForURL(n.FrameURL)
+			}
+			res.Frames = append(res.Frames, fi)
+		}
+		return true
+	})
 	if corpus == nil {
 		return res
 	}

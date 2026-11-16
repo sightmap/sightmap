@@ -78,6 +78,25 @@ func parseFlagsInterspersed(fs *flag.FlagSet, args []string) error {
 	return fs.Parse(append(flags, positionals...))
 }
 
+// foreground brings the connected tab to the front when it is hidden, before a
+// command that sends input to it. Chrome hit-tests and focuses only on the
+// visible tab, so a click or keystroke sent to a background one is accepted and
+// does nothing. It says so on stderr when it had to.
+func foreground(ctx context.Context, conn *browser.CDPConn) error {
+	moved, err := browser.EnsureVisible(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if moved {
+		msg := "brought tab to front"
+		if id, err := browser.TargetID(ctx, conn); err == nil && id != "" {
+			msg = "brought tab " + id + " to front"
+		}
+		fmt.Fprintln(os.Stderr, msg)
+	}
+	return nil
+}
+
 // ── click ─────────────────────────────────────────────────────────────────────
 
 func runClick(args []string) error {
@@ -97,6 +116,9 @@ func runClick(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	if *xFlag >= 0 && *yFlag >= 0 {
 		if err := browser.ClickAt(ctx, conn, *xFlag, *yFlag); err != nil {
@@ -149,6 +171,9 @@ func runFill(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	node, err := resolveTarget(ctx, conn, *sightmapDirFlag, fs.Arg(0))
 	if err != nil {
@@ -184,6 +209,9 @@ func runHover(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	if *xFlag >= 0 && *yFlag >= 0 {
 		if err := browser.HoverAt(ctx, conn, *xFlag, *yFlag); err != nil {
@@ -212,17 +240,18 @@ func runKeyPress(args []string) error {
 	fs := flag.NewFlagSet("keypress", flag.ContinueOnError)
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: browser keypress KEY | MODIFIER+...+KEY\n" +
+		return fmt.Errorf("usage: browser keypress KEY | MODIFIER+...+KEY [COMPONENT-ID | 'ComponentQuery']\n" +
 			"  KEY: a character (c C 5 . ? [), a code name (KeyC Digit1 Period BracketLeft),\n" +
 			"       or a named key (Enter Tab Escape Space Backspace Delete Home End PageUp PageDown\n" +
 			"       ArrowUp ArrowDown ArrowLeft ArrowRight F1-F12)\n" +
 			"  MODIFIER: Shift Control|Ctrl Alt|Option Meta|Cmd|Command ControlOrMeta\n" +
-			"  examples: Escape  Shift+KeyV  Meta+K  Alt+Shift+P  Ctrl+r  ControlOrMeta+Enter")
+			"  examples: Escape  Shift+KeyV  Meta+K  Alt+Shift+P  Ctrl+r  ControlOrMeta+Enter\n" +
+			"  the optional target is given keyboard focus first, in whichever frame holds it")
 	}
 
 	ctx := context.Background()
@@ -231,7 +260,19 @@ func runKeyPress(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
+	if fs.NArg() > 1 {
+		node, err := resolveTarget(ctx, conn, *sightmapDirFlag, fs.Arg(1))
+		if err != nil {
+			return err
+		}
+		if err := browser.Focus(ctx, conn, node); err != nil {
+			return err
+		}
+	}
 	if err := browser.KeyPress(ctx, conn, fs.Arg(0)); err != nil {
 		return err
 	}
@@ -262,6 +303,9 @@ func runScroll(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	if *compID != "" {
 		node, resolveErr := resolveTarget(ctx, conn, *sightmapDirFlag, *compID)
@@ -328,6 +372,9 @@ func runDrag(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	var src *sightmap.ComponentNode
 	if *toFlag != "" {

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -125,6 +126,31 @@ func TestScreenshotWithOptions_FullPagePinsLayoutWidth(t *testing.T) {
 // unless SIGHTMAP_CHROME_E2E=1.
 func fullPageChrome(t *testing.T) (context.Context, *CDPConn) {
 	t.Helper()
+	ctx, addr := chromeBrowser(t)
+	return ctx, chromeTab(t, ctx, addr)
+}
+
+// chromeTab opens a tab in the browser at addr, retrying until its CDP endpoint
+// is up, and closes the connection when the test ends.
+func chromeTab(t *testing.T, ctx context.Context, addr string) *CDPConn {
+	t.Helper()
+	for {
+		if ctx.Err() != nil {
+			t.Fatal("Chrome's CDP endpoint never came up")
+		}
+		if _, conn, err := CreateTab(ctx, addr, ""); err == nil {
+			t.Cleanup(func() { conn.Close() })
+			return conn
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// chromeBrowser starts a headless Chrome at a 700x600 window, DPR 2, and returns
+// a context bounding the test and the CDP endpoint's address (not necessarily up
+// yet: open tabs with chromeTab). It skips unless SIGHTMAP_CHROME_E2E=1.
+func chromeBrowser(t *testing.T) (context.Context, string) {
+	t.Helper()
 	if os.Getenv("SIGHTMAP_CHROME_E2E") == "" {
 		t.Skip("set SIGHTMAP_CHROME_E2E=1 to run against a real Chrome")
 	}
@@ -141,13 +167,9 @@ func fullPageChrome(t *testing.T) (context.Context, *CDPConn) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	port, err := FindFreePort(9600)
-	if err != nil {
-		t.Fatal(err)
-	}
 	cmd := exec.Command(bin, "--headless=new", "--no-first-run", "--no-default-browser-check",
 		"--disable-gpu", "--no-sandbox", "--window-size=700,600", "--force-device-scale-factor=2",
-		fmt.Sprintf("--remote-debugging-port=%d", port), "--user-data-dir="+profile, "about:blank")
+		"--remote-debugging-port=0", "--user-data-dir="+profile, "about:blank")
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -156,24 +178,28 @@ func fullPageChrome(t *testing.T) (context.Context, *CDPConn) {
 		_, _ = cmd.Process.Wait()
 		_ = os.RemoveAll(profile)
 	})
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	t.Cleanup(cancel)
-	var conn *CDPConn
-	for conn == nil {
+	// Chrome picks its own port (0) and writes it to DevToolsActivePort in the
+	// profile. A port probed beforehand is not held, so tests run as separate
+	// processes (go test ./..., or several at once) could be handed the same one
+	// and drive each other's browser.
+	var addr string
+	for addr == "" {
 		if ctx.Err() != nil {
-			t.Fatal("Chrome's CDP endpoint never came up")
+			t.Fatal("Chrome never wrote its DevToolsActivePort")
 		}
-		if _, c, err := CreateTab(ctx, addr, ""); err == nil {
-			conn = c
-		} else {
-			time.Sleep(200 * time.Millisecond)
+		if b, err := os.ReadFile(filepath.Join(profile, "DevToolsActivePort")); err == nil {
+			if port, _, ok := strings.Cut(string(b), "\n"); ok && port != "" {
+				addr = "127.0.0.1:" + port
+			}
+		}
+		if addr == "" {
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	t.Cleanup(func() { conn.Close() })
-
-	return ctx, conn
+	return ctx, addr
 }
 
 // TestFullPageScreenshotMatchesLayout_Chrome checks against a real Chrome

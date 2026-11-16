@@ -87,6 +87,44 @@ tree). Each line starts with a numeric component ID, then the node content:
 Properties are sorted alphabetically. The accessible name is shown last inside
 brackets when not suppressed (an exact match with a property value).
 
+### Iframes
+
+A snapshot descends into every iframe — same-origin, cross-origin (a separate
+process) and nested at any depth — and hangs each frame's tree under its
+`Iframe` node, so an MCP Apps widget's controls show up as ordinary components:
+
+```
+70 Iframe "destination_dates view"
+  1_9 Iframe
+    2_13 [DateWindows destination="seville"]
+      2_26 [DateWindow start="2027-03-03" end="2027-03-06"]
+```
+
+- **Ids carry a frame prefix.** The top document's ids are bare (`42`); the Nth
+  frame's are `N_…` (`2_26`). Click, fill, hover, drag, keypress, scroll, `bounds`,
+  `wait-for` and `screenshot --component` all take them like any other id, and
+  find the right frame. Bounds are in top-page coordinates, and a click's point
+  is worked out from the live layout right before it is sent, so it lands after
+  a scroll. A click refuses (`covered by another element`) when something in the
+  page is drawn over the frame at that point. `drag` works the same way, but
+  its source and target must be in one document or in frames of one process.
+- **A frame is matched as a page of its own, at its own URL** — so the corpus
+  view whose route matches the *frame's* URL (e.g. a widget host's `/sandbox`)
+  supplies its components, not the page's view. A selector does not cross a
+  frame boundary in either direction. A `srcdoc` / `about:blank` frame takes its
+  parent's URL. A masked or blocked `<iframe>` masks or blocks its document.
+- **A `[Frames]` section** lists each frame document (its root id, URL, and the
+  view that URL resolved to) and then any `⚠` notes about what was left out.
+  `no view matched` on a frame means the corpus has no view for the frame's
+  path: add one (a widget's route is its host's sandbox path).
+- **Size.** Each frame is capped at 3000 nodes and a page at 32 frames; a frame
+  past the cap is cut and the `[Frames]` notes say so. `--frame-max-nodes N` and
+  `--max-frames N` change the caps; `--no-frames` leaves frames out (an `Iframe`
+  is a leaf, the old behaviour). Chrome gives out-of-process frames to the
+  session on its own; nothing to configure.
+- `keypress KEY <id-or-query>` focuses the target first (in its frame); with no
+  target the key goes to whatever is focused.
+
 The `[View: …]` header may be followed by a `tags:` line: the union of tags
 across every view whose route matches the page. A component the corpus marks
 `privacy: block` or `mask` renders **without** its content properties or AX
@@ -107,9 +145,9 @@ probe ID from snapshot output **or** a component query (see below):
 |---------|-------------|
 | `sightmap browser click <id>` | Click element by probe ID |
 | `sightmap browser click 'ComponentQuery'` | Click element by sightmap identity (preferred on dynamic pages) |
-| `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing. Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
+| `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing (date/time/color/range inputs are set, not typed). Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
-| `sightmap browser keypress Enter` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)) |
+| `sightmap browser keypress Enter [<id-or-query>]` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)); with a target, focus it first (in whichever frame holds it) |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |
@@ -282,6 +320,14 @@ fails loudly when nothing editable is focused instead of typing on regardless.
 ```bash
 sightmap browser fill --clear 'SearchInput' 'burrito'
 ```
+
+**`browser fill` sets, not types, date/time/color/range inputs.**
+Typing into `<input type=date>` goes through Chrome's segmented year/month/day editor and mangles the value. For `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range`, `fill` sets the value whole (native setter, then `input` and `change`), including in iframes, and reads it back. Pass the format the control stores: `fill 214 2027-04-16`, not `04/16/2027`. A value the control can't parse errors rather than leaving the field empty.
+
+**Input commands foreground a hidden tab.**
+Chrome is reported to hit-test and focus only on the visible tab, so a click sent to a background one could print success and do nothing. `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` now bring a hidden `--tab` to the front first and print `brought tab ID to front` on stderr; the tab stays in front.
+
+**`fill` errors when its click did not focus the field** (`did not focus it`), instead of typing into nothing; `fill --clear` says `the field did not take focus` where it used to print a raw JS exception.
 
 **`browser click` scrolls the target into view and refuses off-screen / covered clicks.**
 `click` scrolls the element to the center of the viewport, then verifies its center is actually the top-most element there before dispatching. It **errors** (rather than silently no-op'ing) when the target can't be positioned in the viewport, or is `covered by another element` — the signal of an open overlay/modal or a target you need to reveal first. The confirmation line reports the real post-scroll coordinates it clicked.

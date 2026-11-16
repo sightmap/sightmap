@@ -87,6 +87,9 @@ func buildTreeIndex(root *sightmap.ComponentNode) *treeIndex {
 			}
 		}
 		for _, c := range n.Children {
+			if c.IsFrameRoot() {
+				continue // an id or label in another document is not this one's
+			}
 			ix.parent[c] = n
 			walk(c)
 		}

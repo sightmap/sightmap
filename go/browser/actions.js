@@ -54,7 +54,9 @@ function __smFullyVisible(el) {
 // scrolled to the center of the viewport only when it is not already fully
 // visible: scrolling a visible element moves the layout the caller measured the
 // drop target in (an inner list scrolls under its header and the target's top
-// ends up clipped).
+// ends up clipped). force scrolls it regardless: for an element in a frame,
+// "fully visible" is judged in the frame's own viewport, and the frame itself
+// can still be off the top page's screen.
 //
 // With an offset (offX/offY, from the element's top-left corner) that is the
 // point; hit says whether the element is what is top-most there. Without one it
@@ -63,10 +65,10 @@ function __smFullyVisible(el) {
 // button, a link, an input), because pressing those starts a click or a focus,
 // not a drag. It falls back to the center. Returns null when the element is
 // gone.
-function __smDragPrepare(sel, offX, offY) {
+function __smDragPrepare(sel, offX, offY, force) {
   const el = __smDeepQuery(document, sel);
   if (!el) return null;
-  if (!__smFullyVisible(el)) {
+  if (force || !__smFullyVisible(el)) {
     el.scrollIntoView({
       block: "center",
       inline: "center",
@@ -174,6 +176,16 @@ function __smScrollIntoViewBySelector(sel) {
   } catch (_) {}
 }
 
+// __smFocusBySelector gives the element keyboard focus (and reports whether it
+// exists), for a keypress that should land on it without a click.
+function __smFocusBySelector(sel) {
+  const el = __smDeepQuery(document, sel);
+  if (!el) return false;
+  el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+  if (typeof el.focus === "function") el.focus();
+  return true;
+}
+
 function __smSelectorExists(sel) {
   return !!__smDeepQuery(document, sel);
 }
@@ -228,16 +240,98 @@ function __smSelectActive() {
   return { selected: false, value: "" };
 }
 
+// __smNativeSetValue sets el.value through the setter of the element's own
+// prototype (input, textarea or select: HTMLInputElement's setter called on a
+// textarea throws "Illegal invocation"), which bypasses the instance-level
+// value tracking a framework like React installs (assigning el.value directly
+// is swallowed there), then fires the input and change events a user's edit
+// would.
+function __smNativeSetValue(el, value) {
+  const proto = [HTMLInputElement, HTMLTextAreaElement, HTMLSelectElement].find(
+    (C) => el instanceof C,
+  )?.prototype;
+  const setter = proto && Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  if (!setter) {
+    throw new Error(
+      "the focused <" + el.tagName.toLowerCase() + "> has no value to set",
+    );
+  }
+  setter.call(el, value);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+// __smIsNativeValueType says whether an <input> type is one whose entry
+// keystrokes cannot produce: a date, time or month control edits through
+// segmented fields that swallow typed characters (typing 2027-04-16 into a date
+// holding 2027-04-09 leaves "270416-04-09"), and a color picker or slider has no
+// text to type. `fill` sets their value instead of typing it. (A function, not
+// a top-level const: this script is evaluated again on every call, in the same
+// page, where a second const declaration is a SyntaxError.)
+function __smIsNativeValueType(type) {
+  return [
+    "date",
+    "time",
+    "datetime-local",
+    "month",
+    "week",
+    "color",
+    "range",
+  ].includes(type);
+}
+
+// __smSetValueIfNative sets the value of the <input> carrying the selector
+// natively, when __smIsNativeValueType, and fires input and change.
+// It returns {native:false} for anything else (text inputs keep the keystroke
+// path). Otherwise it reports the input's type and the value it holds
+// afterwards: the browser sanitizes a value it cannot parse (a malformed date)
+// to "" and clamps one out of range, so the caller sees what actually took.
+// `blocked` is set for a disabled or read-only control a user could not edit.
+function __smSetValueIfNative(sel, value) {
+  const el = __smDeepQuery(document, sel);
+  if (!el || !(el instanceof HTMLInputElement)) return { native: false };
+  const type = (el.type || "text").toLowerCase();
+  if (!__smIsNativeValueType(type)) return { native: false };
+  if (el.disabled || el.readOnly) return { native: true, type, blocked: true };
+  __smNativeSetValue(el, value);
+  return { native: true, type, blocked: false, value: el.value };
+}
+
+// __smFocusProblem says why the focused element cannot be typed into, or is
+// null when focus is on a field. `nothing` means focus is on the page itself
+// (activeElement is BODY): what a click leaves behind when it never reached the
+// page (a hidden tab) or landed on something that cannot take focus.
+function __smFocusProblem() {
+  const a = __smActiveElement();
+  if (!a || a === document.body || a === document.documentElement) {
+    return {
+      nothing: true,
+      reason: `nothing has focus (activeElement is ${a ? a.tagName : "absent"}, visibilityState=${document.visibilityState})`,
+    };
+  }
+  if (!(a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement)) {
+    return {
+      nothing: false,
+      reason: `focus is on <${a.tagName.toLowerCase()}>, not an input or textarea`,
+    };
+  }
+  return null;
+}
+
 // __smClearActiveElement empties the focused input, textarea, select or
-// contenteditable and returns what it held, or throws when it cannot. Inputs go
-// through the native value setter of the element's own prototype, which is what
-// React-controlled fields listen to: HTMLInputElement's setter called on a
-// textarea throws "Illegal invocation", so the setter is picked by the
-// element, not by whichever prototype has one.
+// contenteditable and returns {ok:true, old} with what it held, or
+// {ok:false, reason} when nothing it can clear has focus (so the caller can say
+// the field did not take focus, rather than the page's exception). Inputs go
+// through __smNativeSetValue, which is what React-controlled fields listen to.
 function __smClearActiveElement() {
   const el = __smActiveElement();
-  if (!el || el === document.body || el === document.documentElement) {
-    throw new Error("nothing is focused to clear");
+  const problem = __smFocusProblem();
+  if (
+    problem &&
+    (problem.nothing ||
+      !(el.isContentEditable || el instanceof HTMLSelectElement))
+  ) {
+    return { ok: false, reason: problem.reason };
   }
   if (el.isContentEditable && el.value == null) {
     const old = el.textContent || "";
@@ -250,20 +344,9 @@ function __smClearActiveElement() {
     el.dispatchEvent(
       new InputEvent("input", { bubbles: true, inputType: "deleteContent" }),
     );
-    return old;
-  }
-  const proto = [HTMLInputElement, HTMLTextAreaElement, HTMLSelectElement].find(
-    (C) => el instanceof C,
-  )?.prototype;
-  const setter = proto && Object.getOwnPropertyDescriptor(proto, "value")?.set;
-  if (!setter) {
-    throw new Error(
-      "the focused <" + el.tagName.toLowerCase() + "> has no value to clear",
-    );
+    return { ok: true, old };
   }
   const old = String(el.value);
-  setter.call(el, "");
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-  el.dispatchEvent(new Event("change", { bubbles: true }));
-  return old;
+  __smNativeSetValue(el, "");
+  return { ok: true, old };
 }

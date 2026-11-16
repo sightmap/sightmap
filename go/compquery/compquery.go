@@ -168,6 +168,12 @@ func FindCandidates(
 	var out []*sightmap.ComponentNode
 	var walk func(node *sightmap.ComponentNode, ancestors []*sightmap.ComponentNode)
 	walk = func(node *sightmap.ComponentNode, ancestors []*sightmap.ComponentNode) {
+		// A frame is a page of its own: an ancestor outside it does not scope a
+		// component inside it (see match/frames.go), so the chain starts afresh
+		// at the frame's document.
+		if node.IsFrameRoot() {
+			ancestors = nil
+		}
 		if satisfies(node, target, matches, props) && subsequence(prefix, ancestors, matches, props) {
 			out = append(out, node)
 		}
