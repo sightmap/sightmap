@@ -174,7 +174,7 @@ func project(n componentState, fields []string) map[string]any {
 		if n.Text != "" {
 			out["text"] = n.Text
 		}
-		if n.Focused {
+		if _, own := n.Props["focused"]; n.Focused && !own {
 			out["focused"] = true
 		}
 		return out
@@ -190,8 +190,12 @@ func project(n componentState, fields []string) map[string]any {
 }
 
 // field reads one named value off a component: a corpus property, or one of the
-// built-ins text, visible, focused.
+// built-ins text, visible, focused. The corpus wins: an app whose rows carry
+// their own `focused` (a data-focused hook) keeps its meaning.
 func field(n componentState, name string) (string, bool) {
+	if v, ok := n.Props[name]; ok {
+		return v, true
+	}
 	switch name {
 	case "text":
 		return n.Text, true
@@ -200,8 +204,7 @@ func field(n componentState, name string) (string, bool) {
 	case "focused":
 		return strconv.FormatBool(n.Focused), true
 	}
-	v, ok := n.Props[name]
-	return v, ok
+	return "", false
 }
 
 // nearMiss says what the page has instead, for a query that matched nothing:
@@ -471,11 +474,11 @@ func propCondition(qs, spec string) (condition, error) {
 			desc: fmt.Sprintf("%s %s%s%q", qs, name, op, val),
 			ok: func(st *pageState) bool {
 				return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool {
-					if name == "text" || name == "visible" || name == "focused" {
-						v, _ := field(n, name)
-						return pred.Match(map[string]string{name: v}) != neg
+					v, ok := field(n, name)
+					if !ok {
+						return neg // a missing property is never equal, so != holds
 					}
-					return pred.Match(n.Props) != neg
+					return pred.Match(map[string]string{name: v}) != neg
 				})
 			},
 			observed: func(st *pageState) string { return observedField(st, name) },

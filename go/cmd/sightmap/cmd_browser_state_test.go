@@ -62,6 +62,19 @@ func TestPropCondition(t *testing.T) {
 	}
 }
 
+func TestCorpusPropertyShadowsBuiltin(t *testing.T) {
+	n := componentState{Props: map[string]string{"focused": ""}, Focused: false}
+	if v, _ := field(n, "focused"); v != "" {
+		t.Errorf("field focused = %q, want the corpus value \"\"", v)
+	}
+	if v, _ := field(componentState{Focused: true}, "focused"); v != "true" {
+		t.Errorf("built-in focused = %q, want true", v)
+	}
+	if _, ok := project(n, nil)["focused"]; !ok {
+		t.Error("project dropped the corpus focused property")
+	}
+}
+
 func TestCountCondition(t *testing.T) {
 	st := &pageState{Nodes: make([]componentState, 3)}
 	for spec, want := range map[string]bool{"3": true, "2": false, ">=2": true, ">=4": false, "<=3": true, "<=2": false} {
