@@ -49,6 +49,12 @@ func runBrowser(args []string) error {
 		return runHover(args[1:])
 	case "keypress", "key-press":
 		return runKeyPress(args[1:])
+	case "keys":
+		return runKeys(args[1:])
+	case "get":
+		return runGet(args[1:])
+	case "expect":
+		return runExpect(args[1:])
 	case "scroll":
 		return runScroll(args[1:])
 	case "drag":
@@ -99,6 +105,7 @@ Interaction (IDs from sightmap snapshot output):
   keypress KEY | MOD+...+KEY          one key or a chord: c  KeyC  Escape  Shift+KeyV  Meta+K  Alt+Shift+P  ControlOrMeta+Enter
                                       (mods: Shift Control/Ctrl Alt/Option Meta/Cmd ControlOrMeta; keys: a character, a code name
                                       like KeyC/Digit1/Period, Enter Tab Escape Space Home End PageUp/Down Arrow* F1-F12)
+  keys     KEY... [--type TEXT] [--focus QUERY]   a key sequence in one call: keys g m   keys Meta+k --type prio Enter
   scroll   [--component-id ID] [--delta-x N] [--delta-y N]
   drag        SOURCE (--to TARGET [--to-position above|below|center] | --delta-x N --delta-y N) [--steps N] [--from-offset X,Y]
                 pointer drag: scrolls SOURCE into view, presses inside it, moves in N steps (default 10), releases
@@ -106,6 +113,11 @@ Interaction (IDs from sightmap snapshot output):
   dialog      accept|dismiss [--text INPUT]
   screenshot  [--out FILE] [--stdout] [--full-page | --component NAME | --selector SEL] [--expand-pct N]
   bounds      QUERY... | --selector SEL | --all   viewport-% bounding boxes (JSON)
+
+State (component queries against the corpus; use these instead of eval):
+  get     QUERY... [--props a,b] [--count]     each match's corpus properties, text, focus as JSON lines; 'page' = url + title
+  expect  [QUERY] [--prop k=v] [--text S] [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--title T] [--timeout-ms N]
+                                               wait until every condition holds (default 5 s); on timeout print what was seen, exit 1
 
 Session utilities:
   clear-storage [--origin URL]   wipe cookies + storage (reset session state)
