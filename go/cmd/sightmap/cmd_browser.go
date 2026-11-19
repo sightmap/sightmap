@@ -56,6 +56,8 @@ func runBrowser(args []string) error {
 		return runGet(args[1:])
 	case "expect":
 		return runExpect(args[1:])
+	case "run":
+		return runRun(args[1:])
 	case "scroll":
 		return runScroll(args[1:])
 	case "drag":
@@ -123,6 +125,8 @@ State (component queries against the corpus; use these instead of eval):
   expect  [QUERY] [--prop k=v] [--text S] [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--title T] [--timeout-ms N]
                                                wait until every condition holds (default 5 s); on timeout print what was seen, exit 1
                                                e.g. expect Toast --text 'Reverted.'   expect 'Row[id=7]' --prop text*=Done
+  run     FILE|- [--keep-going] [--quiet]      browser steps, one per line (navigate /path --settle, keys j, expect ...);
+                                               stops at the first failing step and says which, with the page it was on
 
 Session utilities:
   clear-storage [--origin URL]   wipe cookies + storage (reset session state)

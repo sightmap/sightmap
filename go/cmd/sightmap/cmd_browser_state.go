@@ -105,14 +105,15 @@ func runGet(args []string) error {
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
-	propsFlag := fs.String("props", "", "Comma-separated properties to print (default: all; 'text', 'visible' and 'focused' work too)")
+	propsFlag := fs.String("props", "", "Comma-separated properties to print (default: all, with text cut to 80 characters; 'text', 'visible' and 'focused' work too)")
 	countFlag := fs.Bool("count", false, "Print only how many components match")
+	limitFlag := fs.Int("limit", 25, "Print at most N matches (0 = all); the rest are counted")
 	queries, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(queries) == 0 {
-		return fmt.Errorf("usage: browser get QUERY... [--props a,b] [--count]\n" +
+		return fmt.Errorf("usage: browser get QUERY... [--props a,b] [--count] [--limit N]\n" +
 			"  prints each match's corpus properties (and text, visibility, focus) as JSON, one line per match\n" +
 			"  QUERY: a component query (IssueRow, IssueRow[identifier=WEB-143], ViewBar Tab#1); 'page' prints url and title\n" +
 			"  examples: get 'IssueRow[identifier=WEB-143]' --props status,priority   get IssueRow --props identifier,group\n" +
@@ -155,8 +156,15 @@ func runGet(args []string) error {
 		if len(st.Nodes) == 0 {
 			return fmt.Errorf("get: no component matches %s%s", q, nearMiss(ctx, conn, *sightmapDirFlag, q))
 		}
-		for _, n := range st.Nodes {
+		shown := st.Nodes
+		if *limitFlag > 0 && len(shown) > *limitFlag {
+			shown = shown[:*limitFlag]
+		}
+		for _, n := range shown {
 			printJSONLine(project(n, fields))
+		}
+		if len(shown) < len(st.Nodes) {
+			fmt.Fprintf(os.Stderr, "... %d more %s (--limit 0 for all, --count for the number, or narrow the query)\n", len(st.Nodes)-len(shown), q)
 		}
 	}
 	return nil
@@ -172,7 +180,7 @@ func project(n componentState, fields []string) map[string]any {
 			out[k] = v
 		}
 		if n.Text != "" {
-			out["text"] = n.Text
+			out["text"] = clip(n.Text, 80)
 		}
 		if _, own := n.Props["focused"]; n.Focused && !own {
 			out["focused"] = true
@@ -374,8 +382,11 @@ func runExpect(args []string) error {
 		if err == nil {
 			last, lastErr = st, nil
 			if allHold(conds, st) {
-				for _, n := range st.Nodes {
-					printJSONLine(project(n, nil))
+				// The matches, when there are a few: a check that holds needs no list.
+				if len(st.Nodes) <= 3 {
+					for _, n := range st.Nodes {
+						printJSONLine(project(n, nil))
+					}
 				}
 				fmt.Fprintf(os.Stderr, "ok: %s\n", describe(conds))
 				return nil
@@ -710,6 +721,15 @@ func takeSettle(args []string) (bool, []string) {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+// clip shortens s to at most n runes, marking the cut.
+func clip(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n-1]) + "…"
+}
 
 // multiFlag collects a repeatable string flag.
 type multiFlag []string

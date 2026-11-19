@@ -24,6 +24,9 @@ instead of brittle CSS. To build or maintain the corpus itself, see the
   wait and the assertion: no `sleep`, no polling. With nothing specific to check, add
   `--settle` to the action (`navigate`, `click`, `fill`, `keys`, `drag`): it returns once the
   DOM has been quiet for 300 ms with no fetch in flight.
+- **re-check:** `browser run journey.steps` runs a list of these commands in one call and
+  stops at the first that fails, saying which and what the page showed. Write a journey
+  once, rerun it after every change (see [Journeys as scripts](#journeys-as-scripts-browser-run)).
 - **`browser screenshot`**: visual evidence; clip to one component with `--component`.
 - **`console` / `network`**: debug what the page logged and requested.
 - **`browser eval`** is the last resort, for what no verb covers. Reading a component's
@@ -292,12 +295,51 @@ sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
   origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter.
 - A query that matches nothing says what is there instead: `(8 IssueRow on the page;
   identifier is "WEB-130", "WEB-120", …)` or `none has a "focused" property`.
+- `get` prints at most 25 matches (`--limit N`, `0` for all; the rest are counted) with text
+  cut to 80 characters; ask for `--props` to print just what you need. A passing `expect`
+  prints the matches only when there are three or fewer.
 - Every match's `text` (its rendered text) comes with `get` by default and is checkable:
   `expect Toast --text 'Reverted.'`, `expect 'CommentCard#0' --prop text*=Looks`.
 - These read only what the corpus models. A value you can't get is a property to add to
   the corpus, which then serves `get`, `expect`, queries and snapshots alike.
 - `browser eval` prints a one-line `hint:` on stderr when its script reads component
   state, waits, or synthesizes clicks and keys: the verb that does it instead.
+
+## Journeys as scripts: `browser run`
+
+A journey you will check more than once (after each change, before each commit) goes in a
+file of browser steps, one per line, without the `sightmap browser` prefix:
+
+```bash
+cat > j8.steps <<'STEPS'
+# J8: peek and keyboard navigation
+navigate /?reset --settle
+navigate /my-issues/assigned --settle
+keys j
+expect 'IssueRow[identifier=WEB-130]' --prop focused=focused
+keys Space --settle
+expect IssuePeek --text WEB-130
+keys s 5 --settle
+expect 'IssueRow[identifier=WEB-130]' --prop group=status:done
+keys Escape --settle
+expect IssuePeek --gone
+STEPS
+sightmap browser run j8.steps --quiet     # "all 10 steps passed in 7.2s", or:
+# step 6 (line 7) failed: expect IssuePeek --text WEB-130
+#   want IssuePeek text contains "WEB-130"; saw text "PLT-211 ☆ Status Todo …"
+#   page: http://localhost:5173/my-issues/assigned?peek=PLT-211 ("My issues · Plumb")
+```
+
+- Steps: `navigate click fill hover keypress keys scroll drag wait-for get expect eval
+  screenshot dialog`. A `navigate` path (`/inbox`) resolves against the current page's
+  origin. `--sightmap-dir`, `--addr` and `--tab` given to `run` apply to every step.
+- Quotes, a trailing `\` to continue a line, `# comments` and `$VARS` work as in `sh`;
+  `-` reads the steps from stdin.
+- It stops at the first failing step (exit 1) with the step, its line, the failure and the
+  page's URL and title; `--keep-going` runs them all and lists every failure; `--quiet`
+  prints only failures and the summary.
+- Start a journey from a known state (`navigate /?reset --settle` in a Potemkin app): a
+  rerun otherwise starts from whatever the last one left.
 
 ## Console & network — the runtime view of the corpus
 
