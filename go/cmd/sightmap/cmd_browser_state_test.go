@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -105,6 +106,33 @@ func TestSplitAroundType(t *testing.T) {
 		if !reflect.DeepEqual(b, c.before) || !reflect.DeepEqual(a, c.after) {
 			t.Errorf("splitAroundType(%q) = %q, %q; want %q, %q", c.args, b, a, c.before, c.after)
 		}
+	}
+}
+
+func TestEvalHint(t *testing.T) {
+	cases := map[string]string{
+		`document.querySelector("[data-component=IssueRow]").dataset.group`:            "browser get",
+		`[...document.querySelectorAll("[data-component=Toast]")].map(e=>e.innerText)`: "browser get",
+		`new Promise(r => setTimeout(r, 500))`:                                         "browser expect",
+		`document.querySelector("[data-action=apply]").click()`:                        "browser click",
+		`location.pathname`:                   "",
+		`localStorage.getItem("plumb.draft")`: "",
+	}
+	for script, want := range cases {
+		got := evalHint(script)
+		if want == "" && got != "" || want != "" && !strings.Contains(got, want) {
+			t.Errorf("evalHint(%q) = %q, want it to mention %q", script, got, want)
+		}
+	}
+}
+
+func TestTakeSettle(t *testing.T) {
+	s, rest := takeSettle([]string{"http://x/", "--settle", "--sightmap-dir", "d"})
+	if !s || !reflect.DeepEqual(rest, []string{"http://x/", "--sightmap-dir", "d"}) {
+		t.Errorf("takeSettle = %v, %q", s, rest)
+	}
+	if s, _ := takeSettle([]string{"http://x/"}); s {
+		t.Error("takeSettle found a --settle that wasn't there")
 	}
 }
 

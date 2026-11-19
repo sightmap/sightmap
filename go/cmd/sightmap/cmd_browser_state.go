@@ -564,12 +564,13 @@ func runKeys(args []string) error {
 	focusFlag := fs.String("focus", "", "Component query (or probe id) to give keyboard focus first")
 	typeFlag := fs.String("type", "", "Text to type after the keys, one character at a time")
 	delayMs := fs.Int("delay-ms", 50, "Pause between keys, so key handlers and sequence timers see them apart")
+	settle := addSettleFlag(fs)
 	keys, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(keys) == 0 && *typeFlag == "" {
-		return fmt.Errorf("usage: browser keys KEY... [--type TEXT] [--focus QUERY] [--delay-ms N]\n" +
+		return fmt.Errorf("usage: browser keys KEY... [--type TEXT] [--focus QUERY] [--delay-ms N] [--settle]\n" +
 			"  presses each KEY (a key or chord, as for keypress) in order, then types TEXT\n" +
 			"  examples: keys g m   keys Meta+k --type prio   keys s 3   keys --focus CommentComposer --type 'Looks good' Meta+Enter")
 	}
@@ -621,7 +622,7 @@ func runKeys(args []string) error {
 	}
 	parts = append(parts, after...)
 	fmt.Fprintf(os.Stderr, "pressed %s\n", strings.Join(parts, " "))
-	return nil
+	return settleAfter(ctx, conn, *settle)
 }
 
 // splitAroundType splits the positional keys into those given before --type and
@@ -650,6 +651,56 @@ func splitAroundType(args, keys []string) (before, after []string) {
 		}
 	}
 	return before, append(after, keys[ki:]...)
+}
+
+// ── settle ─────────────────────────────────────────────────────────────────────
+
+// settleQuiet is how long the DOM must stay unchanged, with no fetch in
+// flight, for the page to count as settled; settleMax caps the wait.
+const (
+	settleQuiet = 300 * time.Millisecond
+	settleMax   = 5 * time.Second
+)
+
+// addSettleFlag registers --settle on an action's flag set. Waiting after an
+// action stays the caller's explicit choice (an action never waits on its own),
+// but it is one flag instead of a separate sleep.
+func addSettleFlag(fs *flag.FlagSet) *bool {
+	return fs.Bool("settle", false, "After acting, wait until the DOM has been quiet for 300 ms with no fetch in flight (at most 5 s), instead of a sleep")
+}
+
+// settleAfter waits for the page to settle when asked, and says how long it
+// took on stderr, so a caller sees both that it waited and that it can stop
+// sleeping.
+func settleAfter(ctx context.Context, conn *browser.CDPConn, settle bool) error {
+	if !settle {
+		return nil
+	}
+	r, err := browser.WaitSettled(ctx, conn, settleQuiet, settleMax)
+	if err != nil {
+		return err
+	}
+	if r.Quiet {
+		fmt.Fprintf(os.Stderr, "settled in %dms\n", r.Elapsed.Milliseconds())
+	} else {
+		fmt.Fprintf(os.Stderr, "still changing after %dms (an animation or a poll?); expect a specific result instead\n", r.Elapsed.Milliseconds())
+	}
+	return nil
+}
+
+// takeSettle removes a --settle flag from args for the commands that parse
+// their arguments by hand (navigate).
+func takeSettle(args []string) (bool, []string) {
+	out := args[:0:0]
+	settle := false
+	for _, a := range args {
+		if a == "--settle" || a == "-settle" {
+			settle = true
+			continue
+		}
+		out = append(out, a)
+	}
+	return settle, out
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

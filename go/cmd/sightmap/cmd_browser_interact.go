@@ -106,6 +106,7 @@ func runClick(args []string) error {
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	xFlag := fs.Int("x", -1, "Absolute x coordinate (skips node lookup)")
 	yFlag := fs.Int("y", -1, "Absolute y coordinate (skips node lookup)")
+	settle := addSettleFlag(fs)
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -125,10 +126,10 @@ func runClick(args []string) error {
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "clicked @ (%d,%d)\n", *xFlag, *yFlag)
-		return nil
+		return settleAfter(ctx, conn, *settle)
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: browser click (COMPONENT-ID | 'ComponentQuery' | --x N --y N)")
+		return fmt.Errorf("usage: browser click (COMPONENT-ID | 'ComponentQuery' | --x N --y N) [--settle]")
 	}
 	node, err := resolveTarget(ctx, conn, *sightmapDirFlag, fs.Arg(0))
 	if err != nil {
@@ -144,10 +145,10 @@ func runClick(args []string) error {
 		fmt.Fprintf(os.Stderr, "clicked %s\n", fs.Arg(0))
 	}
 	// A click may trigger async (SPA) navigation that only settles after this
-	// returns. We deliberately do NOT wait here — waiting is the caller's explicit
-	// step: follow an action that should navigate with `wait-for --view/--component`
-	// (or --url), matching how Playwright/Selenium separate the act from the wait.
-	return nil
+	// returns. We do NOT wait unless asked: waiting is the caller's explicit step,
+	// either --settle (until the DOM is quiet) or `expect` (until a stated result
+	// holds), matching how Playwright/Selenium separate the act from the wait.
+	return settleAfter(ctx, conn, *settle)
 }
 
 // ── fill ──────────────────────────────────────────────────────────────────────
@@ -158,6 +159,7 @@ func runFill(args []string) error {
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	clearFlag := fs.Bool("clear", false, "Empty the field through its native value setter before typing (for React-controlled inputs where select-all does not stick)")
+	settle := addSettleFlag(fs)
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -187,7 +189,7 @@ func runFill(args []string) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "filled %s = %q\n", fs.Arg(0), fs.Arg(1))
-	return nil
+	return settleAfter(ctx, conn, *settle)
 }
 
 // ── hover ─────────────────────────────────────────────────────────────────────
@@ -241,6 +243,7 @@ func runKeyPress(args []string) error {
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
+	settle := addSettleFlag(fs)
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -277,7 +280,7 @@ func runKeyPress(args []string) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "pressed %s\n", fs.Arg(0))
-	return nil
+	return settleAfter(ctx, conn, *settle)
 }
 
 // ── scroll ────────────────────────────────────────────────────────────────────
@@ -339,6 +342,7 @@ func runDrag(args []string) error {
 	toPos := fs.String("to-position", "center", "Where on the --to component to drop: above (4px inside its top edge), below (4px inside its bottom edge) or center")
 	steps := fs.Int("steps", browser.DefaultDragSteps, "Mouse moves between press and release, about 16ms apart")
 	fromOffset := fs.String("from-offset", "", "Press at X,Y pixels from the source's top-left corner (default: a point that is not an interactive child)")
+	settle := addSettleFlag(fs)
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -393,7 +397,7 @@ func runDrag(args []string) error {
 	} else {
 		fmt.Fprintf(os.Stderr, "dragged %s by (%d,%d) in %d steps\n", fs.Arg(0), *deltaX, *deltaY, *steps)
 	}
-	return nil
+	return settleAfter(ctx, conn, *settle)
 }
 
 // ── wait-for ──────────────────────────────────────────────────────────────────

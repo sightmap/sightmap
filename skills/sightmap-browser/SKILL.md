@@ -21,7 +21,9 @@ instead of brittle CSS. To build or maintain the corpus itself, see the
 - **act:** `click`/`fill`/`hover`/`drag` by query, `keys` for key sequences and typing.
 - **check:** `browser expect QUERY --prop k=v` (or `--text`, `--count`, `--gone`,
   `--url`, `--title`) waits until the page agrees and fails with what it saw. It is the
-  wait and the assertion: no `sleep`, no polling.
+  wait and the assertion: no `sleep`, no polling. With nothing specific to check, add
+  `--settle` to the action (`navigate`, `click`, `fill`, `keys`, `drag`): it returns once the
+  DOM has been quiet for 300 ms with no fetch in flight.
 - **`browser screenshot`**: visual evidence; clip to one component with `--component`.
 - **`console` / `network`**: debug what the page logged and requested.
 - **`browser eval`** is the last resort, for what no verb covers. Reading a component's
@@ -30,6 +32,7 @@ instead of brittle CSS. To build or maintain the corpus itself, see the
 - **`inspect`**: raw DOM for authoring selectors (see `sightmap-authoring`).
 
 ```bash
+sightmap browser navigate "$URL/team/WEB/active" --settle   # act, then let the page finish loading
 sightmap browser keys s 3                                   # act: status picker, 3rd option
 sightmap browser expect 'IssueRow[identifier=WEB-120]' --prop group='status:in progress'
 sightmap browser get IssueRow --props identifier,group      # observe: every row, one JSON line each
@@ -289,8 +292,12 @@ sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
   origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter.
 - A query that matches nothing says what is there instead: `(8 IssueRow on the page;
   identifier is "WEB-130", "WEB-120", …)` or `none has a "focused" property`.
+- Every match's `text` (its rendered text) comes with `get` by default and is checkable:
+  `expect Toast --text 'Reverted.'`, `expect 'CommentCard#0' --prop text*=Looks`.
 - These read only what the corpus models. A value you can't get is a property to add to
   the corpus, which then serves `get`, `expect`, queries and snapshots alike.
+- `browser eval` prints a one-line `hint:` on stderr when its script reads component
+  state, waits, or synthesizes clicks and keys: the verb that does it instead.
 
 ## Console & network — the runtime view of the corpus
 
