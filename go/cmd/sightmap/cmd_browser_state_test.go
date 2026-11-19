@@ -92,19 +92,25 @@ func TestCountCondition(t *testing.T) {
 	}
 }
 
-func TestSplitAroundType(t *testing.T) {
+func TestKeySteps(t *testing.T) {
+	k := func(s string) keyStep { return keyStep{text: s} }
+	ty := func(s string) keyStep { return keyStep{text: s, typed: true} }
 	cases := []struct {
-		args, keys, before, after []string
+		args, keys []string
+		want       []keyStep
 	}{
-		{[]string{"g", "m"}, []string{"g", "m"}, []string{"g", "m"}, nil},
-		{[]string{"Meta+k", "--type", "prio", "Enter"}, []string{"Meta+k", "Enter"}, []string{"Meta+k"}, []string{"Enter"}},
-		{[]string{"--type=hi", "Meta+Enter"}, []string{"Meta+Enter"}, nil, []string{"Meta+Enter"}},
-		{[]string{"--focus", "Composer", "--type", "x"}, nil, nil, nil},
+		{[]string{"g", "m"}, []string{"g", "m"}, []keyStep{k("g"), k("m")}},
+		{[]string{"Meta+k", "--type", "prio", "Enter"}, []string{"Meta+k", "Enter"}, []keyStep{k("Meta+k"), ty("prio"), k("Enter")}},
+		// Plumb i2: two --type flags in one call; the second must not swallow the first.
+		{[]string{"f", "--type", "Labels", "Enter", "--type", "Bug", "Enter"}, []string{"f", "Enter", "Enter"},
+			[]keyStep{k("f"), ty("Labels"), k("Enter"), ty("Bug"), k("Enter")}},
+		{[]string{"--type=hi", "Meta+Enter"}, []string{"Meta+Enter"}, []keyStep{ty("hi"), k("Meta+Enter")}},
+		{[]string{"--focus", "Composer", "--type", "x", "--settle", "Enter"}, []string{"Enter"}, []keyStep{ty("x"), k("Enter")}},
+		{[]string{"--delay-ms", "80", "j", "--sightmap-dir", "d", "s"}, []string{"j", "s"}, []keyStep{k("j"), k("s")}},
 	}
 	for _, c := range cases {
-		b, a := splitAroundType(c.args, c.keys)
-		if !reflect.DeepEqual(b, c.before) || !reflect.DeepEqual(a, c.after) {
-			t.Errorf("splitAroundType(%q) = %q, %q; want %q, %q", c.args, b, a, c.before, c.after)
+		if got := keySteps(c.args, c.keys); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("keySteps(%q) = %v, want %v", c.args, got, c.want)
 		}
 	}
 }

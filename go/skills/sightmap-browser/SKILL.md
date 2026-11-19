@@ -164,7 +164,7 @@ probe ID from snapshot output **or** a component query (see below):
 | `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing (date/time/color/range inputs are set, not typed). Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
 | `sightmap browser keypress Enter [<id-or-query>]` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)); with a target, focus it first (in whichever frame holds it) |
-| `sightmap browser keys g m` | Press a sequence of keys or chords in one call; `--type TEXT` types text (keys before `--type` go first, keys after it last); `--focus QUERY` focuses a component first |
+| `sightmap browser keys g m` | Press a sequence of keys or chords in one call; `--type TEXT` (repeatable) types text at its place among the keys: `keys f --type Labels Enter --type Bug Enter`; `--focus QUERY` focuses a component first |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |

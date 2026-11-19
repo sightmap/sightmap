@@ -562,17 +562,19 @@ func runKeys(args []string) error {
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for --focus queries)")
 	focusFlag := fs.String("focus", "", "Component query (or probe id) to give keyboard focus first")
-	typeFlag := fs.String("type", "", "Text to type after the keys, one character at a time")
+	var typeFlags multiFlag
+	fs.Var(&typeFlags, "type", "Text to type, one character at a time, at its place among the keys (repeatable)")
 	delayMs := fs.Int("delay-ms", 50, "Pause between keys, so key handlers and sequence timers see them apart")
 	settle := addSettleFlag(fs)
 	keys, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
 		return err
 	}
-	if len(keys) == 0 && *typeFlag == "" {
-		return fmt.Errorf("usage: browser keys KEY... [--type TEXT] [--focus QUERY] [--delay-ms N] [--settle]\n" +
-			"  presses each KEY (a key or chord, as for keypress) in order, then types TEXT\n" +
-			"  examples: keys g m   keys Meta+k --type prio   keys s 3   keys --focus CommentComposer --type 'Looks good' Meta+Enter")
+	if len(keys) == 0 && len(typeFlags) == 0 {
+		return fmt.Errorf("usage: browser keys KEY... [--type TEXT]... [--focus QUERY] [--delay-ms N] [--settle]\n" +
+			"  presses each KEY (a key or chord, as for keypress) and types each --type TEXT, in the order given\n" +
+			"  examples: keys g m   keys Meta+k --type prio Enter   keys f --type Labels Enter --type Bug Enter\n" +
+			"            keys --focus CommentComposer --type 'Looks good' Meta+Enter")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -594,63 +596,67 @@ func runKeys(args []string) error {
 		}
 	}
 	pause := time.Duration(*delayMs) * time.Millisecond
-	// Keys before --type and keys after it: `keys Meta+k --type prio Enter` is parsed
-	// by the flag package as keys [Meta+k Enter], so a key given after the text is
-	// told apart by its position in the original arguments.
-	before, after := splitAroundType(args, keys)
-	for _, k := range before {
-		if err := browser.KeyPress(ctx, conn, k); err != nil {
+	var parts []string
+	for _, s := range keySteps(args, keys) {
+		var err error
+		if s.typed {
+			err = browser.TypeText(ctx, conn, s.text)
+			parts = append(parts, strconv.Quote(s.text))
+		} else {
+			err = browser.KeyPress(ctx, conn, s.text)
+			parts = append(parts, s.text)
+		}
+		if err != nil {
 			return err
 		}
 		time.Sleep(pause)
 	}
-	if *typeFlag != "" {
-		if err := browser.TypeText(ctx, conn, *typeFlag); err != nil {
-			return err
-		}
-		time.Sleep(pause)
-	}
-	for _, k := range after {
-		if err := browser.KeyPress(ctx, conn, k); err != nil {
-			return err
-		}
-		time.Sleep(pause)
-	}
-	parts := append([]string{}, before...)
-	if *typeFlag != "" {
-		parts = append(parts, strconv.Quote(*typeFlag))
-	}
-	parts = append(parts, after...)
 	fmt.Fprintf(os.Stderr, "pressed %s\n", strings.Join(parts, " "))
 	return settleAfter(ctx, conn, *settle)
 }
 
-// splitAroundType splits the positional keys into those given before --type and
-// those given after it, by walking the original arguments.
-func splitAroundType(args, keys []string) (before, after []string) {
-	seenType := false
+// keyStep is one step of a `keys` call: a key to press, or text to type.
+type keyStep struct {
+	text  string
+	typed bool
+}
+
+// keySteps puts the keys and the --type texts back in the order they were
+// given. The flag package separates them (`keys f --type Labels Enter --type Bug
+// Enter` parses as keys [f Enter Enter] and two type values), so the order is
+// read from the original arguments. Other flags and their values are skipped.
+func keySteps(args, keys []string) []keyStep {
+	var steps []keyStep
 	ki := 0
-	for i := 0; i < len(args) && ki < len(keys); i++ {
+	for i := 0; i < len(args); i++ {
 		a := args[i]
-		if a == "--type" || a == "-type" {
-			seenType = true
-			i++ // skip the value
-			continue
-		}
-		if strings.HasPrefix(a, "--type=") || strings.HasPrefix(a, "-type=") {
-			seenType = true
-			continue
-		}
-		if a == keys[ki] {
-			if seenType {
-				after = append(after, a)
-			} else {
-				before = append(before, a)
+		name, val, hasVal := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		if strings.HasPrefix(a, "-") && a != "-" {
+			switch name {
+			case "type":
+				if !hasVal && i+1 < len(args) {
+					i++
+					val = args[i]
+				}
+				steps = append(steps, keyStep{text: val, typed: true})
+			case "settle":
+				// a bool flag: no value follows
+			default:
+				if !hasVal {
+					i++ // skip the value of --focus, --delay-ms, --addr, ...
+				}
 			}
+			continue
+		}
+		if ki < len(keys) && a == keys[ki] {
+			steps = append(steps, keyStep{text: a})
 			ki++
 		}
 	}
-	return before, append(after, keys[ki:]...)
+	for ; ki < len(keys); ki++ {
+		steps = append(steps, keyStep{text: keys[ki]})
+	}
+	return steps
 }
 
 // ── settle ─────────────────────────────────────────────────────────────────────
