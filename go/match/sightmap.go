@@ -27,6 +27,7 @@ func ParseQueries(defs []sightmap.ComponentDef) ([]MatchQuery, []error) {
 				Parts:       ps.Parts,
 				Combinators: ps.Combinators,
 				Def:         def,
+				Key:         selStr,
 			})
 		}
 	}

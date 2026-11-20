@@ -79,7 +79,7 @@ Setup:
   install                                                           download Chrome for Testing
 
 Session:
-  start [--detach] [--port N] [--extensions PATH] [--url URL] [--profile DIR]  launch Chrome + sightmap server (blocks the shell; --detach backgrounds it)
+  start [--detach] [--attach HOST:PORT] [--port N] [--extensions PATH] [--url URL] [--profile DIR]  launch (or attach to) Chrome + sightmap server (blocks the shell; --detach backgrounds it)
   stop
   status
   navigate <url>
@@ -96,9 +96,12 @@ Interaction (IDs from sightmap snapshot output):
   click    COMPONENT-ID | --x N --y N
   fill     COMPONENT-ID VALUE
   hover    COMPONENT-ID | --x N --y N
-  keypress KEY                        (Enter Tab Escape ArrowUp/Down Backspace ...)
+  keypress KEY | MOD+...+KEY          one key or a chord: c  KeyC  Escape  Shift+KeyV  Meta+K  Alt+Shift+P  ControlOrMeta+Enter
+                                      (mods: Shift Control/Ctrl Alt/Option Meta/Cmd ControlOrMeta; keys: a character, a code name
+                                      like KeyC/Digit1/Period, Enter Tab Escape Space Home End PageUp/Down Arrow* F1-F12)
   scroll   [--component-id ID] [--delta-x N] [--delta-y N]
-  drag        COMPONENT-ID --delta-x N --delta-y N
+  drag        SOURCE (--to TARGET [--to-position above|below|center] | --delta-x N --delta-y N) [--steps N] [--from-offset X,Y]
+                pointer drag: scrolls SOURCE into view, presses inside it, moves in N steps (default 10), releases
   wait-for    --url PATTERN | --selector SEL | --component QUERY | --view NAME | --load  [--timeout-ms N]
   dialog      accept|dismiss [--text INPUT]
   screenshot  [--out FILE] [--stdout] [--full-page | --component NAME | --selector SEL] [--expand-pct N]

@@ -63,8 +63,9 @@ components:
   # value), while a dom.attr read does not. Naming data-account-id in a dom.attr
   # extract is itself the declaration that it carries content.
   #
-  # The three reads withheld by their component's own privacy (value, line1,
-  # account) each draw an extract-privacy-withheld warning (SEP-0017).
+  # The four reads withheld by their component's own privacy (value, line1,
+  # account, and PhoneInput's typed below) each draw an
+  # extract-privacy-withheld warning (SEP-0017).
   - name: SubscribeToggle
     selector: '[role="switch"]'
     privacy: mask
@@ -73,6 +74,18 @@ components:
         extract: { from: dom.state, path: checked }
       - name: account
         extract: { from: dom.attr, path: data-account-id }
+
+  # Under mask a form control's accessible name may still resolve (it comes
+  # from the field's label, never its value), so a dom.text read on an input
+  # draws no warning. The value it holds is withheld and does.
+  - name: PhoneInput
+    selector: 'input[name="phone"]'
+    privacy: mask
+    properties:
+      - name: label
+        extract: { from: dom.text }
+      - name: typed
+        extract: { from: dom.attr, path: value }
 
 views:
   - name: Checkout

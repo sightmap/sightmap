@@ -1,0 +1,14 @@
+{
+  "cases": [
+    {
+      "command": "match",
+      "args": { "url": "/account-settings" },
+      "expected": { "result": { "view": { "name": "AccountSettings" } } }
+    },
+    {
+      "command": "match",
+      "args": { "url": "/billing-settings" },
+      "expected": { "result": { "view": { "name": "AnySettings" } } }
+    }
+  ]
+}
