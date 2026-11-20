@@ -1,0 +1,429 @@
+{
+ "kind": "root",
+ "id": "",
+ "text": "",
+ "kids": [
+  {
+   "kind": "group",
+   "id": "menu.tab.all",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "All",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "menu.tab.burritos",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Burritos",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "menu.tab.bowls",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Bowls",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "menu.tab.tacos",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Tacos",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "menu.tab.sides",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Sides",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "menu.tab.drinks",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "navigation",
+   "id": "",
+   "text": "🌯 Burrito Co.",
+   "kids": []
+  },
+  {
+   "kind": "group",
+   "id": "menu.list",
+   "text": "",
+   "kids": [
+    {
+     "kind": "list",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "menu.card.classic-burrito",
+       "text": "🌯",
+       "kids": [
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Classic Burrito",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "A flour tortilla stuffed with your choice of protein, rice, black beans, cheese, and salsa.",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "$10.95",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "★ Popular",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "list",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "menu.card.chicken-bowl",
+       "text": "🍚",
+       "kids": [
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Chicken Burrito Bowl",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Grilled chicken over cilantro-lime rice with fajita veggies, corn salsa, and sour cream.",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "$11.50",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "★ Popular",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "list",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "menu.card.veggie-tacos",
+       "text": "🌮",
+       "kids": [
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Veggie Tacos",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Three soft corn tortillas with sofritas, roasted chili-corn salsa, fresh guacamole, and shredded ...",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "$9.75",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "list",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "menu.card.chips-guac",
+       "text": "🥑",
+       "kids": [
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Chips & Guacamole",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Fresh house-made chips with creamy guacamole.",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "$4.95",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "list",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "menu.card.steak-quesadilla",
+       "text": "🥩",
+       "kids": [
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Steak Quesadilla",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "Grilled flour tortilla with marinated steak, Monterey Jack cheese, and chipotle cream.",
+         "kids": []
+        },
+        {
+         "kind": "text",
+         "id": "",
+         "text": "$13.25",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "list",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "menu.card.carnitas-burrito",
+       "text": "🌯",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "🌯 Burrito Co.",
+   "text": "",
+   "kids": [
+    {
+     "kind": "navigation",
+     "id": "",
+     "text": "🌯 Burrito Co.",
+     "kids": []
+    },
+    {
+     "kind": "navigation",
+     "id": "",
+     "text": "Cart",
+     "kids": [
+      {
+       "kind": "button",
+       "id": "menu.cart",
+       "text": "Cart",
+       "kids": [
+        {
+         "kind": "group",
+         "id": "menu.cart",
+         "text": "Cart",
+         "kids": [
+          {
+           "kind": "button",
+           "id": "",
+           "text": "",
+           "kids": []
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "tablist",
+   "id": "",
+   "text": "Tab Bar",
+   "kids": [
+    {
+     "kind": "tablist",
+     "id": "",
+     "text": "Tab Bar",
+     "kids": [
+      {
+       "kind": "tab",
+       "id": "tab.menu",
+       "text": "Menu",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "fork.knife",
+         "text": "Food",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Menu",
+         "kids": []
+        }
+       ]
+      },
+      {
+       "kind": "tab",
+       "id": "tab.orders",
+       "text": "Orders",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "list.bullet.rectangle.fill",
+         "text": "list.bullet.rectangle.fill",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Orders",
+         "kids": []
+        }
+       ]
+      },
+      {
+       "kind": "tab",
+       "id": "tab.account",
+       "text": "Account",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "person.crop.circle.fill",
+         "text": "account",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Account",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
