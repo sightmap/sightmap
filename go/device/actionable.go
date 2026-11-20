@@ -247,6 +247,9 @@ const containerInset = 8
 // notched or Dynamic Island iPhone, small on an iPad or a home-button iPhone.
 // It stays below the center of a navigation bar item on every device.
 func (t *Tree) systemTop() int {
+	if t.StatusBar > 0 {
+		return int(math.Ceil(t.StatusBar))
+	}
 	switch {
 	case t.Screen.W >= 600:
 		return 24

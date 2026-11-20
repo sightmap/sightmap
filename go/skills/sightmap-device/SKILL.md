@@ -1,26 +1,28 @@
 ---
 name: sightmap-device
-description: Use when driving a native iOS app in the local iOS Simulator with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console and network requests. Activate when the user wants to run, try, test, or reproduce a flow in an iOS app on the Simulator, inspect an iOS screen, or author `.sightmap/` definitions for an iOS or React Native app.
+description: Use when driving a native iOS app in the local iOS Simulator, or an Android app on an emulator or device, with a sightmap — booting a simulator, installing and launching the app, taking annotated component snapshots of the accessibility tree, tapping and typing by accessibility identifier or component query, and reading the app's console and network requests. Activate when the user wants to run, try, test, or reproduce a flow in an iOS or Android app, inspect a mobile screen, or author `.sightmap/` definitions for an iOS, Android or React Native app.
 activation:
-  - .sightmap/ directory exists in an iOS or React Native project
+  - .sightmap/ directory exists in an iOS, Android or React Native project
   - driving an app in the iOS Simulator against a sightmap corpus
+  - driving an Android app on an emulator or device against a sightmap corpus
 ---
 
-# Sightmap device: drive an iOS app in the Simulator
+# Sightmap device: drive an iOS or Android app
 
-`sightmap device` drives an app in the iOS Simulator on this Mac the way
+`sightmap device` drives an app in the iOS Simulator on this Mac, or on an
+Android emulator or device (see [Android](#android)), the way
 `sightmap browser` drives Chrome: it reads the app's **accessibility tree**,
 layers your `.sightmap/` corpus onto it, and lets you **act on elements by
 accessibility identifier or component query**. Matching uses sightmap's own
 matcher, so `sightmap explain` and `sightmap coverage` agree with what a device
-snapshot shows. Simulator only; nothing leaves the Mac except the app's own
-traffic. To build the corpus itself, see the `sightmap-authoring` skill.
+snapshot shows. Nothing leaves the machine except the app's own traffic. To build the corpus itself, see the `sightmap-authoring` skill.
 
 ## Prerequisites
 
-Apple Silicon Mac, macOS 15+, Xcode 26+ selected with `xcode-select` (not just
+For iOS: Apple Silicon Mac, macOS 15+, Xcode 26+ selected with `xcode-select` (not just
 the Command Line Tools), and an iOS Simulator runtime. Install the CLI if
-`sightmap version` fails (`npm install -g @sightmap/sightmap`).
+`sightmap version` fails (`npm install -g @sightmap/sightmap`). Android needs
+only adb; see [Android](#android).
 
 Run **`sightmap device doctor`** first. It prints the exact fix for anything
 missing (`--fix` runs the unprivileged ones) and builds the simulator helper on
@@ -92,7 +94,9 @@ dev-menu button, and says what to do. Long SwiftUI/UIKit lists expose only the r
 so a row further down is "not found" until you scroll:
 `scroll down --until TARGET` scrolls slowly enough not to fling past it, nudges
 the target into the middle of the screen, stops once it is tappable there, and
-refreshes the snapshot ids.
+refreshes the snapshot ids. A target matching several elements stops at the
+first tappable one. `[text="…"]` is the whole label; use `[text*="…"]` for part
+of it.
 
 **Waiting.** Actions return as soon as the tap lands; navigation keeps
 animating for a moment. If a snapshot still shows the old screen, snapshot
@@ -372,9 +376,102 @@ Apps you build yourself must be built by Xcode (`xcodebuild` or the Xcode
 app), not assembled by hand, so they carry the simulated entitlements. After
 signing in, iOS may show a "Save Password?" sheet: it appears as `[Overlay]`.
 
+## Android
+
+The same commands drive an Android emulator or device through `adb` (any OS,
+only the SDK platform-tools needed). `sightmap device doctor --platform android`
+checks for adb and a device or AVD. Start with an `.apk` or `--package`, which
+imply `--platform android`:
+
+```bash
+sightmap device start --app app/build/outputs/apk/debug/app-debug.apk --detach
+sightmap device start --package com.example.app --device Pixel_8_API_35 --detach
+```
+
+What differs from iOS:
+
+- `--device` is an `adb devices` serial, a model, or an AVD name (a stopped AVD
+  is booted).
+- Each read is a `uiautomator dump`, a second or more, but it waits for an idle
+  screen, so `click` and `scroll` act on one read, without waiting for two to
+  agree or for the 0.75 s hold-still. If it fails with "could not get idle state", turn off animations
+  (`adb shell settings put global animator_duration_scale 0`, and the
+  transition and window scales). It can't run beside an Appium UiAutomator2
+  server.
+- Points are dp: divide screenshot pixels by dpi/160.
+- `identifier` / `testid` is the resource-id without its package
+  (`login_submit`, not `com.example:id/login_submit`). Compose `testTag`s show up
+  only with `Modifier.semantics { testTagsAsResourceId = true }` on an ancestor,
+  and a dialog, bottom sheet or popup is a window of its own that needs it
+  again inside. A snapshot of Compose content with no identifiers says
+  `[No identifiers]`.
+- Roles come from widget classes (`Button` → `button`, `TextView` → `text`,
+  `EditText` → `textfield`/`securetextfield`, scrollable views → `scrollview`,
+  `RecyclerView` → `collection`, the rest → `other`). Compose roles arrive the
+  same way: a `Button` is a `button`, a segmented button a `radio`, a
+  checkbox row a `checkbox`, and a `Switch` or `Modifier.toggleable` row a
+  `switch`. A clickable `other` without text, such as a list row, is named by
+  its children's text; when that is one text, the text is folded into it, as
+  on iOS (`button "Sign out"`, no `text` child).
+- Tabs are `tab` in a `tabbar`, with `(selected)` on the current one, so a
+  cross-platform `TabBarItem: 'tab'` matches them. Android has no tab class in
+  the dump, so a row counts as tabs when a library marks it (a Material
+  `BottomNavigationView` or `NavigationRailView` item, a `TabWidget`), or when
+  it looks like a tab bar: labelled tappable items side by side, exactly one
+  selected, along the top or bottom of the screen (a Compose `NavigationBar`
+  or `TabRow`, a `TabLayout`, React Navigation's tabs). A segmented control
+  mid-screen stays as it is (`radio` for Compose's). The bar covers what
+  scrolls under it, as on iOS.
+- `checked` is in the state of every checkable element, toggle-group segments
+  and chips included (`(checked)` in the snapshot when it shows no value).
+- A field's label is its hint, or a Compose text field's label text; its value
+  is its text. A Material `TextInputLayout` field that is empty reports its
+  hint as its text, so it reads as `value="Search products"`.
+- Permission dialogs and other apps' windows appear as `[Overlay]`.
+- `button back` goes back or hides the keyboard; `button` also takes `home`,
+  `menu`, `app_switch`, `lock`, `volume_up`, `volume_down`.
+- `type` / `fill` are ASCII only (`adb shell input text`); a newline is a
+  return key press.
+- `network` is iOS-only for now; on Android it fails with `unsupported`.
+- `console` is the logcat of the app's processes from their first line, also
+  when the app was started by hand (tag as subsystem; `System.out` reads as
+  `stdout`).
+
+### Authoring for Android
+
+- **Ask for identifiers first.** Without them only roles and text select
+  anything, and generic structural selectors (`scrollview > other`) match on
+  other screens too. In Compose that is one line at each composition root,
+  and again inside each dialog, sheet and popup:
+  `Modifier.semantics { testTagsAsResourceId = true }`.
+- **Rows keep their texts as children.** Unlike iOS, a clickable row (a
+  Compose `Modifier.clickable` row, a `RecyclerView` item) has its title,
+  brand and price as separate `text` children, each with its own testTag or
+  view id when the app sets one. Read them through child components, not a
+  `pattern` on the joined label:
+
+  ```yaml
+  - name: ProductRow
+    selector: 'other[identifier^="product."]'
+    properties:
+      - name: title
+        extract: { from: component, path: Title.text }
+    children:
+      - name: Title
+        selector: '#product\.title'
+        properties: [{ name: text, extract: { from: dom.text } }]
+  ```
+
+  A child id that starts like the row's (`product.title` under
+  `product.1`) also matches `[identifier^="product."]`; qualify the row's
+  role (`other[...]`) or give children their own prefix.
+- **`RecyclerView` items repeat their layout's ids**: every row is
+  `product_row`. Select rows by that id and tell them apart by a child's text
+  (`click 'ProductRow[title="Red Lipstick"]'`).
+
 ## Known limits
 
-- Simulator only, Apple Silicon only. No physical devices.
+- iOS: Simulator only, Apple Silicon only. No physical iOS devices.
 - No hover or file upload; for another screen size, pick a different `--device`.
 - The helper uses Apple private frameworks (via FBSimulatorControl); a new
   Xcode release may need a sightmap update. `doctor` says so when the helper
