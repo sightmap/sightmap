@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -49,6 +50,14 @@ func runBrowser(args []string) error {
 		return runHover(args[1:])
 	case "keypress", "key-press":
 		return runKeyPress(args[1:])
+	case "keys":
+		return runKeys(args[1:])
+	case "get":
+		return runGet(args[1:])
+	case "expect":
+		return runExpect(args[1:])
+	case "run":
+		return runRun(args[1:])
 	case "scroll":
 		return runScroll(args[1:])
 	case "drag":
@@ -92,13 +101,17 @@ WebMCP (tools a page exposes via document.modelContext):
   mcp list [--json]                             enumerate the page's WebMCP tools (name, description, input schema)
   mcp call <tool> [--args JSON] [--param k=v] [--json]   invoke a tool via executeTool; prints its result, non-zero exit on tool error
 
-Interaction (IDs from sightmap snapshot output):
+Work in a loop: observe (snapshot, get) -> act (click/fill/keys by query) -> check (expect).
+Actions take --settle to wait until the page stops changing; eval is the last resort.
+
+Interaction (component queries like 'IssueRow[identifier=WEB-143]', or IDs from snapshot):
   click    COMPONENT-ID | --x N --y N
   fill     COMPONENT-ID VALUE
   hover    COMPONENT-ID | --x N --y N
   keypress KEY | MOD+...+KEY          one key or a chord: c  KeyC  Escape  Shift+KeyV  Meta+K  Alt+Shift+P  ControlOrMeta+Enter
                                       (mods: Shift Control/Ctrl Alt/Option Meta/Cmd ControlOrMeta; keys: a character, a code name
                                       like KeyC/Digit1/Period, Enter Tab Escape Space Home End PageUp/Down Arrow* F1-F12)
+  keys     KEY... [--type TEXT] [--focus QUERY]   a key sequence in one call: keys g m   keys Meta+k --type prio Enter
   scroll   [--component-id ID] [--delta-x N] [--delta-y N]
   drag        SOURCE (--to TARGET [--to-position above|below|center] | --delta-x N --delta-y N) [--steps N] [--from-offset X,Y]
                 pointer drag: scrolls SOURCE into view, presses inside it, moves in N steps (default 10), releases
@@ -106,6 +119,14 @@ Interaction (IDs from sightmap snapshot output):
   dialog      accept|dismiss [--text INPUT]
   screenshot  [--out FILE] [--stdout] [--full-page | --component NAME | --selector SEL] [--expand-pct N]
   bounds      QUERY... | --selector SEL | --all   viewport-% bounding boxes (JSON)
+
+State (component queries against the corpus; use these instead of eval):
+  get     QUERY... [--props a,b] [--count]     each match's corpus properties and text as JSON lines; 'page' = url + title
+  expect  [QUERY] [--prop k=v] [--text S] [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--title T] [--timeout-ms N]
+                                               wait until every condition holds (default 5 s); on timeout print what was seen, exit 1
+                                               e.g. expect Toast --text 'Reverted.'   expect 'Row[id=7]' --prop text*=Done
+  run     FILE|- [--keep-going] [--quiet]      browser steps, one per line (navigate /path --settle, keys j, expect ...);
+                                               stops at the first failing step and says which, with the page it was on
 
 Session utilities:
   clear-storage [--origin URL]   wipe cookies + storage (reset session state)
@@ -499,6 +520,7 @@ func isDeadlineErr(err error) bool {
 }
 
 func runNavigate(args []string) error {
+	settle, args := takeSettle(args)
 	sightmapDir, args := resolveSightmapDir(args)
 	addr, args := resolveAddr(args, sightmapDir)
 	tabID, args := resolveTab(args)
@@ -532,7 +554,7 @@ func runNavigate(args []string) error {
 	} else {
 		fmt.Fprintf(os.Stderr, "navigated to %s\n", url)
 	}
-	return nil
+	return settleAfter(ctx, conn, settle)
 }
 
 // evalTimeout bounds a single `browser eval`, so an awaited promise that never
@@ -599,5 +621,30 @@ func runEval(args []string) error {
 	} else {
 		fmt.Println(string(result))
 	}
+	if hint := evalHint(script); hint != "" {
+		fmt.Fprintln(os.Stderr, hint)
+	}
 	return nil
 }
+
+// evalHint names the verb that does what script does, when it reads component
+// state or waits: agents learn the CLI from its output (a delegated subagent
+// may never read the skill), so the hint goes where they look. One line on
+// stderr; stdout keeps only the result.
+func evalHint(script string) string {
+	switch {
+	case evalWaits.MatchString(script):
+		return "hint: to wait for a result use `browser expect QUERY --prop k=v` (or --text, --count, --gone, --url); to let the page finish reacting, add --settle to the action"
+	case evalReadsComponent.MatchString(script):
+		return "hint: `browser get 'Name[prop=v]' [--props a,b]` reads a component's corpus properties and text without eval; a value it lacks is a property to add to the corpus"
+	case evalDrivesUI.MatchString(script):
+		return "hint: `browser click QUERY`, `browser keys k1 k2 [--type TEXT]` send real input; synthetic events from eval are untrusted and can miss handlers"
+	}
+	return ""
+}
+
+var (
+	evalWaits          = regexp.MustCompile(`setTimeout|setInterval|new Promise|requestAnimationFrame`)
+	evalReadsComponent = regexp.MustCompile(`data-component[\s\S]*(getAttribute|dataset|innerText|textContent|\.length)|(getAttribute|dataset|innerText|textContent)[\s\S]*data-component`)
+	evalDrivesUI       = regexp.MustCompile(`\.click\(\)|dispatchEvent\(|new (Keyboard|Mouse|Pointer)Event`)
+)

@@ -14,13 +14,32 @@ component tree and **act on elements by their semantic component identity**
 instead of brittle CSS. To build or maintain the corpus itself, see the
 `sightmap-authoring` skill.
 
-**What to reach for:**
+**What to reach for:** work in a loop of **observe → act → check**, all by component query.
 
-- **`snapshot`** — read page state as an annotated component tree (start here).
-- **interaction** (`click`/`fill`/`scroll`/…) — drive the page by component identity.
-- **`browser screenshot`** — visual evidence; clip to one component with `--component`.
-- **`console` / `network`** — debug what the page logged and requested.
-- **`inspect`** — raw DOM for authoring selectors (see `sightmap-authoring`).
+- **observe:** `snapshot` for the whole page as a component tree (start here);
+  `browser get QUERY` for one component's corpus properties as JSON.
+- **act:** `click`/`fill`/`hover`/`drag` by query, `keys` for key sequences and typing.
+- **check:** `browser expect QUERY --prop k=v` (or `--text`, `--count`, `--gone`,
+  `--url`, `--title`) waits until the page agrees and fails with what it saw. It is the
+  wait and the assertion: no `sleep`, no polling. With nothing specific to check, add
+  `--settle` to the action (`navigate`, `click`, `fill`, `keys`, `drag`): it returns once the
+  DOM has been quiet for 300 ms with no fetch in flight.
+- **re-check:** `browser run journey.steps` runs a list of these commands in one call and
+  stops at the first that fails, saying which and what the page showed. Write a journey
+  once, rerun it after every change (see [Journeys as scripts](#journeys-as-scripts-browser-run)).
+- **`browser screenshot`**: visual evidence; clip to one component with `--component`.
+- **`console` / `network`**: debug what the page logged and requested.
+- **`browser eval`** is the last resort, for what no verb covers. Reading a component's
+  attributes or text is `get`; waiting for a result is `expect`. If you need an eval to read
+  something the app shows, the corpus is missing a property: add it (`sightmap-authoring`).
+- **`inspect`**: raw DOM for authoring selectors (see `sightmap-authoring`).
+
+```bash
+sightmap browser navigate "$URL/team/WEB/active" --settle   # act, then let the page finish loading
+sightmap browser keys s 3                                   # act: status picker, 3rd option
+sightmap browser expect 'IssueRow[identifier=WEB-120]' --prop group='status:in progress'
+sightmap browser get IssueRow --props identifier,group      # observe: every row, one JSON line each
+```
 
 ## Installation
 
@@ -62,7 +81,7 @@ daemon and returns immediately.
 | `sightmap browser status` | Check session health, tabs, and current URL. Reports `⚠ degraded` when Chrome's CDP is up but the daemon's HTTP server was reaped. |
 | `sightmap browser navigate 'URL'` | Navigate to URL (positional arg — no `--url` flag). |
 | `sightmap browser stop` | Stop Chrome session. |
-| `sightmap browser eval 'js'` | Evaluate JS in page context. Returns JSON-serializable values only — DOM element references return an error. A returned promise is awaited, so `async` evals resolve to their value. |
+| `sightmap browser eval 'js'` | Evaluate JS in page context (last resort: use `get`/`expect` to read component state). Returns JSON-serializable values only — DOM element references return an error. A returned promise is awaited, so `async` evals resolve to their value. |
 | `sightmap browser inject --file X --persist` | Inject a script that re-runs on **every** new document/tab for the whole session (survives navigations), vs `eval`'s one-shot. `--list` / `--remove ID` manage them. Needs a running session (the daemon holds the registry). |
 | `sightmap browser mcp list` | Enumerate the WebMCP tools the page exposes via `document.modelContext` (name, description, input schema; `--json` for full schemas). Reports native vs polyfilled vs absent; fails loudly with the Chrome-flag hint when absent. When a page exposes tools, prefer a named `mcp call` over blind click/fill. |
 | `sightmap browser mcp call <tool> --args '{…}'` | Invoke one exposed tool via `executeTool`. Args via `--args JSON` and/or repeatable `--param k=v`. Unwraps the WebMCP `CallToolResult` (text/guidance shown as itself, not a stringified blob) and exits non-zero on tool `isError`. One tool at a point in time — no cross-navigation; if the tool navigates, re-run `mcp list` on the new view. |
@@ -148,6 +167,7 @@ probe ID from snapshot output **or** a component query (see below):
 | `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing (date/time/color/range inputs are set, not typed). Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
 | `sightmap browser keypress Enter [<id-or-query>]` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)); with a target, focus it first (in whichever frame holds it) |
+| `sightmap browser keys g m` | Press a sequence of keys or chords in one call; `--type TEXT` (repeatable) types text at its place among the keys: `keys f --type Labels Enter --type Bug Enter`; `--focus QUERY` focuses a component first |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |
@@ -181,7 +201,8 @@ sightmap browser keypress ControlOrMeta+Enter   # Meta on macOS, Control elsewhe
   `Shift+KeyC` or `Shift+c` for Shift held.
 - **Text:** a character is typed (into a focused input) only when no Control, Meta or Alt
   is held.
-- **Sequences** (`G` then `I`) are separate calls: `keypress g` then `keypress i`.
+- **Sequences** (`G` then `I`) go in one call: `keys g i`. With text: `keys Meta+k --type prio
+  Enter` opens the palette, types `prio`, presses Enter. Keys are 50 ms apart (`--delay-ms`).
 
 ### Dragging
 
@@ -212,8 +233,8 @@ sightmap browser drag 'IssueCard[identifier="WEB-143"]' \
   refused the same way: `document.elementFromPoint` reports the shadow host there, not the
   element (`click` has the same limit).
 - It drives the pointer only: native HTML5 drag-and-drop (`draggable` + `dragstart`) is not
-  started by it. Confirm the result with `eval` or a fresh `snapshot`; `drag` reports only
-  that the gesture was sent.
+  started by it. Confirm the result with `expect` (e.g. `expect 'IssueCard[identifier=WEB-143]'
+  --prop group='status:in progress'`); `drag` reports only that the gesture was sent.
 
 ### Component queries (CSS-shaped, over sightmap components + extracted properties)
 
@@ -246,6 +267,79 @@ so nothing goes stale. Prefer queries on dynamic pages.
   property like `FulfillmentTileButton.label` is what makes the element
   addressable (see the `sightmap-authoring` skill).
 - `--sightmap-dir` (default `.sightmap`) controls which corpus resolves a query.
+
+## Reading and checking state: `get` and `expect`
+
+Both take a component query and answer from the corpus: a component's **properties** are
+the ones its corpus entry extracts, plus three built-ins, `text` (rendered text),
+`visible` and `focused` (keyboard focus is in it). Each match prints as one JSON line.
+
+```bash
+sightmap browser get 'IssueRow[identifier=WEB-143]'        # {"component":"IssueRow","group":"status:todo","identifier":"WEB-143","text":"…"}
+sightmap browser get IssueRow --props identifier,group     # every IssueRow, two fields each
+sightmap browser get IssueRow --count                      # 76
+sightmap browser get page                                  # {"title":"Web › Active · Plumb","url":"…"}
+
+sightmap browser expect Toast --text 'Reverted.'           # waits up to 5 s (--timeout-ms)
+sightmap browser expect PropertyPicker --gone
+sightmap browser expect 'IssueRow[identifier=WEB-120]' --prop group=status:done --prop focused=true
+sightmap browser expect IssueRow --count '>=1'
+sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
+```
+
+- `expect` holds when **every** condition holds for **every** match (a property condition
+  needs at least one match). With only a query it waits for the component to appear. On
+  timeout it exits 1 and prints each failed condition with what it saw, e.g. `want
+  IssueRow[identifier=WEB-130] group="status:done"; saw group "status:todo"`.
+- `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no
+  origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter.
+- A query that matches nothing says what is there instead: `(8 IssueRow on the page;
+  identifier is "WEB-130", "WEB-120", …)` or `none has a "focused" property`.
+- `get` prints at most 25 matches (`--limit N`, `0` for all; the rest are counted) with text
+  cut to 80 characters; ask for `--props` to print just what you need. A passing `expect`
+  prints the matches only when there are three or fewer.
+- Every match's `text` (its rendered text) comes with `get` by default and is checkable:
+  `expect Toast --text 'Reverted.'`, `expect 'CommentCard#0' --prop text*=Looks`.
+- These read only what the corpus models. A value you can't get is a property to add to
+  the corpus, which then serves `get`, `expect`, queries and snapshots alike.
+- `browser eval` prints a one-line `hint:` on stderr when its script reads component
+  state, waits, or synthesizes clicks and keys: the verb that does it instead.
+
+## Journeys as scripts: `browser run`
+
+A journey you will check more than once (after each change, before each commit) goes in a
+file of browser steps, one per line, without the `sightmap browser` prefix:
+
+```bash
+cat > j8.steps <<'STEPS'
+# J8: peek and keyboard navigation
+navigate /?reset --settle
+navigate /my-issues/assigned --settle
+keys j
+expect 'IssueRow[identifier=WEB-130]' --prop focused=focused
+keys Space --settle
+expect IssuePeek --text WEB-130
+keys s 5 --settle
+expect 'IssueRow[identifier=WEB-130]' --prop group=status:done
+keys Escape --settle
+expect IssuePeek --gone
+STEPS
+sightmap browser run j8.steps --quiet     # "all 10 steps passed in 7.2s", or:
+# step 6 (line 7) failed: expect IssuePeek --text WEB-130
+#   want IssuePeek text contains "WEB-130"; saw text "PLT-211 ☆ Status Todo …"
+#   page: http://localhost:5173/my-issues/assigned?peek=PLT-211 ("My issues · Plumb")
+```
+
+- Steps: `navigate click fill hover keypress keys scroll drag wait-for get expect eval
+  screenshot dialog`. A `navigate` path (`/inbox`) resolves against the current page's
+  origin. `--sightmap-dir`, `--addr` and `--tab` given to `run` apply to every step.
+- Quotes, a trailing `\` to continue a line, `# comments` and `$VARS` work as in `sh`;
+  `-` reads the steps from stdin.
+- It stops at the first failing step (exit 1) with the step, its line, the failure and the
+  page's URL and title; `--keep-going` runs them all and lists every failure; `--quiet`
+  prints only failures and the summary.
+- Start a journey from a known state (`navigate /?reset --settle` in a Potemkin app): a
+  rerun otherwise starts from whatever the last one left.
 
 ## Console & network — the runtime view of the corpus
 
