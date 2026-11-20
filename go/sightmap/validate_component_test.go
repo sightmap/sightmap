@@ -113,10 +113,11 @@ func TestCheckComponentProperties(t *testing.T) {
 
 func TestCheckComponentProperties_ObjectForm(t *testing.T) {
 	tests := []struct {
-		name    string
-		privacy string
-		extract Extract
-		want    string // "" means no finding
+		name      string
+		privacy   string
+		selectors []string // default .card
+		extract   Extract
+		want      string // "" means no finding
 	}{
 		{name: "dom.text", extract: Extract{From: FromDOMText}},
 		{name: "dom.raw_text with pattern", extract: Extract{From: FromDOMRawText, Pattern: `\$(\d+)`}},
@@ -142,6 +143,11 @@ func TestCheckComponentProperties_ObjectForm(t *testing.T) {
 		{name: "multi property name", extract: Extract{From: FromComponent, Path: "Tag.value[]", Join: ",", joinSet: true}, want: "component-property-extract-invalid"},
 		{name: "exists with multi", extract: Extract{From: FromComponentExists, Path: "Tag[]"}, want: "component-property-extract-invalid"},
 		{name: "text under mask", privacy: "mask", extract: Extract{From: FromDOMText}, want: "extract-privacy-withheld"},
+		{name: "text under mask on a form control", privacy: "mask", selectors: []string{"form input[name=zip]", "textarea", "SELECT.country"}, extract: Extract{From: FromDOMText}},
+		{name: "text under mask, one selector not a form control", privacy: "mask", selectors: []string{"input", ".card"}, extract: Extract{From: FromDOMText}, want: "extract-privacy-withheld"},
+		{name: "raw_text under mask on a form control", privacy: "mask", selectors: []string{"textarea"}, extract: Extract{From: FromDOMRawText}, want: "extract-privacy-withheld"},
+		{name: "attr under mask on a form control", privacy: "mask", selectors: []string{"input"}, extract: Extract{From: FromDOMAttr, Path: "value"}, want: "extract-privacy-withheld"},
+		{name: "text under block on a form control", privacy: "block", selectors: []string{"input"}, extract: Extract{From: FromDOMText}, want: "extract-privacy-withheld"},
 		{name: "attr under block", privacy: "block", extract: Extract{From: FromDOMAttr, Path: "x"}, want: "extract-privacy-withheld"},
 		{name: "attr under mask", privacy: "mask", extract: Extract{From: FromDOMAttr, Path: "data-x"}, want: "extract-privacy-withheld"},
 		{name: "state attr under mask", privacy: "mask", extract: Extract{From: FromDOMAttr, Path: "checked"}},
@@ -153,8 +159,12 @@ func TestCheckComponentProperties_ObjectForm(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			sels := tt.selectors
+			if sels == nil {
+				sels = []string{".card"}
+			}
 			c := &Corpus{GlobalComponents: []ComponentDef{{
-				Name: "Card", Selectors: []string{".card"}, Privacy: tt.privacy,
+				Name: "Card", Selectors: sels, Privacy: tt.privacy,
 				Properties: []ComponentPropertyDef{{Name: "x", Extract: tt.extract}},
 			}}}
 			got := checkComponentProperties(c)

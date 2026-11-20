@@ -85,8 +85,9 @@ type Field struct {
 // RequestsForURL returns every RequestDef whose route matches requestURL and
 // whose method matches. An empty RequestDef.Method matches any method; an empty
 // method argument matches any RequestDef. requestURL is the observed network
-// request's URL (the API endpoint being called), NOT the page URL; its query
-// string and fragment are ignored and trailing slashes are normalized away.
+// request's URL (the API endpoint being called), NOT the page URL; its
+// fragment is ignored, its query string is read only by a route's query
+// conditions (SEP-0025), and trailing slashes are normalized away.
 //
 // Global requests are returned first (corpus-file order), then view-scoped
 // requests in view-declaration order. All matches apply — there is no winner.
@@ -95,12 +96,12 @@ func (c *Corpus) RequestsForURL(requestURL, method string) []RequestDef {
 	if err != nil {
 		return nil
 	}
-	path := normalizeRoutePath(u.Path)
+	path, q := normalizeRoutePath(u.Path), u.Query()
 
 	var out []RequestDef
 	appendMatches := func(defs []RequestDef) {
 		for _, rd := range defs {
-			if !MatchRoute(rd.Route, path) {
+			if !matchRouteURL(rd.Route, path, q) {
 				continue
 			}
 			if rd.Method != "" && method != "" && !strings.EqualFold(rd.Method, method) {

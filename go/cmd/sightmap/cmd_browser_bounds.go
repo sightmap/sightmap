@@ -309,19 +309,40 @@ func boundsBySelector(
 ) ([]boundsResult, error) {
 	script := boundsJS + fmt.Sprintf("\n__smBoundsBySelector(%s)", jsString(selector))
 
-	raw, err := browser.EvalJSON(ctx, conn, script)
-	if err != nil {
-		return nil, fmt.Errorf("bounds: selector eval: %w", err)
-	}
-	var rects []struct {
+	type rectResult struct {
 		X      float64 `json:"x"`
 		Y      float64 `json:"y"`
 		Width  float64 `json:"width"`
 		Height float64 `json:"height"`
 		Label  string  `json:"label"`
 	}
+	raw, err := browser.EvalJSON(ctx, conn, script)
+	if err != nil {
+		return nil, fmt.Errorf("bounds: selector eval: %w", err)
+	}
+	var rects []rectResult
 	if err := json.Unmarshal(raw, &rects); err != nil {
 		return nil, fmt.Errorf("bounds: parse selector result: %w", err)
+	}
+	// Elements of child frames too, moved from their frame's viewport onto the
+	// page's, like every other box this command reports.
+	for _, f := range browser.ChildFrames(ctx, conn) {
+		raw, err := f.EvalJSON(ctx, script)
+		if err != nil {
+			continue
+		}
+		var inFrame []rectResult
+		if json.Unmarshal(raw, &inFrame) != nil || len(inFrame) == 0 {
+			continue
+		}
+		ox, oy, err := f.Origin(ctx)
+		if err != nil {
+			continue
+		}
+		for _, r := range inFrame {
+			r.X, r.Y = r.X+ox, r.Y+oy
+			rects = append(rects, r)
+		}
 	}
 
 	results := make([]boundsResult, 0, len(rects))
