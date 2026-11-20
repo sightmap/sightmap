@@ -1,0 +1,93 @@
+slug: qrcodecrafter-com
+name: QR Code Crafter
+url: https://qrcodecrafter.com/
+host: qrcodecrafter.com
+description: Create free static QR codes for links, Wi-Fi, business cards, messages, and payments.
+category: productivity
+type: live
+built_with_sightkick: false
+submitted_by: maintainer
+labels: []
+collections: []
+added: 2026-09-10
+updated: 2026-09-10
+scan: scans/qrcodecrafter-com/2026-09-10.json
+tools:
+  - name: generate_verified_qr
+    kind: read
+    description: Generate a static QR asset, structurally review its payload, assess quiet zone and
+      contrast settings, decode the final SVG, PNG, JPG, or WebP file, compare payload hashes, and
+      return an evidence-linked receipt. Asset bytes are returned only when final-file decoding
+      matches the requested payload.
+    page: /
+  - name: generate_bulk_qr
+    kind: action
+    description: Generate a ZIP archive of up to 50 static QR code files from CSV or row objects. Use
+      for labels, classrooms, packaging, menus, and agent batch workflows.
+    page: /
+  - name: create_dynamic_qr
+    kind: action
+    description: Create an editable public HTTPS redirect and return its stable QR URL plus a one-time
+      private management capability.
+    page: /
+  - name: manage_dynamic_qr
+    kind: sensitive
+    description: Read, update, pause, resume, rotate, or permanently delete a dynamic QR redirect using
+      its private capability. Changes fetch the current ETag first.
+    page: /
+  - name: create_dynamic_qr_campaign
+    kind: action
+    description: Sequentially create up to five editable HTTPS redirects and return a private manifest
+      with explicit partial failures and one-time management capabilities.
+    page: /
+  - name: create_qr_vault
+    kind: action
+    description: Create a private capability-managed vault for up to 50 dynamic QR redirects. Empty
+      vaults expire after six hours; adding a QR makes the project durable.
+    page: /
+  - name: manage_qr_vault
+    kind: sensitive
+    description: Read analytics, rename, delete, or manage project-owned dynamic QR redirects using one
+      private vault capability. Mutations fetch the current ETag first.
+    page: /
+  - name: create_print_ready_qr_campaign
+    kind: action
+    description: Turn a brief of one to five safe HTTPS destinations into editable or static print
+      campaign records, generate each QR asset with conservative print defaults, decode-check every
+      final digital file, and return explicit partial failures plus separate public and private
+      manifests.
+    page: /
+  - name: generate_qr
+    kind: action
+    description: Generate a static QR code in SVG, PNG, JPG, WebP, PDF, or EPS format and return file metadata.
+    page: /
+  - name: create_static_qr_code
+    kind: action
+    description: Create a static QR code from URL, text, Wi-Fi, email, SMS, phone, WhatsApp, or vCard input.
+    page: /
+  - name: create_wifi_qr_code
+    kind: action
+    description: Create a static Wi-Fi QR code for a network name, security type, and password.
+    page: /wifi
+  - name: import_vcard_contact
+    kind: action
+    description: Import one local vCard 2.1, 3.0, or 4.0 .vcf file up to 256 KB to prefill the static
+      contact QR code form without uploading the contact.
+    page: /vcard
+  - name: create_vcard_qr_code
+    kind: action
+    description: Create a static vCard contact QR code from required identity, phone, and email fields.
+    page: /vcard
+suggested_journeys:
+  - intent: Call generate_verified_qr and read what it returns.
+    tools:
+      - generate_verified_qr
+strengths:
+  - Every tool has a name (13/13).
+  - Every tool has a description (13/13).
+  - Every tool has an input schema (13/13).
+  - Tool names are snake_case (13/13).
+  - Tool names are unique (13 distinct).
+  - Tool set changes with the page (3 distinct tool sets across 3 pages).
+improvements:
+  - Tool metadata contains suspicious wording (create_wifi_qr_code).
