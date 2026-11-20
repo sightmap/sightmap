@@ -10,6 +10,14 @@ Once a session is running ([Browser sessions](/cli/browser)), these commands act
 All commands on this page except `tabs` subcommands resolve a session with `--addr` (default `localhost:7892`) and `--tab`. Pass `--tab` whenever two or more content tabs are open. Session lifecycle commands are documented under [Browser sessions](/cli/browser).
 </Note>
 
+## Iframes
+
+Probe IDs and component queries reach into iframes, including cross-origin and nested ones. An ID minted in a frame carries the frame's prefix (`2_26`; the top document's IDs are bare numbers), and `click`, `fill`, `hover`, `drag`, `keypress`, `scroll`, `wait-for` (`--component` and `--selector`), `bounds` and `screenshot --component` resolve it to the frame that holds the element. Boxes are in top-page coordinates. A click's point is computed from the live layout right before the event is sent, after the element is scrolled into view, and `click` refuses (`covered by another element`) when something in the page is drawn over the frame at that point. `drag` measures its start and drop points the same way and checks the drop target the same way, but the source and the target must be in the same document or in frames of one process: the pointer is sent to one process and cannot be carried into another. See [Iframes](/cli/capture#iframes) for how snapshots include frames and match them.
+
+## Background tabs
+
+Chrome is reported to deliver mouse and focus events only to the visible tab, accepting them on a background one and doing nothing. So `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` first bring the target tab to the front when it is hidden (as [`browser front`](/cli/browser) does), and say so on stderr: `brought tab TAB to front`. The tab stays in front afterward.
+
 ## Component queries
 
 Probe IDs belong to one extraction. A later extraction reassigns them, and a page re-render can replace the target node. Component queries reduce that risk by extracting the live tree and applying the corpus immediately before acting. Prefer queries on pages that re-render often.
@@ -66,12 +74,16 @@ Off-screen targets can be missed. Scroll the element into view first with `brows
 
 ### `browser fill`
 
-Types a value into an input. Takes two positionals: the target (probe ID or component query) and the value. After typing it reads the value back and **errors** when a non-empty value was typed but the field is still empty — the signature of a React-controlled input where plain typing doesn't stick; retry with `--clear`, which clears via the native value setter first. On success it echoes `filled TARGET = "value"` to stderr.
+Replaces the value of an input, textarea or contenteditable by typing. Takes two positionals: the target (probe ID or component query) and the value. It selects the field's whole content through the DOM first, then types real key events. After typing it reads the value back and **errors** when the field is still empty (a React-controlled input where plain typing doesn't stick) or when the old value was not replaced (the field now holds old and new text); retry with `--clear`, which empties the field through its native value setter first. On success it echoes `filled TARGET = "value"` to stderr.
+
+`fill` also **errors** when the click meant to focus the field left focus on the page (`clicking "N" did not focus it`), rather than typing into nothing; with `--clear`, a field that took no focus is reported as `the field did not take focus` instead of a raw `JS exception`.
+
+Inputs whose value is not typed characters — `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range` — are not typed into: Chrome routes keystrokes into a date control's segmented year/month/day editor, which mangles them. `fill` sets their value whole, the way a script would with the native setter, fires `input` and `change`, and reads it back. Give the value in the format the control stores (`2027-04-16` for a date, `14:45` for a time, `#ff0000` for a color); a value the control does not take (a date it cannot parse, a color that is not `#rrggbb`, a range value that is not a number) is an error, and a range given a number outside its `min`/`max` holds the nearest bound, as the control clamps it, and a disabled or read-only control is refused. This works inside iframes too.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | `localhost:7892` | CDP address |
-| `--clear` | off | Clear the field via JS before typing (use for React-controlled inputs) |
+| `--clear` | off | Empty the field through its native value setter before typing (for React-controlled inputs where select-all does not stick) |
 | `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for component queries) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
@@ -80,7 +92,7 @@ sightmap browser fill --clear SearchInput 'garden hose'
 ```
 
 <Tip>
-React-controlled inputs may append instead of replace. Pass `--clear`, or set the value through the native setter with `browser eval`:
+If `fill` reports that the old value was not replaced, pass `--clear`, or set the value through the native setter with `browser eval`:
 
 ```bash
 sightmap browser eval 'var el = document.querySelector("INPUT_SELECTOR"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "new value"); el.dispatchEvent(new Event("input", {bubbles: true}))'
@@ -109,16 +121,26 @@ sightmap browser hover 'AccountMenu'
 
 ### `browser keypress`
 
-Sends a key event to the focused element. Click or fill a field first when it needs focus. The key name is a positional argument, such as `Enter`, `Tab`, `Escape`, `Backspace`, `Delete`, `ArrowUp`, `ArrowDown`, or `Space`. On success it echoes `pressed KEY` to stderr.
+Sends a key, or a Playwright-style chord, to the focused element. Click or fill a field first when it needs focus, or pass a target after the key and it is focused first, in whichever frame holds it. The key is a positional argument in the form `KEY` or `MODIFIER+...+KEY`.
+
+- **Modifiers:** `Shift`, `Control` (`Ctrl`), `Alt` (`Option`), `Meta` (`Cmd`, `Command`), and `ControlOrMeta` (Meta on macOS, Control elsewhere, chosen by the machine running the CLI).
+- **Keys:** a character (`c`, `C`, `5`, `.`, `?`), a code name (`KeyC`, `Digit1`, `Period`, `BracketLeft`), or one of `Enter`, `Tab`, `Escape`, `Space`, `Backspace`, `Delete`, `Home`, `End`, `PageUp`, `PageDown`, `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `F1`–`F12`. A name outside this list is an error and nothing is sent.
+- **Text:** a character is typed only when no Control, Meta, or Alt is held, so `Meta+K` does not insert a `k`.
+
+On success it echoes `pressed KEY` to stderr.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--addr` | `localhost:7892` | CDP address |
+| `--sightmap-dir` | `.sightmap` | Path to the `.sightmap/` dir (for a component query target) |
 | `--tab` | the lone content tab | Target tab ID (from `browser start` output) |
 
 ```bash
 sightmap browser fill SearchInput 'garden hose'
 sightmap browser keypress Enter
+sightmap browser keypress Shift+KeyV
+sightmap browser keypress ControlOrMeta+K
+sightmap browser keypress ArrowDown 'DateWindows'   # focus the target first
 ```
 
 ---

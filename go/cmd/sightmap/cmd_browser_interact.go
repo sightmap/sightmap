@@ -78,6 +78,25 @@ func parseFlagsInterspersed(fs *flag.FlagSet, args []string) error {
 	return fs.Parse(append(flags, positionals...))
 }
 
+// foreground brings the connected tab to the front when it is hidden, before a
+// command that sends input to it. Chrome hit-tests and focuses only on the
+// visible tab, so a click or keystroke sent to a background one is accepted and
+// does nothing. It says so on stderr when it had to.
+func foreground(ctx context.Context, conn *browser.CDPConn) error {
+	moved, err := browser.EnsureVisible(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if moved {
+		msg := "brought tab to front"
+		if id, err := browser.TargetID(ctx, conn); err == nil && id != "" {
+			msg = "brought tab " + id + " to front"
+		}
+		fmt.Fprintln(os.Stderr, msg)
+	}
+	return nil
+}
+
 // ── click ─────────────────────────────────────────────────────────────────────
 
 func runClick(args []string) error {
@@ -97,6 +116,9 @@ func runClick(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	if *xFlag >= 0 && *yFlag >= 0 {
 		if err := browser.ClickAt(ctx, conn, *xFlag, *yFlag); err != nil {
@@ -135,7 +157,7 @@ func runFill(args []string) error {
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
-	clearFlag := fs.Bool("clear", false, "Clear the field via JS before typing (use for React-controlled inputs)")
+	clearFlag := fs.Bool("clear", false, "Empty the field through its native value setter before typing (for React-controlled inputs where select-all does not stick)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
@@ -149,6 +171,9 @@ func runFill(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	node, err := resolveTarget(ctx, conn, *sightmapDirFlag, fs.Arg(0))
 	if err != nil {
@@ -184,6 +209,9 @@ func runHover(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	if *xFlag >= 0 && *yFlag >= 0 {
 		if err := browser.HoverAt(ctx, conn, *xFlag, *yFlag); err != nil {
@@ -212,13 +240,18 @@ func runKeyPress(args []string) error {
 	fs := flag.NewFlagSet("keypress", flag.ContinueOnError)
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: browser keypress KEY\n" +
-			"  KEY examples: Enter Tab Escape Backspace Delete ArrowUp ArrowDown Space")
+		return fmt.Errorf("usage: browser keypress KEY | MODIFIER+...+KEY [COMPONENT-ID | 'ComponentQuery']\n" +
+			"  KEY: a character (c C 5 . ? [), a code name (KeyC Digit1 Period BracketLeft),\n" +
+			"       or a named key (Enter Tab Escape Space Backspace Delete Home End PageUp PageDown\n" +
+			"       ArrowUp ArrowDown ArrowLeft ArrowRight F1-F12)\n" +
+			"  MODIFIER: Shift Control|Ctrl Alt|Option Meta|Cmd|Command ControlOrMeta\n" +
+			"  examples: Escape  Shift+KeyV  Meta+K  Alt+Shift+P  Ctrl+r  ControlOrMeta+Enter\n" +
+			"  the optional target is given keyboard focus first, in whichever frame holds it")
 	}
 
 	ctx := context.Background()
@@ -227,7 +260,19 @@ func runKeyPress(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
+	if fs.NArg() > 1 {
+		node, err := resolveTarget(ctx, conn, *sightmapDirFlag, fs.Arg(1))
+		if err != nil {
+			return err
+		}
+		if err := browser.Focus(ctx, conn, node); err != nil {
+			return err
+		}
+	}
 	if err := browser.KeyPress(ctx, conn, fs.Arg(0)); err != nil {
 		return err
 	}
@@ -258,6 +303,9 @@ func runScroll(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
 	if *compID != "" {
 		node, resolveErr := resolveTarget(ctx, conn, *sightmapDirFlag, *compID)
@@ -284,14 +332,38 @@ func runDrag(args []string) error {
 	fs := flag.NewFlagSet("drag", flag.ContinueOnError)
 	addrFlag := fs.String("addr", "", "CDP address (default: the session for --sightmap-dir)")
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
-	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (keys session lookup)")
+	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir (for component queries; keys session lookup)")
 	deltaX := fs.Int("delta-x", 0, "Horizontal drag delta in pixels")
 	deltaY := fs.Int("delta-y", 0, "Vertical drag delta in pixels")
+	toFlag := fs.String("to", "", "Drop on this component (probe id or component query) instead of moving by a delta")
+	toPos := fs.String("to-position", "center", "Where on the --to component to drop: above (4px inside its top edge), below (4px inside its bottom edge) or center")
+	steps := fs.Int("steps", browser.DefaultDragSteps, "Mouse moves between press and release, about 16ms apart")
+	fromOffset := fs.String("from-offset", "", "Press at X,Y pixels from the source's top-left corner (default: a point that is not an interactive child)")
 	if err := parseFlagsInterspersed(fs, args); err != nil {
 		return err
 	}
-	if fs.NArg() == 0 {
-		return fmt.Errorf("usage: browser drag COMPONENT-ID --delta-x N --delta-y N")
+	const usage = "usage: browser drag SOURCE (--to TARGET [--to-position above|below|center] | --delta-x N --delta-y N) [--steps N] [--from-offset X,Y]"
+	if fs.NArg() != 1 {
+		return fmt.Errorf(usage)
+	}
+	if *toFlag == "" && *deltaX == 0 && *deltaY == 0 {
+		return fmt.Errorf("drag: nowhere to drag to\n%s", usage)
+	}
+	if *toFlag != "" && (*deltaX != 0 || *deltaY != 0) {
+		return fmt.Errorf("drag: give --to or --delta-x/--delta-y, not both")
+	}
+	opts := browser.DragOptions{Steps: *steps, ToPosition: *toPos, DeltaX: *deltaX, DeltaY: *deltaY}
+	if *steps < 1 {
+		return fmt.Errorf("drag: --steps must be at least 1")
+	}
+	if *fromOffset != "" {
+		xs, ys, ok := strings.Cut(*fromOffset, ",")
+		x, errX := strconv.Atoi(strings.TrimSpace(xs))
+		y, errY := strconv.Atoi(strings.TrimSpace(ys))
+		if !ok || errX != nil || errY != nil {
+			return fmt.Errorf("drag: --from-offset wants X,Y in pixels, got %q", *fromOffset)
+		}
+		opts.FromOffset = &[2]int{x, y}
 	}
 
 	ctx := context.Background()
@@ -300,15 +372,27 @@ func runDrag(args []string) error {
 		return err
 	}
 	defer conn.Close()
+	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
 
-	node, err := resolveNode(ctx, conn, fs.Arg(0))
+	var src *sightmap.ComponentNode
+	if *toFlag != "" {
+		src, opts.To, err = resolveTargetPair(ctx, conn, *sightmapDirFlag, fs.Arg(0), *toFlag)
+	} else {
+		src, err = resolveTarget(ctx, conn, *sightmapDirFlag, fs.Arg(0))
+	}
 	if err != nil {
 		return err
 	}
-	if err := browser.Drag(ctx, conn, node, *deltaX, *deltaY); err != nil {
+	if err := browser.DragWith(ctx, conn, src, opts); err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stderr, "dragged %s by (%d,%d)\n", fs.Arg(0), *deltaX, *deltaY)
+	if *toFlag != "" {
+		fmt.Fprintf(os.Stderr, "dragged %s to %s (%s) in %d steps\n", fs.Arg(0), *toFlag, *toPos, *steps)
+	} else {
+		fmt.Fprintf(os.Stderr, "dragged %s by (%d,%d) in %d steps\n", fs.Arg(0), *deltaX, *deltaY, *steps)
+	}
 	return nil
 }
 

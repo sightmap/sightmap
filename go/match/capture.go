@@ -48,7 +48,7 @@ func foldRank(parent, local int) int {
 // selector of every component that declares privacy or watch.
 type captureSet struct {
 	queries []MatchQuery // each with privacyRank and/or watch set
-	index   *firstPartIndex
+	index   *queryIndex
 }
 
 func compileCapture(defs []sightmap.ComponentDef) *captureSet {
@@ -68,12 +68,12 @@ func compileCapture(defs []sightmap.ComponentDef) *captureSet {
 				continue // reported by validation
 			}
 			cs.queries = append(cs.queries, MatchQuery{
-				Name: d.Name, Parts: ps.Parts, Combinators: ps.Combinators, Def: d,
+				Name: d.Name, Parts: ps.Parts, Combinators: ps.Combinators, Def: d, Key: sel,
 				privacyRank: rank, watch: d.Watch,
 			})
 		}
 	}
-	cs.index = newFirstPartIndex(cs.queries)
+	cs.index = newQueryIndex(cs.queries)
 	return cs
 }
 
@@ -146,25 +146,33 @@ func (c captured) sortWatched() {
 // covers nodes no component names.
 func (m *Matcher) Privacy(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode]string {
 	out := map[*sightmap.ComponentNode]string{}
-	cs := m.entryFor(pageURL).capture
-	if root == nil || len(cs.queries) == 0 {
+	if root == nil {
 		return out
 	}
-	local, eff := rankNone, []int(nil)
-	walkMatches(root, cs.queries, cs.index,
-		func(_ *sightmap.ComponentNode, q *MatchQuery) { local = max(local, q.privacyRank) },
-		func(n *sightmap.ComponentNode, depth int) {
-			parent := rankNone
+	eachDoc(root, pageURL, func(d frameDoc) []frameDoc {
+		cs := m.entryFor(d.url).capture
+		if len(cs.queries) == 0 && d.inherit == rankNone {
+			return framesIn(d.root, rankNone)
+		}
+		local, eff := rankNone, []int(nil)
+		var frames []frameDoc
+		onNode := func(n *sightmap.ComponentNode, depth int) {
+			parent := d.inherit
 			if depth > 0 {
 				parent = eff[depth-1]
 			}
 			e := foldRank(parent, local)
 			eff = append(eff[:depth], e)
+			frames = append(frames, framesOf(n, e)...)
 			if e != rankNone {
 				out[n] = rankNames[e]
 			}
 			local = rankNone
-		})
+		}
+		onMatch := func(_ *sightmap.ComponentNode, q *MatchQuery) { local = max(local, q.privacyRank) }
+		walkMatches(d.root, cs.queries, cs.index, onMatch, onNode)
+		return frames
+	})
 	return out
 }
 
@@ -174,5 +182,15 @@ func (m *Matcher) Privacy(root *sightmap.ComponentNode, pageURL string) map[*sig
 // share it (component names are unique only per parent). Unlike Match, it
 // covers nodes no component names.
 func (m *Matcher) Watched(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode][]string {
-	return m.entryFor(pageURL).capture.collect(root).watched
+	out := map[*sightmap.ComponentNode][]string{}
+	if root == nil {
+		return out
+	}
+	eachDoc(root, pageURL, func(d frameDoc) []frameDoc {
+		for n, names := range m.entryFor(d.url).capture.collect(d.root).watched {
+			out[n] = names
+		}
+		return framesIn(d.root, rankNone)
+	})
+	return out
 }

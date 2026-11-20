@@ -29,6 +29,10 @@ type liveFlags struct {
 	tab         *string
 	sightmapDir *string
 	cmd         string // command name, for error messages
+
+	noFrames      *bool
+	frameMaxNodes *int
+	maxFrames     *int
 }
 
 // addLiveFlags registers the common live-session flags on fs and returns a
@@ -42,6 +46,10 @@ func addLiveFlags(fs *flag.FlagSet, cmd string) *liveFlags {
 		tab:         fs.String("tab", "", "Target tab ID (from 'browser start' output)"),
 		sightmapDir: fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir"),
 		cmd:         cmd,
+
+		noFrames:      fs.Bool("no-frames", false, "Leave iframes out: an <iframe> is a leaf (default: descend into every frame, cross-origin and nested included)"),
+		frameMaxNodes: fs.Int("frame-max-nodes", browser.DefaultFrameMaxNodes, "Cap on the nodes taken from each child frame; a frame past it is cut and the snapshot says so"),
+		maxFrames:     fs.Int("max-frames", browser.DefaultMaxFrames, "Cap on the child frames taken from a page, in document order"),
 	}
 }
 
@@ -53,6 +61,11 @@ func (lf *liveFlags) connect(ctx context.Context) (*browser.CDPConn, func(), err
 	if err != nil {
 		return nil, nil, err
 	}
+	conn.SetFrameOptions(browser.FrameOptions{
+		Disabled:  *lf.noFrames,
+		MaxNodes:  *lf.frameMaxNodes,
+		MaxFrames: *lf.maxFrames,
+	})
 	return conn, func() { conn.Close() }, nil
 }
 

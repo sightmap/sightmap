@@ -73,6 +73,11 @@ type ComponentMatch struct {
 	// Watch reports whether Watched is non-empty.
 	Watch      bool
 	Properties []PropertyValue
+	// Withheld names the declared properties that privacy withheld (SEP-0009),
+	// in declaration order. Like an unresolved one, a withheld property is absent
+	// from Properties. This tells the two apart for corpus tooling; what a
+	// capture consumer surfaces must not.
+	Withheld []string
 }
 
 // Property returns the extracted value named name, if present.

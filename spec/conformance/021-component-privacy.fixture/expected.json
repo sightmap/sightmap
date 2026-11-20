@@ -8,6 +8,7 @@
         "diagnostics": [
           { "code": "extract-privacy-withheld", "severity": "warning" },
           { "code": "extract-privacy-withheld", "severity": "warning" },
+          { "code": "extract-privacy-withheld", "severity": "warning" },
           { "code": "extract-privacy-withheld", "severity": "warning" }
         ]
       }

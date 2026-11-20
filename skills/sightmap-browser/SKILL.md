@@ -87,6 +87,44 @@ tree). Each line starts with a numeric component ID, then the node content:
 Properties are sorted alphabetically. The accessible name is shown last inside
 brackets when not suppressed (an exact match with a property value).
 
+### Iframes
+
+A snapshot descends into every iframe — same-origin, cross-origin (a separate
+process) and nested at any depth — and hangs each frame's tree under its
+`Iframe` node, so an MCP Apps widget's controls show up as ordinary components:
+
+```
+70 Iframe "destination_dates view"
+  1_9 Iframe
+    2_13 [DateWindows destination="seville"]
+      2_26 [DateWindow start="2027-03-03" end="2027-03-06"]
+```
+
+- **Ids carry a frame prefix.** The top document's ids are bare (`42`); the Nth
+  frame's are `N_…` (`2_26`). Click, fill, hover, drag, keypress, scroll, `bounds`,
+  `wait-for` and `screenshot --component` all take them like any other id, and
+  find the right frame. Bounds are in top-page coordinates, and a click's point
+  is worked out from the live layout right before it is sent, so it lands after
+  a scroll. A click refuses (`covered by another element`) when something in the
+  page is drawn over the frame at that point. `drag` works the same way, but
+  its source and target must be in one document or in frames of one process.
+- **A frame is matched as a page of its own, at its own URL** — so the corpus
+  view whose route matches the *frame's* URL (e.g. a widget host's `/sandbox`)
+  supplies its components, not the page's view. A selector does not cross a
+  frame boundary in either direction. A `srcdoc` / `about:blank` frame takes its
+  parent's URL. A masked or blocked `<iframe>` masks or blocks its document.
+- **A `[Frames]` section** lists each frame document (its root id, URL, and the
+  view that URL resolved to) and then any `⚠` notes about what was left out.
+  `no view matched` on a frame means the corpus has no view for the frame's
+  path: add one (a widget's route is its host's sandbox path).
+- **Size.** Each frame is capped at 3000 nodes and a page at 32 frames; a frame
+  past the cap is cut and the `[Frames]` notes say so. `--frame-max-nodes N` and
+  `--max-frames N` change the caps; `--no-frames` leaves frames out (an `Iframe`
+  is a leaf, the old behaviour). Chrome gives out-of-process frames to the
+  session on its own; nothing to configure.
+- `keypress KEY <id-or-query>` focuses the target first (in its frame); with no
+  target the key goes to whatever is focused.
+
 The `[View: …]` header may be followed by a `tags:` line: the union of tags
 across every view whose route matches the page. A component the corpus marks
 `privacy: block` or `mask` renders **without** its content properties or AX
@@ -107,16 +145,75 @@ probe ID from snapshot output **or** a component query (see below):
 |---------|-------------|
 | `sightmap browser click <id>` | Click element by probe ID |
 | `sightmap browser click 'ComponentQuery'` | Click element by sightmap identity (preferred on dynamic pages) |
-| `sightmap browser fill [--clear] <id-or-query> "text"` | Type into an input. Errors if the value doesn't stick — retry with `--clear` (see gotchas). |
+| `sightmap browser fill [--clear] <id-or-query> "text"` | Replace an input's value by typing (date/time/color/range inputs are set, not typed). Errors if the value doesn't stick or the old text was kept — retry with `--clear` (see gotchas). |
 | `sightmap browser hover <id-or-query>` | Hover over element |
-| `sightmap browser keypress Enter` | Press a key (optionally focused on `<id>`) |
+| `sightmap browser keypress Enter [<id-or-query>]` | Press a key, or a Playwright-style chord (see [Keyboard](#keyboard)); with a target, focus it first (in whichever frame holds it) |
 | `sightmap browser scroll --delta-y 500` | Scroll the page |
 | `sightmap browser scroll --component-id <id-or-query>` | Scroll a component into view |
 | `sightmap browser click --x N --y N` | Click raw coordinates (escape hatch; layout-fragile) |
+| `sightmap browser drag <src> --to <target> [--to-position above\|below\|center]` | Pointer-drag one component onto another (see [Dragging](#dragging)) |
+| `sightmap browser drag <src> --delta-x N --delta-y N` | Pointer-drag a component by a pixel offset |
 | `sightmap browser wait-for --view <Name>` | Wait until the URL resolves to a sightmap view (the step boundary after a navigating action) |
 | `sightmap browser wait-for --component '<Query>'` | Wait until a component query matches a node |
 | `sightmap browser wait-for --selector "[data-loaded]"` | Wait until a CSS selector matches (also `--url SUBSTRING` (plain substring, not glob), `--load`) |
 | `sightmap browser tabs list` | List open tabs |
+
+### Keyboard
+
+`keypress` takes one key or a chord, `Modifier+…+Key`, the way Playwright's `press` does:
+
+```bash
+sightmap browser keypress c               # key "c", code "KeyC"
+sightmap browser keypress Shift+KeyV      # key "V", code "KeyV", shiftKey
+sightmap browser keypress Meta+K          # ⌘K; no "k" is typed
+sightmap browser keypress Alt+Shift+P
+sightmap browser keypress ControlOrMeta+Enter   # Meta on macOS, Control elsewhere
+```
+
+- **Modifiers:** `Shift`, `Control` (`Ctrl`), `Alt` (`Option`), `Meta` (`Cmd`, `Command`),
+  `ControlOrMeta`. The page gets the modifier state on keydown/keyup and key events for
+  the modifiers themselves.
+- **Keys:** a character (`c`, `C`, `5`, `.`, `?`, `[`), a code name (`KeyC`, `Digit1`,
+  `Period`, `BracketLeft`), or `Enter`, `Tab`, `Escape`, `Space`, `Backspace`, `Delete`,
+  `Home`, `End`, `PageUp`, `PageDown`, `ArrowUp/Down/Left/Right`, `F1`–`F12`. Both forms
+  give the same `event.code` (US layout), so apps that match `event.code` plus modifiers
+  work. A character is not a modifier: `C` is key `C` with no `shiftKey`; use
+  `Shift+KeyC` or `Shift+c` for Shift held.
+- **Text:** a character is typed (into a focused input) only when no Control, Meta or Alt
+  is held.
+- **Sequences** (`G` then `I`) are separate calls: `keypress g` then `keypress i`.
+
+### Dragging
+
+`drag` moves the pointer the way a person does, so pointer-event drags (boards, sortable
+lists, sliders) register it: it scrolls the source into view (only if it is not already
+fully visible, so a visible-to-visible drag leaves the layout alone), presses inside it, makes
+`--steps N` mouse moves (default 10, about 16 ms apart, button held), and releases at the
+drop point. Jumping straight to the target would never pass the app's activation distance.
+
+```bash
+# Drop WEB-143 on the top edge of the first card of another column (inserts above it).
+sightmap browser drag 'IssueCard[identifier="WEB-143"]' \
+  --to 'BoardColumn[group="status:in progress"] IssueCard#0' --to-position above
+```
+
+- **Source and target** are probe ids or component queries (both the same kind: resolving a
+  query re-probes the page and invalidates probe ids). Queries are resolved in one pass.
+- **`--to-position`:** `center` (default), `above` (4 px inside the target's top edge) or
+  `below` (4 px inside its bottom edge). Use `--delta-x/--delta-y` instead of `--to` to drag
+  by an offset; give one or the other.
+- **Where it presses:** a point on the source that is not an interactive child (button,
+  link, input, chip). Override with `--from-offset X,Y` (pixels from the source's top-left).
+- **Both ends must be reachable.** Before pressing, `drag` checks that the start point is
+  over the source and the drop point is over the target (`elementFromPoint`), so a target
+  scrolled under a column header or a sticky bar, or outside the viewport, fails with what
+  is in the way instead of dropping on nothing. Scroll the target fully into view (or
+  `tabs resize` for a taller window) and retry. A source or target inside a shadow root is
+  refused the same way: `document.elementFromPoint` reports the shadow host there, not the
+  element (`click` has the same limit).
+- It drives the pointer only: native HTML5 drag-and-drop (`draggable` + `dragstart`) is not
+  started by it. Confirm the result with `eval` or a fresh `snapshot`; `drag` reports only
+  that the gesture was sent.
 
 ### Component queries (CSS-shaped, over sightmap components + extracted properties)
 
@@ -154,7 +251,9 @@ so nothing goes stale. Prefer queries on dynamic pages.
 
 The `browser start` daemon owns the session and runs a **collector** that buffers
 console messages and network requests from every tab for the life of the session
-(bounded ring buffers, ~1000 of each). Read them with thin query commands — no
+(bounded ring buffers, ~1000 of each; successful scripts, styles, images and fonts
+get a ring of their own so a dev server's hundreds of module scripts cannot evict the
+app's `/api` calls). Read them with thin query commands — no
 re-attaching to Chrome, and with history the transient page commands never saw.
 
 These are not just raw debug streams. Each captured record is matched against the
@@ -168,7 +267,7 @@ properties**.
 |---------|-------------|
 | `sightmap console list [--level error] [--tab ID] [--limit N]` | Console messages, each led by its `messages:` match (uncaught exceptions fold in as `level=exception`). |
 | `sightmap console get <index>` | One console message + any extracted stack `properties:`. |
-| `sightmap network list [--type XHR] [--url /api] [--tab ID] [--limit N]` | Requests: `[Match] method url → status (type) {prop=value}`. |
+| `sightmap network list [--type XHR] [--url /api] [--filter REGEXP] [--static] [--tab ID] [--limit N]` | Requests: `[Match] method url → status (type) {prop=value}`. Successful static assets are hidden unless `--static`. |
 | `sightmap network get <index> [--response-file F]` | One request + its `requests:` match, a `Properties:` block, and response body (save with `--response-file`). |
 
 Reading the slot:
@@ -187,8 +286,15 @@ drowning the matched ones.
   refresh the page or re-trigger the action, then read. (A SPA may never reach
   `wait-for --load`; prefer `wait-for --url`/`--selector`, or just re-read after
   a short pause.)
+- `network list` **hides successful static requests** (Script, Stylesheet, Image,
+  Font, Media, Manifest, TextTrack with a 2xx or 304) by default, as `playwright-cli
+  requests` does, so a Vite page's ~200 `/src/...` modules don't bury the app's calls.
+  A failed asset (404, 5xx, refused) still shows. Pass `--static` to see scripts and
+  styles too (`--type Script` implies it); `--type`, `--url` and `--filter` narrow
+  either list further. `network get <index>` works for hidden requests as well.
 - `--url` is a substring match, not a path anchor (`--url /aura` also catches
-  `.../auraFW/...`) — narrow it when a route is noisy.
+  `.../auraFW/...`) — narrow it when a route is noisy. `--filter` takes a regular
+  expression (`--filter '/api/(issues|me)$'`), unanchored.
 - To find failures: reproduce, then scan the `[...]` slots in `console list`
   (`--level error`) and `network list`; `network get <index>` pulls the body +
   properties.
@@ -201,11 +307,27 @@ sightmap browser navigate 'https://...'     # ✓ correct
 sightmap browser navigate --url 'https://'  # ✗ wrong — passes literal "--url" as the URL
 ```
 
-**`browser fill` detects when a value doesn't stick.**
-On some React-controlled inputs plain `fill` (select-all + type) leaves the field empty. `fill` now reads the value back and **errors** in that case, telling you to retry with `--clear` (which clears via the native value setter first). If filling the same field repeatedly *accumulates* text, also use `--clear`.
+**`browser fill` replaces the value and checks that it did.**
+`fill` focuses the field, selects its whole content through the DOM (input, textarea,
+contenteditable; a Ctrl/Cmd+A chord with the `selectAll` command is the fallback for
+anything else), then types, so the page sees real key events. It reads the value back and
+**errors** when the field is still empty (a React-controlled input that dropped the keys) or
+when the old value was **not replaced** (the field now holds old and new text, e.g.
+`2026-04-102026-04-17`); the message names both. A masked or reformatted value is accepted.
+On such an error retry with `--clear`, which empties the field through the element's native
+value setter first (input, textarea, select, contenteditable) and then types. `--clear`
+fails loudly when nothing editable is focused instead of typing on regardless.
 ```bash
 sightmap browser fill --clear 'SearchInput' 'burrito'
 ```
+
+**`browser fill` sets, not types, date/time/color/range inputs.**
+Typing into `<input type=date>` goes through Chrome's segmented year/month/day editor and mangles the value. For `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range`, `fill` sets the value whole (native setter, then `input` and `change`), including in iframes, and reads it back. Pass the format the control stores: `fill 214 2027-04-16`, not `04/16/2027`. A value the control can't parse errors rather than leaving the field empty.
+
+**Input commands foreground a hidden tab.**
+Chrome is reported to hit-test and focus only on the visible tab, so a click sent to a background one could print success and do nothing. `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` now bring a hidden `--tab` to the front first and print `brought tab ID to front` on stderr; the tab stays in front.
+
+**`fill` errors when its click did not focus the field** (`did not focus it`), instead of typing into nothing; `fill --clear` says `the field did not take focus` where it used to print a raw JS exception.
 
 **`browser click` scrolls the target into view and refuses off-screen / covered clicks.**
 `click` scrolls the element to the center of the viewport, then verifies its center is actually the top-most element there before dispatching. It **errors** (rather than silently no-op'ing) when the target can't be positioned in the viewport, or is `covered by another element` — the signal of an open overlay/modal or a target you need to reveal first. The confirmation line reports the real post-scroll coordinates it clicked.

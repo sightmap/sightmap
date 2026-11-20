@@ -1,0 +1,12 @@
+version: 1
+views:
+  # Declared most specific first and with one route's conditions reversed on
+  # purpose: neither declaration order nor condition order may change a match.
+  - name: FooCooView
+    route: /test?b=coo&a=foo
+  - name: CooView
+    route: /test?b=coo
+  - name: FooView
+    route: /test?a=foo
+  - name: Page
+    route: /test
