@@ -18,6 +18,13 @@ func TestPathMatches(t *testing.T) {
 		{"http://localhost:5173", "/", true},
 		{"http://localhost:5173/view/v1", "/view/*", true},
 		{"http://localhost:5173/a/b/c", "/a/*/c", true},
+		// Three or more stars need backtracking: the first "aa" is not the one to take.
+		{"http://x/abaaab", "/*aa*aa*b", false},
+		{"http://x/abaaaab", "/*aa*aa*b", true},
+		{"http://x/team/WEB/cycles/14/x", "/team/*/cycles/*/*", true},
+		{"http://x/team/WEB/cycles", "/team/*/cycles/*/*", false},
+		{"http://x/inbox", "/inbox*", true},
+		{"http://x/", "/*", true},
 	}
 	for _, c := range cases {
 		if got := pathMatches(c.url, c.want); got != c.ok {
@@ -139,6 +146,26 @@ func TestTakeSettle(t *testing.T) {
 	}
 	if s, _ := takeSettle([]string{"http://x/"}); s {
 		t.Error("takeSettle found a --settle that wasn't there")
+	}
+	// The flag package's other forms of a bool flag, before or after the URL.
+	for _, c := range []struct {
+		args []string
+		want bool
+	}{
+		{[]string{"http://x/", "--settle=true"}, true},
+		{[]string{"--settle=true", "http://x/"}, true},
+		{[]string{"-settle=1", "http://x/"}, true},
+		{[]string{"http://x/", "--settle=false"}, false},
+		{[]string{"--settle", "http://x/", "--settle=false"}, false},
+	} {
+		s, rest := takeSettle(c.args)
+		if s != c.want || !reflect.DeepEqual(rest, []string{"http://x/"}) {
+			t.Errorf("takeSettle(%q) = %v, %q; want %v, [http://x/]", c.args, s, rest, c.want)
+		}
+	}
+	// Not the flag: a URL or value that merely contains the word.
+	if s, rest := takeSettle([]string{"http://x/settle", "--settled"}); s || len(rest) != 2 {
+		t.Errorf("takeSettle matched a non-flag: %v %q", s, rest)
 	}
 }
 

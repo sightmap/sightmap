@@ -547,22 +547,29 @@ func pathMatches(pageURL, want string) bool {
 }
 
 func globMatch(pattern, s string) bool {
-	parts := strings.Split(pattern, "*")
-	if !strings.HasPrefix(s, parts[0]) {
-		return false
-	}
-	s = s[len(parts[0]):]
-	for i, p := range parts[1:] {
-		if i == len(parts)-2 {
-			return strings.HasSuffix(s, p)
-		}
-		j := strings.Index(s, p)
-		if j < 0 {
+	// Iterative wildcard matching with one backtrack point: on a mismatch after a
+	// *, retry with the * taking one more character. Linear in practice, and right
+	// for any number of stars (a first-occurrence scan is not: *aa*aa*b vs abaaab).
+	p, i, star, mark := 0, 0, -1, 0
+	for i < len(s) {
+		switch {
+		case p < len(pattern) && pattern[p] == '*':
+			star, mark = p, i
+			p++
+		case p < len(pattern) && pattern[p] == s[i]:
+			p++
+			i++
+		case star >= 0:
+			p, mark = star+1, mark+1
+			i = mark
+		default:
 			return false
 		}
-		s = s[j+len(p):]
 	}
-	return true
+	for p < len(pattern) && pattern[p] == '*' {
+		p++
+	}
+	return p == len(pattern)
 }
 
 // ── keys ──────────────────────────────────────────────────────────────────────
@@ -706,16 +713,24 @@ func settleAfter(ctx context.Context, conn *browser.CDPConn, settle bool) error 
 }
 
 // takeSettle removes a --settle flag from args for the commands that parse
-// their arguments by hand (navigate).
+// their arguments by hand (navigate). It accepts every form the flag package
+// does for a bool: --settle, -settle, and --settle=VALUE / -settle=VALUE with a
+// strconv.ParseBool value; the last occurrence wins, as with flag.
 func takeSettle(args []string) (bool, []string) {
 	out := args[:0:0]
 	settle := false
 	for _, a := range args {
-		if a == "--settle" || a == "-settle" {
-			settle = true
+		name, value, hasValue := strings.Cut(strings.TrimLeft(a, "-"), "=")
+		if !strings.HasPrefix(a, "-") || name != "settle" {
+			out = append(out, a)
 			continue
 		}
-		out = append(out, a)
+		settle = true
+		if hasValue {
+			if b, err := strconv.ParseBool(value); err == nil {
+				settle = b
+			}
+		}
 	}
 	return settle, out
 }
