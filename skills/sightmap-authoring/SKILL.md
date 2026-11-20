@@ -146,6 +146,9 @@ non-standard attributes (e.g. `value` on a `role="option"` `<li>`). `class` and
 `.classname` / `#id` use. Prefer `.classname` / `#id` when a full class or id is
 stable — they're the shortest forms — but reach for the attribute forms when only
 a fragment is stable, e.g. `[id^="issue_"]` for dynamic `issue_<uuid>` ids.
+An id with punctuation needs backslash escapes, single-quoted in YAML:
+`'#product\.1'` (unescaped, `#checkout.submit` means id `checkout` + class
+`submit`). A leading digit takes a hex escape: `'#\31 \.circle'` for `1.circle`.
 Verify any new selector with `sel-probe` regardless.
 
 **Pseudo-classes: `:not()`, `:is()`, `:where()`, `:has()` are supported**

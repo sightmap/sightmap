@@ -15,5 +15,5 @@ import "embed"
 
 // FS contains the embedded skill directories (one per top-level directory).
 //
-//go:embed sightmap-authoring sightmap-browser
+//go:embed sightmap-authoring sightmap-browser sightmap-device
 var FS embed.FS

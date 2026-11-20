@@ -56,6 +56,7 @@ Live (browser-dependent):
 | Package | Responsibility |
 |---|---|
 | `browser` | The Chrome layer: process launch + session file (`launcher.go`), tabs (`tabs.go`), the CDP connection (`cdp.go`), and every interaction primitive (`Click`/`Fill`/`Screenshot`/`EvalJSON`/`ExtractComponents`/…). A caller can own the whole browser lifecycle through this package. |
+| `device` | The iOS Simulator layer, the native counterpart of `browser`: the embedded Swift helper (accessibility tree + input), `simctl` lifecycle, the tree normalizer onto `ComponentNode`, view selection and annotation through `match` + `coverage`, target resolution, the session daemon, console and run log. |
 | `observe` **(planned)** | The live-acquisition operation. Composes `browser` + `sightmap` (Corpus) + `match` + `coverage` + `render` into one annotated observation of a page. This is the "connect → extract → match → annotate" flow that ~10 commands copy-paste today. |
 | `authoring` **(planned)** | The bespoke live-DOM scans used only while authoring: candidate-selector discovery (`suggest`) and link/URL-pattern discovery (`discover`). |
 
@@ -109,6 +110,7 @@ read (it uses no bespoke DOM JS). This is why callers never need a
 | Command | Surface | Subsystems |
 |---|---|---|
 | `browser *` (start/stop/status/navigate/eval/click/fill/…/tabs) | browser-use | `browser` |
+| `device *` (start/stop/status/snapshot/click/fill/scroll/console/run/…) | device-use | `device` (→ `match`, `coverage`, `compquery`) |
 | `snapshot` | browser-use | `browser` → `observe` (→ `match`, `coverage`, `render`) |
 | `screenshot` | browser-use | `browser` |
 | `console` / `network` **(planned .12)** | browser-use | `browser` |

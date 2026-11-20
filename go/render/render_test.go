@@ -840,6 +840,24 @@ func TestSelectorHint_TagAndId(t *testing.T) {
 	}
 }
 
+func TestSelectorHint_EscapesId(t *testing.T) {
+	for id, want := range map[string]string{
+		"product.1": `li#product\.1`,
+		"1.circle":  `li#\31 \.circle`,
+	} {
+		if got := selectorHint(&sightmap.Element{Tag: "li", Id: id}); got != want {
+			t.Errorf("selectorHint(id %q) = %q, want %q", id, got, want)
+		}
+	}
+}
+
+func TestInspectSelectorDisplay_EscapesId(t *testing.T) {
+	got := inspectSelectorDisplay(&sightmap.Element{Tag: "li", Id: "product.1", Classes: []string{"row"}}, "", InspectOpts{Classes: true})
+	if !strings.HasPrefix(got, `li#product\.1.row`) {
+		t.Errorf("inspectSelectorDisplay = %q, want prefix %q", got, `li#product\.1.row`)
+	}
+}
+
 func TestSelectorHint_NoClasses(t *testing.T) {
 	sel := &sightmap.Element{
 		Tag:     "button",

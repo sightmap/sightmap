@@ -1,0 +1,21 @@
+version: 1
+views:
+  # Placeholder route: sightmap requires one, and a native screen has no URL.
+  - name: Simple
+    route: /simple
+    components:
+      - $ref: TabBar
+      - name: PrimaryButton
+        selector: 'button[identifier="simple.primary"]'
+      - name: SecondaryButton
+        selector: '[text="Secondary"]'
+      - name: EmailField
+        selector: 'textfield[identifier="simple.email"]'
+        properties:
+          - name: value
+            extract: { from: dom.attr, path: value }
+      - name: NotificationsToggle
+        selector: 'switch[identifier="simple.toggle"]'
+        properties:
+          - name: on
+            extract: { from: dom.state, path: checked }
