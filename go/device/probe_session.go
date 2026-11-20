@@ -51,6 +51,8 @@ type probeState struct {
 	ready  chan struct{}
 	key    string
 	items  []*probeItem
+	ax     []*ProbeAX // the dump's accessibility trees, one per window
+	screen Size
 	// excluded outlives launches: a class that took the app down once would
 	// again.
 	excluded []string
@@ -67,7 +69,7 @@ func (s *Session) probeLaunched(pid int) {
 	gen := p.gen
 	ready := make(chan struct{})
 	p.ready = ready
-	p.key, p.items = "", nil
+	p.key, p.items, p.ax = "", nil, nil
 	p.status = ProbeStatus{State: "starting", Dylib: s.Probe, Socket: s.probeSocket(), Excluded: p.excluded}
 	p.mu.Unlock()
 	go s.probeWarmup(gen, pid, ready)
@@ -200,7 +202,7 @@ const (
 func (s *Session) probeDumpArgs() map[string]any {
 	s.probe.mu.Lock()
 	defer s.probe.mu.Unlock()
-	return map[string]any{"swiftui": true, "onScreen": true, "skipClasses": append([]string{}, s.probe.excluded...)}
+	return map[string]any{"ax": true, "swiftui": true, "onScreen": true, "skipClasses": append([]string{}, s.probe.excluded...)}
 }
 
 // probeFailed records a dump that took the app down, so later dumps leave that
@@ -234,10 +236,10 @@ func (s *Session) mergeProbe(ctx context.Context, d *Describe, mode probeMode) b
 	p := &s.probe
 	p.mu.Lock()
 	if p.key == key && p.items != nil {
-		items := p.items
+		items, ax, screen := p.items, p.ax, p.screen
 		p.status.CacheHits++
 		p.mu.Unlock()
-		MergeProbe(d, items, s.mergeOptions())
+		s.applyProbe(d, items, ax, screen)
 		return true
 	}
 	state, gen := p.status.State, p.gen
@@ -266,16 +268,26 @@ func (s *Session) mergeProbe(ctx context.Context, d *Describe, mode probeMode) b
 	for _, h := range dump.Hosts {
 		stat.Bytes += h.Info.Bytes
 	}
-	MergeProbe(d, items, s.mergeOptions())
+	s.applyProbe(d, items, dump.Meta.AX, dump.Meta.Screen)
 	stat.TotalMS = time.Since(started).Milliseconds()
 	p.mu.Lock()
-	p.key, p.items = key, items
+	p.key, p.items, p.ax, p.screen = key, items, dump.Meta.AX, dump.Meta.Screen
 	p.status.LastDump = stat
 	p.status.Dumps++
 	p.mu.Unlock()
 	s.Log(fmt.Sprintf("probe: dump of %d hosts (%d off screen skipped), %d bytes; in-app %d ms, total %d ms, %d items",
 		stat.Hosts, stat.Skipped, stat.Bytes, stat.InAppMS, stat.TotalMS, stat.Items))
 	return true
+}
+
+// applyProbe shapes d with a dump: the in-process accessibility tree replaces
+// the out-of-process one, which cannot see an element's container ids, and the
+// SwiftUI graph's app views and Texts are merged under its elements.
+func (s *Session) applyProbe(d *Describe, items []*probeItem, ax []*ProbeAX, screen Size) {
+	if root := ProbeTree(d.Root, ax, cmp.Or(screen, d.Screen)); root != nil {
+		d.Root = root
+	}
+	MergeProbe(d, items, s.mergeOptions())
 }
 
 func (s *Session) mergeOptions() MergeOptions {
