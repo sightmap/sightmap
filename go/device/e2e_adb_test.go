@@ -13,13 +13,16 @@ import (
 // TestAndroidE2E drives an installed or given app through the sightmap CLI on
 // a real emulator or device. It runs only when SIGHTMAP_ANDROID_E2E names the
 // device (a serial or AVD name) and SIGHTMAP_ANDROID_E2E_APP names the app, as
-// an .apk path or a package that is already installed:
+// an .apk path, a package that is already installed, or `sample` for the sample
+// app in testdata/AndroidSample, built with its build.sh:
 //
 //	SIGHTMAP_ANDROID_E2E=emulator-5554 SIGHTMAP_ANDROID_E2E_APP=path/to/app-debug.apk \
 //	  go test ./device -run TestAndroidE2E -v -timeout 10m
 //
 // It snapshots the launch screen and checks the screenshot, console, run log
-// and relaunch paths.
+// and relaunch paths. With the sample app it also checks that Compose
+// identifiers, a segment's checked state and a switch's arrive and change, and
+// that Compose and Material tab bars read as tabs with the current one selected.
 func TestAndroidE2E(t *testing.T) {
 	serial, app := os.Getenv("SIGHTMAP_ANDROID_E2E"), os.Getenv("SIGHTMAP_ANDROID_E2E_APP")
 	if serial == "" || app == "" {
@@ -50,6 +53,15 @@ func TestAndroidE2E(t *testing.T) {
 	}
 	t.Cleanup(func() { run("stop") })
 
+	sample := app == "sample"
+	if sample {
+		out, err := exec.Command("testdata/AndroidSample/build.sh").Output()
+		if err != nil {
+			t.Fatalf("build the sample app: %v", err)
+		}
+		app = strings.TrimSpace(string(out))
+	}
+
 	must("doctor", "--platform", "android")
 	start := []string{"start", "--platform", "android", "--device", serial, "--detach"}
 	if strings.HasSuffix(app, ".apk") {
@@ -78,6 +90,42 @@ func TestAndroidE2E(t *testing.T) {
 		t.Errorf("screenshot is not a PNG (%v)", err)
 	}
 	must("console", "list", "--limit", "5")
+	if sample {
+		if !strings.Contains(snap, `identifier="product.1"`) {
+			t.Errorf("the sample's Shop screen lacks its testTags:\n%s", snap)
+		}
+		wantAll := func(out, what string, lines ...string) {
+			t.Helper()
+			for _, l := range lines {
+				if !strings.Contains(out, l) {
+					t.Errorf("%s: no %s in\n%s", what, l, out)
+				}
+			}
+		}
+		wantAll(snap, "Compose bottom navigation", `tabbar[identifier="nav"]`, `tab[identifier="nav.shop"] "Shop" (selected)`, `tab[identifier="nav.plain"] "Plain"`+"\n")
+		must("click", "shop.filter.sale")
+		if out := must("snapshot"); !strings.Contains(out, `radio[identifier="shop.filter.sale"] "Sale" value="1"`) {
+			t.Errorf("the Sale segment is not checked after a click:\n%s", out)
+		}
+		must("click", "nav.settings")
+		must("click", "settings.notifications")
+		out := must("snapshot")
+		if !strings.Contains(out, `switch[identifier="settings.notifications"] "Notifications" value="1"`) {
+			t.Errorf("the notifications switch is not on after a click:\n%s", out)
+		}
+		wantAll(out, "Compose tab row and bottom navigation", `tabbar[identifier="settings.tabs"]`, `tab[identifier="settings.tab.general"] "General" (selected)`,
+			`tab[identifier="nav.settings"] "Settings" (selected)`, `tab[identifier="nav.shop"] "Shop"`+"\n")
+		must("click", "nav.views")
+		var views string
+		for range 5 {
+			if views = must("snapshot"); strings.Contains(views, "bottom_nav") {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		wantAll(views, "BottomNavigationView", `tabbar[identifier="bottom_nav"]`, `tab[identifier="nav_views"] "Views" (selected)`, `tab[identifier="nav_compose"] "Compose"`+"\n")
+		must("button", "back")
+	}
 	must("relaunch")
 	if out := must("run", "tail"); !strings.Contains(out, "relaunch") {
 		t.Errorf("run log lacks the relaunch:\n%s", out)
