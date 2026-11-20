@@ -26,12 +26,15 @@ func deviceUsage() {
 	fmt.Fprint(os.Stderr, `sightmap device — drive an app in the local iOS Simulator (macOS, Apple Silicon, Xcode 26+)
 
 Session:
-  doctor [--fix]                                    check prerequisites; builds the simulator helper on first use
+  doctor [--fix]                                    check prerequisites; builds the simulator helper and probe
   start [--device NAME|UDID] [--app PATH | --bundle-id ID] [--label L] [--console-limit N] [--detach]
         [--network auto|har|rn-cdp|summary|off] [--network-limit N] [--metro-port N]
+        [--probe [--probe-fields none]]
                                                     boot, enable accessibility, install, launch, run the daemon
                                                     (blocks the shell; --detach backgrounds it). On a running
-                                                    session: reinstall (--app) and relaunch the same app
+                                                    session: reinstall (--app) and relaunch the same app.
+                                                    --probe loads an in-app probe: SwiftUI view types and one
+                                                    node per Text in snapshots
   status                                            session health
   stop [--shutdown]                                 stop the daemon and the app (--shutdown: the simulator too)
   launch | relaunch                                 foreground the app | restart it (re-enables accessibility)
@@ -717,6 +720,9 @@ func deviceDoctor(args []string, f *deviceFlags) error {
 		if err := device.Call(session.Socket, "status", nil, &s, 10*time.Second); err == nil && s.Network != nil {
 			checks = append(checks, networkCheck(*s.Network))
 		}
+		if s.Probe != nil {
+			checks = append(checks, probeCheck(*s.Probe))
+		}
 	}
 	failed := 0
 	for _, c := range checks {
@@ -771,11 +777,16 @@ func deviceStart(args []string, f *deviceFlags) error {
 	network := fs.String("network", device.NetworkAuto, "network source: auto, har, rn-cdp, summary or off")
 	networkLimit := fs.Int("network-limit", 1000, "how many network entries the session keeps")
 	metroPort := fs.Int("metro-port", 0, "where rn-cdp looks for Metro (default: the app's RCT_jsLocation, else 8081)")
+	probe := fs.Bool("probe", false, "load an in-app probe into the app for a richer tree: SwiftUI view types and each Text as its own node")
+	probeFields := fs.String("probe-fields", "", "with --probe, `none` leaves app views' stored fields out of the tree")
 	if _, err := parseFlagsAroundArgs(fs, args); err != nil {
 		return usageErr("%v", err)
 	}
 	if *networkLimit < 1 {
 		return usageErr("--network-limit must be at least 1, not %d", *networkLimit)
+	}
+	if *probeFields != "" && (*probeFields != device.ProbeFieldsNone || !*probe) {
+		return usageErr("--probe-fields takes `none`, with --probe")
 	}
 	if !device.ValidNetworkMode(*network) {
 		return usageErr("--network takes %s, not %q", strings.Join(device.NetworkModes, ", "), *network)
@@ -814,6 +825,20 @@ func deviceStart(args []string, f *deviceFlags) error {
 				Message: fmt.Sprintf("a session for %s is already running on %s; it can't switch to %s", existing.BundleID, existing.DeviceName, wanted),
 				Hint:    fmt.Sprintf("run `sightmap device stop`, then `sightmap device start %s --detach`", again)}
 		}
+		if *probe && existing.Probe && *probeFields != existing.ProbeFields {
+			return &device.Error{Code: "session_running",
+				Message: fmt.Sprintf("the running session was started with --probe-fields %q; it can't restart with %q", existing.ProbeFields, *probeFields),
+				Hint:    "run `sightmap device stop`, then start again"}
+		}
+		if *probe != existing.Probe {
+			want, have := "with", "without"
+			if !*probe {
+				want, have = "without", "with"
+			}
+			return &device.Error{Code: "session_running",
+				Message: fmt.Sprintf("the running session was started %s --probe; it can't restart %s it", have, want),
+				Hint:    "run `sightmap device stop`, then start again"}
+		}
 		var result json.RawMessage
 		if err := device.Call(existing.Socket, "restart", device.ValueArgs{App: appPath}, &result, 5*time.Minute); err != nil {
 			return err
@@ -848,6 +873,12 @@ func deviceStart(args []string, f *deviceFlags) error {
 	cfg := device.Config{UDID: d.UDID, DeviceName: d.Label(), BundleID: *bundleID, AppPath: appPath, SightmapDir: sightmapDir, RunLabel: *label, ConsoleLimit: *consoleLimit,
 		Network: *network, NetworkLimit: *networkLimit, MetroPort: *metroPort,
 		RunDir: filepath.Join(device.CacheDir(), "sessions", d.UDID)}
+	if *probe {
+		if cfg.Probe, err = device.BuildProbe(ctx); err != nil {
+			return err
+		}
+		cfg.ProbeFields = *probeFields
+	}
 	if appPath != "" {
 		if cfg.BundleID == "" {
 			if cfg.BundleID, err = device.PlistValue(appPath, "CFBundleIdentifier"); err != nil {
@@ -935,6 +966,16 @@ func formatDeviceStart(info *device.SessionInfo, ready map[string]any, took time
 		lines = append(lines, fmt.Sprintf("  ⚠ accessibility tree not readable yet: %s. Next: %s", e.Message, e.Hint))
 	} else if r, _ := ready["ready"].(bool); !r {
 		lines = append(lines, "  ⚠ the app shows no interactive elements yet; snapshot again shortly")
+	}
+	if p, ok := ready["probe"]; ok {
+		var st device.ProbeStatus
+		if raw, err := json.Marshal(p); err == nil && json.Unmarshal(raw, &st) == nil {
+			if st.State == "unavailable" {
+				lines = append(lines, "  ⚠ probe not loaded; snapshots are the plain accessibility tree: "+st.Reason)
+			} else {
+				lines = append(lines, "  probe:   "+st.State+" (in-app SwiftUI structure merged into snapshots)")
+			}
+		}
 	}
 	return strings.Join(append(lines, "  next:    sightmap device snapshot"), "\n")
 }
@@ -1073,8 +1114,41 @@ func deviceStatus(args []string, f *deviceFlags) error {
 	if s.Network != nil {
 		fmt.Println(strings.Join(networkStatusLines(*s.Network), "\n"))
 	}
+	if s.Probe != nil {
+		fmt.Println(probeStatusLine(*s.Probe))
+	}
 	fmt.Printf("  session: %s\n  run:     %s (%d entries)\n", session.File, s.Run.Run, s.Run.Seq)
 	return nil
+}
+
+func probeStatusLine(p device.ProbeStatus) string {
+	line := "  probe:   " + p.State
+	switch {
+	case p.Reason != "":
+		line += ": " + p.Reason
+	case p.State == "loaded":
+		line += fmt.Sprintf(" (%d dumps, %d cache hits", p.Dumps, p.CacheHits)
+		if p.LastDump != nil {
+			line += fmt.Sprintf("; last %d hosts, %d skipped off screen, %d KB, %d ms", p.LastDump.Hosts, p.LastDump.Skipped, p.LastDump.Bytes/1024, p.LastDump.TotalMS)
+		}
+		if p.WarmupMS > 0 {
+			line += fmt.Sprintf("; warm-up %d ms", p.WarmupMS)
+		}
+		line += ")"
+	}
+	if len(p.Excluded) > 0 {
+		line += "; left out after a crash: " + strings.Join(p.Excluded, ", ")
+	}
+	return line
+}
+
+// probeCheck is doctor's report on a running session's in-app probe.
+func probeCheck(p device.ProbeStatus) device.Check {
+	c := device.Check{Name: "probe", OK: p.State != "unavailable", Detail: strings.TrimPrefix(probeStatusLine(p), "  probe:   ")}
+	if !c.OK {
+		c.Fix = "snapshots fall back to the plain accessibility tree; fix the cause above, then `sightmap device restart`"
+	}
+	return c
 }
 
 func networkStatusLines(n device.NetStatus) []string {

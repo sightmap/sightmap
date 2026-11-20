@@ -86,6 +86,15 @@ func doctorChecks(ctx context.Context, progress io.Writer) []Check {
 	} else {
 		checks = append(checks, pass("helper", path))
 	}
+	// Built here so the first `start --probe` doesn't wait on it.
+	if path, err := BuildProbe(ctx); err != nil {
+		e := AsError(err)
+		// Optional: a failed build only matters to `start --probe`, which
+		// reports it again, so it does not fail doctor.
+		checks = append(checks, pass("probe", "not built (needed only for `start --probe`): "+e.Message))
+	} else {
+		checks = append(checks, pass("probe", path))
+	}
 	return checks
 }
 

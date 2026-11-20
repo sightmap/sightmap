@@ -20,6 +20,8 @@ type Snapshot struct {
 	Conflicts []sightmap.Conflict
 	Coverage  coverage.Result
 	Memory    []Memory
+	// ProbeMerged is true when the in-app probe's structure is in the tree.
+	ProbeMerged bool
 	// CorpusApplied is false when there was no corpus to apply.
 	CorpusApplied bool
 }

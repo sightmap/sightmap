@@ -95,6 +95,11 @@ struct MainTabs: View {
                     Label("Account", systemImage: "person.crop.circle")
                         .accessibilityIdentifier("tab-account")
                 }
+            CatalogList()
+                .tabItem {
+                    Label("Catalog", systemImage: "square.grid.2x2")
+                        .accessibilityIdentifier("tab-catalog")
+                }
         }
     }
 }
@@ -122,6 +127,67 @@ struct ProductList: View {
             }
             .navigationTitle("Products")
             .navigationDestination(for: Product.self) { ProductDetail(product: $0) }
+        }
+    }
+}
+
+// The catalog's rows are built the way list rows usually are: a NavigationLink
+// whose label is a custom view of several Texts, which SwiftUI joins into one
+// accessibility label. Titles and makers contain ", " on purpose, so the joined
+// label cannot be split back apart.
+struct CatalogItem: Identifiable, Hashable {
+    struct Summary: Hashable {
+        let id: Int
+        let title: String
+        let price: Double
+    }
+
+    let summary: Summary
+    let maker: String
+    var id: Int { summary.id }
+
+    static let all = [
+        CatalogItem(summary: Summary(id: 1, title: "Socks, Wool, Pair of 2", price: 9.99), maker: "Acme, Inc."),
+        CatalogItem(summary: Summary(id: 2, title: "Desk Lamp", price: 24.5), maker: "Bright, Light & Co."),
+        CatalogItem(summary: Summary(id: 3, title: "Mug, Large", price: 12), maker: "Kiln"),
+    ]
+}
+
+struct CatalogList: View {
+    var body: some View {
+        NavigationStack {
+            List(CatalogItem.all) { item in
+                NavigationLink(value: item.id) {
+                    CatalogRow(item: item.summary, maker: item.maker)
+                }
+                .accessibilityIdentifier("catalog-row-\(item.id)")
+                .accessibilityCustomContent("Maker", item.maker)
+                .accessibilityCustomContent("Price", item.summary.price.formatted(.currency(code: "USD")))
+            }
+            .navigationTitle("Catalog")
+            .navigationDestination(for: Int.self) { id in Text("Item \(id)") }
+        }
+    }
+}
+
+struct CatalogRow: View {
+    let item: CatalogItem.Summary
+    let maker: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.quaternary)
+                .frame(width: 44, height: 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.headline)
+                Text(maker)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(item.price, format: .currency(code: "USD"))
+                    .font(.subheadline.monospacedDigit())
+            }
         }
     }
 }
