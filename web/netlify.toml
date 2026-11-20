@@ -35,6 +35,11 @@
 
 # POST /api/atlas/submit needs no rule here — see netlify/functions/atlas-submit.mts for the request chain.
 
+# GET /try/<host> needs no rule here either, for the same reason: functions are
+# evaluated before redirects, so the catch-all below cannot shadow it. Nothing
+# is prerendered under /try/, so the "a static file wins over a non-forced
+# redirect" rule never comes into play — see netlify/functions/atlas-try.mts.
+
 # Unknown URLs. Every real route has a prerendered dist/<route>/index.html, and
 # Netlify serves an existing static file before applying a non-forced redirect,
 # so this rule only ever answers paths that do not exist. It used to return 200
