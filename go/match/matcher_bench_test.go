@@ -3,8 +3,10 @@ package match_test
 import (
 	"fmt"
 	"math/rand/v2"
+	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sightmap/sightmap/go/match"
@@ -299,17 +301,43 @@ func TestFindAllMatchesEquivalentToReference(t *testing.T) {
 			t.Fatal(errs)
 		}
 		want := collectCalls(referenceFindAllMatches, root, queries)
-		got := collectCalls(match.FindAllMatches, root, queries)
 		if len(want) == 0 {
 			t.Fatalf("%+v: reference produced no matches; the generator is not exercising the matcher", c)
 		}
-		if len(got) != len(want) {
-			t.Fatalf("%+v: got %d calls, want %d", c, len(got), len(want))
+		// A prepared set walked twice must answer as the one-shot call does.
+		prepared := match.Prepare(queries)
+		findPrepared := func(root *sightmap.ComponentNode, _ []match.MatchQuery, f func(*sightmap.ComponentNode, *match.MatchQuery)) {
+			prepared.FindAll(root, f)
 		}
-		for i := range want {
-			if got[i] != want[i] {
-				t.Fatalf("%+v call %d: got (%s, %s), want (%s, %s)",
-					c, i, got[i].node.Id, got[i].q.Name, want[i].node.Id, want[i].q.Name)
+		for _, find := range []func(*sightmap.ComponentNode, []match.MatchQuery, func(*sightmap.ComponentNode, *match.MatchQuery)){match.FindAllMatches, findPrepared, findPrepared} {
+			got := collectCalls(find, root, queries)
+			if len(got) != len(want) {
+				t.Fatalf("%+v: got %d calls, want %d", c, len(got), len(want))
+			}
+			for i := range want {
+				if got[i] != want[i] {
+					t.Fatalf("%+v call %d: got (%s, %s), want (%s, %s)",
+						c, i, got[i].node.Id, got[i].q.Name, want[i].node.Id, want[i].q.Name)
+				}
+			}
+		}
+	}
+}
+
+// MatchConflicts must answer exactly what Match and Conflicts answer apart.
+func TestMatchConflictsEqualsMatchAndConflicts(t *testing.T) {
+	for seed := uint64(1); seed <= 30; seed++ {
+		for _, exotic := range []bool{false, true} {
+			comps := 10 + int(seed)*3
+			root := benchTree(seed, 400, comps, exotic)
+			m := match.NewMatcher(benchCorpus(seed, comps, exotic))
+			wantM, wantC := m.Match(root, "/"), m.Conflicts(root, "/")
+			gotM, gotC := m.MatchConflicts(root, "/")
+			if !reflect.DeepEqual(gotM, wantM) {
+				t.Fatalf("seed %d exotic %v: matches differ", seed, exotic)
+			}
+			if !reflect.DeepEqual(gotC, wantC) {
+				t.Fatalf("seed %d exotic %v: conflicts differ: got %d, want %d", seed, exotic, len(gotC), len(wantC))
 			}
 		}
 	}
@@ -394,4 +422,31 @@ func refAppendIfNew(ss []refState, s refState) []refState {
 		return ss
 	}
 	return append(ss, s)
+}
+
+// Goroutines sharing one Matcher share its specificity memo; every one must
+// get the answer a lone caller gets. Run under -race.
+func TestMatchConcurrentOnOneMatcher(t *testing.T) {
+	const comps = 40
+	root := benchTree(7, 400, comps, true)
+	m := match.NewMatcher(benchCorpus(7, comps, true))
+	wantM, wantC := m.MatchConflicts(root, "/")
+
+	var wg sync.WaitGroup
+	errs := make(chan string, 8)
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			gotM, gotC := m.MatchConflicts(root, "/")
+			if !reflect.DeepEqual(gotM, wantM) || !reflect.DeepEqual(gotC, wantC) {
+				errs <- "concurrent MatchConflicts differs from a lone call"
+			}
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for e := range errs {
+		t.Error(e)
+	}
 }

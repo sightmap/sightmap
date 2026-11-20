@@ -102,9 +102,10 @@ Viewport bounding box in pixels.
 | InViewport | bool | `inViewport` | pre-merge | Bounds intersect the viewport. |
 | IsIgnored | bool | `isIgnored` | post-merge | A11Y tree marks this node as ignored. |
 | NthChild | int | `nthChild` | pre-merge | 1-based position among parent's children. |
+| FrameURL | string | `frameUrl` | pre-merge | Set only on the root of a child frame's document, which is the single child of its owning `<iframe>` node: the URL the document is matched at (its own; an `about:blank`/`about:srcdoc` document takes its parent's). A matcher treats the subtree as a page of its own. Omitted elsewhere. |
 | Children | []\*ComponentNode | `children` | pre-merge | Direct children in document order. |
 
-`omitempty` applies to: `Properties`, `State`, `Element`, `Bounds`, `Children`.
+`omitempty` applies to: `Properties`, `State`, `Element`, `Bounds`, `FrameURL`, `Children`.
 
 ### Element
 

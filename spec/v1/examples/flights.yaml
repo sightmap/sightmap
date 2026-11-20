@@ -63,6 +63,15 @@ views:
         memory:
           - Rate-limited to 10 requests/min per user; returns 429 beyond that
 
+  # Same path, different screen: the query condition selects the map mode, and
+  # outranks /search on any URL carrying ?view=map (SEP-0025).
+  - name: FlightSearchMap
+    route: /search?view=map
+    description: Search results plotted on a map instead of listed
+    components:
+      - name: RouteMap
+        selector: '[data-component="RouteMap"]'
+
 components:
   - name: Navigation
     selector: 'nav[data-component="Navigation"]'
