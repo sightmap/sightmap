@@ -19,7 +19,7 @@ sightmap coverage --trace product-list.snap
 
 ## 2. Properties completeness *(manual)*
 
-Every T1 link and button has at least one extracted property. Scan the snap for bare `[ComponentName]` annotations on interactive leaf nodes — these are components without properties where every instance looks identical.
+Every T1 link and button is **identifiable** — by its accessible name, or by a *useful* property (a discriminator or signal). Scan the snap for bare `[ComponentName]` annotations on interactive leaf nodes — these are components without properties where every instance looks identical.
 
 ```bash
 grep '\[ProductCard\]' product-list.snap     # bare annotation = no properties resolved
