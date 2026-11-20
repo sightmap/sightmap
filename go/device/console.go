@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -184,6 +183,7 @@ type LogCollector struct {
 
 	mu        sync.Mutex
 	cancel    context.CancelFunc
+	streams   sync.WaitGroup
 	streaming bool
 }
 
@@ -191,7 +191,11 @@ type LogCollector struct {
 func (l *LogCollector) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	l.cancel = cancel
-	go l.stream(ctx)
+	l.streams.Add(1)
+	go func() {
+		defer l.streams.Done()
+		l.stream(ctx)
+	}()
 	go l.tail(ctx, l.Stdout, "stdout")
 	go l.tail(ctx, l.Stderr, "stderr")
 }
@@ -212,7 +216,7 @@ func (l *LogCollector) setStreaming(on bool) {
 func (l *LogCollector) stream(ctx context.Context) {
 	predicate := fmt.Sprintf(`process == %q AND (NOT (subsystem BEGINSWITH "com.apple.") OR messageType == error OR messageType == fault)`, l.Process)
 	for ctx.Err() == nil {
-		cmd := exec.CommandContext(ctx, "xcrun", "simctl", "spawn", l.UDID, "log", "stream", "--style", "ndjson", "--level", "info", "--predicate", predicate)
+		cmd := logStream(ctx, l.UDID, predicate)
 		out, err := cmd.StdoutPipe()
 		if err == nil {
 			err = cmd.Start()
@@ -294,4 +298,7 @@ func (l *LogCollector) Close() {
 	if l.cancel != nil {
 		l.cancel()
 	}
+	// The daemon exits right after Close; a log stream not yet reaped would
+	// outlive it.
+	l.streams.Wait()
 }
