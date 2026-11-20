@@ -1,0 +1,90 @@
+{
+ "kind": "root",
+ "id": "",
+ "text": "",
+ "kids": [
+  {
+   "kind": "text",
+   "id": "",
+   "text": "🌯 Burrito Co.",
+   "kids": []
+  },
+  {
+   "kind": "text",
+   "id": "",
+   "text": "Sign in to order",
+   "kids": []
+  },
+  {
+   "kind": "group",
+   "id": "signin.email",
+   "text": "",
+   "kids": [
+    {
+     "kind": "textbox",
+     "id": "",
+     "text": "",
+     "kids": [
+      {
+       "kind": "textbox",
+       "id": "",
+       "text": "",
+       "kids": []
+      },
+      {
+       "kind": "textbox",
+       "id": "",
+       "text": "Email",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "signin.password",
+   "text": "",
+   "kids": [
+    {
+     "kind": "textbox",
+     "id": "",
+     "text": "",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "signin.submit",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "",
+     "kids": []
+    },
+    {
+     "kind": "button",
+     "id": "",
+     "text": "Sign in",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "group",
+   "id": "signin.guest",
+   "text": "",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "",
+     "text": "Continue as guest",
+     "kids": []
+    }
+   ]
+  }
+ ]
+}

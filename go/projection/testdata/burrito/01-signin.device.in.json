@@ -1,0 +1,57 @@
+{
+ "kind": "root",
+ "id": "",
+ "text": "",
+ "kids": [
+  {
+   "kind": "text",
+   "id": "",
+   "text": "🌯 Burrito Co.",
+   "kids": []
+  },
+  {
+   "kind": "text",
+   "id": "",
+   "text": "Sign in to order",
+   "kids": []
+  },
+  {
+   "kind": "textbox",
+   "id": "signin.email",
+   "text": "",
+   "kids": [
+    {
+     "kind": "text",
+     "id": "",
+     "text": "Email",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "textbox",
+   "id": "signin.password",
+   "text": "",
+   "kids": [
+    {
+     "kind": "text",
+     "id": "",
+     "text": "Password",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "button",
+   "id": "signin.submit",
+   "text": "Sign in",
+   "kids": []
+  },
+  {
+   "kind": "button",
+   "id": "signin.guest",
+   "text": "Continue as guest",
+   "kids": []
+  }
+ ]
+}
