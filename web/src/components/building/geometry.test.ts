@@ -1,16 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { furnish } from './furnish'
 import { buildPath, routeOnFloor } from './geometry'
-import {
-  CORE,
-  FLOOR_H,
-  FLOORS,
-  JOURNEYS,
-  LANES,
-  SLAB_T,
-  findRoom,
-  roomStand,
-} from './model'
+import { CORE, DEMO_MODEL, FLOOR_H, SLAB_T, findRoom, roomStand } from './model'
+
+const { floors: FLOORS, journeys: JOURNEYS, lanes: LANES } = DEMO_MODEL
 
 const RADIUS = 0.13
 const SKIP_TYPES = new Set(['partition', 'rail'])
@@ -114,7 +107,7 @@ describe('lane graph', () => {
 describe('buildPath', () => {
   it('does not emit consecutive duplicate points', () => {
     for (const j of JOURNEYS) {
-      const path = buildPath(j)
+      const path = buildPath(DEMO_MODEL, j)
       for (let i = 1; i < path.points.length; i++) {
         expect(path.points[i].distanceToSquared(path.points[i - 1]), `${j.name} dup at ${i}`).toBeGreaterThan(1e-6)
       }
@@ -123,7 +116,7 @@ describe('buildPath', () => {
 
   it('routes floor changes through the core at both floor heights', () => {
     for (const j of JOURNEYS) {
-      const path = buildPath(j)
+      const path = buildPath(DEMO_MODEL, j)
       for (let k = 1; k < j.stops.length; k++) {
         const [pf] = j.stops[k - 1]
         const [f] = j.stops[k]
@@ -138,7 +131,7 @@ describe('buildPath', () => {
   it('keeps every journey leg clear of low furniture', () => {
     const hitsAll: string[] = []
     for (const j of JOURNEYS) {
-      const path = buildPath(j)
+      const path = buildPath(DEMO_MODEL, j)
       for (let k = 1; k < j.stops.length; k++) {
         const [pf, fromName] = j.stops[k - 1]
         const [f, toName] = j.stops[k]
@@ -163,16 +156,16 @@ describe('buildPath', () => {
 describe('HealDemo legs', () => {
   it('routes PaymentForm to both ContinueButton stands without clipping', () => {
     const hitsAll: string[] = []
-    const from = roomStand(3, findRoom(3, 'PaymentForm'))
-    const room = findRoom(3, 'ContinueButton')
-    const oldPos = roomStand(3, room, 0)
-    const newPos = roomStand(3, room, 1)
+    const from = roomStand(DEMO_MODEL, 3, findRoom(DEMO_MODEL, 3, 'PaymentForm'))
+    const room = findRoom(DEMO_MODEL, 3, 'ContinueButton')
+    const oldPos = roomStand(DEMO_MODEL, 3, room, 0)
+    const newPos = roomStand(DEMO_MODEL, 3, room, 1)
     const legs: [string, [number, number, number], [number, number, number]][] = [
       ['pay→old', from, oldPos],
       ['old→new', oldPos, newPos],
     ]
     for (const [label, a, b] of legs) {
-      const route = routeOnFloor(3, a[0], a[2], b[0], b[2])
+      const route = routeOnFloor(DEMO_MODEL, 3, a[0], a[2], b[0], b[2])
       const obs = obstaclesOn(3, 'ContinueButton')
       for (let i = 0; i < route.length - 1; i++) {
         const p = route[i]
@@ -190,7 +183,7 @@ describe('roomStand', () => {
   it('places walkers on the slab, not below it', () => {
     for (const j of JOURNEYS) {
       for (const [f, name] of j.stops) {
-        const stand = roomStand(f, findRoom(f, name))
+        const stand = roomStand(DEMO_MODEL, f, findRoom(DEMO_MODEL, f, name))
         expect(stand[1], `${name} F${f}`).toBeGreaterThanOrEqual(f * FLOOR_H + SLAB_T - 1e-6)
       }
     }

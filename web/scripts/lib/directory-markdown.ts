@@ -94,6 +94,7 @@ ${l.strengths.length ? `\n## Strong\n\n${l.strengths.map((s) => `- ${plain(s)}`)
 - ${SITE_URL}/atlas/sites/${l.slug}/tools.json
 - ${SITE_URL}/atlas/scans/${l.slug}.json
 - ${SITE_URL}/atlas/directory.json
+- Building blueprint: ${SITE_URL}/atlas/sites/${l.slug}/blueprint.json
 
 Classification is Atlas's own, corrected by a maintainer on review. A listing records the tools a scan detected on the date shown, and says nothing about the site beyond that.
 `

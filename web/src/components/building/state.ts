@@ -10,6 +10,9 @@ export interface SharedState {
   progress: number
   /** Pointer in [-1, 1] each axis, for parallax. */
   pointer: { x: number; y: number }
+  /** Degrees the viewer has dragged the building around Y. The tour page
+   *  leaves this at 0; a listing's limited orbit writes it. */
+  orbit: number
   /** Damped scene parameters, written by Scene's updater each frame. */
   cur: SceneParams
   /** Scratch target, refilled each frame. */
@@ -29,6 +32,7 @@ export function createSharedState(): SharedState {
   return {
     progress: 0,
     pointer: { x: 0, y: 0 },
+    orbit: 0,
     cur: defaultParams(),
     target: defaultParams(),
     healShift: 0,

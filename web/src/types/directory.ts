@@ -8,6 +8,8 @@
 // carry identical keys. The camelCase fields on DirectoryListing are derived
 // by scripts/lib/directory.ts from the listing and its scan.
 
+import type { Blueprint } from './blueprint'
+
 /** How a tool is classified. `classified by Atlas`, never by the site. */
 export type ToolKind = 'read' | 'action' | 'sensitive'
 
@@ -138,6 +140,8 @@ export interface ListingMeta {
   submitted_by: 'owner' | 'nominator' | 'maintainer'
   labels: string[]
   collections: string[]
+  /** The city lot the building stands on; assigned when the listing is first written. */
+  lot?: number
   added: string
   updated: string
   /** Path of the latest scan report, relative to the directory data dir. */
@@ -180,4 +184,9 @@ export interface SightkickStarter {
 /** What the app renders: a listing plus the build-time extras the page shows. */
 export interface DirectoryListingView extends DirectoryListing {
   starter: SightkickStarter
+  /** The building this listing's scan derives, ready to render without a fetch. */
+  blueprint: Blueprint
+  /** Where it stands in the city, and whether it is the skyline's one peak. */
+  lot: number
+  peak: boolean
 }

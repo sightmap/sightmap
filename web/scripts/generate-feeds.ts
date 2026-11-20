@@ -24,6 +24,7 @@ import {
   BLOG_DESCRIPTION,
   ATLAS_DESCRIPTION,
   escXml,
+  ATLAS_CITY_DESCRIPTION,
   BUILDING_DESCRIPTION,
   SIGHTKICK_DESCRIPTION,
 } from './lib/site'
@@ -146,6 +147,7 @@ export function buildSitemap(
     { loc: `${SITE_URL}/developers`, lastmod: today, priority: '0.8' },
     { loc: `${SITE_URL}/building`, lastmod: today, priority: '0.8' },
     { loc: `${SITE_URL}/sightkick`, lastmod: today, priority: '0.8' },
+    { loc: `${SITE_URL}/atlas/city`, lastmod: atlasIndexLastmod ?? today, priority: '0.7' },
     { loc: `${SITE_URL}/blog`, lastmod: posts[0]?.date ?? today, priority: '0.8' },
     ...posts.map((p) => ({
       loc: `${SITE_URL}/blog/${p.slug}`,
@@ -288,6 +290,7 @@ export function buildLlmsTxt(
     `- [Specification](https://github.com/sightmap/sightmap/tree/main/spec): The normative spec, JSON Schema, and conformance fixtures.`,
     `- [The Building](${SITE_URL}/building): ${oneLine(BUILDING_DESCRIPTION)}`,
     `- [Sightkick](${SITE_URL}/sightkick): ${oneLine(SIGHTKICK_DESCRIPTION)}`,
+    `- [The city](${SITE_URL}/atlas/city): ${oneLine(ATLAS_CITY_DESCRIPTION)}`,
     '',
     '## Sightmap developer resources',
     '',

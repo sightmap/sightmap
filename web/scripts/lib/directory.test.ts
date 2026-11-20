@@ -121,6 +121,7 @@ describe('markdown twins', () => {
     expect(md).toContain('\\<b\\>now\\</b\\>')
     expect(md).toContain('## Since 2026-09-01')
     expect(md).toContain('Added: `open_page`')
+    expect(md).toContain('Building blueprint: https://sightmap.org/atlas/sites/alpha-tools/blueprint.json')
   })
 
   it('renders a scan report with checks, tools, and pages', () => {

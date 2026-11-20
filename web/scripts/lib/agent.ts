@@ -3,6 +3,8 @@
 // writes them into dist/; the negotiate edge function serves the twins
 // when Accept prefers text/markdown.
 import {
+  ATLAS_CITY_DESCRIPTION,
+  ATLAS_CITY_TITLE,
   ATLAS_DESCRIPTION,
   BUILDING_DESCRIPTION,
   BUILDING_TITLE,
@@ -167,6 +169,37 @@ Machine index: ${SITE_URL}/atlas/index.json
 HTTP API: ${SITE_URL}/api/atlas
 
 ${entryItems}
+`
+}
+
+/** One line per listed building, for the city's markdown twin. */
+export interface CityTwinEntry {
+  name: string
+  slug: string
+  lot?: number
+}
+
+export function buildCityMarkdown(entries: CityTwinEntry[]): string {
+  const rows =
+    entries.length === 0
+      ? '- No buildings yet.'
+      : entries
+          .map((e) => `- [${e.name}](${SITE_URL}/atlas/${e.slug}.md)${e.lot === undefined ? '' : ` — lot ${e.lot}`}`)
+          .join('\n')
+  return `# ${ATLAS_CITY_TITLE}
+
+${ATLAS_CITY_DESCRIPTION}
+
+The interactive version at ${SITE_URL}/atlas/city is a 3D scene. Each building is derived from its listing's scan: a floor per page, a room per tool, a walk per journey. A lot is assigned once and kept. The plan with every placement: ${SITE_URL}/atlas/city.json
+
+## Buildings
+
+${rows}
+
+## Next
+
+- [Atlas](${SITE_URL}/atlas.md)
+- [Homepage](${SITE_URL}/)
 `
 }
 
