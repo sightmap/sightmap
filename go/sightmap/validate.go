@@ -190,7 +190,7 @@ func checkRouteCollisions(views []ViewDef) []ValidationError {
 		if v.Route == "" {
 			continue
 		}
-		r := normalizeRoutePath(v.Route)
+		r := canonicalRoute(v.Route)
 		if _, seen := byRoute[r]; !seen {
 			order = append(order, r)
 		}

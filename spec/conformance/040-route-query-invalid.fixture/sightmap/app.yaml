@@ -1,0 +1,19 @@
+version: 1
+views:
+  # One route, spelled two ways: conditions compare in any order.
+  - name: Billing
+    route: /settings?tab=billing&mode=:mode
+  - name: BillingAgain
+    route: /settings/?mode=:mode&tab=billing
+  # A key may be named once.
+  - name: Twice
+    route: /page?id=1&id=2
+  # Keys and values are percent-encoded as in a URL.
+  - name: BadEscape
+    route: /page?id=%zz
+  # A URL's query never holds a raw "#": the fragment starts there.
+  - name: Fragment
+    route: /page?id=1#top
+  # An escape must decode to UTF-8, as a browser's decoder requires.
+  - name: NotUTF8
+    route: /page?id=%FF

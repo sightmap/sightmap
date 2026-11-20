@@ -15,7 +15,7 @@ var routeParamPattern = regexp.MustCompile(`^:([a-z][a-z0-9_]*)$`)
 // binds: it spans a variable number of segments, so there is no single value to name.
 func routeParams(route string) []string {
 	var out []string
-	for _, seg := range strings.Split(route, "/") {
+	for _, seg := range strings.Split(routePath(route), "/") {
 		if m := routeParamPattern.FindStringSubmatch(seg); m != nil {
 			out = append(out, m[1])
 		}
@@ -87,10 +87,10 @@ func checkBindingConflicts(owner, route string, props []namedExtract) []Validati
 // checkRouteBindings reports a :name that repeats within one route, and one that
 // collides with a reserved name. reserved is nil for views, which have none.
 func checkRouteBindings(owner, route string, reserved []string) []ValidationError {
-	var errs []ValidationError
+	errs := checkRouteQuery(owner, route)
 	// Route matching treats any :segment as a parameter, but only a name that is
 	// also a valid property name binds; say so rather than bind nothing silently.
-	for _, seg := range strings.Split(route, "/") {
+	for _, seg := range strings.Split(routePath(route), "/") {
 		if strings.HasPrefix(seg, ":") && !routeParamPattern.MatchString(seg) {
 			errs = append(errs, ValidationError{
 				Component: owner,

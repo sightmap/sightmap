@@ -54,6 +54,8 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 		fmt.Fprintf(w, "[No view matched] %s\n\n", r.URL)
 	}
 
+	writeFrames(w, r)
+
 	// ── [Guide] ───────────────────────────────────────────────────────────────
 	// Skipped in coverage-only mode, which is meant to be a terse feedback r.View.
 	if !opts.CoverageOnly && len(r.Matches) > 0 {
@@ -110,6 +112,41 @@ func Format(w io.Writer, r *Result, opts FormatOpts) {
 			}
 		}
 	}
+}
+
+// writeFrames prints the [Frames] section: each child frame document in the
+// tree (the id of its root, which carries the prefix its nodes' ids share), the
+// URL it is matched at and the view that URL resolves to, and then whatever
+// extraction left out of the frames. Silent on a page with no frames and no
+// notes. A frame's nodes appear in the tree under their <iframe>.
+func writeFrames(w io.Writer, r *Result) {
+	if len(r.Frames) == 0 && len(r.Notes) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "[Frames]\n")
+	for _, f := range r.Frames {
+		fmt.Fprintf(w, "%s  %s", f.Root.Id, shortURL(f.URL))
+		switch {
+		case f.View != nil:
+			fmt.Fprintf(w, "  view: %s", f.View.Name)
+		case r.CorpusApplied:
+			fmt.Fprintf(w, "  (no view matched)")
+		}
+		fmt.Fprintln(w)
+	}
+	for _, n := range r.Notes {
+		fmt.Fprintf(w, "⚠ %s\n", n)
+	}
+	fmt.Fprintln(w)
+}
+
+// shortURL cuts a long URL (a sandbox frame's query can carry a whole CSP).
+func shortURL(u string) string {
+	const max = 100
+	if r := []rune(u); len(r) > max {
+		return string(r[:max]) + "…"
+	}
+	return u
 }
 
 // writeGuide prints the [Guide] section: component names and match counts,

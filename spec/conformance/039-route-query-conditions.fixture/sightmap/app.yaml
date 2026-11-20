@@ -1,0 +1,24 @@
+version: 1
+views:
+  # The broad routes are declared first on purpose: a query condition wins by
+  # specificity, not by position.
+  - name: Page
+    route: /en-us/:page
+  - name: Profile
+    route: /en-us/profile
+  - name: GiftCards
+    route: /en-us/profile?section=gift-cards
+  - name: OrderAgain
+    route: /en-us/profile?section=order-again
+  - name: Document
+    route: /page?id=:id
+  - name: Article
+    route: /page?id=101
+  - name: Library
+    route: /:org/library?type=metrics&view=*
+
+requests:
+  - name: GraphQL
+    route: /graphql
+  - name: GraphQLItems
+    route: /graphql?operationName=Items

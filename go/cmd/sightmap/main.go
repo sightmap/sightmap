@@ -65,6 +65,8 @@ func main() {
 		err = runGap(args)
 	case "coverage":
 		err = runCoverage(args)
+	case "match":
+		err = runMatch(args)
 	case "multi-coverage", "multi_coverage":
 		err = runMultiCoverage(args)
 	case "capture-novelty", "capture_novelty":
@@ -134,6 +136,7 @@ Commands:
   inspect        [--url URL] [--out FILE] [--sightmap-dir DIR]  raw DOM tree for selector authoring
   explain        [--snap FILE] [--id ID | --grep STR | SELECTOR] [--sightmap-dir DIR]  one node's facts, candidates, tier + owner, ancestors
   coverage       [--sightmap-dir DIR] [FILE.snap ...]            offline T1/T2/T3 check
+  match          [--sightmap-dir DIR] FILE.snap|DIR ...          JSONL per capture: view by URL, components, unmatched regions, conflicts
   multi-coverage [--sightmap-dir DIR] [FILE.snap ...]            cross-page coverage matrix
   capture-novelty [--sightmap-dir DIR] FILE.snap               does a capture add new components/slots vs its view set?
   capture-prune [--dry-run] (<view> | --all)                   drop captures subsumed by the rest of their view set

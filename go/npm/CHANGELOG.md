@@ -1,5 +1,68 @@
 # @sightmap/sightmap
 
+## 0.40.0
+
+### Minor Changes
+
+- 082dfec: `match.ClaimCache`: matching the same trees against a run of similar corpora walks each tree only for selectors it has not met. `Matcher.MatchConflictsCached` / `ConflictsCached` return exactly what `MatchConflicts` / `Conflicts` do; `CachedQueries.Claims` / `FindAll` are `FindAll` from the cache. `MatchQuery` gains `Key`, the selector text. `ClaimCache.Stats` / `ClaimStats` report what a cache holds (trees, keys, match lists, nodes).
+- 1bbc75f: `sightmap network list` now **hides successful static requests by default**, and `--static` shows them. This changes the default output: a script, stylesheet, image, font, media file, manifest or text track that came back 2xx or 304 no longer appears unless you pass `--static`. A failed one (404, 5xx, refused, blocked) still does, as does every Document, XHR, Fetch, EventSource, WebSocket and unknown-type request. This matches `playwright-cli requests`.
+
+  Against a dev server such as Vite, every page load fetches hundreds of module scripts. They filled the 1000-entry network buffer and evicted the app's own `/api` calls ("476 earlier network entries dropped"). Successful static requests now go in a separate ring of the same size, so they can fill only that ring. Indexes stay unique across both rings, so `network get N` works for either. The dropped note names the ring: `earlier network entries` for the main one, and `earlier static network entries` only when `--static` is given.
+
+  `network list` also takes `--filter REGEXP` (Go syntax, unanchored) to match request URLs, alongside `--url SUBSTR`. Both can be combined with `--static`, `--type`, `--tab` and `--limit`.
+
+  A static `--type` (`--type Script`) implies `--static`, and an empty listing without `--static` says the static requests were not searched.
+
+  For Go importers of `go/browser`: `Collector.Network` now returns a `NetworkDrops` (`Main`, `Static`) instead of an `int`, and `NetworkFilter` gained `URLPattern` and `IncludeStatic`.
+
+  Minor, not patch: it adds two flags and changes what an existing command prints by default.
+
+- e8ca559: `snapshot` and every command that reads the page now descend into iframes: same-origin, cross-origin (out-of-process) and nested at any depth, which is how every MCP Apps host renders a widget. Each frame's tree hangs under its `<iframe>` node with bounds in top-page coordinates, and its component ids carry a frame prefix (`2_26`; the top document's stay bare). `click`, `fill`, `hover`, `drag`, `keypress` (which now takes an optional target to focus), `scroll`, `wait-for`, `bounds` and `screenshot --component` resolve an id to the frame that holds it, and a click's or drag's point is computed from the live layout just before it is sent, so it lands after a scroll; a click under an overlay in the page is refused, and so is a drag onto a covered target. A drag's source and target must be in one document or in frames of one process. A click, hover or drag into a cross-origin frame is sent on that frame's own session: sent through the top page, Chrome can lose it after a scroll while reporting success.
+
+  A frame is matched as a page of its own, at its own URL: the corpus view whose route matches the frame's URL supplies its components, selectors do not cross the frame boundary, and a masked or blocked `<iframe>` masks or blocks its document. A new `[Frames]` section lists each frame and what was left out.
+
+  Each frame is capped at 3000 nodes and a page at 32 frames (`--frame-max-nodes`, `--max-frames`); `--no-frames` restores the old leaf `<iframe>`. `ComponentNode` gains an optional `frameUrl`.
+
+### Patch Changes
+
+- 3b81dbe: `sightmap browser drag` now drives pointer-event drags (boards, sortable lists): it scrolls the source into view only when it is not already fully visible, presses inside it, moves in `--steps N` small steps (default 10, about 16 ms apart, button held) and releases at the drop point, instead of jumping straight to the target. New `--to TARGET [--to-position above|below|center]` drops on another component; `--delta-x/--delta-y` still work. The press lands on a point of the source that is not an interactive child, or at `--from-offset X,Y`. Source and target accept component queries as well as probe ids.
+
+  `drag` refuses before pressing when the start point is not over the source or the drop point is not over the target (clipped by a scrolling ancestor, covered by a header, or off screen), and names what is in the way.
+
+- bc890eb: `sightmap browser fill` replaces the field's value instead of appending to it. It selects the focused input, textarea or contenteditable through the DOM (so it no longer depends on a Ctrl+A key event, which macOS Chrome does not turn into a select-all), and falls back to a Cmd/Ctrl+A chord with the key code and the `selectAll` editing command for other elements. After typing it reads the value back and errors when the old value was kept (`2026-04-102026-04-17`) as well as when the field is empty. `fill --clear` now works on textareas, selects and contenteditables (it picked the input value setter for every element and threw on a textarea) and fails when the clear fails; `EvalJSON` errors now carry the page exception's message.
+- d324809: A full-page screenshot (`capture --screenshot`, `browser screenshot --full-page`) no longer stretches `vh`-sized elements. The viewport was pinned to the document's height, so `vh`, `svh` and `dvh` lengths resolved against the document: a `72vh` hero drew 898 px taller than the box the probe measured, and everything under it was drawn that far below its box (a `position: fixed; bottom: 0` bar drew at the document's end). Only the width is pinned now, to keep the page at the layout the probe saw; the whole document is still captured.
+- 518a11c: `browser fill` no longer mangles `<input type=date>` (typing `2027-04-16` into a date holding `2027-04-09` left `270416-04-09`). For `date`, `time`, `datetime-local`, `month`, `week`, `color` and `range` inputs it sets the value with the native setter, fires `input` and `change`, and reads it back, in iframes too; text inputs still take keystrokes.
+
+  `click`, `fill`, `hover`, `keypress`, `scroll` and `drag` on a background tab now bring it to the front first (`brought tab X to front` on stderr), because Chrome is reported to hit-test and focus only on the visible tab.
+
+  `fill` errors when its focusing click left focus on the page (`clicking "N" did not focus it`), and `fill --clear` reports `the field did not take focus` instead of a raw `JS exception: Uncaught`.
+
+- c8a3987: `sightmap browser keypress` accepts Playwright-style chords (`Shift+KeyV`, `Meta+K`, `Alt+Shift+P`, `Ctrl+r`, `ControlOrMeta+Enter`) and sends a correct `key`, `code` and modifier state for them, so apps that match `KeyboardEvent.code` plus modifiers can be driven. A bare character (`c`, `5`, `.`, `?`) or code name (`KeyC`, `Digit1`) now yields both `key` and `code` (US layout); `Space`, `Home`, `End`, `PageUp`, `PageDown` and `F1`–`F12` are new named keys. Text is typed only when no Control, Meta or Alt is held.
+- a7fdf6a: `sightmap network` no longer fills with the tool's own traffic. The extension's content script polled `/sightmap/version` every 4 s and each poll was buffered; a long session overflowed the 1000-entry ring ("8890 earlier network entries dropped") and the app's own `/api` requests were gone. The collector now drops requests to the session's sightmap server port, the server's `/sightmap` and `/sightmap/version` endpoints on the loopback ports 7891-7900 (the extension's port probing), and `chrome-extension://` URLs at capture, so they cannot displace the page's requests. The content script also stops polling while the overlay is hidden, which is always the case in a CDP-driven or headless session (nothing reads the corpus then); opening the side panel polls once to catch up.
+
+## 0.39.0
+
+### Minor Changes
+
+- 09432db: New `sightmap match FILE.snap|DIR ...`: one JSON record per capture, matched by its URL as a session pipeline would. Each record gives the view (or the tied views), nodes per component, unmatched regions grouped by nearest hooked ancestor, and nodes claimed by more than one definition: the signals a capture sampler reads to fill gaps and retire stale components.
+- 665ee1b: Faster matching when one query set is walked over many trees, with identical results. `match.Prepare` indexes a compiled query set once and `Queries.FindAll` walks any number of trees with it, where `FindAllMatches` re-indexed on every call; `Matcher.MatchConflicts` answers `Match` and `Conflicts` in one traversal instead of two; and the specificity memo is a `sync.Map`, so parallel matches no longer queue on a lock. On a 292-capture, 1,381-definition corpus, a selector derivation that matches every capture dozens of times spends several seconds less in the matcher.
+- 61bde23: Query conditions in routes (SEP-0025, Draft): a view or request `route` may end in `?KEY=VALUE&KEY=:name&KEY=*`. Each condition reads the first decoded value of its key: `KEY=VALUE` requires that value (a `*` inside it is a wildcard within the value), `KEY=:name` and `KEY=*` require the key to be present. Keys the route doesn't name are ignored, so a route without conditions matches exactly as before. For views, each condition adds the score of the path segment it mirrors (3, 2, 1), so `/profile?section=gift-cards` wins over `/profile` on that section and `/profile` keeps the rest. `ViewForURL`, `TiedViews`, `TagsForURL`, `RequestsForURL` and `MatchRoute` read the URL's query string; `validate` reports `route-query-invalid` for a malformed query part and compares conditions in any order for `route-conflict`. The browser overlay picks views the same way.
+- a02c2f3: SEP-0009 (amended): under `privacy: mask`, a `dom.text` read of an `input`, `textarea` or `select` now resolves to the control's accessible name when nothing it is computed from is content. The name comes from `aria-labelledby`, `aria-label`, an associated `label`, `title` or `placeholder`, never from the value, so a masked field keeps its label ("Street address") while what was typed stays withheld. It is still withheld when `aria-labelledby` or a label reaches masked or blocked content or another control, for button-like, `image`, `file` and `hidden` inputs, under an ARIA role override, when no source on the control explains the name, and when the name contains the control's own value. `dom.raw_text`, `dom.attr` and everything under `block` are unchanged. `validate` no longer warns `extract-privacy-withheld` on a masked `dom.text` read whose component selects only `input`, `textarea` or `select`. `ComponentMatch.Withheld` lists the properties privacy withheld.
+
+### Patch Changes
+
+- 51b0bec: `browser start --attach HOST:PORT --detach` now backgrounds the attach daemon and returns once it is ready, instead of ignoring `--detach` and holding the shell. A reaped attach daemon can be restarted with `--detach` while the attached Chrome is still running.
+- 1e5967e: Full-page screenshots (`capture --screenshot`, `capture --inbox`, `browser screenshot --full-page`) now keep the page's layout. `captureBeyondViewport` alone kept the window's width, so with classic scrollbars the page relaid out 15 px wider for the shot: text rewrapped and a capture's element boxes drifted from the screenshot down the page (65 px by y 7600 on a 26000 px article). Chrome also left the tab at that wider layout afterwards. The viewport is now pinned to the page's client width and document height, with scrollbars hidden, for the screenshot, then restored along with the scroll position.
+- 03995a8: Faster component matching on large, deeply nested corpora, with identical results. The matcher now skips an in-flight selector at any node missing an id, exact attribute value, `^=` prefix, class or tag its next compound requires. It keeps in-flight selectors on one shared stack instead of copying them at every node, flattens each compound's attribute tests once per compiled corpus, and reuses walk scratch between calls. On a 54-view, 1,335-definition corpus, matching all 187 captures takes 8x less CPU, and `Matcher.Conflicts` no longer builds a per-node map.
+- d3c757b: match: a Matcher compiles its queries once per view rather than once per page URL, so a long-lived matcher that sees many URLs of the same views holds far less (`sightmap match` over 292 Fullstory captures: peak RSS 618 MB to 189 MB, identical output). `Corpus.ViewIndexForURL` names the view a URL selects by index. Selector specificity no longer allocates per compound pair.
+- a7178fc: The `sightmap-authoring` skill now warns that a partial-wildcard catch-all route like `/*-settings` ties an exact route under most-specific-wins (a segment mixing a wildcard with literal text scores as a literal), so it must be declared after the exact views. Matching behavior is unchanged.
+
+## 0.38.0
+
+### Minor Changes
+
+- edc7a6f: `render.Props` and `render.PropEquals` export the rules `Format` uses for a matched node's properties: which properties it shows (the extracted ones, plus the AX value as `value` unless privacy withholds it), and which name or StaticText child it leaves out because a property already shows it. Renderers that keep their own tree and only reuse the matcher can call them so their output agrees with `Format`.
+
 ## 0.37.0
 
 ### Minor Changes

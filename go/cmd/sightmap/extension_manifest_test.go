@@ -87,3 +87,58 @@ func TestContentScriptDoesNotGateOnGlobals(t *testing.T) {
 			"false and silently disables the overlay. Use corpusLoaded() instead.")
 	}
 }
+
+// TestContentScriptPollsOnlyWhileOverlayShown pins the version poll to the
+// overlay being visible. The overlay is shown only while the side panel is open,
+// so a CDP-driven or headless session never opens it; polling /sightmap/version
+// there put a request every 4 s into the page's network log until the app's own
+// requests were pushed out of the buffer.
+func TestContentScriptPollsOnlyWhileOverlayShown(t *testing.T) {
+	data, err := extensionFS.ReadFile("extension/content.js")
+	if err != nil {
+		t.Fatalf("read embedded extension/content.js: %v", err)
+	}
+	src := string(data)
+
+	// fn returns the body of the named function, found by matching braces so it
+	// does not depend on how the function is indented or what follows it.
+	fn := func(name string) string {
+		t.Helper()
+		start := strings.Index(src, "function "+name+"(")
+		if start < 0 {
+			t.Fatalf("content.js: function %s is gone", name)
+		}
+		open := strings.Index(src[start:], "{")
+		if open < 0 {
+			t.Fatalf("content.js: cannot find the body of %s", name)
+		}
+		depth := 0
+		for i := start + open; i < len(src); i++ {
+			switch src[i] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					return src[start : i+1]
+				}
+			}
+		}
+		t.Fatalf("content.js: cannot find the end of %s", name)
+		return ""
+	}
+
+	poll := fn("pollVersion")
+	guard := strings.Index(poll, "if (!state.enabled) return;")
+	request := strings.Index(poll, "await ")
+	if guard < 0 {
+		t.Error("pollVersion must return early while the overlay is hidden (state.enabled false)")
+	} else if request >= 0 && guard > request {
+		t.Error("pollVersion's overlay guard must come before any request")
+	}
+
+	show := fn("setOverlayVisible")
+	if !strings.Contains(show, "pollVersion()") {
+		t.Error("setOverlayVisible(true) must poll once, to catch up on the ticks skipped while hidden")
+	}
+}
