@@ -74,6 +74,51 @@ describe("__smLocateForClick", () => {
     });
   });
 
+  test("does not scroll a target that is already wholly on screen", () => {
+    document.body.innerHTML = '<button id="btn"></button>';
+    const btn = document.getElementById("btn");
+    btn.scrollIntoView = jest.fn();
+    btn.getBoundingClientRect = () => ({ left: 10, top: 10, right: 34, bottom: 34, width: 24, height: 24 });
+    document.elementFromPoint = jest.fn().mockReturnValue(btn);
+    Object.defineProperty(window, "innerWidth", { value: 800, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 600, configurable: true });
+
+    expect(__smLocateForClick("#btn")).toMatchObject({ hit: true, cx: 22, cy: 22 });
+    expect(btn.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  test("scrolls a target inside the viewport that a scrolling list clips out of sight", () => {
+    document.body.innerHTML = '<button id="btn"></button><div id="row"></div>';
+    const btn = document.getElementById("btn");
+    const row = document.getElementById("row");
+    let scrolled = false;
+    btn.scrollIntoView = jest.fn(() => { scrolled = true; });
+    btn.getBoundingClientRect = () => ({ left: 10, top: 500, right: 250, bottom: 532, width: 240, height: 32 });
+    document.elementFromPoint = jest.fn(() => (scrolled ? btn : row));
+    Object.defineProperty(window, "innerWidth", { value: 800, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 600, configurable: true });
+
+    expect(__smLocateForClick("#btn").hit).toBe(true);
+    expect(btn.scrollIntoView).toHaveBeenCalled();
+  });
+
+  test("scrolls an off-screen target into view without centering it horizontally", () => {
+    document.body.innerHTML = '<button id="btn"></button>';
+    const btn = document.getElementById("btn");
+    let scrolled = false;
+    btn.scrollIntoView = jest.fn(() => { scrolled = true; });
+    btn.getBoundingClientRect = () =>
+      scrolled
+        ? { left: 10, top: 300, right: 34, bottom: 324, width: 24, height: 24 }
+        : { left: 10, top: 900, right: 34, bottom: 924, width: 24, height: 24 };
+    document.elementFromPoint = jest.fn().mockReturnValue(btn);
+    Object.defineProperty(window, "innerWidth", { value: 800, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 600, configurable: true });
+
+    expect(__smLocateForClick("#btn")).toMatchObject({ inViewport: true, cy: 312 });
+    expect(btn.scrollIntoView).toHaveBeenCalledWith({ block: "center", inline: "nearest", behavior: "instant" });
+  });
+
   test("reports hit:false when something else is on top", () => {
     document.body.innerHTML =
       '<button id="btn"></button><div id="overlay"></div>';

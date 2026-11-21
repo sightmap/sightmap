@@ -134,11 +134,39 @@ function __smDropCheck(sel, x, y) {
 // reports whether its center is actually the top-most element there (so a
 // target hidden behind an overlay is reported as not-hit rather than clicked
 // through).
+//
+// A target already wholly on screen, and the top-most element at its center (so
+// not clipped out of sight by a scrolling list it sits in), is not scrolled at
+// all. One that is scrolled is brought into view horizontally only as far as
+// needed ("nearest"), never centered:
+// centering scrolls every scrollable ancestor, including an overflow:hidden
+// one that is wider than its box only because a tooltip overflows it. That
+// moves the content under a still mouse, which closes the tooltip, which
+// snaps the scroll back, and the click lands where the target was a moment
+// before (on its neighbour).
 function __smLocateForClick(sel) {
   const el = __smDeepQuery(document, sel);
   if (!el) return { found: false };
-  el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
-  const r = el.getBoundingClientRect();
+  const hits = (r) => {
+    const at = document.elementFromPoint(
+      Math.floor(r.left + r.width / 2),
+      Math.floor(r.top + r.height / 2),
+    );
+    return !!at && (at === el || el.contains(at) || at.contains(el));
+  };
+  let r = el.getBoundingClientRect();
+  const onScreen =
+    r.width > 0 &&
+    r.height > 0 &&
+    r.left >= 0 &&
+    r.top >= 0 &&
+    r.right <= window.innerWidth &&
+    r.bottom <= window.innerHeight &&
+    hits(r);
+  if (!onScreen) {
+    el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+    r = el.getBoundingClientRect();
+  }
   const cx = Math.floor(r.left + r.width / 2),
     cy = Math.floor(r.top + r.height / 2);
   const inViewport =
@@ -148,11 +176,7 @@ function __smLocateForClick(sel) {
     cy >= 0 &&
     cx < window.innerWidth &&
     cy < window.innerHeight;
-  let hit = false;
-  if (inViewport) {
-    const at = document.elementFromPoint(cx, cy);
-    hit = !!at && (at === el || el.contains(at) || at.contains(el));
-  }
+  const hit = inViewport && hits(r);
   return { found: true, inViewport, hit, cx, cy };
 }
 
