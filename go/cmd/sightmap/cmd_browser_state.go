@@ -13,6 +13,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"slices"
@@ -36,6 +37,9 @@ type componentState struct {
 	Text      string            `json:"text,omitempty"`
 	Visible   bool              `json:"visible"`
 	Focused   bool              `json:"focused,omitempty"`
+	// Box is the viewport bounding box in CSS pixels, nil when the tree carried
+	// none. It feeds the built-in x, y, width, height, right and bottom.
+	Box *sightmap.Bounds `json:"-"`
 }
 
 // pageState is the live page as the state commands see it: the URL, the title,
@@ -88,7 +92,7 @@ func readState(ctx context.Context, conn *browser.CDPConn, sightmapDir string, q
 		}
 	}
 	for _, n := range cands {
-		cs := componentState{Props: props[n.Id], Text: n.Text, Visible: n.IsVisible}
+		cs := componentState{Props: props[n.Id], Text: n.Text, Visible: n.IsVisible, Box: n.Bounds}
 		if m := matches[n]; m != nil {
 			cs.Component = m.Name
 		}
@@ -212,8 +216,9 @@ func project(n componentState, fields []string) map[string]any {
 }
 
 // field reads one named value off a component: a corpus property, or one of the
-// built-ins text, visible, focused. The corpus wins: an app whose rows carry
-// their own `focused` (a data-focused hook) keeps its meaning.
+// built-ins text, visible, focused and the box (x or left, y or top, width,
+// height, right, bottom: viewport CSS pixels). The corpus wins: an app whose rows carry their
+// own `focused` (a data-focused hook) keeps its meaning.
 func field(n componentState, name string) (string, bool) {
 	if v, ok := n.Props[name]; ok {
 		return v, true
@@ -225,6 +230,23 @@ func field(n componentState, name string) (string, bool) {
 		return strconv.FormatBool(n.Visible), true
 	case "focused":
 		return strconv.FormatBool(n.Focused), true
+	}
+	if n.Box != nil {
+		b := n.Box
+		switch name {
+		case "x", "left":
+			return strconv.Itoa(b.X), true
+		case "y", "top":
+			return strconv.Itoa(b.Y), true
+		case "width":
+			return strconv.Itoa(b.Width), true
+		case "height":
+			return strconv.Itoa(b.Height), true
+		case "right":
+			return strconv.Itoa(b.X + b.Width), true
+		case "bottom":
+			return strconv.Itoa(b.Y + b.Height), true
+		}
 	}
 	return "", false
 }
@@ -282,7 +304,7 @@ func runExpect(args []string) error {
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	timeoutMs := fs.Int("timeout-ms", 5000, "How long to wait for the conditions (default 5 000)")
 	var propConds, textConds, noTextConds, queryConds multiFlag
-	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value): every match's property (repeatable)")
+	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value; numbers: NAME>=N, NAME<N, NAME=N~T): every match's property or box (left, top, width, height, right, bottom) (repeatable)")
 	fs.Var(&textConds, "text", "Substring of the component's text (repeatable)")
 	fs.Var(&noTextConds, "no-text", "A substring no match's text contains (repeatable)")
 	fs.Var(&queryConds, "query", "NAME=VALUE: the page URL's query parameter equals VALUE; NAME= means absent, NAME!=VALUE differs (repeatable)")
@@ -521,8 +543,13 @@ func observedField(st *pageState, name string) string {
 }
 
 // propCondition parses NAME=VALUE (or ^=, *=, !=) into a condition every match
-// must satisfy, using the component-query predicate semantics.
+// must satisfy, using the component-query predicate semantics. Numeric forms
+// compare the value as a number: NAME>=N, NAME<=N, NAME>N, NAME<N, and
+// NAME=N~T (within T of N), for the box built-ins or any numeric property.
 func propCondition(qs, spec string) (condition, error) {
+	if c, ok, err := numericCondition(qs, spec); ok || err != nil {
+		return c, err
+	}
 	// The operator is the first one in the spec: a value may itself contain
 	// "!=" or "^=" (`text=Count != 3` is an equality on "Count != 3").
 	op, i := "", -1
@@ -553,6 +580,67 @@ func propCondition(qs, spec string) (condition, error) {
 		},
 		observed: func(st *pageState) string { return observedField(st, name) },
 	}, nil
+}
+
+// numericCondition recognises the numeric --prop forms; ok is false for any
+// other spec, so propCondition handles it.
+func numericCondition(qs, spec string) (c condition, ok bool, err error) {
+	var name, op, rhs string
+	// Like propCondition, the first operator in the spec decides: in
+	// `text=a > b` the "=" comes first, so it is a text equality, not a number.
+	eq := strings.Index(spec, "=")
+	for _, o := range []string{">=", "<=", ">", "<"} {
+		if i := strings.Index(spec, o); i > 0 && (eq < 0 || i <= eq) {
+			name, op, rhs = spec[:i], o, spec[i+len(o):]
+			break
+		}
+	}
+	if op == "" {
+		i := strings.Index(spec, "=")
+		if i <= 0 || !strings.Contains(spec[i:], "~") || strings.ContainsAny(spec[:i], "!^*") {
+			return condition{}, false, nil
+		}
+		name, op, rhs = spec[:i], "~", spec[i+1:]
+	}
+	var want, tol float64
+	if op == "~" {
+		v, t, _ := strings.Cut(rhs, "~")
+		if want, err = strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+			tol, err = strconv.ParseFloat(strings.TrimSpace(t), 64)
+		}
+	} else {
+		want, err = strconv.ParseFloat(strings.TrimSpace(rhs), 64)
+	}
+	if err != nil {
+		return condition{}, true, fmt.Errorf("expect: --prop %q: want a number (NAME>=N, NAME=N~T)", spec)
+	}
+	holds := func(v float64) bool {
+		switch op {
+		case ">=":
+			return v >= want
+		case "<=":
+			return v <= want
+		case ">":
+			return v > want
+		case "<":
+			return v < want
+		}
+		return math.Abs(v-want) <= tol
+	}
+	return condition{
+		desc: fmt.Sprintf("%s %s%s%s", qs, name, strings.Replace(op, "~", "=", 1), strings.Replace(rhs, "~", "±", 1)),
+		ok: func(st *pageState) bool {
+			return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool {
+				s, ok := field(n, name)
+				if !ok {
+					return false
+				}
+				v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+				return err == nil && holds(v)
+			})
+		},
+		observed: func(st *pageState) string { return observedField(st, name) },
+	}, true, nil
 }
 
 // queryCondition parses NAME=VALUE or NAME!=VALUE into a condition on the page

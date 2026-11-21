@@ -301,6 +301,10 @@ sightmap browser expect Toast --no-text Error              # no match's text con
   names a few rows, so unrelated rows don't break the check. `\,` is a literal comma. For a list
   that mixes kinds of rows, name alternatives: `--seq 'identifier|project=WEB-144,plant-id-v2'`
   takes each match's first.
+- Every match also has a box, in viewport CSS pixels: `left` (`x`), `top` (`y`), `width`,
+  `height`, `right`, `bottom`. Numeric forms compare any number: `--prop width=720~2` (within
+  2), `--prop top>=90`, `--prop 'height<60'`. So a layout rule is `expect 'Dialog[name=x]'
+  --prop width=720~2 --prop top=96~4`, not an eval of `getBoundingClientRect`.
 - `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no
   origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter;
   check a parameter that does matter with `--query NAME=VALUE` (`NAME=` absent, `!=` differs).

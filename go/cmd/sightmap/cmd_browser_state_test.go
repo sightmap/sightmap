@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func TestPathMatches(t *testing.T) {
@@ -50,6 +52,9 @@ func TestPropCondition(t *testing.T) {
 		// The first operator wins; a later "!=" belongs to the value.
 		{"text=a!=b", false},
 		{"text!=a=b", true},
+		// ...and so does a later ">" or "~": these are text, not numbers.
+		{"text=a > 3", false},
+		{"text*=Keyboard ~ nav", false},
 		{"missing=x", false},
 		{"text*=Keyboard", true},
 		{"visible=false", true},
@@ -116,6 +121,44 @@ func TestListCondition(t *testing.T) {
 	}
 	if got := splitValues(`a\,b,c`); !reflect.DeepEqual(got, []string{"a,b", "c"}) {
 		t.Errorf("splitValues = %q", got)
+	}
+}
+
+func TestNumericPropCondition(t *testing.T) {
+	st := &pageState{Nodes: []componentState{{
+		Component: "Dialog",
+		Props:     map[string]string{"count": "12", "name": "x"},
+		Box:       &sightmap.Bounds{X: 360, Y: 96, Width: 720, Height: 400},
+	}}}
+	cases := []struct {
+		spec string
+		ok   bool
+	}{
+		{"width=720~2", true},
+		{"width=716~2", false},
+		{"top=96~4", true},
+		{"y=100~4", true},
+		{"left=360~0", true},
+		{"right=1080~0", true},
+		{"bottom>=496", true},
+		{"bottom>496", false},
+		{"height<401", true},
+		{"count>=10", true},
+		{"count<10", false},
+		{"name>=1", false}, // not a number
+		{"name=x", true},   // plain equality still works
+	}
+	for _, c := range cases {
+		cond, err := propCondition("Dialog", c.spec)
+		if err != nil {
+			t.Fatalf("%s: %v", c.spec, err)
+		}
+		if got := cond.ok(st); got != c.ok {
+			t.Errorf("%s: ok = %v, want %v (observed %s)", c.spec, got, c.ok, cond.observed(st))
+		}
+	}
+	if _, err := propCondition("Dialog", "width=abc~2"); err == nil {
+		t.Error("width=abc~2: want an error")
 	}
 }
 
