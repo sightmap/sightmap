@@ -13,6 +13,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"slices"
 	"sort"
@@ -280,9 +281,11 @@ func runExpect(args []string) error {
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	timeoutMs := fs.Int("timeout-ms", 5000, "How long to wait for the conditions (default 5 000)")
-	var propConds, textConds multiFlag
+	var propConds, textConds, noTextConds, queryConds multiFlag
 	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value): every match's property (repeatable)")
 	fs.Var(&textConds, "text", "Substring of the component's text (repeatable)")
+	fs.Var(&noTextConds, "no-text", "A substring no match's text contains (repeatable)")
+	fs.Var(&queryConds, "query", "NAME=VALUE: the page URL's query parameter equals VALUE; NAME= means absent, NAME!=VALUE differs (repeatable)")
 	var seqConds, setConds, containsConds, orderConds multiFlag
 	fs.Var(&seqConds, "seq", "NAME=a,b,c: the matches' NAME values, in document order, are exactly this list (repeatable; \\, for a literal comma; NAME|OTHER takes each match's first)")
 	fs.Var(&setConds, "set", "NAME=a,b,c: the matches' NAME values are exactly these, in any order (repeatable)")
@@ -297,12 +300,13 @@ func runExpect(args []string) error {
 	if err != nil {
 		return err
 	}
-	usage := "usage: browser expect [QUERY] [--prop k=v]... [--text S]... [--seq|--set|--contains|--order k=a,b]... [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--title T] [--timeout-ms N]\n" +
+	usage := "usage: browser expect [QUERY] [--prop k=v]... [--text S]... [--no-text S]... [--seq|--set|--contains|--order k=a,b]... [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--query k=v]... [--title T] [--timeout-ms N]\n" +
 		"  waits until every condition holds, then prints the matches; on timeout prints what it saw and exits 1\n" +
 		"  with a QUERY and no other condition it waits for the component to be present\n" +
 		"  examples: expect 'IssueRow[identifier=WEB-120]' --prop group='status:done'\n" +
 		"            expect Toast --text 'Reverted.'   expect PropertyPicker --gone   expect --url /inbox --title 'Inbox (6) · Plumb'\n" +
-		"            expect InboxRow --seq identifier=WEB-144,WEB-130,WEB-160   expect IssueRow --order identifier=WEB-130,WEB-144"
+		"            expect InboxRow --seq identifier=WEB-144,WEB-130,WEB-160   expect IssueRow --order identifier=WEB-130,WEB-144\n" +
+		"            expect --url /my-issues/assigned --query peek=WEB-120   expect Toast --no-text Error"
 	if len(queries) > 1 {
 		return errors.New("expect: one query at a time\n" + usage)
 	}
@@ -317,9 +321,9 @@ func runExpect(args []string) error {
 
 	var conds []condition
 	listConds := len(seqConds) + len(setConds) + len(containsConds) + len(orderConds)
-	componentConds := len(propConds) > 0 || len(textConds) > 0 || listConds > 0 || *countFlag != "" || *goneFlag || *focusedFlag
+	componentConds := len(propConds) > 0 || len(textConds) > 0 || len(noTextConds) > 0 || listConds > 0 || *countFlag != "" || *goneFlag || *focusedFlag
 	if componentConds && q == nil {
-		return errors.New("expect: --prop, --text, --seq, --set, --contains, --order, --count, --gone and --focused need a QUERY\n" + usage)
+		return errors.New("expect: --prop, --text, --no-text, --seq, --set, --contains, --order, --count, --gone and --focused need a QUERY\n" + usage)
 	}
 	if q != nil && !componentConds {
 		conds = append(conds, condition{
@@ -344,6 +348,23 @@ func runExpect(args []string) error {
 			},
 			observed: func(st *pageState) string { return observedField(st, "text") },
 		})
+	}
+	for _, t := range noTextConds {
+		t := t
+		conds = append(conds, condition{
+			desc: fmt.Sprintf("%s text lacks %q", qs, t),
+			ok: func(st *pageState) bool {
+				return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool { return !strings.Contains(n.Text, t) })
+			},
+			observed: func(st *pageState) string { return observedField(st, "text") },
+		})
+	}
+	for _, spec := range queryConds {
+		c, err := queryCondition(spec)
+		if err != nil {
+			return err
+		}
+		conds = append(conds, c)
 	}
 	for _, l := range []struct {
 		kind  listKind
@@ -531,6 +552,60 @@ func propCondition(qs, spec string) (condition, error) {
 			})
 		},
 		observed: func(st *pageState) string { return observedField(st, name) },
+	}, nil
+}
+
+// queryCondition parses NAME=VALUE or NAME!=VALUE into a condition on the page
+// URL's query string. NAME= (an empty value) means the parameter is absent;
+// NAME!= means it is present.
+func queryCondition(spec string) (condition, error) {
+	neg := false
+	name, want, ok := strings.Cut(spec, "!=")
+	if ok {
+		neg = true
+	} else if name, want, ok = strings.Cut(spec, "="); !ok {
+		return condition{}, fmt.Errorf("expect: --query wants NAME=VALUE or NAME!=VALUE, got %q", spec)
+	}
+	if name == "" {
+		return condition{}, fmt.Errorf("expect: --query wants a parameter name, got %q", spec)
+	}
+	param := func(st *pageState) (string, bool) {
+		u, err := url.Parse(st.URL)
+		if err != nil {
+			return "", false
+		}
+		vs, has := u.Query()[name]
+		if !has || len(vs) == 0 {
+			return "", false
+		}
+		return vs[0], true
+	}
+	op := "="
+	if neg {
+		op = "!="
+	}
+	desc := fmt.Sprintf("url ?%s%s%s", name, op, want)
+	if want == "" {
+		desc = fmt.Sprintf("url without ?%s", name)
+		if neg {
+			desc = fmt.Sprintf("url with ?%s", name)
+		}
+	}
+	return condition{
+		desc: desc,
+		ok: func(st *pageState) bool {
+			v, has := param(st)
+			if want == "" {
+				return has == neg
+			}
+			return (has && v == want) != neg
+		},
+		observed: func(st *pageState) string {
+			if v, has := param(st); has {
+				return fmt.Sprintf("?%s=%s", name, v)
+			}
+			return fmt.Sprintf("no ?%s (url %s)", name, st.URL)
+		},
 	}, nil
 }
 

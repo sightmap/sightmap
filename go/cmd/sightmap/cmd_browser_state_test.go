@@ -119,6 +119,35 @@ func TestListCondition(t *testing.T) {
 	}
 }
 
+func TestQueryCondition(t *testing.T) {
+	st := &pageState{URL: "http://localhost:5173/my-issues/assigned?peek=WEB-120&latency=0"}
+	cases := []struct {
+		spec string
+		ok   bool
+	}{
+		{"peek=WEB-120", true},
+		{"peek=WEB-130", false},
+		{"peek!=WEB-130", true},
+		{"peek!=WEB-120", false},
+		{"tab=", true},   // absent
+		{"peek=", false}, // present
+		{"peek!=", true}, // present
+		{"tab!=", false},
+	}
+	for _, c := range cases {
+		cond, err := queryCondition(c.spec)
+		if err != nil {
+			t.Fatalf("%s: %v", c.spec, err)
+		}
+		if got := cond.ok(st); got != c.ok {
+			t.Errorf("%s: ok = %v, want %v (observed %s)", c.spec, got, c.ok, cond.observed(st))
+		}
+	}
+	if _, err := queryCondition("peek"); err == nil {
+		t.Error("--query peek: want an error")
+	}
+}
+
 func TestCorpusPropertyShadowsBuiltin(t *testing.T) {
 	n := componentState{Props: map[string]string{"focused": ""}, Focused: false}
 	if v, _ := field(n, "focused"); v != "" {

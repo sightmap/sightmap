@@ -287,6 +287,8 @@ sightmap browser expect IssueRow --count '>=1'
 sightmap browser expect InboxRow --seq identifier=WEB-144,WEB-130,WEB-160   # the whole list, in order
 sightmap browser expect IssueRow --contains identifier=WEB-130,WEB-144     # these are among the rows
 sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
+sightmap browser expect --query peek=WEB-120                # one query parameter; peek= means absent
+sightmap browser expect Toast --no-text Error              # no match's text contains it
 ```
 
 - `expect` holds when **every** condition holds for **every** match (a property condition
@@ -300,7 +302,8 @@ sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
   that mixes kinds of rows, name alternatives: `--seq 'identifier|project=WEB-144,plant-id-v2'`
   takes each match's first.
 - `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no
-  origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter.
+  origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter;
+  check a parameter that does matter with `--query NAME=VALUE` (`NAME=` absent, `!=` differs).
 - A query that matches nothing says what is there instead: `(8 IssueRow on the page;
   identifier is "WEB-130", "WEB-120", …)` or `none has a "focused" property`.
 - `get` prints at most 25 matches (`--limit N`, `0` for all; the rest are counted) with text
