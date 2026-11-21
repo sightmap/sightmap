@@ -84,6 +84,15 @@ func NavigateAndWait(ctx context.Context, conn *CDPConn, url string) error {
 // know an action actually moved the page. Callers should compare the result
 // against the pre-action URL and only report a move when it actually changed.
 func AwaitNavigation(ctx context.Context, conn *CDPConn, maxWait time.Duration) (string, bool) {
+	return AwaitNavigationUntil(ctx, conn, maxWait, nil)
+}
+
+// AwaitNavigationUntil is AwaitNavigation that also gives up early when stop is
+// closed before any navigation has been seen: the caller knows by other means
+// that none is coming (the page has gone quiet, say), so it need not wait out
+// maxWait. Once a navigation has been seen, stop is ignored and the grace for
+// chained redirects runs as usual. A nil stop never fires.
+func AwaitNavigationUntil(ctx context.Context, conn *CDPConn, maxWait time.Duration, stop <-chan struct{}) (string, bool) {
 	if err := conn.EnableDomain(ctx, "Page"); err != nil {
 		return "", false
 	}
@@ -108,6 +117,12 @@ func AwaitNavigation(ctx context.Context, conn *CDPConn, maxWait time.Duration) 
 		case <-graceCh:
 			url, _ := GetURL(ctx, conn)
 			return url, true
+		case <-stop:
+			if !navigated {
+				return "", false
+			}
+			stop = nil // a navigation is under way; let its grace decide
+			continue
 		case <-overall.C:
 			if navigated {
 				url, _ := GetURL(ctx, conn)

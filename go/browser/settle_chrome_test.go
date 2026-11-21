@@ -64,6 +64,43 @@ func TestWaitSettledShadowDOM_Chrome(t *testing.T) {
 	}
 }
 
+// TestAwaitNavigationUntil_Chrome checks the early stop navigate uses: a stop
+// before any navigation ends the wait at once with no move, and a stop that
+// comes after a client-side redirect has started is ignored, so the redirect is
+// still reported.
+func TestAwaitNavigationUntil_Chrome(t *testing.T) {
+	ctx, conn := fullPageChrome(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprint(w, `<!doctype html><html><body>ok</body></html>`)
+	}))
+	t.Cleanup(srv.Close)
+	if err := NavigateAndWaitIdle(ctx, conn, srv.URL+"/", 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+
+	stop := make(chan struct{})
+	time.AfterFunc(100*time.Millisecond, func() { close(stop) })
+	start := time.Now()
+	if url, moved := AwaitNavigationUntil(ctx, conn, 3*time.Second, stop); moved {
+		t.Fatalf("no navigation happened, but it reported a move to %q", url)
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("a stop with no navigation should end the wait at once; it took %v", d)
+	}
+
+	// The redirect starts at 50 ms; the stop fires at 100 ms, mid-grace.
+	if _, err := EvalJSON(ctx, conn, `setTimeout(() => history.pushState(null, "", "/landed"), 50), true`); err != nil {
+		t.Fatal(err)
+	}
+	stop = make(chan struct{})
+	time.AfterFunc(100*time.Millisecond, func() { close(stop) })
+	url, moved := AwaitNavigationUntil(ctx, conn, 3*time.Second, stop)
+	if !moved || url != srv.URL+"/landed" {
+		t.Errorf("a redirect under way when the stop fires is still reported: got %q, %v; want %q, true", url, moved, srv.URL+"/landed")
+	}
+}
+
 // TestWaitSettledXHRThrow_Chrome checks that an XMLHttpRequest whose send throws
 // does not leave the in-flight counter up, which would make every later settle
 // run to its cap.
