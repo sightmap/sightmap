@@ -126,9 +126,16 @@ func runGet(args []string) error {
 	propsFlag := fs.String("props", "", "Comma-separated properties to print (default: all, with text cut to 80 characters; 'text', 'visible' and 'focused' work too)")
 	countFlag := fs.Bool("count", false, "Print only how many components match")
 	limitFlag := fs.Int("limit", 25, "Print at most N matches (0 = all); the rest are counted")
+	asFlag := fs.String("as", "", "In a `run` script: keep the value as $NAME for later steps (needs --count, or one match and one --props field)")
 	queries, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
 		return err
+	}
+	if *asFlag != "" && !validVarName(*asFlag) {
+		return fmt.Errorf("get: --as wants a variable name (letters, digits, _), got %q", *asFlag)
+	}
+	if *asFlag != "" && len(queries) != 1 {
+		return errors.New("get: --as takes one query")
 	}
 	if len(queries) == 0 {
 		return fmt.Errorf("usage: browser get QUERY... [--props a,b] [--count] [--limit N]\n" +
@@ -162,6 +169,15 @@ func runGet(args []string) error {
 		st, err := readState(ctx, conn, *sightmapDirFlag, q)
 		if err != nil {
 			return err
+		}
+		if *asFlag != "" {
+			v, err := singleValue(st, *countFlag, fields)
+			if err != nil {
+				return fmt.Errorf("get %s --as %s: %w", qs, *asFlag, err)
+			}
+			setRunVar(*asFlag, v)
+			fmt.Printf("%s=%s\n", *asFlag, v)
+			continue
 		}
 		if *countFlag {
 			if len(queries) > 1 {
@@ -213,6 +229,25 @@ func project(n componentState, fields []string) map[string]any {
 		}
 	}
 	return out
+}
+
+// singleValue is what `get --as` keeps: the match count, or the one field of
+// the one match.
+func singleValue(st *pageState, count bool, fields []string) (string, error) {
+	if count {
+		return strconv.Itoa(len(st.Nodes)), nil
+	}
+	if len(fields) != 1 {
+		return "", errors.New("name one field with --props (or use --count)")
+	}
+	if len(st.Nodes) != 1 {
+		return "", fmt.Errorf("want one match, saw %d", len(st.Nodes))
+	}
+	v, ok := field(st.Nodes[0], fields[0])
+	if !ok {
+		return "", fmt.Errorf("the match has no %q", fields[0])
+	}
+	return v, nil
 }
 
 // field reads one named value off a component: a corpus property, or one of the

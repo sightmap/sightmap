@@ -15,8 +15,10 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,11 +34,43 @@ var runSteps = map[string]func([]string) error{
 	"screenshot": runScreenshot, "dialog": runDialog,
 }
 
-// step is one line of a script, split into words.
+// step is one line of a script. Its words are split when the step runs, not
+// when the script is read, so a $VAR a previous step set (`get ... --as N`)
+// expands to its value.
 type step struct {
 	line  int
 	text  string
 	words []string
+}
+
+// runVars are the variables `get --as` sets during one `run`. A $NAME in a
+// step reads them first, then the environment.
+var runVars map[string]string
+
+func setRunVar(name, v string) {
+	if runVars == nil {
+		runVars = map[string]string{}
+	}
+	runVars[name] = v
+}
+
+func lookupVar(name string) string {
+	if v, ok := runVars[name]; ok {
+		return v
+	}
+	return os.Getenv(name)
+}
+
+func validVarName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, c := range s {
+		if !(c == '_' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || i > 0 && c >= '0' && c <= '9') {
+			return false
+		}
+	}
+	return true
 }
 
 func runRun(args []string) error {
@@ -58,6 +92,7 @@ func runRun(args []string) error {
 			"    keys j s 3\n" +
 			"    expect 'IssueRow[identifier=WEB-143]' --prop group='status:in progress'\n" +
 			"  # comments and blank lines are skipped; quotes and $VARS work as in sh\n" +
+			"  get Q --count --as N, or get Q --props width --as W, keeps a value as $N / $W for later steps\n" +
 			"  steps: " + strings.Join(sortedStepNames(), " "))
 	}
 	var in io.Reader = os.Stdin
@@ -92,10 +127,21 @@ func runRun(args []string) error {
 		common = append(common, "--tab", *tabFlag)
 	}
 	start := time.Now()
+	runVars = nil
+	defer func() { runVars = nil }()
 	var failed []string
 	for i, s := range steps {
 		if !*quiet {
 			fmt.Fprintf(os.Stderr, "[%d/%d] %s\n", i+1, len(steps), s.text)
+		}
+		// Split again now, so variables set by earlier steps expand.
+		if words, err := shellWords(s.text); err == nil {
+			for len(words) > 0 && (words[0] == "sightmap" || words[0] == "browser") {
+				words = words[1:]
+			}
+			if len(words) > 0 {
+				s.words = words
+			}
 		}
 		args := s.words[1:]
 		if s.words[0] == "navigate" {
@@ -200,13 +246,21 @@ func shellWords(s string) ([]string, error) {
 	}
 	expand := func(i int) int { // s[i] == '$'; returns the index after the variable
 		j := i + 1
+		if strings.HasPrefix(s[j:], "((") {
+			if end := strings.Index(s[j+2:], "))"); end >= 0 {
+				if v, err := arith(s[j+2 : j+2+end]); err == nil {
+					cur.WriteString(strconv.FormatInt(v, 10))
+					return j + 2 + end + 2
+				}
+			}
+		}
 		if j < len(s) && s[j] == '{' {
 			end := strings.IndexByte(s[j:], '}')
 			if end < 0 {
 				cur.WriteByte('$')
 				return i + 1
 			}
-			cur.WriteString(os.Getenv(s[j+1 : j+end]))
+			cur.WriteString(lookupVar(s[j+1 : j+end]))
 			return j + end + 1
 		}
 		k := j
@@ -217,7 +271,7 @@ func shellWords(s string) ([]string, error) {
 			cur.WriteByte('$')
 			return j
 		}
-		cur.WriteString(os.Getenv(s[j:k]))
+		cur.WriteString(lookupVar(s[j:k]))
 		return k
 	}
 	for i := 0; i < len(s); {
@@ -275,6 +329,121 @@ func shellWords(s string) ([]string, error) {
 	}
 	flush()
 	return words, nil
+}
+
+// arith evaluates sh's $((...)) for what a step needs: integers, $VAR or bare
+// VAR names, + - * / and parentheses.
+func arith(expr string) (int64, error) {
+	p := &arithParser{s: strings.TrimSpace(expr)}
+	v, err := p.sum()
+	if err != nil {
+		return 0, err
+	}
+	p.space()
+	if p.i != len(p.s) {
+		return 0, fmt.Errorf("$((%s)): unexpected %q", expr, p.s[p.i:])
+	}
+	return v, nil
+}
+
+type arithParser struct {
+	s string
+	i int
+}
+
+func (p *arithParser) space() {
+	for p.i < len(p.s) && (p.s[p.i] == ' ' || p.s[p.i] == '\t') {
+		p.i++
+	}
+}
+
+func (p *arithParser) sum() (int64, error) {
+	v, err := p.product()
+	for err == nil {
+		p.space()
+		if p.i >= len(p.s) || (p.s[p.i] != '+' && p.s[p.i] != '-') {
+			break
+		}
+		op := p.s[p.i]
+		p.i++
+		var r int64
+		if r, err = p.product(); err == nil {
+			if op == '+' {
+				v += r
+			} else {
+				v -= r
+			}
+		}
+	}
+	return v, err
+}
+
+func (p *arithParser) product() (int64, error) {
+	v, err := p.atom()
+	for err == nil {
+		p.space()
+		if p.i >= len(p.s) || (p.s[p.i] != '*' && p.s[p.i] != '/') {
+			break
+		}
+		op := p.s[p.i]
+		p.i++
+		var r int64
+		if r, err = p.atom(); err == nil {
+			if op == '*' {
+				v *= r
+			} else if r == 0 {
+				err = errors.New("division by zero")
+			} else {
+				v /= r
+			}
+		}
+	}
+	return v, err
+}
+
+func (p *arithParser) atom() (int64, error) {
+	p.space()
+	if p.i >= len(p.s) {
+		return 0, errors.New("missing operand")
+	}
+	switch c := p.s[p.i]; {
+	case c == '(':
+		p.i++
+		v, err := p.sum()
+		p.space()
+		if err == nil && (p.i >= len(p.s) || p.s[p.i] != ')') {
+			err = errors.New("unclosed (")
+		}
+		p.i++
+		return v, err
+	case c == '-':
+		p.i++
+		v, err := p.atom()
+		return -v, err
+	case c >= '0' && c <= '9':
+		j := p.i
+		for p.i < len(p.s) && p.s[p.i] >= '0' && p.s[p.i] <= '9' {
+			p.i++
+		}
+		return strconv.ParseInt(p.s[j:p.i], 10, 64)
+	default:
+		if c == '$' {
+			p.i++
+		}
+		j := p.i
+		for p.i < len(p.s) && validVarName(p.s[j:p.i+1]) {
+			p.i++
+		}
+		if j == p.i {
+			return 0, fmt.Errorf("unexpected %q", p.s[j:])
+		}
+		name := p.s[j:p.i]
+		v, err := strconv.ParseFloat(strings.TrimSpace(lookupVar(name)), 64)
+		if err != nil {
+			return 0, fmt.Errorf("$%s is not a number", name)
+		}
+		return int64(math.Round(v)), nil
+	}
 }
 
 // withoutGiven drops the session flags a step already sets itself.

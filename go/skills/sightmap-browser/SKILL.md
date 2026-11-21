@@ -350,6 +350,10 @@ sightmap browser run j8.steps --quiet     # "all 10 steps passed in 7.2s", or:
   origin. `--sightmap-dir`, `--addr` and `--tab` given to `run` apply to every step.
 - Quotes, a trailing `\` to continue a line, `# comments` and `$VARS` work as in `sh`;
   `-` reads the steps from stdin.
+- A step can keep a value for later ones: `get InboxRow --count --as N0`, or `get Board
+  --props width --as W` (one match, one field). Later steps read `$N0`, and `$((...))` does
+  integer arithmetic: `expect InboxRow --count $((N0 - 1))` after archiving one, `expect Board
+  --prop "width>=$((W + 100))"` after hiding a panel. Variables live for one `run`.
 - It stops at the first failing step (exit 1) with the step, its line, the failure and the
   page's URL and title; `--keep-going` runs them all and lists every failure; `--quiet`
   prints only failures and the summary.
