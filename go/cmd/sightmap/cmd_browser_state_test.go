@@ -77,7 +77,8 @@ func TestListCondition(t *testing.T) {
 	row := func(id string) componentState {
 		return componentState{Component: "InboxRow", Props: map[string]string{"identifier": id}}
 	}
-	st := &pageState{Nodes: []componentState{row("WEB-144"), row("WEB-130"), {Component: "InboxRow"}, row("WEB-160")}}
+	project := componentState{Component: "InboxRow", Props: map[string]string{"project": "plant-id-v2"}}
+	st := &pageState{Nodes: []componentState{row("WEB-144"), row("WEB-130"), project, row("WEB-160")}}
 	cases := []struct {
 		kind listKind
 		spec string
@@ -94,6 +95,8 @@ func TestListCondition(t *testing.T) {
 		{listOrder, "identifier=WEB-144,WEB-160", true},
 		{listOrder, "identifier=WEB-160,WEB-144", false},
 		{listSeq, "title=", true}, // no match has a title: the empty list
+		{listSeq, "identifier|project=WEB-144,WEB-130,plant-id-v2,WEB-160", true},
+		{listSeq, "identifier|project=WEB-144,WEB-130,WEB-160", false},
 	}
 	for _, c := range cases {
 		cond, err := listCondition("InboxRow", c.kind, c.spec)

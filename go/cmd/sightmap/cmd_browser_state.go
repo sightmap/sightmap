@@ -284,7 +284,7 @@ func runExpect(args []string) error {
 	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value): every match's property (repeatable)")
 	fs.Var(&textConds, "text", "Substring of the component's text (repeatable)")
 	var seqConds, setConds, containsConds, orderConds multiFlag
-	fs.Var(&seqConds, "seq", "NAME=a,b,c: the matches' NAME values, in document order, are exactly this list (repeatable; \\, for a literal comma)")
+	fs.Var(&seqConds, "seq", "NAME=a,b,c: the matches' NAME values, in document order, are exactly this list (repeatable; \\, for a literal comma; NAME|OTHER takes each match's first)")
 	fs.Var(&setConds, "set", "NAME=a,b,c: the matches' NAME values are exactly these, in any order (repeatable)")
 	fs.Var(&containsConds, "contains", "NAME=a,b: each value is among the matches' NAME values (repeatable)")
 	fs.Var(&orderConds, "order", "NAME=a,b: these values occur among the matches in this order, others may come between (repeatable)")
@@ -576,12 +576,16 @@ func listCondition(qs string, kind listKind, spec string) (condition, error) {
 }
 
 // values lists a field across the matches, in document order, skipping a match
-// that lacks it.
+// that lacks it. NAME may list alternatives, `identifier|project`: each match
+// contributes the first it has, for a list that mixes kinds of rows.
 func values(st *pageState, name string) []string {
 	var out []string
 	for _, n := range st.Nodes {
-		if v, ok := field(n, name); ok {
-			out = append(out, v)
+		for _, alt := range strings.Split(name, "|") {
+			if v, ok := field(n, alt); ok {
+				out = append(out, v)
+				break
+			}
 		}
 	}
 	return out

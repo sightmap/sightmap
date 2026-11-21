@@ -296,7 +296,9 @@ sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
 - List conditions compare one property across the matches, in document order: `--seq`
   (exactly this list), `--set` (exactly these, any order), `--contains` (each is there) and
   `--order` (these, in this order, others between). Prefer `--contains`/`--order` when a rule
-  names a few rows, so unrelated rows don't break the check. `\,` is a literal comma.
+  names a few rows, so unrelated rows don't break the check. `\,` is a literal comma. For a list
+  that mixes kinds of rows, name alternatives: `--seq 'identifier|project=WEB-144,plant-id-v2'`
+  takes each match's first.
 - `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no
   origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter.
 - A query that matches nothing says what is there instead: `(8 IssueRow on the page;
