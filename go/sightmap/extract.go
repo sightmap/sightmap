@@ -16,6 +16,7 @@ const (
 	FromDOMText         = "dom.text"
 	FromDOMRawText      = "dom.raw_text"
 	FromDOMAttr         = "dom.attr"
+	FromDOMHas          = "dom.has"
 	FromDOMState        = "dom.state"
 	FromComponent       = "component"
 	FromComponentExists = "component.exists"
@@ -35,7 +36,7 @@ var URLExtractSources = []string{FromURLQuery, FromURLPath}
 // ComponentExtractSources is the closed set of sources a component property may
 // read.
 var ComponentExtractSources = []string{
-	FromDOMText, FromDOMRawText, FromDOMAttr, FromDOMState, FromComponent, FromComponentExists,
+	FromDOMText, FromDOMRawText, FromDOMAttr, FromDOMHas, FromDOMState, FromComponent, FromComponentExists,
 }
 
 // StateNames are the interactive-state names `from: dom.state` accepts (SEP-0013).

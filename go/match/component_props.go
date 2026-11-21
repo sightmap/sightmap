@@ -2,6 +2,7 @@ package match
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/sightmap/sightmap/go/sightmap"
@@ -92,7 +93,8 @@ func resolveComponentProperties(r *propResolver) {
 // Withholds reports whether the directive alone withholds a value read by e from
 // a node whose effective privacy is p (SEP-0009, per SEP-0017). Content is
 // withheld under block and mask; mask still permits state, including a dom.attr
-// read of an interactive-state attribute. component and component.exists read
+// read of an interactive-state attribute, and a dom.has presence test, which
+// reads markup structure rather than content. component and component.exists read
 // another node and are judged there instead, so they never withhold here. p is
 // a resolved directive, as Matcher.Privacy or ComponentMatch.Privacy report it.
 //
@@ -107,7 +109,7 @@ func Withholds(p string, e sightmap.Extract) bool {
 	case sightmap.FromDOMAttr:
 		// SEP-0009 retains the interactive-state attributes under mask.
 		return p == "block" || (p == "mask" && !slices.Contains(sightmap.StateNames, e.Path))
-	case sightmap.FromDOMState:
+	case sightmap.FromDOMState, sightmap.FromDOMHas:
 		return p == "block"
 	}
 	return false
@@ -169,6 +171,16 @@ func (r *propResolver) resolveExtract(node *sightmap.ComponentNode, e sightmap.E
 			return unresolved
 		}
 		return found(refine(e, node.Element.Attrs[e.Path]))
+
+	case sightmap.FromDOMHas:
+		// Presence, as HTML reads a boolean attribute: carried at all, even with
+		// an empty value, is "true"; not carried is "false". dom.attr cannot
+		// express this, since it omits an empty value.
+		if node.Element == nil {
+			return unresolved
+		}
+		_, has := node.Element.Attrs[e.Path]
+		return extracted{value: strconv.FormatBool(has), ok: true}
 
 	case sightmap.FromDOMState:
 		// Current interactive state, never the markup attribute of the same

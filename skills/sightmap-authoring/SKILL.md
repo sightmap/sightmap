@@ -417,7 +417,8 @@ name + label discriminator beats a false-specific name.
 |--------|--------|-------------|
 | `dom.text` | — | the matched node's accessible name (the default), falling back to its rendered `innerText` when it has no accessible name, so role-less `<span>`s / custom elements resolve their visible value offline, not empty |
 | `dom.raw_text` | — | the node's own text nodes only: the escape when the accessible name welds in extra text |
-| `dom.attr` | attribute name | the value of that attribute on the matched node, as the markup states it |
+| `dom.attr` | attribute name | the value of that attribute on the matched node, as the markup states it; an empty value (`data-selected=""`) is omitted |
+| `dom.has` | attribute name | `"true"` if the node carries the attribute at all, even empty, else `"false"`: read a boolean attribute (`data-selected`, `data-unread`) this way |
 | `dom.state` | `checked` / `selected` / `disabled` / `expanded` | the control's *current* state, `"true"`/`"false"`; `dom.attr` with `checked` reads only the initial markup |
 | `component` | `Child.prop` | the extracted `prop` of a descendant *component* `Child` |
 | `component.exists` | `Child` | `"true"` if descendant component `Child` matched, else omitted (a boolean flag) |

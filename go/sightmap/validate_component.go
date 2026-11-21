@@ -103,6 +103,13 @@ func checkComponentExtract(e Extract) (code, msg string) {
 		if e.Path == "" {
 			return invalid, "from: dom.attr requires path: an attribute name"
 		}
+	case FromDOMHas:
+		if e.Path == "" {
+			return invalid, "from: dom.has requires path: an attribute name"
+		}
+		if e.Pattern != "" {
+			return invalid, "from: dom.has takes no pattern"
+		}
 	case FromDOMState:
 		if !containsString(StateNames, e.Path) {
 			return invalid, fmt.Sprintf("from: dom.state requires path: one of %s", strings.Join(StateNames, ", "))
@@ -161,7 +168,7 @@ func privacyWithholds(privacy string, e Extract, selectors []string) string {
 		if privacy == "block" || (privacy == "mask" && !containsString(StateNames, e.Path)) {
 			return hint
 		}
-	case FromDOMState:
+	case FromDOMState, FromDOMHas:
 		if privacy == "block" {
 			return hint
 		}

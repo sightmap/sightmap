@@ -371,7 +371,7 @@
           "if": {
             "properties": {
               "from": {
-                "const": "component.exists"
+                "enum": ["component.exists", "dom.has"]
               }
             }
           },
@@ -396,7 +396,7 @@
       ],
       "properties": {
         "from": {
-          "enum": ["dom.text", "dom.raw_text", "dom.attr", "dom.state", "component", "component.exists"]
+          "enum": ["dom.text", "dom.raw_text", "dom.attr", "dom.has", "dom.state", "component", "component.exists"]
         }
       }
     },
