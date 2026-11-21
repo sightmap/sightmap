@@ -73,6 +73,49 @@ func TestPropCondition(t *testing.T) {
 	}
 }
 
+func TestListCondition(t *testing.T) {
+	row := func(id string) componentState {
+		return componentState{Component: "InboxRow", Props: map[string]string{"identifier": id}}
+	}
+	st := &pageState{Nodes: []componentState{row("WEB-144"), row("WEB-130"), {Component: "InboxRow"}, row("WEB-160")}}
+	cases := []struct {
+		kind listKind
+		spec string
+		ok   bool
+	}{
+		{listSeq, "identifier=WEB-144,WEB-130,WEB-160", true},
+		{listSeq, "identifier=WEB-130,WEB-144,WEB-160", false},
+		{listSeq, "identifier=WEB-144,WEB-130", false},
+		{listSet, "identifier=WEB-160,WEB-144,WEB-130", true},
+		{listSet, "identifier=WEB-160,WEB-144", false},
+		{listContains, "identifier=WEB-160,WEB-144", true},
+		{listContains, "identifier=WEB-160,WEB-999", false},
+		{listContains, "identifier=WEB-144,WEB-144", false}, // a repeat must be there twice
+		{listOrder, "identifier=WEB-144,WEB-160", true},
+		{listOrder, "identifier=WEB-160,WEB-144", false},
+		{listSeq, "title=", true}, // no match has a title: the empty list
+	}
+	for _, c := range cases {
+		cond, err := listCondition("InboxRow", c.kind, c.spec)
+		if err != nil {
+			t.Fatalf("--%s %s: %v", c.kind, c.spec, err)
+		}
+		if got := cond.ok(st); got != c.ok {
+			t.Errorf("--%s %s: ok = %v, want %v (observed %s)", c.kind, c.spec, got, c.ok, cond.observed(st))
+		}
+	}
+	cond, _ := listCondition("InboxRow", listContains, "identifier=WEB-160,WEB-999")
+	if got := cond.observed(st); !strings.Contains(got, "missing WEB-999") {
+		t.Errorf("observed = %q, want it to name the missing value", got)
+	}
+	if _, err := listCondition("InboxRow", listContains, "identifier="); err == nil {
+		t.Error("--contains with no values: want an error")
+	}
+	if got := splitValues(`a\,b,c`); !reflect.DeepEqual(got, []string{"a,b", "c"}) {
+		t.Errorf("splitValues = %q", got)
+	}
+}
+
 func TestCorpusPropertyShadowsBuiltin(t *testing.T) {
 	n := componentState{Props: map[string]string{"focused": ""}, Focused: false}
 	if v, _ := field(n, "focused"); v != "" {

@@ -284,6 +284,8 @@ sightmap browser expect Toast --text 'Reverted.'           # waits up to 5 s (--
 sightmap browser expect PropertyPicker --gone
 sightmap browser expect 'IssueRow[identifier=WEB-120]' --prop group=status:done --prop focused=true
 sightmap browser expect IssueRow --count '>=1'
+sightmap browser expect InboxRow --seq identifier=WEB-144,WEB-130,WEB-160   # the whole list, in order
+sightmap browser expect IssueRow --contains identifier=WEB-130,WEB-144     # these are among the rows
 sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
 ```
 
@@ -291,6 +293,10 @@ sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
   needs at least one match). With only a query it waits for the component to appear. On
   timeout it exits 1 and prints each failed condition with what it saw, e.g. `want
   IssueRow[identifier=WEB-130] group="status:done"; saw group "status:todo"`.
+- List conditions compare one property across the matches, in document order: `--seq`
+  (exactly this list), `--set` (exactly these, any order), `--contains` (each is there) and
+  `--order` (these, in this order, others between). Prefer `--contains`/`--order` when a rule
+  names a few rows, so unrelated rows don't break the check. `\,` is a literal comma.
 - `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no
   origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter.
 - A query that matches nothing says what is there instead: `(8 IssueRow on the page;

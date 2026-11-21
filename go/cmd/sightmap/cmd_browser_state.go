@@ -14,6 +14,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -282,6 +283,11 @@ func runExpect(args []string) error {
 	var propConds, textConds multiFlag
 	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value): every match's property (repeatable)")
 	fs.Var(&textConds, "text", "Substring of the component's text (repeatable)")
+	var seqConds, setConds, containsConds, orderConds multiFlag
+	fs.Var(&seqConds, "seq", "NAME=a,b,c: the matches' NAME values, in document order, are exactly this list (repeatable; \\, for a literal comma)")
+	fs.Var(&setConds, "set", "NAME=a,b,c: the matches' NAME values are exactly these, in any order (repeatable)")
+	fs.Var(&containsConds, "contains", "NAME=a,b: each value is among the matches' NAME values (repeatable)")
+	fs.Var(&orderConds, "order", "NAME=a,b: these values occur among the matches in this order, others may come between (repeatable)")
 	countFlag := fs.String("count", "", "How many components match: N, >=N or <=N")
 	goneFlag := fs.Bool("gone", false, "No component matches")
 	focusedFlag := fs.Bool("focused", false, "The (single) match holds keyboard focus")
@@ -291,11 +297,12 @@ func runExpect(args []string) error {
 	if err != nil {
 		return err
 	}
-	usage := "usage: browser expect [QUERY] [--prop k=v]... [--text S]... [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--title T] [--timeout-ms N]\n" +
+	usage := "usage: browser expect [QUERY] [--prop k=v]... [--text S]... [--seq|--set|--contains|--order k=a,b]... [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--title T] [--timeout-ms N]\n" +
 		"  waits until every condition holds, then prints the matches; on timeout prints what it saw and exits 1\n" +
 		"  with a QUERY and no other condition it waits for the component to be present\n" +
 		"  examples: expect 'IssueRow[identifier=WEB-120]' --prop group='status:done'\n" +
-		"            expect Toast --text 'Reverted.'   expect PropertyPicker --gone   expect --url /inbox --title 'Inbox (6) · Plumb'"
+		"            expect Toast --text 'Reverted.'   expect PropertyPicker --gone   expect --url /inbox --title 'Inbox (6) · Plumb'\n" +
+		"            expect InboxRow --seq identifier=WEB-144,WEB-130,WEB-160   expect IssueRow --order identifier=WEB-130,WEB-144"
 	if len(queries) > 1 {
 		return errors.New("expect: one query at a time\n" + usage)
 	}
@@ -309,9 +316,10 @@ func runExpect(args []string) error {
 	}
 
 	var conds []condition
-	componentConds := len(propConds) > 0 || len(textConds) > 0 || *countFlag != "" || *goneFlag || *focusedFlag
+	listConds := len(seqConds) + len(setConds) + len(containsConds) + len(orderConds)
+	componentConds := len(propConds) > 0 || len(textConds) > 0 || listConds > 0 || *countFlag != "" || *goneFlag || *focusedFlag
 	if componentConds && q == nil {
-		return errors.New("expect: --prop, --text, --count, --gone and --focused need a QUERY\n" + usage)
+		return errors.New("expect: --prop, --text, --seq, --set, --contains, --order, --count, --gone and --focused need a QUERY\n" + usage)
 	}
 	if q != nil && !componentConds {
 		conds = append(conds, condition{
@@ -336,6 +344,18 @@ func runExpect(args []string) error {
 			},
 			observed: func(st *pageState) string { return observedField(st, "text") },
 		})
+	}
+	for _, l := range []struct {
+		kind  listKind
+		specs multiFlag
+	}{{listSeq, seqConds}, {listSet, setConds}, {listContains, containsConds}, {listOrder, orderConds}} {
+		for _, spec := range l.specs {
+			c, err := listCondition(qs, l.kind, spec)
+			if err != nil {
+				return err
+			}
+			conds = append(conds, c)
+		}
 	}
 	if *countFlag != "" {
 		c, err := countCondition(qs, *countFlag)
@@ -512,6 +532,124 @@ func propCondition(qs, spec string) (condition, error) {
 		},
 		observed: func(st *pageState) string { return observedField(st, name) },
 	}, nil
+}
+
+// listKind is how a list condition compares the matches' values with its own.
+type listKind string
+
+const (
+	listSeq      listKind = "seq"      // exactly this list, in order
+	listSet      listKind = "set"      // exactly these values, any order
+	listContains listKind = "contains" // each value present
+	listOrder    listKind = "order"    // these values, in this relative order
+)
+
+// listCondition parses NAME=a,b,c into a condition on the sequence of NAME
+// values across the matches, in document order. A match without the property
+// contributes no value. Values split on commas; `\,` is a literal comma.
+func listCondition(qs string, kind listKind, spec string) (condition, error) {
+	i := strings.IndexByte(spec, '=')
+	if i <= 0 {
+		return condition{}, fmt.Errorf("expect: --%s wants NAME=a,b,c, got %q", kind, spec)
+	}
+	name, want := spec[:i], splitValues(spec[i+1:])
+	if len(want) == 0 && kind != listSeq && kind != listSet {
+		return condition{}, fmt.Errorf("expect: --%s %s= needs at least one value", kind, name)
+	}
+	return condition{
+		desc: fmt.Sprintf("%s %s --%s %s", qs, name, kind, strings.Join(want, ",")),
+		ok:   func(st *pageState) bool { return listHolds(kind, values(st, name), want) },
+		observed: func(st *pageState) string {
+			got := values(st, name)
+			if len(got) == 0 {
+				return fmt.Sprintf("no %s values (%d match(es))", name, len(st.Nodes))
+			}
+			s := name + " " + strings.Join(got, ",")
+			if kind == listContains || kind == listOrder {
+				if miss := missing(got, want); len(miss) > 0 {
+					s += "; missing " + strings.Join(miss, ",")
+				}
+			}
+			return s
+		},
+	}, nil
+}
+
+// values lists a field across the matches, in document order, skipping a match
+// that lacks it.
+func values(st *pageState, name string) []string {
+	var out []string
+	for _, n := range st.Nodes {
+		if v, ok := field(n, name); ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func listHolds(kind listKind, got, want []string) bool {
+	switch kind {
+	case listSeq:
+		return slices.Equal(got, want)
+	case listSet:
+		a, b := slices.Clone(got), slices.Clone(want)
+		sort.Strings(a)
+		sort.Strings(b)
+		return slices.Equal(a, b)
+	case listContains:
+		return len(missing(got, want)) == 0
+	case listOrder:
+		j := 0
+		for _, v := range got {
+			if j < len(want) && v == want[j] {
+				j++
+			}
+		}
+		return j == len(want)
+	}
+	return false
+}
+
+// missing lists the wanted values got lacks, counting repeats: a value wanted
+// twice must be there twice.
+func missing(got, want []string) []string {
+	have := map[string]int{}
+	for _, v := range got {
+		have[v]++
+	}
+	var out []string
+	for _, v := range want {
+		if have[v] > 0 {
+			have[v]--
+		} else {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// splitValues splits a comma-separated list, where `\,` is a literal comma.
+// Values are kept as written (no trimming), since a property value can carry
+// spaces; an empty list is written as nothing after the `=`.
+func splitValues(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	var cur strings.Builder
+	for i := 0; i < len(s); i++ {
+		switch {
+		case s[i] == '\\' && i+1 < len(s) && s[i+1] == ',':
+			cur.WriteByte(',')
+			i++
+		case s[i] == ',':
+			out = append(out, cur.String())
+			cur.Reset()
+		default:
+			cur.WriteByte(s[i])
+		}
+	}
+	return append(out, cur.String())
 }
 
 func countCondition(qs, spec string) (condition, error) {
