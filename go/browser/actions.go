@@ -977,7 +977,6 @@ func selectAllChord(ctx context.Context, conn *CDPConn) error {
 	return nil
 }
 
-// typeText types value into the focused element, one key event pair per rune.
 // TypeText types value into whatever holds keyboard focus, one key event per
 // rune, the way Fill types once it has focused its field.
 func TypeText(ctx context.Context, conn *CDPConn, value string) error {
@@ -987,6 +986,7 @@ func TypeText(ctx context.Context, conn *CDPConn, value string) error {
 	return nil
 }
 
+// typeText types value into the focused element, one key event pair per rune.
 func typeText(ctx context.Context, conn *CDPConn, value string) error {
 	for _, r := range value {
 		ch := string(r)

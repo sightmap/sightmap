@@ -46,11 +46,23 @@ type pageState struct {
 
 // readState extracts the live tree once, applies the corpus and returns every
 // candidate for q (all of them; `#N` picks one). Focus comes from the page's
-// active element, read in the same round trip as the URL and title.
+// active element, read in the same round trip as the URL and title. A nil q
+// reads only the URL and title: no extraction, so `get page` and `expect --url`
+// work on a page the corpus does not match and poll cheaply.
+//
+// The extraction runs first because it stamps the data-sightmap-id the focus
+// lookup reads.
 func readState(ctx context.Context, conn *browser.CDPConn, sightmapDir string, q *compquery.Query) (*pageState, error) {
-	root, matches, props, err := extractMatchedComponents(ctx, conn, sightmapDir)
-	if err != nil {
-		return nil, err
+	var (
+		root    *sightmap.ComponentNode
+		matches map[*sightmap.ComponentNode]*sightmap.ComponentMatch
+		props   map[string]map[string]string
+	)
+	if q != nil {
+		var err error
+		if root, matches, props, err = extractMatchedComponents(ctx, conn, sightmapDir); err != nil {
+			return nil, err
+		}
 	}
 	var meta struct {
 		URL     string `json:"url"`
@@ -470,32 +482,36 @@ func observedField(st *pageState, name string) string {
 // propCondition parses NAME=VALUE (or ^=, *=, !=) into a condition every match
 // must satisfy, using the component-query predicate semantics.
 func propCondition(qs, spec string) (condition, error) {
-	for _, op := range []string{"!=", "^=", "*=", "="} {
-		i := strings.Index(spec, op)
-		if i <= 0 {
-			continue
+	// The operator is the first one in the spec: a value may itself contain
+	// "!=" or "^=" (`text=Count != 3` is an equality on "Count != 3").
+	op, i := "", -1
+	for _, o := range []string{"!=", "^=", "*=", "="} {
+		if j := strings.Index(spec, o); j > 0 && (i < 0 || j < i) {
+			op, i = o, j
 		}
-		name, val := spec[:i], spec[i+len(op):]
-		neg := op == "!="
-		pred := compquery.Predicate{Prop: name, Op: op, Val: val}
-		if neg {
-			pred.Op = "="
-		}
-		return condition{
-			desc: fmt.Sprintf("%s %s%s%q", qs, name, op, val),
-			ok: func(st *pageState) bool {
-				return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool {
-					v, ok := field(n, name)
-					if !ok {
-						return neg // a missing property is never equal, so != holds
-					}
-					return pred.Match(map[string]string{name: v}) != neg
-				})
-			},
-			observed: func(st *pageState) string { return observedField(st, name) },
-		}, nil
 	}
-	return condition{}, fmt.Errorf("expect: --prop wants NAME=VALUE (or ^= *= !=), got %q", spec)
+	if i < 0 {
+		return condition{}, fmt.Errorf("expect: --prop wants NAME=VALUE (or ^= *= !=), got %q", spec)
+	}
+	name, val := spec[:i], spec[i+len(op):]
+	neg := op == "!="
+	pred := compquery.Predicate{Prop: name, Op: op, Val: val}
+	if neg {
+		pred.Op = "="
+	}
+	return condition{
+		desc: fmt.Sprintf("%s %s%s%q", qs, name, op, val),
+		ok: func(st *pageState) bool {
+			return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool {
+				v, ok := field(n, name)
+				if !ok {
+					return neg // a missing property is never equal, so != holds
+				}
+				return pred.Match(map[string]string{name: v}) != neg
+			})
+		},
+		observed: func(st *pageState) string { return observedField(st, name) },
+	}, nil
 }
 
 func countCondition(qs, spec string) (condition, error) {
@@ -613,6 +629,9 @@ func runKeys(args []string) error {
 			return err
 		}
 	}
+	if err := armSettle(ctx, conn, *settle); err != nil {
+		return err
+	}
 	pause := time.Duration(*delayMs) * time.Millisecond
 	var parts []string
 	for _, s := range keySteps(args, keys) {
@@ -691,6 +710,16 @@ const (
 // but it is one flag instead of a separate sleep.
 func addSettleFlag(fs *flag.FlagSet) *bool {
 	return fs.Bool("settle", false, "After acting, wait until the DOM has been quiet for 300 ms with no fetch in flight (at most 5 s), instead of a sleep")
+}
+
+// armSettle starts counting the page's requests in flight when --settle was
+// given. Call it just before the action, so a request the action starts is
+// counted from the moment it is sent.
+func armSettle(ctx context.Context, conn *browser.CDPConn, settle bool) error {
+	if !settle {
+		return nil
+	}
+	return browser.ArmSettle(ctx, conn)
 }
 
 // settleAfter waits for the page to settle when asked, and says how long it

@@ -47,6 +47,9 @@ func TestPropCondition(t *testing.T) {
 		{"group*=done", true},
 		{"group!=status:todo", true},
 		{"group!=status:done", false},
+		// The first operator wins; a later "!=" belongs to the value.
+		{"text=a!=b", false},
+		{"text!=a=b", true},
 		{"missing=x", false},
 		{"text*=Keyboard", true},
 		{"visible=false", true},

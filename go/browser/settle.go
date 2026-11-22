@@ -24,6 +24,9 @@ type SettleResult struct {
 // that renders after an /api response is not taken as settled while the response
 // is pending.
 //
+// A caller that acts first should call ArmSettle before the action: a request
+// the action starts is only counted once the tracker is installed.
+//
 // The observers disconnect themselves at max even if the caller has gone (the
 // eval errored or was cancelled), so repeated waits never pile observers up on a
 // document.
@@ -89,6 +92,17 @@ func WaitSettled(ctx context.Context, conn *CDPConn, quiet, max time.Duration) (
 		return SettleResult{}, fmt.Errorf("WaitSettled: %w", err)
 	}
 	return SettleResult{Elapsed: time.Duration(r.Ms) * time.Millisecond, Quiet: r.Quiet}, nil
+}
+
+// ArmSettle installs what WaitSettled reads (see instrument). Call it before an
+// action whose reaction WaitSettled will wait for, so a request the action
+// starts is counted from the moment it is sent. Without it the counter is
+// installed inside WaitSettled, after the action, and a slow request the action
+// started is invisible: the wait ends once the DOM has been quiet for the quiet
+// period, with the response still pending. It does nothing on a document that is
+// already armed, and a navigation drops it (WaitSettled installs it again).
+func ArmSettle(ctx context.Context, conn *CDPConn) error {
+	return instrument(ctx, conn)
 }
 
 // instrument installs, once per document, what WaitSettled needs to see beyond a

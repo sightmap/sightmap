@@ -14,8 +14,9 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -356,10 +357,5 @@ func pageWhere(addr, sightmapDir, tab string) string {
 }
 
 func sortedStepNames() []string {
-	names := make([]string, 0, len(runSteps))
-	for n := range runSteps {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return names
+	return slices.Sorted(maps.Keys(runSteps))
 }

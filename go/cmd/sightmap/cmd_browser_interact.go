@@ -121,6 +121,10 @@ func runClick(args []string) error {
 		return err
 	}
 
+	if err := armSettle(ctx, conn, *settle); err != nil {
+		return err
+	}
+
 	if *xFlag >= 0 && *yFlag >= 0 {
 		if err := browser.ClickAt(ctx, conn, *xFlag, *yFlag); err != nil {
 			return err
@@ -174,6 +178,10 @@ func runFill(args []string) error {
 	}
 	defer conn.Close()
 	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
+
+	if err := armSettle(ctx, conn, *settle); err != nil {
 		return err
 	}
 
@@ -264,6 +272,10 @@ func runKeyPress(args []string) error {
 	}
 	defer conn.Close()
 	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
+
+	if err := armSettle(ctx, conn, *settle); err != nil {
 		return err
 	}
 
@@ -377,6 +389,10 @@ func runDrag(args []string) error {
 	}
 	defer conn.Close()
 	if err := foreground(ctx, conn); err != nil {
+		return err
+	}
+
+	if err := armSettle(ctx, conn, *settle); err != nil {
 		return err
 	}
 
