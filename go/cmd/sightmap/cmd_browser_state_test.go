@@ -56,6 +56,10 @@ func TestPropCondition(t *testing.T) {
 		{"text=a > 3", false},
 		{"text*=Keyboard ~ nav", false},
 		{"missing=x", false},
+		{"missing=", true},     // absent
+		{"missing!=", false},   // not present
+		{"identifier!=", true}, // present
+		{"identifier=", false},
 		{"text*=Keyboard", true},
 		{"visible=false", true},
 	}

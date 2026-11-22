@@ -339,7 +339,7 @@ func runExpect(args []string) error {
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	timeoutMs := fs.Int("timeout-ms", 5000, "How long to wait for the conditions (default 5 000)")
 	var propConds, textConds, noTextConds, queryConds multiFlag
-	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value; numbers: NAME>=N, NAME<N, NAME=N~T): every match's property or box (left, top, width, height, right, bottom) (repeatable)")
+	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value; NAME= absent, NAME!= present; numbers: NAME>=N, NAME<N, NAME=N~T): every match's property or box (left, top, width, height, right, bottom) (repeatable)")
 	fs.Var(&textConds, "text", "Substring of the component's text (repeatable)")
 	fs.Var(&noTextConds, "no-text", "A substring no match's text contains (repeatable)")
 	fs.Var(&queryConds, "query", "NAME=VALUE: the page URL's query parameter equals VALUE; NAME= means absent, NAME!=VALUE differs (repeatable)")
@@ -597,6 +597,9 @@ func propCondition(qs, spec string) (condition, error) {
 		return condition{}, fmt.Errorf("expect: --prop wants NAME=VALUE (or ^= *= !=), got %q", spec)
 	}
 	name, val := spec[:i], spec[i+len(op):]
+	if val == "" && (op == "=" || op == "!=") {
+		return presenceCondition(qs, name, op == "!="), nil
+	}
 	neg := op == "!="
 	pred := compquery.Predicate{Prop: name, Op: op, Val: val}
 	if neg {
@@ -852,6 +855,25 @@ func splitValues(s string) []string {
 		}
 	}
 	return append(out, cur.String())
+}
+
+// presenceCondition is --prop NAME= (no match has NAME: the part isn't shown)
+// or NAME!= (every match has a non-empty NAME), as --query reads an empty value.
+func presenceCondition(qs, name string, present bool) condition {
+	desc := fmt.Sprintf("%s without %s", qs, name)
+	if present {
+		desc = fmt.Sprintf("%s with %s", qs, name)
+	}
+	return condition{
+		desc: desc,
+		ok: func(st *pageState) bool {
+			return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool {
+				v, ok := field(n, name)
+				return (ok && v != "") == present
+			})
+		},
+		observed: func(st *pageState) string { return observedField(st, name) },
+	}
 }
 
 func countCondition(qs, spec string) (condition, error) {

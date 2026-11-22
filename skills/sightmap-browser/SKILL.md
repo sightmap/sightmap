@@ -305,6 +305,8 @@ sightmap browser expect Toast --no-text Error              # no match's text con
   `height`, `right`, `bottom`. Numeric forms compare any number: `--prop width=720~2` (within
   2), `--prop top>=90`, `--prop 'height<60'`. So a layout rule is `expect 'Dialog[name=x]'
   --prop width=720~2 --prop top=96~4`, not an eval of `getBoundingClientRect`.
+- `--prop NAME=` (nothing after `=`) says no match has `NAME`, and `NAME!=` that every match
+  has it: a count badge that must not be shown is `--prop count=`.
 - `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no
   origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter;
   check a parameter that does matter with `--query NAME=VALUE` (`NAME=` absent, `!=` differs).
