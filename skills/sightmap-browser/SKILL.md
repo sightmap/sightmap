@@ -305,6 +305,11 @@ sightmap browser expect Toast --no-text Error              # no match's text con
   `height`, `right`, `bottom`. Numeric forms compare any number: `--prop width=720~2` (within
   2), `--prop top>=90`, `--prop 'height<60'`. So a layout rule is `expect 'Dialog[name=x]'
   --prop width=720~2 --prop top=96~4`, not an eval of `getBoundingClientRect`.
+- Time: `--for 800` says the conditions hold now and keep holding for 800 ms (a row that must
+  stay, a state that must not change yet); `--not-before 800 --timeout-ms 2000` says they must
+  not hold before 800 ms and must by 2 s (a delay), both counted from the step's start. So
+  "selected but still unread, read about a second later" is `keys j`, `expect R --prop
+  unread=true --for 600`, `expect R --prop unread=false --timeout-ms 1500`.
 - `--prop NAME=` (nothing after `=`) says no match has `NAME`, and `NAME!=` that every match
   has it: a count badge that must not be shown is `--prop count=`.
 - `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no

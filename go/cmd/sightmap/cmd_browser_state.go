@@ -338,6 +338,8 @@ func runExpect(args []string) error {
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	timeoutMs := fs.Int("timeout-ms", 5000, "How long to wait for the conditions (default 5 000)")
+	forMs := fs.Int("for", 0, "The conditions hold at once and keep holding for this many ms (a state that must not change yet)")
+	notBeforeMs := fs.Int("not-before", 0, "The conditions must not hold until this many ms have passed, then hold by --timeout-ms (a delay)")
 	var propConds, textConds, noTextConds, queryConds multiFlag
 	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value; NAME= absent, NAME!= present; numbers: NAME>=N, NAME<N, NAME=N~T): every match's property or box (left, top, width, height, right, bottom) (repeatable)")
 	fs.Var(&textConds, "text", "Substring of the component's text (repeatable)")
@@ -476,13 +478,29 @@ func runExpect(args []string) error {
 		return errors.New(usage)
 	}
 
+	if *forMs > 0 && *notBeforeMs > 0 {
+		return errors.New("expect: --for and --not-before don't combine; use two steps")
+	}
+	if *notBeforeMs > 0 && *notBeforeMs >= *timeoutMs {
+		return fmt.Errorf("expect: --not-before %d needs a --timeout-ms past it", *notBeforeMs)
+	}
+
 	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	deadline := time.Now().Add(time.Duration(*timeoutMs) * time.Millisecond)
+	if *forMs > 0 {
+		read := func() (*pageState, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			return readState(ctx, conn, *sightmapDirFlag, q)
+		}
+		return expectThroughout(read, conds, time.Duration(*forMs)*time.Millisecond, 100*time.Millisecond)
+	}
+	start := time.Now()
+	deadline := start.Add(time.Duration(*timeoutMs) * time.Millisecond)
 	var last *pageState
 	var lastErr error
 	for {
@@ -491,6 +509,9 @@ func runExpect(args []string) error {
 		cancel()
 		if err == nil {
 			last, lastErr = st, nil
+			if allHold(conds, st) && *notBeforeMs > 0 && time.Since(start) < time.Duration(*notBeforeMs)*time.Millisecond {
+				return fmt.Errorf("expect: %s held after %dms, before %dms", describe(conds), time.Since(start).Milliseconds(), *notBeforeMs)
+			}
 			if allHold(conds, st) {
 				// The matches, when there are a few: a check that holds needs no list.
 				if len(st.Nodes) <= 3 {
@@ -525,6 +546,32 @@ func runExpect(args []string) error {
 		cancel()
 	}
 	return errors.New(b.String())
+}
+
+// expectThroughout checks that every condition holds now and on every sample
+// until d has passed: a state that must not change yet (still unread, the row
+// stays). It fails at the first sample that breaks, saying when.
+func expectThroughout(read func() (*pageState, error), conds []condition, d, every time.Duration) error {
+	start := time.Now()
+	samples := 0
+	for {
+		st, err := read()
+		if err != nil {
+			return fmt.Errorf("expect: %v", err)
+		}
+		samples++
+		for _, c := range conds {
+			if !c.ok(st) {
+				return fmt.Errorf("expect: %s stopped holding after %dms of %dms\n  want %s; saw %s",
+					describe(conds), time.Since(start).Milliseconds(), d.Milliseconds(), c.desc, c.observed(st))
+			}
+		}
+		if time.Since(start) >= d {
+			fmt.Fprintf(os.Stderr, "ok: %s for %dms (%d samples)\n", describe(conds), d.Milliseconds(), samples)
+			return nil
+		}
+		time.Sleep(every)
+	}
 }
 
 func allHold(conds []condition, st *pageState) bool {

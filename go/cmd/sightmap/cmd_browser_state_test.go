@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sightmap/sightmap/go/sightmap"
 )
@@ -163,6 +164,33 @@ func TestNumericPropCondition(t *testing.T) {
 	}
 	if _, err := propCondition("Dialog", "width=abc~2"); err == nil {
 		t.Error("width=abc~2: want an error")
+	}
+}
+
+func TestExpectThroughout(t *testing.T) {
+	cond, _ := propCondition("InboxRow", "unread=true")
+	state := func(unread string) *pageState {
+		return &pageState{Nodes: []componentState{{Props: map[string]string{"unread": unread}}}}
+	}
+	n := 0
+	steady := func() (*pageState, error) { n++; return state("true"), nil }
+	if err := expectThroughout(steady, []condition{cond}, 30*time.Millisecond, 5*time.Millisecond); err != nil {
+		t.Fatalf("steady state: %v", err)
+	}
+	if n < 3 {
+		t.Errorf("sampled %d times over 30ms, want several", n)
+	}
+	n = 0
+	flips := func() (*pageState, error) {
+		n++
+		if n >= 3 {
+			return state("false"), nil
+		}
+		return state("true"), nil
+	}
+	err := expectThroughout(flips, []condition{cond}, time.Second, 5*time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "stopped holding") || !strings.Contains(err.Error(), `saw unread "false"`) {
+		t.Errorf("a state that changes: err = %v", err)
 	}
 }
 
