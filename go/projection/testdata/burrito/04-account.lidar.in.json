@@ -1,0 +1,418 @@
+{
+ "kind": "root",
+ "id": "",
+ "text": "",
+ "kids": [
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "group",
+     "id": "account.name",
+     "text": "Guest",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "group",
+     "id": "account.email",
+     "text": "Not signed in",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "group",
+     "id": "account.points",
+     "text": "0 points",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "section",
+     "id": "",
+     "text": "Preferences",
+     "kids": [
+      {
+       "kind": "switch",
+       "id": "",
+       "text": "",
+       "kids": [
+        {
+         "kind": "group",
+         "id": "account.switch.pickupReminders",
+         "text": "Pickup reminders",
+         "kids": [
+          {
+           "kind": "switch",
+           "id": "",
+           "text": "Pickup reminders",
+           "kids": [
+            {
+             "kind": "switch",
+             "id": "",
+             "text": "",
+             "kids": [
+              {
+               "kind": "img",
+               "id": "",
+               "text": "",
+               "kids": []
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "section",
+     "id": "",
+     "text": "Preferences",
+     "kids": [
+      {
+       "kind": "switch",
+       "id": "",
+       "text": "",
+       "kids": [
+        {
+         "kind": "group",
+         "id": "account.switch.emailReceipts",
+         "text": "Email receipts",
+         "kids": [
+          {
+           "kind": "switch",
+           "id": "",
+           "text": "Email receipts",
+           "kids": [
+            {
+             "kind": "switch",
+             "id": "",
+             "text": "",
+             "kids": [
+              {
+               "kind": "img",
+               "id": "",
+               "text": "",
+               "kids": []
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "section",
+     "id": "",
+     "text": "Preferences",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "",
+       "text": "Spice level",
+       "kids": [
+        {
+         "kind": "tablist",
+         "id": "",
+         "text": "",
+         "kids": [
+          {
+           "kind": "group",
+           "id": "account.spice.mild",
+           "text": "",
+           "kids": [
+            {
+             "kind": "button",
+             "id": "",
+             "text": "Mild",
+             "kids": []
+            }
+           ]
+          },
+          {
+           "kind": "group",
+           "id": "account.spice.medium",
+           "text": "",
+           "kids": [
+            {
+             "kind": "button",
+             "id": "",
+             "text": "",
+             "kids": [
+              {
+               "kind": "text",
+               "id": "",
+               "text": "Medium",
+               "kids": []
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "kind": "group",
+           "id": "account.spice.hot",
+           "text": "",
+           "kids": [
+            {
+             "kind": "button",
+             "id": "",
+             "text": "Hot",
+             "kids": []
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "section",
+     "id": "",
+     "text": "Preferences",
+     "kids": [
+      {
+       "kind": "group",
+       "id": "account.deleteAccount",
+       "text": "",
+       "kids": [
+        {
+         "kind": "button",
+         "id": "",
+         "text": "Delete account",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "group",
+     "id": "account.about",
+     "text": "",
+     "kids": [
+      {
+       "kind": "link",
+       "id": "",
+       "text": "About",
+       "kids": []
+      },
+      {
+       "kind": "link",
+       "id": "",
+       "text": "About",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "group",
+     "id": "account.rewards",
+     "text": "",
+     "kids": [
+      {
+       "kind": "link",
+       "id": "",
+       "text": "Rewards",
+       "kids": []
+      },
+      {
+       "kind": "link",
+       "id": "",
+       "text": "Rewards",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "group",
+     "id": "account.signOut",
+     "text": "",
+     "kids": [
+      {
+       "kind": "button",
+       "id": "",
+       "text": "Sign out",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "kind": "list",
+   "id": "",
+   "text": "",
+   "kids": [
+    {
+     "kind": "section",
+     "id": "",
+     "text": "Preferences",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "navigation",
+   "id": "",
+   "text": "Account",
+   "kids": []
+  },
+  {
+   "kind": "group",
+   "id": "Account",
+   "text": "",
+   "kids": [
+    {
+     "kind": "navigation",
+     "id": "",
+     "text": "Account",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "tablist",
+   "id": "",
+   "text": "Tab Bar",
+   "kids": [
+    {
+     "kind": "tablist",
+     "id": "",
+     "text": "Tab Bar",
+     "kids": [
+      {
+       "kind": "tab",
+       "id": "tab.menu",
+       "text": "Menu",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "fork.knife",
+         "text": "Food",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Menu",
+         "kids": []
+        }
+       ]
+      },
+      {
+       "kind": "tab",
+       "id": "tab.orders",
+       "text": "Orders",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "list.bullet.rectangle.fill",
+         "text": "list.bullet.rectangle.fill",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Orders",
+         "kids": []
+        }
+       ]
+      },
+      {
+       "kind": "tab",
+       "id": "tab.account",
+       "text": "Account",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "person.crop.circle.fill",
+         "text": "account",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Account",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

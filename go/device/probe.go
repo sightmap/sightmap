@@ -111,6 +111,8 @@ type ProbeAX struct {
 	Value  string     `json:"value"`
 	Traits uint64     `json:"traits"`
 	Ptr    string     `json:"ptr"`
+	// Secure is set on a password field.
+	Secure bool       `json:"secure"`
 	Kids   []*ProbeAX `json:"kids"`
 }
 

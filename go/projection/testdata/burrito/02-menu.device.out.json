@@ -1,0 +1,258 @@
+{
+ "kind": "root",
+ "id": "",
+ "text": "",
+ "kids": [
+  {
+   "kind": "button",
+   "id": "menu.tab.all",
+   "text": "All",
+   "kids": []
+  },
+  {
+   "kind": "button",
+   "id": "menu.tab.burritos",
+   "text": "Burritos",
+   "kids": []
+  },
+  {
+   "kind": "button",
+   "id": "menu.tab.bowls",
+   "text": "Bowls",
+   "kids": []
+  },
+  {
+   "kind": "button",
+   "id": "menu.tab.tacos",
+   "text": "Tacos",
+   "kids": []
+  },
+  {
+   "kind": "button",
+   "id": "menu.tab.sides",
+   "text": "Sides",
+   "kids": []
+  },
+  {
+   "kind": "button",
+   "id": "menu.tab.drinks",
+   "text": "Drinks",
+   "kids": []
+  },
+  {
+   "kind": "heading",
+   "id": "",
+   "text": "🌯 Burrito Co.",
+   "kids": []
+  },
+  {
+   "kind": "group",
+   "id": "menu.list",
+   "text": "",
+   "kids": [
+    {
+     "kind": "group",
+     "id": "menu.card.classic-burrito",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Classic Burrito",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "A flour tortilla stuffed with your choice of protein, rice, black beans, cheese, and salsa.",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "$10.95",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "★ Popular",
+       "kids": []
+      }
+     ]
+    },
+    {
+     "kind": "group",
+     "id": "menu.card.chicken-bowl",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Chicken Burrito Bowl",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Grilled chicken over cilantro-lime rice with fajita veggies, corn salsa, and sour cream.",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "$11.50",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "★ Popular",
+       "kids": []
+      }
+     ]
+    },
+    {
+     "kind": "group",
+     "id": "menu.card.veggie-tacos",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Veggie Tacos",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Three soft corn tortillas with sofritas, roasted chili-corn salsa, fresh guacamole, and shredded cheese.",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "$9.75",
+       "kids": []
+      }
+     ]
+    },
+    {
+     "kind": "group",
+     "id": "menu.card.chips-guac",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Chips & Guacamole",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Fresh house-made chips with creamy guacamole.",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "$4.95",
+       "kids": []
+      }
+     ]
+    },
+    {
+     "kind": "group",
+     "id": "menu.card.steak-quesadilla",
+     "text": "",
+     "kids": [
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Steak Quesadilla",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "Grilled flour tortilla with marinated steak, Monterey Jack cheese, and chipotle cream.",
+       "kids": []
+      },
+      {
+       "kind": "text",
+       "id": "",
+       "text": "$13.25",
+       "kids": []
+      }
+     ]
+    },
+    {
+     "kind": "group",
+     "id": "menu.card.carnitas-burrito",
+     "text": "",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "navigation",
+   "id": "🌯 Burrito Co.",
+   "text": "🌯 Burrito Co.",
+   "kids": [
+    {
+     "kind": "button",
+     "id": "menu.cart",
+     "text": "Cart",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "tablist",
+   "id": "",
+   "text": "Tab Bar",
+   "kids": [
+    {
+     "kind": "tab",
+     "id": "tab.menu",
+     "text": "Menu",
+     "kids": [
+      {
+       "kind": "img",
+       "id": "fork.knife",
+       "text": "Food",
+       "kids": []
+      }
+     ]
+    },
+    {
+     "kind": "tab",
+     "id": "tab.orders",
+     "text": "Orders",
+     "kids": [
+      {
+       "kind": "img",
+       "id": "list.bullet.rectangle.fill",
+       "text": "list.bullet.rectangle.fill",
+       "kids": []
+      }
+     ]
+    },
+    {
+     "kind": "tab",
+     "id": "tab.account",
+     "text": "Account",
+     "kids": [
+      {
+       "kind": "img",
+       "id": "person.crop.circle.fill",
+       "text": "account",
+       "kids": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

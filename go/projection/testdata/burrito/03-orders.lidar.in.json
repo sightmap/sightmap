@@ -1,0 +1,103 @@
+{
+ "kind": "root",
+ "id": "",
+ "text": "",
+ "kids": [
+  {
+   "kind": "group",
+   "id": "orders.empty",
+   "text": "No orders yet",
+   "kids": []
+  },
+  {
+   "kind": "group",
+   "id": "Orders",
+   "text": "",
+   "kids": [
+    {
+     "kind": "navigation",
+     "id": "",
+     "text": "Orders",
+     "kids": []
+    },
+    {
+     "kind": "navigation",
+     "id": "",
+     "text": "Orders",
+     "kids": []
+    }
+   ]
+  },
+  {
+   "kind": "tablist",
+   "id": "",
+   "text": "Tab Bar",
+   "kids": [
+    {
+     "kind": "tablist",
+     "id": "",
+     "text": "Tab Bar",
+     "kids": [
+      {
+       "kind": "tab",
+       "id": "tab.menu",
+       "text": "Menu",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "fork.knife",
+         "text": "Food",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Menu",
+         "kids": []
+        }
+       ]
+      },
+      {
+       "kind": "tab",
+       "id": "tab.orders",
+       "text": "Orders",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "list.bullet.rectangle.fill",
+         "text": "list.bullet.rectangle.fill",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Orders",
+         "kids": []
+        }
+       ]
+      },
+      {
+       "kind": "tab",
+       "id": "tab.account",
+       "text": "Account",
+       "kids": [
+        {
+         "kind": "img",
+         "id": "person.crop.circle.fill",
+         "text": "account",
+         "kids": []
+        },
+        {
+         "kind": "tab",
+         "id": "",
+         "text": "Account",
+         "kids": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

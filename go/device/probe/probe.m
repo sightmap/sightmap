@@ -99,6 +99,10 @@ static NSDictionary *walkAX(id e, int depth) {
   if ((s = [e accessibilityValue]).length) n[@"value"] = s;
   if ([e accessibilityTraits]) n[@"traits"] = @([e accessibilityTraits]);
   if ([e isKindOfClass:[UIView class]]) n[@"ptr"] = ptr(e);
+  // A secure field's accessibilityValue is already bullets, but nothing in its class
+  // or traits says it is one; the session must know, to keep what is typed out of logs.
+  if ([e isKindOfClass:[UITextField class]] && ((UITextField *)e).secureTextEntry) n[@"secure"] = @YES;
+  if ([e isKindOfClass:[UITextView class]] && ((UITextView *)e).secureTextEntry) n[@"secure"] = @YES;
   if (depth < 60) {
     NSMutableArray *kids = [NSMutableArray array];
     for (id k in axChildren(e)) [kids addObject:walkAX(k, depth + 1)];
