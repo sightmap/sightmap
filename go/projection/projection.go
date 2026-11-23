@@ -13,7 +13,9 @@
 //
 // Producers adapt their tree to Node first: Kind is one of the roles below,
 // and ID must be an identifier the app set, not one the platform derived.
-// Project returns a new tree and leaves its input alone.
+// Project returns a new tree and leaves its input alone. A node's ID and Text
+// in the result may come from a node the rules folded into it; its Ref stays
+// the survivor's own.
 package projection
 
 // Kinds the rules distinguish. A producer may use others; they are treated as
@@ -44,6 +46,11 @@ type Node struct {
 	ID   string  `json:"id"`
 	Text string  `json:"text"`
 	Kids []*Node `json:"kids"`
+	// Ref is the producer's own element, carried through untouched: a node
+	// that survives keeps its Ref, and a node the rules build from another
+	// (a group that becomes its button) takes the Ref of the one it stands for.
+	// The package never reads it.
+	Ref any `json:"-"`
 }
 
 // isControl reports whether kind is something a person operates.
@@ -201,7 +208,7 @@ func fold(n *Node) *Node {
 			if text == "" {
 				text = n.Text
 			}
-			return &Node{Kind: KindButton, ID: n.ID, Text: text}
+			return &Node{Kind: KindButton, ID: n.ID, Text: text, Ref: n.Ref}
 		}
 	}
 
@@ -211,7 +218,7 @@ func fold(n *Node) *Node {
 		case len(n.Kids) > 0:
 			return &Node{Kind: splice, Kids: n.Kids}
 		case n.Text != "":
-			return &Node{Kind: KindText, Text: n.Text}
+			return &Node{Kind: KindText, Text: n.Text, Ref: n.Ref}
 		default:
 			return &Node{Kind: splice}
 		}
