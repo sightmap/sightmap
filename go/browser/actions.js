@@ -164,7 +164,11 @@ function __smLocateForClick(sel) {
     r.bottom <= window.innerHeight &&
     hits(r);
   if (!onScreen) {
-    el.scrollIntoView({ block: "center", inline: "nearest", behavior: "instant" });
+    el.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: "instant",
+    });
     r = el.getBoundingClientRect();
   }
   const cx = Math.floor(r.left + r.width / 2),
