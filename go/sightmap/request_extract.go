@@ -14,7 +14,9 @@ import (
 // and the extracted content (Properties). Requests, like components, carry
 // live-extracted properties — unlike MessageMatch, which has none.
 type RequestMatch struct {
-	Name       string
+	Name string
+	// ID is the matched RequestDef's SEP-0020 id; "" when the sightmap declares none.
+	ID         string
 	Memory     []string
 	Tags       []string
 	Properties []PropertyValue
@@ -40,6 +42,7 @@ func (c *Corpus) RequestsForRecord(rec Request) []RequestMatch {
 	for i := range defs {
 		out = append(out, RequestMatch{
 			Name:       defs[i].Name,
+			ID:         defs[i].ID,
 			Memory:     defs[i].Memory,
 			Tags:       defs[i].Tags,
 			Properties: defs[i].ExtractProperties(rec),

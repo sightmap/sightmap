@@ -190,6 +190,7 @@ func (m *Matcher) matchDoc(d frameDoc, conflicts bool) (map[*sightmap.ComponentN
 			q := claims[0]
 			named = &sightmap.ComponentMatch{Name: q.Name}
 			if q.Def != nil {
+				named.ID, named.RefID = q.Def.ID, q.Def.RefID
 				named.Memory = q.Def.Memory
 				named.Tags = q.Def.Tags
 				defByNode[node] = q.Def
