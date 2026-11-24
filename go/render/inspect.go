@@ -159,10 +159,7 @@ func inspectSelectorDisplay(sel *sightmap.Element, tag string, opts InspectOpts)
 		sb.WriteString(tag)
 	}
 
-	if sel.Id != "" {
-		sb.WriteString("#")
-		sb.WriteString(sel.Id)
-	}
+	sb.WriteString(sightmap.IDSelector(sel.Id))
 
 	if opts.Classes {
 		for _, cls := range sel.Classes {

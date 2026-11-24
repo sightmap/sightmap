@@ -22,7 +22,7 @@ implementation, and both websites in one place:
 |---|---|
 | [`spec/`](spec/) | The **normative** specification — `spec/v1/` schema + JSON Schema, the SEP process (`spec/seps/`), and language-agnostic conformance fixtures. Source of truth. |
 | [`go/`](go/) | The reference **Go implementation** — the `sightmap` CLI (live browser capture, annotated snapshots, coverage) plus a `go get`-able library for the component model and selector matching. Published to npm as [`@sightmap/sightmap`](https://www.npmjs.com/package/@sightmap/sightmap). |
-| [`skills/`](skills/) | The **agent skills** — `sightmap-authoring` and `sightmap-browser`. This is the canonical, standalone skills directory; the CLI embeds a committed copy under `go/skills/` (regenerated via `go generate`). |
+| [`skills/`](skills/) | The **agent skills** — `sightmap-authoring`, `sightmap-browser`, and `sightmap-device`. This is the canonical, standalone skills directory; the CLI embeds a committed copy under `go/skills/` (regenerated via `go generate`). |
 | [`docs/`](docs/) | The documentation site at [docs.sightmap.org](https://docs.sightmap.org) (Mintlify). |
 | [`web/`](web/) | The marketing landing page at [sightmap.org](https://sightmap.org) (React + Vite). |
 
@@ -67,8 +67,9 @@ browser.
 ## Skills & plugin
 
 The [`skills/`](skills/) directory is a first-class, installable skill set for
-coding agents — `sightmap-authoring` (build and maintain a corpus) and
-`sightmap-browser` (drive a live session). It reaches agents three ways, all
+coding agents — `sightmap-authoring` (build and maintain a corpus),
+`sightmap-browser` (drive a live browser session), and `sightmap-device` (drive
+an iOS app in the Simulator). It reaches agents three ways, all
 from the same source:
 
 - **As a plugin** — install this repo like any other (Claude Code:

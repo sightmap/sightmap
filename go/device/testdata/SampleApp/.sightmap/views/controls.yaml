@@ -1,0 +1,15 @@
+version: 1
+views:
+  # Placeholder route (native screens have no URL); see login.yaml.
+  - name: Controls
+    route: /account/controls
+    components:
+      - name: RangeSegment
+        selector: 'tabgroup[identifier="controls-range"] tab'
+        properties:
+          - name: title
+            extract: { from: dom.text }
+      - name: NotifySwitch
+        selector: 'switch[identifier="controls-notify"]'
+      - name: ShareButton
+        selector: 'button[identifier="controls-share"]'

@@ -18,7 +18,7 @@ durable local-dev runbook is `skills/local-dev/SKILL.md`.
 | `go/npm/` | Packaging | npm wrapper `@sightmap/sightmap` — `bin/`, platform optional deps, build scripts |
 | `go/skills/` | Generated | Committed embed of root `skills/` — regenerate with `go generate`, never hand-edit |
 | `go/clitest/`, `go/conformance/`, `go/testdata/` | Tests | CLI integration harness, conformance runner, fixtures |
-| `skills/` | Skills | Canonical `sightmap-authoring` + `sightmap-browser` skills (edit here, not `go/skills/`) |
+| `skills/` | Skills | Canonical `sightmap-authoring` + `sightmap-browser` + `sightmap-device` skills (edit here, not `go/skills/`) |
 | `docs/` | Docs site | Mintlify site for docs.sightmap.org (`docs.json`) |
 | `docs/reference/`, `docs/start/`, `docs/cli/`, `docs/concepts/`, `docs/authoring/` | Docs site | Guides; `reference/schema.md` is generated from `spec/v1/schema.md` |
 | `docs/scripts/` | Docs site | `sync-spec.mjs`, `build-changelog.mjs` |

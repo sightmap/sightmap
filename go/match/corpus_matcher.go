@@ -63,20 +63,58 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 		v = m.corpus.ViewIndexForURL(pageURL)
 		m.views[pageURL] = v
 	}
+	return m.entryForIndex(v)
+}
+
+// entryForView returns the cached (or freshly compiled) queries for a view
+// chosen without a URL. View names need not be unique, so a view of this
+// corpus is keyed by its position, like the one a URL selects; any other view
+// is compiled and not cached.
+func (m *Matcher) entryForView(view *sightmap.ViewDef) *queryCacheEntry {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.cache == nil {
+		m.cache = make(map[int]*queryCacheEntry)
+		m.views = make(map[string]int)
+	}
+	if view == nil {
+		return m.entryForIndex(-1)
+	}
+	for i := range m.corpus.Views {
+		if &m.corpus.Views[i] == view {
+			return m.entryForIndex(i)
+		}
+	}
+	return m.compile(view)
+}
+
+// entryForIndex returns the entry for the view at index v of the corpus (-1:
+// none, globals only), compiling it on a miss. The caller holds m.mu.
+func (m *Matcher) entryForIndex(v int) *queryCacheEntry {
 	if e, ok := m.cache[v]; ok {
 		return e
 	}
-	compList := m.corpus.ComponentsForURL(pageURL)
+	var view *sightmap.ViewDef
+	if v >= 0 {
+		view = &m.corpus.Views[v]
+	}
+	e := m.compile(view)
+	m.cache[v] = e
+	return e
+}
+
+// compile builds the queries for view's components (plus globals).
+func (m *Matcher) compile(view *sightmap.ViewDef) *queryCacheEntry {
+	compList := m.corpus.ComponentsForView(view)
 	queries, _ := ParseQueries(compList)
 	e := &queryCacheEntry{
 		components: compList,
 		queries:    queries,
 		index:      newQueryIndex(queries),
-		capture:    compileCapture(captureDefsForURL(m.corpus, pageURL)),
+		capture:    compileCapture(captureDefsForView(m.corpus, view)),
 	}
 	e.combined = append(append([]MatchQuery(nil), queries...), e.capture.queries...)
 	e.combinedIndex = newQueryIndex(e.combined)
-	m.cache[v] = e
 	return e
 }
 
@@ -85,27 +123,37 @@ func (m *Matcher) entryFor(pageURL string) *queryCacheEntry {
 // queries if not already cached, then runs the NFA matcher over root. Returns
 // nil when root is nil or no queries apply.
 func (m *Matcher) Match(root *sightmap.ComponentNode, pageURL string) map[*sightmap.ComponentNode]*sightmap.ComponentMatch {
-	result, _ := m.match(root, pageURL, false)
+	result, _ := m.match(root, pageURL, false, m.entryFor)
+	return result
+}
+
+// MatchView is Match for a tree that has no URL to select a view by, such as a
+// native app screen: it applies view's components (plus non-colliding globals),
+// or the globals alone when view is nil. The caller chooses the view.
+func (m *Matcher) MatchView(root *sightmap.ComponentNode, view *sightmap.ViewDef) map[*sightmap.ComponentNode]*sightmap.ComponentMatch {
+	result, _ := m.match(root, "", false, func(string) *queryCacheEntry { return m.entryForView(view) })
 	return result
 }
 
 // MatchConflicts is Match and Conflicts in one traversal of root: the same
 // two answers, for half the walking.
 func (m *Matcher) MatchConflicts(root *sightmap.ComponentNode, pageURL string) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict) {
-	return m.match(root, pageURL, true)
+	return m.match(root, pageURL, true, m.entryFor)
 }
 
 // match is Match, and with conflicts also what Conflicts reports: a capture
 // rule never names a node, so the naming claims a node collects here are the
 // claims Conflicts walks for, in the same order.
-func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts bool) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict) {
+//
+// entryOf names the compiled queries of each document by its URL.
+func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts bool, entryOf func(string) *queryCacheEntry) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict) {
 	if root == nil {
 		return nil, nil
 	}
 	var result map[*sightmap.ComponentNode]*sightmap.ComponentMatch
 	var out []sightmap.Conflict
 	eachDoc(root, pageURL, func(d frameDoc) []frameDoc {
-		r, c, frames := m.matchDoc(d, conflicts)
+		r, c, frames := m.matchDoc(d, conflicts, entryOf(d.url))
 		out = append(out, c...)
 		switch {
 		case r == nil:
@@ -123,9 +171,8 @@ func (m *Matcher) match(root *sightmap.ComponentNode, pageURL string, conflicts 
 
 // matchDoc is match for one document, without descending into the frame
 // documents it hosts: it returns them for the caller to match in their turn.
-func (m *Matcher) matchDoc(d frameDoc, conflicts bool) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict, []frameDoc) {
-	root, pageURL := d.root, d.url
-	entry := m.entryFor(pageURL)
+func (m *Matcher) matchDoc(d frameDoc, conflicts bool, entry *queryCacheEntry) (map[*sightmap.ComponentNode]*sightmap.ComponentMatch, []sightmap.Conflict, []frameDoc) {
+	root := d.root
 	if len(entry.queries) == 0 {
 		return nil, nil, framesIn(root, d.inherit)
 	}
@@ -236,12 +283,21 @@ func (m *Matcher) Components(pageURL string) []sightmap.ComponentDef {
 // still counts once, since they are one definition, and so do a global and its
 // $ref expansions, which are copies of one definition.
 func (m *Matcher) Conflicts(root *sightmap.ComponentNode, pageURL string) []sightmap.Conflict {
+	return conflictsWith(root, pageURL, m.entryFor)
+}
+
+// ConflictsView is Conflicts for a view chosen without a URL; see MatchView.
+func (m *Matcher) ConflictsView(root *sightmap.ComponentNode, view *sightmap.ViewDef) []sightmap.Conflict {
+	return conflictsWith(root, "", func(string) *queryCacheEntry { return m.entryForView(view) })
+}
+
+func conflictsWith(root *sightmap.ComponentNode, pageURL string, entryOf func(string) *queryCacheEntry) []sightmap.Conflict {
 	if root == nil {
 		return nil
 	}
 	var out []sightmap.Conflict
 	eachDoc(root, pageURL, func(d frameDoc) []frameDoc {
-		entry := m.entryFor(d.url)
+		entry := entryOf(d.url)
 		if len(entry.queries) == 0 {
 			return framesIn(d.root, rankNone)
 		}

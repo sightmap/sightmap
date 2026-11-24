@@ -174,10 +174,10 @@ func SelectorCandidates(el *sightmap.Element) []string {
 			if pre := idPrefix(id); pre != "" {
 				add(fmt.Sprintf(`[id^="%s"]`, pre), 55)
 			} else {
-				add("#"+id, 60)
+				add(sightmap.IDSelector(id), 60)
 			}
 		default:
-			add("#"+id, 70)
+			add(sightmap.IDSelector(id), 70)
 		}
 	}
 	// Other stable data-* attributes (e.g. data-target-selection-name). Attrs is

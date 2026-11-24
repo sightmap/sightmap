@@ -13,7 +13,7 @@ both websites.
 |---|---|---|
 | `spec/` | Markdown + JSON Schema | Normative specification, SEP process, conformance fixtures. Source of truth. |
 | `go/` | Go | Reference implementation: `sightmap` CLI + `go get`-able library. npm: `@sightmap/sightmap`. |
-| `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
+| `skills/` | Markdown | Canonical agent skills (`sightmap-authoring`, `sightmap-browser`, `sightmap-device`). Installable as a plugin, embedded in the CLI, and vendored downstream. |
 | `docs/` | Mintlify | Documentation site (docs.sightmap.org). |
 | `web/` | React + Vite | Marketing landing page (sightmap.org). |
 
@@ -38,11 +38,16 @@ Never change spec semantics without an SEP (`spec/seps/`).
 - `go test ./...` from `go/`.
 - `cmd/sightmap/` is the binary; library packages (`match`, `sel`, `comps`, …) at the module root.
 - Downstream consumers import the library directly, so treat exported names as public API.
+- `device/` backs `sightmap device` (the iOS Simulator counterpart of `sightmap browser`).
+  Its Swift helper (`device/helper/`) is embedded and built with the local Xcode on
+  first use. The end-to-end tests need a simulator:
+  `SIGHTMAP_DEVICE_E2E="iPhone 17 Pro" go test ./device -run TestE2E`.
 - `go/skills/<name>/` is a **generated, committed** copy of the canonical `skills/`
   (see below) — never hand-edit it.
 
 ### `skills/` (canonical agent skills)
-- The source of truth for the `sightmap-authoring` and `sightmap-browser` skills.
+- The source of truth for the `sightmap-authoring`, `sightmap-browser` and
+  `sightmap-device` skills.
   Edit the skill Markdown **here**, at the repo root.
 - `go:embed` can't reach outside the `go/` module or follow symlinks, so a copy
   is generated into `go/skills/<name>/` and checked in (the same generate-and-commit

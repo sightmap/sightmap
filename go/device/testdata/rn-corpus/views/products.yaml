@@ -1,0 +1,19 @@
+version: 1
+views:
+  - name: Products
+    route: /products
+    components:
+      - name: ProductRow
+        selector: '[testid^="product-row-"]'
+        properties:
+          - name: title
+            extract: { from: dom.text }
+          - name: number
+            extract: { from: dom.attr, path: identifier, pattern: 'product-row-(\d+)' }
+  - name: Events
+    route: /events
+    components:
+      - name: SearchField
+        selector: '[identifier="search"]'
+      - name: JoinButton
+        selector: '[identifier="join-button"]'
