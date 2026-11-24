@@ -4,7 +4,7 @@ sidebarTitle: "Interaction"
 description: "Click, fill, scroll, and screenshot a live page by probe ID, component query, or coordinates."
 ---
 
-Once a session is running ([Browser sessions](/cli/browser)), these commands act on the live page: `click`, `fill`, `hover`, `keypress`, `scroll`, `drag`, `wait-for`, `dialog`, `screenshot`, `bounds`, and `tabs`. Most commands target a numeric probe ID from [`sightmap snapshot`](/cli/capture) or a component query, a CSS-shaped expression that matches Sightmap component names and properties.
+Once a session is running ([Browser sessions](/cli/browser)), these commands act on the live page: `click`, `fill`, `hover`, `keypress`, `keys`, `scroll`, `drag`, `wait-for`, `dialog`, `screenshot`, `bounds`, and `tabs`. `get`, `expect` and `run` read, check and script it. Most commands target a numeric probe ID from [`sightmap snapshot`](/cli/capture) or a component query, a CSS-shaped expression that matches Sightmap component names and properties.
 
 <Note>
 All commands on this page except `tabs` subcommands resolve a session with `--addr` (default `localhost:7892`) and `--tab`. Pass `--tab` whenever two or more content tabs are open. Session lifecycle commands are documented under [Browser sessions](/cli/browser).
@@ -142,6 +142,105 @@ sightmap browser keypress Shift+KeyV
 sightmap browser keypress ControlOrMeta+K
 sightmap browser keypress ArrowDown 'DateWindows'   # focus the target first
 ```
+
+---
+
+### `browser keys`
+
+Presses a sequence of keys and types text in one call, in the order given. Each `KEY` is a key or chord as for `keypress`; each `--type TEXT` types text one character at a time, at its place among the keys. `--focus QUERY` gives a component keyboard focus first. On success it echoes `pressed ...` to stderr.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--delay-ms` | `50` | Pause between keys, so key handlers and sequence timers see them apart |
+| `--focus` | none | Component query (or probe ID) to focus first |
+| `--settle` | off | After the last key, wait until the page settles (see [Settling](#settling-after-an-action)) |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir (for `--focus`) |
+| `--tab` | the lone content tab | Target tab ID |
+| `--type` | none | Text to type; repeatable |
+
+```bash
+sightmap browser keys g m
+sightmap browser keys f --type Labels Enter --type Bug Enter
+```
+
+---
+
+### `browser get`
+
+Prints what the corpus says about the live page, so a check needs no `eval`. Each argument is a component query; each match prints as one JSON line with its component name, extracted properties, text (cut to 80 characters), visibility, and whether it holds keyboard focus. A property the corpus defines wins over a built-in of the same name (`text`, `visible`, `focused`). `get page` prints the URL and title and needs no corpus match. A query that matches nothing is an error that says what the page has instead, for example `8 IssueRow on the page; identifier is "WEB-130", ...`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--count` | off | Print only how many components match |
+| `--limit` | `25` | Print at most N matches (0 for all); the rest are counted on stderr |
+| `--props` | all | Comma-separated properties to print (`text`, `visible` and `focused` work too) |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir |
+| `--tab` | the lone content tab | Target tab ID |
+
+```bash
+sightmap browser get 'IssueRow[identifier=WEB-143]' --props status,priority
+sightmap browser get IssueRow --count
+sightmap browser get page
+```
+
+---
+
+### `browser expect`
+
+Waits until every condition holds, then exits `0`. On timeout it exits `1` and prints each failed condition with what the page showed, for example `want IssueRow[identifier=WEB-130] group="status:done"; saw group "status:todo"`. With a query and no other condition it waits for the component to be present. `--prop`, `--text`, `--count`, `--gone` and `--focused` need a query; `--url` and `--title` do not.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address |
+| `--count` | none | How many components match: `N`, `>=N` or `<=N` |
+| `--focused` | off | The single match holds keyboard focus |
+| `--gone` | off | No component matches |
+| `--prop` | none | `NAME=VALUE`, or `NAME^=prefix`, `NAME*=substring`, `NAME!=value`; every match must satisfy it. Repeatable |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir |
+| `--tab` | the lone content tab | Target tab ID |
+| `--text` | none | Substring of every match's text. Repeatable |
+| `--timeout-ms` | `5000` | How long to wait |
+| `--title` | none | `document.title` equals this |
+| `--url` | none | The page path (no origin, query or fragment) equals this, or matches it as a glob where `*` matches any run of characters |
+
+```bash
+sightmap browser expect 'IssueRow[identifier=WEB-120]' --prop group='status:done'
+sightmap browser expect Toast --text 'Reverted.'
+sightmap browser expect PropertyPicker --gone
+sightmap browser expect --url '/team/*/active'
+```
+
+---
+
+### `browser run`
+
+Runs browser subcommands from a file (or `-` for stdin), one per line, against one session. A step is a subcommand without the `sightmap browser` prefix. Blank lines and `#` comments are skipped; quotes, a trailing `\` continuation and `$VARS` work as in `sh`. A `navigate` path such as `/inbox` resolves against the current page's origin. Every step name is checked before the first one runs. The run stops at the first failing step and prints its line, the failure, and the page's URL and title.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--addr` | `localhost:7892` | CDP address, passed to every step |
+| `--keep-going` | off | Run every step and report all failures |
+| `--quiet` | off | Print only failures and the summary |
+| `--sightmap-dir` | `.sightmap` | Path to `.sightmap/` dir, passed to every step |
+| `--tab` | the lone content tab | Target tab ID, passed to every step |
+
+Steps: `navigate`, `click`, `fill`, `hover`, `keypress`, `keys`, `scroll`, `drag`, `wait-for`, `get`, `expect`, `eval`, `screenshot`, `dialog`.
+
+```bash
+sightmap browser run - <<'EOF'
+navigate /my-issues/assigned --settle
+keys j
+expect 'IssueRow[identifier=WEB-130]' --prop focused=true
+EOF
+```
+
+---
+
+### Settling after an action
+
+`navigate`, `click`, `fill`, `keypress`, `keys` and `drag` take `--settle`. After acting, the command waits until the DOM, including open shadow roots, has been quiet for 300 ms with no `fetch` or `XMLHttpRequest` in flight, for at most 5 seconds, and prints `settled in Nms` (or that the page was still changing) to stderr. Use it instead of a fixed `sleep`; to wait for a specific result, use `expect`. A page that animates or polls never goes quiet and runs to the 5 second cap.
 
 ---
 
