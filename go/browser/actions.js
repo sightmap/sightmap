@@ -135,16 +135,21 @@ function __smDropCheck(sel, x, y) {
 // target hidden behind an overlay is reported as not-hit rather than clicked
 // through).
 //
-// A target already wholly on screen, and the top-most element at its center (so
-// not clipped out of sight by a scrolling list it sits in), is not scrolled at
-// all. One that is scrolled is brought into view horizontally only as far as
-// needed ("nearest"), never centered:
+// A target already wholly visible (inside the viewport and every clipping
+// ancestor, __smFullyVisible) is not scrolled at all, even when something covers
+// it: scrolling can't uncover it, and the hit test below reports it as covered.
+// One that is scrolled is brought into view horizontally only as far as needed
+// ("nearest"), never centered:
 // centering scrolls every scrollable ancestor, including an overflow:hidden
 // one that is wider than its box only because a tooltip overflows it. That
 // moves the content under a still mouse, which closes the tooltip, which
 // snaps the scroll back, and the click lands where the target was a moment
 // before (on its neighbour).
-function __smLocateForClick(sel) {
+// force scrolls even a visible target: an element visible in its own frame can
+// sit in a frame that is itself off the top page's screen, and only a scroll
+// started from the element (which scrolls the enclosing documents too) brings
+// it into view. The caller asks for it after measuring the frame's position.
+function __smLocateForClick(sel, force) {
   const el = __smDeepQuery(document, sel);
   if (!el) return { found: false };
   const hits = (r) => {
@@ -155,15 +160,7 @@ function __smLocateForClick(sel) {
     return !!at && (at === el || el.contains(at) || at.contains(el));
   };
   let r = el.getBoundingClientRect();
-  const onScreen =
-    r.width > 0 &&
-    r.height > 0 &&
-    r.left >= 0 &&
-    r.top >= 0 &&
-    r.right <= window.innerWidth &&
-    r.bottom <= window.innerHeight &&
-    hits(r);
-  if (!onScreen) {
+  if (force || !__smFullyVisible(el)) {
     el.scrollIntoView({
       block: "center",
       inline: "nearest",

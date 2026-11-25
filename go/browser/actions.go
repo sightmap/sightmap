@@ -118,11 +118,25 @@ func AwaitNavigationUntil(ctx context.Context, conn *CDPConn, maxWait time.Durat
 			url, _ := GetURL(ctx, conn)
 			return url, true
 		case <-stop:
+			// select picks at random among ready cases, so a navigation that
+			// arrived as stop closed may still be queued: take it first.
+			drained := false
+			select {
+			case <-frameCh:
+				drained = true
+			case <-docCh:
+				drained = true
+			default:
+			}
+			navigated = navigated || drained
 			if !navigated {
 				return "", false
 			}
 			stop = nil // a navigation is under way; let its grace decide
-			continue
+			if !drained {
+				continue
+			}
+			// A navigation just taken: fall through and (re)arm its grace.
 		case <-overall.C:
 			if navigated {
 				url, _ := GetURL(ctx, conn)
@@ -805,7 +819,18 @@ type clickTarget struct {
 // has settled; "hit" then also asks that nothing in an enclosing document is
 // drawn over the frame at that point.
 func locateForClick(ctx context.Context, conn *CDPConn, id string) (clickTarget, error) {
-	script := actionsJS + fmt.Sprintf("\n__smLocateForClick(%s)", idSelectorJSON(id))
+	t, err := locateForClickOnce(ctx, conn, id, false)
+	if err == nil && t.frame != nil && t.Found && !t.InViewport {
+		// Visible in its frame, so not scrolled, but the frame is off the top
+		// page's screen: scroll from the element, which moves the enclosing
+		// documents too.
+		return locateForClickOnce(ctx, conn, id, true)
+	}
+	return t, err
+}
+
+func locateForClickOnce(ctx context.Context, conn *CDPConn, id string, force bool) (clickTarget, error) {
+	script := actionsJS + fmt.Sprintf("\n__smLocateForClick(%s, %t)", idSelectorJSON(id), force)
 	raw, f, err := evalForID(ctx, conn, id, script)
 	if err != nil {
 		return clickTarget{}, err

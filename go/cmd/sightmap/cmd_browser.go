@@ -551,17 +551,29 @@ func runNavigate(args []string) error {
 	// and settled none is coming). Without a corpus match, the old fixed 2 s.
 	// The fixed wait was most of every navigate's time on a fast app, and too
 	// short for a slow one (an app that boots in 2.5 s was reported early).
+	//
+	// The watch never ends before redirectFloor after load, however soon the page
+	// goes quiet: a redirect from a short timer (an auth bounce deferred a tick, a
+	// brief interstitial) fires after the app first renders.
 	shown := make(chan struct{})
 	var quiet browser.SettleResult // written before shown closes
+	floor := time.After(redirectFloor)
 	go func() {
 		// A page the corpus doesn't recognise within 2 s (another site, an error
 		// page) gets the old fixed 2 s watch, no longer.
 		if awaitRecognised(ctx, conn, sightmapDir, 2*time.Second) {
 			quiet, _ = browser.WaitSettled(ctx, conn, settleQuiet, settleMax)
 		}
+		<-floor
 		close(shown)
 	}()
 	clientURL, moved := browser.AwaitNavigationUntil(ctx, conn, settleMax, shownOr(shown, 2*time.Second, sightmapDir))
+	// One settle at a time per document: WaitSettled's shadow-root hook is a
+	// single page global, so a second wait started while this one runs would
+	// take the hook from it. Let it finish (it is bounded by settleMax, and on a
+	// redirected page it ends as soon as the new route goes quiet) before any
+	// settle below.
+	<-shown
 	if moved && clientURL != "" {
 		finalURL = clientURL
 	}
@@ -572,15 +584,9 @@ func runNavigate(args []string) error {
 	}
 	// The watch ended because the page showed and went quiet with no redirect:
 	// that is the settle --settle asks for, so don't wait for a second one.
-	if settle && !moved {
-		select {
-		case <-shown:
-			if quiet.Quiet {
-				fmt.Fprintf(os.Stderr, "settled in %dms\n", quiet.Elapsed.Milliseconds())
-				return nil
-			}
-		default:
-		}
+	if settle && !moved && quiet.Quiet {
+		fmt.Fprintf(os.Stderr, "settled in %dms\n", quiet.Elapsed.Milliseconds())
+		return nil
 	}
 	return settleAfter(ctx, conn, settle)
 }

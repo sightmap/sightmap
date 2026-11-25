@@ -105,9 +105,20 @@ describe("__smLocateForClick", () => {
   });
 
   test("scrolls a target inside the viewport that a scrolling list clips out of sight", () => {
-    document.body.innerHTML = '<button id="btn"></button><div id="row"></div>';
+    document.body.innerHTML =
+      '<div id="list" style="overflow-y: auto"><button id="btn"></button></div><div id="row"></div>';
     const btn = document.getElementById("btn");
     const row = document.getElementById("row");
+    // The list shows y 0..300; the button sits at 500, inside the viewport but
+    // clipped by the list.
+    document.getElementById("list").getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: 800,
+      bottom: 300,
+      width: 800,
+      height: 300,
+    });
     let scrolled = false;
     btn.scrollIntoView = jest.fn(() => {
       scrolled = true;
@@ -132,6 +143,35 @@ describe("__smLocateForClick", () => {
 
     expect(__smLocateForClick("#btn").hit).toBe(true);
     expect(btn.scrollIntoView).toHaveBeenCalled();
+  });
+
+  test("does not scroll a visible target that an overlay covers, and reports it not hit", () => {
+    document.body.innerHTML =
+      '<button id="btn"></button><div id="overlay"></div>';
+    const btn = document.getElementById("btn");
+    const overlay = document.getElementById("overlay");
+    btn.scrollIntoView = jest.fn();
+    btn.getBoundingClientRect = () => ({
+      left: 10,
+      top: 100,
+      right: 250,
+      bottom: 132,
+      width: 240,
+      height: 32,
+    });
+    document.elementFromPoint = jest.fn(() => overlay);
+    Object.defineProperty(window, "innerWidth", {
+      value: 800,
+      configurable: true,
+    });
+    Object.defineProperty(window, "innerHeight", {
+      value: 600,
+      configurable: true,
+    });
+
+    const r = __smLocateForClick("#btn");
+    expect(r.hit).toBe(false);
+    expect(btn.scrollIntoView).not.toHaveBeenCalled();
   });
 
   test("scrolls an off-screen target into view without centering it horizontally", () => {

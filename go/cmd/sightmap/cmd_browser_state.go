@@ -700,9 +700,12 @@ func keySteps(args, keys []string) []keyStep {
 
 // settleQuiet is how long the DOM must stay unchanged, with no fetch in
 // flight, for the page to count as settled; settleMax caps the wait.
+// redirectFloor is the least time navigate watches for a client-side redirect
+// after load, even on a page that renders and goes quiet sooner.
 const (
-	settleQuiet = 300 * time.Millisecond
-	settleMax   = 5 * time.Second
+	settleQuiet   = 300 * time.Millisecond
+	settleMax     = 5 * time.Second
+	redirectFloor = 1 * time.Second
 )
 
 // addSettleFlag registers --settle on an action's flag set. Waiting after an
