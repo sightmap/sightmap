@@ -12,6 +12,8 @@ components:
         extract: { from: dom.raw_text, pattern: '\$([\d.]+)' }
       - name: sku
         extract: { from: dom.attr, path: data-sku }
+      - name: featured
+        extract: { from: dom.has, path: data-featured }
       - name: tags
         extract: { from: component, path: 'Tag[].value', join: ',' }
       - name: sold_out

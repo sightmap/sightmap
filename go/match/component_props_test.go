@@ -382,6 +382,27 @@ func TestResolveDOMHas(t *testing.T) {
 	if v, ok := propVal(res[row], "selected_attr"); ok {
 		t.Errorf("selected_attr = %q; want omitted (dom.attr drops an empty value)", v)
 	}
+	// It sees what the browser's hasAttribute sees: id and class in their own
+	// fields, and an SVG attribute under its camelCase capture spelling.
+	defs2 := []sightmap.ComponentDef{{
+		Name:      "Icon",
+		Selectors: []string{"svg"},
+		Properties: []sightmap.ComponentPropertyDef{
+			{Name: "has_id", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "id"}},
+			{Name: "has_class", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "class"}},
+			{Name: "has_viewbox", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "viewbox"}},
+		},
+	}}
+	icon := &sightmap.ComponentNode{
+		Id:      "icon",
+		Element: &sightmap.Element{Tag: "svg", Id: "logo", Classes: []string{"icon"}, Attrs: map[string]string{"viewBox": "0 0 24 24"}},
+	}
+	res2 := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs2}).Match(icon, "")
+	for _, name := range []string{"has_id", "has_class", "has_viewbox"} {
+		if v, ok := propVal(res2[icon], name); !ok || v != "true" {
+			t.Errorf("%s = %q, %v; want \"true\"", name, v, ok)
+		}
+	}
 	if !match.Withholds("block", sightmap.Extract{From: sightmap.FromDOMHas, Path: "data-x"}) ||
 		match.Withholds("mask", sightmap.Extract{From: sightmap.FromDOMHas, Path: "data-x"}) {
 		t.Error("dom.has: want withheld under block only")

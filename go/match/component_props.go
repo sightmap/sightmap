@@ -179,8 +179,7 @@ func (r *propResolver) resolveExtract(node *sightmap.ComponentNode, e sightmap.E
 		if node.Element == nil {
 			return unresolved
 		}
-		_, has := node.Element.Attrs[e.Path]
-		return extracted{value: strconv.FormatBool(has), ok: true}
+		return extracted{value: strconv.FormatBool(node.Element.HasAttr(e.Path)), ok: true}
 
 	case sightmap.FromDOMState:
 		// Current interactive state, never the markup attribute of the same

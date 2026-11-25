@@ -301,8 +301,8 @@ A conforming capture consumer MUST:
 - Never capture content the resolved value marks `block` or `mask`, regardless of its own defaults.
 - Withhold any `properties[]` value whose node resolves to `block` or `mask`, judged at the node
   the value is read from rather than at the declaring component, and omit it the way an unresolved
-  property is omitted. Under `mask`, `exists:PATH`, the four interactive-state attributes and a
-  form control's accessible name, under the conditions above, MAY still resolve; under `block`
+  property is omitted. Under `mask`, `exists:PATH`, a `dom.has` presence test, the four interactive-state
+  attributes and a form control's accessible name, under the conditions above, MAY still resolve; under `block`
   nothing resolves.
 - Under `mask`, withhold from the captured recording the value of every `data-*` attribute, of
   `value`/`title`/`alt`/`placeholder`/`aria-label`, and of any attribute named by an `attr=` extract
