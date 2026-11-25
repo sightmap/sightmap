@@ -134,14 +134,8 @@ func runRun(args []string) error {
 		if !*quiet {
 			fmt.Fprintf(os.Stderr, "[%d/%d] %s\n", i+1, len(steps), s.text)
 		}
-		// Split again now, so variables set by earlier steps expand.
-		if words, err := shellWords(s.text); err == nil {
-			for len(words) > 0 && (words[0] == "sightmap" || words[0] == "browser") {
-				words = words[1:]
-			}
-			if len(words) > 0 {
-				s.words = words
-			}
+		if s.words, err = expandStep(s); err != nil {
+			return fmt.Errorf("step %d (line %d): %v", i+1, s.line, err)
 		}
 		args := s.words[1:]
 		if s.words[0] == "navigate" {
@@ -233,6 +227,27 @@ func parseSteps(r io.Reader) ([]step, error) {
 // separates words, single quotes are literal, double quotes allow \" and $VAR, a backslash
 // outside quotes escapes the next character, and $VAR / ${VAR} expand from the environment
 // outside single quotes. A `#` starting a word ends the line.
+// expandStep splits a step again just before it runs, so variables set by
+// earlier steps expand. The step name is checked again too: the check before
+// the run saw it unexpanded, and a variable there (`$ACT`) could become
+// anything.
+func expandStep(s step) ([]string, error) {
+	words, err := shellWords(s.text)
+	if err != nil {
+		return s.words, nil
+	}
+	for len(words) > 0 && (words[0] == "sightmap" || words[0] == "browser") {
+		words = words[1:]
+	}
+	if len(words) == 0 {
+		return s.words, nil
+	}
+	if runSteps[words[0]] == nil {
+		return nil, fmt.Errorf("%q is not a step after expanding variables (steps: %s)", words[0], strings.Join(sortedStepNames(), " "))
+	}
+	return words, nil
+}
+
 func shellWords(s string) ([]string, error) {
 	var words []string
 	var cur strings.Builder

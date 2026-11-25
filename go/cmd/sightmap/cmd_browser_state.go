@@ -554,10 +554,22 @@ func runExpect(args []string) error {
 func expectThroughout(read func() (*pageState, error), conds []condition, d, every time.Duration) error {
 	start := time.Now()
 	samples := 0
+	var lastErr error
 	for {
 		st, err := read()
 		if err != nil {
-			return fmt.Errorf("expect: %v", err)
+			// One failed read (the tab mid-navigation) is noise, as in the wait
+			// loop: keep sampling, and fail only if no read ever succeeded.
+			lastErr = err
+			if time.Since(start) >= d {
+				if samples == 0 {
+					return fmt.Errorf("expect: %v", lastErr)
+				}
+				fmt.Fprintf(os.Stderr, "ok: %s for %dms (%d samples)\n", describe(conds), d.Milliseconds(), samples)
+				return nil
+			}
+			time.Sleep(every)
+			continue
 		}
 		samples++
 		for _, c := range conds {
@@ -680,24 +692,27 @@ func numericCondition(qs, spec string) (c condition, ok bool, err error) {
 			break
 		}
 	}
+	var want, tol float64
 	if op == "" {
+		// NAME=N~T only when both sides are numbers: a text value may contain "~"
+		// (`title=Home ~ Work`, `path=~/config`) and stays a text equality.
 		i := strings.Index(spec, "=")
-		if i <= 0 || !strings.Contains(spec[i:], "~") || strings.ContainsAny(spec[:i], "!^*") {
+		if i <= 0 || strings.ContainsAny(spec[:i], "!^*") {
 			return condition{}, false, nil
 		}
-		name, op, rhs = spec[:i], "~", spec[i+1:]
-	}
-	var want, tol float64
-	if op == "~" {
-		v, t, _ := strings.Cut(rhs, "~")
-		if want, err = strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
-			tol, err = strconv.ParseFloat(strings.TrimSpace(t), 64)
+		v, t, cut := strings.Cut(spec[i+1:], "~")
+		if !cut {
+			return condition{}, false, nil
 		}
-	} else {
-		want, err = strconv.ParseFloat(strings.TrimSpace(rhs), 64)
-	}
-	if err != nil {
-		return condition{}, true, fmt.Errorf("expect: --prop %q: want a number (NAME>=N, NAME=N~T)", spec)
+		var e1, e2 error
+		want, e1 = strconv.ParseFloat(strings.TrimSpace(v), 64)
+		tol, e2 = strconv.ParseFloat(strings.TrimSpace(t), 64)
+		if e1 != nil || e2 != nil {
+			return condition{}, false, nil
+		}
+		name, op = spec[:i], "~"
+	} else if want, err = strconv.ParseFloat(strings.TrimSpace(rhs), 64); err != nil {
+		return condition{}, true, fmt.Errorf("expect: --prop %q: want a number after %s", spec, op)
 	}
 	holds := func(v float64) bool {
 		switch op {
@@ -732,12 +747,15 @@ func numericCondition(qs, spec string) (c condition, ok bool, err error) {
 // URL's query string. NAME= (an empty value) means the parameter is absent;
 // NAME!= means it is present.
 func queryCondition(spec string) (condition, error) {
-	neg := false
-	name, want, ok := strings.Cut(spec, "!=")
-	if ok {
-		neg = true
-	} else if name, want, ok = strings.Cut(spec, "="); !ok {
+	// The first operator wins, as in --prop: `q=a!=b` is q equal to "a!=b".
+	eq, ne := strings.Index(spec, "="), strings.Index(spec, "!=")
+	if eq < 0 {
 		return condition{}, fmt.Errorf("expect: --query wants NAME=VALUE or NAME!=VALUE, got %q", spec)
+	}
+	neg := ne >= 0 && ne < eq
+	name, want := spec[:eq], spec[eq+1:]
+	if neg {
+		name, want = spec[:ne], spec[ne+2:]
 	}
 	if name == "" {
 		return condition{}, fmt.Errorf("expect: --query wants a parameter name, got %q", spec)

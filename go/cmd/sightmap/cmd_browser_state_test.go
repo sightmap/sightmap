@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -162,8 +163,14 @@ func TestNumericPropCondition(t *testing.T) {
 			t.Errorf("%s: ok = %v, want %v (observed %s)", c.spec, got, c.ok, cond.observed(st))
 		}
 	}
-	if _, err := propCondition("Dialog", "width=abc~2"); err == nil {
-		t.Error("width=abc~2: want an error")
+	// A "~" between non-numbers is text, not a tolerance.
+	for _, spec := range []string{"width=abc~2", "title=Home ~ Work", "path=~/config"} {
+		if _, err := propCondition("Dialog", spec); err != nil {
+			t.Errorf("%s: %v; want a text condition", spec, err)
+		}
+	}
+	if _, err := propCondition("Dialog", "width>=wide"); err == nil {
+		t.Error("width>=wide: want an error")
 	}
 }
 
@@ -192,6 +199,23 @@ func TestExpectThroughout(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "stopped holding") || !strings.Contains(err.Error(), `saw unread "false"`) {
 		t.Errorf("a state that changes: err = %v", err)
 	}
+	// A failed read in between is noise, not a failure.
+	n = 0
+	flaky := func() (*pageState, error) {
+		n++
+		if n == 2 {
+			return nil, errors.New("tab navigating")
+		}
+		return state("true"), nil
+	}
+	if err := expectThroughout(flaky, []condition{cond}, 30*time.Millisecond, 5*time.Millisecond); err != nil {
+		t.Errorf("one failed read: %v", err)
+	}
+	// No read ever succeeding is a failure.
+	broken := func() (*pageState, error) { return nil, errors.New("gone") }
+	if err := expectThroughout(broken, []condition{cond}, 20*time.Millisecond, 5*time.Millisecond); err == nil {
+		t.Error("no successful read: want an error")
+	}
 }
 
 func TestQueryCondition(t *testing.T) {
@@ -208,6 +232,8 @@ func TestQueryCondition(t *testing.T) {
 		{"peek=", false}, // present
 		{"peek!=", true}, // present
 		{"tab!=", false},
+		// The first operator wins: peek equal to "WEB-120!=x", which it isn't.
+		{"peek=WEB-120!=x", false},
 	}
 	for _, c := range cases {
 		cond, err := queryCondition(c.spec)

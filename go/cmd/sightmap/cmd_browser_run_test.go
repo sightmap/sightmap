@@ -101,3 +101,17 @@ func TestClip(t *testing.T) {
 		t.Errorf("clip long = %q", got)
 	}
 }
+
+// A variable in the step name is checked again after it expands: an error, not
+// a nil step function.
+func TestExpandStepRechecksName(t *testing.T) {
+	defer func() { runVars = nil }()
+	setRunVar("ACT", "not-a-step")
+	if _, err := expandStep(step{text: "$ACT IssueRow", words: []string{"expect", "IssueRow"}}); err == nil {
+		t.Error("$ACT expanding to a non-step: want an error")
+	}
+	setRunVar("ACT", "expect")
+	if w, err := expandStep(step{text: "$ACT IssueRow"}); err != nil || w[0] != "expect" {
+		t.Errorf("$ACT expanding to expect: %q, %v", w, err)
+	}
+}
