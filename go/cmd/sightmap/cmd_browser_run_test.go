@@ -6,6 +6,37 @@ import (
 	"testing"
 )
 
+func TestRunVars(t *testing.T) {
+	t.Setenv("N0", "from-env")
+	defer func() { runVars = nil }()
+	setRunVar("N0", "19")
+	setRunVar("W", "720.4")
+	cases := map[string][]string{
+		`expect InboxRow --count $N0`:               {"expect", "InboxRow", "--count", "19"}, // a run variable shadows the environment
+		`expect InboxRow --count $((N0 - 1))`:       {"expect", "InboxRow", "--count", "18"},
+		`expect Board --prop "width>=$((W + 100))"`: {"expect", "Board", "--prop", "width>=820"},
+		`keys $(( (2+3)*4 / 2 ))`:                   {"keys", "10"},
+		`eval '$((N0))'`:                            {"eval", "$((N0))"}, // single quotes stay literal
+	}
+	for in, want := range cases {
+		got, err := shellWords(in)
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("shellWords(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, bad := range []string{"", "1x", "a-b"} {
+		if validVarName(bad) {
+			t.Errorf("validVarName(%q) = true", bad)
+		}
+	}
+	if v, err := singleValue(&pageState{Nodes: []componentState{{}, {}}}, true, nil); err != nil || v != "2" {
+		t.Errorf("singleValue count = %q, %v", v, err)
+	}
+	if _, err := singleValue(&pageState{Nodes: []componentState{{}, {}}}, false, []string{"x"}); err == nil {
+		t.Error("singleValue of two matches: want an error")
+	}
+}
+
 func TestShellWords(t *testing.T) {
 	t.Setenv("ID", "WEB-143")
 	cases := map[string][]string{
@@ -68,5 +99,19 @@ func TestClip(t *testing.T) {
 	}
 	if got := clip(strings.Repeat("é", 100), 10); len([]rune(got)) != 10 || !strings.HasSuffix(got, "…") {
 		t.Errorf("clip long = %q", got)
+	}
+}
+
+// A variable in the step name is checked again after it expands: an error, not
+// a nil step function.
+func TestExpandStepRechecksName(t *testing.T) {
+	defer func() { runVars = nil }()
+	setRunVar("ACT", "not-a-step")
+	if _, err := expandStep(step{text: "$ACT IssueRow", words: []string{"expect", "IssueRow"}}); err == nil {
+		t.Error("$ACT expanding to a non-step: want an error")
+	}
+	setRunVar("ACT", "expect")
+	if w, err := expandStep(step{text: "$ACT IssueRow"}); err != nil || w[0] != "expect" {
+		t.Errorf("$ACT expanding to expect: %q, %v", w, err)
 	}
 }

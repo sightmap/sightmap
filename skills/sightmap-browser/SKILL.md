@@ -284,15 +284,37 @@ sightmap browser expect Toast --text 'Reverted.'           # waits up to 5 s (--
 sightmap browser expect PropertyPicker --gone
 sightmap browser expect 'IssueRow[identifier=WEB-120]' --prop group=status:done --prop focused=true
 sightmap browser expect IssueRow --count '>=1'
+sightmap browser expect InboxRow --seq identifier=WEB-144,WEB-130,WEB-160   # the whole list, in order
+sightmap browser expect IssueRow --contains identifier=WEB-130,WEB-144     # these are among the rows
 sightmap browser expect --url '/team/WEB/triage/*' --title 'Triage · Plumb'
+sightmap browser expect --query peek=WEB-120                # one query parameter; peek= means absent
+sightmap browser expect Toast --no-text Error              # no match's text contains it
 ```
 
 - `expect` holds when **every** condition holds for **every** match (a property condition
   needs at least one match). With only a query it waits for the component to appear. On
   timeout it exits 1 and prints each failed condition with what it saw, e.g. `want
   IssueRow[identifier=WEB-130] group="status:done"; saw group "status:todo"`.
+- List conditions compare one property across the matches, in document order: `--seq`
+  (exactly this list), `--set` (exactly these, any order), `--contains` (each is there) and
+  `--order` (these, in this order, others between). Prefer `--contains`/`--order` when a rule
+  names a few rows, so unrelated rows don't break the check. `\,` is a literal comma. For a list
+  that mixes kinds of rows, name alternatives: `--seq 'identifier|project=WEB-144,plant-id-v2'`
+  takes each match's first.
+- Every match also has a box, in viewport CSS pixels: `left` (`x`), `top` (`y`), `width`,
+  `height`, `right`, `bottom`. Numeric forms compare any number: `--prop width=720~2` (within
+  2), `--prop top>=90`, `--prop 'height<60'`. So a layout rule is `expect 'Dialog[name=x]'
+  --prop width=720~2 --prop top=96~4`, not an eval of `getBoundingClientRect`.
+- Time: `--for 800` says the conditions hold now and keep holding for 800 ms (a row that must
+  stay, a state that must not change yet); `--not-before 800 --timeout-ms 2000` says they must
+  not hold before 800 ms and must by 2 s (a delay), both counted from the step's start. So
+  "selected but still unread, read about a second later" is `keys j`, `expect R --prop
+  unread=true --for 600`, `expect R --prop unread=false --timeout-ms 1500`.
+- `--prop NAME=` (nothing after `=`) says no match has `NAME`, and `NAME!=` that every match
+  has it: a count badge that must not be shown is `--prop count=`.
 - `--prop` takes `=`, `^=`, `*=` (as in queries) and `!=`. `--url` compares the path only (no
-  origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter.
+  origin or query string; `*` globs), so fixture parameters like `?latency=0` don't matter;
+  check a parameter that does matter with `--query NAME=VALUE` (`NAME=` absent, `!=` differs).
 - A query that matches nothing says what is there instead: `(8 IssueRow on the page;
   identifier is "WEB-130", "WEB-120", …)` or `none has a "focused" property`.
 - `get` prints at most 25 matches (`--limit N`, `0` for all; the rest are counted) with text
@@ -335,6 +357,10 @@ sightmap browser run j8.steps --quiet     # "all 10 steps passed in 7.2s", or:
   origin. `--sightmap-dir`, `--addr` and `--tab` given to `run` apply to every step.
 - Quotes, a trailing `\` to continue a line, `# comments` and `$VARS` work as in `sh`;
   `-` reads the steps from stdin.
+- A step can keep a value for later ones: `get InboxRow --count --as N0`, or `get Board
+  --props width --as W` (one match, one field). Later steps read `$N0`, and `$((...))` does
+  integer arithmetic: `expect InboxRow --count $((N0 - 1))` after archiving one, `expect Board
+  --prop "width>=$((W + 100))"` after hiding a panel. Variables live for one `run`.
 - It stops at the first failing step (exit 1) with the step, its line, the failure and the
   page's URL and title; `--keep-going` runs them all and lists every failure; `--quiet`
   prints only failures and the summary.

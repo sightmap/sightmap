@@ -1,9 +1,13 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/sightmap/sightmap/go/sightmap"
 )
 
 func TestPathMatches(t *testing.T) {
@@ -50,7 +54,14 @@ func TestPropCondition(t *testing.T) {
 		// The first operator wins; a later "!=" belongs to the value.
 		{"text=a!=b", false},
 		{"text!=a=b", true},
+		// ...and so does a later ">" or "~": these are text, not numbers.
+		{"text=a > 3", false},
+		{"text*=Keyboard ~ nav", false},
 		{"missing=x", false},
+		{"missing=", true},     // absent
+		{"missing!=", false},   // not present
+		{"identifier!=", true}, // present
+		{"identifier=", false},
 		{"text*=Keyboard", true},
 		{"visible=false", true},
 	}
@@ -70,6 +81,171 @@ func TestPropCondition(t *testing.T) {
 	cond, _ := propCondition("IssueRow", "group=status:done")
 	if cond.ok(&pageState{}) {
 		t.Error("a property condition held with no matches")
+	}
+}
+
+func TestListCondition(t *testing.T) {
+	row := func(id string) componentState {
+		return componentState{Component: "InboxRow", Props: map[string]string{"identifier": id}}
+	}
+	project := componentState{Component: "InboxRow", Props: map[string]string{"project": "plant-id-v2"}}
+	st := &pageState{Nodes: []componentState{row("WEB-144"), row("WEB-130"), project, row("WEB-160")}}
+	cases := []struct {
+		kind listKind
+		spec string
+		ok   bool
+	}{
+		{listSeq, "identifier=WEB-144,WEB-130,WEB-160", true},
+		{listSeq, "identifier=WEB-130,WEB-144,WEB-160", false},
+		{listSeq, "identifier=WEB-144,WEB-130", false},
+		{listSet, "identifier=WEB-160,WEB-144,WEB-130", true},
+		{listSet, "identifier=WEB-160,WEB-144", false},
+		{listContains, "identifier=WEB-160,WEB-144", true},
+		{listContains, "identifier=WEB-160,WEB-999", false},
+		{listContains, "identifier=WEB-144,WEB-144", false}, // a repeat must be there twice
+		{listOrder, "identifier=WEB-144,WEB-160", true},
+		{listOrder, "identifier=WEB-160,WEB-144", false},
+		{listSeq, "title=", true}, // no match has a title: the empty list
+		{listSeq, "identifier|project=WEB-144,WEB-130,plant-id-v2,WEB-160", true},
+		{listSeq, "identifier|project=WEB-144,WEB-130,WEB-160", false},
+	}
+	for _, c := range cases {
+		cond, err := listCondition("InboxRow", c.kind, c.spec)
+		if err != nil {
+			t.Fatalf("--%s %s: %v", c.kind, c.spec, err)
+		}
+		if got := cond.ok(st); got != c.ok {
+			t.Errorf("--%s %s: ok = %v, want %v (observed %s)", c.kind, c.spec, got, c.ok, cond.observed(st))
+		}
+	}
+	cond, _ := listCondition("InboxRow", listContains, "identifier=WEB-160,WEB-999")
+	if got := cond.observed(st); !strings.Contains(got, "missing WEB-999") {
+		t.Errorf("observed = %q, want it to name the missing value", got)
+	}
+	if _, err := listCondition("InboxRow", listContains, "identifier="); err == nil {
+		t.Error("--contains with no values: want an error")
+	}
+	if got := splitValues(`a\,b,c`); !reflect.DeepEqual(got, []string{"a,b", "c"}) {
+		t.Errorf("splitValues = %q", got)
+	}
+}
+
+func TestNumericPropCondition(t *testing.T) {
+	st := &pageState{Nodes: []componentState{{
+		Component: "Dialog",
+		Props:     map[string]string{"count": "12", "name": "x"},
+		Box:       &sightmap.Bounds{X: 360, Y: 96, Width: 720, Height: 400},
+	}}}
+	cases := []struct {
+		spec string
+		ok   bool
+	}{
+		{"width=720~2", true},
+		{"width=716~2", false},
+		{"top=96~4", true},
+		{"y=100~4", true},
+		{"left=360~0", true},
+		{"right=1080~0", true},
+		{"bottom>=496", true},
+		{"bottom>496", false},
+		{"height<401", true},
+		{"count>=10", true},
+		{"count<10", false},
+		{"name>=1", false}, // not a number
+		{"name=x", true},   // plain equality still works
+	}
+	for _, c := range cases {
+		cond, err := propCondition("Dialog", c.spec)
+		if err != nil {
+			t.Fatalf("%s: %v", c.spec, err)
+		}
+		if got := cond.ok(st); got != c.ok {
+			t.Errorf("%s: ok = %v, want %v (observed %s)", c.spec, got, c.ok, cond.observed(st))
+		}
+	}
+	// A "~" between non-numbers is text, not a tolerance.
+	for _, spec := range []string{"width=abc~2", "title=Home ~ Work", "path=~/config"} {
+		if _, err := propCondition("Dialog", spec); err != nil {
+			t.Errorf("%s: %v; want a text condition", spec, err)
+		}
+	}
+	if _, err := propCondition("Dialog", "width>=wide"); err == nil {
+		t.Error("width>=wide: want an error")
+	}
+}
+
+func TestExpectThroughout(t *testing.T) {
+	cond, _ := propCondition("InboxRow", "unread=true")
+	state := func(unread string) *pageState {
+		return &pageState{Nodes: []componentState{{Props: map[string]string{"unread": unread}}}}
+	}
+	n := 0
+	steady := func() (*pageState, error) { n++; return state("true"), nil }
+	if err := expectThroughout(steady, []condition{cond}, 30*time.Millisecond, 5*time.Millisecond); err != nil {
+		t.Fatalf("steady state: %v", err)
+	}
+	if n < 3 {
+		t.Errorf("sampled %d times over 30ms, want several", n)
+	}
+	n = 0
+	flips := func() (*pageState, error) {
+		n++
+		if n >= 3 {
+			return state("false"), nil
+		}
+		return state("true"), nil
+	}
+	err := expectThroughout(flips, []condition{cond}, time.Second, 5*time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "stopped holding") || !strings.Contains(err.Error(), `saw unread "false"`) {
+		t.Errorf("a state that changes: err = %v", err)
+	}
+	// A failed read in between is noise, not a failure.
+	n = 0
+	flaky := func() (*pageState, error) {
+		n++
+		if n == 2 {
+			return nil, errors.New("tab navigating")
+		}
+		return state("true"), nil
+	}
+	if err := expectThroughout(flaky, []condition{cond}, 30*time.Millisecond, 5*time.Millisecond); err != nil {
+		t.Errorf("one failed read: %v", err)
+	}
+	// No read ever succeeding is a failure.
+	broken := func() (*pageState, error) { return nil, errors.New("gone") }
+	if err := expectThroughout(broken, []condition{cond}, 20*time.Millisecond, 5*time.Millisecond); err == nil {
+		t.Error("no successful read: want an error")
+	}
+}
+
+func TestQueryCondition(t *testing.T) {
+	st := &pageState{URL: "http://localhost:5173/my-issues/assigned?peek=WEB-120&latency=0"}
+	cases := []struct {
+		spec string
+		ok   bool
+	}{
+		{"peek=WEB-120", true},
+		{"peek=WEB-130", false},
+		{"peek!=WEB-130", true},
+		{"peek!=WEB-120", false},
+		{"tab=", true},   // absent
+		{"peek=", false}, // present
+		{"peek!=", true}, // present
+		{"tab!=", false},
+		// The first operator wins: peek equal to "WEB-120!=x", which it isn't.
+		{"peek=WEB-120!=x", false},
+	}
+	for _, c := range cases {
+		cond, err := queryCondition(c.spec)
+		if err != nil {
+			t.Fatalf("%s: %v", c.spec, err)
+		}
+		if got := cond.ok(st); got != c.ok {
+			t.Errorf("%s: ok = %v, want %v (observed %s)", c.spec, got, c.ok, cond.observed(st))
+		}
+	}
+	if _, err := queryCondition("peek"); err == nil {
+		t.Error("--query peek: want an error")
 	}
 }
 

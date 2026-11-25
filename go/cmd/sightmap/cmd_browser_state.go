@@ -13,7 +13,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
+	"net/url"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +37,9 @@ type componentState struct {
 	Text      string            `json:"text,omitempty"`
 	Visible   bool              `json:"visible"`
 	Focused   bool              `json:"focused,omitempty"`
+	// Box is the viewport bounding box in CSS pixels, nil when the tree carried
+	// none. It feeds the built-in x, y, width, height, right and bottom.
+	Box *sightmap.Bounds `json:"-"`
 }
 
 // pageState is the live page as the state commands see it: the URL, the title,
@@ -86,7 +92,7 @@ func readState(ctx context.Context, conn *browser.CDPConn, sightmapDir string, q
 		}
 	}
 	for _, n := range cands {
-		cs := componentState{Props: props[n.Id], Text: n.Text, Visible: n.IsVisible}
+		cs := componentState{Props: props[n.Id], Text: n.Text, Visible: n.IsVisible, Box: n.Bounds}
 		if m := matches[n]; m != nil {
 			cs.Component = m.Name
 		}
@@ -120,9 +126,16 @@ func runGet(args []string) error {
 	propsFlag := fs.String("props", "", "Comma-separated properties to print (default: all, with text cut to 80 characters; 'text', 'visible' and 'focused' work too)")
 	countFlag := fs.Bool("count", false, "Print only how many components match")
 	limitFlag := fs.Int("limit", 25, "Print at most N matches (0 = all); the rest are counted")
+	asFlag := fs.String("as", "", "In a `run` script: keep the value as $NAME for later steps (needs --count, or one match and one --props field)")
 	queries, err := parseFlagsAroundArgs(fs, args)
 	if err != nil {
 		return err
+	}
+	if *asFlag != "" && !validVarName(*asFlag) {
+		return fmt.Errorf("get: --as wants a variable name (letters, digits, _), got %q", *asFlag)
+	}
+	if *asFlag != "" && len(queries) != 1 {
+		return errors.New("get: --as takes one query")
 	}
 	if len(queries) == 0 {
 		return fmt.Errorf("usage: browser get QUERY... [--props a,b] [--count] [--limit N]\n" +
@@ -156,6 +169,15 @@ func runGet(args []string) error {
 		st, err := readState(ctx, conn, *sightmapDirFlag, q)
 		if err != nil {
 			return err
+		}
+		if *asFlag != "" {
+			v, err := singleValue(st, *countFlag, fields)
+			if err != nil {
+				return fmt.Errorf("get %s --as %s: %w", qs, *asFlag, err)
+			}
+			setRunVar(*asFlag, v)
+			fmt.Printf("%s=%s\n", *asFlag, v)
+			continue
 		}
 		if *countFlag {
 			if len(queries) > 1 {
@@ -209,9 +231,29 @@ func project(n componentState, fields []string) map[string]any {
 	return out
 }
 
+// singleValue is what `get --as` keeps: the match count, or the one field of
+// the one match.
+func singleValue(st *pageState, count bool, fields []string) (string, error) {
+	if count {
+		return strconv.Itoa(len(st.Nodes)), nil
+	}
+	if len(fields) != 1 {
+		return "", errors.New("name one field with --props (or use --count)")
+	}
+	if len(st.Nodes) != 1 {
+		return "", fmt.Errorf("want one match, saw %d", len(st.Nodes))
+	}
+	v, ok := field(st.Nodes[0], fields[0])
+	if !ok {
+		return "", fmt.Errorf("the match has no %q", fields[0])
+	}
+	return v, nil
+}
+
 // field reads one named value off a component: a corpus property, or one of the
-// built-ins text, visible, focused. The corpus wins: an app whose rows carry
-// their own `focused` (a data-focused hook) keeps its meaning.
+// built-ins text, visible, focused and the box (x or left, y or top, width,
+// height, right, bottom: viewport CSS pixels). The corpus wins: an app whose rows carry their
+// own `focused` (a data-focused hook) keeps its meaning.
 func field(n componentState, name string) (string, bool) {
 	if v, ok := n.Props[name]; ok {
 		return v, true
@@ -223,6 +265,23 @@ func field(n componentState, name string) (string, bool) {
 		return strconv.FormatBool(n.Visible), true
 	case "focused":
 		return strconv.FormatBool(n.Focused), true
+	}
+	if n.Box != nil {
+		b := n.Box
+		switch name {
+		case "x", "left":
+			return strconv.Itoa(b.X), true
+		case "y", "top":
+			return strconv.Itoa(b.Y), true
+		case "width":
+			return strconv.Itoa(b.Width), true
+		case "height":
+			return strconv.Itoa(b.Height), true
+		case "right":
+			return strconv.Itoa(b.X + b.Width), true
+		case "bottom":
+			return strconv.Itoa(b.Y + b.Height), true
+		}
 	}
 	return "", false
 }
@@ -279,9 +338,18 @@ func runExpect(args []string) error {
 	tabFlag := fs.String("tab", "", "Target tab ID (from 'browser start' output)")
 	sightmapDirFlag := fs.String("sightmap-dir", ".sightmap", "Path to .sightmap/ dir")
 	timeoutMs := fs.Int("timeout-ms", 5000, "How long to wait for the conditions (default 5 000)")
-	var propConds, textConds multiFlag
-	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value): every match's property (repeatable)")
+	forMs := fs.Int("for", 0, "The conditions hold at once and keep holding for this many ms (a state that must not change yet)")
+	notBeforeMs := fs.Int("not-before", 0, "The conditions must not hold until this many ms have passed, then hold by --timeout-ms (a delay)")
+	var propConds, textConds, noTextConds, queryConds multiFlag
+	fs.Var(&propConds, "prop", "NAME=VALUE (also NAME^=prefix, NAME*=substring, NAME!=value; NAME= absent, NAME!= present; numbers: NAME>=N, NAME<N, NAME=N~T): every match's property or box (left, top, width, height, right, bottom) (repeatable)")
 	fs.Var(&textConds, "text", "Substring of the component's text (repeatable)")
+	fs.Var(&noTextConds, "no-text", "A substring no match's text contains (repeatable)")
+	fs.Var(&queryConds, "query", "NAME=VALUE: the page URL's query parameter equals VALUE; NAME= means absent, NAME!=VALUE differs (repeatable)")
+	var seqConds, setConds, containsConds, orderConds multiFlag
+	fs.Var(&seqConds, "seq", "NAME=a,b,c: the matches' NAME values, in document order, are exactly this list (repeatable; \\, for a literal comma; NAME|OTHER takes each match's first)")
+	fs.Var(&setConds, "set", "NAME=a,b,c: the matches' NAME values are exactly these, in any order (repeatable)")
+	fs.Var(&containsConds, "contains", "NAME=a,b: each value is among the matches' NAME values (repeatable)")
+	fs.Var(&orderConds, "order", "NAME=a,b: these values occur among the matches in this order, others may come between (repeatable)")
 	countFlag := fs.String("count", "", "How many components match: N, >=N or <=N")
 	goneFlag := fs.Bool("gone", false, "No component matches")
 	focusedFlag := fs.Bool("focused", false, "The (single) match holds keyboard focus")
@@ -291,11 +359,13 @@ func runExpect(args []string) error {
 	if err != nil {
 		return err
 	}
-	usage := "usage: browser expect [QUERY] [--prop k=v]... [--text S]... [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--title T] [--timeout-ms N]\n" +
+	usage := "usage: browser expect [QUERY] [--prop k=v]... [--text S]... [--no-text S]... [--seq|--set|--contains|--order k=a,b]... [--count N|>=N|<=N] [--gone] [--focused] [--url PATH] [--query k=v]... [--title T] [--timeout-ms N]\n" +
 		"  waits until every condition holds, then prints the matches; on timeout prints what it saw and exits 1\n" +
 		"  with a QUERY and no other condition it waits for the component to be present\n" +
 		"  examples: expect 'IssueRow[identifier=WEB-120]' --prop group='status:done'\n" +
-		"            expect Toast --text 'Reverted.'   expect PropertyPicker --gone   expect --url /inbox --title 'Inbox (6) · Plumb'"
+		"            expect Toast --text 'Reverted.'   expect PropertyPicker --gone   expect --url /inbox --title 'Inbox (6) · Plumb'\n" +
+		"            expect InboxRow --seq identifier=WEB-144,WEB-130,WEB-160   expect IssueRow --order identifier=WEB-130,WEB-144\n" +
+		"            expect --url /my-issues/assigned --query peek=WEB-120   expect Toast --no-text Error"
 	if len(queries) > 1 {
 		return errors.New("expect: one query at a time\n" + usage)
 	}
@@ -309,9 +379,10 @@ func runExpect(args []string) error {
 	}
 
 	var conds []condition
-	componentConds := len(propConds) > 0 || len(textConds) > 0 || *countFlag != "" || *goneFlag || *focusedFlag
+	listConds := len(seqConds) + len(setConds) + len(containsConds) + len(orderConds)
+	componentConds := len(propConds) > 0 || len(textConds) > 0 || len(noTextConds) > 0 || listConds > 0 || *countFlag != "" || *goneFlag || *focusedFlag
 	if componentConds && q == nil {
-		return errors.New("expect: --prop, --text, --count, --gone and --focused need a QUERY\n" + usage)
+		return errors.New("expect: --prop, --text, --no-text, --seq, --set, --contains, --order, --count, --gone and --focused need a QUERY\n" + usage)
 	}
 	if q != nil && !componentConds {
 		conds = append(conds, condition{
@@ -336,6 +407,35 @@ func runExpect(args []string) error {
 			},
 			observed: func(st *pageState) string { return observedField(st, "text") },
 		})
+	}
+	for _, t := range noTextConds {
+		t := t
+		conds = append(conds, condition{
+			desc: fmt.Sprintf("%s text lacks %q", qs, t),
+			ok: func(st *pageState) bool {
+				return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool { return !strings.Contains(n.Text, t) })
+			},
+			observed: func(st *pageState) string { return observedField(st, "text") },
+		})
+	}
+	for _, spec := range queryConds {
+		c, err := queryCondition(spec)
+		if err != nil {
+			return err
+		}
+		conds = append(conds, c)
+	}
+	for _, l := range []struct {
+		kind  listKind
+		specs multiFlag
+	}{{listSeq, seqConds}, {listSet, setConds}, {listContains, containsConds}, {listOrder, orderConds}} {
+		for _, spec := range l.specs {
+			c, err := listCondition(qs, l.kind, spec)
+			if err != nil {
+				return err
+			}
+			conds = append(conds, c)
+		}
 	}
 	if *countFlag != "" {
 		c, err := countCondition(qs, *countFlag)
@@ -378,13 +478,29 @@ func runExpect(args []string) error {
 		return errors.New(usage)
 	}
 
+	if *forMs > 0 && *notBeforeMs > 0 {
+		return errors.New("expect: --for and --not-before don't combine; use two steps")
+	}
+	if *notBeforeMs > 0 && *notBeforeMs >= *timeoutMs {
+		return fmt.Errorf("expect: --not-before %d needs a --timeout-ms past it", *notBeforeMs)
+	}
+
 	conn, err := browser.Connect(resolveCDPAddr(*addrFlag, *sightmapDirFlag), *tabFlag)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	deadline := time.Now().Add(time.Duration(*timeoutMs) * time.Millisecond)
+	if *forMs > 0 {
+		read := func() (*pageState, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			return readState(ctx, conn, *sightmapDirFlag, q)
+		}
+		return expectThroughout(read, conds, time.Duration(*forMs)*time.Millisecond, 100*time.Millisecond)
+	}
+	start := time.Now()
+	deadline := start.Add(time.Duration(*timeoutMs) * time.Millisecond)
 	var last *pageState
 	var lastErr error
 	for {
@@ -393,6 +509,9 @@ func runExpect(args []string) error {
 		cancel()
 		if err == nil {
 			last, lastErr = st, nil
+			if allHold(conds, st) && *notBeforeMs > 0 && time.Since(start) < time.Duration(*notBeforeMs)*time.Millisecond {
+				return fmt.Errorf("expect: %s held after %dms, before %dms", describe(conds), time.Since(start).Milliseconds(), *notBeforeMs)
+			}
 			if allHold(conds, st) {
 				// The matches, when there are a few: a check that holds needs no list.
 				if len(st.Nodes) <= 3 {
@@ -427,6 +546,44 @@ func runExpect(args []string) error {
 		cancel()
 	}
 	return errors.New(b.String())
+}
+
+// expectThroughout checks that every condition holds now and on every sample
+// until d has passed: a state that must not change yet (still unread, the row
+// stays). It fails at the first sample that breaks, saying when.
+func expectThroughout(read func() (*pageState, error), conds []condition, d, every time.Duration) error {
+	start := time.Now()
+	samples := 0
+	var lastErr error
+	for {
+		st, err := read()
+		if err != nil {
+			// One failed read (the tab mid-navigation) is noise, as in the wait
+			// loop: keep sampling, and fail only if no read ever succeeded.
+			lastErr = err
+			if time.Since(start) >= d {
+				if samples == 0 {
+					return fmt.Errorf("expect: %v", lastErr)
+				}
+				fmt.Fprintf(os.Stderr, "ok: %s for %dms (%d samples)\n", describe(conds), d.Milliseconds(), samples)
+				return nil
+			}
+			time.Sleep(every)
+			continue
+		}
+		samples++
+		for _, c := range conds {
+			if !c.ok(st) {
+				return fmt.Errorf("expect: %s stopped holding after %dms of %dms\n  want %s; saw %s",
+					describe(conds), time.Since(start).Milliseconds(), d.Milliseconds(), c.desc, c.observed(st))
+			}
+		}
+		if time.Since(start) >= d {
+			fmt.Fprintf(os.Stderr, "ok: %s for %dms (%d samples)\n", describe(conds), d.Milliseconds(), samples)
+			return nil
+		}
+		time.Sleep(every)
+	}
 }
 
 func allHold(conds []condition, st *pageState) bool {
@@ -480,8 +637,13 @@ func observedField(st *pageState, name string) string {
 }
 
 // propCondition parses NAME=VALUE (or ^=, *=, !=) into a condition every match
-// must satisfy, using the component-query predicate semantics.
+// must satisfy, using the component-query predicate semantics. Numeric forms
+// compare the value as a number: NAME>=N, NAME<=N, NAME>N, NAME<N, and
+// NAME=N~T (within T of N), for the box built-ins or any numeric property.
 func propCondition(qs, spec string) (condition, error) {
+	if c, ok, err := numericCondition(qs, spec); ok || err != nil {
+		return c, err
+	}
 	// The operator is the first one in the spec: a value may itself contain
 	// "!=" or "^=" (`text=Count != 3` is an equality on "Count != 3").
 	op, i := "", -1
@@ -494,6 +656,9 @@ func propCondition(qs, spec string) (condition, error) {
 		return condition{}, fmt.Errorf("expect: --prop wants NAME=VALUE (or ^= *= !=), got %q", spec)
 	}
 	name, val := spec[:i], spec[i+len(op):]
+	if val == "" && (op == "=" || op == "!=") {
+		return presenceCondition(qs, name, op == "!="), nil
+	}
 	neg := op == "!="
 	pred := compquery.Predicate{Prop: name, Op: op, Val: val}
 	if neg {
@@ -512,6 +677,268 @@ func propCondition(qs, spec string) (condition, error) {
 		},
 		observed: func(st *pageState) string { return observedField(st, name) },
 	}, nil
+}
+
+// numericCondition recognises the numeric --prop forms; ok is false for any
+// other spec, so propCondition handles it.
+func numericCondition(qs, spec string) (c condition, ok bool, err error) {
+	var name, op, rhs string
+	// Like propCondition, the first operator in the spec decides: in
+	// `text=a > b` the "=" comes first, so it is a text equality, not a number.
+	eq := strings.Index(spec, "=")
+	for _, o := range []string{">=", "<=", ">", "<"} {
+		if i := strings.Index(spec, o); i > 0 && (eq < 0 || i <= eq) {
+			name, op, rhs = spec[:i], o, spec[i+len(o):]
+			break
+		}
+	}
+	var want, tol float64
+	if op == "" {
+		// NAME=N~T only when both sides are numbers: a text value may contain "~"
+		// (`title=Home ~ Work`, `path=~/config`) and stays a text equality.
+		i := strings.Index(spec, "=")
+		if i <= 0 || strings.ContainsAny(spec[:i], "!^*") {
+			return condition{}, false, nil
+		}
+		v, t, cut := strings.Cut(spec[i+1:], "~")
+		if !cut {
+			return condition{}, false, nil
+		}
+		var e1, e2 error
+		want, e1 = strconv.ParseFloat(strings.TrimSpace(v), 64)
+		tol, e2 = strconv.ParseFloat(strings.TrimSpace(t), 64)
+		if e1 != nil || e2 != nil {
+			return condition{}, false, nil
+		}
+		name, op = spec[:i], "~"
+	} else if want, err = strconv.ParseFloat(strings.TrimSpace(rhs), 64); err != nil {
+		return condition{}, true, fmt.Errorf("expect: --prop %q: want a number after %s", spec, op)
+	}
+	holds := func(v float64) bool {
+		switch op {
+		case ">=":
+			return v >= want
+		case "<=":
+			return v <= want
+		case ">":
+			return v > want
+		case "<":
+			return v < want
+		}
+		return math.Abs(v-want) <= tol
+	}
+	return condition{
+		desc: fmt.Sprintf("%s %s%s%s", qs, name, strings.Replace(op, "~", "=", 1), strings.Replace(rhs, "~", "±", 1)),
+		ok: func(st *pageState) bool {
+			return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool {
+				s, ok := field(n, name)
+				if !ok {
+					return false
+				}
+				v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+				return err == nil && holds(v)
+			})
+		},
+		observed: func(st *pageState) string { return observedField(st, name) },
+	}, true, nil
+}
+
+// queryCondition parses NAME=VALUE or NAME!=VALUE into a condition on the page
+// URL's query string. NAME= (an empty value) means the parameter is absent;
+// NAME!= means it is present.
+func queryCondition(spec string) (condition, error) {
+	// The first operator wins, as in --prop: `q=a!=b` is q equal to "a!=b".
+	eq, ne := strings.Index(spec, "="), strings.Index(spec, "!=")
+	if eq < 0 {
+		return condition{}, fmt.Errorf("expect: --query wants NAME=VALUE or NAME!=VALUE, got %q", spec)
+	}
+	neg := ne >= 0 && ne < eq
+	name, want := spec[:eq], spec[eq+1:]
+	if neg {
+		name, want = spec[:ne], spec[ne+2:]
+	}
+	if name == "" {
+		return condition{}, fmt.Errorf("expect: --query wants a parameter name, got %q", spec)
+	}
+	param := func(st *pageState) (string, bool) {
+		u, err := url.Parse(st.URL)
+		if err != nil {
+			return "", false
+		}
+		vs, has := u.Query()[name]
+		if !has || len(vs) == 0 {
+			return "", false
+		}
+		return vs[0], true
+	}
+	op := "="
+	if neg {
+		op = "!="
+	}
+	desc := fmt.Sprintf("url ?%s%s%s", name, op, want)
+	if want == "" {
+		desc = fmt.Sprintf("url without ?%s", name)
+		if neg {
+			desc = fmt.Sprintf("url with ?%s", name)
+		}
+	}
+	return condition{
+		desc: desc,
+		ok: func(st *pageState) bool {
+			v, has := param(st)
+			if want == "" {
+				return has == neg
+			}
+			return (has && v == want) != neg
+		},
+		observed: func(st *pageState) string {
+			if v, has := param(st); has {
+				return fmt.Sprintf("?%s=%s", name, v)
+			}
+			return fmt.Sprintf("no ?%s (url %s)", name, st.URL)
+		},
+	}, nil
+}
+
+// listKind is how a list condition compares the matches' values with its own.
+type listKind string
+
+const (
+	listSeq      listKind = "seq"      // exactly this list, in order
+	listSet      listKind = "set"      // exactly these values, any order
+	listContains listKind = "contains" // each value present
+	listOrder    listKind = "order"    // these values, in this relative order
+)
+
+// listCondition parses NAME=a,b,c into a condition on the sequence of NAME
+// values across the matches, in document order. A match without the property
+// contributes no value. Values split on commas; `\,` is a literal comma.
+func listCondition(qs string, kind listKind, spec string) (condition, error) {
+	i := strings.IndexByte(spec, '=')
+	if i <= 0 {
+		return condition{}, fmt.Errorf("expect: --%s wants NAME=a,b,c, got %q", kind, spec)
+	}
+	name, want := spec[:i], splitValues(spec[i+1:])
+	if len(want) == 0 && kind != listSeq && kind != listSet {
+		return condition{}, fmt.Errorf("expect: --%s %s= needs at least one value", kind, name)
+	}
+	return condition{
+		desc: fmt.Sprintf("%s %s --%s %s", qs, name, kind, strings.Join(want, ",")),
+		ok:   func(st *pageState) bool { return listHolds(kind, values(st, name), want) },
+		observed: func(st *pageState) string {
+			got := values(st, name)
+			if len(got) == 0 {
+				return fmt.Sprintf("no %s values (%d match(es))", name, len(st.Nodes))
+			}
+			s := name + " " + strings.Join(got, ",")
+			if kind == listContains || kind == listOrder {
+				if miss := missing(got, want); len(miss) > 0 {
+					s += "; missing " + strings.Join(miss, ",")
+				}
+			}
+			return s
+		},
+	}, nil
+}
+
+// values lists a field across the matches, in document order, skipping a match
+// that lacks it. NAME may list alternatives, `identifier|project`: each match
+// contributes the first it has, for a list that mixes kinds of rows.
+func values(st *pageState, name string) []string {
+	var out []string
+	for _, n := range st.Nodes {
+		for _, alt := range strings.Split(name, "|") {
+			if v, ok := field(n, alt); ok {
+				out = append(out, v)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func listHolds(kind listKind, got, want []string) bool {
+	switch kind {
+	case listSeq:
+		return slices.Equal(got, want)
+	case listSet:
+		a, b := slices.Clone(got), slices.Clone(want)
+		sort.Strings(a)
+		sort.Strings(b)
+		return slices.Equal(a, b)
+	case listContains:
+		return len(missing(got, want)) == 0
+	case listOrder:
+		j := 0
+		for _, v := range got {
+			if j < len(want) && v == want[j] {
+				j++
+			}
+		}
+		return j == len(want)
+	}
+	return false
+}
+
+// missing lists the wanted values got lacks, counting repeats: a value wanted
+// twice must be there twice.
+func missing(got, want []string) []string {
+	have := map[string]int{}
+	for _, v := range got {
+		have[v]++
+	}
+	var out []string
+	for _, v := range want {
+		if have[v] > 0 {
+			have[v]--
+		} else {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// splitValues splits a comma-separated list, where `\,` is a literal comma.
+// Values are kept as written (no trimming), since a property value can carry
+// spaces; an empty list is written as nothing after the `=`.
+func splitValues(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	var cur strings.Builder
+	for i := 0; i < len(s); i++ {
+		switch {
+		case s[i] == '\\' && i+1 < len(s) && s[i+1] == ',':
+			cur.WriteByte(',')
+			i++
+		case s[i] == ',':
+			out = append(out, cur.String())
+			cur.Reset()
+		default:
+			cur.WriteByte(s[i])
+		}
+	}
+	return append(out, cur.String())
+}
+
+// presenceCondition is --prop NAME= (no match has NAME: the part isn't shown)
+// or NAME!= (every match has a non-empty NAME), as --query reads an empty value.
+func presenceCondition(qs, name string, present bool) condition {
+	desc := fmt.Sprintf("%s without %s", qs, name)
+	if present {
+		desc = fmt.Sprintf("%s with %s", qs, name)
+	}
+	return condition{
+		desc: desc,
+		ok: func(st *pageState) bool {
+			return len(st.Nodes) > 0 && allNodes(st, func(n componentState) bool {
+				v, ok := field(n, name)
+				return (ok && v != "") == present
+			})
+		},
+		observed: func(st *pageState) string { return observedField(st, name) },
+	}
 }
 
 func countCondition(qs, spec string) (condition, error) {
