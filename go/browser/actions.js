@@ -134,11 +134,40 @@ function __smDropCheck(sel, x, y) {
 // reports whether its center is actually the top-most element there (so a
 // target hidden behind an overlay is reported as not-hit rather than clicked
 // through).
-function __smLocateForClick(sel) {
+//
+// A target already wholly visible (inside the viewport and every clipping
+// ancestor, __smFullyVisible) is not scrolled at all, even when something covers
+// it: scrolling can't uncover it, and the hit test below reports it as covered.
+// One that is scrolled is brought into view horizontally only as far as needed
+// ("nearest"), never centered:
+// centering scrolls every scrollable ancestor, including an overflow:hidden
+// one that is wider than its box only because a tooltip overflows it. That
+// moves the content under a still mouse, which closes the tooltip, which
+// snaps the scroll back, and the click lands where the target was a moment
+// before (on its neighbour).
+// force scrolls even a visible target: an element visible in its own frame can
+// sit in a frame that is itself off the top page's screen, and only a scroll
+// started from the element (which scrolls the enclosing documents too) brings
+// it into view. The caller asks for it after measuring the frame's position.
+function __smLocateForClick(sel, force) {
   const el = __smDeepQuery(document, sel);
   if (!el) return { found: false };
-  el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
-  const r = el.getBoundingClientRect();
+  const hits = (r) => {
+    const at = document.elementFromPoint(
+      Math.floor(r.left + r.width / 2),
+      Math.floor(r.top + r.height / 2),
+    );
+    return !!at && (at === el || el.contains(at) || at.contains(el));
+  };
+  let r = el.getBoundingClientRect();
+  if (force || !__smFullyVisible(el)) {
+    el.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: "instant",
+    });
+    r = el.getBoundingClientRect();
+  }
   const cx = Math.floor(r.left + r.width / 2),
     cy = Math.floor(r.top + r.height / 2);
   const inViewport =
@@ -148,11 +177,7 @@ function __smLocateForClick(sel) {
     cy >= 0 &&
     cx < window.innerWidth &&
     cy < window.innerHeight;
-  let hit = false;
-  if (inViewport) {
-    const at = document.elementFromPoint(cx, cy);
-    hit = !!at && (at === el || el.contains(at) || at.contains(el));
-  }
+  const hit = inViewport && hits(r);
   return { found: true, inViewport, hit, cx, cy };
 }
 

@@ -84,6 +84,15 @@ func NavigateAndWait(ctx context.Context, conn *CDPConn, url string) error {
 // know an action actually moved the page. Callers should compare the result
 // against the pre-action URL and only report a move when it actually changed.
 func AwaitNavigation(ctx context.Context, conn *CDPConn, maxWait time.Duration) (string, bool) {
+	return AwaitNavigationUntil(ctx, conn, maxWait, nil)
+}
+
+// AwaitNavigationUntil is AwaitNavigation that also gives up early when stop is
+// closed before any navigation has been seen: the caller knows by other means
+// that none is coming (the page has gone quiet, say), so it need not wait out
+// maxWait. Once a navigation has been seen, stop is ignored and the grace for
+// chained redirects runs as usual. A nil stop never fires.
+func AwaitNavigationUntil(ctx context.Context, conn *CDPConn, maxWait time.Duration, stop <-chan struct{}) (string, bool) {
 	if err := conn.EnableDomain(ctx, "Page"); err != nil {
 		return "", false
 	}
@@ -108,6 +117,26 @@ func AwaitNavigation(ctx context.Context, conn *CDPConn, maxWait time.Duration) 
 		case <-graceCh:
 			url, _ := GetURL(ctx, conn)
 			return url, true
+		case <-stop:
+			// select picks at random among ready cases, so a navigation that
+			// arrived as stop closed may still be queued: take it first.
+			drained := false
+			select {
+			case <-frameCh:
+				drained = true
+			case <-docCh:
+				drained = true
+			default:
+			}
+			navigated = navigated || drained
+			if !navigated {
+				return "", false
+			}
+			stop = nil // a navigation is under way; let its grace decide
+			if !drained {
+				continue
+			}
+			// A navigation just taken: fall through and (re)arm its grace.
 		case <-overall.C:
 			if navigated {
 				url, _ := GetURL(ctx, conn)
@@ -790,7 +819,18 @@ type clickTarget struct {
 // has settled; "hit" then also asks that nothing in an enclosing document is
 // drawn over the frame at that point.
 func locateForClick(ctx context.Context, conn *CDPConn, id string) (clickTarget, error) {
-	script := actionsJS + fmt.Sprintf("\n__smLocateForClick(%s)", idSelectorJSON(id))
+	t, err := locateForClickOnce(ctx, conn, id, false)
+	if err == nil && t.frame != nil && t.Found && !t.InViewport {
+		// Visible in its frame, so not scrolled, but the frame is off the top
+		// page's screen: scroll from the element, which moves the enclosing
+		// documents too.
+		return locateForClickOnce(ctx, conn, id, true)
+	}
+	return t, err
+}
+
+func locateForClickOnce(ctx context.Context, conn *CDPConn, id string, force bool) (clickTarget, error) {
+	script := actionsJS + fmt.Sprintf("\n__smLocateForClick(%s, %t)", idSelectorJSON(id), force)
 	raw, f, err := evalForID(ctx, conn, id, script)
 	if err != nil {
 		return clickTarget{}, err
