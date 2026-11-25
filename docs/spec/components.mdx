@@ -157,7 +157,7 @@ A component can declare `properties:` — named values pulled from its matched e
       selector: '[aria-label="Sold Out"]'
 ```
 
-Each property has a `name` (the annotation key) and an `extract` object: a `from` source and, where the source needs one, a `path`. A component reads its own node (`dom.text`, `dom.raw_text`, `dom.attr`, `dom.state`) or a descendant component (`component`, `component.exists`), so values resolve over the component tree, offline as well as live. `pattern` refines any value with a regex, and `join` collects every match of a component path. A value that comes back empty is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-extract-object.md).
+Each property has a `name` (the annotation key) and an `extract` object: a `from` source and, where the source needs one, a `path`. A component reads its own node (`dom.text`, `dom.raw_text`, `dom.attr`, `dom.has`, `dom.state`) or a descendant component (`component`, `component.exists`), so values resolve over the component tree, offline as well as live. `pattern` refines any value with a regex, and `join` collects every match of a component path. A value that comes back empty is dropped silently. See the [schema reference](/reference/schema#component-properties) and [SEP-0017](https://github.com/sightmap/sightmap/blob/main/spec/seps/0017-extract-object.md).
 
 ## Tags
 
@@ -203,7 +203,7 @@ Rules worth knowing before you add the field:
 
 - **Omission declares nothing.** A component with no `privacy` leaves the consumer's own default unchanged, so you can adopt the field one component at a time.
 - **The corpus is a floor.** A consumer may withhold more than the corpus asks, never less. `unmask` does not override a consumer's own policy.
-- **Properties are governed too**, at the node each value is read from. A property that reads a blocked or masked node is dropped, exactly as if it had not resolved. `component.exists` and `dom.state` may still resolve under `mask`, because they report structure and state rather than content. So may `dom.text` on an `input`, `textarea` or `select` whose accessible name comes only from its own `aria-label`, `title` or `placeholder` or from unmasked labels: that name labels the field and never holds what was typed. The field's value stays withheld. `sightmap validate` warns `extract-privacy-withheld` on a property its own component's `privacy` would withhold.
+- **Properties are governed too**, at the node each value is read from. A property that reads a blocked or masked node is dropped, exactly as if it had not resolved. `component.exists`, `dom.has` and `dom.state` may still resolve under `mask`, because they report structure and state rather than content. So may `dom.text` on an `input`, `textarea` or `select` whose accessible name comes only from its own `aria-label`, `title` or `placeholder` or from unmasked labels: that name labels the field and never holds what was typed. The field's value stays withheld. `sightmap validate` warns `extract-privacy-withheld` on a property its own component's `privacy` would withhold.
 - **`class`, `style`, and `id` survive `mask`**, because replay needs them to render. If one of them carries user data, use `block`.
 
 `privacy` takes no part in matching or identity. See the [schema reference](/reference/schema#privacy) and [SEP-0009](https://github.com/sightmap/sightmap/blob/main/spec/seps/0009-component-privacy.md).

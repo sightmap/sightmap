@@ -77,6 +77,19 @@ describe("extractProperties", () => {
     expect(extractProperties(document.getElementById("b"), props, [])).toEqual({ off: "false" });
   });
 
+  test("dom.has reads an empty boolean attribute as present", () => {
+    document.body.innerHTML = '<li id="r" data-selected="">row</li>';
+    const props = [
+      { name: "selected", extract: { from: "dom.has", path: "data-selected" } },
+      { name: "unread", extract: { from: "dom.has", path: "data-unread" } },
+      { name: "attr", extract: { from: "dom.attr", path: "data-selected" } },
+    ];
+    expect(extractProperties(document.getElementById("r"), props, [])).toEqual({
+      selected: "true",
+      unread: "false",
+    });
+  });
+
   test("the extract object resolves every source with pattern and join", () => {
     document.body.innerHTML =
       '<div id="card" data-sku="A1">Add to cart · $10.95' +

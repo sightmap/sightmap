@@ -123,6 +123,9 @@ func TestCheckComponentProperties_ObjectForm(t *testing.T) {
 		{name: "dom.raw_text with pattern", extract: Extract{From: FromDOMRawText, Pattern: `\$(\d+)`}},
 		{name: "dom.attr", extract: Extract{From: FromDOMAttr, Path: "href"}},
 		{name: "dom.state", extract: Extract{From: FromDOMState, Path: "checked"}},
+		{name: "dom.has", extract: Extract{From: FromDOMHas, Path: "data-selected"}},
+		{name: "dom.has without path", extract: Extract{From: FromDOMHas}, want: "component-property-extract-invalid"},
+		{name: "dom.has with pattern", extract: Extract{From: FromDOMHas, Path: "data-x", Pattern: "x"}, want: "component-property-extract-invalid"},
 		{name: "component", extract: Extract{From: FromComponent, Path: "Row.Price.amount"}},
 		{name: "component join", extract: Extract{From: FromComponent, Path: "Tag[].value", Join: ",", joinSet: true}},
 		{name: "component.exists", extract: Extract{From: FromComponentExists, Path: "Row.Badge"}},
@@ -154,6 +157,8 @@ func TestCheckComponentProperties_ObjectForm(t *testing.T) {
 		{name: "state attr under block", privacy: "block", extract: Extract{From: FromDOMAttr, Path: "checked"}, want: "extract-privacy-withheld"},
 		{name: "state under mask", privacy: "mask", extract: Extract{From: FromDOMState, Path: "checked"}},
 		{name: "state under block", privacy: "block", extract: Extract{From: FromDOMState, Path: "checked"}, want: "extract-privacy-withheld"},
+		{name: "has under mask", privacy: "mask", extract: Extract{From: FromDOMHas, Path: "data-x"}},
+		{name: "has under block", privacy: "block", extract: Extract{From: FromDOMHas, Path: "data-x"}, want: "extract-privacy-withheld"},
 		{name: "component under block", privacy: "block", extract: Extract{From: FromComponent, Path: "Row.x"}},
 		{name: "legacy string", extract: LowerComponentExtract("attr=href"), want: "extract-legacy-form"},
 	}

@@ -460,6 +460,9 @@ function resolveExtract(el, extract, components, ownerAddress) {
       return refine(e, normalizeText(rawTextOf(el)));
     case "dom.attr":
       return refine(e, el.getAttribute(e.path));
+    case "dom.has":
+      // Presence, as HTML reads a boolean attribute: an empty value is "true".
+      return e.path ? String(el.hasAttribute(e.path)) : null;
     case "dom.state":
       return refine(e, STATE_NAMES.includes(e.path) ? stateOf(el, e.path) : null);
     case "component.exists":

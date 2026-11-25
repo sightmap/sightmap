@@ -357,6 +357,58 @@ func TestResolveDOMStatePrefersState(t *testing.T) {
 	}
 }
 
+// dom.has reads presence the way HTML reads a boolean attribute: an empty
+// value is "true", an absent attribute "false". dom.attr omits both.
+func TestResolveDOMHas(t *testing.T) {
+	defs := []sightmap.ComponentDef{{
+		Name:      "Row",
+		Selectors: []string{"li"},
+		Properties: []sightmap.ComponentPropertyDef{
+			{Name: "selected", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "data-selected"}},
+			{Name: "unread", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "data-unread"}},
+			{Name: "selected_attr", Extract: sightmap.Extract{From: sightmap.FromDOMAttr, Path: "data-selected"}},
+		},
+	}}
+	row := &sightmap.ComponentNode{
+		Id:      "row",
+		Element: &sightmap.Element{Tag: "li", Attrs: map[string]string{"data-selected": ""}},
+	}
+	res := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs}).Match(row, "")
+	for name, want := range map[string]string{"selected": "true", "unread": "false"} {
+		if v, ok := propVal(res[row], name); !ok || v != want {
+			t.Errorf("%s = %q, %v; want %q", name, v, ok, want)
+		}
+	}
+	if v, ok := propVal(res[row], "selected_attr"); ok {
+		t.Errorf("selected_attr = %q; want omitted (dom.attr drops an empty value)", v)
+	}
+	// It sees what the browser's hasAttribute sees: id and class in their own
+	// fields, and an SVG attribute under its camelCase capture spelling.
+	defs2 := []sightmap.ComponentDef{{
+		Name:      "Icon",
+		Selectors: []string{"svg"},
+		Properties: []sightmap.ComponentPropertyDef{
+			{Name: "has_id", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "id"}},
+			{Name: "has_class", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "class"}},
+			{Name: "has_viewbox", Extract: sightmap.Extract{From: sightmap.FromDOMHas, Path: "viewbox"}},
+		},
+	}}
+	icon := &sightmap.ComponentNode{
+		Id:      "icon",
+		Element: &sightmap.Element{Tag: "svg", Id: "logo", Classes: []string{"icon"}, Attrs: map[string]string{"viewBox": "0 0 24 24"}},
+	}
+	res2 := match.NewMatcher(&sightmap.Corpus{GlobalComponents: defs2}).Match(icon, "")
+	for _, name := range []string{"has_id", "has_class", "has_viewbox"} {
+		if v, ok := propVal(res2[icon], name); !ok || v != "true" {
+			t.Errorf("%s = %q, %v; want \"true\"", name, v, ok)
+		}
+	}
+	if !match.Withholds("block", sightmap.Extract{From: sightmap.FromDOMHas, Path: "data-x"}) ||
+		match.Withholds("mask", sightmap.Extract{From: sightmap.FromDOMHas, Path: "data-x"}) {
+		t.Error("dom.has: want withheld under block only")
+	}
+}
+
 // An enabled control reports disabled="false" once the probe's native state is
 // carried, even though the AX tree omits disabled for it. This is what keeps
 // dom.state identical between the Go matcher and the browser extension.
